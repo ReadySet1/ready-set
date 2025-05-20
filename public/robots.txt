@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /client/deliveries/
+Disallow: /driver/deliveries/
+Disallow: /reset-password/
+Disallow: /studio/
+
+Sitemap: https://readysetllc.com/sitemap.xml

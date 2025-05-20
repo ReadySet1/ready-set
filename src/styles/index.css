@@ -1,0 +1,123 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Kabel';
+  src: url('/fonts/KabelC-Demi.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Kabel';
+  src: url('/fonts/KabelMedium.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+body {
+  font-family: var(--font-montserrat);
+}
+
+h1, h2 {
+  font-family: "Kabel", sans-serif;
+}
+
+/* Calendar disabled days styling */
+.rdp-day_disabled {
+  color: #f87171 !important; /* text-red-300 equivalent */
+  text-decoration: line-through !important;
+  background-color: #f3f4f6 !important; /* bg-gray-100 equivalent */
+  opacity: 0.7 !important;
+}
+
+/* Additional selector to increase specificity */
+button.rdp-button_disabled, 
+div.rdp-day.rdp-day_disabled, 
+.rdp-day[disabled], 
+[aria-disabled="true"].rdp-day {
+  color: #f87171 !important;
+  text-decoration: line-through !important;
+  background-color: #f3f4f6 !important;
+  opacity: 0.7 !important;
+}
+
+.sticky-menu .navbar-logo {
+  @apply py-2;
+}
+
+.sticky-menu #navbarToggler span {
+  @apply bg-dark dark:bg-white;
+}
+
+.sticky-menu #navbarCollapse li > a {
+  @apply text-dark hover:text-primary hover:opacity-100 dark:text-white;
+}
+#navbarCollapse li .ud-menu-scroll.active {
+  @apply opacity-70;
+}
+.sticky-menu #navbarCollapse li .ud-menu-scroll.active {
+  @apply opacity-100 dark:text-white;
+}
+.sticky-menu .loginBtn {
+  @apply text-dark hover:text-primary hover:opacity-100 dark:text-white;
+}
+
+.sticky-menu .signUpBtn {
+  @apply bg-primary hover:bg-dark text-white hover:text-white;
+}
+
+.navbarTogglerActive > span:nth-child(1) {
+  @apply top-[7px] rotate-45 transform;
+}
+.navbarTogglerActive > span:nth-child(2) {
+  @apply opacity-0;
+}
+.navbarTogglerActive > span:nth-child(3) {
+  @apply top-[-8px] rotate-[135deg];
+}
+
+.blog-details,
+.blog-details p {
+  @apply text-body-color dark:text-dark-6 text-base leading-relaxed;
+}
+
+.blog-details p {
+  @apply mb-8;
+}
+
+.blog-details strong {
+  @apply text-dark font-bold dark:text-white;
+}
+
+.blog-details ul {
+  @apply mb-8 list-inside list-disc space-y-3;
+}
+
+.blog-details ol {
+  @apply mb-8 list-inside list-decimal space-y-3;
+}
+
+.blog-details h1 {
+  @apply text-dark mb-8 text-3xl font-bold dark:text-white sm:text-4xl md:text-[40px] md:leading-[1.28];
+}
+
+.blog-details h2 {
+  @apply text-dark mb-8 text-2xl font-bold dark:text-white sm:text-3xl md:text-[35px] md:leading-[1.28];
+}
+
+.blog-details h3 {
+  @apply text-dark mb-6 text-2xl font-bold dark:text-white sm:text-[28px] sm:leading-[40px];
+}
+
+.theme-toggler span { /* Or whatever your button's class is */
+  color: white; /* Light mode color */
+}
+
+.theme-toggler span.dark\:block { /* Target the dark mode icon specifically */
+  color: black; /* Dark mode color */
+}

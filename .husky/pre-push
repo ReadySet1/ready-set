@@ -1,0 +1,6 @@
+pnpm run typecheck
+
+# Run Vercel build simulation (commented out for faster development - uncomment before deployment)
+# pnpm run vercel-sim
+
+echo "✅ Pre-push checks passed!"
