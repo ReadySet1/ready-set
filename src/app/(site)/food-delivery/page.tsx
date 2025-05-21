@@ -2,12 +2,12 @@
 import { Metadata } from "next";
 import { FormType } from "@/components/Logistics/QuoteRequest/types";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
-import CateringDelivery from "@/components/FoodDelivery/CateringDelivery";
 import DeliveryPartners from "@/components/FoodDelivery/DeliveryPartners";
 import FoodIcons from "@/components/FoodDelivery/FoodIcons";
 import DeliveryTerms from "@/components/FoodDelivery/DeliveryTerms";
 import HostingChecklist from "@/components/FoodDelivery/HostingChecklist";
 import MainMeal from "@/components/FoodDelivery/MainMeal";
+import FoodHeader from "@/components/FoodDelivery/FoodHeader";
 
 export const metadata: Metadata = {
   title: "Food Delivery Services for Events | Ready Set", // Replace with your title
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
 export default function FoodPage() {
   return (
     <div className="pt-20 md:pt-24">
-      <CateringDelivery />
+      <FoodHeader />
       <DeliveryPartners />
       <FoodIcons />
       <DeliveryTerms />

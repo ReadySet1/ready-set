@@ -6,13 +6,11 @@ import { motion } from "framer-motion";
 import ScheduleDialog from "../Logistics/Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 
-interface CateringDeliveryProps {
+interface FoodHeaderProps {
   onRequestQuote?: () => void;
 }
 
-const CateringDelivery: React.FC<CateringDeliveryProps> = ({
-  onRequestQuote,
-}) => {
+const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [marginTopClass, setMarginTopClass] = useState("mt-0");
   const { openForm, DialogForm } = FormManager();
@@ -206,4 +204,4 @@ const CateringDelivery: React.FC<CateringDeliveryProps> = ({
   );
 };
 
-export default CateringDelivery;
+export default FoodHeader;

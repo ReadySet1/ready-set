@@ -13,8 +13,8 @@ interface AppointmentDialogProps {
   dialogTitle?: string;
   dialogDescription?: string;
   calendarUrl: string;
-  className?: string;
   customButton?: React.ReactNode;
+  className?: string;
 }
 
 const ScheduleDialog: React.FC<AppointmentDialogProps> = ({
@@ -23,12 +23,18 @@ const ScheduleDialog: React.FC<AppointmentDialogProps> = ({
   dialogDescription = "Choose a convenient time for your appointment.",
   calendarUrl,
   customButton,
+  className,
 }) => {
   return (
     <Dialog>
       <DialogTrigger asChild>
         {customButton || (
-          <button className="rounded-lg border border-gray-200 bg-white px-6 py-3 font-medium text-gray-900 transition-colors hover:bg-gray-50">
+          <button
+            className={
+              className ||
+              "rounded-lg border border-gray-200 bg-white px-6 py-3 font-medium text-gray-900 transition-colors hover:bg-gray-50"
+            }
+          >
             {buttonText}
           </button>
         )}
