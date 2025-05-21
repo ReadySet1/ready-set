@@ -2,44 +2,82 @@ import { NextRequest } from 'next/server';
 import { CONSTANTS } from '../constants';
 
 /**
- * Initializes monitoring for server components in a Node.js environment
- * This function handles compatibility with the server environment
+ * Monitoring initialization utilities compatible with both Edge Runtime and Node.js
+ * Safely detects the runtime environment and initializes monitoring accordingly
  */
-export function initializeMonitoring() {
-  // Only initialize in server environment, not Edge
-  if (typeof window === 'undefined' && !process.env.NEXT_RUNTIME) {
-    // Dynamic import to avoid TypeScript errors
-    import('@highlight-run/next/server').then(({ registerHighlight }) => {
-      registerHighlight({
-        projectID: CONSTANTS.NEXT_PUBLIC_HIGHLIGHT_PROJECT_ID || '',
-        serviceName: 'ready-set-backend',
-        // Simple config to avoid TypeScript errors
-        networkRecording: {
-          enabled: true,
-        }
-      });
-    }).catch(error => {
-      console.error('Failed to initialize Highlight monitoring:', error);
-    });
+
+// Track initialization state to avoid duplicate setup
+let edgeMonitoringInitialized = false;
+let nodeMonitoringInitialized = false;
+
+/**
+ * Initialize monitoring for Edge Runtime
+ * Called from Edge API routes and middleware
+ */
+export function initializeEdgeMonitoring(): void {
+  // Prevent multiple initializations
+  if (edgeMonitoringInitialized) return;
+  
+  try {
+    // Only initialize if in a runtime that supports it
+    // Edge Runtime differs from Node.js in what global objects are available
+    if (typeof globalThis.Response !== 'undefined') {
+      // We're in an Edge-compatible environment
+      console.log('Initializing Edge Runtime monitoring');
+      
+      // Any edge-specific monitoring setup would go here
+      // This currently just logs initialization, but can be expanded
+      
+      edgeMonitoringInitialized = true;
+    } else {
+      console.warn('Attempted to initialize Edge monitoring in non-Edge environment');
+    }
+  } catch (error) {
+    console.error('Failed to initialize Edge monitoring:', error);
   }
 }
 
 /**
- * Initializes monitoring for Edge Runtime components
- * Uses a more compatible configuration for Edge
+ * Initialize monitoring for Node.js Runtime
+ * Called from Node.js API routes and server components
  */
-export function initializeEdgeMonitoring() {
-  // Use the Edge-compatible version
-  if (process.env.NEXT_RUNTIME === 'edge') {
-    import('@highlight-run/next/server').then(({ registerHighlight }) => {
-      registerHighlight({
-        projectID: CONSTANTS.NEXT_PUBLIC_HIGHLIGHT_PROJECT_ID || '',
-        serviceName: 'ready-set-edge',
-        // Minimal configuration for Edge runtime
-      });
-    }).catch(error => {
-      console.error('Failed to initialize Highlight in Edge runtime:', error);
-    });
+export function initializeNodeMonitoring(): void {
+  // Prevent multiple initializations
+  if (nodeMonitoringInitialized) return;
+  
+  try {
+    // Check for Node.js environment
+    if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+      // We're in a Node.js environment
+      console.log('Initializing Node.js monitoring');
+      
+      // Any Node.js-specific monitoring setup would go here
+      
+      nodeMonitoringInitialized = true;
+    } else {
+      console.warn('Attempted to initialize Node.js monitoring in non-Node environment');
+    }
+  } catch (error) {
+    console.error('Failed to initialize Node.js monitoring:', error);
+  }
+}
+
+/**
+ * Auto-detect environment and initialize appropriate monitoring
+ * Can be called from any environment
+ */
+export function initializeMonitoring(): void {
+  // Detect if we're in Edge or Node.js and initialize accordingly
+  try {
+    if (typeof globalThis.Response !== 'undefined') {
+      initializeEdgeMonitoring();
+    } else if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+      initializeNodeMonitoring();
+    } else {
+      console.warn('Unknown environment, monitoring initialization skipped');
+    }
+  } catch (error) {
+    console.error('Error initializing monitoring:', error);
   }
 }
 
