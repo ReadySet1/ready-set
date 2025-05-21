@@ -1,18 +1,14 @@
 // Navigation.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/utils/supabase/client";
-import { useUser } from "@/contexts/UserContext";
-import { UserType } from "@/types/user";
-import {
-  adminMenuItem,
-  superAdminMenuItem,
-  driverMenuItem,
-  helpdeskMenuItem,
-  vendorMenuItem,
-  clientMenuItem,
-} from "./menuData";
-import { MenuItem } from "@/types/menu";
+import { signOut } from "next-auth/react";
+import { Session } from "next-auth";
+
+interface MenuItem {
+  title: string;
+  path?: string;
+  submenu?: MenuItem[];
+}
 
 interface NavigationProps {
   navbarOpen: boolean;
@@ -20,17 +16,8 @@ interface NavigationProps {
   pathUrl: string;
   sticky: boolean;
   menuData: MenuItem[];
+  session: Session | null;
 }
-
-// Map menu items to UserType enum values
-const ROLE_MENU_ITEMS: Record<UserType, MenuItem> = {
-  [UserType.VENDOR]: vendorMenuItem,
-  [UserType.CLIENT]: clientMenuItem,
-  [UserType.DRIVER]: driverMenuItem,
-  [UserType.ADMIN]: adminMenuItem,
-  [UserType.HELPDESK]: helpdeskMenuItem,
-  [UserType.SUPER_ADMIN]: superAdminMenuItem,
-};
 
 const Navigation: React.FC<NavigationProps> = ({
   navbarOpen,
@@ -38,67 +25,14 @@ const Navigation: React.FC<NavigationProps> = ({
   pathUrl,
   sticky,
   menuData,
+  session,
 }) => {
   const [openIndex, setOpenIndex] = useState<number>(-1);
-  const { user, userRole, isLoading } = useUser();
-  const [supabase, setSupabase] = useState<any>(null);
-
-  // Debug logging
-  useEffect(() => {
-    console.log('Navigation Debug:', {
-      userExists: !!user,
-      userRole,
-      isLoading,
-      availableRoles: Object.values(UserType),
-      menuItems: ROLE_MENU_ITEMS,
-    });
-  }, [user, userRole, isLoading]);
-
-  // Initialize Supabase client
-  useEffect(() => {
-    const initSupabase = async () => {
-      const client = await createClient();
-      setSupabase(client);
-    };
-    
-    initSupabase();
-  }, []);
 
   const handleSubmenu = (index: number) => {
     setOpenIndex(openIndex === index ? -1 : index);
   };
 
-  const handleSignOut = async () => {
-    if (!supabase) return;
-    
-    await supabase.auth.signOut();
-    window.location.href = "/";
-    navbarToggleHandler();
-  };
-
-  // Get role-based menu item if user is authenticated and has a role
-  const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole] : null;
-
-  // Debug logging for role menu item
-  useEffect(() => {
-    if (userRole) {
-      console.log('Role Menu Item Debug:', {
-        userRoleOriginal: userRole,
-        roleMenuItemFound: !!roleMenuItem,
-        menuItem: roleMenuItem,
-        allMenuItems: ROLE_MENU_ITEMS,
-        availableRolesInMap: Object.keys(ROLE_MENU_ITEMS),
-        availableUserTypes: Object.values(UserType)
-      });
-    }
-  }, [userRole, roleMenuItem]);
-
-  // Combine regular menu items with role-based item if available
-  const combinedMenuItems = roleMenuItem ? [...menuData, roleMenuItem] : menuData;
-
-  // DEBUG: Development environment debugging display
-  const isDev = process.env.NODE_ENV === 'development';
-  
   return (
     <nav
       id="navbarCollapse"
@@ -108,18 +42,9 @@ const Navigation: React.FC<NavigationProps> = ({
           : "invisible top-[120%] opacity-0"
       }`}
     >
-      {isDev && userRole && (
-        <div className="p-2 mb-2 text-xs bg-gray-100 dark:bg-gray-800 rounded">
-          <p>User: {user ? 'Logged in' : 'Not logged in'}</p>
-          <p>Role: {userRole}</p>
-          <p>Loading: {isLoading ? 'Yes' : 'No'}</p>
-          <p>Items: {combinedMenuItems.length}</p>
-          <p>Role Menu: {roleMenuItem ? roleMenuItem.title : 'None'}</p>
-        </div>
-      )}
       <ul className="block lg:ml-8 lg:flex lg:gap-x-8 xl:ml-14 xl:gap-x-12">
-        {combinedMenuItems.map((menuItem, index) => (
-          <li key={`${menuItem.title}-${index}`} className="group relative">
+        {menuData.map((menuItem, index) => (
+          <li key={index} className="group relative">
             {menuItem.path ? (
               <Link
                 onClick={navbarToggleHandler}
@@ -148,25 +73,34 @@ const Navigation: React.FC<NavigationProps> = ({
             )}
           </li>
         ))}
-      </ul>
-      <div className="hidden lg:flex lg:ml-auto">
-        {!user && (
+        {!session?.user && (
           <>
             <AuthLink
-              href="/sign-in"
+              href="/signin"
               title="Sign In"
               navbarToggleHandler={navbarToggleHandler}
-              isDesktop={true}
             />
             <AuthLink
-              href="/sign-up"
+              href="/signup"
               title="Sign Up"
               navbarToggleHandler={navbarToggleHandler}
-              isDesktop={true}
             />
           </>
         )}
-      </div>
+        {session?.user && (
+          <li className="group relative lg:hidden">
+            <button
+              onClick={() => {
+                signOut({ callbackUrl: "/", redirect: true });
+                navbarToggleHandler();
+              }}
+              className="ud-menu-scroll flex py-2 text-base text-dark group-hover:text-primary dark:text-white dark:group-hover:text-primary lg:inline-flex lg:px-0 lg:py-6"
+            >
+              Sign Out
+            </button>
+          </li>
+        )}
+      </ul>
     </nav>
   );
 };
@@ -248,33 +182,23 @@ interface AuthLinkProps {
   href: string;
   title: string;
   navbarToggleHandler: () => void;
-  isDesktop?: boolean;
 }
 
 const AuthLink: React.FC<AuthLinkProps> = ({
   href,
   title,
   navbarToggleHandler,
-  isDesktop = false,
-}) => {
-  let linkClasses = "ud-menu-scroll flex py-2 text-base text-dark group-hover:text-primary dark:text-white dark:group-hover:text-primary";
-  
-  if (isDesktop) {
-    linkClasses = "px-7 py-3 text-base font-medium text-dark hover:text-primary dark:text-white dark:hover:text-primary";
-  }
-
-  return (
-    <div className={`${isDesktop ? '' : 'group relative lg:hidden'}`}>
-      <Link
-        onClick={navbarToggleHandler}
-        scroll={false}
-        href={href}
-        className={linkClasses}
-      >
-        {title}
-      </Link>
-    </div>
-  );
-};
+}) => (
+  <li className="group relative lg:hidden">
+    <Link
+      onClick={navbarToggleHandler}
+      scroll={false}
+      href={href}
+      className="ud-menu-scroll flex py-2 text-base text-dark group-hover:text-primary dark:text-white dark:group-hover:text-primary lg:inline-flex lg:px-0 lg:py-6"
+    >
+      {title}
+    </Link>
+  </li>
+);
 
 export default Navigation;
