@@ -19,28 +19,7 @@ export async function safeFetch<T = any>(url: string, options?: RequestInit): Pr
       throw new Error(`Fetch failed with status: ${response.status} ${response.statusText}`);
     }
     
-    // Use arrayBuffer if available (for binary data like PDFs)
-    if (typeof response.arrayBuffer === 'function') {
-      try {
-        const buffer = await response.arrayBuffer();
-        // Return the buffer directly if the caller expects binary data
-        // or attempt to parse it as text/JSON if appropriate
-        
-        // Try to detect if this is text/JSON content that should be parsed
-        const contentType = response.headers.get('content-type');
-        if (contentType?.includes('application/json')) {
-          const text = new TextDecoder().decode(buffer);
-          return JSON.parse(text) as T;
-        }
-        
-        return buffer as unknown as T;
-      } catch (bufferError) {
-        console.error('Error processing arrayBuffer:', bufferError);
-        // Fall back to other methods
-      }
-    }
-    
-    // Try JSON for API responses
+    // Try JSON for API responses first (most common case)
     if (response.headers.get('content-type')?.includes('application/json')) {
       try {
         return await response.json() as T;
@@ -50,20 +29,46 @@ export async function safeFetch<T = any>(url: string, options?: RequestInit): Pr
       }
     }
     
-    // Default fallback to text
-    const text = await response.text();
-    
-    // Attempt to parse as JSON if it looks like JSON
-    if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+    // Only try arrayBuffer if it's available and needed
+    // This helps avoid the "r.arrayBuffer is not a function" error
+    if (typeof response.arrayBuffer === 'function') {
       try {
-        return JSON.parse(text) as T;
-      } catch {
-        // Not valid JSON, return as text
-        return text as unknown as T;
+        const buffer = await response.arrayBuffer();
+        // Try to detect if this is text/JSON content that should be parsed
+        try {
+          const text = new TextDecoder().decode(buffer);
+          if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+            return JSON.parse(text) as T;
+          }
+          return text as unknown as T;
+        } catch {
+          // If text decoding fails, it's likely binary data
+          return buffer as unknown as T;
+        }
+      } catch (bufferError) {
+        console.warn('Error processing arrayBuffer, falling back to text:', bufferError);
+        // Fall back to text
       }
     }
     
-    return text as unknown as T;
+    // Default fallback to text
+    try {
+      const text = await response.text();
+      
+      // Attempt to parse as JSON if it looks like JSON
+      if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+        try {
+          return JSON.parse(text) as T;
+        } catch {
+          // Not valid JSON, return as text
+          return text as unknown as T;
+        }
+      }
+      
+      return text as unknown as T;
+    } catch (textError) {
+      throw new Error(`Failed to read response: ${textError}`);
+    }
   } catch (error) {
     console.error(`Error fetching from ${url}:`, error);
     throw error;
@@ -79,8 +84,15 @@ export async function fetchGuideContent<T>(slug: string): Promise<T | null> {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
     const url = new URL(`/api/guides/${slug}`, baseUrl).toString();
     
-    const data = await safeFetch<T>(url);
-    return data;
+    const response = await safeFetch<{data: T}>(url);
+    
+    // Handle the consistent API response format where data is nested
+    if (response && typeof response === 'object' && 'data' in response) {
+      return response.data;
+    }
+    
+    // If response doesn't match expected format, return it as is
+    return response as unknown as T;
   } catch (error) {
     console.error(`Error fetching guide with slug ${slug}:`, error);
     return null;
