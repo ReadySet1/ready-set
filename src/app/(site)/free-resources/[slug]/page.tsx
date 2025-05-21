@@ -1,12 +1,13 @@
 // src/app/(site)/free-resources/[slug]/page.tsx
 import { notFound } from "next/navigation";
-import { client, urlFor, customFetch } from "@/sanity/lib/client";
-import { getGuideBySlug } from "@/sanity/lib/queries";
+import { urlFor } from "@/sanity/lib/client";
 import BackArrow from "@/components/Common/Back";
 import React from "react";
 import Logo from "@/components/ui/logo";
 import type { Metadata } from "next";
 import { DownloadButtonWrapper } from "./DownloadButtonWrapper";
+import { fetchGuideData, Guide } from "./fetch-guides";
+
 export const revalidate = 30;
 
 // Define types for Portable Text blocks
@@ -25,69 +26,9 @@ interface PortableTextBlock {
   markDefs?: any[];
 }
 
-// Define a Guide type to match what's returned from the client
-interface Guide {
-  _id: string;
-  title: string;
-  subtitle?: string;
-  slug: { current: string };
-  introduction?: PortableTextBlock[];
-  coverImage?: any;
-  mainContent?: Array<{
-    title: string;
-    content: PortableTextBlock[];
-  }>;
-  listSections?: Array<{
-    title: string;
-    items: Array<{
-      title?: string;
-      content: string;
-    }>;
-  }>;
-  callToAction?: string;
-  calendarUrl?: string;
-  consultationCta?: string;
-  _updatedAt: string;
-  category?: string;
-  downloadableFiles?: Array<{
-    _key: string;
-    asset: {
-      _id: string;
-      url: string;
-      originalFilename: string;
-    };
-  }>;
-  seo?: {
-    metaTitle?: string;
-    metaDescription?: string;
-    openGraph?: {
-      title?: string;
-      description?: string;
-      image?: any;
-      siteName?: string;
-      url?: string;
-    };
-    twitter?: {
-      _type: string;
-      handle?: string;
-      site?: string;
-      cardType?: string;
-      creator?: string;
-    };
-  };
-}
-
+// Helper function using our new safe fetch utility
 async function getGuide(slug: string): Promise<Guide | null> {
-  if (!slug) return null;
-  
-  try {
-    // Use the typed helper function
-    const result = await getGuideBySlug(slug);
-    return result as unknown as Guide;
-  } catch (error) {
-    console.error(`Error fetching guide:`, error);
-    return null;
-  }
+  return await fetchGuideData(slug);
 }
 
 export async function generateMetadata({
