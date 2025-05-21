@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Package } from 'lucide-react';
-import Image from 'next/image';
-import Link from 'next/link';
-import ScheduleDialog from '@/components/Logistics/Schedule';
-import { FormType } from '@/components/Logistics/QuoteRequest/types';
+import { useState } from "react";
+import { Package } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import ScheduleDialog from "@/components/Logistics/Schedule";
+import { FormType } from "@/components/Logistics/QuoteRequest/types";
 
 interface PackageDeliveryProps {
   onRequestQuote?: (formType: FormType) => void;
@@ -14,7 +14,7 @@ interface PackageDeliveryProps {
 const DeliveryTermsAndPricing = ({ onRequestQuote }: PackageDeliveryProps) => {
   const handleQuoteClick = () => {
     if (onRequestQuote) {
-      onRequestQuote('flower');
+      onRequestQuote("flower");
     }
   };
 
@@ -31,7 +31,7 @@ const DeliveryTermsAndPricing = ({ onRequestQuote }: PackageDeliveryProps) => {
           // Use object-cover and make sure the image fills the container
           className="h-full min-h-[720px] w-screen object-cover md:min-h-0"
           // Add this to remove any constraints on the image
-          style={{ maxWidth: '100vw' }}
+          style={{ maxWidth: "100vw" }}
         />
 
         {/* Keep overlay centered */}
@@ -74,23 +74,24 @@ const DeliveryTermsAndPricing = ({ onRequestQuote }: PackageDeliveryProps) => {
                 Pricing is based on a minimum order of 10 packages per route.
               </li>
               <li className="mb-1">
-                If the order is less than 10 packages, an additional fee will apply based on the
-                originating pick-up zone.
+                If the order is less than 10 packages, an additional fee will
+                apply based on the originating pick-up zone.
               </li>
               <li className="mb-1">
-                Fees are based on delivery zone; packages may have multiple zones in a route.
+                Fees are based on delivery zone; packages may have multiple
+                zones in a route.
               </li>
               <li className="mb-1">
-                Toll will be charged regardless of the direction of the bridges crossed. Only 1 toll
-                charged per route.
+                Toll will be charged regardless of the direction of the bridges
+                crossed. Only 1 toll charged per route.
               </li>
               <li className="mb-1">
-                Default terms are to be paid on a net 7; this may vary based on volume and mutual
-                agreement.
+                Default terms are to be paid on a net 7; this may vary based on
+                volume and mutual agreement.
               </li>
               <li>
-                Late payments are the greater amount of 3.5% of the invoice or $25 per month after
-                30 days.
+                Late payments are the greater amount of 3.5% of the invoice or
+                $25 per month after 30 days.
               </li>
             </ul>
           </div>
@@ -100,6 +101,4 @@ const DeliveryTermsAndPricing = ({ onRequestQuote }: PackageDeliveryProps) => {
   );
 };
 
-export default DeliveryTermsAndPricing; 
-
-
+export default DeliveryTermsAndPricing;
