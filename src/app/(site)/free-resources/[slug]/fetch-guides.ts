@@ -84,9 +84,16 @@ export async function fetchGuideData(slug: string): Promise<Guide | null> {
       const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
       const url = new URL(`/api/guides/${slug}`, baseUrl).toString();
       
-      const guide = await safeFetch<Guide>(url);
-      if (guide && guide._id) {
-        return guide;
+      const response = await safeFetch<{data?: Guide}>(url);
+      
+      // Handle the nested data structure from the API response
+      if (response && typeof response === 'object' && 'data' in response && response.data) {
+        return response.data;
+      }
+      
+      // Handle older API format without nested data
+      if (response && typeof response === 'object' && '_id' in response) {
+        return response as unknown as Guide;
       }
     } catch (apiError) {
       console.warn(`API fetch failed for guide ${slug}, falling back to direct query:`, apiError);
