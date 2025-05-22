@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import Image from 'next/image';
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import Image from "next/image";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel";
-import Autoplay from 'embla-carousel-autoplay';
+import Autoplay from "embla-carousel-autoplay";
 
 // Custom icons for navigation
 const ArrowLeftIcon = () => (
@@ -46,28 +46,28 @@ type Partner = string;
 
 const ExpertSupportSection: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerHeight, setContainerHeight] = useState<string>('90vh');
+  const [containerHeight, setContainerHeight] = useState<string>("90vh");
   const [isMobile, setIsMobile] = useState<boolean>(false);
-  
+
   // Create a ref for the autoplay plugin
   const autoplayPlugin = useRef(
-    Autoplay({ 
-      delay: 3000, 
+    Autoplay({
+      delay: 3000,
       stopOnInteraction: false,
       stopOnMouseEnter: true,
-    })
+    }),
   );
-  
+
   const partners: Partner[] = useMemo(
     () => [
-      'FTD',
-      'Bloom Link',
-      'H Bloom',
-      'Dove / Teleflora',
-      'Lovingly',
-      'Floom',
-      'Bloom Nation',
-      'Flower Shop Network',
+      "FTD",
+      "Bloom Link",
+      "H Bloom",
+      "Dove / Teleflora",
+      "Lovingly",
+      "Floom",
+      "Bloom Nation",
+      "Flower Shop Network",
     ],
     [],
   );
@@ -77,16 +77,16 @@ const ExpertSupportSection: React.FC = () => {
     const updateHeight = () => {
       const viewportHeight = window.innerHeight;
       const navbarHeight = 80; // Approximate height of your navbar
-      
+
       // Set component height to be 90% of available height
       const availableHeight = viewportHeight - navbarHeight;
       setContainerHeight(`${availableHeight}px`);
     };
-    
+
     updateHeight();
-    window.addEventListener('resize', updateHeight);
-    
-    return () => window.removeEventListener('resize', updateHeight);
+    window.addEventListener("resize", updateHeight);
+
+    return () => window.removeEventListener("resize", updateHeight);
   }, []);
 
   // Check if we're on mobile
@@ -101,21 +101,21 @@ const ExpertSupportSection: React.FC = () => {
     checkIfMobile();
 
     // Add event listener for window resize
-    window.addEventListener('resize', checkIfMobile);
+    window.addEventListener("resize", checkIfMobile);
 
     // Clean up
-    return () => window.removeEventListener('resize', checkIfMobile);
+    return () => window.removeEventListener("resize", checkIfMobile);
   }, []);
 
   // Function to format partner name for mobile view (split into two lines if needed)
   const formatMobilePartnerName = (name: string): React.ReactNode => {
     // Check if the name is too long or contains a slash
-    if (name.length > 8 || name.includes('/')) {
+    if (name.length > 8 || name.includes("/")) {
       // For names with slashes, split at the slash
-      if (name.includes('/')) {
-        const parts = name.split('/');
-        const firstPart = parts[0]?.trim() || '';
-        const secondPart = parts[1]?.trim() || '';
+      if (name.includes("/")) {
+        const parts = name.split("/");
+        const firstPart = parts[0]?.trim() || "";
+        const secondPart = parts[1]?.trim() || "";
         if (firstPart && secondPart) {
           return (
             <>
@@ -128,12 +128,12 @@ const ExpertSupportSection: React.FC = () => {
       }
 
       // For long names without slashes, find a good split point
-      const words = name.split(' ');
+      const words = name.split(" ");
 
       if (words.length > 1) {
         // If there are multiple words, split between words
-        const firstHalf = words.slice(0, Math.ceil(words.length / 2)).join(' ');
-        const secondHalf = words.slice(Math.ceil(words.length / 2)).join(' ');
+        const firstHalf = words.slice(0, Math.ceil(words.length / 2)).join(" ");
+        const secondHalf = words.slice(Math.ceil(words.length / 2)).join(" ");
 
         return (
           <>
@@ -163,7 +163,7 @@ const ExpertSupportSection: React.FC = () => {
   const itemsPerView = isMobile ? 3 : 4;
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="relative flex w-full items-center justify-center overflow-hidden bg-gray-100"
       style={{ height: containerHeight }}
@@ -174,35 +174,26 @@ const ExpertSupportSection: React.FC = () => {
           src="/images/flowers/flower5.jpg"
           alt="Flower shop background"
           fill
-          style={{ objectFit: 'cover' }}
+          style={{ objectFit: "cover" }}
           className="opacity-100 saturate-150"
         />
       </div>
 
-      {/* Centered white box */}
+      {/* Only the image, no white container box */}
       <div className="relative z-10 flex h-full w-full flex-col items-center justify-center">
         <div className="flex flex-col items-center">
-          {/* Centered logo */}
+          {/* Just the image centered */}
           <div className="relative flex w-full justify-center">
-            <div className="absolute left-1/2 top-0 z-30 flex h-48 w-48 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[24px] border-black bg-yellow-400 shadow-lg">
+            <div className="z-30">
               <Image
-                src="/images/logo/new-logo-ready-set copy.png"
-                alt="Ready Set Logo"
-                width={140}
-                height={140}
-                className="rounded-full object-contain"
+                src="/images/flowers/expertsupport.png"
+                alt="Expert Support"
+                width={800}
+                height={500}
+                className="object-contain"
                 priority
               />
             </div>
-          </div>
-          <div className="relative z-20 mt-20 flex w-full flex-col items-center rounded-[3rem] bg-white px-12 py-12 shadow-xl md:w-[900px]">
-            <h2 className="mb-4 text-center text-4xl font-extrabold tracking-wide text-gray-900">
-              EXPERT SUPPORT
-            </h2>
-            <p className="max-w-4xl text-center text-lg font-medium leading-relaxed text-gray-700">
-              WE SPECIALIZE IN FLORAL LOGISTICS, ENSURING SMOOTH DELIVERIES AND STRONG PARTNERSHIPS
-              WITH LOCAL SHOPS FOR A SEAMLESS EXPERIENCE.
-            </p>
           </div>
         </div>
       </div>
@@ -214,15 +205,15 @@ const ExpertSupportSection: React.FC = () => {
             opts={{
               align: "start",
               loop: true,
-              dragFree: false
+              dragFree: false,
             }}
             plugins={[autoplayPlugin.current]}
             className="w-full px-4 md:px-8"
           >
             <CarouselContent className="!pl-0">
               {partners.map((partner, idx) => (
-                <CarouselItem 
-                  key={`${partner}-${idx}`} 
+                <CarouselItem
+                  key={`${partner}-${idx}`}
                   className={`${isMobile ? "basis-1/3" : "basis-1/4"} !pl-2 pr-2`}
                 >
                   <div className="isolate overflow-hidden rounded-2xl">

@@ -1,72 +1,50 @@
 import { MenuItem } from "@/types/menu";
 
-// Role-based menu items
-export const adminMenuItem: MenuItem = {
-  id: 30,
-  title: "Admin Dashboard",
-  path: "/app/(site)/(users)/admin",
-  newTab: false,
-};
-
-export const superAdminMenuItem: MenuItem = {
-  id: 31,
-  title: "Super Admin Dashboard",
-  path: "/app/(site)/(users)/admin",
-  newTab: false,
-};
-
-export const driverMenuItem: MenuItem = {
-  id: 32,
-  title: "Driver Dashboard",
-  path: "/app/(site)/(users)/driver",
-  newTab: false,
-};
-
-export const helpdeskMenuItem: MenuItem = {
-  id: 33,
-  title: "Helpdesk Portal",
-  path: "/admin",
-  newTab: false,
-};
-
-export const vendorMenuItem: MenuItem = {
-  id: 34,
-  title: "Vendor Portal",
-  path: "/app/(site)/(users)/vendor",
-  newTab: false,
-};
-
-export const clientMenuItem: MenuItem = {
-  id: 35,
-  title: "Client Dashboard",
-  path: "/app/(site)/(users)/client",
-  newTab: false,
-};
-
 export const cateringRequestMenuItem: MenuItem = {
-  id: 20,
+  id: 20, // Changed from 10 to avoid conflict
   title: "Orders",
   newTab: false,
   submenu: [
     {
-      id: 21,
+      id: 21, // Changed from 3 to maintain hierarchy
       title: "Catering Request",
       path: "/catering-request",
       newTab: false,
     },
     {
-      id: 22,
+      id: 22, // Changed from 9 to maintain hierarchy
       title: "On-demand",
       path: "/on-demand",
       newTab: false,
     },
     {
-      id: 23,
+      id: 23, // Changed from 10 to maintain hierarchy
       title: "Order status",
       path: "/order-status",
       newTab: false,
     },
   ],
+};
+
+export const adminMenuItem: MenuItem = {
+  id: 30, // Changed from 6 to avoid conflict
+  title: "Admin",
+  path: "/admin",
+  newTab: false,
+};
+
+export const vendorMenuItem: MenuItem = {
+  id: 31, // Changed from 7 to avoid conflict
+  title: "Vendor",
+  path: "/vendor",
+  newTab: false,
+};
+
+export const driverMenuItem: MenuItem = {
+  id: 32, // Changed from 9 to avoid conflict
+  title: "Driver",
+  path: "/driver",
+  newTab: false,
 };
 
 export const rsSubsidiariesMenuItem: MenuItem = {
@@ -75,21 +53,21 @@ export const rsSubsidiariesMenuItem: MenuItem = {
   newTab: false,
   submenu: [
     {
-      id: 15,
+      id: 15, // Changed from 12 to be sequential
       title: "Logistics",
       path: "/logistics",
       newTab: false,
     },
     {
-      id: 16,
+      id: 16, // Changed from 13 to be sequential
       title: "Virtual Assistant",
       path: "/va",
       newTab: false,
     },
     {
-      id: 17,
+      id: 17, // Changed from 14 to be sequential
       title: "Join Us",
-      path: "/apply",
+      path: "/join-the-team",
       newTab: false,
     },
   ],
@@ -108,7 +86,9 @@ const menuData: MenuItem[] = [
     path: "/about",
     newTab: false,
   },
+
   rsSubsidiariesMenuItem,
+
   {
     id: 4,
     title: "Flowers",
@@ -117,32 +97,38 @@ const menuData: MenuItem[] = [
   },
   {
     id: 5,
+    title: "Food",
+    path: "/food-delivery",
+    newTab: false,
+  },
+  {
+    id: 6,
     title: "Contact",
     path: "/contact",
     newTab: false,
   },
   {
-    id: 6,
+    id: 7,
     title: "Blog",
     path: "/blog",
     newTab: false,
   },
   {
-    id: 7,
+    id: 8,
     title: "Resources",
     path: "/free-resources",
     newTab: false,
   },
   {
-    id: 8,
+    id: 9,
     title: "Sign In",
-    path: "/sign-in",
+    path: "/signin",
     newTab: false,
   },
   {
-    id: 9,
+    id: 10,
     title: "Sign Up",
-    path: "/sign-up",
+    path: "/signup",
     newTab: false,
   },
 ];

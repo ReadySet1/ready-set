@@ -41,16 +41,21 @@ const baseMenuItems: MenuItem[] = [
   },
   {
     id: 105,
+    title: "Food",
+    path: "/food-delivery",
+  },
+  {
+    id: 106,
     title: "Contact",
     path: "/contact",
   },
   {
-    id: 106,
+    id: 107,
     title: "Blog",
     path: "/blog",
   },
   {
-    id: 107,
+    id: 108,
     title: "Resources",
     path: "/free-resources",
   },
@@ -96,32 +101,45 @@ interface LogoProps {
   isVirtualAssistantPage: boolean;
 }
 
-const Logo: React.FC<LogoProps> = ({ isHomePage, sticky, isVirtualAssistantPage }) => {
+const Logo: React.FC<LogoProps> = ({
+  isHomePage,
+  sticky,
+  isVirtualAssistantPage,
+}) => {
   if (isVirtualAssistantPage) {
     return (
-      <Link href="/" className={`navbar-logo block w-full ${sticky ? "py-3" : "py-6"}`}>
+      <Link
+        href="/"
+        className={`navbar-logo block w-full ${sticky ? "py-3" : "py-6"}`}
+      >
         {sticky ? (
           <picture>
-            <source srcSet="/images/virtual/logo-headset.webp" type="image/webp" />
-            <Image 
-              src="/images/virtual/logo-headset.png" 
-              alt="Virtual Assistant Logo" 
-              width={180} 
-              height={40} 
-              className="header-logo w-full" 
-              priority 
+            <source
+              srcSet="/images/virtual/logo-headset.webp"
+              type="image/webp"
+            />
+            <Image
+              src="/images/virtual/logo-headset.png"
+              alt="Virtual Assistant Logo"
+              width={180}
+              height={40}
+              className="header-logo w-full"
+              priority
             />
           </picture>
         ) : (
           <picture>
-            <source srcSet="/images/virtual/logo-headset-dark.webp" type="image/webp" />
-            <Image 
-              src="/images/virtual/logo-headset-dark.png" 
-              alt="Virtual Assistant Logo" 
-              width={180} 
-              height={40} 
-              className="header-logo w-full" 
-              priority 
+            <source
+              srcSet="/images/virtual/logo-headset-dark.webp"
+              type="image/webp"
+            />
+            <Image
+              src="/images/virtual/logo-headset-dark.png"
+              alt="Virtual Assistant Logo"
+              width={180}
+              height={40}
+              className="header-logo w-full"
+              priority
             />
           </picture>
         )}
@@ -131,43 +149,46 @@ const Logo: React.FC<LogoProps> = ({ isHomePage, sticky, isVirtualAssistantPage 
 
   const logoClasses = {
     light: sticky || !isHomePage ? "block dark:hidden" : "hidden dark:block",
-    dark: sticky || !isHomePage ? "hidden dark:block" : "block dark:hidden"
+    dark: sticky || !isHomePage ? "hidden dark:block" : "block dark:hidden",
   };
 
   return (
-    <Link href="/" className={`navbar-logo block w-full ${sticky ? "py-3" : "py-6"}`}>
+    <Link
+      href="/"
+      className={`navbar-logo block w-full ${sticky ? "py-3" : "py-6"}`}
+    >
       {!isHomePage || sticky ? (
         <>
-          <Image 
-            src="/images/logo/logo-white.png" 
-            alt="logo" 
-            width={280} 
-            height={40} 
-            className={`header-logo w-full ${logoClasses.light}`} 
+          <Image
+            src="/images/logo/logo-white.png"
+            alt="logo"
+            width={280}
+            height={40}
+            className={`header-logo w-full ${logoClasses.light}`}
           />
-          <Image 
-            src="/images/logo/logo-dark.png" 
-            alt="logo" 
-            width={280} 
-            height={40} 
-            className={`header-logo w-full ${logoClasses.dark}`} 
+          <Image
+            src="/images/logo/logo-dark.png"
+            alt="logo"
+            width={280}
+            height={40}
+            className={`header-logo w-full ${logoClasses.dark}`}
           />
         </>
       ) : (
         <>
-          <Image 
-            src="/images/logo/logo-white.png" 
-            alt="logo" 
-            width={180} 
-            height={40} 
-            className={`header-logo w-full ${logoClasses.light}`} 
+          <Image
+            src="/images/logo/logo-white.png"
+            alt="logo"
+            width={180}
+            height={40}
+            className={`header-logo w-full ${logoClasses.light}`}
           />
-          <Image 
-            src="/images/logo/logo-dark.png" 
-            alt="logo" 
-            width={180} 
-            height={40} 
-            className={`header-logo w-full ${logoClasses.dark}`} 
+          <Image
+            src="/images/logo/logo-dark.png"
+            alt="logo"
+            width={180}
+            height={40}
+            className={`header-logo w-full ${logoClasses.dark}`}
           />
         </>
       )}
@@ -183,11 +204,13 @@ const Header: React.FC = () => {
   const [sticky, setSticky] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState<number>(-1);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(null);
-  
+  const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(
+    null,
+  );
+
   // Use the UserContext for authentication state
   const { user, userRole, isLoading } = useUser();
-  
+
   const isVirtualAssistantPage = pathUrl === "/va";
   const isHomePage = pathUrl === "/";
 
@@ -204,7 +227,7 @@ const Header: React.FC = () => {
   const toggleNavbar = () => {
     setNavbarOpen(!navbarOpen);
   };
-  
+
   // Handle submenu clicks
   const handleSubmenu = (index: number) => {
     setActiveSubmenu(index === activeSubmenu ? -1 : index);
@@ -220,12 +243,12 @@ const Header: React.FC = () => {
   const handleStickyNavbar = () => {
     setSticky(window.scrollY >= 80);
   };
-  
+
   // Effect to close menu on route change
   useEffect(() => {
     closeNavbar();
   }, [pathUrl]);
-  
+
   useEffect(() => {
     window.addEventListener("scroll", handleStickyNavbar);
     return () => window.removeEventListener("scroll", handleStickyNavbar);
@@ -234,7 +257,7 @@ const Header: React.FC = () => {
   // Handle sign out
   const handleSignOut = async () => {
     if (!supabaseClient) return;
-    
+
     setIsSigningOut(true);
     try {
       await supabaseClient.auth.signOut();
@@ -249,7 +272,7 @@ const Header: React.FC = () => {
 
   // Get role-specific menu item
   const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole] : null;
-  
+
   // Use base menu items without adding role-specific item (it will be shown separately)
   const menuItems = baseMenuItems;
 
@@ -291,14 +314,13 @@ const Header: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <Link
                         href="/sign-in"
-                        className={`hidden rounded-lg px-7 py-3 text-base font-semibold transition-all duration-300 lg:block
-                          ${sticky 
+                        className={`hidden rounded-lg px-7 py-3 text-base font-semibold transition-all duration-300 lg:block ${
+                          sticky
                             ? "bg-white/90 text-dark shadow-md hover:bg-white dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
-                            : isVirtualAssistantPage 
+                            : isVirtualAssistantPage
                               ? "bg-white/90 text-dark shadow-md hover:bg-white"
                               : "bg-white/90 text-dark shadow-md hover:bg-white dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
-                          }
-                        `}
+                        } `}
                       >
                         Sign In
                       </Link>
@@ -313,12 +335,11 @@ const Header: React.FC = () => {
                     <>
                       <Link
                         href="/sign-in"
-                        className={`hidden rounded-lg px-7 py-3 text-base font-semibold transition-all duration-300 md:block 
-                          ${sticky 
+                        className={`hidden rounded-lg px-7 py-3 text-base font-semibold transition-all duration-300 md:block ${
+                          sticky
                             ? "bg-white/90 text-dark shadow-md hover:bg-white dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
                             : "bg-white/90 text-dark shadow-md hover:bg-white"
-                          }
-                        `}
+                        } `}
                       >
                         Sign In
                       </Link>
@@ -339,13 +360,15 @@ const Header: React.FC = () => {
                 <>
                   {roleMenuItem && roleMenuItem.path && (
                     <Link href={roleMenuItem.path}>
-                      <p className={`loginBtn hidden px-7 py-3 font-medium lg:block ${
-                        sticky
-                          ? "text-dark dark:text-white"
-                          : isVirtualAssistantPage || isHomePage
-                            ? "text-white"
-                            : "text-dark dark:text-white"
-                      }`}>
+                      <p
+                        className={`loginBtn hidden px-7 py-3 font-medium lg:block ${
+                          sticky
+                            ? "text-dark dark:text-white"
+                            : isVirtualAssistantPage || isHomePage
+                              ? "text-white"
+                              : "text-dark dark:text-white"
+                        }`}
+                      >
                         {roleMenuItem.title}
                       </p>
                     </Link>
