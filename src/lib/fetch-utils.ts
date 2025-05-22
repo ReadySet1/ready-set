@@ -8,6 +8,11 @@
  */
 export async function safeFetch<T = any>(url: string, options?: RequestInit): Promise<T> {
   try {
+    // For static generation, we want to completely avoid API routes when possible
+    if (process.env.NODE_ENV === 'production' && url.includes('/api/')) {
+      throw new Error(`API fetch avoided during static generation: ${url}`);
+    }
+    
     // Ensure we have an absolute URL (required for SSG/static build)
     const fetchUrl = url.startsWith('http') 
       ? url 
@@ -29,29 +34,8 @@ export async function safeFetch<T = any>(url: string, options?: RequestInit): Pr
       }
     }
     
-    // Only try arrayBuffer if it's available and needed
+    // Use text() instead of arrayBuffer for all cases during static generation
     // This helps avoid the "r.arrayBuffer is not a function" error
-    if (typeof response.arrayBuffer === 'function') {
-      try {
-        const buffer = await response.arrayBuffer();
-        // Try to detect if this is text/JSON content that should be parsed
-        try {
-          const text = new TextDecoder().decode(buffer);
-          if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
-            return JSON.parse(text) as T;
-          }
-          return text as unknown as T;
-        } catch {
-          // If text decoding fails, it's likely binary data
-          return buffer as unknown as T;
-        }
-      } catch (bufferError) {
-        console.warn('Error processing arrayBuffer, falling back to text:', bufferError);
-        // Fall back to text
-      }
-    }
-    
-    // Default fallback to text
     try {
       const text = await response.text();
       

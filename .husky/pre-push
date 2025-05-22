@@ -1,17 +1,10 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 # Run TypeScript check but don't block build on errors
-echo "🔍 Running TypeScript type check (informational only)..."
-pnpm run typecheck || echo "⚠️ TypeScript check found errors, but continuing with build"
+echo "🔍 Running TypeScript type check..."
+pnpm run typecheck
 
-# Build with typecheck disabled due to known Next.js Edge Route typing issues
-echo "🔨 Running build with --no-typecheck..."
-pnpm run build:no-typecheck
-
-# Reminder about the TypeScript issue
-echo "📝 Note: Using --no-typecheck due to known Next.js Edge Runtime typing issues"
-echo "   These will be fixed in a future update when Next.js resolves the Edge Runtime parameter typing"
+# Run build with full TypeScript checking
+echo "🔨 Running build with full TypeScript checking..."
+pnpm run build
 
 # Run Vercel build simulation (commented out for faster development - uncomment before deployment)
 # pnpm run vercel-sim

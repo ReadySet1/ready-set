@@ -9,9 +9,10 @@ export const runtime = 'edge';
 initializeEdgeMonitoring();
 
 // Define types compatible with Next.js 15 Edge Runtime
+// Changed from interface to type for better Edge Runtime compatibility
 type RouteParams = {
   slug: string;
-};
+}
 
 /**
  * Edge API route to fetch a guide by slug

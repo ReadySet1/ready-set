@@ -34,9 +34,9 @@ async function getGuide(slug: string): Promise<Guide | null> {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: { slug: string };
 }): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug } = params;
   const guide = await getGuide(slug);
 
   if (!guide) {
@@ -84,9 +84,9 @@ const renderPortableText = (
 export default async function GuidePage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: { slug: string };
 }) {
-  const { slug } = await params;
+  const { slug } = params;
   const guide = await getGuide(slug);
 
   if (!guide) notFound();
@@ -287,7 +287,14 @@ export default async function GuidePage({
 
 export async function generateStaticParams() {
   try {
+    // Import directly from Sanity queries to avoid API fetch during build
     const { getGuides } = await import("@/sanity/lib/queries");
+    
+    // Set environment variable to skip API routes during static generation
+    if (typeof process !== 'undefined') {
+      process.env.NEXT_PUBLIC_SKIP_API_ROUTES_IN_SSG = 'true';
+    }
+    
     const guides = await getGuides();
     
     // Make sure we return objects with slug as string
