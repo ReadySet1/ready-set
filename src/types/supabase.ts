@@ -12,33 +12,36 @@ export interface Database {
       profiles: {
         Row: {
           id: string
-          updated_at?: string
-          username?: string
-          full_name?: string
-          avatar_url?: string
-          email?: string
-          type?: string
-          created_at?: string
+          email: string | null
+          full_name: string | null
+          type: 'ADMIN' | 'SUPER_ADMIN' | 'DRIVER' | 'HELPDESK' | 'VENDOR' | 'CLIENT' | null
+          status: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | null
+          username: string | null
+          avatar_url: string | null
+          created_at: string | null
+          updated_at: string | null
         }
         Insert: {
           id: string
-          updated_at?: string
-          username?: string
-          full_name?: string
-          avatar_url?: string
-          email?: string
-          type?: string
-          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          type?: 'ADMIN' | 'SUPER_ADMIN' | 'DRIVER' | 'HELPDESK' | 'VENDOR' | 'CLIENT' | null
+          status?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | null
+          username?: string | null
+          avatar_url?: string | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Update: {
           id?: string
-          updated_at?: string
-          username?: string
-          full_name?: string
-          avatar_url?: string
-          email?: string
-          type?: string
-          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          type?: 'ADMIN' | 'SUPER_ADMIN' | 'DRIVER' | 'HELPDESK' | 'VENDOR' | 'CLIENT' | null
+          status?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | null
+          username?: string | null
+          avatar_url?: string | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {

@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { createClient as createSupabaseServerClient } from '@/utils/supabase/server';
+import { createClient } from '@/utils/supabase/server';
+import { Database } from '@/types/supabase';
+
+type Profile = Database['public']['Tables']['profiles']['Row'];
+type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
+type UserType = NonNullable<Profile['type']>;
 
 // Define default home routes for each user type
-const USER_HOME_ROUTES: Record<string, string> = {
+const USER_HOME_ROUTES: Record<Lowercase<UserType>, string> = {
   admin: "/admin",
   super_admin: "/admin",
   driver: "/driver",
@@ -19,131 +24,144 @@ export async function GET(request: Request) {
   const errorCode = requestUrl.searchParams.get('error_code');
   const errorDescription = requestUrl.searchParams.get('error_description');
   const next = requestUrl.searchParams.get('next') || '/';
-  
-  // First check if there's an error in the URL (happens when Supabase redirects with an error)
-  if (error) {
-    console.error('Auth error from Supabase redirect:', {
-      error,
-      errorCode,
-      errorDescription
-    });
-    
-    // Redirect to auth error page with error details
-    const errorUrl = new URL('/auth/auth-code-error', requestUrl.origin);
-    errorUrl.searchParams.set('error', errorDescription || error);
-    errorUrl.searchParams.set('errorCode', errorCode || 'unknown');
-    return NextResponse.redirect(errorUrl);
-  }
+  const userType = requestUrl.searchParams.get('userType')?.toUpperCase() as UserType;
+  const mode = requestUrl.searchParams.get('mode') || 'signup';
   
   // Add detailed logging for debugging
   console.log('Auth callback received:', { 
     url: requestUrl.toString(),
-    code: code ? `${code.substring(0, 5)}...` : 'none', // Log partial code for security
-    next
+    code: code ? `${code.substring(0, 5)}...` : 'none',
+    next,
+    userType,
+    mode,
+    error: error || 'none',
+    errorCode: errorCode || 'none'
   });
-  
-  if (code) {
-    try {
-      const cookieStore = cookies();
-      console.log('Creating Supabase client...');
-      const supabase = await createSupabaseServerClient();
-      
-      // Exchange the auth code for a session
-      console.log('Exchanging code for session...');
-      const { data: { session }, error } = await supabase.auth.exchangeCodeForSession(code);
-      
-      if (error) {
-        console.error('Auth code exchange error:', error);
-        console.error('Error details:', {
-          message: error.message,
-          status: error.status,
-          name: error.name,
-          code: error.code
-        });
-        // Redirect to auth error page with error details
-        const errorUrl = new URL('/auth/auth-code-error', requestUrl.origin);
-        errorUrl.searchParams.set('error', error.message);
-        errorUrl.searchParams.set('errorCode', error.code || 'unknown');
-        return NextResponse.redirect(errorUrl);
-      }
-      
-      // Log the successful authentication
-      console.log('Authentication successful:', session ? 'Session created' : 'No session created');
-      
-      // If we have a session, determine the correct dashboard based on user role
-      if (session) {
-        try {
-          console.log('Getting user profile for ID:', session.user.id);
-          // Get user's role from profiles table
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('type')
-            .eq('id', session.user.id)
-            .single();
 
-          if (profileError) {
-            console.error('Error fetching user role:', profileError);
-            console.error('Profile error details:', {
-              message: profileError.message,
-              code: profileError.code,
-              details: profileError.details,
-              hint: profileError.hint
-            });
-            
-            // Check if it's a "not found" error which might indicate we need to create a profile
-            if (profileError.code === 'PGRST116') {
-              console.log('Profile not found, may need to create one');
-              
-              // You could add logic here to create a profile or redirect to a profile creation page
-              return NextResponse.redirect(new URL('/complete-profile', requestUrl.origin));
-            }
-            
-            return NextResponse.redirect(new URL(next, requestUrl.origin));
-          }
+  // Helper function to create error redirect URL
+  const createErrorRedirectUrl = (error: string, code: string = 'unknown') => {
+    const errorUrl = new URL('/auth/auth-code-error', requestUrl.origin);
+    errorUrl.searchParams.set('error', error);
+    errorUrl.searchParams.set('errorCode', code);
+    return errorUrl;
+  };
 
-          if (!profile?.type) {
-            console.log('Profile found but no type specified, redirecting to default');
-            return NextResponse.redirect(new URL(next, requestUrl.origin));
-          }
+  try {
+    const supabase = await createClient();
 
-          // Normalize the user type to lowercase for consistent handling
-          const userTypeKey = profile.type.toLowerCase();
-          console.log('User role for redirection:', userTypeKey);
-          
-          // Get the appropriate home route for this user type, fallback to next param
-          const homeRoute = USER_HOME_ROUTES[userTypeKey] || next;
-          console.log('Redirecting to user dashboard:', homeRoute);
-          
-          // Redirect to the appropriate dashboard
-          return NextResponse.redirect(new URL(homeRoute, requestUrl.origin));
-        } catch (profileError) {
-          console.error('Error in profile lookup:', profileError);
-          console.error('Stack trace:', profileError instanceof Error ? profileError.stack : 'No stack trace');
-          // Fall back to the provided 'next' parameter
-          return NextResponse.redirect(new URL(next, requestUrl.origin));
-        }
-      }
-      
-      // Successful auth but no session - redirect to home or requested page
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
-    } catch (error) {
-      console.error('Auth callback error:', error);
-      console.error('Full error object:', JSON.stringify(error, null, 2));
-      console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
-      
-      // Redirect to auth error page
-      const errorUrl = new URL('/auth/auth-code-error', requestUrl.origin);
-      if (error instanceof Error) {
-        errorUrl.searchParams.set('error', error.message);
-        errorUrl.searchParams.set('errorType', error.name);
-      } else {
-        errorUrl.searchParams.set('error', 'Unknown error occurred during authentication');
-      }
-      return NextResponse.redirect(errorUrl);
+    if (error || errorCode) {
+      console.error('Auth error from provider:', {
+        error,
+        errorCode,
+        errorDescription
+      });
+      return NextResponse.redirect(createErrorRedirectUrl(
+        errorDescription || error || 'Unknown authentication error',
+        errorCode || 'oauth_error'
+      ));
     }
+
+    if (!code) {
+      console.error('No authorization code received');
+      return NextResponse.redirect(createErrorRedirectUrl(
+        'No authorization code received',
+        'no_code'
+      ));
+    }
+
+    // Exchange the code for a session using PKCE flow
+    const { data: { session }, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (exchangeError) {
+      console.error('Session exchange error:', exchangeError);
+      return NextResponse.redirect(createErrorRedirectUrl(
+        exchangeError.message,
+        'session_exchange_failed'
+      ));
+    }
+
+    if (!session?.user) {
+      console.error('No user session created');
+      return NextResponse.redirect(createErrorRedirectUrl(
+        'Failed to create user session',
+        'no_session'
+      ));
+    }
+
+    // Get or create user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select()
+      .eq('id', session.user.id)
+      .single();
+
+    if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = not found
+      console.error('Error fetching profile:', profileError);
+      return NextResponse.redirect(createErrorRedirectUrl(
+        'Failed to fetch user profile',
+        'profile_fetch_failed'
+      ));
+    }
+
+    // Create profile if it doesn't exist
+    if (!profile) {
+      const newProfile: ProfileInsert = {
+        id: session.user.id,
+        email: session.user.email,
+        full_name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || null,
+        type: userType || 'CLIENT',
+        status: 'PENDING'
+      };
+
+      const { error: createProfileError } = await supabase
+        .from('profiles')
+        .insert(newProfile);
+
+      if (createProfileError) {
+        console.error('Error creating profile:', createProfileError);
+        return NextResponse.redirect(createErrorRedirectUrl(
+          'Failed to create user profile',
+          'profile_creation_failed'
+        ));
+      }
+
+      // Redirect new users to complete their profile
+      const completeProfileUrl = new URL('/complete-profile', requestUrl.origin);
+      completeProfileUrl.searchParams.set('mode', mode);
+      return NextResponse.redirect(completeProfileUrl);
+    }
+
+    // Handle existing profiles
+    if (profile.status === 'PENDING') {
+      const completeProfileUrl = new URL('/complete-profile', requestUrl.origin);
+      completeProfileUrl.searchParams.set('mode', mode);
+      return NextResponse.redirect(completeProfileUrl);
+    }
+
+    if (profile.status === 'SUSPENDED') {
+      return NextResponse.redirect(createErrorRedirectUrl(
+        'Your account has been suspended. Please contact support.',
+        'account_suspended'
+      ));
+    }
+
+    // Determine the home route based on user type
+    const userHomeRoute = profile.type ? 
+      USER_HOME_ROUTES[profile.type.toLowerCase() as Lowercase<UserType>] : 
+      '/';
+    
+    const redirectUrl = new URL(userHomeRoute || next, requestUrl.origin);
+
+    // Add success parameter for UI feedback
+    redirectUrl.searchParams.set('auth_success', 'true');
+
+    return NextResponse.redirect(redirectUrl);
+
+  } catch (error) {
+    console.error('Unhandled error in auth callback:', error);
+    return NextResponse.redirect(createErrorRedirectUrl(
+      error instanceof Error ? error.message : 'An unexpected error occurred',
+      'unhandled_error'
+    ));
   }
-  
-  // If no code is present, redirect to error page
-  console.error('Auth callback received with no code parameter');
-  return NextResponse.redirect(new URL('/auth/auth-code-error?error=no_code', requestUrl.origin));
 }
