@@ -1,13 +1,8 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
-import { Database } from '@/types/supabase';
-import { UserStatus } from '@/types/supabase';
 
-type UserProfileType = 'vendor' | 'client' | 'admin' | 'super_admin' | 'driver' | 'helpdesk';
-
-// Define default home routes for each user type
-const USER_HOME_ROUTES: Record<UserProfileType, string> = {
+// Define user types and their corresponding routes
+const USER_HOME_ROUTES = {
   admin: "/admin/dashboard",
   super_admin: "/admin/dashboard",
   driver: "/driver/dashboard",
@@ -18,14 +13,13 @@ const USER_HOME_ROUTES: Record<UserProfileType, string> = {
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
-
+  const supabase = createClient();
+  
   try {
     // Get URL parameters
     const code = requestUrl.searchParams.get('code');
     const next = requestUrl.searchParams.get('next') || '/';
-    const userType = requestUrl.searchParams.get('userType') as UserProfileType | null;
+    const userType = requestUrl.searchParams.get('userType');
     const mode = requestUrl.searchParams.get('mode') || 'signup';
     const error = requestUrl.searchParams.get('error') || 'none';
     const errorCode = requestUrl.searchParams.get('error_code') || 'none';
@@ -47,17 +41,7 @@ export async function GET(request: Request) {
       );
     }
 
-    // Get code verifier from cookie
-    const codeVerifier = cookieStore.get('code_verifier')?.value;
-
-    if (!codeVerifier) {
-      console.error('No code verifier found in cookies');
-      return NextResponse.redirect(
-        `${requestUrl.origin}/auth/error?error=missing_code_verifier`
-      );
-    }
-
-    // Exchange code for session
+    // Exchange code for session (PKCE flow handled by Supabase)
     const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (sessionError) {
@@ -93,7 +77,7 @@ export async function GET(request: Request) {
           full_name: session.user.user_metadata.full_name,
           avatar_url: session.user.user_metadata.avatar_url,
           user_type: userType || 'client',
-          status: UserStatus.PENDING
+          status: 'pending'
         });
 
       if (profileError) {
@@ -109,19 +93,14 @@ export async function GET(request: Request) {
 
     // Determine home route based on user type and status
     let homeRoute = '/';
-    if (existingProfile.status === UserStatus.PENDING) {
+    if (existingProfile.status === 'pending') {
       homeRoute = '/onboarding';
-    } else if (existingProfile.user_type) {
-      homeRoute = USER_HOME_ROUTES[existingProfile.user_type as UserProfileType] || '/';
+    } else if (existingProfile.user_type && existingProfile.user_type in USER_HOME_ROUTES) {
+      homeRoute = USER_HOME_ROUTES[existingProfile.user_type as keyof typeof USER_HOME_ROUTES];
     }
 
     // Create the response with redirect
-    const response = NextResponse.redirect(`${requestUrl.origin}${homeRoute}`);
-
-    // Clean up the code verifier cookie
-    response.cookies.delete('code_verifier');
-
-    return response;
+    return NextResponse.redirect(`${requestUrl.origin}${homeRoute}`);
 
   } catch (error) {
     console.error('Callback route error:', error);

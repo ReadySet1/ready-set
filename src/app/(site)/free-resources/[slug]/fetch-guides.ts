@@ -79,10 +79,29 @@ export async function fetchGuideData(slug: string): Promise<Guide | null> {
   if (!slug) return null;
   
   try {
-    // Always use direct Sanity query during static site generation
-    // This completely avoids the arrayBuffer issue
-    const guide = await getGuideBySlug(slug);
-    return guide as unknown as Guide;
+    // Check if we're in static generation
+    const isStaticGeneration = process.env.NEXT_PUBLIC_SKIP_API_ROUTES_IN_SSG === 'true';
+    
+    if (isStaticGeneration) {
+      // Use direct Sanity query during static site generation
+      const guide = await getGuideBySlug(slug);
+      return guide;
+    } else {
+      // For client-side or dynamic rendering, use the API route
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const url = new URL(`/api/guides/${slug}`, baseUrl).toString();
+      
+      const response = await fetch(url, {
+        next: { revalidate: 30 }, // Match the revalidation time from page.tsx
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch guide: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data.data;
+    }
   } catch (error) {
     console.error(`Error fetching guide with slug ${slug}:`, error);
     return null;

@@ -7,6 +7,7 @@ import Logo from "@/components/ui/logo";
 import type { Metadata } from "next";
 import { DownloadButtonWrapper } from "./DownloadButtonWrapper";
 import { fetchGuideData, Guide } from "./fetch-guides";
+import { getGuides } from "@/sanity/lib/queries";
 
 export const revalidate = 30;
 
@@ -287,19 +288,22 @@ export default async function GuidePage({
 
 export async function generateStaticParams() {
   try {
-    // Import directly from Sanity queries to avoid API fetch during build
-    const { getGuides } = await import("@/sanity/lib/queries");
-    
     // Set environment variable to skip API routes during static generation
     if (typeof process !== 'undefined') {
       process.env.NEXT_PUBLIC_SKIP_API_ROUTES_IN_SSG = 'true';
     }
     
+    // Import and use the direct Sanity query
     const guides = await getGuides();
     
+    // Reset the environment variable
+    if (typeof process !== 'undefined') {
+      process.env.NEXT_PUBLIC_SKIP_API_ROUTES_IN_SSG = 'false';
+    }
+    
     // Make sure we return objects with slug as string
-    return guides.map((guide) => ({
-      slug: guide.slug.current,
+    return guides.map((guide: Guide) => ({
+      slug: typeof guide.slug === 'string' ? guide.slug : guide.slug.current,
     }));
   } catch (error) {
     console.error("Error generating static params:", error);

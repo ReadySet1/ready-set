@@ -4,7 +4,7 @@
 import { createBrowserClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { type CookieOptions } from '@supabase/ssr'
-import { Database } from '@/types/supabase'
+import type { Database } from '@/types/supabase'
 
 // Get environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -77,25 +77,25 @@ const removeStorageCookie = (name: string, options: CookieOptions = {}) => {
  * Creates a Supabase client for browser environments
  */
 export function createClient() {
-  return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  return createBrowserClient({
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  })
 }
 
 /**
  * Clears all Supabase-related cookies for auth recovery
  */
 export const clearSupabaseCookies = () => {
-  const cookieOptions: CookieOptions = {
-    path: '/',
-    domain: window.location.hostname,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production'
-  };
-
   try {
     // Clear all potential Supabase cookies
+    const cookieOptions = {
+      path: '/',
+      domain: window.location.hostname,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production'
+    };
+
     const cookieNames = [
       'supabase-auth-token',
       'sb-access-token',
@@ -108,7 +108,7 @@ export const clearSupabaseCookies = () => {
     ];
     
     cookieNames.forEach(name => {
-      removeStorageCookie(name, cookieOptions);
+      document.cookie = `${name}=; path=${cookieOptions.path}; max-age=-1; domain=${cookieOptions.domain}; ${cookieOptions.secure ? 'secure;' : ''} samesite=${cookieOptions.sameSite}`;
     });
     
     // Also clear local storage items
@@ -130,7 +130,6 @@ export const clearSupabaseCookies = () => {
 export const retryAuth = async () => {
   try {
     clearSupabaseCookies();
-    supabaseInstance = null;
     const supabase = createClient();
     const { data, error } = await supabase.auth.refreshSession();
     
