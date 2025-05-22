@@ -3,13 +3,31 @@ import { createServerClient } from '@supabase/ssr'
 // import { NextApiRequest, NextApiResponse } from 'next' // Not used if Pages Router client is removed/unused
 // import { parseCookies, setCookie } from 'nookies' // Not used if Pages Router client is removed/unused
 import { cookies } from 'next/headers'
-import type { Database } from '@/types/supabase'
+import type { Database } from '@/types/database'
+
+// Definimos los tipos que necesitamos localmente para evitar dependencias rotas
+type CookieOption = {
+  name: string
+  value: string
+  maxAge?: number
+  domain?: string
+  path?: string
+  sameSite?: 'lax' | 'strict' | 'none'
+  secure?: boolean
+  httpOnly?: boolean
+}
+
+type Cookie = {
+  name: string
+  value: string
+  options?: CookieOption
+}
 
 // For App Router usage - this uses next/headers which only works in the App Router
 export function createClient() {
   const cookieStore = cookies()
   
-  return createServerClient({
+  return createServerClient<Database>({
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
     supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     cookies: {
@@ -35,7 +53,7 @@ export function createClient() {
 export function createAdminClient() {
   const cookieStore = cookies()
   
-  return createServerClient({
+  return createServerClient<Database>({
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
     supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
     cookies: {

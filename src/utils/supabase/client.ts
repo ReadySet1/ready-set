@@ -4,7 +4,7 @@
 import { createBrowserClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { type CookieOptions } from '@supabase/ssr'
-import type { Database } from '@/types/supabase'
+import type { Database } from '@/types/database'
 
 // Get environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -77,7 +77,7 @@ const removeStorageCookie = (name: string, options: CookieOptions = {}) => {
  * Creates a Supabase client for browser environments
  */
 export function createClient() {
-  return createBrowserClient({
+  return createBrowserClient<Database>({
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
     supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   })
