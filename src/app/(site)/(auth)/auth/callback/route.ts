@@ -13,7 +13,7 @@ const USER_HOME_ROUTES = {
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const supabase = createClient();
+  const supabase = await createClient();
   
   try {
     // Get URL parameters
