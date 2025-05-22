@@ -8,13 +8,27 @@ export function getRedirectUrl(): string {
   // Make sure we always include the /auth/callback path
   const callbackPath = '/auth/callback';
   
+  // First check for the production domain
+  const prodDomain = 'development.readysetllc.com';
+  
   // For client-side
   if (typeof window !== 'undefined') {
+    // If we're on the production domain, use it exactly
+    if (window.location.hostname === prodDomain) {
+      return `https://${prodDomain}${callbackPath}`;
+    }
+    
+    // Otherwise use the current origin
     return `${window.location.origin}${callbackPath}`;
   }
   
   // For server-side
-  // First check for Vercel-specific environment variables
+  // First check for our known production domain
+  if (process.env.NODE_ENV === 'production') {
+    return `https://${prodDomain}${callbackPath}`;
+  }
+  
+  // Then check for Vercel-specific environment variables
   if (process.env.VERCEL_URL) {
     // Vercel provides this for all deployments including previews
     return `https://${process.env.VERCEL_URL}${callbackPath}`;

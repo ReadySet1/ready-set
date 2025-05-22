@@ -18,23 +18,46 @@ let supabaseInstance: SupabaseClient | null = null;
 
 const getStorageCookie = (name: string) => {
   try {
+    // Simple cookie getter that doesn't attempt to parse
     const cookie = document.cookie
       .split('; ')
       .find(row => row.startsWith(`${name}=`))
-    return cookie ? cookie.split('=')[1] : null
+    
+    if (!cookie) return null
+    
+    // Return the raw value - don't try to decode or parse
+    const rawValue = cookie.split('=')[1]
+    console.log(`Got client cookie ${name} (${rawValue ? rawValue.length : 0} chars)`)
+    return rawValue
   } catch (e) {
+    console.error('Error getting cookie:', e);
     return null
   }
 }
 
 const setStorageCookie = (name: string, value: string, options: CookieOptions = {}) => {
   try {
+    // Add security and compatibility improvements
+    const isProd = process.env.NODE_ENV === 'production';
+    const domain = isProd ? 'development.readysetllc.com' : undefined;
+    
     let cookieString = `${name}=${value}; path=${options.path || '/'}`
     if (options.maxAge) cookieString += `; max-age=${options.maxAge}`
-    if (options.domain) cookieString += `; domain=${options.domain}`
-    if (options.secure) cookieString += '; secure'
-    if (options.sameSite) cookieString += `; samesite=${options.sameSite}`
+    if (domain) cookieString += `; domain=${domain}`
+    if (isProd) cookieString += '; secure'
+    
+    // Use SameSite=None for cross-site cookies in production
+    // This helps with redirects between domains
+    const sameSite = isProd ? 'none' : 'lax';
+    cookieString += `; samesite=${sameSite}`
+    
+    // IMPORTANT: Browser cookies cannot be httpOnly when set from JavaScript
+    // This property can only be set by the server
+    // Remove httpOnly from client-side cookies
+    // cookieString += '; httponly'
+    
     document.cookie = cookieString
+    console.log(`Client cookie set: ${name} (${value ? value.length : 0} chars)`);
   } catch (e) {
     console.error('Error setting cookie:', e)
   }
@@ -43,6 +66,7 @@ const setStorageCookie = (name: string, value: string, options: CookieOptions = 
 const removeStorageCookie = (name: string, options: CookieOptions = {}) => {
   try {
     setStorageCookie(name, '', { ...options, maxAge: -1 })
+    console.log(`Client cookie removed: ${name}`);
   } catch (e) {
     console.error('Error removing cookie:', e)
   }
@@ -54,6 +78,7 @@ const removeStorageCookie = (name: string, options: CookieOptions = {}) => {
 export const createClient = (): SupabaseClient => {
   if (!supabaseInstance) {
     try {
+      console.log('Creating new browser Supabase client');
       supabaseInstance = createBrowserClient(supabaseUrl, supabaseAnonKey, {
         cookies: {
           get: (name: string) => getStorageCookie(name),
@@ -69,6 +94,18 @@ export const createClient = (): SupabaseClient => {
           persistSession: true
         }
       });
+      
+      // Check the session state right after creating the client
+      supabaseInstance.auth.getSession().then(({ data }) => {
+        if (data.session) {
+          console.log('Session loaded successfully in client');
+        } else {
+          console.log('No session found in client');
+        }
+      }).catch(err => {
+        console.error('Error checking session:', err);
+      });
+      
     } catch (error) {
       console.error('Error creating Supabase client:', error);
       throw error;

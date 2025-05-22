@@ -16,7 +16,7 @@ const AddressesPage = () => {
   // Initialize Supabase client
   useEffect(() => {
     const initSupabase = async () => {
-      const client = await createClient();
+      const client = createClient();
       setSupabase(client);
     };
     

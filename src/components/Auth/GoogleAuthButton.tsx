@@ -25,10 +25,17 @@ const GoogleAuthButton = ({
     try {
       setIsLoading(true)
       
-      // Prepare redirect URL with userType parameter if provided
-      let redirectUrl = getRedirectUrl();
+      // Use a more explicit redirect URL rather than relying on getRedirectUrl()
+      const isProd = typeof window !== 'undefined' && 
+        window.location.hostname === 'development.readysetllc.com';
+      
+      // In production, use the exact domain; otherwise use the helper function
+      let redirectUrl = isProd 
+        ? 'https://development.readysetllc.com/auth/callback'
+        : getRedirectUrl();
+      
+      // Append userType as a query parameter to the redirect URL
       if (userType) {
-        // Append userType as a query parameter to the redirect URL
         redirectUrl = `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}userType=${userType}`;
       }
       
@@ -38,6 +45,10 @@ const GoogleAuthButton = ({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
+          queryParams: {
+            prompt: 'select_account', // Force Google to show account selection
+            access_type: 'offline' // Request refresh token
+          }
         }
       })
       

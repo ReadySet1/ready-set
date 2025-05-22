@@ -56,26 +56,32 @@ export async function GET() {
     console.log("Sales Total Count:", salesTotal);
     console.log("Total Vendors Count:", totalVendors);
 
-    const revenueValue = totalRevenue._sum.orderTotal;
-    console.log("Raw Revenue Value:", revenueValue);
+    const revenueValue = totalRevenue._sum.orderTotal; // This should be Prisma.Decimal | null
+    console.log("Raw Revenue Value:", revenueValue ? revenueValue.toString() : 'null'); // Log it safely
 
     // Handle potential Decimal type from Prisma before converting
     let finalRevenue = 0;
-    if (revenueValue instanceof Decimal) {
+    if (revenueValue && typeof revenueValue.toNumber === 'function') {
+      // It's a Prisma.Decimal-like object
       finalRevenue = revenueValue.toNumber();
     } else if (typeof revenueValue === 'number') {
-      // Although orderTotal is Decimal?, sum might return null if no records exist or all are null.
-      // Prisma's aggregate sum typically returns null in such cases, not 0. 
-      // The null case is handled because `revenueValue` would be null, not satisfying either condition.
-      // Let's explicitly check for null for clarity.
-      finalRevenue = revenueValue; // This branch might be less likely if schema enforces Decimal
+      // This case should ideally not happen if schema type is Decimal
+      finalRevenue = revenueValue;
     } else if (revenueValue === null) {
       finalRevenue = 0;
-    } 
-    // Consider adding an else block to log if revenueValue is an unexpected type
+    } else if (revenueValue !== undefined) {
+      // Fallback for unexpected types, try to parse if it's a string number
+      const parsed = parseFloat(revenueValue as any);
+      if (!isNaN(parsed)) {
+        finalRevenue = parsed;
+        console.warn(`Revenue value was an unexpected type but parsed: ${typeof revenueValue}, value: ${revenueValue}`);
+      } else {
+        console.error(`Revenue value is of an unexpected type and could not be parsed: ${typeof revenueValue}, value: ${revenueValue}`);
+      }
+    }
+    // If revenueValue is undefined, finalRevenue remains 0, which is fine.
     
     console.log("Processed Revenue Value:", finalRevenue);
-
 
     return NextResponse.json({
       totalRevenue: finalRevenue,

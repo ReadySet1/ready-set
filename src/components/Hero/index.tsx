@@ -21,9 +21,9 @@ interface ButtonLinkProps {
 type MotionDivProps = Omit<React.HTMLProps<HTMLDivElement>, keyof MotionProps> & MotionProps;
 
 // Custom motion components
-const MotionDiv: React.FC<MotionDivProps> = motion('div');
-const MotionHeader: React.FC<MotionDivProps> = motion('header');
-const MotionHeading: React.FC<MotionDivProps> = motion('h2');
+const MotionDiv: React.FC<MotionDivProps> = motion.div;
+const MotionHeader: React.FC<MotionDivProps> = motion.header;
+const MotionHeading: React.FC<MotionDivProps> = motion.h2;
 
 const ButtonLink: React.FC<ButtonLinkProps> = ({
   href,
