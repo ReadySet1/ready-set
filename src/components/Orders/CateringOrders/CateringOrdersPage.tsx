@@ -2,9 +2,10 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -185,133 +186,110 @@ const LoadingSkeleton = () => (
   </div>
 );
 
+// Define the fetch function for React Query
+const fetchCateringOrders = async (
+  page: number, 
+  limit: number, 
+  status: OrderStatus, 
+  searchTerm: string, 
+  sortField: string, 
+  sortDirection: string
+): Promise<CateringOrdersApiResponse> => {
+  const queryParams = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+    sort: sortField,
+    direction: sortDirection,
+    status: status,
+  });
+
+  if (searchTerm) {
+    queryParams.append('search', searchTerm);
+  }
+
+  const supabase = createClient(); // Assuming createClient is from @/utils/supabase/client
+  const { data: { session } } = await supabase.auth.getSession();
+
+  const response = await fetch(`/api/orders/catering-orders?${queryParams.toString()}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': session ? `Bearer ${session.access_token}` : '',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: "Failed to fetch orders and parse error response" }));
+    throw new Error(errorData.message || 'Failed to fetch orders');
+  }
+  return response.json();
+};
+
 const CateringOrdersPage: React.FC = () => {
-  const [orders, setOrders] = useState<CateringOrder[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<OrderStatus>('ACTIVE');
-  const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortField, setSortField] = useState<string>("date");
+  const [sortField, setSortField] = useState<string>("pickupDateTime");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [limit] = useState(10); // Default limit for pagination
+  const [limit] = useState(10);
   const [userRoles, setUserRoles] = useState<UserRole>({
     isAdmin: false,
     isSuperAdmin: false,
     helpdesk: false
   });
 
-  // Add status tabs
   const statusTabs = [
-    { value: 'ACTIVE', label: 'Active' },
-    { value: 'ASSIGNED', label: 'Assigned' },
-    { value: 'CANCELLED', label: 'Cancelled' },
-    { value: 'COMPLETED', label: 'Completed' }
+    { value: 'ACTIVE' as OrderStatus, label: 'Active' },
+    { value: 'ASSIGNED' as OrderStatus, label: 'Assigned' },
+    { value: 'CANCELLED' as OrderStatus, label: 'Cancelled' },
+    { value: 'COMPLETED' as OrderStatus, label: 'Completed' }
   ];
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        // Construct the query parameters
-        const queryParams = new URLSearchParams({
-          page: page.toString(),
-          limit: limit.toString(),
-          sort: sortField,
-          direction: sortDirection,
-          status: statusFilter,
-        });
+  // React Query for fetching orders
+  const { 
+    data: queryData,
+    isLoading,
+    isError,
+    error,
+  } = useQuery<CateringOrdersApiResponse, Error>({
+    queryKey: ['cateringOrders', page, limit, statusFilter, searchTerm, sortField, sortDirection],
+    queryFn: () => fetchCateringOrders(page, limit, statusFilter, searchTerm, sortField, sortDirection),
+  });
 
-        // Add search term if present
-        if (searchTerm) {
-          queryParams.append('search', searchTerm);
-        }
+  const orders = useMemo(() => queryData?.orders || [], [queryData]);
+  const totalPages = useMemo(() => queryData?.totalPages || 1, [queryData]);
 
-        // Get current user for auth token
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        // Make API call with authentication
-        const response = await fetch(`/api/orders/catering-orders?${queryParams}`, {
-          headers: {
-            'Content-Type': 'application/json',
-            // Use session access_token instead of user.id
-            'Authorization': session ? `Bearer ${session.access_token}` : '',
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch orders');
-        }
-
-        const data: CateringOrdersApiResponse = await response.json();
-        setOrders(data.orders);
-        setTotalPages(data.totalPages);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred while fetching orders');
-        console.error('Error fetching orders:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchOrders();
-  }, [page, statusFilter, searchTerm, sortField, sortDirection, limit]);
-
-  // New useEffect to fetch user roles
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchUserRoles = async () => {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          console.error("No authenticated user found");
-          return;
-        }
-        
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('type')
-          .eq('id', user.id)
-          .single();
-        
-        if (profile) {
-          setUserRoles({
-            isAdmin: profile.type.toLowerCase() === 'admin',
-            isSuperAdmin: profile.type.toLowerCase() === 'super_admin',
-            helpdesk: profile.type.toLowerCase() === 'helpdesk'
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching user roles:", error);
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.app_metadata?.roles) {
+        const roles = session.user.app_metadata.roles as string[];
+        setUserRoles({
+          isAdmin: roles.includes('admin'),
+          isSuperAdmin: roles.includes('super_admin'),
+          helpdesk: roles.includes('helpdesk'),
+        });
       }
     };
-
     fetchUserRoles();
   }, []);
 
   const handlePageChange = (newPage: number) => {
-    if (newPage < 1 || newPage > totalPages) return;
-    setPage(newPage);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (newPage > 0 && newPage <= totalPages) {
+      setPage(newPage);
+    }
   };
 
-  // Update status filter handler
   const handleStatusFilter = (status: OrderStatus) => {
+    setPage(1);
     setStatusFilter(status);
-    setPage(1); // Reset to first page when changing filters
   };
 
   const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
+    const newDirection = sortField === field && sortDirection === "desc" ? "asc" : "desc";
+    setSortField(field);
+    setSortDirection(newDirection);
+    setPage(1);
   };
 
   const getSortIcon = (field: string) => {
@@ -321,7 +299,6 @@ const CateringOrdersPage: React.FC = () => {
       <ChevronDown className="h-4 w-4 inline ml-1 opacity-50" />;
   };
 
-  // Format date for display
   const formatDate = (dateInput: string | Date | null): string => {
     if (!dateInput) return 'N/A';
     const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
@@ -342,7 +319,6 @@ const CateringOrdersPage: React.FC = () => {
     });
   };
 
-  // Format currency for display
   const formatCurrency = (amount: number | undefined | null): string => {
     if (!amount) return '$0.00';
     return new Intl.NumberFormat('en-US', {
@@ -351,97 +327,34 @@ const CateringOrdersPage: React.FC = () => {
     }).format(amount);
   };
 
-  // Add refresh handler for when an order is deleted
   const handleOrderDeleted = () => {
-    // Refetch orders
-    const fetchOrders = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        // Construct the query parameters
-        const queryParams = new URLSearchParams({
-          page: page.toString(),
-          limit: limit.toString(),
-          sort: sortField,
-          direction: sortDirection,
-          status: statusFilter,
-        });
-
-        // Add search term if present
-        if (searchTerm) {
-          queryParams.append('search', searchTerm);
-        }
-
-        // Get current user for auth token
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        // Make API call with authentication
-        const response = await fetch(`/api/orders/catering-orders?${queryParams}`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': session ? `Bearer ${session.access_token}` : '',
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch orders');
-        }
-
-        const data: CateringOrdersApiResponse = await response.json();
-        setOrders(data.orders);
-        setTotalPages(data.totalPages);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred while fetching orders');
-        console.error('Error fetching orders:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchOrders();
+    console.log("Order deleted, data will refresh on next parameter change.");
   };
 
-  // Add a function to map CateringOrder to Order
-  const mapToOrderType = (orders: CateringOrder[]): Order[] => {
-    return orders.map((order) => ({
-      id: order.id,
-      order_number: order.orderNumber,
-      status: order.status.toLowerCase(),
-      date: order.pickupDateTime || order.createdAt,
-      order_total: order.orderTotal ? Number(order.orderTotal) : 0,
-      client_attention: order.clientAttention || undefined,
-      user: order.user ? {
-        id: order.user.id,
-        name: order.user.name || 'N/A',
-        email: order.user.email,
-        contactNumber: order.user.contactNumber
-      } : undefined,
-      pickupAddress: {
-        id: order.pickupAddress.id,
-        street1: order.pickupAddress.street1,
-        street2: order.pickupAddress.street2,
-        city: order.pickupAddress.city,
-        state: order.pickupAddress.state,
-        zip: order.pickupAddress.zip,
-        county: order.pickupAddress.county
-      },
-      deliveryAddress: {
-        id: order.deliveryAddress.id,
-        street1: order.deliveryAddress.street1,
-        street2: order.deliveryAddress.street2,
-        city: order.deliveryAddress.city,
-        state: order.deliveryAddress.state,
-        zip: order.deliveryAddress.zip,
-        county: order.deliveryAddress.county
+  const mappedOrders = useMemo(() => mapToOrderType(orders), [orders]);
+
+  if (isLoading) return <LoadingSkeleton />;
+  if (isError) {
+    let errorMessage = "An unknown error occurred.";
+    if (error) {
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error; // Should not happen with Error type in useQuery
       }
-    }));
-  };
+    }
+    return (
+      <Alert variant="destructive" className="m-4">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Error Fetching Orders</AlertTitle>
+        <AlertDescription>{errorMessage}</AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6"> 
       
-      {/* Page Title and New Order Button */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
@@ -461,7 +374,6 @@ const CateringOrdersPage: React.FC = () => {
         </Link>
       </div>
 
-      {/* Status filter tabs */}
       <div className="mb-6 flex space-x-2">
         {statusTabs.map((tab) => (
           <button
@@ -477,11 +389,9 @@ const CateringOrdersPage: React.FC = () => {
         ))}
       </div>
 
-      {/* Card containing filters and the CateringOrdersTable */}
       <Card className="shadow-sm rounded-xl border-slate-200 overflow-hidden">
         <CardContent className="p-0">
           
-          {/* Filters Section */}
           <div className="border-b bg-slate-50 p-4">
             <div className="flex flex-col lg:flex-row gap-4 justify-between">
               <div className="flex gap-2 flex-1 flex-wrap">
@@ -533,7 +443,6 @@ const CateringOrdersPage: React.FC = () => {
             </div>
           </div>
 
-          {/* CateringOrdersTable Component */}
           <div className="mt-0">
             {isLoading ? (
               <LoadingSkeleton />
@@ -542,12 +451,12 @@ const CateringOrdersPage: React.FC = () => {
                 <Alert variant="destructive" className="inline-flex flex-col items-center">
                   <AlertCircle className="h-5 w-5 mb-2" />
                   <AlertTitle>Error Fetching Orders</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>{(error as any) instanceof Error ? (error as any).message : String(error)}</AlertDescription>
                 </Alert>
               </div>
             ) : orders.length > 0 ? (
               <CateringOrdersTable 
-                orders={mapToOrderType(orders)}
+                orders={mappedOrders}
                 isLoading={isLoading}
                 statusFilter={statusFilter.toLowerCase() as StatusFilter}
                 onStatusFilterChange={(status) => handleStatusFilter(status.toUpperCase() as OrderStatus)}
@@ -555,7 +464,6 @@ const CateringOrdersPage: React.FC = () => {
                 onOrderDeleted={handleOrderDeleted}
               />
             ) : (
-              // Empty State
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
                   <ClipboardList className="h-8 w-8 text-slate-400" />
@@ -573,7 +481,6 @@ const CateringOrdersPage: React.FC = () => {
               </div>
             )}
 
-            {/* Pagination Section */}
             {!isLoading && totalPages > 1 && (
               <div className="p-4 border-t bg-slate-50">
                 <Pagination>
@@ -584,7 +491,6 @@ const CateringOrdersPage: React.FC = () => {
                         className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"}
                       />
                     </PaginationItem>
-                    {/* Basic Pagination - Consider a more advanced version for many pages */}
                     {[...Array(totalPages)].map((_, i) => (
                       <PaginationItem key={i}>
                         <PaginationLink 
@@ -611,6 +517,54 @@ const CateringOrdersPage: React.FC = () => {
       </Card>
     </div>
   );
+};
+
+const mapToOrderType = (apiOrders: CateringOrder[]): Order[] => {
+  return apiOrders.map(order => ({
+    id: order.id,
+    order_number: order.orderNumber,
+    user: order.user,
+    pickupAddress: order.pickupAddress,
+    deliveryAddress: order.deliveryAddress,
+    status: order.status as OrderType['status'],
+    date: order.pickupDateTime ? new Date(order.pickupDateTime) : (order.createdAt ? new Date(order.createdAt) : new Date()),
+    pickupDateTime: order.pickupDateTime ? new Date(order.pickupDateTime) : null,
+    arrivalDateTime: order.arrivalDateTime ? new Date(order.arrivalDateTime) : null,
+    completeDateTime: order.completeDateTime ? new Date(order.completeDateTime) : null,
+    order_total: order.orderTotal !== null && order.orderTotal !== undefined 
+                 ? new Prisma.Decimal(order.orderTotal).toNumber() 
+                 : 0,
+    driverStatus: order.driverStatus || undefined,
+    driverName: order.dispatches?.[0]?.driver?.name || "N/A",
+    order_type: 'catering',
+    headcount: order.headcount,
+    needHost: order.needHost,
+    brokerage: order.brokerage,
+    clientAttention: order.clientAttention,
+    specialNotes: order.specialNotes,
+    image: order.image,
+    tip: order.tip !== null && order.tip !== undefined 
+         ? new Prisma.Decimal(order.tip).toNumber() 
+         : null,
+    guid: order.guid,
+    userId: order.userId,
+    pickupAddressId: order.pickupAddressId,
+    deliveryAddressId: order.deliveryAddressId,
+    hoursNeeded: order.hoursNeeded,
+    numberOfHosts: order.numberOfHosts,
+    createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
+    updatedAt: order.updatedAt ? new Date(order.updatedAt) : new Date(),
+    deletedAt: order.deletedAt ? new Date(order.deletedAt) : null,
+    dispatches: order.dispatches?.map(d => ({
+      id: d.id,
+      driver: d.driver ? {
+        id: d.driver.id,
+        name: d.driver.name,
+        email: d.driver.email,
+        contactNumber: d.driver.contactNumber
+      } : undefined
+    })) || []
+  } as Order));
 };
 
 export default CateringOrdersPage;
