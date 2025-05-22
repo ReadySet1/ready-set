@@ -4,6 +4,7 @@
 import { createBrowserClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { type CookieOptions } from '@supabase/ssr'
+import { Database } from '@/types/supabase'
 
 // Get environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -75,44 +76,12 @@ const removeStorageCookie = (name: string, options: CookieOptions = {}) => {
 /**
  * Creates a Supabase client for browser environments
  */
-export const createClient = (): SupabaseClient => {
-  if (!supabaseInstance) {
-    try {
-      console.log('Creating new browser Supabase client');
-      supabaseInstance = createBrowserClient(supabaseUrl, supabaseAnonKey, {
-        cookies: {
-          get: (name: string) => getStorageCookie(name),
-          set: (name: string, value: string, options: CookieOptions) => 
-            setStorageCookie(name, value, options),
-          remove: (name: string, options: CookieOptions) => 
-            removeStorageCookie(name, options)
-        },
-        auth: {
-          flowType: 'pkce',
-          detectSessionInUrl: true,
-          autoRefreshToken: true,
-          persistSession: true
-        }
-      });
-      
-      // Check the session state right after creating the client
-      supabaseInstance.auth.getSession().then(({ data }) => {
-        if (data.session) {
-          console.log('Session loaded successfully in client');
-        } else {
-          console.log('No session found in client');
-        }
-      }).catch(err => {
-        console.error('Error checking session:', err);
-      });
-      
-    } catch (error) {
-      console.error('Error creating Supabase client:', error);
-      throw error;
-    }
-  }
-  return supabaseInstance;
-};
+export function createClient() {
+  return createBrowserClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
 /**
  * Clears all Supabase-related cookies for auth recovery

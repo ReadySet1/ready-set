@@ -6,35 +6,33 @@ import { cookies } from 'next/headers'
 import { type Database } from '@/types/supabase'
 
 // For App Router usage - this uses next/headers which only works in the App Router
-export async function createClient() { // Reverted to async
-  const cookieStore = await cookies() // Added await
-  
+export function createClient(cookieStore = cookies()) {
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          // try/catch removed for brevity, can be added back if specific error handling is needed
+        get(name) {
           return cookieStore.get(name)?.value
         },
-        set(name: string, value: string, options: CookieOptions) {
+        set(name, value, options) {
           try {
-            cookieStore.set({ name, value, ...options })
-            // console.log(`Set cookie ${name} successfully (${value.slice(0, 10)}...)`); // Optional: keep for debugging
+            cookieStore.set(name, value, options)
           } catch (error) {
-            // This error handling is important, especially if used in a context where cookies can't be set.
-            console.error(`Error setting cookie ${name} in createClient:`, error)
+            // The `set` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
           }
         },
-        remove(name: string, options: CookieOptions) {
+        remove(name, options) {
           try {
-            cookieStore.set({ name, value: '', ...options }) // Effectively removes the cookie
-            // console.log(`Removed cookie ${name} successfully`); // Optional: keep for debugging
+            cookieStore.delete(name, options)
           } catch (error) {
-            console.error(`Error removing cookie ${name} in createClient:`, error)
+            // The `delete` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
           }
-        }
+        },
       },
       // Using default auth options from @supabase/ssr unless overrides are specifically needed.
       // auth: {

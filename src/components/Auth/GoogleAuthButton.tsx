@@ -6,7 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import { getRedirectUrl } from '@/utils/supabase/auth-helpers'
 import { useState } from 'react'
 import Loader from "@/components/Common/Loader";
-import { OAuthResponse, Provider } from '@supabase/supabase-js'
+import { Provider } from '@supabase/supabase-js'
 
 interface GoogleAuthButtonProps {
   className?: string;
@@ -19,17 +19,6 @@ interface AuthError extends Error {
   statusText?: string;
 }
 
-// Define custom type for OAuth options to include PKCE
-interface CustomOAuthOptions {
-  redirectTo?: string;
-  queryParams?: { [key: string]: string };
-  skipBrowserRedirect?: boolean;
-  flowType?: 'pkce';
-  pkce?: {
-    codeChallengeMethod: 'S256';
-  };
-}
-
 const GoogleAuthButton = ({ 
   className = '', 
   userType, 
@@ -39,7 +28,7 @@ const GoogleAuthButton = ({
   const [error, setError] = useState<string | null>(null)
 
   const handleGoogleSignIn = async () => {
-    const supabase = await createClient()
+    const supabase = createClient()
     try {
       setIsLoading(true)
       setError(null)
@@ -70,23 +59,16 @@ const GoogleAuthButton = ({
       
       console.log("Auth redirect URL:", redirectUrlObj.toString());
       
-      const oauthOptions: CustomOAuthOptions = {
-        redirectTo: redirectUrlObj.toString(),
-        queryParams: {
-          prompt: 'select_account',
-          access_type: 'offline',
-          response_type: 'code',
-        },
-        skipBrowserRedirect: false,
-        flowType: 'pkce',
-        pkce: {
-          codeChallengeMethod: 'S256'
-        }
-      };
-
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google' as Provider,
-        options: oauthOptions as any // Type assertion needed due to Supabase types limitation
+        options: {
+          redirectTo: redirectUrlObj.toString(),
+          queryParams: {
+            prompt: 'select_account',
+            access_type: 'offline',
+          },
+          skipBrowserRedirect: false
+        }
       })
       
       if (error) {
@@ -96,7 +78,6 @@ const GoogleAuthButton = ({
 
       console.log("Auth flow initiated:", {
         provider: 'google',
-        flowType: 'pkce',
         redirectUrl: redirectUrlObj.toString()
       });
       
