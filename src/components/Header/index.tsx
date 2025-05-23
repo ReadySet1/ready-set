@@ -27,22 +27,23 @@ const baseMenuItems: MenuItem[] = [
   },
   {
     id: 103,
-    title: "RS Subsidiaries",
+    title: "Logistic",
     submenu: [
       { id: 1031, title: "Logistics", path: "/logistics" },
-      { id: 1032, title: "Virtual Assistant", path: "/va" },
-      { id: 1033, title: "Join Us", path: "/apply" },
+      { id: 1032, title: "Food Delivery", path: "/food-delivery" },
+      { id: 1033, title: "Flowers Delivery", path: "/flowers" },
+      { id: 1034, title: "Bakery Delivery", path: "/bakery-delivery" },
     ],
   },
   {
     id: 104,
-    title: "Flowers",
-    path: "/flowers",
+    title: "Virtual Assistant",
+    path: "/va",
   },
   {
     id: 105,
-    title: "Food",
-    path: "/food-delivery",
+    title: "Join Us",
+    path: "/join-the-team",
   },
   {
     id: 106,
