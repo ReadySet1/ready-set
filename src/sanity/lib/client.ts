@@ -330,7 +330,19 @@ export function urlFor(source: any) {
   }
 }
 
-// Custom fetch helper
+// Custom fetch helper with Edge Runtime compatibility
 export async function customFetch(url: string, options: RequestInit = {}) {
-  return fetch(url, options);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      // Ensure we're using Edge-compatible fetch options
+      next: { revalidate: 60 } // Cache results for 60 seconds
+    });
+    
+    // Don't use arrayBuffer() in Edge Runtime - just return the response
+    return response;
+  } catch (error) {
+    console.error('Error in customFetch:', error);
+    throw error;
+  }
 }

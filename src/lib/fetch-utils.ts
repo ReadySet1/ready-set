@@ -29,9 +29,12 @@ export async function safeFetch<T = any>(url: string, options?: RequestInit): Pr
       }
     }
     
-    // Only try arrayBuffer if it's available and needed
+    // Edge Runtime compatibility check
+    // Only try arrayBuffer if it's available as a function (not in Edge Runtime)
     // This helps avoid the "r.arrayBuffer is not a function" error
-    if (typeof response.arrayBuffer === 'function') {
+    if (typeof response.arrayBuffer === 'function' && 
+        // Additional check to avoid Edge Runtime issues
+        typeof window !== 'undefined') {
       try {
         const buffer = await response.arrayBuffer();
         // Try to detect if this is text/JSON content that should be parsed
