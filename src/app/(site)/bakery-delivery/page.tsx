@@ -6,67 +6,81 @@ import BakeryTerms from "@/components/BakeryDelivery/BakeryTerms";
 import DownloadableResources from "@/components/BakeryDelivery/DownloadableResources";
 import BakeryHero from "@/components/BakeryDelivery/BakeryHero";
 
-// export const metadata: Metadata = {
-//   title: 'Food Delivery Services for Events | Ready Set', // Replace with your title
-//   description:
-//     'We offer reliable and efficient catering delivery services for your events. Delicious food delivered right to your door in Bay Area and Sillicon Valley!', // Replace with your description
-//   keywords: [
-//     'food delivery',
-//     'catering delivery',
-//     'event food',
-//     'catering service',
-//     'banquet delivery',
-//     // Add more relevant keywords for your service and location
-//   ],
-//   openGraph: {
-//     title: 'Exceptional Catering and Food Delivery Services | Ready Set', // Replace with your Open Graph title
-//     description:
-//       'Make your event a success with our high-quality food delivery. Serving [Service Areas] and ensuring a memorable culinary experience.', // Replace with your Open Graph description
-//     type: 'website',
-//     locale: 'en_US', // Set the language to English (United States)
-//     siteName: 'Ready Set', // Replace with your site name
-//     // You can add a relevant image for Open Graph
-//     // images: [
-//     //   {
-//     //     url: 'Your image URL',
-//     //     width: 1200,
-//     //     height: 630,
-//     //     alt: 'Image description',
-//     //   },
-//     // ],
-//   },
-//   twitter: {
-//     card: 'summary_large_image', // Or 'summary' if you don't have a large image
-//     title: 'Your Brand: Hassle-Free Food Delivery for Events', // Replace with your Twitter title
-//     description:
-//       'Need delicious food for your next event? We handle the delivery in Bay Area and Sillicon Valley! Contact us today.', // Replace with your Twitter description
-//     // You can add Twitter handles if you have them
-//     // site: '@YourTwitter',
-//     // creator: '@YourTwitter',
-//     // You can add a relevant image for Twitter Card
-//     // images: ['Your Twitter image URL'],
-//   },
-//   robots: {
-//     index: true,
-//     follow: true,
-//     googleBot: {
-//       index: true,
-//       follow: true,
-//       'max-image-preview': 'large',
-//       'max-snippet': -1,
-//     },
-//   },
-//   // You can add more metadata as needed, such as 'authors', 'category', 'alternates', etc.
-// };
+export const metadata: Metadata = {
+  title: "Premium Food & Bakery Delivery Services | Ready Set",
+  description:
+    "Professional food and bakery delivery services for events, parties, and corporate gatherings. Fresh, high-quality meals delivered on time in the Bay Area and Silicon Valley.",
+  keywords: [
+    "food delivery",
+    "bakery delivery",
+    "catering services",
+    "event catering",
+    "corporate catering",
+    "Bay Area food delivery",
+    "Silicon Valley catering",
+    "party catering",
+    "fresh bakery items",
+    "professional food service",
+  ],
+  authors: [{ name: "Ready Set Team" }],
+  category: "Food & Catering Services",
+  openGraph: {
+    title: "Premium Food & Bakery Delivery Services | Ready Set",
+    description:
+      "Transform your events with our exceptional food and bakery delivery services. Serving the Bay Area and Silicon Valley with fresh, delicious meals and baked goods.",
+    type: "website",
+    locale: "en_US",
+    siteName: "Ready Set",
+    url: "/food",
+    images: [
+      {
+        url: "/images/og-food-delivery.jpg", // Add your actual image path
+        width: 1200,
+        height: 630,
+        alt: "Ready Set food and bakery delivery services showcase",
+        type: "image/jpeg",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Premium Food & Bakery Delivery | Ready Set",
+    description:
+      "Elevate your events with our professional food and bakery delivery services in the Bay Area and Silicon Valley. Fresh quality, on-time delivery guaranteed.",
+    images: ["/images/twitter-food-card.jpg"], // Add your actual image path
+    site: "@ReadySetDelivery", // Replace with actual handle
+    creator: "@ReadySetDelivery", // Replace with actual handle
+  },
+  robots: {
+    index: true,
+    follow: true,
+    nocache: false,
+    googleBot: {
+      index: true,
+      follow: true,
+      noimageindex: false,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  alternates: {
+    canonical: "/food",
+  },
+  other: {
+    "geo.region": "US-CA",
+    "geo.placename": "Bay Area, Silicon Valley",
+  },
+} satisfies Metadata;
 
-export default function BakeryPage() {
+export default function BakeryPage(): React.ReactElement {
   return (
     <div className="pt-20 md:pt-24">
       <BakeryHero />
       <BakeryPartners />
       <FoodIcons />
       <BakeryTerms />
-      <DownloadableResources />
+      {/* <DownloadableResources /> */}
     </div>
   );
 }
