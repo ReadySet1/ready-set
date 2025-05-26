@@ -63,6 +63,11 @@ const CookieConsentBanner = ({ metricoolHash, gaMeasurementId }: CookieConsentBa
     
     setConsentGiven(preferences);
     setIsVisible(false);
+    
+    // Dispatch custom event to notify other components
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('cookiePreferencesUpdated'));
+    }
   };
 
   const handleRejectAll = () => {
@@ -84,6 +89,11 @@ const CookieConsentBanner = ({ metricoolHash, gaMeasurementId }: CookieConsentBa
     
     setConsentGiven(preferences);
     setIsVisible(false);
+    
+    // Dispatch custom event to notify other components
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('cookiePreferencesUpdated'));
+    }
   };
 
   const handlePreferences = () => {
@@ -106,6 +116,11 @@ const CookieConsentBanner = ({ metricoolHash, gaMeasurementId }: CookieConsentBa
     
     setConsentGiven(preferences);
     setIsVisible(false);
+    
+    // Dispatch custom event to notify other components
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('cookiePreferencesUpdated'));
+    }
   };
 
   const handleClose = () => {

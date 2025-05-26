@@ -5,6 +5,7 @@ import { H } from 'highlight.run';
 import { CONSTANTS } from '@/constants';
 import { Button } from '@/components/ui/button';
 import { logError } from '@/utils/error-logging';
+import UmamiTestComponent from '@/components/Analytics/UmamiTestComponent';
 
 export default function HighlightTest() {
   const [status, setStatus] = useState<string>('Initializing...');
@@ -119,8 +120,15 @@ export default function HighlightTest() {
   };
   
   return (
-    <div className="p-8 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Highlight.io Error Testing</h1>
+    <div className="p-8 max-w-6xl mx-auto space-y-8 pt-32">
+      <h1 className="text-3xl font-bold mb-8 text-center">Analytics & Error Testing Dashboard</h1>
+      
+      {/* Umami Analytics Test Section */}
+      <UmamiTestComponent />
+      
+      {/* Highlight.io Test Section */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 className="text-2xl font-bold mb-4">Highlight.io Error Testing</h2>
       
       <div className="p-4 bg-slate-100 rounded-md mb-6">
         <p className="font-semibold">Status: <span className={status.includes('Failed') ? 'text-red-600' : 'text-green-600'}>{status}</span></p>
@@ -153,6 +161,7 @@ export default function HighlightTest() {
           ))}
           {logs.length === 0 && <div className="text-gray-500">No logs yet...</div>}
         </div>
+      </div>
       </div>
     </div>
   );

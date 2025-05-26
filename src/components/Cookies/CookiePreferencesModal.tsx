@@ -36,6 +36,11 @@ const CookiePreferencesModal: React.FC<CookiePreferencesModalProps> = ({
   const handleSave = () => {
     onSave(preferences);
     onClose();
+    
+    // Dispatch custom event to notify other components
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('cookiePreferencesUpdated'));
+    }
   };
 
   const handlePreferenceChange = (
@@ -66,7 +71,7 @@ const CookiePreferencesModal: React.FC<CookiePreferencesModalProps> = ({
           <div className="flex items-center justify-between space-x-4">
             <div>
               <h4 className="font-medium">Analytics Cookies</h4>
-              <p className="text-sm text-gray-500">Help us improve our website</p>
+              <p className="text-sm text-gray-500">Help us improve our website using privacy-focused analytics (no personal data stored)</p>
             </div>
             <Switch 
               checked={preferences.analytics}
