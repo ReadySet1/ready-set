@@ -23,9 +23,9 @@ interface PortableTextBlock {
   _key?: string;
   _type: string;
   style?: string;
-  children?: PortableTextSpan[] | PortableTextListItem[];
+  children?: PortableTextSpan[];
   markDefs?: any[];
-  listItem?: string;
+  listItem?: 'bullet' | 'number';
   level?: number;
 }
 
@@ -117,31 +117,106 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
                 marks: []
               }
             ]
-          },
+          }
+        ]
+      },
+      {
+        title: 'What You Will Learn',
+        content: [
           {
             _type: 'block',
             style: 'normal',
+            listItem: 'bullet',
             children: [
               {
                 _type: 'span',
-                text: 'What You Will Learn',
-                marks: ['strong'] // Puedes usar 'strong' para negrita si lo deseas
+                text: 'What Is Email Marketing?',
+                marks: []
               }
             ]
           },
           {
-            _type: 'list',
+            _type: 'block',
+            style: 'normal',
             listItem: 'bullet',
             children: [
-              { _type: 'listItem', children: [{ _type: 'span', text: 'What Is Email Marketing?' }] },
-              { _type: 'listItem', children: [{ _type: 'span', text: 'The Pros and Cons of Email Marketing' }] },
-              { _type: 'listItem', children: [{ _type: 'span', text: 'Types of Email Marketing Campaigns' }] },
-              { _type: 'listItem', children: [{ _type: 'span', text: 'How to Build an Email List' }] },
-              { _type: 'listItem', children: [{ _type: 'span', text: 'Getting Customer Consent' }] },
-              { _type: 'listItem', children: [{ _type: 'span', text: 'Lead Magnets That Work: Discover how to use free resources to attract and retain subscribers.' }] },
-              { _type: 'listItem', children: [{ _type: 'span', text: 'Email Authentication Essentials' }] }
+              {
+                _type: 'span',
+                text: 'The Pros and Cons of Email Marketing',
+                marks: []
+              }
             ]
           },
+          {
+            _type: 'block',
+            style: 'normal',
+            listItem: 'bullet',
+            children: [
+              {
+                _type: 'span',
+                text: 'Types of Email Marketing Campaigns',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            listItem: 'bullet',
+            children: [
+              {
+                _type: 'span',
+                text: 'How to Build an Email List',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            listItem: 'bullet',
+            children: [
+              {
+                _type: 'span',
+                text: 'Getting Customer Consent',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            listItem: 'bullet',
+            children: [
+              {
+                _type: 'span',
+                text: 'Lead Magnets That Work',
+                marks: ['strong']
+              },
+              {
+                _type: 'span',
+                text: ': Discover how to use free resources to attract and retain subscribers.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            listItem: 'bullet',
+            children: [
+              {
+                _type: 'span',
+                text: 'Email Authentication Essentials',
+                marks: []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Ready to Get Started?',
+        content: [
           {
             _type: 'block',
             style: 'normal',
@@ -159,38 +234,39 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
             children: [
               {
                 _type: 'span',
-                text: 'If you found this guide helpful, share it with your network or schedule a consultation call with us. Ready to take the next step?',
-                marks: []
-              },
-              {
-                _type: 'span',
-                text: ' Contact ',
+                text: 'If you found this guide helpful, share it with your network or schedule a consultation call with us. Ready to take the next step? Contact ',
                 marks: []
               },
               {
                 _type: 'span',
                 text: 'Ready Set Group',
-                marks: ['link'], // Puedes usar 'link' para un enlace, necesitarás definir la URL en tu renderizado
-                // Aquí podrías agregar un campo 'href' si tu esquema lo permite, por ejemplo:
-                // href: 'https://readysetgroup.com/contact'
+                marks: ['link']
               },
               {
                 _type: 'span',
                 text: ' now!',
                 marks: []
               }
+            ],
+            markDefs: [
+              {
+                _key: 'link-ready-set-group',
+                _type: 'link',
+                href: '#' // Replace with actual URL
+              }
             ]
           }
         ]
       }
     ],
-         coverImage: {
-       _type: 'image',
-       asset: {
-         _ref: 'image-Tb9Ew8CXIwaY6R1kjMvI0uRR-2000x3000-jpg',
-         _type: 'reference'
-       }
-     },
+    // ✅ Updated coverImage to use local image path
+    coverImage: {
+      _type: 'image',
+      asset: {
+        url: '/images/resources/2.webp',
+        _type: 'reference'
+      }
+    },
     seo: {
       metaTitle: 'What Is Email Marketing? - Complete Guide | Ready Set LLC',
       metaDescription: 'Learn the fundamentals of email marketing and how it can help grow your business with this comprehensive guide.',
