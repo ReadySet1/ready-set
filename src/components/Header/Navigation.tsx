@@ -1,8 +1,8 @@
 // Navigation.tsx
 import React, { useState } from "react";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
-import { Session } from "next-auth";
+import { createClient } from "@/utils/supabase/client";
+import { User } from "@supabase/supabase-js";
 
 interface MenuItem {
   title: string;
@@ -16,7 +16,7 @@ interface NavigationProps {
   pathUrl: string;
   sticky: boolean;
   menuData: MenuItem[];
-  session: Session | null;
+  session: { user: User } | null;
 }
 
 const Navigation: React.FC<NavigationProps> = ({
@@ -90,9 +90,11 @@ const Navigation: React.FC<NavigationProps> = ({
         {session?.user && (
           <li className="group relative lg:hidden">
             <button
-              onClick={() => {
-                signOut({ callbackUrl: "/", redirect: true });
+              onClick={async () => {
+                const supabase = createClient();
+                await supabase.auth.signOut();
                 navbarToggleHandler();
+                window.location.href = "/";
               }}
               className="ud-menu-scroll flex py-2 text-base text-dark group-hover:text-primary dark:text-white dark:group-hover:text-primary lg:inline-flex lg:px-0 lg:py-6"
             >

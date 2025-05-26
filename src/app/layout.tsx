@@ -36,19 +36,14 @@ export default function RootLayout({
       lang="en"
     >
       <head>
-        {/* Perception Company Analytics Script */}
+        {/* Umami Analytics Script */}
         <Script
-          id="perception-company-analytics"
+          async
+          src="https://analytics.umami.is/script.js"
+          data-website-id={CONSTANTS.UMAMI_WEBSITE_ID}
           strategy="afterInteractive"
-          src="https://www.perception-company.com/js/803213.js"
         />
-        <noscript>
-          <img
-            src="https://www.perception-company.com/803213.png"
-            style={{ display: "none" }}
-            alt="analytics-pixel"
-          />
-        </noscript>
+
         
         {/* Directly include Highlight.js script for more reliable loading */}
         <Script id="highlight-init" strategy="beforeInteractive">
