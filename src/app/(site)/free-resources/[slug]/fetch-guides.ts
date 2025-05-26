@@ -10,12 +10,23 @@ interface PortableTextSpan {
   text: string;
 }
 
+interface PortableTextListItem {
+  _type: 'listItem';
+  children: Array<{
+    _type: string;
+    text?: string;
+    children?: PortableTextSpan[];
+  }>;
+}
+
 interface PortableTextBlock {
   _key?: string;
   _type: string;
   style?: string;
-  children?: PortableTextSpan[];
+  children?: PortableTextSpan[] | PortableTextListItem[];
   markDefs?: any[];
+  listItem?: string;
+  level?: number;
 }
 
 // Guide type definition
@@ -75,7 +86,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
   'what-is-email-marketing': {
     _id: 'static-email-marketing',
     title: 'What Is Email Marketing?',
-    subtitle: 'A comprehensive guide to email marketing for business owners',
+    subtitle: 'A Business Owner\'s Guide to Getting Started',
     slug: { current: 'what-is-email-marketing' },
     _updatedAt: new Date().toISOString(),
     category: 'Marketing',
@@ -86,7 +97,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
         children: [
           {
             _type: 'span',
-            text: 'Email marketing is one of the most effective digital marketing strategies for businesses of all sizes.',
+            text: 'Does the idea of email marketing feel overwhelming or outdated? Many business owners mistakenly think email marketing is reserved for large corporations or struggle with ineffective campaigns. In reality, email marketing is a powerful tool to build meaningful customer relationships and drive sales—no matter your business size.',
             marks: []
           }
         ]
@@ -94,7 +105,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     ],
     mainContent: [
       {
-        title: 'Getting Started with Email Marketing',
+        title: 'How This Guide Helps You',
         content: [
           {
             _type: 'block',
@@ -102,7 +113,70 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
             children: [
               {
                 _type: 'span',
-                text: 'Email marketing allows you to reach your customers directly in their inbox with personalized, targeted messages.',
+                text: 'This guide breaks down email marketing essentials, from its benefits and types of campaigns to the key steps for launching a successful strategy. Whether you are new to email marketing or looking to optimize your approach, this guide is your starting point.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'What You Will Learn',
+                marks: ['strong'] // Puedes usar 'strong' para negrita si lo deseas
+              }
+            ]
+          },
+          {
+            _type: 'list',
+            listItem: 'bullet',
+            children: [
+              { _type: 'listItem', children: [{ _type: 'span', text: 'What Is Email Marketing?' }] },
+              { _type: 'listItem', children: [{ _type: 'span', text: 'The Pros and Cons of Email Marketing' }] },
+              { _type: 'listItem', children: [{ _type: 'span', text: 'Types of Email Marketing Campaigns' }] },
+              { _type: 'listItem', children: [{ _type: 'span', text: 'How to Build an Email List' }] },
+              { _type: 'listItem', children: [{ _type: 'span', text: 'Getting Customer Consent' }] },
+              { _type: 'listItem', children: [{ _type: 'span', text: 'Lead Magnets That Work: Discover how to use free resources to attract and retain subscribers.' }] },
+              { _type: 'listItem', children: [{ _type: 'span', text: 'Email Authentication Essentials' }] }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'This guide offers clear steps to understand email marketing, grow your audience, and build meaningful connections with your customers. Use it to get started today.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'If you found this guide helpful, share it with your network or schedule a consultation call with us. Ready to take the next step?',
+                marks: []
+              },
+              {
+                _type: 'span',
+                text: ' Contact ',
+                marks: []
+              },
+              {
+                _type: 'span',
+                text: 'Ready Set Group',
+                marks: ['link'], // Puedes usar 'link' para un enlace, necesitarás definir la URL en tu renderizado
+                // Aquí podrías agregar un campo 'href' si tu esquema lo permite, por ejemplo:
+                // href: 'https://readysetgroup.com/contact'
+              },
+              {
+                _type: 'span',
+                text: ' now!',
                 marks: []
               }
             ]
