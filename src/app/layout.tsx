@@ -13,6 +13,7 @@ import { HighlightInit } from '@highlight-run/next/client';
 import { H } from 'highlight.run';
 import { CONSTANTS } from '@/constants';
 import { HighlightErrorBoundary } from '@/components/ErrorBoundary/HighlightErrorBoundary';
+import UmamiAnalytics from '@/components/Analytics/UmamiAnalytics';
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -36,15 +37,6 @@ export default function RootLayout({
       lang="en"
     >
       <head>
-        {/* Umami Analytics Script */}
-        <Script
-          async
-          src="https://analytics.umami.is/script.js"
-          data-website-id={CONSTANTS.UMAMI_WEBSITE_ID}
-          strategy="afterInteractive"
-        />
-
-        
         {/* Directly include Highlight.js script for more reliable loading */}
         <Script id="highlight-init" strategy="beforeInteractive">
           {`
@@ -89,6 +81,7 @@ export default function RootLayout({
         <Toaster />
         {/* {process.env.NODE_ENV === "development" && <VercelToolbar />} */}
         <Analytics />
+        <UmamiAnalytics />
         <CookieConsentBanner
           metricoolHash="5e4d77df771777117a249111f4fc9683"
           gaMeasurementId="G-PHGL28W4NP"

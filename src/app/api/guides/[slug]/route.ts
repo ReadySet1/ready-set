@@ -15,15 +15,14 @@ type RouteParams = {
 
 /**
  * Edge API route to fetch a guide by slug
- * Note: There is a known TypeScript error with Edge Runtime + dynamic params
- * See EDGE_RUNTIME_TYPESCRIPT_NOTES.md for details
+ * Note: In Next.js 15, params in Edge Runtime can be async
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: RouteParams }
+  { params }: { params: Promise<RouteParams> }
 ) {
   try {
-    const { slug } = params;
+    const { slug } = await params;
     
     if (!slug || typeof slug !== 'string') {
       return NextResponse.json(
@@ -55,7 +54,7 @@ export async function GET(
     });
   } catch (error) {
     // Log the error for debugging
-    console.error(`Error fetching guide with slug ${params?.slug}:`, error);
+    console.error(`Error fetching guide:`, error);
     
     // Return appropriate error response
     return NextResponse.json(
