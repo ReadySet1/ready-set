@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
 
 # Run TypeScript check but don't block build on errors
 echo "🔍 Running TypeScript type check (informational only)..."

@@ -14,6 +14,51 @@ import { H } from 'highlight.run';
 import { CONSTANTS } from '@/constants';
 import { HighlightErrorBoundary } from '@/components/ErrorBoundary/HighlightErrorBoundary';
 import UmamiAnalytics from '@/components/Analytics/UmamiAnalytics';
+import type { Metadata } from 'next';
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://readysetllc.com';
+
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'Ready Set LLC - Always Ready',
+    template: '%s | Ready Set LLC',
+  },
+  description: 'On-demand courier that specializes in delivery for all your needs. We are Food Safety, and HIPPA Certified. Our team can meet all your Bay Area delivery needs.',
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: siteUrl,
+    siteName: 'Ready Set LLC',
+    title: 'Ready Set LLC - Always Ready',
+    description: 'On-demand courier that specializes in delivery for all your needs. We are Food Safety, and HIPPA Certified. Our team can meet all your Bay Area delivery needs.',
+    images: [
+      {
+        url: '/images/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Ready Set LLC',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Ready Set LLC - Always Ready',
+    description: 'On-demand courier that specializes in delivery for all your needs. We are Food Safety, and HIPPA Certified.',
+    images: ['/images/og-image.jpg'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+};
 
 const montserrat = Montserrat({
   subsets: ["latin"],
