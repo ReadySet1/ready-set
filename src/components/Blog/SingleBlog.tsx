@@ -12,6 +12,15 @@ interface PostsProps {
   basePath: string;
 }
 
+const getSlugValue = (
+  slug: string | { current: string } | undefined,
+): string => {
+  if (!slug) return "";
+  if (typeof slug === "string") return slug;
+  if (typeof slug === "object" && "current" in slug) return slug.current;
+  return "";
+};
+
 const SingleBlog = ({ data, basePath }: PostsProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
@@ -73,6 +82,15 @@ const SingleBlog = ({ data, basePath }: PostsProps) => {
     return category ? colors[category] || colors.default : colors.default;
   };
 
+  const createPostLink = (post: SimpleBlogCard): string => {
+    const slugValue = getSlugValue(post.slug);
+    if (!slugValue) {
+      console.warn("Post without valid slug:", post);
+      return "#"; // O redirigir a una página de error
+    }
+    return `/${basePath}/${slugValue}`;
+  };
+
   return (
     <div className="mx-auto w-full max-w-7xl">
       {/* Featured Post - Only show on first page */}
@@ -115,28 +133,24 @@ const SingleBlog = ({ data, basePath }: PostsProps) => {
                   )}
                 <h2 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white md:text-3xl">
                   <Link
-                    href={`/${basePath}/${featuredPost.slug?.current}`}
+                    href={createPostLink(featuredPost)}
                     className="transition-colors duration-300 hover:text-primary"
                   >
                     {featuredPost.title}
                   </Link>
                 </h2>
-                {/* --- INICIO DE CAMBIO --- */}
-                {/* Volvemos a como lo tenías, asumiendo smallDescription es propiedad directa */}
                 {featuredPost.smallDescription && (
                   <p className="mb-6 text-gray-600 dark:text-gray-300">
                     {featuredPost.smallDescription}
                   </p>
                 )}
-                {/* --- FIN DE CAMBIO --- */}
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {formatDate(featuredPost._updatedAt)}{" "}
-                  {/* Este usa _updatedAt, lo cual es normal */}
+                  {formatDate(featuredPost._updatedAt)}
                 </span>
                 <Link
-                  href={`/${basePath}/${featuredPost.slug?.current}`}
+                  href={createPostLink(featuredPost)}
                   className="inline-flex items-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors duration-300 hover:bg-primary/90"
                 >
                   Read More
@@ -163,95 +177,93 @@ const SingleBlog = ({ data, basePath }: PostsProps) => {
 
       {/* Blog grid */}
       <div className="grid w-full grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-        {gridPosts.map((post) => (
-          <div
-            key={post._id}
-            className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-md transition-all hover:translate-y-[-5px] hover:shadow-lg dark:bg-gray-800"
-          >
-            <div className="relative aspect-video w-full overflow-hidden">
-              <Link
-                href={`/${basePath}/${post.slug?.current}`}
-                className="block"
-              >
-                {post.mainImage ? (
-                  <Image
-                    src={urlFor(post.mainImage).url()}
-                    alt={post.title}
-                    fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    style={{ objectFit: "cover" }}
-                    className="transition-transform duration-500 hover:scale-105"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700">
-                    <span className="text-gray-500 dark:text-gray-400">
-                      No Image
-                    </span>
-                  </div>
-                )}
-              </Link>
-            </div>
+        {gridPosts.map((post) => {
+          const postLink = createPostLink(post);
 
-            <div className="flex flex-grow flex-col p-6">
-              {post.categories && post.categories.length > 0 && (
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {post.categories.map((cat: any) => (
-                    <span
-                      key={cat.title}
-                      className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${getCategoryBadge(cat.title)}`}
-                    >
-                      {cat.title}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <h3 className="mb-3 text-xl font-semibold text-gray-800 dark:text-white">
-                <Link
-                  href={`/${basePath}/${post.slug?.current}`}
-                  className="transition-colors duration-300 hover:text-primary"
-                >
-                  {post.title}
-                </Link>
-              </h3>
-
-              {/* --- INICIO DE CAMBIO --- */}
-              {/* Volvemos a como lo tenías, asumiendo smallDescription es propiedad directa */}
-              {post.smallDescription && (
-                <p className="mb-4 line-clamp-3 text-sm text-gray-600 dark:text-gray-300">
-                  {post.smallDescription}
-                </p>
-              )}
-              {/* --- FIN DE CAMBIO --- */}
-
-              <div className="mt-auto flex items-center justify-between pt-4">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {formatDate(post._updatedAt)}
-                </span>
-                <Link
-                  href={`/${basePath}/${post.slug?.current}`}
-                  className="inline-flex items-center text-sm font-medium text-primary transition-colors hover:text-primary/80"
-                >
-                  Read More
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="ml-1 h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
+          return (
+            <div
+              key={post._id}
+              className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-md transition-all hover:translate-y-[-5px] hover:shadow-lg dark:bg-gray-800"
+            >
+              <div className="relative aspect-video w-full overflow-hidden">
+                <Link href={postLink} className="block">
+                  {post.mainImage ? (
+                    <Image
+                      src={urlFor(post.mainImage).url()}
+                      alt={post.title}
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      style={{ objectFit: "cover" }}
+                      className="transition-transform duration-500 hover:scale-105"
                     />
-                  </svg>
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700">
+                      <span className="text-gray-500 dark:text-gray-400">
+                        No Image
+                      </span>
+                    </div>
+                  )}
                 </Link>
               </div>
+
+              <div className="flex flex-grow flex-col p-6">
+                {post.categories && post.categories.length > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {post.categories.map((cat: any) => (
+                      <span
+                        key={cat.title}
+                        className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${getCategoryBadge(cat.title)}`}
+                      >
+                        {cat.title}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <h3 className="mb-3 text-xl font-semibold text-gray-800 dark:text-white">
+                  <Link
+                    href={postLink}
+                    className="transition-colors duration-300 hover:text-primary"
+                  >
+                    {post.title}
+                  </Link>
+                </h3>
+
+                {post.smallDescription && (
+                  <p className="mb-4 line-clamp-3 text-sm text-gray-600 dark:text-gray-300">
+                    {post.smallDescription}
+                  </p>
+                )}
+
+                <div className="mt-auto flex items-center justify-between pt-4">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {formatDate(post._updatedAt)}
+                  </span>
+                  <Link
+                    href={postLink}
+                    className="inline-flex items-center text-sm font-medium text-primary transition-colors hover:text-primary/80"
+                  >
+                    Read More
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="ml-1 h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </Link>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Pagination */}
