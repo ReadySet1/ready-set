@@ -136,6 +136,12 @@ export function AppSidebar() {
       href: "/admin/job-applications",
       icon: ClipboardList,
       isActive: pathname?.includes("/admin/job-applications") ?? false,
+    },
+    {
+      title: "Carrier Integrations",
+      href: "/admin/carriers",
+      icon: Settings,
+      isActive: pathname?.includes("/admin/carriers") ?? false,
     }
   ];
 
