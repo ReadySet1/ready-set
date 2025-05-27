@@ -1,5 +1,4 @@
 // src/app/(site)/free-resources/page.tsx
-import Breadcrumb from "@/components/Common/Breadcrumb";
 import ResourcesGrid from "@/components/Resources/ResourcesGrid";
 import NewsletterForm from "@/components/Resources/ui/NewsLetterForm";
 import { Separator } from "@/components/ui/separator";

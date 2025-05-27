@@ -261,10 +261,10 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     ],
     // ✅ Updated coverImage to use local image path
     coverImage: {
-      _type: 'image',
-      asset: {
-        url: '/images/resources/2.webp',
-        _type: 'reference'
+       _type: 'image',
+       asset: {
+         _ref: 'image-Tb9Ew8CXIwaY6R1kjMvI0uRR-2000x3000-jpg',
+         _type: 'reference'
       }
     },
     seo: {
@@ -275,7 +275,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
   'your-guide-to-delegation': {
     _id: 'static-delegation',
     title: 'Your Guide to Delegation',
-    subtitle: 'How to effectively delegate tasks and grow your business',
+    subtitle: 'Mastering the Art of Delegating for Business Growth',
     slug: { current: 'your-guide-to-delegation' },
     _updatedAt: new Date().toISOString(),
     category: 'Management',
@@ -286,7 +286,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
         children: [
           {
             _type: 'span',
-            text: 'Effective delegation is crucial for business growth and personal productivity.',
+            text: 'Does managing your business feel overwhelming? Many business owners struggle to balance daily operations while also focusing on growth. Holding onto too many tasks can lead to burnout, inefficiency, and stalled progress. However, delegation isn’t about losing control—it’s about gaining the freedom to focus on what truly matters.',
             marks: []
           }
         ]
@@ -294,7 +294,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     ],
     mainContent: [
       {
-        title: 'The Art of Delegation',
+        title: 'How This Guide Helps You',
         content: [
           {
             _type: 'block',
@@ -302,13 +302,113 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
             children: [
               {
                 _type: 'span',
-                text: 'Learn how to delegate effectively to maximize your team\'s potential and focus on high-impact activities.',
+                text: 'This guide breaks down the essentials of delegating tasks, the benefits of delegation, and proven methods such as the Eisenhower Decision Matrix to help you determine what to delegate. Whether you’re new to delegation or looking to refine your approach, this guide will help you delegate smarter and work more efficiently.',
                 marks: []
               }
             ]
           }
         ]
+      }, 
+       {
+        title: 'What You Will Learn',
+        content: [
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'What is Delegation? Understanding the delegate meaning and why it matters.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'The Benefits of Delegation: How handing off tasks can improve efficiency and business growth.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Effective Delegation Methods: A breakdown of strategies, including the Eisenhower Decision Matrix, to prioritize and delegate tasks effectively.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'How to Delegate Successfully: Steps to assign tasks, set expectations, and track progress.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Common Delegation Mistakes to Avoid: How to overcome trust issues and ensure accountability.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Delegating to Virtual Assistants: How VAs can help manage emails, scheduling, customer service, and more.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'If you found this guide helpful, share it with your network or schedule a consultation call with us. Ready to take the next step? Contact ',
+                marks: []
+              },
+              {
+                _type: 'span',
+                text: 'Ready Set Group',
+                marks: ['link']
+              },
+              {
+                _type: 'span',
+                text: ' now!',
+                marks: []
+              }
+            ],
+            markDefs: [
+              {
+                _key: 'link-ready-set-group',
+                _type: 'link',
+                href: '#' // Replace with actual URL
+              }
+            ]
+          }
+        ]
       }
+      
     ],
          coverImage: {
        _type: 'image',
@@ -325,7 +425,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
   'building-a-reliable-delivery-network': {
     _id: 'static-delivery-network',
     title: 'Building a Reliable Delivery Network',
-    subtitle: 'Essential strategies for creating dependable logistics',
+    subtitle: 'Key Considerations for Business Owners',
     slug: { current: 'building-a-reliable-delivery-network' },
     _updatedAt: new Date().toISOString(),
     category: 'Logistics',
@@ -336,7 +436,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
         children: [
           {
             _type: 'span',
-            text: 'A reliable delivery network is the backbone of any successful logistics operation.',
+            text: 'This guide breaks down the key components of a strong delivery system, helping you optimize logistics, improve customer satisfaction, and cut costs without the confusion of technical jargon. You’ll discover the essential strategies to build a seamless delivery process that keeps your business running smoothly and customers coming back.',
             marks: []
           }
         ]
@@ -344,7 +444,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     ],
     mainContent: [
       {
-        title: 'Network Infrastructure',
+        title: 'What You Will Get',
         content: [
           {
             _type: 'block',
@@ -353,6 +453,126 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
               {
                 _type: 'span',
                 text: 'Build a robust delivery network that ensures timely and efficient service to your customers.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '✓ Why a Reliable Delivery Network Matters',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '✓ Key Components of an Efficient Delivery System',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '✓ Steps to Build & Optimize Your Network',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '✓ Cost Considerations & ROI Benefits',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '✓ Common Mistakes to Avoid',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '✓ Best Practices for Long-Term Success',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '✓ Future Trends in Delivery & Logistics',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'This guide matters because it provides both strategic overview and tactical guidance for building a delivery network that drives business growth.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Download your Free Building Reliable Delivery Network Guide to get more insights!',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'If you found this guide helpful, share it with your network or schedule a consultation call with us. Ready to take the next step? Contact ',
+                marks: []
+              },
+              {
+                _type: 'span',
+                text: 'Ready Set Group',
+                marks: [] // Puedes agregar marcas específicas si "Ready Set Group" es un enlace o tiene un formato especial
+              },
+              {
+                _type: 'span',
+                text: ' now!',
                 marks: []
               }
             ]
@@ -375,11 +595,11 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
   'the-complete-guide-to-choosing-the-right-delivery-partner': {
     _id: 'static-delivery-partner',
     title: 'The Complete Guide to Choosing the Right Delivery Partner',
-    subtitle: 'How to select the best delivery service for your business',
+    subtitle: 'A Strategic Approach',
     slug: { current: 'the-complete-guide-to-choosing-the-right-delivery-partner' },
     _updatedAt: new Date().toISOString(),
     category: 'Business',
-    introduction: [
+   introduction: [
       {
         _type: 'block',
         style: 'normal',
@@ -387,6 +607,28 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
           {
             _type: 'span',
             text: 'Choosing the right delivery partner can make or break your customer experience.',
+            marks: []
+          }
+        ]
+      },
+      {
+        _type: 'block',
+        style: 'normal',
+        children: [
+          {
+            _type: 'span',
+            text: 'Whether you\'re running a small business or managing a larger operation, this guide provides a structured approach to making an informed decision that will support your business growth and customer satisfaction goals.',
+            marks: []
+          }
+        ]
+      },
+      {
+        _type: 'block',
+        style: 'normal',
+        children: [
+          {
+            _type: 'span',
+            text: 'This comprehensive resource helps businesses navigate the critical process of selecting the right delivery partner in today\'s evolving e-commerce landscape. The guide is particularly valuable because:',
             marks: []
           }
         ]
@@ -403,6 +645,214 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
               {
                 _type: 'span',
                 text: 'Learn the key factors to consider when selecting a delivery partner for your business needs.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '1. The guide provides detailed frameworks for evaluating potential partners across four key areas:',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Cost structure analysis (both direct and indirect costs)',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Customer experience optimization',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Technology integration capabilities',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Support system evaluation',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '2. It includes practical implementation tools such as:',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Step-by-step checklists',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Industry-specific considerations for specialized deliveries',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Risk management strategies',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Performance measurement metrics',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'This resource will help your business succeed by:',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Avoiding common pitfalls in delivery partner selection',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Ensuring comprehensive evaluation of potential partners',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Establishing clear metrics for success',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Maintaining quality control throughout the partnership',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Creating contingency plans for potential disruptions',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Download your Free Delivery Partner Selection Guide to get more insights!',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'If you found this guide helpful, share it with your network or schedule a consultation call with us. Ready to take the next step? Contact ',
+                marks: []
+              },
+              {
+                _type: 'span',
+                text: 'Ready Set Group',
+                marks: [] // You might want to add a mark here if "Ready Set Group" is a link
+              },
+              {
+                _type: 'span',
+                text: ' now!',
                 marks: []
               }
             ]
@@ -436,7 +886,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
         children: [
           {
             _type: 'span',
-            text: 'Hiring the right virtual assistant can transform your business productivity and efficiency.',
+            text: 'Hiring a Virtual Assistant (VA) isn\'t just about ticking tasks off your list—it\'s about finding someone who fits your business and work style. Before you start, ask yourself: What tasks do I need help with? What skills should my VA have? This guide walks you through the process of finding the right VA who can help you work smarter and free up your time.',
             marks: []
           }
         ]
@@ -444,7 +894,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     ],
     mainContent: [
       {
-        title: 'Finding the Perfect VA',
+        title: 'How This Guide Helps You',
         content: [
           {
             _type: 'block',
@@ -452,15 +902,69 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
             children: [
               {
                 _type: 'span',
-                text: 'Discover the steps to identify, evaluate, and hire virtual assistants who will excel in your business.',
+                text: 'Learn how to hire the right Virtual Assistant for your business. This guide covers how to identify tasks to delegate, find qualified VAs, evaluate candidates, and onboard them into your workflow. You\'ll also learn how to manage and measure their performance effectively.',
+                marks: []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        title: 'What You Will Get',
+        content: [
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Hiring the Perfect Virtual Assistant for Your Business\n• How to Find the Right Virtual Assistant (VA)\n• Checklist: What to Look for in a VA\n• Benefits of Having a Virtual Assistant for Your Business',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Hiring a VA is a smart move when you\'re ready to focus on the bigger picture. Let Ready Set Group LLC match you with professionals who fit your business needs. Get your free guide and start delegating today.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Want personalized support? Book a Discovery Call with Ready Set Group LLC and let us help you find the right VA.',
+                marks: []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Next Steps',
+        content: [
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'If you found this guide helpful, share it with your network or schedule a consultation call with us. Ready to take the next step? Contact Ready Set Group now!',
                 marks: []
               }
             ]
           }
         ]
       }
-    ],
-         coverImage: {
+    ],          
+    coverImage: {
        _type: 'image',
        asset: {
          _ref: 'image-Tb9Ew8CXIwaY6R1kjMvI0uRR-2000x3000-jpg',
@@ -472,10 +976,10 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
       metaDescription: 'Learn how to find, evaluate, and hire the perfect virtual assistant for your business with our step-by-step guide.',
     }
   },
-  'how-to-start-social-media-marketing-made-simple': {
+ 'how-to-start-social-media-marketing-made-simple': {
     _id: 'static-social-media',
     title: 'How to Start Social Media Marketing Made Simple',
-    subtitle: 'A beginner-friendly approach to social media marketing',
+    subtitle: 'Your Step-by-Step Guide',
     slug: { current: 'how-to-start-social-media-marketing-made-simple' },
     _updatedAt: new Date().toISOString(),
     category: 'Marketing',
@@ -486,7 +990,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
         children: [
           {
             _type: 'span',
-            text: 'Social media marketing doesn\'t have to be overwhelming. Start with these simple, effective strategies.',
+            text: 'If you\'re a business owner, small business operator, or solopreneur struggling to maintain a consistent social media presence, this social media marketing guide is for you. You might feel overwhelmed by content creation, unsure of which platforms to focus on, or frustrated by low engagement. Social media doesn\'t have to be complicated—with the right approach, you can turn followers into loyal customers. Inside this guide, you\'ll learn how to build a results-driven social media strategy. You\'ll discover how to identify the best platforms for your business, create content that engages and converts, and use social media marketing metrics to refine your approach. Additionally, you\'ll learn how to leverage Virtual Assistants to stay consistent without the stress.',
             marks: []
           }
         ]
@@ -494,15 +998,110 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     ],
     mainContent: [
       {
-        title: 'Getting Started',
+        title: 'What You Will Get',
         content: [
+          {
+            _type: 'block',
+            style: 'normal',
+            listItem: 'bullet',
+            children: [
+              {
+                _type: 'span',
+                text: 'What Social Media Marketing Is',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            listItem: 'bullet',
+            children: [
+              {
+                _type: 'span',
+                text: 'Why Social Media Matters',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            listItem: 'bullet',
+            children: [
+              {
+                _type: 'span',
+                text: 'How to Get Started',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            listItem: 'bullet',
+            children: [
+              {
+                _type: 'span',
+                text: 'Key Elements of a Social Media Strategy',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            listItem: 'bullet',
+            children: [
+              {
+                _type: 'span',
+                text: 'Common Mistakes to Avoid',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            listItem: 'bullet',
+            children: [
+              {
+                _type: 'span',
+                text: 'Social Media Metrics to Track',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            listItem: 'bullet',
+            children: [
+              {
+                _type: 'span',
+                text: 'How Virtual Assistants Can Help',
+                marks: []
+              }
+            ]
+          },
           {
             _type: 'block',
             style: 'normal',
             children: [
               {
                 _type: 'span',
-                text: 'Learn the fundamentals of social media marketing and how to create an effective strategy for your business.',
+                text: 'This free guide provides a step-by-step roadmap to streamline your social media efforts, so you can focus on growing your business. Download your free Social Media Strategy Checklist now to get started.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'If you found this guide helpful, share it with your network or schedule a consultation call with us. Ready to take the next step? Contact Ready Set Group now!',
                 marks: []
               }
             ]
@@ -510,7 +1109,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
         ]
       }
     ],
-         coverImage: {
+       coverImage: {
        _type: 'image',
        asset: {
          _ref: 'image-Tb9Ew8CXIwaY6R1kjMvI0uRR-2000x3000-jpg',
@@ -525,7 +1124,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
   'why-email-metrics-matter': {
     _id: 'static-email-metrics',
     title: 'Why Email Metrics Matter',
-    subtitle: 'Understanding and improving your email marketing performance',
+    subtitle: 'A Business Owner’s Guide to Tracking Campaign Performance',
     slug: { current: 'why-email-metrics-matter' },
     _updatedAt: new Date().toISOString(),
     category: 'Analytics',
@@ -536,7 +1135,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
         children: [
           {
             _type: 'span',
-            text: 'Email metrics provide valuable insights into your marketing performance and customer engagement.',
+            text: 'Are you sending email after email without seeing the results you want? You’re not alone. Too many business owners rely on guesswork and ‘gut feelings’ when it comes to their email campaigns—only to be left wondering why open rates are low, conversions are stalled, and unsubscribe rates keep climbing.',
             marks: []
           }
         ]
@@ -544,7 +1143,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     ],
     mainContent: [
       {
-        title: 'Key Email Metrics',
+        title: 'How This Guide Helps You',
         content: [
           {
             _type: 'block',
@@ -552,7 +1151,111 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
             children: [
               {
                 _type: 'span',
-                text: 'Learn which email metrics to track and how to use them to improve your marketing campaigns.',
+                text: 'This comprehensive guide takes the mystery out of email marketing metrics, showing you exactly what to track and why it matters. Discover how to optimize your campaigns step by step—from pinpointing subject lines that boost open rates, to refining your message so you attract the right audience and grow your bottom line.',
+                marks: []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        title: 'What You Will Get',
+        content: [
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• What Happens When You Ignore Your Email Metrics',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Key Email Reporting Metrics You Should Know',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Email Campaign Performance Checklist',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• How It Will Help Your Business',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• When to Gather and Report Email Metrics',
+                marks: []
+              }
+            ]
+          },
+          // Content that previously had 'title: null' is now directly part of 'mainContent' without a separate title.
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'This free guide is your roadmap for crafting a winning email strategy—but for monitoring, forecasting, and other ‘menial tasks, delegate it to us!',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Download your free Email Metrics Template report now to get started.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'If you found this guide helpful, share it with your network or schedule a consultation call with us. Ready to take the next step? Contact ',
+                marks: []
+              },
+              {
+                _type: 'span',
+                text: 'Ready Set Group',
+                marks: ['strong']
+              },
+              {
+                _type: 'span',
+                text: ' now!',
                 marks: []
               }
             ]
@@ -575,7 +1278,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
   'addressing-key-issues-in-delivery-logistics': {
     _id: 'static-delivery-logistics',
     title: 'Addressing Key Issues in Delivery Logistics',
-    subtitle: 'Solving common delivery and logistics challenges',
+    subtitle: 'A Practical Guide',
     slug: { current: 'addressing-key-issues-in-delivery-logistics' },
     _updatedAt: new Date().toISOString(),
     category: 'Logistics',
@@ -586,7 +1289,18 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
         children: [
           {
             _type: 'span',
-            text: 'Identify and solve the most common challenges in delivery logistics to improve your operations.',
+            text: 'Are you navigating the complex world of delivery logistics? This guide equips business owners with practical solutions to the most pressing challenges in the delivery market, from optimizing operations to managing costs and ensuring customer satisfaction.',
+            marks: []
+          }
+        ]
+      },
+      {
+        _type: 'block',
+        style: 'normal',
+        children: [
+          {
+            _type: 'span',
+            text: 'Whether you\'re launching a new delivery service or scaling your operations, this guide provides actionable insights to help you stay competitive in an ever-evolving industry.',
             marks: []
           }
         ]
@@ -594,7 +1308,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     ],
     mainContent: [
       {
-        title: 'Common Logistics Issues',
+        title: 'Why this guide is essential:',
         content: [
           {
             _type: 'block',
@@ -602,7 +1316,72 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
             children: [
               {
                 _type: 'span',
-                text: 'Learn about typical delivery logistics problems and proven solutions to overcome them.',
+                text: '• Understand Key Challenges: Gain insight into the most common issues faced in delivery logistics, such as last-mile delivery, cost management, and route optimization.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Actionable Solutions: Learn practical strategies to overcome logistical hurdles and enhance operational efficiency.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Improve Customer Satisfaction: Implement tips to enhance delivery speed, accuracy, and overall customer experience.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Save Time and Money: Identify cost-effective methods to streamline your logistics processes and boost profitability.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Download this must-read resource to take a step forward in mastering delivery logistics.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'If you found this guide helpful, share it with your network or schedule a consultation call with us. Ready to take the next step? Contact ',
+                marks: []
+              },
+              {
+                _type: 'span',
+                text: 'Ready Set Group',
+                marks: ['strong'] // Assuming "Ready Set Group" is meant to be bold based on visual emphasis
+              },
+              {
+                _type: 'span',
+                text: ' now!',
                 marks: []
               }
             ]
@@ -624,8 +1403,8 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
   },
   'email-testing-made-simple': {
     _id: 'static-email-testing',
-    title: 'Email Testing Made Simple',
-    subtitle: 'A practical guide to testing your email campaigns',
+    title: 'Email A/B Testing Made Simple:',
+    subtitle: 'A Guide for Business Owners',
     slug: { current: 'email-testing-made-simple' },
     _updatedAt: new Date().toISOString(),
     category: 'Marketing',
@@ -636,7 +1415,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
         children: [
           {
             _type: 'span',
-            text: 'Effective email testing ensures your campaigns perform at their best and reach your audience successfully.',
+            text: 'If you are a business owner, small business owner, or solopreneur looking to improve your email campaigns but are not sure where to start, A/B testing is your new best friend. It is not as complicated as it sounds, and the insights it provides can help you make informed decisions about what works - and what doesn\'t.',
             marks: []
           }
         ]
@@ -644,7 +1423,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     ],
     mainContent: [
       {
-        title: 'Testing Strategies',
+        title: 'How This Guide Helps You',
         content: [
           {
             _type: 'block',
@@ -652,7 +1431,144 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
             children: [
               {
                 _type: 'span',
-                text: 'Learn simple yet effective methods to test your email campaigns and improve their performance.',
+                text: 'Inside this guide, you will learn what A/B testing is and how it works - explained simply, without the jargon. You\'ll discover key areas to test, like subject lines, CTAs, visuals, and timing, along with practical tips to run tests that lead to better open rates, clicks and conversions.',
+                marks: []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        title: 'What You Will Get',
+        content: [
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• What Email A/B Testing is',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Why A/B Testing Matters',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• How to Get Started',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Key Email Elements to Test',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• When to A/B Test',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• Biggest A/B Testing Challenges',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• A/B Testing Checklist',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: '• 7 High-Performing Subject Line Strategies',
+                marks: []
+              }
+            ]
+          },
+          // Content that previously had 'title: null' is now directly part of 'mainContent' without a separate title.
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'This free guide is your roadmap for crafting a winning email strategy-but for monitoring, forecasting and other menial tasks, delegate it to us!',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Download your free Email Metrics Template report now to get started',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'If you found this guide helpful, share it with your network or schedule a consultation call with us. Ready to take the next step? Contact ',
+                marks: []
+              },
+              {
+                _type: 'span',
+                text: 'Ready Set Group',
+                marks: ['strong']
+              },
+              {
+                _type: 'span',
+                text: ' now!',
                 marks: []
               }
             ]
@@ -674,8 +1590,8 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
   },
   'social-media-strategy-guide-and-template': {
     _id: 'static-social-strategy',
-    title: 'Social Media Strategy Guide and Template',
-    subtitle: 'Create a winning social media strategy for your business',
+    title: 'Social Media Strategy Guide & Template',
+    subtitle: 'Your Roadmap to a More Purposeful Social Media Approach',
     slug: { current: 'social-media-strategy-guide-and-template' },
     _updatedAt: new Date().toISOString(),
     category: 'Marketing',
@@ -686,7 +1602,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
         children: [
           {
             _type: 'span',
-            text: 'A well-planned social media strategy is essential for building brand awareness and engaging with your audience.',
+            text: 'Managing social media can feel challenging. Many business owners struggle with creating a clear, focused strategy that drives engagement and results. This social media strategy guide provides a step-by-step approach to help you define your goals, identify your audience, select the best platforms, and create a content plan that works for your business.',
             marks: []
           }
         ]
@@ -694,7 +1610,7 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     ],
     mainContent: [
       {
-        title: 'Strategy Development',
+        title: 'How This Guide Helps You',
         content: [
           {
             _type: 'block',
@@ -702,7 +1618,88 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
             children: [
               {
                 _type: 'span',
-                text: 'Use our comprehensive guide and template to create an effective social media strategy for your business.',
+                text: 'This guide takes the guesswork out of social media management, covering everything from goal setting to audience identification, platform selection, and content creation. By following the steps in this guide, you\'ll learn how to create your own social media strategy template that is tailored to your business goals and needs.',
+                marks: []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        title: 'What You Will Learn',
+        content: [
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Defining Your Social Media Purpose: Understand why you\'re on social media—whether it\'s to build brand awareness, drive traffic, or generate leads.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Identifying Your Target Audience: Learn how to define and connect with your ideal customers.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Choosing the Right Platforms: Focus your efforts on platforms that align with where your audience spends their time.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'Content Planning & Creation: Develop a content calendar that includes the right mix of content types and formats.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'By following this guide, you\'ll be able to optimize your social media efforts, track your progress with KPIs, and create a social media strategy template that supports your business goals.',
+                marks: []
+              }
+            ]
+          },
+          {
+            _type: 'block',
+            style: 'normal',
+            children: [
+              {
+                _type: 'span',
+                text: 'If you found this guide helpful, share it with your network or schedule a consultation call with us. Ready to take the next step? Contact ',
+                marks: []
+              },
+              {
+                _type: 'span',
+                text: 'Ready Set Group',
+                marks: ['strong'] // Assuming "Ready Set Group" is meant to be bold based on visual emphasis
+              },
+              {
+                _type: 'span',
+                text: ' now!',
                 marks: []
               }
             ]
