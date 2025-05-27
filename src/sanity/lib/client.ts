@@ -123,10 +123,9 @@ const createSimpleBlogCard = (post: ExtendedPostDocument): SimpleBlogCard => ({
   title: post.title,
   slug: {
     current: post.slug.current,
-    _type: "slug",
-    _createdAt: new Date().toISOString(),
-    smallDescription: post.smallDescription
+    _type: "slug"
   },
+  smallDescription: post.smallDescription,
   mainImage: post.mainImage ? {
     alt: post.title,
     asset: post.mainImage.asset,
