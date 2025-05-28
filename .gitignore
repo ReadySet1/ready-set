@@ -22,6 +22,8 @@
 .DS_Store
 *.pem
 .vscode/ 
+.prisma-initialized
+
 
 # debug
 npm-debug.log*
