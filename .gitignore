@@ -44,6 +44,9 @@ next-env.d.ts
 backups/*
 !backups/.gitkeep
 
+# prisma
+prisma/migrations/
+
 
 
 # Environment Variables

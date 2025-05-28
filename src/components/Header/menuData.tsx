@@ -60,19 +60,19 @@ export const rsSubsidiariesMenuItem: MenuItem = {
     },
     {
       id: 13,
-      title: "Food Delivery",
+      title: "Food Deliveries",
       path: "/food-delivery",
       newTab: false,
     },
     {
       id: 14,
-      title: "Flowers Delivery",
+      title: "Flowers Deliveries",
       path: "/flowers",
       newTab: false,
     },
     {
       id: 15,
-      title: "Bakery Delivery",
+      title: "Bakery Deliveries",
       path: "/bakery-delivery",
       newTab: false,
     },

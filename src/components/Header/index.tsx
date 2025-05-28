@@ -30,9 +30,9 @@ const baseMenuItems: MenuItem[] = [
     title: "Logistic",
     submenu: [
       { id: 1031, title: "Logistics", path: "/logistics" },
-      { id: 1032, title: "Food Delivery", path: "/food-delivery" },
-      { id: 1033, title: "Flowers Delivery", path: "/flowers" },
-      { id: 1034, title: "Bakery Delivery", path: "/bakery-delivery" },
+      { id: 1032, title: "Food Deliveries", path: "/food-delivery" },
+      { id: 1033, title: "Flowers Deliveries", path: "/flowers" },
+      { id: 1034, title: "Bakery Deliveries", path: "/bakery-delivery" },
     ],
   },
   {
