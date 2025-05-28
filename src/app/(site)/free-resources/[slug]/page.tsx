@@ -89,6 +89,25 @@ export default async function GuidePage({
   const { slug } = await params;
   const guide = await getGuide(slug);
 
+  console.log("---------------------------------------");
+  console.log(
+    "Guía completa recibida en GuidePage:",
+    JSON.stringify(guide, null, 2),
+  ); // Convierte a string para ver el objeto completo
+  console.log(
+    "Contenido de Introducción:",
+    JSON.stringify(guide?.introduction, null, 2),
+  );
+  console.log(
+    "Contenido de Secciones Principales:",
+    JSON.stringify(guide?.mainContent, null, 2),
+  );
+  console.log(
+    "Contenido de Secciones de Lista:",
+    JSON.stringify(guide?.listSections, null, 2),
+  );
+  console.log("---------------------------------------");
+
   if (!guide) notFound();
 
   // Get the image URL from coverImage
@@ -206,9 +225,7 @@ export default async function GuidePage({
                 {/* Call to action */}
                 {guide.callToAction && (
                   <div className="mt-8 space-y-4">
-                    <p className="font-medium text-gray-700">
-                      
-                    </p>
+                    <p className="font-medium text-gray-700"></p>
                     <p className="text-gray-600">
                       If you found this guide helpful, share it with your
                       network or schedule a consultation call with us. Ready to
@@ -288,33 +305,34 @@ export default async function GuidePage({
 export async function generateStaticParams() {
   try {
     // During build time, use static list to avoid fetch issues
-    const isStaticGeneration = typeof window === 'undefined' && !process.env.VERCEL_URL;
-    const isNextBuild = process.env.npm_lifecycle_event === 'build';
-    
+    const isStaticGeneration =
+      typeof window === "undefined" && !process.env.VERCEL_URL;
+    const isNextBuild = process.env.npm_lifecycle_event === "build";
+
     if (isStaticGeneration || isNextBuild) {
       // Return static guide slugs to avoid fetch operations during build
       const staticGuideSlugs = [
-        'what-is-email-marketing',
-        'your-guide-to-delegation', 
-        'building-a-reliable-delivery-network',
-        'the-complete-guide-to-choosing-the-right-delivery-partner',
-        'how-to-hire-the-right-virtual-assistant',
-        'how-to-start-social-media-marketing-made-simple',
-        'why-email-metrics-matter',
-        'addressing-key-issues-in-delivery-logistics',
-        'email-testing-made-simple',
-        'social-media-strategy-guide-and-template'
+        "what-is-email-marketing",
+        "your-guide-to-delegation",
+        "building-a-reliable-delivery-network",
+        "the-complete-guide-to-choosing-the-right-delivery-partner",
+        "how-to-hire-the-right-virtual-assistant",
+        "how-to-start-social-media-marketing-made-simple",
+        "why-email-metrics-matter",
+        "addressing-key-issues-in-delivery-logistics",
+        "email-testing-made-simple",
+        "social-media-strategy-guide-and-template",
       ];
-      
+
       return staticGuideSlugs.map((slug) => ({
         slug: slug,
       }));
     }
-    
+
     // Runtime: Try to fetch from Sanity
     const { getGuides } = await import("@/sanity/lib/queries");
     const guides = await getGuides();
-    
+
     // Make sure we return objects with slug as string
     return guides.map((guide) => ({
       slug: guide.slug.current,
@@ -323,18 +341,18 @@ export async function generateStaticParams() {
     console.error("Error generating static params:", error);
     // Fallback to static guide slugs if Sanity fetch fails
     const staticGuideSlugs = [
-      'what-is-email-marketing',
-      'your-guide-to-delegation', 
-      'building-a-reliable-delivery-network',
-      'the-complete-guide-to-choosing-the-right-delivery-partner',
-      'how-to-hire-the-right-virtual-assistant',
-      'how-to-start-social-media-marketing-made-simple',
-      'why-email-metrics-matter',
-      'addressing-key-issues-in-delivery-logistics',
-      'email-testing-made-simple',
-      'social-media-strategy-guide-and-template'
+      "what-is-email-marketing",
+      "your-guide-to-delegation",
+      "building-a-reliable-delivery-network",
+      "the-complete-guide-to-choosing-the-right-delivery-partner",
+      "how-to-hire-the-right-virtual-assistant",
+      "how-to-start-social-media-marketing-made-simple",
+      "why-email-metrics-matter",
+      "addressing-key-issues-in-delivery-logistics",
+      "email-testing-made-simple",
+      "social-media-strategy-guide-and-template",
     ];
-    
+
     return staticGuideSlugs.map((slug) => ({
       slug: slug,
     }));
