@@ -31,6 +31,8 @@ import { useUser } from "@/contexts/UserContext";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/utils/supabase/client";
+import { CarrierOrdersBadge } from "@/components/Dashboard/CarrierManagement/CarrierOrdersBadge";
+import { CarrierSummaryWidget } from "@/components/Dashboard/CarrierManagement/CarrierSummaryWidget";
 
 // Add interface for Job Applications API response
 interface JobApplicationsApiResponse {
@@ -321,10 +323,18 @@ const ModernOrdersTable: React.FC<{orders: CateringRequest[]}> = ({ orders }) =>
         <div className="bg-white divide-y divide-gray-100">
           {orders.map((order) => (
             <div key={order.id} className="grid grid-cols-4 px-6 py-4 hover:bg-gray-50/50 transition-colors duration-150">
-              <div className="text-sm font-medium">
+              <div className="text-sm font-medium space-y-1">
                 <Link href={`/admin/catering-orders/${order.orderNumber}`} className="text-blue-600 hover:text-blue-800 hover:underline">
                   #{order.orderNumber}
                 </Link>
+                <div>
+                  <CarrierOrdersBadge 
+                    orderNumber={order.orderNumber}
+                    brokerage={isCateringRequest(order) ? order.brokerage : undefined}
+                    className="text-xs"
+                    showTooltip={false}
+                  />
+                </div>
               </div>
               <div className="text-sm text-gray-600">
                 {isCateringRequest(order) ? "Catering" : isOnDemand(order) ? "On Demand" : "Catering"}
@@ -652,33 +662,41 @@ export function ModernDashboardHome() {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <ModernDashboardCard
-            title="Active Catering Orders"
-            linkText="View All Orders"
-            linkHref="/admin/catering-orders"
-            icon={Calendar}
-          >
-            <ModernOrdersTable orders={activeOrders} />
-          </ModernDashboardCard>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-6">
+            <ModernDashboardCard
+              title="Active Catering Orders"
+              linkText="View All Orders"
+              linkHref="/admin/catering-orders"
+              icon={Calendar}
+            >
+              <ModernOrdersTable orders={activeOrders} />
+            </ModernDashboardCard>
+            
+            <div className="grid gap-6 md:grid-cols-2">
+              <ModernDashboardCard
+                title="Recent Job Applications"
+                linkText="View All Applications"
+                linkHref="/admin/job-applications"
+                icon={Briefcase}
+              >
+                <ModernJobApplicationsTable applications={recentApplications.slice(0, 5)} />
+              </ModernDashboardCard>
+              
+              <ModernDashboardCard
+                title="Recent Users"
+                linkText="View All Users"
+                linkHref="/admin/users"
+                icon={Users}
+              >
+                <ModernUsersTable users={users.slice(0, 5)} />
+              </ModernDashboardCard>
+            </div>
+          </div>
           
-          <ModernDashboardCard
-            title="Recent Job Applications"
-            linkText="View All Applications"
-            linkHref="/admin/job-applications"
-            icon={Briefcase}
-          >
-            <ModernJobApplicationsTable applications={recentApplications.slice(0, 5)} />
-          </ModernDashboardCard>
-          
-          <ModernDashboardCard
-            title="Recent Users"
-            linkText="View All Users"
-            linkHref="/admin/users"
-            icon={Users}
-          >
-            <ModernUsersTable users={users.slice(0, 5)} />
-          </ModernDashboardCard>
+          <div className="space-y-6">
+            <CarrierSummaryWidget />
+          </div>
         </div>
       </main>
     </div>

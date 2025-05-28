@@ -21,7 +21,7 @@
 # misc
 .DS_Store
 *.pem
-.vscode/ 
+.vscode/
 
 # debug
 npm-debug.log*
@@ -44,11 +44,6 @@ next-env.d.ts
 backups/*
 !backups/.gitkeep
 
-# prisma
-prisma/migrations/
-
-
-
 # Environment Variables
 .env.local
 .env.development.local
@@ -61,3 +56,42 @@ prisma/migrations/
 
 .github/
 .cursor/
+
+# Prisma
+.prisma-initialized
+prisma/migrations/migration_lock.toml
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE and Editor files
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store?
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Temporary folders
+tmp/
+temp/
