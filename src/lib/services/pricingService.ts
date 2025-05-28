@@ -1,126 +1,209 @@
 /**
- * Pricing Service for calculating delivery costs
- * Based on Ready Set LLC pricing structure for CaterValley integration
+ * Updated Pricing Service for CaterValley Integration
+ * Implements the new distance-based and head count-based pricing structure
+ * URGENT: Updated to address financial losses on deliveries
  */
 
 interface PricingParams {
   pickupAddress: string;
   dropoffAddress: string;
-  itemCount: number;
-  orderTotal: number;
+  headCount: number;
+  foodCost: number;
   deliveryDate?: string;
   deliveryTime?: string;
+  includeTip?: boolean; // New field to handle tip vs no-tip pricing
 }
 
 interface PricingResult {
   deliveryPrice: number;
+  distance: number;
+  tier: string;
   breakdown: {
     basePrice: number;
-    itemCountMultiplier?: number;
-    orderTotalMultiplier?: number;
-    distanceMultiplier?: number;
-    peakTimeMultiplier?: number;
+    distanceTier: string;
+    headCountTier: string;
+    foodCostTier: string;
+    tipIncluded: boolean;
+    calculation: string;
   };
 }
 
-// Base pricing structure from meeting notes
-const PRICING_CONFIG = {
-  BASE_PRICE: 42.5,
-  PRICE_OVER_25_ITEMS: 50,
-  PRICE_OVER_300_TOTAL: 55,
-  PEAK_TIME_MULTIPLIER: 1.15, // 15% increase during peak hours
-  DISTANCE_BASE_MILES: 15, // Base distance included in price
-  DISTANCE_PER_ADDITIONAL_MILE: 2.5,
-  WEEKEND_MULTIPLIER: 1.1, // 10% increase for weekend deliveries
+// Updated pricing structure based on new CaterValley requirements
+const PRICING_TIERS = {
+  // Standard Delivery (0-10 miles)
+  STANDARD: {
+    tier1: { headCount: 25, foodCost: 300, withTip: 35.00, withoutTip: 42.50 },
+    tier2: { headCount: 49, foodCost: 599, withTip: 45.00, withoutTip: 52.50 },
+    tier3: { headCount: 74, foodCost: 899, withTip: 55.00, withoutTip: 62.50 },
+    tier4: { headCount: 99, foodCost: 1199, withTip: 65.00, withoutTip: 72.50 },
+    tier5: { headCount: 100, foodCost: 1200, withTipPercent: 0.09, withoutTipPercent: 0.10 }
+  },
+  
+  // Over 10 Miles Delivery (example: >25 headcount = $71.59 with tip)
+  OVER_10_MILES: {
+    tier1: { headCount: 25, foodCost: 300, withTip: 71.59, withoutTip: 85.00 },
+    tier2: { headCount: 49, foodCost: 599, withTip: 90.00, withoutTip: 105.00 },
+    tier3: { headCount: 74, foodCost: 899, withTip: 110.00, withoutTip: 125.00 },
+    tier4: { headCount: 99, foodCost: 1199, withTip: 130.00, withoutTip: 145.00 },
+    tier5: { headCount: 100, foodCost: 1200, withTipPercent: 0.18, withoutTipPercent: 0.20 }
+  },
+  
+  // Over 30 Miles Delivery (example: >25 headcount = $75.00 delivery fee)
+  OVER_30_MILES: {
+    tier1: { headCount: 25, foodCost: 300, withTip: 75.00, withoutTip: 90.00 },
+    tier2: { headCount: 49, foodCost: 599, withTip: 95.00, withoutTip: 110.00 },
+    tier3: { headCount: 74, foodCost: 899, withTip: 115.00, withoutTip: 130.00 },
+    tier4: { headCount: 99, foodCost: 1199, withTip: 135.00, withoutTip: 150.00 },
+    tier5: { headCount: 100, foodCost: 1200, withTipPercent: 0.20, withoutTipPercent: 0.22 }
+  }
 };
 
 /**
- * Calculates the delivery price based on order parameters
+ * Calculates the delivery price based on new CaterValley pricing structure
  */
 export async function calculateDeliveryPrice(params: PricingParams): Promise<PricingResult> {
-  const breakdown = {
-    basePrice: PRICING_CONFIG.BASE_PRICE,
-  } as PricingResult['breakdown'];
-
-  let finalPrice = PRICING_CONFIG.BASE_PRICE;
-
-  // Apply item count pricing
-  if (params.itemCount > 25) {
-    finalPrice = PRICING_CONFIG.PRICE_OVER_25_ITEMS;
-    breakdown.basePrice = PRICING_CONFIG.PRICE_OVER_25_ITEMS;
-    breakdown.itemCountMultiplier = params.itemCount / 25;
-  }
-
-  // Apply order total pricing (takes precedence if higher)
-  if (params.orderTotal > 300) {
-    const orderTotalPrice = PRICING_CONFIG.PRICE_OVER_300_TOTAL;
-    if (orderTotalPrice > finalPrice) {
-      finalPrice = orderTotalPrice;
-      breakdown.basePrice = orderTotalPrice;
-      breakdown.orderTotalMultiplier = params.orderTotal / 300;
-    }
-  }
-
-  // Calculate distance multiplier (if we have a distance calculation service)
   try {
+    // 1. Calculate actual distance between addresses
     const distance = await calculateDistance(params.pickupAddress, params.dropoffAddress);
-    if (distance > PRICING_CONFIG.DISTANCE_BASE_MILES) {
-      const additionalMiles = distance - PRICING_CONFIG.DISTANCE_BASE_MILES;
-      const distanceCharge = additionalMiles * PRICING_CONFIG.DISTANCE_PER_ADDITIONAL_MILE;
-      finalPrice += distanceCharge;
-      breakdown.distanceMultiplier = distance / PRICING_CONFIG.DISTANCE_BASE_MILES;
+    
+    // 2. Determine distance tier
+    let distanceTier: 'STANDARD' | 'OVER_10_MILES' | 'OVER_30_MILES';
+    let tierName: string;
+    
+    if (distance <= 10) {
+      distanceTier = 'STANDARD';
+      tierName = 'Standard Delivery (0-10 miles)';
+    } else if (distance <= 30) {
+      distanceTier = 'OVER_10_MILES';
+      tierName = 'Over 10 Miles Delivery';
+    } else {
+      distanceTier = 'OVER_30_MILES';
+      tierName = 'Over 30 Miles Delivery';
     }
+    
+    // 3. Get pricing tier configuration
+    const pricingTier = PRICING_TIERS[distanceTier];
+    
+    // 4. Determine which tier to use based on head count and food cost
+    let selectedTier;
+    let tierDescription;
+    
+    if (params.headCount >= 100 || params.foodCost >= 1200) {
+      selectedTier = pricingTier.tier5;
+      tierDescription = '100+ headcount or $1200+ food cost';
+    } else if (params.headCount >= 75 || params.foodCost >= 900) {
+      selectedTier = pricingTier.tier4;
+      tierDescription = '75-99 headcount or $900-$1199 food cost';
+    } else if (params.headCount >= 50 || params.foodCost >= 600) {
+      selectedTier = pricingTier.tier3;
+      tierDescription = '50-74 headcount or $600-$899 food cost';
+    } else if (params.headCount >= 25 || params.foodCost >= 300) {
+      selectedTier = pricingTier.tier2;
+      tierDescription = '25-49 headcount or $300-$599 food cost';
+    } else {
+      selectedTier = pricingTier.tier1;
+      tierDescription = '>25 headcount or >$300 food cost';
+    }
+    
+    // 5. Calculate final price
+    let finalPrice: number;
+    let calculation: string;
+    const includeTip = params.includeTip ?? true; // Default to including tip
+    
+    if ('withTipPercent' in selectedTier) {
+      // For 100+ headcount, use percentage-based pricing
+      const percentage = includeTip ? selectedTier.withTipPercent : selectedTier.withoutTipPercent;
+      finalPrice = params.foodCost * percentage;
+      calculation = `${params.foodCost} × ${(percentage * 100).toFixed(1)}% = ${finalPrice.toFixed(2)}`;
+    } else {
+      // For fixed pricing tiers
+      finalPrice = includeTip ? selectedTier.withTip : selectedTier.withoutTip;
+      calculation = `Fixed rate: $${finalPrice.toFixed(2)} (${includeTip ? 'with tip' : 'without tip'})`;
+    }
+    
+    // 6. Round to 2 decimal places
+    finalPrice = Math.round(finalPrice * 100) / 100;
+    
+    return {
+      deliveryPrice: finalPrice,
+      distance,
+      tier: tierName,
+      breakdown: {
+        basePrice: finalPrice,
+        distanceTier: tierName,
+        headCountTier: tierDescription,
+        foodCostTier: `$${params.foodCost}`,
+        tipIncluded: includeTip,
+        calculation
+      }
+    };
+    
   } catch (error) {
-    console.warn('Could not calculate distance for pricing:', error);
-    // Continue with base pricing if distance calculation fails
-  }
-
-  // Apply time-based multipliers
-  if (params.deliveryDate && params.deliveryTime) {
-    const deliveryDateTime = new Date(`${params.deliveryDate}T${params.deliveryTime}`);
+    console.error('Error calculating delivery price:', error);
     
-    // Weekend multiplier
-    const dayOfWeek = deliveryDateTime.getDay();
-    if (dayOfWeek === 0 || dayOfWeek === 6) { // Sunday or Saturday
-      finalPrice *= PRICING_CONFIG.WEEKEND_MULTIPLIER;
-      breakdown.peakTimeMultiplier = PRICING_CONFIG.WEEKEND_MULTIPLIER;
-    }
-
-    // Peak hours multiplier (11:30 AM - 1:30 PM and 5:30 PM - 7:30 PM)
-    const hour = deliveryDateTime.getHours();
-    const minute = deliveryDateTime.getMinutes();
-    const totalMinutes = hour * 60 + minute;
-    
-    const lunchStart = 11 * 60 + 30; // 11:30 AM
-    const lunchEnd = 13 * 60 + 30;   // 1:30 PM
-    const dinnerStart = 17 * 60 + 30; // 5:30 PM
-    const dinnerEnd = 19 * 60 + 30;   // 7:30 PM
-
-    if ((totalMinutes >= lunchStart && totalMinutes <= lunchEnd) ||
-        (totalMinutes >= dinnerStart && totalMinutes <= dinnerEnd)) {
-      finalPrice *= PRICING_CONFIG.PEAK_TIME_MULTIPLIER;
-      breakdown.peakTimeMultiplier = (breakdown.peakTimeMultiplier || 1) * PRICING_CONFIG.PEAK_TIME_MULTIPLIER;
-    }
+    // Fallback to basic pricing
+    return {
+      deliveryPrice: 42.50,
+      distance: 0,
+      tier: 'Standard (fallback)',
+      breakdown: {
+        basePrice: 42.50,
+        distanceTier: 'Unable to calculate distance',
+        headCountTier: 'Fallback pricing',
+        foodCostTier: `$${params.foodCost}`,
+        tipIncluded: params.includeTip ?? true,
+        calculation: 'Fallback rate due to calculation error'
+      }
+    };
   }
-
-  // Round to 2 decimal places
-  finalPrice = Math.round(finalPrice * 100) / 100;
-
-  return {
-    deliveryPrice: finalPrice,
-    breakdown,
-  };
 }
 
 /**
- * Calculate distance between two addresses
- * This is a placeholder implementation - in production, you'd use Google Maps API
+ * Calculate actual distance between two addresses using Google Maps API
+ * This replaces the mock implementation with real distance calculation
  */
 async function calculateDistance(pickupAddress: string, dropoffAddress: string): Promise<number> {
-  // Placeholder implementation - returns a mock distance
-  // In production, integrate with Google Maps Distance Matrix API
+  const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
   
-  // Simple estimation based on address similarity (mock logic)
+  if (!GOOGLE_MAPS_API_KEY) {
+    console.warn('Google Maps API key not configured. Using estimated distance.');
+    return estimateDistance(pickupAddress, dropoffAddress);
+  }
+  
+  try {
+    const origins = encodeURIComponent(pickupAddress);
+    const destinations = encodeURIComponent(dropoffAddress);
+    
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origins}&destinations=${destinations}&units=imperial&key=${GOOGLE_MAPS_API_KEY}`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.status === 'OK' && data.rows[0]?.elements[0]?.status === 'OK') {
+      const distanceText = data.rows[0].elements[0].distance.text;
+      const distanceValue = data.rows[0].elements[0].distance.value; // in meters
+      
+      // Convert meters to miles
+      const miles = (distanceValue * 0.000621371);
+      
+      console.log(`Distance calculated: ${pickupAddress} to ${dropoffAddress} = ${miles.toFixed(2)} miles`);
+      
+      return Math.round(miles * 100) / 100; // Round to 2 decimal places
+    } else {
+      console.warn('Google Maps API returned error:', data.error_message || data.status);
+      return estimateDistance(pickupAddress, dropoffAddress);
+    }
+    
+  } catch (error) {
+    console.error('Error calling Google Maps API:', error);
+    return estimateDistance(pickupAddress, dropoffAddress);
+  }
+}
+
+/**
+ * Fallback distance estimation when Google Maps API is unavailable
+ */
+function estimateDistance(pickupAddress: string, dropoffAddress: string): number {
   const pickup = pickupAddress.toLowerCase();
   const dropoff = dropoffAddress.toLowerCase();
   
@@ -132,27 +215,65 @@ async function calculateDistance(pickupAddress: string, dropoffAddress: string):
     return 8; // Same city - average 8 miles
   }
   
-  // Different cities - estimate 20+ miles
-  return 22;
+  // Different cities - estimate based on known city distances
+  const cityDistances: Record<string, Record<string, number>> = {
+    'san francisco': {
+      'oakland': 12,
+      'san jose': 45,
+      'palo alto': 35,
+      'fremont': 35,
+      'hayward': 30,
+      'concord': 28,
+      'richmond': 20
+    },
+    'oakland': {
+      'san francisco': 12,
+      'san jose': 40,
+      'palo alto': 30,
+      'fremont': 20,
+      'hayward': 15,
+      'concord': 25,
+      'richmond': 15
+    },
+    // Add more city pairs as needed
+  };
+  
+  const distance = cityDistances[pickupCity]?.[dropoffCity] || cityDistances[dropoffCity]?.[pickupCity];
+  
+  if (distance) {
+    return distance;
+  }
+  
+  // Default estimate for unknown city pairs
+  return 25;
 }
 
 /**
- * Extract city from address string (simple implementation)
+ * Extract city from address string (improved implementation)
  */
 function extractCity(address: string): string {
-  // This is a simplified implementation
-  // In production, you'd use proper address parsing
   const parts = address.split(',');
   if (parts.length >= 2 && parts[1]) {
-    return parts[1].trim();
+    return parts[1].trim().toLowerCase();
   }
+  
+  // Try to extract city from end of address
+  const addressParts = address.trim().split(/\s+/);
+  const cityKeywords = ['san francisco', 'sf', 'oakland', 'san jose', 'palo alto', 'fremont', 'hayward', 'concord', 'richmond'];
+  
+  for (const keyword of cityKeywords) {
+    if (address.includes(keyword)) {
+      return keyword;
+    }
+  }
+  
   return '';
 }
 
 /**
  * Get estimated pickup time based on delivery time
  */
-export function calculatePickupTime(deliveryDate: string, deliveryTime: string, bufferMinutes: number = 30): string {
+export function calculatePickupTime(deliveryDate: string, deliveryTime: string, bufferMinutes: number = 45): string {
   const deliveryDateTime = new Date(`${deliveryDate}T${deliveryTime}`);
   const pickupDateTime = new Date(deliveryDateTime.getTime() - bufferMinutes * 60 * 1000);
   return pickupDateTime.toISOString();
