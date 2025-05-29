@@ -138,12 +138,12 @@ const Hero: React.FC = () => {
         />
       </div>
 
-      <div className="flex min-h-screen flex-col items-center">
+      <div className="flex h-screen flex-col items-center">
         <MotionHeader
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="w-full flex flex-col items-center px-4 sm:px-6 pt-8 sm:pt-16"
+          className="w-full flex flex-col items-center px-4 sm:px-6 pt-16 sm:pt-20 md:pt-24 lg:pt-20"
         >
           <MotionDiv
             initial={{ scale: 0.8, opacity: 0 }}
@@ -167,57 +167,57 @@ const Hero: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.7, duration: 0.5 }}
-            className="mt-4 text-balance text-xl font-bold text-white drop-shadow-lg dark:text-white sm:mt-6 sm:text-2xl md:text-3xl lg:text-4xl"
+            className="mt-4 text-balance text-xl font-bold text-white drop-shadow-lg dark:text-white sm:mt-6 sm:text-2xl md:text-3xl lg:text-4xl mb-8 sm:mb-12 md:mb-16"
           >
             How can we help?
           </MotionHeading>
         </MotionHeader>
 
-        <div className="flex-1" />
-
-        <MotionDiv
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="mb-8 sm:mb-12 grid w-full max-w-6xl grid-cols-1 gap-6 px-4 sm:grid-cols-2 sm:gap-8 sm:px-6 lg:grid-cols-3 lg:gap-12 lg:px-8"
-        >
-          <ButtonLink
-            href="/logistics"
-            icon={
-              <Truck
-                strokeWidth={1.5}
-                className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
-              />
-            }
-            title="Logistics"
-            description="Streamline your supply chain with our logistics solutions"
-            delay={0.9}
-          />
-          <ButtonLink
-            href="/va"
-            icon={
-              <Headphones
-                strokeWidth={1.5}
-                className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
-              />
-            }
-            title="Virtual Assistant"
-            description="Reclaim your time and boost your productivity!"
-            delay={1.1}
-          />
-          <ButtonLink
-            href="/apply"
-            icon={
-              <Users
-                strokeWidth={1.5}
-                className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
-              />
-            }
-            title="Join the Team"
-            description="Explore various exciting positions available in our growing company"
-            delay={1.3}
-          />
-        </MotionDiv>
+        <div className="flex-1 flex items-end pb-16 sm:pb-24">
+          <MotionDiv
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid w-full max-w-6xl grid-cols-1 gap-6 px-4 sm:grid-cols-2 sm:gap-8 sm:px-6 lg:grid-cols-3 lg:gap-12 lg:px-8"
+          >
+            <ButtonLink
+              href="/logistics"
+              icon={
+                <Truck
+                  strokeWidth={1.5}
+                  className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
+                />
+              }
+              title="Logistics"
+              description="Streamline your supply chain with our logistics solutions"
+              delay={0.9}
+            />
+            <ButtonLink
+              href="/va"
+              icon={
+                <Headphones
+                  strokeWidth={1.5}
+                  className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
+                />
+              }
+              title="Virtual Assistant"
+              description="Reclaim your time and boost your productivity!"
+              delay={1.1}
+            />
+            <ButtonLink
+              href="/apply"
+              icon={
+                <Users
+                  strokeWidth={1.5}
+                  className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
+                />
+              }
+              title="Join the Team"
+              description="Explore various exciting positions available in our growing company"
+              delay={1.3}
+            />
+          </MotionDiv>
+        </div>
       </div>
     </section>
   );
