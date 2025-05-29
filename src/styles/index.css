@@ -34,6 +34,96 @@
   }
 }
 
+/* Safari-specific fixes */
+@supports (-webkit-appearance: none) {
+  /* Fix file input styling in Safari */
+  input[type="file"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  
+  /* Ensure proper button alignment in Safari */
+  .file-upload-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+  }
+  
+  /* Fix modal positioning in Safari mobile */
+  [data-radix-dialog-content] {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    max-height: calc(100vh - 1rem) !important;
+    max-width: calc(100vw - 1rem) !important;
+    z-index: 1001 !important;
+  }
+  
+  /* Fix modal overlay positioning */
+  [data-radix-dialog-overlay] {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 1000 !important;
+  }
+  
+  /* Fix viewport height issues in Safari mobile */
+  .min-h-screen {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+  
+  /* Fix button alignment in Safari */
+  button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+}
+
+/* iOS Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  /* Fix viewport height on iOS Safari */
+  .min-h-screen {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+  
+  /* Fix modal overlay on iOS */
+  [data-radix-dialog-overlay] {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 1000 !important;
+  }
+  
+  /* Fix modal content positioning on iOS */
+  [data-radix-dialog-content] {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    max-height: calc(100vh - 1rem) !important;
+    max-width: calc(100vw - 1rem) !important;
+    z-index: 1001 !important;
+    margin: 0.5rem !important;
+  }
+  
+  /* Prevent zoom on input focus in iOS Safari */
+  input[type="file"],
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+  
+  /* Fix modal scrolling on iOS */
+  [data-radix-dialog-content] {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+  }
+}
+
 body {
   font-family: var(--font-montserrat);
 }
