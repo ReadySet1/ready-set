@@ -20,6 +20,59 @@ interface Guide {
   slug: { current: string };
   coverImage: any;
   _updatedAt: string;
+  
+  introduction?: Array<{
+    _type: string;
+    style?: string;
+    children?: Array<{
+      _type: string;
+      text: string;
+      marks?: string[];
+    }>;
+  }>;
+  mainContent?: Array<{
+    title: string;
+    content: Array<{
+      _type: string;
+      style?: string;
+      children?: Array<{
+        _type: string;
+        text: string;
+        marks?: string[];
+      }>;
+    }>;
+  }>;
+  listSections?: Array<{
+    title: string;
+    items: Array<{
+      title?: string;
+      content: string;
+    }>;
+  }>;
+  
+  callToAction?: string;
+  calendarUrl?: string;
+  downloadCtaText?: string;
+  consultationCtaText?: string;
+  
+  downloadableFiles?: Array<{
+    _key: string;
+    asset: {
+      _id: string;
+      url: string;
+      originalFilename: string;
+    };
+  }>;
+  
+  category?: {
+    _id: string;
+    title: string;
+    slug: {
+      current: string;
+    };
+  };
+  
+  // SEO
   seo?: SeoType;
 }
 
@@ -221,30 +274,127 @@ const createFallbackGuide = (slug: string): Guide => ({
   }
 });
 
-// Helper function to get a guide by slug
+// Helper function to get a guide by slug 
 export async function getGuideBySlug(slug: string): Promise<Guide> {
   try {
+    console.log(`[getGuideBySlug] Fetching guide: ${slug}`);
+    
     const guide = await client.fetch(
       `*[_type == "guide" && slug.current == $slug][0]{
         _id,
+        _type,
+        _updatedAt,
         title,
         subtitle,
         slug,
-        coverImage,
-        _updatedAt,
-        seo
+        
+        // CONTENIDO PRINCIPAL - Estos campos faltaban
+        introduction,
+        mainContent[] {
+          title,
+          content
+        },
+        listSections[] {
+          title,
+          items[] {
+            title,
+            content
+          }
+        },
+        
+        // CTAs y otros campos
+        callToAction,
+        calendarUrl,
+        downloadCtaText,
+        consultationCtaText,
+        
+        // Archivos descargables
+        downloadableFiles[] {
+          _key,
+          asset-> {
+            _id,
+            url,
+            originalFilename
+          }
+        },
+        
+        // Imagen de portada completa
+        coverImage {
+          _type,
+          crop,
+          hotspot,
+          asset-> {
+            _id,
+            _ref,
+            url,
+            metadata {
+              dimensions {
+                width,
+                height
+              }
+            }
+          }
+        },
+        
+        // Categoría
+        category-> {
+          _id,
+          title,
+          slug
+        },
+        
+        // SEO
+        seo {
+          _type,
+          metaTitle,
+          metaDescription,
+          metaImage {
+            asset-> {
+              _id,
+              url
+            }
+          },
+          nofollowAttributes,
+          seoKeywords,
+          openGraph {
+            _type,
+            title,
+            description,
+            siteName,
+            url,
+            image {
+              asset-> {
+                _id,
+                url
+              }
+            }
+          },
+          twitter {
+            _type,
+            handle,
+            site,
+            cardType,
+            creator
+          }
+        }
       }`,
       { slug }
     );
     
     if (!guide) {
-      console.warn(`No guide found with slug ${slug}, using fallback`);
+      console.warn(`[getGuideBySlug] No guide found with slug ${slug}, using fallback`);
       return createFallbackGuide(slug);
     }
     
+    console.log(`[getGuideBySlug] Guide found for slug: ${slug}`);
+    console.log(`[getGuideBySlug] Introduction content:`, guide.introduction ? 'FOUND' : 'MISSING');
+    console.log(`[getGuideBySlug] Main content sections:`, guide.mainContent?.length || 0);
+    console.log(`[getGuideBySlug] List sections:`, guide.listSections?.length || 0);
+    console.log(`[getGuideBySlug] Cover image:`, guide.coverImage ? 'FOUND' : 'MISSING');
+    
     return guide;
   } catch (error) {
-    console.error(`Error fetching guide with slug ${slug}:`, error);
+    console.error(`[getGuideBySlug] Error fetching guide with slug ${slug}:`, error);
     return createFallbackGuide(slug);
   }
 }

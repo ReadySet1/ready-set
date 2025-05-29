@@ -24,7 +24,10 @@ export async function GET(
   try {
     const { slug } = await params;
     
+    console.log(`🔥🔥🔥 [API Route] Starting fetch for slug: ${slug}`);
+    
     if (!slug || typeof slug !== 'string') {
+      console.log(`🔥🔥🔥 [API Route] Invalid slug: ${slug}`);
       return NextResponse.json(
         { 
           error: 'Invalid request', 
@@ -34,11 +37,23 @@ export async function GET(
       );
     }
     
+    console.log(`🔥🔥🔥 [API Route] About to call getGuideBySlug`);
+    
     // Attempt to fetch the guide
     const guide = await getGuideBySlug(slug);
     
+    console.log(`🔥🔥🔥 [API Route] Received guide data:`, {
+      id: guide?._id,
+      title: guide?.title,
+      hasIntroduction: !!guide?.introduction,
+      hasMainContent: !!guide?.mainContent,
+      hasListSections: !!guide?.listSections,
+      rawGuide: guide
+    });
+    
     // Return 404 if guide not found
     if (!guide) {
+      console.log(`🔥🔥🔥 [API Route] No guide found for slug: ${slug}`);
       return NextResponse.json(
         { 
           error: 'Not found',
@@ -48,13 +63,15 @@ export async function GET(
       );
     }
     
+    console.log(`🔥🔥🔥 [API Route] Returning guide data`);
+    
     // Return the guide data
     return NextResponse.json({
       data: guide
     });
   } catch (error) {
     // Log the error for debugging
-    console.error(`Error fetching guide:`, error);
+    console.error(`🔥🔥🔥 [API Route] Error fetching guide:`, error);
     
     // Return appropriate error response
     return NextResponse.json(
@@ -65,4 +82,4 @@ export async function GET(
       { status: 500 }
     );
   }
-} 
+}

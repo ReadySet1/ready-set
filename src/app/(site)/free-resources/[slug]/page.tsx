@@ -10,7 +10,6 @@ import { fetchGuideData, Guide } from "./fetch-guides";
 
 export const revalidate = 30;
 
-// Define types for Portable Text blocks
 interface PortableTextSpan {
   _key?: string;
   _type: string;
@@ -93,7 +92,7 @@ export default async function GuidePage({
   console.log(
     "Guía completa recibida en GuidePage:",
     JSON.stringify(guide, null, 2),
-  ); // Convierte a string para ver el objeto completo
+  );
   console.log(
     "Contenido de Introducción:",
     JSON.stringify(guide?.introduction, null, 2),
@@ -284,7 +283,7 @@ export default async function GuidePage({
                       rel="noopener noreferrer"
                       className="w-full rounded-lg bg-yellow-400 px-6 py-3 font-semibold text-gray-800 transition-colors hover:bg-yellow-500"
                     >
-                      {guide.consultationCta || "Schedule a Consultation"}
+                      {guide.consultationCtaText || "Schedule a Consultation"}
                     </a>
                   </div>
                 )}
@@ -304,42 +303,21 @@ export default async function GuidePage({
 
 export async function generateStaticParams() {
   try {
-    // During build time, use static list to avoid fetch issues
-    const isStaticGeneration =
-      typeof window === "undefined" && !process.env.VERCEL_URL;
-    const isNextBuild = process.env.npm_lifecycle_event === "build";
+    const { getGuides } = await import("@/sanity/lib/client");
 
-    if (isStaticGeneration || isNextBuild) {
-      // Return static guide slugs to avoid fetch operations during build
-      const staticGuideSlugs = [
-        "what-is-email-marketing",
-        "your-guide-to-delegation",
-        "building-a-reliable-delivery-network",
-        "the-complete-guide-to-choosing-the-right-delivery-partner",
-        "how-to-hire-the-right-virtual-assistant",
-        "how-to-start-social-media-marketing-made-simple",
-        "why-email-metrics-matter",
-        "addressing-key-issues-in-delivery-logistics",
-        "email-testing-made-simple",
-        "social-media-strategy-guide-and-template",
-      ];
-
-      return staticGuideSlugs.map((slug) => ({
-        slug: slug,
-      }));
-    }
-
-    // Runtime: Try to fetch from Sanity
-    const { getGuides } = await import("@/sanity/lib/queries");
     const guides = await getGuides();
 
-    // Make sure we return objects with slug as string
-    return guides.map((guide) => ({
+    const params = guides.map((guide) => ({
       slug: guide.slug.current,
     }));
+
+    return params;
   } catch (error) {
-    console.error("Error generating static params:", error);
-    // Fallback to static guide slugs if Sanity fetch fails
+    console.error(
+      "Error generating static params from Sanity, falling back to static list:",
+      error,
+    );
+    // Fallback a slugs estáticos si el fetch de Sanity falla
     const staticGuideSlugs = [
       "what-is-email-marketing",
       "your-guide-to-delegation",
@@ -352,7 +330,6 @@ export async function generateStaticParams() {
       "email-testing-made-simple",
       "social-media-strategy-guide-and-template",
     ];
-
     return staticGuideSlugs.map((slug) => ({
       slug: slug,
     }));
