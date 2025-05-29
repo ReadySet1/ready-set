@@ -146,10 +146,12 @@ interface CateringOrdersApiResponse {
   totalPages: number;
 }
 
-type OrderStatus = 'ACTIVE' | 'ASSIGNED' | 'CANCELLED' | 'COMPLETED';
+type OrderStatus = 'ACTIVE' | 'PENDING' | 'CONFIRMED' | 'ASSIGNED' | 'CANCELLED' | 'COMPLETED';
 
 const statusConfig = {
   ACTIVE: { className: "bg-amber-100 text-amber-800 hover:bg-amber-200", icon: <AlertCircle className="h-3 w-3 mr-1" /> },
+  PENDING: { className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200", icon: <AlertCircle className="h-3 w-3 mr-1" /> },
+  CONFIRMED: { className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-200", icon: <ClipboardList className="h-3 w-3 mr-1" /> },
   ASSIGNED: { className: "bg-blue-100 text-blue-800 hover:bg-blue-200", icon: <User className="h-3 w-3 mr-1" /> },
   CANCELLED: { className: "bg-red-100 text-red-800 hover:bg-red-200", icon: <AlertCircle className="h-3 w-3 mr-1" /> },
   COMPLETED: { className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-200", icon: <ClipboardList className="h-3 w-3 mr-1" /> },
@@ -205,6 +207,8 @@ const CateringOrdersPage: React.FC = () => {
   // Add status tabs
   const statusTabs = [
     { value: 'ACTIVE', label: 'Active' },
+    { value: 'PENDING', label: 'Pending' },
+    { value: 'CONFIRMED', label: 'Confirmed' },
     { value: 'ASSIGNED', label: 'Assigned' },
     { value: 'CANCELLED', label: 'Cancelled' },
     { value: 'COMPLETED', label: 'Completed' }

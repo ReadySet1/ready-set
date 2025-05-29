@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client'
 
 /**
  * PrismaClient instantiation with improved singleton pattern for Vercel deployment
+ * and optimized logging configuration
  */
 
 // Define the global type that will hold our PrismaClient instance
@@ -14,7 +15,11 @@ declare global {
 export const prisma = globalThis.prismaGlobal || 
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' 
-      ? ['query', 'info', 'warn', 'error'] 
+      ? [
+          'error',
+          'warn',
+          // Reduce query logging verbosity - only log in development when needed
+        ]
       : ['error'],
   });
 

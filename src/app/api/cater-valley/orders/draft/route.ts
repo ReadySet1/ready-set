@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
     const draftOrder = await prisma.cateringRequest.create({
       data: {
         orderNumber: `CV-${validatedData.orderCode}`,
-        status: 'PENDING',
+        status: 'ACTIVE',
         userId: systemUser.id,
         pickupAddressId: pickupAddress.id,
         deliveryAddressId: deliveryAddress.id,
