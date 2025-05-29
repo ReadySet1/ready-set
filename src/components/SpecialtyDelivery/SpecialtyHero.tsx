@@ -76,7 +76,10 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
   }[screenSize];
 
   return (
-    <section className={`relative w-full ${marginTopClass} overflow-hidden`}>
+    // Agregamos padding-bottom a la sección principal
+    <section
+      className={`relative w-full ${marginTopClass} **pb-20 lg:pb-32** overflow-hidden sm:pb-24`}
+    >
       {/* Background image */}
       <div className="absolute inset-0 z-0">
         <Image
@@ -90,6 +93,8 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
       </div>
 
       <div className="relative mx-auto max-w-7xl px-4 py-12 sm:py-16 lg:py-20">
+        {" "}
+        {/* Quitamos el pb del div interno */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
           {/* Left content - Text */}
           <div className="relative z-10 w-full max-w-xl space-y-6 px-4 sm:px-6 lg:w-1/2 lg:px-0">

@@ -41,8 +41,8 @@ const SpecialtyIcons: React.FC = () => {
         "Our HIPAA-trained drivers and support team act as a seamless extension of your brand, punctual, professional, and committed to every delivery.",
     },
     {
-      imageUrl: "/images/food/cards/bag.png",
-      altText: "Proper Equipment Bag",
+      imageUrl: "/images/specialty/handling.png",
+      altText: "Handling Specialty Items",
       description:
         "We ensure your items, whether medications, legal documents, equipment, or parcels, are delivered with the utmost care and strict confidentiality.",
     },

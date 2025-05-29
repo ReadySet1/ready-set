@@ -33,9 +33,13 @@ const SpecialtyTerms = ({ onRequestQuote }: SpecialtyTermsProps) => {
         />
 
         {/* Content container - separate positioning for mobile vs desktop */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center px-4 pb-8 pt-16 md:justify-center md:py-8">
+        {/* IMPORTANT: Check this line. Increased 'pt' for mobile (default) to push content down. */}
+        {/* 'md:justify-center' and 'md:py-8' ensure desktop layout remains centered and has consistent padding. */}
+        <div className="absolute inset-0 flex flex-col items-center justify-start px-4 pb-8 pt-32 md:items-center md:justify-center md:py-8">
           {/* Dark container */}
-          <div className="mb-3 w-full max-w-4xl rounded-2xl bg-gray-900 p-4 text-center md:mb-6 md:p-10">
+          {/* IMPORTANT: Check this line. 'mb' for mobile (default) creates space below the black box. */}
+          {/* 'md:mb-6' ensures desktop margin is as intended. */}
+          <div className="mb-10 w-full max-w-4xl rounded-2xl bg-gray-900 p-4 text-center md:mb-6 md:p-10">
             <h2 className="mb-3 text-xl font-bold text-white md:mb-6 md:text-5xl">
               Package Delivery Terms <br /> & Pricing Chart
             </h2>
