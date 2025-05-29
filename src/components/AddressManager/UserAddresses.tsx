@@ -197,10 +197,10 @@ const UserAddresses: React.FC = () => {
         </CardDescription>
         <div className="flex justify-between items-center mt-4">
           <Tabs defaultValue={filterType} onValueChange={(value) => setFilterType(value as any)}>
-            <TabsList>
-              <TabsTrigger value="all">All Addresses</TabsTrigger>
-              <TabsTrigger value="private">Your Private Addresses</TabsTrigger>
-              <TabsTrigger value="shared">Shared Addresses</TabsTrigger>
+            <TabsList className="gap-1">
+              <TabsTrigger value="all" className="text-xs sm:text-sm">All Addresses</TabsTrigger>
+              <TabsTrigger value="private" className="text-xs sm:text-sm">Your Private Addresses</TabsTrigger>
+              <TabsTrigger value="shared" className="text-xs sm:text-sm">Shared Addresses</TabsTrigger>
             </TabsList>
           </Tabs>
           <Button onClick={handleAddNewAddress}>
