@@ -84,11 +84,10 @@ const Orders = async ({
   );
 
   return (
-    // This outer div might not be strictly necessary if the layout handles background
-    // Keeping it simple here.
-    <div className="flex w-full flex-col"> 
-      {/* Wrapper for header, giving it specific padding */}
-      <div className="p-6 pb-0"> 
+    // Mobile-first responsive wrapper with proper spacing
+    <div className="flex w-full flex-col min-h-screen"> 
+      {/* Mobile-responsive header wrapper with proper padding */}
+      <div className="px-4 sm:px-6 lg:px-6 pt-4 sm:pt-6 pb-0"> 
         <PageHeader
           breadcrumbs={[
             { label: "Dashboard", href: "/admin" },
@@ -97,8 +96,10 @@ const Orders = async ({
           ]}
         />
       </div>
-      {/* Render the main page content component */}
-      <CateringOrdersPage /> 
+      {/* Main content with mobile-responsive padding and flex-grow for full height */}
+      <div className="flex-1 px-0 sm:px-0">
+        <CateringOrdersPage /> 
+      </div>
     </div>
   );
 };

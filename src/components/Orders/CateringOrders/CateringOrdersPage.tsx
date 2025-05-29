@@ -162,27 +162,35 @@ const getStatusConfig = (status: string) => {
 };
 
 const LoadingSkeleton = () => (
-  <div className="space-y-4 p-4">
-    <div className="flex items-center space-x-4">
-      <Skeleton className="h-10 w-[250px]" />
-      <Skeleton className="h-10 w-[200px]" />
+  <div className="space-y-4 p-3 sm:p-4">
+    <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-4">
+      <Skeleton className="h-10 w-full sm:w-[250px]" />
+      <Skeleton className="h-10 w-full sm:w-[200px]" />
     </div>
     <div className="rounded-lg border overflow-hidden">
-      <div className="bg-slate-50 p-4">
-        <div className="grid grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (<Skeleton key={i} className="h-8 w-full" />))}
+      <div className="bg-slate-50 p-3 sm:p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-6 sm:h-8 w-full" />
+          ))}
         </div>
       </div>
       {[...Array(5)].map((_, i) => (
-        <div key={i} className="border-t p-4">
-          <div className="grid grid-cols-5 gap-4">
-            {[...Array(5)].map((_, j) => (<Skeleton key={j} className="h-6 w-full" style={{ animationDelay: `${i * 100 + j * 50}ms` }} />))}
+        <div key={i} className="border-t p-3 sm:p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
+            {[...Array(5)].map((_, j) => (
+              <Skeleton 
+                key={j} 
+                className="h-4 sm:h-6 w-full" 
+                style={{ animationDelay: `${i * 100 + j * 50}ms` }} 
+              />
+            ))}
           </div>
         </div>
       ))}
     </div>
     <div className="flex justify-center">
-      <Skeleton className="h-10 w-[300px]" />
+      <Skeleton className="h-10 w-full sm:w-[300px]" />
     </div>
   </div>
 );
@@ -443,53 +451,58 @@ const CateringOrdersPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6"> 
+    <div className="px-4 sm:px-6 lg:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6"> 
       
       {/* Page Title and New Order Button */}
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
+      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:justify-between sm:items-start lg:items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
             Catering Orders
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-slate-500 mt-1 text-sm sm:text-base">
             Manage and track all catering orders across the platform
           </p>
         </div>
-        <Link href="/admin/catering-orders/new" passHref>
-          <Button 
-            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md transition-all hover:shadow-lg w-full lg:w-auto"
-          >
-            <PlusCircle className="mr-2 h-4 w-4" />
-            New Order
-          </Button>
-        </Link>
+        <div className="flex-shrink-0 w-full sm:w-auto">
+          <Link href="/admin/catering-orders/new" passHref>
+            <Button 
+              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md transition-all hover:shadow-lg w-full sm:w-auto"
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              New Order
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      {/* Status filter tabs */}
-      <div className="mb-6 flex space-x-2">
-        {statusTabs.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => handleStatusFilter(tab.value as OrderStatus)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
-              ${statusFilter === tab.value 
-                ? 'bg-blue-100 text-blue-800' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Status filter tabs - Mobile scrollable */}
+      <div className="mb-4 sm:mb-6">
+        <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
+          {statusTabs.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => handleStatusFilter(tab.value as OrderStatus)}
+              className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0
+                ${statusFilter === tab.value 
+                  ? 'bg-blue-100 text-blue-800' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Card containing filters and the CateringOrdersTable */}
       <Card className="shadow-sm rounded-xl border-slate-200 overflow-hidden">
         <CardContent className="p-0">
           
-          {/* Filters Section */}
-          <div className="border-b bg-slate-50 p-4">
-            <div className="flex flex-col lg:flex-row gap-4 justify-between">
-              <div className="flex gap-2 flex-1 flex-wrap">
-                <div className="relative flex-1 min-w-[200px]">
+          {/* Filters Section - Mobile responsive */}
+          <div className="border-b bg-slate-50 p-3 sm:p-4">
+            <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:gap-4 sm:justify-between">
+              <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:gap-2 flex-1">
+                {/* Search Input - Full width on mobile */}
+                <div className="relative flex-1 min-w-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     placeholder="Search order #, client..."
@@ -498,41 +511,49 @@ const CateringOrdersPage: React.FC = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="gap-2 h-10">
-                      <Filter className="h-4 w-4" />
-                      <span className="hidden sm:inline">Filters</span>
+                
+                {/* Filter Controls - Responsive layout */}
+                <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="gap-2 h-10 flex-1 sm:flex-none">
+                        <Filter className="h-4 w-4" />
+                        <span className="sm:hidden md:inline">Filters</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem>Today's Orders</DropdownMenuItem>
+                      <DropdownMenuItem>This Week's Orders</DropdownMenuItem>
+                      <DropdownMenuItem>This Month's Orders</DropdownMenuItem>
+                      <DropdownMenuItem>High Value ({'>'}$1000)</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  
+                  <div className="flex gap-2 flex-1 sm:flex-none">
+                    <Select
+                      value={sortField}
+                      onValueChange={(value) => { handleSort(value); }}
+                    >
+                      <SelectTrigger className="h-10 min-w-[100px] flex-1 sm:min-w-[120px]">
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="date">Date</SelectItem>
+                        <SelectItem value="order_total">Amount</SelectItem>
+                        <SelectItem value="order_number">Order Number</SelectItem>
+                        <SelectItem value="user.name">Client Name</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    <Button variant="ghost" onClick={() => handleSort(sortField)} className="h-10 px-2 flex-shrink-0">
+                      {sortDirection === 'asc' ? 
+                        <ChevronDown className="h-4 w-4 opacity-70 rotate-180" /> : 
+                        <ChevronDown className="h-4 w-4 opacity-70" /> 
+                      }
+                      <span className="sr-only">Toggle Sort Direction</span>
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem>Today's Orders</DropdownMenuItem>
-                    <DropdownMenuItem>This Week's Orders</DropdownMenuItem>
-                    <DropdownMenuItem>This Month's Orders</DropdownMenuItem>
-                    <DropdownMenuItem>High Value ({'>'}$1000)</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Select
-                  value={sortField}
-                  onValueChange={(value) => { handleSort(value); }}
-                >
-                  <SelectTrigger className="w-auto h-10 min-w-[120px]">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="date">Date</SelectItem>
-                    <SelectItem value="order_total">Amount</SelectItem>
-                    <SelectItem value="order_number">Order Number</SelectItem>
-                    <SelectItem value="user.name">Client Name</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button variant="ghost" onClick={() => handleSort(sortField)} className="h-10 px-2">
-                  {sortDirection === 'asc' ? 
-                    <ChevronDown className="h-4 w-4 opacity-70 rotate-180" /> : 
-                    <ChevronDown className="h-4 w-4 opacity-70" /> 
-                  }
-                  <span className="sr-only">Toggle Sort Direction</span>
-                </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -542,11 +563,11 @@ const CateringOrdersPage: React.FC = () => {
             {isLoading ? (
               <LoadingSkeleton />
             ) : error ? (
-              <div className="p-6 text-center">
+              <div className="p-4 sm:p-6 text-center">
                 <Alert variant="destructive" className="inline-flex flex-col items-center">
                   <AlertCircle className="h-5 w-5 mb-2" />
                   <AlertTitle>Error Fetching Orders</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription className="text-sm">{error}</AlertDescription>
                 </Alert>
               </div>
             ) : orders.length > 0 ? (
@@ -559,13 +580,13 @@ const CateringOrdersPage: React.FC = () => {
                 onOrderDeleted={handleOrderDeleted}
               />
             ) : (
-              // Empty State
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-                  <ClipboardList className="h-8 w-8 text-slate-400" />
+              // Empty State - Mobile responsive
+              <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center px-4">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                  <ClipboardList className="h-6 w-6 sm:h-8 sm:w-8 text-slate-400" />
                 </div>
                 <h3 className="text-lg font-semibold text-slate-800">No orders found</h3>
-                <p className="text-slate-500 max-w-md mt-1">
+                <p className="text-slate-500 max-w-md mt-1 text-sm sm:text-base">
                   No {statusFilter !== 'ACTIVE' ? <span className="capitalize font-medium">{statusFilter}</span> : ''} orders match your current filters.
                 </p>
                 <Link href="/admin/catering-orders/new" className="mt-4">
@@ -577,33 +598,39 @@ const CateringOrdersPage: React.FC = () => {
               </div>
             )}
 
-            {/* Pagination Section */}
+            {/* Pagination Section - Mobile responsive */}
             {!isLoading && totalPages > 1 && (
-              <div className="p-4 border-t bg-slate-50">
+              <div className="p-3 sm:p-4 border-t bg-slate-50">
                 <Pagination>
-                  <PaginationContent>
+                  <PaginationContent className="flex-wrap gap-1">
                     <PaginationItem>
                       <PaginationPrevious 
                         onClick={() => handlePageChange(page - 1)} 
-                        className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"}
+                        className={`${page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
                       />
                     </PaginationItem>
                     {/* Basic Pagination - Consider a more advanced version for many pages */}
                     {[...Array(totalPages)].map((_, i) => (
-                      <PaginationItem key={i}>
+                      <PaginationItem key={i} className="hidden sm:block">
                         <PaginationLink 
                           onClick={() => handlePageChange(i + 1)}
                           isActive={page === i + 1}
-                          className={`cursor-pointer ${page === i + 1 ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'hover:bg-slate-200'}`}
+                          className={`cursor-pointer text-sm ${page === i + 1 ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'hover:bg-slate-200'}`}
                         >
                           {i + 1}
                         </PaginationLink>
                       </PaginationItem>
                     ))}
+                    {/* Mobile: Show current page info */}
+                    <PaginationItem className="sm:hidden">
+                      <span className="px-3 py-2 text-sm text-slate-600">
+                        {page} of {totalPages}
+                      </span>
+                    </PaginationItem>
                     <PaginationItem>
                       <PaginationNext 
                         onClick={() => handlePageChange(page + 1)} 
-                        className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"}
+                        className={`${page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
                       />
                     </PaginationItem>
                   </PaginationContent>
