@@ -31,42 +31,48 @@ const HeroHeader: React.FC = () => {
   };
 
   return (
-    <div className="bg-transparent">
+    <div className="bg-white">
       <section className="relative isolate">
         <div className="relative isolate flex min-h-screen flex-col justify-between">
-          {/* Background Image */}
-          <div className="absolute inset-0 h-screen overflow-hidden">
-            <picture>
-              <source
-                srcSet="/images/virtual/header-bg.webp"
-                type="image/webp"
-              />
-              <Image
-                src="/images/virtual/header-bg.jpg"
-                alt="Background"
-                fill
-                className="object-cover brightness-50"
-                priority
-              />
-            </picture>
+          {/* Background Image - Limitada a la parte superior */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="relative h-[70vh] w-full">
+              <picture>
+                <source
+                  srcSet="/images/virtual/header-bg.webp"
+                  type="image/webp"
+                />
+                <Image
+                  src="/images/virtual/header-bg.jpg"
+                  alt="Background"
+                  fill
+                  className="object-cover brightness-50"
+                  priority
+                />
+              </picture>
+            </div>
+            {/* Fondo blanco sólido para la parte inferior */}
+            <div className="h-[30vh] w-full bg-white" />
           </div>
+
           <MaskBackground />
 
           {/* Main Content */}
           <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4">
             <motion.div
               {...({
-                className: "flex flex-grow flex-col items-center justify-center pt-32",
+                className:
+                  "flex flex-grow flex-col items-center justify-center pt-32",
                 initial: "hidden",
                 animate: "visible",
-                variants: animations.staggerChildren
+                variants: animations.staggerChildren,
               } as HTMLMotionProps<"div">)}
             >
               {/* Hero Title */}
               <motion.div
                 {...({
                   className: "mx-auto max-w-4xl text-center",
-                  variants: animations.fadeIn
+                  variants: animations.fadeIn,
                 } as HTMLMotionProps<"div">)}
               >
                 <h1 className="font-kabel text-white">
@@ -83,28 +89,28 @@ const HeroHeader: React.FC = () => {
               <motion.div
                 {...({
                   className: "mt-12 md:mt-16",
-                  variants: animations.scaleIn
+                  variants: animations.scaleIn,
                 } as HTMLMotionProps<"div">)}
               >
                 <AppointmentDialog calendarUrl="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ26Tewp9laqwen17F4qh13UwlakRL20eQ6LOJn7ANJ4swhUdFfc4inaFMixVsMghhFzE3nlpTSx?gv=true" />
               </motion.div>
             </motion.div>
 
-            {/* Feature Carousel */}
+            {/* Feature Carousel - Con esquinas redondeadas completas */}
             <motion.div
               {...({
                 className: "mx-auto mb-4 w-full max-w-5xl px-4",
                 variants: animations.fadeIn,
                 initial: "hidden",
                 animate: "visible",
-                transition: { delay: 0.5 }
+                transition: { delay: 0.5 },
               } as HTMLMotionProps<"div">)}
             >
-              <FeatureCarousel />
+              <div className="overflow-hidden rounded-3xl">
+                <FeatureCarousel />
+              </div>
             </motion.div>
           </div>
-
-          <MaskBackground />
         </div>
       </section>
     </div>

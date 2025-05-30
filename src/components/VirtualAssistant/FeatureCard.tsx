@@ -82,9 +82,9 @@ const BusinessOverwhelm = () => {
 
             <div className="text-gray-700">
               Ready for a real change? It&apos;s time to build a business that
-              thrives with or without your constant involvement. Ready Set VAs help
-              you create efficient workflows and empower your team, so you can
-              finally step away without everything falling apart.
+              thrives with or without your constant involvement. Ready Set VAs
+              help you create efficient workflows and empower your team, so you
+              can finally step away without everything falling apart.
             </div>
 
             <div className="text-gray-700">

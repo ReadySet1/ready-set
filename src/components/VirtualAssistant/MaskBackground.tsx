@@ -2,7 +2,7 @@ export const MaskBackground = () => {
   return (
     <div className="pointer-events-none absolute bottom-0 left-0 right-0 w-full">
       <svg
-        className="w-full h-auto"
+        className="h-auto w-full"
         viewBox="0 0 1440 140"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
