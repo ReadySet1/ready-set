@@ -93,7 +93,7 @@ export const seoFields = groq`
 
 // Updated queries with SEO fields
 export const postsQuery = groq`
-  *[_type == "post" && defined(slug.current)]{
+  *[_type == "post" && defined(slug.current)] | order(_updatedAt desc) {
     _id,
     _type,
     title,
