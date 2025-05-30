@@ -14,6 +14,9 @@ import {
   ChevronDown,
   Plus,
   ClipboardList,
+  Calculator,
+  Flower,
+  Package,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -105,8 +108,8 @@ export function AppSidebar() {
     }
   };
 
-  // Main navigation items
-  const mainNavItems: SidebarNavItem[] = [
+  // Main navigation items - Core Admin Functions
+  const coreNavItems: SidebarNavItem[] = [
     {
       title: "Dashboard",
       href: "/admin",
@@ -125,6 +128,10 @@ export function AppSidebar() {
       icon: Zap,
       isActive: pathname?.includes("/admin/on-demand-orders") ?? false,
     },
+  ];
+
+  // Management items
+  const managementItems: SidebarNavItem[] = [
     {
       title: "Users",
       href: "/admin/users",
@@ -142,7 +149,29 @@ export function AppSidebar() {
       href: "/admin/carriers",
       icon: Settings,
       isActive: pathname?.includes("/admin/carriers") ?? false,
-    }
+    },
+  ];
+
+  // Tools and Calculators
+  const toolsItems: SidebarNavItem[] = [
+    {
+      title: "Drives Calculator",
+      href: "/admin/drives-calculator",
+      icon: Calculator,
+      isActive: pathname?.includes("/admin/drives-calculator") ?? false,
+    },
+    {
+      title: "Flower Calculator",
+      href: "/admin/flower-calculator",
+      icon: Flower,
+      isActive: pathname?.includes("/admin/flower-calculator") ?? false,
+    },
+    {
+      title: "Logistics Tools",
+      href: "/admin/logistics-tools",
+      icon: Package,
+      isActive: pathname?.includes("/admin/logistics-tools") ?? false,
+    },
   ];
 
   return (
@@ -170,10 +199,10 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="px-3 py-1">Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="px-3 py-1">Core Operations</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNavItems.map((item) => (
+              {coreNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -226,6 +255,52 @@ export function AppSidebar() {
               </SidebarGroupContent>
             </CollapsibleContent>
           </Collapsible>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-3 py-1">Management</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {managementItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={item.isActive}
+                    tooltip={item.title}
+                    className="py-1.5"
+                  >
+                    <Link href={item.href}>
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-3 py-1">Tools</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {toolsItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={item.isActive}
+                    tooltip={item.title}
+                    className="py-1.5"
+                  >
+                    <Link href={item.href}>
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
