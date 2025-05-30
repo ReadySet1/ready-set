@@ -18,6 +18,8 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
+      const height = window.innerHeight;
+
       if (width < 640) {
         setScreenSize("mobile");
       } else if (width < 1024) {
@@ -75,29 +77,68 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
     desktop: "flex justify-end",
   }[screenSize];
 
+  // Background position classes - Ajustado para diferentes iPhones
+  const getBackgroundPosition = () => {
+    if (screenSize === "mobile") {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      // iPhone 14 Pro Max (430x932) - ajustar proporcionalmente
+      if (width === 430 && height === 932) {
+        return "top-[38rem]"; // Proporcionalmente ajustado para altura mayor
+      }
+      // iPhone 12 Pro y otros móviles (390x844)
+      return "top-[35rem]"; // Posición que funciona bien en iPhone 12 Pro
+    }
+    return "top-0";
+  };
+
+  const backgroundPositionClass = getBackgroundPosition();
+
+  // Dynamic padding based on screen size for consistent proportions
+  const getPaddingBottom = () => {
+    if (screenSize === "mobile") {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      // iPhone 14 Pro Max necesita más padding para mantener proporciones
+      if (width === 430 && height === 932) {
+        return "pb-72"; // Ajustado para iPhone 14 Pro Max
+      }
+      // iPhone 12 Pro y otros
+      return "pb-64"; // Padding que funciona bien en iPhone 12 Pro
+    }
+    return "pb-32"; // Desktop/tablet
+  };
+
+  const paddingBottomClass = getPaddingBottom();
+
   return (
-    // Agregamos padding-bottom a la sección principal
     <section
-      className={`relative w-full ${marginTopClass} **pb-20 lg:pb-32** overflow-hidden sm:pb-24`}
+      className={`relative w-full ${marginTopClass} overflow-hidden ${paddingBottomClass} sm:pb-56 lg:pb-32`}
     >
-      {/* Background image */}
-      <div className="absolute inset-0 z-0">
+      {/* Background image with dynamic positioning */}
+      <div
+        className={`absolute inset-0 z-0 ${backgroundPositionClass} ${screenSize === "mobile" ? "flex justify-center" : ""}`}
+      >
         <Image
           src="/images/specialty/specialtydelivery.png"
           alt="Delivery truck background"
           fill
           sizes="100vw"
           priority
-          style={{ objectFit: "cover" }}
+          style={{
+            objectFit: "cover",
+            objectPosition:
+              screenSize === "mobile" ? "center top" : "center center",
+          }}
         />
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-4 py-12 sm:py-16 lg:py-20">
-        {" "}
-        {/* Quitamos el pb del div interno */}
+      <div className="relative mx-auto max-w-7xl px-4 py-6 sm:py-8 lg:py-20">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
           {/* Left content - Text */}
-          <div className="relative z-10 w-full max-w-xl space-y-6 px-4 sm:px-6 lg:w-1/2 lg:px-0">
+          <div className="relative z-10 w-full max-w-xl space-y-4 px-4 sm:px-6 lg:w-1/2 lg:space-y-6 lg:px-0">
             <h1 className="font-[Montserrat] text-3xl font-black leading-tight text-gray-800 sm:text-4xl lg:text-5xl">
               Your Go-To Delivery
               <br />
@@ -116,7 +157,7 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
               Ready Set delivers with precision, care, and confidentiality.
             </p>
 
-            <div className="flex flex-col items-center gap-4 pt-4 sm:flex-row">
+            <div className="flex flex-col items-center gap-3 pt-2 sm:flex-row sm:gap-4 sm:pt-4">
               <button
                 onClick={handleQuoteClick}
                 className="w-full rounded-full bg-yellow-300 px-8 py-3 font-[Montserrat] font-bold text-gray-800 transition-colors hover:bg-yellow-400 sm:w-auto"

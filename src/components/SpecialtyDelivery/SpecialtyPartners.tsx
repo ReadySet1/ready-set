@@ -24,7 +24,7 @@ const SpecialtyPartners: React.FC = () => {
       { name: "Conviva", logo: "/images/food/partners/conviva.png" },
       { name: "Kasa Indian Eatery", logo: "/images/food/partners/kasa.png" },
       { name: "CaterValley", logo: "/images/food/partners/catervalley.png" },
-      // Add any additional partners here
+      { name: "Quivx", logo: "/images/food/partners/quivx.png" },
     ],
     [],
   );
@@ -73,7 +73,7 @@ const SpecialtyPartners: React.FC = () => {
       </div>
 
       <div className="relative z-10 flex h-full w-full flex-col justify-between">
-        {/* Top section with penguin logo - now positioned relative to the container */}
+        {/* Top section with penguin logo */}
         <div
           className="relative mx-auto mt-8 w-full max-w-3xl px-4 md:mt-16 md:px-0"
           style={{ marginTop: topImageMargin }}
@@ -89,7 +89,7 @@ const SpecialtyPartners: React.FC = () => {
         </div>
         <div className="flex-grow" />
 
-        {/* Partners slider at bottom */}
+        {/* Partners slider at bottom - Fixed spacing issues */}
         <div className="w-full pb-8 pt-4 md:pb-8 md:pt-0">
           <div className="mx-auto max-w-[90%] md:max-w-[80%]">
             <Carousel
@@ -97,19 +97,19 @@ const SpecialtyPartners: React.FC = () => {
                 align: "center",
                 loop: true,
                 dragFree: false,
-                containScroll: false,
-                slidesToScroll: 3,
+                containScroll: "trimSnaps",
+                slidesToScroll: 1,
               }}
               plugins={isClient ? [autoplayPlugin.current] : []}
-              className="w-full"
+              className="w-full overflow-visible"
             >
-              <CarouselContent className="-ml-0 -mr-0">
+              <CarouselContent className="ml-0">
                 {partners.map((partner) => (
                   <CarouselItem
                     key={partner.name}
-                    className="basis-1/3 pl-0 pr-0"
+                    className="basis-1/3 pl-0 pr-4"
                   >
-                    <div className="mx-1 md:mx-2">
+                    <div className="w-full">
                       <div className="relative h-20 w-full overflow-hidden rounded-2xl border-4 border-yellow-400 bg-white shadow-lg md:h-24">
                         <Image
                           src={partner.logo}
