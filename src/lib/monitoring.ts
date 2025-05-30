@@ -23,14 +23,20 @@ export function initializeEdgeMonitoring(): void {
     // Edge Runtime differs from Node.js in what global objects are available
     if (typeof globalThis.Response !== 'undefined') {
       // We're in an Edge-compatible environment
-      console.log('Initializing Edge Runtime monitoring');
+      
+      // Only log during development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Initializing Edge Runtime monitoring');
+      }
       
       // Any edge-specific monitoring setup would go here
       // This currently just logs initialization, but can be expanded
       
       edgeMonitoringInitialized = true;
     } else {
-      console.warn('Attempted to initialize Edge monitoring in non-Edge environment');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Attempted to initialize Edge monitoring in non-Edge environment');
+      }
     }
   } catch (error) {
     console.error('Failed to initialize Edge monitoring:', error);
@@ -49,13 +55,19 @@ export function initializeNodeMonitoring(): void {
     // Check for Node.js environment
     if (typeof process !== 'undefined' && process.versions && process.versions.node) {
       // We're in a Node.js environment
-      console.log('Initializing Node.js monitoring');
+      
+      // Only log during development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Initializing Node.js monitoring');
+      }
       
       // Any Node.js-specific monitoring setup would go here
       
       nodeMonitoringInitialized = true;
     } else {
-      console.warn('Attempted to initialize Node.js monitoring in non-Node environment');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Attempted to initialize Node.js monitoring in non-Node environment');
+      }
     }
   } catch (error) {
     console.error('Failed to initialize Node.js monitoring:', error);
@@ -74,7 +86,9 @@ export function initializeMonitoring(): void {
     } else if (typeof process !== 'undefined' && process.versions && process.versions.node) {
       initializeNodeMonitoring();
     } else {
-      console.warn('Unknown environment, monitoring initialization skipped');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Unknown environment, monitoring initialization skipped');
+      }
     }
   } catch (error) {
     console.error('Error initializing monitoring:', error);
@@ -91,5 +105,9 @@ export function initializeMonitoring(): void {
 export function initializeClientMonitoring() {
   // This is intentionally simplified to avoid TypeScript errors
   // The actual initialization will be handled by Next.js integration
-  console.log('Client-side monitoring is handled by Next.js Highlight integration');
+  
+  // Only log during development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Client-side monitoring is handled by Next.js Highlight integration');
+  }
 } 

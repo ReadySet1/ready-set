@@ -1,12 +1,11 @@
 // src/app/(site)/free-resources/[slug]/page.tsx
 import { notFound } from "next/navigation";
-import { urlFor } from "@/sanity/lib/client";
+import { client, urlFor } from "@/sanity/lib/client";
 import BackArrow from "@/components/Common/Back";
 import React from "react";
 import Logo from "@/components/ui/logo";
 import type { Metadata } from "next";
 import { DownloadButtonWrapper } from "./DownloadButtonWrapper";
-import { fetchGuideData, Guide } from "./fetch-guides";
 
 export const revalidate = 30;
 
@@ -25,9 +24,160 @@ interface PortableTextBlock {
   markDefs?: any[];
 }
 
-// Helper function using our new safe fetch utility
-async function getGuide(slug: string): Promise<Guide | null> {
-  return await fetchGuideData(slug);
+// Updated query to match the new schema structure
+const guideQuery = `*[_type == "guide" && slug.current == $slug][0]{
+  _id,
+  _type,
+  _updatedAt,
+  title,
+  subtitle,
+  slug,
+  
+  // CONTENIDO PRINCIPAL - Campos exactos de Sanity
+  introduction,
+  mainContent[] {
+    title,
+    content
+  },
+  listSections[] {
+    title,
+    items[] {
+      title,
+      content
+    }
+  },
+  
+  // CTAs y otros campos
+  callToAction,
+  calendarUrl,
+  downloadCtaText,
+  consultationCtaText,
+  
+  // Archivos descargables
+  downloadableFiles[] {
+    _key,
+    asset-> {
+      _id,
+      url,
+      originalFilename
+    }
+  },
+  
+  // Imagen de portada
+  coverImage,
+  
+  // Categoría
+  category-> {
+    _id,
+    title,
+    slug
+  },
+  
+  // SEO
+  seo{
+    metaTitle,
+    metaDescription,
+    metaImage,
+    nofollowAttributes,
+    seoKeywords,
+    openGraph{
+      siteName,
+      url,
+      description,
+      title,
+      image
+    },
+    twitter{
+      site,
+      creator,
+      cardType,
+      handle
+    }
+  }
+}`;
+
+interface GuideDocument {
+  _id: string;
+  title: string;
+  subtitle?: string;
+  slug: { current: string };
+  introduction?: PortableTextBlock[];
+  coverImage?: any;
+  mainContent?: Array<{
+    title: string;
+    content: PortableTextBlock[];
+  }>;
+  listSections?: Array<{
+    title: string;
+    items: Array<{
+      title?: string;
+      content: string;
+    }>;
+  }>;
+  callToAction?: string;
+  calendarUrl?: string;
+  downloadCtaText?: string;
+  consultationCtaText?: string;
+  _updatedAt: string;
+  category?: {
+    _id: string;
+    title: string;
+    slug: { current: string };
+  };
+  downloadableFiles?: Array<{
+    _key: string;
+    asset: {
+      _id: string;
+      url: string;
+      originalFilename: string;
+    };
+  }>;
+  seo?: {
+    metaTitle?: string;
+    metaDescription?: string;
+    openGraph?: {
+      title?: string;
+      description?: string;
+      image?: any;
+      siteName?: string;
+      url?: string;
+    };
+  };
+}
+
+// Helper function using direct Sanity client
+async function getGuide(slug: string): Promise<GuideDocument | null> {
+  if (!slug) return null;
+  
+  try {
+    const guide = await client.fetch(guideQuery, { slug });
+    
+    // Only log during development, not during build
+    if (process.env.NODE_ENV === 'development') {
+      if (guide) {
+        console.log(`✅ [Direct Sanity] Successfully fetched guide: ${slug}`);
+      } else {
+        console.log(`❌ [Direct Sanity] No guide found for slug: ${slug}`);
+      }
+    }
+    
+    return guide;
+  } catch (error) {
+    // Handle specific build-time errors gracefully
+    if (error instanceof TypeError && error.message.includes('arrayBuffer')) {
+      // This is a known issue during build with Sanity client, return null gracefully
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`⚠️ [Build] Sanity client error during build for ${slug}, this is expected during static generation`);
+      }
+      return null;
+    }
+    
+    // Only log errors during development
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`🔥 [Direct Sanity] Error fetching guide ${slug}:`, error);
+    }
+    return null;
+  }
 }
 
 export async function generateMetadata({
@@ -87,25 +237,6 @@ export default async function GuidePage({
 }) {
   const { slug } = await params;
   const guide = await getGuide(slug);
-
-  console.log("---------------------------------------");
-  console.log(
-    "Guía completa recibida en GuidePage:",
-    JSON.stringify(guide, null, 2),
-  );
-  console.log(
-    "Contenido de Introducción:",
-    JSON.stringify(guide?.introduction, null, 2),
-  );
-  console.log(
-    "Contenido de Secciones Principales:",
-    JSON.stringify(guide?.mainContent, null, 2),
-  );
-  console.log(
-    "Contenido de Secciones de Lista:",
-    JSON.stringify(guide?.listSections, null, 2),
-  );
-  console.log("---------------------------------------");
 
   if (!guide) notFound();
 
@@ -303,21 +434,32 @@ export default async function GuidePage({
 
 export async function generateStaticParams() {
   try {
-    const { getGuides } = await import("@/sanity/lib/client");
+    // During build, use a simpler approach to avoid edge runtime issues
+    const guides = await client.fetch(`*[_type == "guide" && defined(slug.current)]{
+      "slug": slug.current
+    }`);
 
-    const guides = await getGuides();
+    // Add null check for guides
+    if (!guides || !Array.isArray(guides)) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('⚠️ No guides found or invalid response from Sanity, using fallback slugs');
+      }
+      throw new Error('Invalid guides response');
+    }
 
-    const params = guides.map((guide) => ({
-      slug: guide.slug.current,
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`📄 Found ${guides.length} guides for static generation`);
+    }
+    
+    return guides.map((guide: { slug: string }) => ({
+      slug: guide.slug,
     }));
-
-    return params;
   } catch (error) {
-    console.error(
-      "Error generating static params from Sanity, falling back to static list:",
-      error,
-    );
-    // Fallback a slugs estáticos si el fetch de Sanity falla
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("❌ Error in generateStaticParams:", error);
+    }
+    
+    // Fallback to static slugs if Sanity fetch fails
     const staticGuideSlugs = [
       "what-is-email-marketing",
       "your-guide-to-delegation",
@@ -330,6 +472,11 @@ export async function generateStaticParams() {
       "email-testing-made-simple",
       "social-media-strategy-guide-and-template",
     ];
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`🔄 Using ${staticGuideSlugs.length} fallback guide slugs`);
+    }
+    
     return staticGuideSlugs.map((slug) => ({
       slug: slug,
     }));
