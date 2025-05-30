@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { PrismaClient, Prisma } from '@prisma/client'
-import { Decimal } from '@/types/prisma'
+import { Decimal } from '@prisma/client/runtime/library'
 import { CateringStatus } from '@/types/order-status'
 
 const prisma = new PrismaClient();
@@ -11,96 +11,95 @@ const prisma = new PrismaClient();
 // import { OrderStatus } from '@prisma/client'; // Example if defined
 
 export async function GET() {
-  console.log("API Route /api/dashboard-metrics called."); // Log route entry
+  console.log("API Route /api/dashboard-metrics called.");
   try {
-    // It's often better to perform these sequentially if one depends on another
-    // or if you want finer-grained error handling. Promise.all is fine for independent queries.
+    console.log("Fetching dashboard metrics...");
     
-    console.log("Fetching total revenue...");
-    const totalRevenuePromise = prisma.cateringRequest.aggregate({
-      _sum: {
-        orderTotal: true, // orderTotal is Decimal, Prisma handles sum
-      },
-    });
-
-    console.log("Fetching total delivery requests count...");
-    const deliveriesRequestsPromise = prisma.cateringRequest.count();
-
-    console.log("Fetching completed sales count...");
-    const salesTotalPromise = prisma.cateringRequest.count({
-      where: {
-        // Use the imported CateringStatus enum
-        status: CateringStatus.COMPLETED, 
-      },
-    });
-
-    console.log("Fetching total vendors count...");
-    const totalVendorsPromise = prisma.profile.count({
-      where: {
-        // Use string directly for vendor type
-        type: "VENDOR", 
-      },
-    });
-
+    // Use Promise.all for better performance
     const [totalRevenue, deliveriesRequests, salesTotal, totalVendors] =
       await Promise.all([
-        totalRevenuePromise,
-        deliveriesRequestsPromise,
-        salesTotalPromise,
-        totalVendorsPromise,
+        prisma.cateringRequest.aggregate({
+          _sum: {
+            orderTotal: true,
+          },
+          where: {
+            deletedAt: null,
+            // Only include completed orders for revenue calculation
+            status: CateringStatus.COMPLETED,
+          },
+        }),
+        prisma.cateringRequest.count({
+          where: {
+            deletedAt: null,
+          },
+        }),
+        prisma.cateringRequest.count({
+          where: {
+            deletedAt: null,
+            status: CateringStatus.COMPLETED,
+          },
+        }),
+        prisma.profile.count({
+          where: {
+            deletedAt: null,
+            type: "VENDOR",
+          },
+        }),
       ]);
       
     console.log("Prisma queries completed successfully.");
     console.log("Total Revenue Result:", totalRevenue);
-    console.log("Deliveries Requests Count:", deliveriesRequests);
-    console.log("Sales Total Count:", salesTotal);
-    console.log("Total Vendors Count:", totalVendors);
 
     const revenueValue = totalRevenue._sum.orderTotal;
     console.log("Raw Revenue Value:", revenueValue);
 
-    // Handle potential Decimal type from Prisma before converting
+    // Properly handle Decimal type from Prisma
     let finalRevenue = 0;
-    if (revenueValue instanceof Decimal) {
-      finalRevenue = revenueValue.toNumber();
-    } else if (typeof revenueValue === 'number') {
-      // Although orderTotal is Decimal?, sum might return null if no records exist or all are null.
-      // Prisma's aggregate sum typically returns null in such cases, not 0. 
-      // The null case is handled because `revenueValue` would be null, not satisfying either condition.
-      // Let's explicitly check for null for clarity.
-      finalRevenue = revenueValue; // This branch might be less likely if schema enforces Decimal
-    } else if (revenueValue === null) {
-      finalRevenue = 0;
-    } 
-    // Consider adding an else block to log if revenueValue is an unexpected type
+    if (revenueValue !== null && revenueValue !== undefined) {
+      if (revenueValue instanceof Decimal) {
+        finalRevenue = revenueValue.toNumber();
+      } else if (typeof revenueValue === 'string') {
+        // Handle case where Decimal might be serialized as string
+        finalRevenue = parseFloat(revenueValue);
+      } else if (typeof revenueValue === 'number') {
+        finalRevenue = revenueValue;
+      } else {
+        console.warn("Unexpected revenue value type:", typeof revenueValue, revenueValue);
+        finalRevenue = 0;
+      }
+    }
     
     console.log("Processed Revenue Value:", finalRevenue);
 
-
-    return NextResponse.json({
+    const response = {
       totalRevenue: finalRevenue,
       deliveriesRequests,
       salesTotal,
       totalVendors,
+    };
+
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600', // Cache for 5 minutes
+      },
     });
   } catch (error: any) {
-    // Log the specific error object
     console.error("Dashboard metrics error occurred:", error);
     console.error("Error Name:", error.name);
     console.error("Error Message:", error.message);
-    console.error("Error Stack:", error.stack);
-    // If it's a Prisma error, it might have a 'code' property
+    
     if (error.code) {
        console.error("Prisma Error Code:", error.code);
     }
+    
     return NextResponse.json(
-      { error: "Failed to fetch dashboard metrics", details: error.message }, 
+      { 
+        error: "Failed to fetch dashboard metrics", 
+        details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      }, 
       { status: 500 }
     );
   } finally {
-    // Optional: Disconnect Prisma client if not using long-running connections
-    // await prisma.$disconnect(); 
-    // Be cautious with this in serverless environments or frequent requests.
-    console.log("API Route /api/dashboard-metrics finished."); // Log route exit
+    console.log("API Route /api/dashboard-metrics finished.");
   }
 }
