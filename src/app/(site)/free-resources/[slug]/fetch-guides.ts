@@ -1,3 +1,5 @@
+// src/app/(site)/free-resources/[slug]/fetch-guides.ts
+
 import { notFound } from 'next/navigation';
 import { safeFetch } from '@/lib/fetch-utils';
 import { getGuideBySlug } from '@/sanity/lib/queries';
@@ -39,9 +41,16 @@ export interface Guide {
   }>;
   callToAction?: string;
   calendarUrl?: string;
-  consultationCta?: string;
+  downloadCtaText?: string;        
+  consultationCtaText?: string;  
   _updatedAt: string;
-  category?: string;
+  category?: {
+    _id: string;
+    title: string;
+    slug: {
+      current: string;
+    };
+  };
   downloadableFiles?: Array<{
     _key: string;
     asset: {
@@ -78,7 +87,13 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     subtitle: 'A comprehensive guide to email marketing for business owners',
     slug: { current: 'what-is-email-marketing' },
     _updatedAt: new Date().toISOString(),
-    category: 'Marketing',
+    category: {
+      _id: 'marketing',
+      title: 'Marketing',
+      slug: {
+        current: 'marketing'
+      }
+    },
     introduction: [
       {
         _type: 'block',
@@ -128,7 +143,13 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     subtitle: 'How to effectively delegate tasks and grow your business',
     slug: { current: 'your-guide-to-delegation' },
     _updatedAt: new Date().toISOString(),
-    category: 'Management',
+    category: {
+      _id: 'management',
+      title: 'Management',
+      slug: {
+        current: 'management'
+      }
+    },
     introduction: [
       {
         _type: 'block',
@@ -178,7 +199,13 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     subtitle: 'Essential strategies for creating dependable logistics',
     slug: { current: 'building-a-reliable-delivery-network' },
     _updatedAt: new Date().toISOString(),
-    category: 'Logistics',
+    category: {
+      _id: 'logistics',
+      title: 'Logistics',
+      slug: {
+        current: 'logistics'
+      }
+    },
     introduction: [
       {
         _type: 'block',
@@ -228,7 +255,13 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     subtitle: 'How to select the best delivery service for your business',
     slug: { current: 'the-complete-guide-to-choosing-the-right-delivery-partner' },
     _updatedAt: new Date().toISOString(),
-    category: 'Business',
+    category: {
+      _id: 'business',
+      title: 'Business',
+      slug: {
+        current: 'business'
+      }
+    },
     introduction: [
       {
         _type: 'block',
@@ -278,7 +311,13 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     subtitle: 'Your complete guide to finding and hiring virtual assistants',
     slug: { current: 'how-to-hire-the-right-virtual-assistant' },
     _updatedAt: new Date().toISOString(),
-    category: 'Human Resources',
+    category: {
+      _id: 'human-resources',
+      title: 'Human Resources',
+      slug: {
+        current: 'human-resources'
+      }
+    },
     introduction: [
       {
         _type: 'block',
@@ -328,7 +367,13 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     subtitle: 'A beginner-friendly approach to social media marketing',
     slug: { current: 'how-to-start-social-media-marketing-made-simple' },
     _updatedAt: new Date().toISOString(),
-    category: 'Marketing',
+    category: {
+      _id: 'marketing',
+      title: 'Marketing',
+      slug: {
+        current: 'marketing'
+      }
+    },
     introduction: [
       {
         _type: 'block',
@@ -378,7 +423,13 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     subtitle: 'Understanding and improving your email marketing performance',
     slug: { current: 'why-email-metrics-matter' },
     _updatedAt: new Date().toISOString(),
-    category: 'Analytics',
+    category: {
+      _id: 'analytics',
+      title: 'Analytics',
+      slug: {
+        current: 'analytics'
+      }
+    },
     introduction: [
       {
         _type: 'block',
@@ -428,7 +479,13 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     subtitle: 'Solving common delivery and logistics challenges',
     slug: { current: 'addressing-key-issues-in-delivery-logistics' },
     _updatedAt: new Date().toISOString(),
-    category: 'Logistics',
+    category: {
+      _id: 'logistics',
+      title: 'Logistics',
+      slug: {
+        current: 'logistics'
+      }
+    },
     introduction: [
       {
         _type: 'block',
@@ -478,7 +535,13 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     subtitle: 'A practical guide to testing your email campaigns',
     slug: { current: 'email-testing-made-simple' },
     _updatedAt: new Date().toISOString(),
-    category: 'Marketing',
+    category: {
+      _id: 'marketing',
+      title: 'Marketing',
+      slug: {
+        current: 'marketing'
+      }
+    },
     introduction: [
       {
         _type: 'block',
@@ -528,7 +591,13 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
     subtitle: 'Create a winning social media strategy for your business',
     slug: { current: 'social-media-strategy-guide-and-template' },
     _updatedAt: new Date().toISOString(),
-    category: 'Marketing',
+    category: {
+      _id: 'marketing',
+      title: 'Marketing',
+      slug: {
+        current: 'marketing'
+      }
+    },
     introduction: [
       {
         _type: 'block',
@@ -574,107 +643,116 @@ const STATIC_FALLBACK_GUIDES: Record<string, Guide> = {
   }
 };
 
-/**
- * Detect if we're in build/static generation environment
- */
-function isBuildTime(): boolean {
-  // Multiple checks to ensure we catch build time scenarios
-  const isNodeEnvProduction = process.env.NODE_ENV === 'production';
+//**
+
+function shouldForceStaticFallback(): boolean {
+  // This environment variable is true during `next build` AND in Vercel deployments.
+  // It is UNDEFINED in `next dev`.
+  const isBuilding = process.env.NEXT_BUILD_ID;
+
+  // This environment variable is true during `npm run build`.
+  const isLocalBuildCommand = process.env.npm_lifecycle_event === 'build';
+
+  // This environment variable is defined when deployed on Vercel.
   const hasVercelUrl = !!process.env.VERCEL_URL;
-  const isServerSide = typeof window === 'undefined';
-  const isNextBuild = process.env.npm_lifecycle_event === 'build';
-  const isStaticGeneration = isServerSide && !hasVercelUrl;
-  
-  return isStaticGeneration || isNextBuild || (isNodeEnvProduction && !hasVercelUrl);
+
+  // We want to force static fallback ONLY if it's a local `npm run build`
+  // AND it's NOT a Vercel deployment.
+  return isLocalBuildCommand && !hasVercelUrl;
 }
 
 /**
  * Safely fetches guide data with proper error handling
- * During build time, uses static fallbacks to avoid Edge Runtime fetch issues
  */
 export async function fetchGuideData(slug: string): Promise<Guide | null> {
   if (!slug) return null;
   
   try {
-    // During build time, use static fallbacks to completely avoid fetch operations
-    if (isBuildTime()) {
-      console.log(`Build time detected, using static fallback for guide: ${slug}`);
+    // If it's a local 'npm run build', use static fallbacks first.
+    // This avoids hitting external APIs during a local static build explicitly.
+    if (shouldForceStaticFallback()) {
+      console.log(`[fetchGuideData] Local 'npm run build' detected, forcing static fallback for guide: ${slug}`);
       const staticGuide = STATIC_FALLBACK_GUIDES[slug];
       if (staticGuide) {
         return staticGuide;
       }
-      
-      console.warn(`No static fallback found for guide: ${slug}`);
-      // Return a generic fallback guide
+      console.warn(`[fetchGuideData] No specific static fallback found for ${slug}, returning generic.`);
+      // Return a generic fallback if no specific one exists
       return {
         _id: `static-${slug}`,
-        title: 'Business Guide',
-        subtitle: 'A helpful business guide',
+        title: 'Business Guide (Static Fallback)',
+        subtitle: 'A helpful business guide from static data',
         slug: { current: slug },
         _updatedAt: new Date().toISOString(),
-        category: 'Business',
-        introduction: [
-          {
-            _type: 'block',
-            style: 'normal',
-            children: [
-              {
-                _type: 'span',
-                text: 'This is a comprehensive business guide to help you succeed.',
-                marks: []
-              }
-            ]
+        category: {
+          _id: 'business',
+          title: 'Business',
+          slug: {
+            current: 'business'
           }
-        ],
-                 coverImage: {
-           _type: 'image',
-           asset: {
-             _ref: 'image-Tb9Ew8CXIwaY6R1kjMvI0uRR-2000x3000-jpg',
-             _type: 'reference'
-           }
-         },
-        seo: {
-          metaTitle: `Business Guide | Ready Set LLC`,
-          metaDescription: 'A comprehensive business guide to help you succeed.',
-        }
+        },
+        introduction: [{ _type: 'block', style: 'normal', children: [{ _type: 'span', text: 'This content is from a static fallback (generic).', marks: [] }] }],
+        coverImage: { _type: 'image', asset: { _ref: 'image-Tb9Ew8CXIwaY6R1kjMvI0uRR-2000x3000-jpg', _type: 'reference' } },
+        seo: { metaTitle: `Static Guide for ${slug}`, metaDescription: 'This is a static fallback description (generic).' }
       };
     }
     
-    // Runtime: Try API route first, then fallback to direct query
+    // --- FROM HERE, IT WILL ALWAYS TRY TO FETCH FROM SANITY/API ---
+    // This part runs in `npm run dev` and Vercel deployments.
+
+    // Attempt to fetch from API route first (recommended if you have one)
     try {
-      // Convert to absolute URL to avoid parsing errors during static generation
       const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
       const url = new URL(`/api/guides/${slug}`, baseUrl).toString();
       
+      console.log(`[fetchGuideData] Attempting to fetch guide ${slug} from API route: ${url}`);
       const response = await safeFetch<{data?: Guide}>(url);
       
-      // Handle the nested data structure from the API response
       if (response && typeof response === 'object' && 'data' in response && response.data) {
+        console.log(`[fetchGuideData] Guide ${slug} fetched successfully from API route.`);
         return response.data;
       }
       
-      // Handle older API format without nested data
       if (response && typeof response === 'object' && '_id' in response) {
+        console.log(`[fetchGuideData] Guide ${slug} fetched successfully from API route (legacy format).`);
         return response as unknown as Guide;
       }
+      
+      console.warn(`[fetchGuideData] API route for guide ${slug} returned empty or invalid data, trying direct Sanity query.`);
+
     } catch (apiError) {
-      console.warn(`API fetch failed for guide ${slug}, falling back to direct query:`, apiError);
+      console.warn(`[fetchGuideData] API fetch failed for guide ${slug}, falling back to direct Sanity query:`, apiError);
       // API route failed, trying direct Sanity query as fallback
     }
     
     // Fallback to direct Sanity query
+    console.log(`[fetchGuideData] Attempting to fetch guide ${slug} directly from Sanity.`);
     const guide = await getGuideBySlug(slug);
+    
+    if (!guide || guide._id === undefined || guide._id.startsWith("fallback-")) {
+      console.warn(`[fetchGuideData] Direct Sanity query for guide ${slug} returned empty, null, or fallback. It might indicate a CORS/network issue or missing data.`);
+      // If Sanity itself fails, as a last resort, return a static fallback
+      const staticGuide = STATIC_FALLBACK_GUIDES[slug];
+      if (staticGuide) {
+        console.log(`[fetchGuideData] Using static fallback for guide: ${slug} after direct Sanity query failure.`);
+        return staticGuide;
+      }
+      console.error(`[fetchGuideData] No real data and no specific static fallback for ${slug}. Returning null.`);
+      return null;
+    }
+    
+    console.log(`[fetchGuideData] Guide ${slug} fetched successfully directly from Sanity.`);
     return guide as unknown as Guide;
   } catch (error) {
-    console.error(`Error fetching guide with slug ${slug}:`, error);
-    
-    // Final fallback: check static guides even during runtime
+    console.error(`[fetchGuideData] CRITICAL ERROR fetching guide with slug ${slug}:`, error);
+
+    // Final fallback in case of ANY unhandled error during fetch
     const staticGuide = STATIC_FALLBACK_GUIDES[slug];
     if (staticGuide) {
-      console.log(`Using static fallback for guide: ${slug}`);
+      console.log(`[fetchGuideData] Using static fallback for guide: ${slug} due to critical error.`);
       return staticGuide;
     }
     
     return null;
   }
-} 
+}
