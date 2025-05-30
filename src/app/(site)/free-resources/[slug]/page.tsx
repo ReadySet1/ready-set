@@ -1,16 +1,14 @@
 // src/app/(site)/free-resources/[slug]/page.tsx
 import { notFound } from "next/navigation";
-import { urlFor } from "@/sanity/lib/client";
+import { client, urlFor } from "@/sanity/lib/client";
 import BackArrow from "@/components/Common/Back";
 import React from "react";
 import Logo from "@/components/ui/logo";
 import type { Metadata } from "next";
 import { DownloadButtonWrapper } from "./DownloadButtonWrapper";
-import { fetchGuideData, Guide } from "./fetch-guides";
 
 export const revalidate = 30;
 
-// Define types for Portable Text blocks
 interface PortableTextSpan {
   _key?: string;
   _type: string;
@@ -26,9 +24,160 @@ interface PortableTextBlock {
   markDefs?: any[];
 }
 
-// Helper function using our new safe fetch utility
-async function getGuide(slug: string): Promise<Guide | null> {
-  return await fetchGuideData(slug);
+// Updated query to match the new schema structure
+const guideQuery = `*[_type == "guide" && slug.current == $slug][0]{
+  _id,
+  _type,
+  _updatedAt,
+  title,
+  subtitle,
+  slug,
+  
+  // CONTENIDO PRINCIPAL - Campos exactos de Sanity
+  introduction,
+  mainContent[] {
+    title,
+    content
+  },
+  listSections[] {
+    title,
+    items[] {
+      title,
+      content
+    }
+  },
+  
+  // CTAs y otros campos
+  callToAction,
+  calendarUrl,
+  downloadCtaText,
+  consultationCtaText,
+  
+  // Archivos descargables
+  downloadableFiles[] {
+    _key,
+    asset-> {
+      _id,
+      url,
+      originalFilename
+    }
+  },
+  
+  // Imagen de portada
+  coverImage,
+  
+  // Categoría
+  category-> {
+    _id,
+    title,
+    slug
+  },
+  
+  // SEO
+  seo{
+    metaTitle,
+    metaDescription,
+    metaImage,
+    nofollowAttributes,
+    seoKeywords,
+    openGraph{
+      siteName,
+      url,
+      description,
+      title,
+      image
+    },
+    twitter{
+      site,
+      creator,
+      cardType,
+      handle
+    }
+  }
+}`;
+
+interface GuideDocument {
+  _id: string;
+  title: string;
+  subtitle?: string;
+  slug: { current: string };
+  introduction?: PortableTextBlock[];
+  coverImage?: any;
+  mainContent?: Array<{
+    title: string;
+    content: PortableTextBlock[];
+  }>;
+  listSections?: Array<{
+    title: string;
+    items: Array<{
+      title?: string;
+      content: string;
+    }>;
+  }>;
+  callToAction?: string;
+  calendarUrl?: string;
+  downloadCtaText?: string;
+  consultationCtaText?: string;
+  _updatedAt: string;
+  category?: {
+    _id: string;
+    title: string;
+    slug: { current: string };
+  };
+  downloadableFiles?: Array<{
+    _key: string;
+    asset: {
+      _id: string;
+      url: string;
+      originalFilename: string;
+    };
+  }>;
+  seo?: {
+    metaTitle?: string;
+    metaDescription?: string;
+    openGraph?: {
+      title?: string;
+      description?: string;
+      image?: any;
+      siteName?: string;
+      url?: string;
+    };
+  };
+}
+
+// Helper function using direct Sanity client
+async function getGuide(slug: string): Promise<GuideDocument | null> {
+  if (!slug) return null;
+  
+  try {
+    const guide = await client.fetch(guideQuery, { slug });
+    
+    // Only log during development, not during build
+    if (process.env.NODE_ENV === 'development') {
+      if (guide) {
+        console.log(`✅ [Direct Sanity] Successfully fetched guide: ${slug}`);
+      } else {
+        console.log(`❌ [Direct Sanity] No guide found for slug: ${slug}`);
+      }
+    }
+    
+    return guide;
+  } catch (error) {
+    // Handle specific build-time errors gracefully
+    if (error instanceof TypeError && error.message.includes('arrayBuffer')) {
+      // This is a known issue during build with Sanity client, return null gracefully
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`⚠️ [Build] Sanity client error during build for ${slug}, this is expected during static generation`);
+      }
+      return null;
+    }
+    
+    // Only log errors during development
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`🔥 [Direct Sanity] Error fetching guide ${slug}:`, error);
+    }
+    return null;
+  }
 }
 
 export async function generateMetadata({
@@ -206,9 +355,7 @@ export default async function GuidePage({
                 {/* Call to action */}
                 {guide.callToAction && (
                   <div className="mt-8 space-y-4">
-                    <p className="font-medium text-gray-700">
-                      
-                    </p>
+                    <p className="font-medium text-gray-700"></p>
                     <p className="text-gray-600">
                       If you found this guide helpful, share it with your
                       network or schedule a consultation call with us. Ready to
@@ -267,7 +414,7 @@ export default async function GuidePage({
                       rel="noopener noreferrer"
                       className="w-full rounded-lg bg-yellow-400 px-6 py-3 font-semibold text-gray-800 transition-colors hover:bg-yellow-500"
                     >
-                      {guide.consultationCta || "Schedule a Consultation"}
+                      {guide.consultationCtaText || "Schedule a Consultation"}
                     </a>
                   </div>
                 )}
@@ -287,53 +434,48 @@ export default async function GuidePage({
 
 export async function generateStaticParams() {
   try {
-    // During build time, use static list to avoid fetch issues
-    const isStaticGeneration = typeof window === 'undefined' && !process.env.VERCEL_URL;
-    const isNextBuild = process.env.npm_lifecycle_event === 'build';
-    
-    if (isStaticGeneration || isNextBuild) {
-      // Return static guide slugs to avoid fetch operations during build
-      const staticGuideSlugs = [
-        'what-is-email-marketing',
-        'your-guide-to-delegation', 
-        'building-a-reliable-delivery-network',
-        'the-complete-guide-to-choosing-the-right-delivery-partner',
-        'how-to-hire-the-right-virtual-assistant',
-        'how-to-start-social-media-marketing-made-simple',
-        'why-email-metrics-matter',
-        'addressing-key-issues-in-delivery-logistics',
-        'email-testing-made-simple',
-        'social-media-strategy-guide-and-template'
-      ];
-      
-      return staticGuideSlugs.map((slug) => ({
-        slug: slug,
-      }));
+    // During build, use a simpler approach to avoid edge runtime issues
+    const guides = await client.fetch(`*[_type == "guide" && defined(slug.current)]{
+      "slug": slug.current
+    }`);
+
+    // Add null check for guides
+    if (!guides || !Array.isArray(guides)) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('⚠️ No guides found or invalid response from Sanity, using fallback slugs');
+      }
+      throw new Error('Invalid guides response');
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`📄 Found ${guides.length} guides for static generation`);
     }
     
-    // Runtime: Try to fetch from Sanity
-    const { getGuides } = await import("@/sanity/lib/queries");
-    const guides = await getGuides();
-    
-    // Make sure we return objects with slug as string
-    return guides.map((guide) => ({
-      slug: guide.slug.current,
+    return guides.map((guide: { slug: string }) => ({
+      slug: guide.slug,
     }));
   } catch (error) {
-    console.error("Error generating static params:", error);
-    // Fallback to static guide slugs if Sanity fetch fails
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("❌ Error in generateStaticParams:", error);
+    }
+    
+    // Fallback to static slugs if Sanity fetch fails
     const staticGuideSlugs = [
-      'what-is-email-marketing',
-      'your-guide-to-delegation', 
-      'building-a-reliable-delivery-network',
-      'the-complete-guide-to-choosing-the-right-delivery-partner',
-      'how-to-hire-the-right-virtual-assistant',
-      'how-to-start-social-media-marketing-made-simple',
-      'why-email-metrics-matter',
-      'addressing-key-issues-in-delivery-logistics',
-      'email-testing-made-simple',
-      'social-media-strategy-guide-and-template'
+      "what-is-email-marketing",
+      "your-guide-to-delegation",
+      "building-a-reliable-delivery-network",
+      "the-complete-guide-to-choosing-the-right-delivery-partner",
+      "how-to-hire-the-right-virtual-assistant",
+      "how-to-start-social-media-marketing-made-simple",
+      "why-email-metrics-matter",
+      "addressing-key-issues-in-delivery-logistics",
+      "email-testing-made-simple",
+      "social-media-strategy-guide-and-template",
     ];
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`🔄 Using ${staticGuideSlugs.length} fallback guide slugs`);
+    }
     
     return staticGuideSlugs.map((slug) => ({
       slug: slug,

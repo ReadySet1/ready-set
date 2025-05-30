@@ -1,3 +1,4 @@
+// components/Blog/SingleBlog.tsx
 "use client";
 
 import React, { useState, useCallback, useMemo } from "react";
@@ -11,11 +12,19 @@ interface PostsProps {
   basePath: string;
 }
 
+const getSlugValue = (
+  slug: string | { current: string } | undefined,
+): string => {
+  if (!slug) return "";
+  if (typeof slug === "string") return slug;
+  if (typeof slug === "object" && "current" in slug) return slug.current;
+  return "";
+};
+
 const SingleBlog = ({ data, basePath }: PostsProps) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6; // Changed from 9 to 6 for better UX on large screens
+  const itemsPerPage = 6;
 
-  // Calculate pagination info
   const calculatePaginationInfo = useCallback(() => {
     const total = data.length;
     const start = (currentPage - 1) * itemsPerPage;
@@ -32,13 +41,14 @@ const SingleBlog = ({ data, basePath }: PostsProps) => {
   const { start, end, total, currentItems, totalPages } =
     calculatePaginationInfo();
 
-  // Get featured post (first post)
-  const featuredPost = useMemo(() => (data.length > 0 ? data[0] : null), [data]);
-  
-  // Get remaining posts for grid (excluding featured post if on first page)
+  const featuredPost = useMemo(
+    () => (data.length > 0 ? data[0] : null),
+    [data],
+  );
+
   const gridPosts = useMemo(() => {
     if (currentPage === 1 && featuredPost) {
-      return currentItems.slice(1); // Skip the featured post
+      return currentItems.slice(1);
     }
     return currentItems;
   }, [currentPage, featuredPost, currentItems]);
@@ -68,10 +78,17 @@ const SingleBlog = ({ data, basePath }: PostsProps) => {
       Technology: "bg-green-100 text-green-800",
       default: "bg-gray-100 text-gray-800",
     };
-    
-    return category 
-      ? colors[category] || colors.default
-      : colors.default;
+
+    return category ? colors[category] || colors.default : colors.default;
+  };
+
+  const createPostLink = (post: SimpleBlogCard): string => {
+    const slugValue = getSlugValue(post.slug);
+    if (!slugValue) {
+      console.warn("Post without valid slug:", post);
+      return "#"; // O redirigir a una página de error
+    }
+    return `/${basePath}/${slugValue}`;
   };
 
   return (
@@ -101,29 +118,30 @@ const SingleBlog = ({ data, basePath }: PostsProps) => {
             </div>
             <div className="flex flex-col justify-between p-6 md:p-8">
               <div>
-                {featuredPost.categories && featuredPost.categories.length > 0 && (
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    {featuredPost.categories.map((cat: any) => (
-                      <span 
-                        key={cat.title} 
-                        className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${getCategoryBadge(cat.title)}`}
-                      >
-                        {cat.title}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                {featuredPost.categories &&
+                  featuredPost.categories.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {featuredPost.categories.map((cat: any) => (
+                        <span
+                          key={cat.title}
+                          className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${getCategoryBadge(cat.title)}`}
+                        >
+                          {cat.title}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 <h2 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white md:text-3xl">
-                  <Link 
-                    href={`/${basePath}/${featuredPost.slug?.current}`}
-                    className="hover:text-primary transition-colors duration-300"
+                  <Link
+                    href={createPostLink(featuredPost)}
+                    className="transition-colors duration-300 hover:text-primary"
                   >
                     {featuredPost.title}
                   </Link>
                 </h2>
-                {featuredPost.slug?.smallDescription && (
+                {featuredPost.smallDescription && (
                   <p className="mb-6 text-gray-600 dark:text-gray-300">
-                    {featuredPost.slug.smallDescription}
+                    {featuredPost.smallDescription}
                   </p>
                 )}
               </div>
@@ -132,18 +150,23 @@ const SingleBlog = ({ data, basePath }: PostsProps) => {
                   {formatDate(featuredPost._updatedAt)}
                 </span>
                 <Link
-                  href={`/${basePath}/${featuredPost.slug?.current}`}
+                  href={createPostLink(featuredPost)}
                   className="inline-flex items-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors duration-300 hover:bg-primary/90"
                 >
                   Read More
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    className="ml-2 h-4 w-4" 
-                    fill="none" 
-                    viewBox="0 0 24 24" 
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="ml-2 h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
                     stroke="currentColor"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
                   </svg>
                 </Link>
               </div>
@@ -154,87 +177,93 @@ const SingleBlog = ({ data, basePath }: PostsProps) => {
 
       {/* Blog grid */}
       <div className="grid w-full grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-        {gridPosts.map((post) => (
-          <div
-            key={post._id}
-            className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-md transition-all hover:translate-y-[-5px] hover:shadow-lg dark:bg-gray-800"
-          >
-            <div className="relative aspect-video w-full overflow-hidden">
-              <Link
-                href={`/${basePath}/${post.slug?.current}`}
-                className="block"
-              >
-                {post.mainImage ? (
-                  <Image
-                    src={urlFor(post.mainImage).url()}
-                    alt={post.title}
-                    fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    style={{ objectFit: "cover" }}
-                    className="transition-transform duration-500 hover:scale-105"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700">
-                    <span className="text-gray-500 dark:text-gray-400">
-                      No Image
-                    </span>
-                  </div>
-                )}
-              </Link>
-            </div>
+        {gridPosts.map((post) => {
+          const postLink = createPostLink(post);
 
-            <div className="flex flex-grow flex-col p-6">
-              {post.categories && post.categories.length > 0 && (
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {post.categories.map((cat: any) => (
-                    <span 
-                      key={cat.title} 
-                      className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${getCategoryBadge(cat.title)}`}
-                    >
-                      {cat.title}
-                    </span>
-                  ))}
-                </div>
-              )}
-              
-              <h3 className="mb-3 text-xl font-semibold text-gray-800 dark:text-white">
-                <Link 
-                  href={`/${basePath}/${post.slug?.current}`}
-                  className="hover:text-primary transition-colors duration-300"
-                >
-                  {post.title}
-                </Link>
-              </h3>
-              
-              {post.slug?.smallDescription && (
-                <p className="mb-4 line-clamp-3 text-sm text-gray-600 dark:text-gray-300">
-                  {post.slug.smallDescription}
-                </p>
-              )}
-              
-              <div className="mt-auto flex items-center justify-between pt-4">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {formatDate(post._updatedAt)}
-                </span>
-                <Link
-                  href={`/${basePath}/${post.slug?.current}`}
-                  className="inline-flex items-center text-sm font-medium text-primary transition-colors hover:text-primary/80"
-                >
-                  Read More
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    className="ml-1 h-4 w-4" 
-                    fill="none" 
-                    viewBox="0 0 24 24" 
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+          return (
+            <div
+              key={post._id}
+              className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-md transition-all hover:translate-y-[-5px] hover:shadow-lg dark:bg-gray-800"
+            >
+              <div className="relative aspect-video w-full overflow-hidden">
+                <Link href={postLink} className="block">
+                  {post.mainImage ? (
+                    <Image
+                      src={urlFor(post.mainImage).url()}
+                      alt={post.title}
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      style={{ objectFit: "cover" }}
+                      className="transition-transform duration-500 hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700">
+                      <span className="text-gray-500 dark:text-gray-400">
+                        No Image
+                      </span>
+                    </div>
+                  )}
                 </Link>
               </div>
+
+              <div className="flex flex-grow flex-col p-6">
+                {post.categories && post.categories.length > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {post.categories.map((cat: any) => (
+                      <span
+                        key={cat.title}
+                        className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${getCategoryBadge(cat.title)}`}
+                      >
+                        {cat.title}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <h3 className="mb-3 text-xl font-semibold text-gray-800 dark:text-white">
+                  <Link
+                    href={postLink}
+                    className="transition-colors duration-300 hover:text-primary"
+                  >
+                    {post.title}
+                  </Link>
+                </h3>
+
+                {post.smallDescription && (
+                  <p className="mb-4 line-clamp-3 text-sm text-gray-600 dark:text-gray-300">
+                    {post.smallDescription}
+                  </p>
+                )}
+
+                <div className="mt-auto flex items-center justify-between pt-4">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {formatDate(post._updatedAt)}
+                  </span>
+                  <Link
+                    href={postLink}
+                    className="inline-flex items-center text-sm font-medium text-primary transition-colors hover:text-primary/80"
+                  >
+                    Read More
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="ml-1 h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </Link>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Pagination */}
@@ -290,7 +319,9 @@ const SingleBlog = ({ data, basePath }: PostsProps) => {
 
               {/* Ellipsis if needed */}
               {currentPage > 3 && (
-                <span className="px-1 text-gray-500 dark:text-gray-400">...</span>
+                <span className="px-1 text-gray-500 dark:text-gray-400">
+                  ...
+                </span>
               )}
 
               {/* Dynamic page numbers */}
@@ -311,7 +342,7 @@ const SingleBlog = ({ data, basePath }: PostsProps) => {
                       className={`flex h-10 w-10 items-center justify-center rounded-md ${
                         currentPage === pageNumber
                           ? "bg-primary font-medium text-white"
-                        : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                          : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                       }`}
                       aria-label={`Page ${pageNumber}`}
                     >
@@ -324,7 +355,9 @@ const SingleBlog = ({ data, basePath }: PostsProps) => {
 
               {/* Ellipsis if needed */}
               {currentPage < totalPages - 2 && (
-                <span className="px-1 text-gray-500 dark:text-gray-400">...</span>
+                <span className="px-1 text-gray-500 dark:text-gray-400">
+                  ...
+                </span>
               )}
 
               {/* Last page */}

@@ -48,13 +48,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { UserStatus } from "@/types/user";
 
-// Log UserStatus values for debugging
-console.log("UserStatus enum values:", {
-  ACTIVE: UserStatus.ACTIVE,
-  PENDING: UserStatus.PENDING,
-  DELETED: UserStatus.DELETED
-});
-
 interface Delivery {
   id: string;
   order_number: string;
@@ -133,11 +126,6 @@ const DriverDeliveries: React.FC = () => {
           throw new Error("Failed to fetch user profile");
         }
         const profileData: UserProfile = await response.json();
-        console.log("User profile data:", profileData);
-        console.log("User status:", profileData.status);
-        console.log("Status type:", typeof profileData.status);
-        console.log("Is status pending:", profileData.status === UserStatus.PENDING);
-        console.log("Is status active:", profileData.status === UserStatus.ACTIVE);
         setUserProfile(profileData);
       } catch (error) {
         console.error("Error fetching user profile:", error);

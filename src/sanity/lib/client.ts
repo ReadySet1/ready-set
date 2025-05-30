@@ -6,6 +6,14 @@ import ImageUrlBuilder from '@sanity/image-url'
 import { apiVersion, dataset, projectId, useCdn } from '../env'
 import type { PostDocument, SeoType } from "../schemaTypes/seo";
 import type { SimpleBlogCard, FullPost } from "@/types/simple-blog-card";
+import {
+  postsQuery,
+  postQuery,
+  guideQuery,
+  guidesQuery,
+  allCategoriesQuery,
+  categoryGuidesQuery
+} from "./queries";
 
 // Add missing properties to the PostDocument interface to match our usage
 interface ExtendedPostDocument extends PostDocument {
@@ -20,6 +28,59 @@ interface Guide {
   slug: { current: string };
   coverImage: any;
   _updatedAt: string;
+  
+  introduction?: Array<{
+    _type: string;
+    style?: string;
+    children?: Array<{
+      _type: string;
+      text: string;
+      marks?: string[];
+    }>;
+  }>;
+  mainContent?: Array<{
+    title: string;
+    content: Array<{
+      _type: string;
+      style?: string;
+      children?: Array<{
+        _type: string;
+        text: string;
+        marks?: string[];
+      }>;
+    }>;
+  }>;
+  listSections?: Array<{
+    title: string;
+    items: Array<{
+      title?: string;
+      content: string;
+    }>;
+  }>;
+  
+  callToAction?: string;
+  calendarUrl?: string;
+  downloadCtaText?: string;
+  consultationCtaText?: string;
+  
+  downloadableFiles?: Array<{
+    _key: string;
+    asset: {
+      _id: string;
+      url: string;
+      originalFilename: string;
+    };
+  }>;
+  
+  category?: {
+    _id: string;
+    title: string;
+    slug: {
+      current: string;
+    };
+  };
+  
+  // SEO
   seo?: SeoType;
 }
 
@@ -41,7 +102,7 @@ const createMockPostResponse = (slug?: string): ExtendedPostDocument => ({
   _id: "mock-post-id",
   _updatedAt: new Date().toISOString(),
   title: "Mock Post Title",
-  slug: { 
+  slug: {
     current: slug || "mock-post-slug"
   },
   smallDescription: "This is a mock post description for testing purposes.",
@@ -59,8 +120,8 @@ const createMockPostResponse = (slug?: string): ExtendedPostDocument => ({
       _key: "mock-block-1",
       markDefs: [],
       children: [
-        { 
-          _type: "span", 
+        {
+          _type: "span",
           text: "This is mock content.",
           marks: [],
           _key: "mock-span-1"
@@ -115,10 +176,9 @@ const createSimpleBlogCard = (post: ExtendedPostDocument): SimpleBlogCard => ({
   title: post.title,
   slug: {
     current: post.slug.current,
-    _type: "slug",
-    _createdAt: new Date().toISOString(),
-    smallDescription: post.smallDescription
+    _type: "slug"
   },
+  smallDescription: post.smallDescription,
   mainImage: post.mainImage ? {
     alt: post.title,
     asset: post.mainImage.asset,
@@ -159,7 +219,7 @@ export async function getPostBySlug(slug: string): Promise<PostDocument> {
       _updatedAt: new Date().toISOString(),
       title: "Fallback Post",
       slug: { current: slug },
-      mainImage: { 
+      mainImage: {
         _type: "image",
         asset: {
           _ref: FALLBACK_IMAGE_REF,
@@ -193,7 +253,7 @@ export async function getFullPostBySlug(slug: string): Promise<FullPost> {
       currentSlug: slug,
       _updaAt: new Date().toISOString(),
       body: [],
-      mainImage: { 
+      mainImage: {
         _type: "image",
         asset: {
           _ref: FALLBACK_IMAGE_REF,
@@ -221,30 +281,121 @@ const createFallbackGuide = (slug: string): Guide => ({
   }
 });
 
-// Helper function to get a guide by slug
+// Helper function to get a guide by slug 
 export async function getGuideBySlug(slug: string): Promise<Guide> {
   try {
+    console.log(`[getGuideBySlug] Fetching guide: ${slug}`);
+    
     const guide = await client.fetch(
       `*[_type == "guide" && slug.current == $slug][0]{
         _id,
+        _type,
+        _updatedAt,
         title,
         subtitle,
         slug,
-        coverImage,
-        _updatedAt,
-        seo
+        
+        // CONTENIDO PRINCIPAL - Estos campos faltaban
+        introduction,
+        mainContent[] {
+          title,
+          content
+        },
+        listSections[] {
+          title,
+          items[] {
+            title,
+            content
+          }
+        },
+        
+        // CTAs y otros campos
+        callToAction,
+        calendarUrl,
+        downloadCtaText,
+        consultationCtaText,
+        
+        // Archivos descargables
+        downloadableFiles[] {
+          _key,
+          asset-> {
+            _id,
+            url,
+            originalFilename
+          }
+        },
+        
+        // Imagen de portada completa
+        coverImage {
+          _type,
+          crop,
+          hotspot,
+          asset-> {
+            _id,
+            _ref,
+            url,
+            metadata {
+              dimensions {
+                width,
+                height
+              }
+            }
+          }
+        },
+        
+        // Categoría
+        category-> {
+          _id,
+          title,
+          slug
+        },
+        
+        // SEO
+        seo {
+          _type,
+          metaTitle,
+          metaDescription,
+          metaImage {
+            asset-> {
+              _id,
+              url
+            }
+          },
+          nofollowAttributes,
+          seoKeywords,
+          openGraph {
+            _type,
+            title,
+            description,
+            siteName,
+            url,
+            image {
+              asset-> {
+                _id,
+                url
+              }
+            }
+          },
+          twitter {
+            _type,
+            handle,
+            site,
+            cardType,
+            creator
+          }
+        }
       }`,
       { slug }
     );
-    
+
     if (!guide) {
-      console.warn(`No guide found with slug ${slug}, using fallback`);
+      console.warn(`[getGuideBySlug] No guide found with slug ${slug}, using fallback`);
       return createFallbackGuide(slug);
     }
-    
+
     return guide;
   } catch (error) {
-    console.error(`Error fetching guide with slug ${slug}:`, error);
+    console.error(`[getGuideBySlug] Error fetching guide with slug ${slug}:`, error);
     return createFallbackGuide(slug);
   }
 }
@@ -252,19 +403,7 @@ export async function getGuideBySlug(slug: string): Promise<Guide> {
 // Helper function to get posts
 export async function getPosts(): Promise<SimpleBlogCard[]> {
   try {
-    return await client.fetch(
-      `*[_type == "post" && defined(slug.current)]{
-        _id,
-        _updatedAt,
-        title,
-        slug,
-        mainImage,
-        categories[]->{
-          title,
-          _id
-        }
-      }`
-    );
+    return await client.fetch(postsQuery);
   } catch (error) {
     console.error("Error fetching posts:", error);
     // Return empty array as fallback
@@ -286,7 +425,7 @@ export async function getGuides(): Promise<Guide[]> {
         seo
       }`
     );
-    
+
     if (!guides || !guides.length) {
       console.warn("No guides found, using fallback guides");
       return [
@@ -295,7 +434,7 @@ export async function getGuides(): Promise<Guide[]> {
         createFallbackGuide("building-a-reliable-delivery-network")
       ];
     }
-    
+
     return guides;
   } catch (error) {
     console.error("Error fetching guides:", error);
@@ -319,7 +458,7 @@ export function urlFor(source: any) {
       url: () => "https://via.placeholder.com/600x400?text=Image+Not+Available"
     };
   }
-  
+
   try {
     return builder.image(source);
   } catch (error) {
@@ -338,7 +477,7 @@ export async function customFetch(url: string, options: RequestInit = {}) {
       // Ensure we're using Edge-compatible fetch options
       next: { revalidate: 60 } // Cache results for 60 seconds
     });
-    
+
     // Don't use arrayBuffer() in Edge Runtime - just return the response
     return response;
   } catch (error) {

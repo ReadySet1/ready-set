@@ -76,6 +76,12 @@ export const rsSubsidiariesMenuItem: MenuItem = {
       path: "/bakery-delivery",
       newTab: false,
     },
+    {
+      id: 16,
+      title: "Specialty Deliveries",
+      path: "/specialty-deliveries",
+      newTab: false,
+    },
   ],
 };
 

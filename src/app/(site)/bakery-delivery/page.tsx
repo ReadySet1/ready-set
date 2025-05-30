@@ -1,4 +1,5 @@
-// src/app/(site)/food/page.tsx
+// src/app/(site)/bakery/page.tsx
+
 import { Metadata } from "next";
 import FoodIcons from "@/components/FoodDelivery/FoodIcons";
 import BakeryPartners from "@/components/BakeryDelivery/BakeryPartners";

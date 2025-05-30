@@ -1,21 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGuideBySlug } from '@/sanity/lib/queries';
-import { initializeEdgeMonitoring } from '@/lib/monitoring';
 
-// Set edge runtime for better performance
-export const runtime = 'edge';
-
-// Initialize edge-compatible monitoring
-initializeEdgeMonitoring();
-
-// Define types compatible with Next.js 15 Edge Runtime
+// Define types compatible with Next.js 15
 type RouteParams = {
   slug: string;
 };
 
 /**
- * Edge API route to fetch a guide by slug
- * Note: In Next.js 15, params in Edge Runtime can be async
+ * API route to fetch a guide by slug
+ * Note: This route is kept for compatibility but not actively used
  */
 export async function GET(
   request: NextRequest,
@@ -53,9 +46,6 @@ export async function GET(
       data: guide
     });
   } catch (error) {
-    // Log the error for debugging
-    console.error(`Error fetching guide:`, error);
-    
     // Return appropriate error response
     return NextResponse.json(
       { 
@@ -65,4 +55,4 @@ export async function GET(
       { status: 500 }
     );
   }
-} 
+}

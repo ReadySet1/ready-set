@@ -28,6 +28,7 @@ export const imageFields = groq`
   },
   asset->{
     _id,
+    _ref,
     url,
     metadata {
       dimensions {
@@ -70,9 +71,12 @@ export const metaAttributesQuery = groq`
 export const seoFields = groq`
   _type,
   metaTitle,
+  metaDescription,
+  metaImage{
+    ${imageFields}
+  },
   nofollowAttributes,
   seoKeywords,
-  metaDescription,
   openGraph{
     ${openGraphQuery}
   },
@@ -89,7 +93,7 @@ export const seoFields = groq`
 
 // Updated queries with SEO fields
 export const postsQuery = groq`
-  *[_type == "post" && defined(slug.current)]{
+  *[_type == "post" && defined(slug.current)] | order(_updatedAt desc) {
     _id,
     _type,
     title,
@@ -127,32 +131,58 @@ export const postPathsQuery = groq`
   }
 `;
 
-// Helper functions for fetching
-export async function getPostWithSEO(slug: string) {
-  return await fetchPostBySlug(slug);
-}
-
-export async function getAllPosts() {
-  return await fetchPosts();
-}
-
 export const guideQuery = groq`
   *[_type == "guide" && slug.current == $slug][0]{
     _id,
     _type,
+    _updatedAt,
     title,
     subtitle,
-    "slug": slug.current,
+    slug,
+    
+    // CONTENIDO PRINCIPAL - Campos exactos de Sanity
     introduction,
-    sections,
-    "coverImage": coverImage.asset->,
-    calendarUrl,
-    ctaText,
-    consultationCta,
-    "category": category->{
+    mainContent[] {
       title,
-      "slug": slug.current
+      content
     },
+    listSections[] {
+      title,
+      items[] {
+        title,
+        content
+      }
+    },
+    
+    // CTAs y otros campos
+    callToAction,
+    calendarUrl,
+    downloadCtaText,
+    consultationCtaText,
+    
+    // Archivos descargables
+    downloadableFiles[] {
+      _key,
+      asset-> {
+        _id,
+        url,
+        originalFilename
+      }
+    },
+    
+    // Imagen de portada COMPLETA (con crop y hotspot)
+    coverImage {
+      ${imageFields}
+    },
+    
+    // Categoría
+    category-> {
+      _id,
+      title,
+      slug
+    },
+    
+    // SEO
     seo{
       ${seoFields}
     }
@@ -167,7 +197,9 @@ export const categoryGuidesQuery = groq`
       title,
       subtitle,
       "slug": slug.current,
-      "coverImage": coverImage.asset->,
+      coverImage {
+        ${imageFields}
+      },
       seo{
         ${seoFields}
       }
@@ -191,7 +223,9 @@ export const guidesQuery = groq`
     title,
     subtitle,
     "slug": slug.current,
-    "coverImage": coverImage.asset->,
+    coverImage {
+      ${imageFields}
+    },
     "category": category->{
       title,
       "slug": slug.current
@@ -202,10 +236,39 @@ export const guidesQuery = groq`
   }
 `;
 
+export const guidePathsQuery = groq`
+  *[_type == "guide" && defined(slug.current)]{
+    "slug": slug.current
+  }
+`;
+
+// Helper functions for fetching
+export async function getPostWithSEO(slug: string) {
+  return await fetchPostBySlug(slug);
+}
+
+export async function getAllPosts() {
+  return await fetchPosts();
+}
+
 export async function getGuides() {
   return await fetchGuides();
 }
 
+
 export async function getGuideBySlug(slug: string) {
-  return await fetchGuideBySlug(slug);
+  try {
+    
+    const guide = await client.fetch(guideQuery, { slug });
+    
+    if (!guide) {
+      console.warn(`🔥🔥🔥 [queries.ts] No guide found with slug: ${slug}`);
+      return null;
+    }
+    
+    return guide;
+  } catch (error) {
+    console.error(`🔥🔥🔥 [queries.ts] Error fetching guide with slug ${slug}:`, error);
+    return null;
+  }
 }
