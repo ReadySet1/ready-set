@@ -80,55 +80,78 @@ export function FileUpload({
   const displayFileName = file?.name || fileName;
 
   return (
-    <div className="space-y-2">
-      <Label>
+    <div className="space-y-3">
+      <Label className="text-sm font-medium text-slate-700">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </Label>
 
       {!file && !isUploading ? (
-        <div className="flex items-center gap-2">
+        <div className="relative">
           <Input
             type="file"
             accept={accept}
             onChange={handleFileChange}
-            disabled={isUploading} // Keep disabled during upload
-            className="flex-grow file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold hover:file:bg-yellow-100 file:bg-yellow-50 file:text-yellow-700 cursor-pointer"
+            disabled={isUploading}
+            className="w-full h-12 cursor-pointer border-2 border-dashed border-slate-300 hover:border-yellow-400 focus:border-yellow-500 transition-colors rounded-xl bg-slate-50 hover:bg-yellow-50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-100 file:text-yellow-700 hover:file:bg-yellow-200"
           />
-          <Upload className="text-gray-400" />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+            <Upload className="h-5 w-5 text-slate-400" />
+          </div>
         </div>
       ) : (
-        <div className="flex items-center gap-3 p-2 border border-gray-200 rounded-md">
-          {isUploading && progress !== 100 ? (
-            <Loader2 className="h-5 w-5 animate-spin text-yellow-500" />
-          ) : (
-            <FileCheck className="h-5 w-5 text-green-600" />
-          )}
-          <div className="flex-grow space-y-1">
-            <span className="text-sm font-medium text-gray-700 truncate block">{displayFileName ?? 'File'}</span>
-            {isUploading && typeof progress === 'number' && progress < 100 && (
-              <Progress value={progress} className="h-1" />
-            )}
-            {!isUploading && file && (
-              <span className="text-xs text-green-700">Upload complete</span>
+        <div className="flex items-center gap-3 p-4 border-2 border-slate-200 rounded-xl bg-white shadow-sm">
+          <div className="flex-shrink-0">
+            {isUploading && progress !== 100 ? (
+              <Loader2 className="h-6 w-6 animate-spin text-yellow-500" />
+            ) : (
+              <FileCheck className="h-6 w-6 text-green-600" />
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-            onClick={handleRemove}
-            disabled={isUploading} // Disable remove during upload
-            aria-label="Remove file"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          
+          <div className="flex-grow min-w-0 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-slate-700 truncate pr-2">
+                {displayFileName ?? 'File'}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex-shrink-0 h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                onClick={handleRemove}
+                disabled={isUploading}
+                aria-label="Remove file"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {isUploading && typeof progress === 'number' && progress < 100 && (
+              <div className="space-y-1">
+                <Progress value={progress} className="h-2 bg-slate-200" />
+                <div className="flex justify-between items-center text-xs text-slate-500">
+                  <span>Uploading...</span>
+                  <span>{Math.round(progress)}%</span>
+                </div>
+              </div>
+            )}
+            
+            {!isUploading && file && (
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-xs text-green-700 font-medium">Upload complete</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* Display react-hook-form error if provided */}
       {error?.message && (
-        <p className="text-sm text-red-500 mt-1">{error.message}</p>
+        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-2 rounded-lg">
+          <X className="h-4 w-4 flex-shrink-0" />
+          <span>{error.message}</span>
+        </div>
       )}
     </div>
   );

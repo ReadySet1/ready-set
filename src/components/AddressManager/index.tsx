@@ -313,10 +313,10 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       
       {showFilters && (
         <Tabs defaultValue={filterType} onValueChange={handleFilterChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="all">All Addresses</TabsTrigger>
-            <TabsTrigger value="private">Your Addresses</TabsTrigger>
-            <TabsTrigger value="shared">Shared Addresses</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 gap-1">
+            <TabsTrigger value="all" className="text-xs sm:text-sm">All Addresses</TabsTrigger>
+            <TabsTrigger value="private" className="text-xs sm:text-sm">Your Addresses</TabsTrigger>
+            <TabsTrigger value="shared" className="text-xs sm:text-sm">Shared Addresses</TabsTrigger>
           </TabsList>
         </Tabs>
       )}

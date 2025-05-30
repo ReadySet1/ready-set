@@ -8,456 +8,377 @@ import {
   Users, 
   Clock, 
   TrendingUp, 
+  TrendingDown,
   BarChart4, 
   Calendar, 
   ChevronRight,
   Menu,
-  Search,
-  Bell,
   Briefcase,
   LayoutDashboard,
   ArrowUpRight,
-  Loader2
+  Loader2,
+  Plus,
+  MoreHorizontal,
+  Eye,
+  Edit,
+  Trash2,
+  Activity,
+  Package,
+  UserPlus,
+  Settings,
+  RefreshCw,
+  MapPin,
+  FileText,
+  User,
+  Phone,
+  Mail,
+  CheckCircle
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { motion, AnimatePresence } from "framer-motion";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import Link from "next/link";
-import { User } from "@/types/user";
-import { CateringRequest, OrderStatus, isCateringRequest, isOnDemand } from "@/types/order";
+import { CateringRequest, OrderStatus } from "@/types/order";
 import { useDashboardMetrics } from "@/components/Dashboard/DashboardMetrics";
 import { LoadingDashboard } from "../ui/loading";
 import { ApplicationStatus, JobApplication } from "@/types/job-application";
 import { useUser } from "@/contexts/UserContext";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/utils/supabase/client";
+import { CarrierOrdersBadge } from "@/components/Dashboard/CarrierManagement/CarrierOrdersBadge";
+import { CarrierSummaryWidget } from "@/components/Dashboard/CarrierManagement/CarrierSummaryWidget";
 
-// Add interface for Job Applications API response
+// API Response Interfaces
 interface JobApplicationsApiResponse {
   applications: JobApplication[];
   totalCount: number;
   totalPages: number;
 }
 
-// Add interface for Orders API response
 interface OrdersApiResponse {
   orders: CateringRequest[];
-  totalPages: number; // Adjust if the API response structure is different
-}
-
-// Interface for API responses
-interface UsersApiResponse {
-  users: User[];
   totalPages: number;
 }
 
-// Modern Metric Card Component
-const ModernMetricCard: React.FC<{
+interface UsersApiResponse {
+  users: any[];
+  totalPages: number;
+}
+
+// Modern Stat Card Component with improved design
+const StatCard: React.FC<{
   title: string;
   value: string | number;
   icon: React.ElementType;
-  change: string;
-  trend?: "up" | "down" | "neutral";
-  accent?: string;
-}> = ({ title, value, icon: Icon, change, trend = "neutral", accent = "bg-blue-500" }) => {
-  // Determine trend color and icon
-  const trendConfig = {
-    up: { color: "text-green-500", icon: <TrendingUp className="h-3 w-3" /> },
-    down: { color: "text-red-500", icon: <TrendingUp className="h-3 w-3 transform rotate-180" /> },
-    neutral: { color: "text-gray-500", icon: null }
+  change?: string;
+  changeType?: "increase" | "decrease" | "neutral";
+  color?: "blue" | "green" | "purple" | "orange" | "red";
+}> = ({ 
+  title, 
+  value, 
+  icon: Icon, 
+  change, 
+  changeType = "neutral",
+  color = "blue" 
+}) => {
+  const colorClasses = {
+    blue: "bg-blue-50 text-blue-600 border-blue-100",
+    green: "bg-green-50 text-green-600 border-green-100", 
+    purple: "bg-purple-50 text-purple-600 border-purple-100",
+    orange: "bg-orange-50 text-orange-600 border-orange-100",
+    red: "bg-red-50 text-red-600 border-red-100"
+  };
+
+  const changeColors = {
+    increase: "text-green-600 bg-green-50",
+    decrease: "text-red-600 bg-red-50", 
+    neutral: "text-gray-600 bg-gray-50"
   };
 
   return (
-    <Card className="overflow-hidden transition-all duration-200 hover:shadow-md">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className={`rounded-full p-2 ${accent.replace('bg-', 'bg-opacity-15 text-')}`}>
-            <Icon className="h-5 w-5" />
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all duration-200"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
+          <Icon className="h-6 w-6" />
+        </div>
+        {change && (
+          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${changeColors[changeType]}`}>
+            {changeType === "increase" && <TrendingUp className="h-3 w-3" />}
+            {changeType === "decrease" && <TrendingDown className="h-3 w-3" />}
+            {change}
           </div>
-          <div className="flex items-center text-xs font-medium px-2 py-1 rounded-full bg-gray-50">
-            <span className={`mr-1 ${trendConfig[trend].color}`}>{change}</span>
-            {trendConfig[trend].icon}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="py-0">
-        <div className="space-y-1">
-          <p className="text-3xl font-bold">{value}</p>
-          <p className="text-sm text-gray-500">{title}</p>
-        </div>
-        <div className="mt-4 h-1">
-          <div className={`h-full w-2/3 rounded-full ${accent}`}></div>
-        </div>
-      </CardContent>
-    </Card>
+        )}
+      </div>
+      <div className="space-y-1">
+        <p className="text-2xl font-bold text-slate-800">{value}</p>
+        <p className="text-sm text-slate-600">{title}</p>
+      </div>
+    </motion.div>
   );
 };
 
-// Action Card Component
-const ActionCard: React.FC = () => (
-  <Card className="overflow-hidden transition-all duration-200 hover:shadow-md flex flex-col h-full">
-    <CardHeader className="pb-2">
-      <CardTitle className="text-sm font-medium text-gray-700">Quick Actions</CardTitle>
-      <CardDescription className="text-xs text-gray-500">
-        Common operations you might need
-      </CardDescription>
-    </CardHeader>
-    <CardContent className="flex-grow">
-      <div className="space-y-3">
-        <Link href="/admin/catering-orders/new" className="block w-full">
-          <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 flex items-center justify-center gap-2">
-            Create new order
-            <ArrowUpRight className="h-4 w-4" />
-          </Button>
-        </Link>
-        <Link href="/admin/users/new-user" className="block w-full">
-          <Button 
-            className="w-full border-blue-200 text-blue-700 hover:bg-blue-50 transition-all duration-200"
-            variant="outline"
-          >
-            Create new user
-          </Button>
-        </Link>
-      </div>
-    </CardContent>
-    {/* <CardFooter className="pt-0 pb-4">
-      <div className="w-full pt-3 border-t border-gray-100">
-        <Link href="/admin/dashboard/settings" className="text-xs text-gray-500 hover:text-gray-700 transition-colors flex items-center justify-end">
-          Dashboard settings
-          <ChevronRight className="h-3 w-3 ml-1" />
-        </Link>
-      </div>
-    </CardFooter> */}
-  </Card>
+// Quick Actions Component
+const QuickActions: React.FC = () => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.4, delay: 0.1 }}
+    className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+  >
+    <div className="p-6 border-b border-slate-100">
+      <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+        <Settings className="h-5 w-5 text-blue-600" />
+        Quick Actions
+      </h3>
+    </div>
+    <div className="p-6 space-y-3">
+      <Link href="/admin/catering-orders/new" className="block">
+        <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white justify-between shadow-lg hover:shadow-xl transition-all duration-200">
+          <span className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Create Order
+          </span>
+          <ArrowUpRight className="h-4 w-4" />
+        </Button>
+      </Link>
+      <Link href="/admin/users/new-user" className="block">
+        <Button variant="outline" className="w-full justify-between border-slate-200 hover:bg-slate-50 transition-all duration-200">
+          <span className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4" />
+            Add User
+          </span>
+          <ArrowUpRight className="h-4 w-4" />
+        </Button>
+      </Link>
+      <Link href="/admin/job-applications" className="block">
+        <Button variant="ghost" className="w-full justify-between hover:bg-slate-50 transition-all duration-200">
+          <span className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4" />
+            Review Applications
+          </span>
+          <ArrowUpRight className="h-4 w-4" />
+        </Button>
+      </Link>
+    </div>
+  </motion.div>
 );
-
-// Application Status Badge Component
-const ApplicationStatusBadge: React.FC<{status: ApplicationStatus}> = ({ status }) => {
-  const config: Record<string, { bg: string, text: string, icon: React.ReactNode }> = {
-    [ApplicationStatus.PENDING]: { 
-      bg: "bg-amber-100", 
-      text: "text-amber-700",
-      icon: <Clock className="h-3 w-3 mr-1" />
-    },
-    [ApplicationStatus.APPROVED]: { 
-      bg: "bg-green-100", 
-      text: "text-green-700", 
-      icon: <svg className="h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    },
-    [ApplicationStatus.REJECTED]: { 
-      bg: "bg-red-100", 
-      text: "text-red-700", 
-      icon: <svg className="h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    },
-    [ApplicationStatus.INTERVIEWING]: { 
-      bg: "bg-indigo-100", 
-      text: "text-indigo-700",
-      icon: <Users className="h-3 w-3 mr-1" />
-    }
-  };
-
-  const style = config[status] || { bg: "bg-gray-100", text: "text-gray-700", icon: null };
-  
-  const label = {
-    [ApplicationStatus.PENDING]: "Pending",
-    [ApplicationStatus.APPROVED]: "Approved",
-    [ApplicationStatus.REJECTED]: "Rejected",
-    [ApplicationStatus.INTERVIEWING]: "Interviewing"
-  }[status];
-
-  return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
-      {style.icon}
-      {label}
-    </span>
-  );
-};
 
 // Status Badge Component
-const StatusBadge: React.FC<{status: string}> = ({ status }) => {
-  const config: Record<string, { bg: string, text: string, icon: React.ReactNode }> = {
-    active: { 
-      bg: "bg-blue-100", 
-      text: "text-blue-700", 
-      icon: <svg className="h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg> 
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const statusConfig: Record<string, { className: string }> = {
+    active: { className: "bg-gradient-to-r from-amber-50 to-amber-100 text-amber-800 border border-amber-200" },
+    assigned: { className: "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-800 border border-blue-200" },
+    pending: { className: "bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-800 border border-yellow-200" },
+    confirmed: { className: "bg-gradient-to-r from-green-50 to-green-100 text-green-800 border border-green-200" },
+    completed: { className: "bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-800 border border-emerald-200" },
+    cancelled: { className: "bg-gradient-to-r from-red-50 to-red-100 text-red-800 border border-red-200" }
+  };
+
+  const config = statusConfig[status.toLowerCase()];
+  
+  return (
+    <Badge className={`${config?.className || "bg-gradient-to-r from-gray-50 to-gray-100 text-gray-800 border border-gray-200"} font-medium px-3 py-1 rounded-full`}>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </Badge>
+  );
+};
+
+// Application Status Badge
+const ApplicationStatusBadge: React.FC<{ status: ApplicationStatus }> = ({ status }) => {
+  const statusConfig: Record<ApplicationStatus, { className: string; label: string }> = {
+    [ApplicationStatus.PENDING]: { 
+      className: "bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-800 border border-yellow-200", 
+      label: "Pending" 
     },
-    pending: { 
-      bg: "bg-amber-100", 
-      text: "text-amber-700", 
-      icon: <Clock className="h-3 w-3 mr-1" /> 
+    [ApplicationStatus.APPROVED]: { 
+      className: "bg-gradient-to-r from-green-50 to-green-100 text-green-800 border border-green-200", 
+      label: "Approved" 
     },
-    confirmed: { 
-      bg: "bg-indigo-100", 
-      text: "text-indigo-700", 
-      icon: <svg className="h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg> 
+    [ApplicationStatus.REJECTED]: { 
+      className: "bg-gradient-to-r from-red-50 to-red-100 text-red-800 border border-red-200", 
+      label: "Rejected" 
     },
-    in_progress: { 
-      bg: "bg-purple-100", 
-      text: "text-purple-700", 
-      icon: <Loader2 className="h-3 w-3 mr-1 animate-spin" /> 
-    },
-    completed: { 
-      bg: "bg-green-100", 
-      text: "text-green-700", 
-      icon: <svg className="h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg> 
-    },
-    cancelled: { 
-      bg: "bg-red-100", 
-      text: "text-red-700", 
-      icon: <svg className="h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg> 
+    [ApplicationStatus.INTERVIEWING]: { 
+      className: "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-800 border border-blue-200", 
+      label: "Interviewing" 
     }
   };
 
-  const style = config[status.toLowerCase()] || { bg: "bg-gray-100", text: "text-gray-700", icon: null };
-
-  return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
-      {style.icon}
-      {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
-    </span>
-  );
-};
-
-// User Type Badge Component
-const UserTypeBadge: React.FC<{type: string}> = ({ type }) => {
-  const config: Record<string, { bg: string, text: string }> = {
-    admin: { bg: "bg-indigo-100", text: "text-indigo-700" },
-    super_admin: { bg: "bg-purple-100", text: "text-purple-700" },
-    vendor: { bg: "bg-blue-100", text: "text-blue-700" },
-    client: { bg: "bg-green-100", text: "text-green-700" },
-    driver: { bg: "bg-amber-100", text: "text-amber-700" },
-    helpdesk: { bg: "bg-teal-100", text: "text-teal-700" }
-  };
-
-  const style = config[type.toLowerCase()] || { bg: "bg-gray-100", text: "text-gray-700" };
-
-  return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
-      {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
-    </span>
-  );
-};
-
-// New component for Job Applications
-const ModernJobApplicationsTable: React.FC<{applications: JobApplication[]}> = ({ applications }) => {
-  // Format date for display
-  const formatDate = (dateString: string | Date): string => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+  const config = statusConfig[status];
   
   return (
-    <div className="overflow-hidden">
-      {applications.length > 0 ? (
-        <div className="min-w-full divide-y divide-gray-200">
-          <div className="bg-gray-50/80">
-            <div className="grid grid-cols-4 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              <div>Applicant</div>
-              <div>Position</div>
-              <div>Status</div>
-              <div>Applied</div>
-            </div>
-          </div>
-          <div className="bg-white divide-y divide-gray-100">
-            {applications.map((app) => (
-              <div key={app.id} className="grid grid-cols-4 px-6 py-4 hover:bg-gray-50/50 transition-colors duration-150">
-                <div className="text-sm font-medium">
-                  <Link href={`/admin/job-applications?id=${app.id}`} className="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
-                    {app.firstName} {app.lastName}
-                  </Link>
-                </div>
-                <div className="text-sm text-gray-600">
-                  {app.position}
-                </div>
-                <div><ApplicationStatusBadge status={app.status} /></div>
-                <div className="text-sm text-gray-600">
-                  {formatDate(app.createdAt)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-10 text-gray-500 bg-gray-50/50 rounded-lg">
-          <Briefcase className="h-10 w-10 text-gray-300 mb-2" />
-          <p className="text-sm">No job applications at this moment</p>
-          <Button variant="ghost" size="sm" className="mt-2 text-xs">
-            Post a new job opening
-          </Button>
-        </div>
-      )}
-    </div>
+    <Badge className={`${config.className} font-medium px-3 py-1 rounded-full`}>
+      {config.label}
+    </Badge>
   );
 };
 
-// Recent Orders Table Component
-const ModernOrdersTable: React.FC<{orders: CateringRequest[]}> = ({ orders }) => (
-  <div className="overflow-hidden">
-    {orders.length > 0 ? (
-      <div className="min-w-full divide-y divide-gray-200">
-        <div className="bg-gray-50/80">
-          <div className="grid grid-cols-4 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            <div>Order</div>
-            <div>Type</div>
-            <div>Status</div>
-            <div>Total</div>
+// Modern Data Table Component with Card styling
+const DataTableCard: React.FC<{
+  title: string;
+  icon: React.ElementType;
+  data: any[];
+  columns: { key: string; label: string; render?: (item: any) => React.ReactNode }[];
+  actions?: (item: any) => React.ReactNode;
+  emptyMessage?: string;
+  viewAllLink?: string;
+}> = ({ title, icon: Icon, data, columns, actions, emptyMessage = "No data available", viewAllLink }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.4, delay: 0.2 }}
+    className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+  >
+    <div className="p-6 border-b border-slate-100">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <Icon className="h-5 w-5 text-blue-600" />
+          {title}
+        </h3>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="hover:bg-slate-50">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          {viewAllLink && (
+            <Link href={viewAllLink}>
+              <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                View All
+                <ChevronRight className="h-3 w-3 ml-1" />
+              </Button>
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+    <div className="overflow-x-auto">
+      {data.length === 0 ? (
+        <div className="p-8 text-center">
+          <div className="w-12 h-12 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center">
+            <Package className="h-6 w-6 text-slate-400" />
+          </div>
+          <p className="text-slate-500">{emptyMessage}</p>
+        </div>
+      ) : (
+        <table className="w-full">
+          <thead className="bg-slate-50">
+            <tr>
+              {columns.map((column) => (
+                <th key={column.key} className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  {column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {data.map((item, index) => (
+              <tr key={index} className="hover:bg-slate-50 transition-colors">
+                {columns.map((column) => (
+                  <td key={column.key} className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                    {column.render ? column.render(item) : item[column.key]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  </motion.div>
+);
+
+// Activity Feed Card
+const ActivityFeedCard: React.FC = () => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.4, delay: 0.3 }}
+    className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+  >
+    <div className="p-6 border-b border-slate-100">
+      <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+        <Activity className="h-5 w-5 text-purple-600" />
+        Recent Activity
+      </h3>
+    </div>
+    <div className="p-6">
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-blue-50 rounded-lg">
+            <Activity className="h-4 w-4 text-blue-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-slate-900">New order created</p>
+            <p className="text-xs text-slate-500">2 minutes ago</p>
           </div>
         </div>
-        <div className="bg-white divide-y divide-gray-100">
-          {orders.map((order) => (
-            <div key={order.id} className="grid grid-cols-4 px-6 py-4 hover:bg-gray-50/50 transition-colors duration-150">
-              <div className="text-sm font-medium">
-                <Link href={`/admin/catering-orders/${order.orderNumber}`} className="text-blue-600 hover:text-blue-800 hover:underline">
-                  #{order.orderNumber}
-                </Link>
-              </div>
-              <div className="text-sm text-gray-600">
-                {isCateringRequest(order) ? "Catering" : isOnDemand(order) ? "On Demand" : "Catering"}
-              </div>
-              <div><StatusBadge status={order.status} /></div>
-              <div className="text-sm font-medium text-gray-900">
-                ${order.orderTotal ? 
-                  (typeof order.orderTotal === 'number' 
-                    ? order.orderTotal.toFixed(2) 
-                    : parseFloat(order.orderTotal).toFixed(2))
-                  : "0.00"}
-              </div>
-            </div>
-          ))}
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-green-50 rounded-lg">
+            <UserPlus className="h-4 w-4 text-green-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-slate-900">New user registered</p>
+            <p className="text-xs text-slate-500">1 hour ago</p>
+          </div>
+        </div>
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-purple-50 rounded-lg">
+            <Briefcase className="h-4 w-4 text-purple-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-slate-900">Application approved</p>
+            <p className="text-xs text-slate-500">3 hours ago</p>
+          </div>
         </div>
       </div>
-    ) : (
-      <div className="flex flex-col items-center justify-center py-10 text-gray-500 bg-gray-50/50 rounded-lg">
-        <ClipboardList className="h-10 w-10 text-gray-300 mb-2" />
-        <p className="text-sm">No active orders at this moment</p>
-        <Link href="/catering-request">
-          <Button variant="ghost" size="sm" className="mt-2 text-xs">
-            Create new order
-          </Button>
-        </Link>
-      </div>
-    )}
-  </div>
+    </div>
+  </motion.div>
 );
 
-// Recent Users Table Component
-const ModernUsersTable: React.FC<{users: User[]}> = ({ users }) => (
-  <div className="overflow-hidden">
-    {users.length > 0 ? (
-      <div className="min-w-full divide-y divide-gray-200">
-        {/* Header - hidden on small screens, grid on medium+ */}
-        <div className="hidden md:grid md:grid-cols-3 bg-gray-50/80 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-          <div>Name</div>
-          <div>Email</div>
-          <div>Type</div>
-        </div>
-        {/* User Rows */}
-        <div className="bg-white divide-y divide-gray-100">
-          {users.map((user) => (
-            // Stack vertically on small screens, grid on medium+
-            <div key={user.id} className="px-4 py-4 md:px-6 md:grid md:grid-cols-3 md:gap-4 hover:bg-gray-50/50 transition-colors duration-150 items-center">
-              {/* Name */}
-              <div className="flex justify-between items-center md:block">
-                 <span className="text-xs font-medium text-gray-500 uppercase md:hidden mr-2">Name:</span>
-                 <div className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline truncate">
-                   <Link href={`/admin/users/${user.id}`}>
-                     {user.name || user.contactName || "Unnamed User"}
-                   </Link>
-                 </div>
-              </div>
-              {/* Email */}
-              <div className="mt-2 md:mt-0 flex justify-between items-center md:block">
-                 <span className="text-xs font-medium text-gray-500 uppercase md:hidden mr-2">Email:</span>
-                 <div className="text-sm text-gray-600 truncate">{user.email}</div>
-              </div>
-              {/* Type */}
-              <div className="mt-2 md:mt-0 flex justify-between items-center md:block">
-                 <span className="text-xs font-medium text-gray-500 uppercase md:hidden mr-2">Type:</span>
-                 <div><UserTypeBadge type={user.type} /></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    ) : (
-      <div className="flex flex-col items-center justify-center py-10 text-gray-500 bg-gray-50/50 rounded-lg">
-        <Users className="h-10 w-10 text-gray-300 mb-2" />
-        <p className="text-sm">No users found</p>
-        <Link href="/admin/users/new">
-          <Button variant="ghost" size="sm" className="mt-2 text-xs">
-            Create new user
-          </Button>
-        </Link>
-      </div>
-    )}
-  </div>
-);
-
-// Modern Dashboard Card Component
-const ModernDashboardCard: React.FC<{
-  title: string;
-  children: React.ReactNode;
-  linkText: string;
-  linkHref: string;
-  icon?: React.ElementType;
-}> = ({ title, children, linkText, linkHref, icon: Icon }) => (
-  <Card className="overflow-hidden transition-all duration-200 hover:shadow-md h-full flex flex-col">
-    <CardHeader className="pb-3 space-y-0">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          {Icon && <Icon className="h-5 w-5 text-gray-400" />}
-          <CardTitle className="text-base font-medium">{title}</CardTitle>
-        </div>
-        <Link 
-          href={linkHref} 
-          className="text-xs text-blue-600 hover:text-blue-800 flex items-center group"
-        >
-          {linkText}
-          <ChevronRight className="h-3.5 w-3.5 ml-1 transition-transform duration-200 group-hover:translate-x-0.5" />
-        </Link>
-      </div>
-    </CardHeader>
-    <CardContent className="p-0 flex-grow">
-      {children}
-    </CardContent>
-  </Card>
-);
-
-// Redesigned DashboardHome Component
+// Main Dashboard Component
 export function ModernDashboardHome() {
-  const { 
-    user, 
-    isLoading: userLoading, 
-    error: userError 
-  } = useUser();
+  const { user, isLoading: userLoading, error: userError } = useUser();
   
   const [recentOrders, setRecentOrders] = useState<CateringRequest[]>([]);
   const [activeOrders, setActiveOrders] = useState<CateringRequest[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [recentApplications, setRecentApplications] = useState<JobApplication[]>([]);
   const [pendingApplications, setPendingApplications] = useState<JobApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const {
-    metrics,
-    loading: metricsLoading,
-    error: metricsError,
-  } = useDashboardMetrics();
+  const [userProfile, setUserProfile] = useState<any>(null);
+  
+  const { metrics, loading: metricsLoading, error: metricsError } = useDashboardMetrics();
+
+  // Get user display name
+  const getUserDisplayName = () => {
+    if (userProfile?.name) return userProfile.name;
+    if (user?.user_metadata?.full_name) return user.user_metadata.full_name;
+    if (user?.user_metadata?.name) return user.user_metadata.name;
+    if (user?.email) return user.email.split('@')[0];
+    return 'Admin';
+  };
+
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    const name = getUserDisplayName();
+    if (name === 'Admin') return 'A';
+    return name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+  };
 
   useEffect(() => {
     if (userLoading || !user) {
@@ -471,7 +392,6 @@ export function ModernDashboardHome() {
       setLoading(true);
       setError(null);
       try {
-        // Get the current user for authentication
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         
@@ -479,7 +399,6 @@ export function ModernDashboardHome() {
           throw new Error("Authentication required: No active session");
         }
         
-        // Prepare the auth headers for all API requests
         const headers = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
@@ -488,9 +407,12 @@ export function ModernDashboardHome() {
         const results = await Promise.allSettled([
           fetch("/api/orders/catering-orders?recentOnly=true", { headers }),
           fetch("/api/users", { headers }),
-          fetch("/api/admin/job-applications", { headers })
+          fetch("/api/admin/job-applications", { headers }),
+          // Fetch user profile
+          fetch("/api/users/current-user", { headers })
         ]);
 
+        // Handle orders
         const ordersResult = results[0];
         if (ordersResult.status === 'fulfilled') {
           if (!ordersResult.value.ok) {
@@ -498,7 +420,6 @@ export function ModernDashboardHome() {
             throw new Error(`Orders API failed: ${ordersResult.value.status} - ${errorText}`);
           }
           const ordersData = await ordersResult.value.json() as OrdersApiResponse;
-          console.log('Orders data:', ordersData.orders);
           setRecentOrders(ordersData.orders || []);
           const activeOrdersList = (ordersData.orders || []).filter((order: CateringRequest) => 
             [OrderStatus.ACTIVE, OrderStatus.ASSIGNED].includes(order.status)
@@ -509,6 +430,7 @@ export function ModernDashboardHome() {
           throw new Error("Failed to fetch orders data.");
         }
 
+        // Handle users
         const usersResult = results[1];
         if (usersResult.status === 'fulfilled') {
           if (!usersResult.value.ok) {
@@ -518,10 +440,11 @@ export function ModernDashboardHome() {
           const usersData = await usersResult.value.json() as UsersApiResponse;
           setUsers(usersData.users || []);
         } else {
-           console.error("Failed to fetch users:", usersResult.reason);
+          console.error("Failed to fetch users:", usersResult.reason);
           throw new Error("Failed to fetch users data.");
         }
 
+        // Handle applications
         const applicationsResult = results[2];
         if (applicationsResult.status === 'fulfilled') {
           if (!applicationsResult.value.ok) {
@@ -529,7 +452,6 @@ export function ModernDashboardHome() {
             throw new Error(`Applications API failed: ${applicationsResult.value.status} - ${errorText}`);
           }
           const applicationsData = await applicationsResult.value.json() as JobApplicationsApiResponse;
-          console.log('Applications data:', applicationsData.applications);
           setRecentApplications(applicationsData.applications || []);
           const pendingAppsList = (applicationsData.applications || []).filter(
             (app) => app.status === ApplicationStatus.PENDING
@@ -540,11 +462,18 @@ export function ModernDashboardHome() {
           throw new Error("Failed to fetch applications data.");
         }
 
+        // Handle user profile
+        const profileResult = results[3];
+        if (profileResult.status === 'fulfilled' && profileResult.value.ok) {
+          const profileData = await profileResult.value.json();
+          setUserProfile(profileData);
+        }
+
       } catch (err) {
         console.error("Dashboard data fetch error:", err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred fetching dashboard data');
       } finally {
-         setLoading(false);
+        setLoading(false);
       }
     };
 
@@ -560,130 +489,300 @@ export function ModernDashboardHome() {
 
   if (combinedError) {
     return (
-      <div className="flex h-screen items-center justify-center bg-red-50">
-        <div className="rounded-lg bg-white p-8 shadow-lg max-w-md">
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
+        <motion.div 
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm max-w-md"
+        >
           <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-red-100">
-            <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
           </div>
-          <h3 className="mb-2 text-xl font-semibold text-center text-gray-900">Error Loading Dashboard</h3>
-          <p className="text-sm text-center text-red-600">{combinedError}</p> 
-          <div className="mt-6 text-center">
-            <Button 
-              onClick={() => window.location.reload()}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              Retry
-            </Button>
-          </div>
-        </div>
+          <h3 className="mb-2 text-xl font-semibold text-center text-slate-900">Error Loading Dashboard</h3>
+          <p className="text-sm text-center text-red-600 mb-6">{combinedError}</p> 
+          <Button 
+            onClick={() => window.location.reload()}
+            className="w-full bg-red-600 hover:bg-red-700 text-white"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </motion.div>
       </div>
     );
   }
 
+  // Calculate metrics
   const totalOrdersCount = Array.isArray(recentOrders) ? recentOrders.length : 0;
-  const activeOrdersPercentage = ((activeOrders.length / (totalOrdersCount || 1)) * 100).toFixed(1);
-  
+  const activeOrdersPercentage = totalOrdersCount > 0 ? ((activeOrders.length / totalOrdersCount) * 100).toFixed(1) : "0";
   const totalApplicationsCount = Array.isArray(recentApplications) ? recentApplications.length : 0;
-  const pendingApplicationsPercentage = ((pendingApplications.length / (totalApplicationsCount || 1)) * 100).toFixed(1);
-  
-  return (
-    <div className="flex min-h-screen w-full flex-col bg-gray-50">
-      <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10 shadow-sm">
-        <div className="flex justify-between items-center max-w-7xl mx-auto">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="icon" className="md:hidden">
-              <Menu className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center">
-              <LayoutDashboard className="h-6 w-6 text-primary mr-2 hidden sm:block" />
-              <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
-            </div>
+  const pendingApplicationsPercentage = totalApplicationsCount > 0 ? ((pendingApplications.length / totalApplicationsCount) * 100).toFixed(1) : "0";
+  const completedOrdersCount = recentOrders.filter(order => order.status === OrderStatus.COMPLETED).length;
+  const completionRate = totalOrdersCount > 0 ? ((completedOrdersCount / totalOrdersCount) * 100).toFixed(1) : "0";
+
+  // Table configurations
+  const ordersColumns = [
+    { 
+      key: 'id', 
+      label: 'Order ID',
+      render: (order: CateringRequest) => (
+        <Link href={`/admin/catering-orders/${order.orderNumber}`} className="font-medium text-blue-600 hover:text-blue-800 hover:underline">
+          #{order.orderNumber}
+        </Link>
+      )
+    },
+    { 
+      key: 'customer', 
+      label: 'Customer',
+      render: (order: CateringRequest) => (
+        <div className="flex items-center gap-3">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-slate-100 text-slate-600 text-xs">
+              {order.user?.name?.charAt(0) || 'C'}
+            </AvatarFallback>
+          </Avatar>
+          <span className="font-medium text-slate-800">{order.user?.name || 'Unknown'}</span>
+        </div>
+      )
+    },
+    { 
+      key: 'status', 
+      label: 'Status',
+      render: (order: CateringRequest) => <StatusBadge status={order.status} />
+    },
+    { 
+      key: 'date', 
+      label: 'Date',
+      render: (order: CateringRequest) => (
+        <span className="text-slate-600">
+          {new Date(order.createdAt).toLocaleDateString()}
+        </span>
+      )
+    }
+  ];
+
+  const applicationsColumns = [
+    { 
+      key: 'name', 
+      label: 'Applicant',
+      render: (app: JobApplication) => (
+        <div className="flex items-center gap-3">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-slate-100 text-slate-600 text-xs">
+              {app.firstName?.charAt(0) || 'A'}
+            </AvatarFallback>
+          </Avatar>
+          <span className="font-medium text-slate-800">{app.firstName} {app.lastName}</span>
+        </div>
+      )
+    },
+    { 
+      key: 'position', 
+      label: 'Position',
+      render: (app: JobApplication) => (
+        <span className="text-slate-600">{app.position || 'Not specified'}</span>
+      )
+    },
+    { 
+      key: 'status', 
+      label: 'Status',
+      render: (app: JobApplication) => <ApplicationStatusBadge status={app.status} />
+    },
+    { 
+      key: 'date', 
+      label: 'Applied',
+      render: (app: JobApplication) => (
+        <span className="text-slate-600">
+          {new Date(app.createdAt).toLocaleDateString()}
+        </span>
+      )
+    }
+  ];
+
+  const usersColumns = [
+    { 
+      key: 'name', 
+      label: 'User',
+      render: (user: any) => (
+        <div className="flex items-center gap-3">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-slate-100 text-slate-600 text-xs">
+              {user.name?.charAt(0) || user.email?.charAt(0) || 'U'}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <p className="font-medium text-slate-800">{user.name || 'Unknown User'}</p>
+            <p className="text-xs text-slate-500">{user.email}</p>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="relative rounded-md shadow-sm hidden md:block">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-gray-400" />
+        </div>
+      )
+    },
+    { 
+      key: 'role', 
+      label: 'Role',
+      render: (user: any) => (
+        <Badge variant="outline" className="font-medium border-slate-200">
+          {user.type || 'User'}
+        </Badge>
+      )
+    },
+    { 
+      key: 'status', 
+      label: 'Status',
+      render: (user: any) => (
+        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-0">
+          Active
+        </Badge>
+      )
+    }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      {/* Header */}
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+        <div className="px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" className="lg:hidden">
+                <Menu className="h-5 w-5" />
+              </Button>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <LayoutDashboard className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-semibold text-slate-900">Dashboard</h1>
+                  <p className="text-sm text-slate-500 hidden sm:block">Welcome back, {getUserDisplayName()}</p>
+                </div>
               </div>
-              <input
-                type="text"
-                className="focus:ring-primary focus:border-primary block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md text-sm"
-                placeholder="Search..."
-              />
             </div>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500"></span>
-            </Button>
+            
+            <div className="flex items-center gap-3">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture} />
+                <AvatarFallback className="bg-blue-100 text-blue-600">
+                  {getUserInitials()}
+                </AvatarFallback>
+              </Avatar>
+            </div>
           </div>
         </div>
       </div>
 
-      <main className="flex-1 px-4 sm:px-6 py-6 sm:py-8 max-w-7xl mx-auto w-full">
-        <div className="mb-8">
-          <h2 className="text-lg font-medium text-gray-900 mb-6">Overview</h2>
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-            <ModernMetricCard
+      {/* Main Content */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="container mx-auto px-6 py-8"
+      >
+        <div className="max-w-7xl mx-auto space-y-8">
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard
               title="Active Orders"
               value={activeOrders.length}
               icon={ClipboardList}
               change={`${activeOrdersPercentage}% of total`}
-              trend={Number(activeOrdersPercentage) > 50 ? "up" : "neutral"}
-              accent="bg-blue-500"
+              changeType={Number(activeOrdersPercentage) > 50 ? "increase" : "neutral"}
+              color="blue"
             />
-            <ModernMetricCard
+            <StatCard
               title="Pending Applications"
               value={pendingApplications.length}
               icon={Briefcase}
               change={`${pendingApplicationsPercentage}% of total`}
-              trend={Number(pendingApplicationsPercentage) > 30 ? "up" : "neutral"}
-              accent="bg-indigo-500"
+              changeType={Number(pendingApplicationsPercentage) > 30 ? "increase" : "neutral"}
+              color="purple"
             />
-            <ModernMetricCard
+            <StatCard
               title="Total Vendors"
               value={metrics.totalVendors}
               icon={BarChart4}
-              change="+180.1% from last month"
-              trend="up"
-              accent="bg-green-500"
+              change="+12.5% this month"
+              changeType="increase"
+              color="green"
             />
-            <ActionCard />
+            <StatCard
+              title="Total Revenue"
+              value={`$${metrics.totalRevenue.toLocaleString()}`}
+              icon={CheckCircle}
+              change={metrics.totalRevenue > 0 ? "+8.2% this month" : "No revenue yet"}
+              changeType={metrics.totalRevenue > 0 ? "increase" : "neutral"}
+              color="orange"
+            />
+          </div>
+
+          {/* Main Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left Column - Data Tables */}
+            <div className="lg:col-span-2 space-y-8">
+              <DataTableCard
+                title="Active Catering Orders"
+                icon={Calendar}
+                data={activeOrders.slice(0, 5)}
+                columns={ordersColumns}
+                actions={(order) => (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="hover:bg-slate-50">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link href={`/admin/catering-orders/${order.orderNumber}`} className="flex items-center">
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Order
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+                emptyMessage="No active orders found"
+                viewAllLink="/admin/catering-orders"
+              />
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                <DataTableCard
+                  title="Recent Job Applications"
+                  icon={Briefcase}
+                  data={recentApplications.slice(0, 5)}
+                  columns={applicationsColumns}
+                  emptyMessage="No applications found"
+                  viewAllLink="/admin/job-applications"
+                />
+
+                <DataTableCard
+                  title="Recent Users"
+                  icon={Users}
+                  data={users.slice(0, 5)}
+                  columns={usersColumns}
+                  emptyMessage="No users found"
+                  viewAllLink="/admin/users"
+                />
+              </div>
+            </div>
+
+            {/* Right Column - Quick Actions & Widgets */}
+            <div className="space-y-6">
+              <QuickActions />
+              <CarrierSummaryWidget />
+              <ActivityFeedCard />
+            </div>
           </div>
         </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <ModernDashboardCard
-            title="Active Catering Orders"
-            linkText="View All Orders"
-            linkHref="/admin/catering-orders"
-            icon={Calendar}
-          >
-            <ModernOrdersTable orders={activeOrders} />
-          </ModernDashboardCard>
-          
-          <ModernDashboardCard
-            title="Recent Job Applications"
-            linkText="View All Applications"
-            linkHref="/admin/job-applications"
-            icon={Briefcase}
-          >
-            <ModernJobApplicationsTable applications={recentApplications.slice(0, 5)} />
-          </ModernDashboardCard>
-          
-          <ModernDashboardCard
-            title="Recent Users"
-            linkText="View All Users"
-            linkHref="/admin/users"
-            icon={Users}
-          >
-            <ModernUsersTable users={users.slice(0, 5)} />
-          </ModernDashboardCard>
-        </div>
-      </main>
+      </motion.div>
     </div>
   );
 }
 
-// Export the component as default
 export default ModernDashboardHome;

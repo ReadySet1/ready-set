@@ -36,12 +36,9 @@ interface CateringOrderWithDetails extends CateringRequest {
 
 export async function GET(req: NextRequest) {
   try {
-    console.log('Catering orders API called');
-    
     // Get the authorization header
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('Unauthorized request - invalid authorization header');
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
@@ -55,12 +52,9 @@ export async function GET(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
-      console.log('Unauthorized request - token validation failed');
       console.error('Auth error:', authError);
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-
-    console.log('Authenticated user:', user.id);
 
     const url = new URL(req.url);
     const limit = parseInt(url.searchParams.get('limit') || `${ITEMS_PER_PAGE}`, 10);
@@ -70,70 +64,52 @@ export async function GET(req: NextRequest) {
     const searchTerm = url.searchParams.get('search') || '';
     const sortField = url.searchParams.get('sort') || 'pickupDateTime';
     const sortDirection = url.searchParams.get('direction') || 'desc';
+    const recentOnly = url.searchParams.get('recentOnly') === 'true';
 
-    console.log('Query params:', { limit, page, skip, status: statusParam, searchTerm, sortField, sortDirection });
-
+    // Build where clause
     let whereClause: Prisma.CateringRequestWhereInput = {
       deletedAt: null
     };
 
     if (statusParam && statusParam !== 'all') {
-      // Validate against the CateringStatus enum from Prisma
       if (Object.values(CateringStatus).includes(statusParam as CateringStatus)) {
          whereClause.status = statusParam as CateringStatus;
-      } else {
-         console.warn(`Invalid status filter provided: ${statusParam}. Ignoring.`);
       }
     }
 
+    if (recentOnly) {
+      // Only get orders from the last 30 days for recent view
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      whereClause.createdAt = {
+        gte: thirtyDaysAgo
+      };
+    }
+
     if (searchTerm) {
-      // Adjust search fields to use Profile model relations
       whereClause.OR = [
         { orderNumber: { contains: searchTerm, mode: 'insensitive' } },
-        { user: { name: { contains: searchTerm, mode: 'insensitive' } } }, // Search user (Profile) name
-        { user: { email: { contains: searchTerm, mode: 'insensitive' } } }, // Search user (Profile) email
+        { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
+        { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
       ];
     }
 
-    console.log('Where clause:', whereClause);
-
+    // Build order by clause
     let orderByClause: Prisma.CateringRequestOrderByWithRelationInput = {};
-    // Adjust sort fields based on Profile relation
-    const validSortFields: { [key: string]: Prisma.CateringRequestOrderByWithRelationInput } = {
-      pickupDateTime: { pickupDateTime: 'desc' },
-      date: { pickupDateTime: 'desc' }, // Add 'date' as an alias for pickupDateTime
-      orderTotal: { orderTotal: 'desc' },
-      orderNumber: { orderNumber: 'desc' },
-      'user.name': { user: { name: 'desc' } }, // Sort by Profile name via relation
-      createdAt: { createdAt: 'desc' },
-    };
-
     const effectiveSortDirection = sortDirection === 'asc' ? 'asc' : 'desc';
     
-    if (validSortFields[sortField]) {
-        if (sortField === 'user.name') {
-            orderByClause = { user: { name: effectiveSortDirection } }; // Sort by Profile name
-        } else if (sortField === 'date') {
-            // Map 'date' to 'pickupDateTime' for sorting
-            orderByClause = { pickupDateTime: effectiveSortDirection };
-        } else {
-            // Ensure sortField is a valid key of CateringRequest
-            const validKeys: (keyof CateringRequest)[] = ['pickupDateTime', 'orderTotal', 'orderNumber', 'createdAt', 'status'];
-            if (validKeys.includes(sortField as keyof CateringRequest)) {
-               orderByClause = { [sortField as keyof CateringRequest]: effectiveSortDirection };
-            } else {
-               orderByClause = { pickupDateTime: 'desc' }; 
-               console.warn(`Sort field ${sortField} is not a direct sortable key. Defaulting.`);
-            }
-        }
-    } else {
-      orderByClause = { pickupDateTime: 'desc' }; 
-      console.warn(`Invalid sort field provided: ${sortField}. Defaulting to pickupDateTime desc.`);
-    }
+    const validSortFields: { [key: string]: Prisma.CateringRequestOrderByWithRelationInput } = {
+      pickupDateTime: { pickupDateTime: effectiveSortDirection },
+      date: { pickupDateTime: effectiveSortDirection },
+      orderTotal: { orderTotal: effectiveSortDirection },
+      orderNumber: { orderNumber: effectiveSortDirection },
+      'user.name': { user: { name: effectiveSortDirection } },
+      createdAt: { createdAt: effectiveSortDirection },
+    };
 
-    console.log('Order by clause:', orderByClause);
+    orderByClause = validSortFields[sortField] || { pickupDateTime: 'desc' };
 
-    // Fetch data using the corrected include/select structure
+    // Fetch data with optimized query
     const [cateringOrders, totalCount] = await Promise.all([
       prisma.cateringRequest.findMany({
         where: whereClause,
@@ -141,14 +117,14 @@ export async function GET(req: NextRequest) {
         take: limit,
         orderBy: orderByClause,
         include: {
-          user: { // Include related Profile (user)
+          user: {
             select: { id: true, name: true, email: true, contactNumber: true }
           },
           pickupAddress: true,
           deliveryAddress: true,
           dispatches: {
             include: {
-              driver: { // Include related Profile (driver)
+              driver: {
                 select: { id: true, name: true, email: true, contactNumber: true }
               }
             }
@@ -158,19 +134,17 @@ export async function GET(req: NextRequest) {
       prisma.cateringRequest.count({ where: whereClause }),
     ]) as [CateringOrderWithDetails[], number]; 
 
-    console.log(`Found ${cateringOrders.length} orders out of ${totalCount} total`);
-
     const totalPages = Math.ceil(totalCount / limit);
 
-    // Format response using correct types
+    // Format response with optimized data structure
     const formattedOrders = cateringOrders.map((order: CateringOrderWithDetails) => ({ 
       id: order.id,
       orderNumber: order.orderNumber,
-      status: order.status, // This is CateringStatus
+      status: order.status,
       pickupDateTime: order.pickupDateTime,
       date: order.pickupDateTime || order.createdAt, 
       orderTotal: order.orderTotal ?? 0, 
-      user: { // User is a Profile
+      user: {
         id: order.user.id,
         name: order.user.name || 'N/A', 
         email: order.user.email,
@@ -181,14 +155,12 @@ export async function GET(req: NextRequest) {
       clientAttention: order.clientAttention,
       specialNotes: order.specialNotes,
       pickupNotes: order.pickupNotes,
-      driverStatus: order.driverStatus, // This exists on CateringRequest
+      driverStatus: order.driverStatus,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       dispatches: order.dispatches.map((dispatch: EnrichedDispatch) => ({ 
         id: dispatch.id,
-        // Dispatch model has no status field, so remove this
-        // status: dispatch.status,
-        driver: dispatch.driver ? { // Driver is a Profile
+        driver: dispatch.driver ? {
           id: dispatch.driver.id,
           name: dispatch.driver.name || 'N/A',
           email: dispatch.driver.email,
@@ -204,18 +176,14 @@ export async function GET(req: NextRequest) {
       currentPage: page
     };
 
-    console.log('Sending response with metadata:', {
-      totalOrders: formattedOrders.length,
-      totalPages,
-      totalCount,
-      currentPage: page
-    });
+    // Determine cache strategy based on request type
+    const cacheHeaders = recentOnly || statusParam === 'ACTIVE' 
+      ? { 'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60' } // Short cache for active data
+      : { 'Cache-Control': 'private, s-maxage=300, stale-while-revalidate=600' }; // Longer cache for historical data
 
     return NextResponse.json(response, { 
       status: 200,
-      headers: {
-        'Cache-Control': 'no-store, max-age=0', 
-      }
+      headers: cacheHeaders
     });
 
   } catch (error: unknown) { 
@@ -226,20 +194,16 @@ export async function GET(req: NextRequest) {
 
     if (error instanceof PrismaClientKnownRequestError) { 
        const prismaError = error as PrismaClientKnownRequestError;
-       console.error(`Prisma Error Code: ${prismaError.code}`);
        if (prismaError.code === 'P1001') {
           errorMessage = "Database connection issue. Please try again later.";
           statusCode = 503; 
        } else {
-          errorMessage = `Database query failed: ${prismaError.message} (Code: ${prismaError.code}).`;
+          errorMessage = process.env.NODE_ENV === 'development' 
+            ? `Database query failed: ${prismaError.message} (Code: ${prismaError.code}).`
+            : "Database query failed";
        }
     } else if (error instanceof Error) {
-      errorMessage = error.message;
-    } else {
-       errorMessage = "An unexpected error occurred.";
-       try {
-          errorMessage = `An unexpected error occurred: ${JSON.stringify(error)}`;
-       } catch (_) { /* Ignore stringify errors */ }
+      errorMessage = process.env.NODE_ENV === 'development' ? error.message : "Internal server error";
     }
     
     return NextResponse.json({ 

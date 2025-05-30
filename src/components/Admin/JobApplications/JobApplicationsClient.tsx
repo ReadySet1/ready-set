@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ClipboardList,
@@ -20,23 +21,28 @@ import {
   RefreshCw,
   Trash2,
   AlertTriangle,
+  Mail,
+  Phone,
+  MapPin,
+  Eye,
+  MoreVertical,
+  TrendingUp,
+  TrendingDown,
+  Plus,
+  ChevronRight,
+  Building,
+  GraduationCap,
+  Award,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Select,
@@ -48,7 +54,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LoadingDashboard } from "@/components/ui/loading";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -57,21 +63,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { approveJobApplication, deleteJobApplication } from '@/app/actions/admin/job-applications';
 import { createClient } from "@/utils/supabase/client";
 import { ApplicationDetailDialog } from "./ApplicationDetailDialog";
-import { StatusBadge } from "./StatusBadge";
-import { StatsOverview } from "./StatsOverview";
 import { 
   JobApplication, 
   ApplicationStatus, 
@@ -81,230 +76,356 @@ import {
 // Constants
 const COLORS = ["#3b82f6", "#10b981", "#ef4444", "#6366f1"];
 
-// Document opener utility
-const openDocumentWithFallback = async (url: string) => {
-  console.log("Document URL (resolved, passed to openDocumentWithFallback):", url);
+// Enhanced status config with modern styling
+const statusConfig = {
+  [ApplicationStatus.PENDING]: { 
+    className: "bg-gradient-to-r from-amber-50 to-amber-100 text-amber-800 border border-amber-200", 
+    icon: <Clock className="h-3 w-3 mr-1" />,
+    color: "amber"
+  },
+  [ApplicationStatus.APPROVED]: { 
+    className: "bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-800 border border-emerald-200", 
+    icon: <CheckCircle className="h-3 w-3 mr-1" />,
+    color: "emerald"
+  },
+  [ApplicationStatus.REJECTED]: { 
+    className: "bg-gradient-to-r from-red-50 to-red-100 text-red-800 border border-red-200", 
+    icon: <XCircle className="h-3 w-3 mr-1" />,
+    color: "red"
+  },
+  [ApplicationStatus.INTERVIEWING]: { 
+    className: "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-800 border border-blue-200", 
+    icon: <Calendar className="h-3 w-3 mr-1" />,
+    color: "blue"
+  },
+};
 
-  if (!url) {
-    console.error("No URL provided to openDocumentWithFallback.");
-    toast({
-      title: "Error",
-      description: "Document URL is missing.",
-      variant: "destructive",
-    });
-    return;
-  }
-  
-  try {
-    // First try to open the file directly
-    console.log("Attempting to open URL directly:", url);
-    let win = window.open(url, "_blank");
-    
-    // Check if window.open returned null or if the window was closed immediately (common pop-up blocker behavior)
-    if (!win || win.closed || typeof win.closed === 'undefined') { 
-      console.warn("window.open might have been blocked or failed. URL:", url);
+const getStatusConfig = (status: ApplicationStatus) => {
+  return statusConfig[status] || { 
+    className: "bg-gradient-to-r from-gray-50 to-gray-100 text-gray-800 border border-gray-200", 
+    icon: null,
+    color: "gray"
+  };
+};
+
+// Modern loading skeleton
+const ApplicationsSkeleton: React.FC = () => (
+  <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <div className="container mx-auto px-6 py-8">
+      {/* Header Skeleton */}
+      <div className="mb-8">
+        <Skeleton className="h-12 w-80 mb-4" />
+        <Skeleton className="h-6 w-60" />
+      </div>
       
-      // If the URL is a Supabase URL and we can extract the path,
-      // try to get a signed URL as a fallback
-      if (url.includes('/storage/v1/object/public/')) {
-        console.log("Direct URL might have failed, trying signed URL...");
-        const matches = url.match(/\/storage\/v1\/object\/public\/([^\/]+)\/(.+)/);
-        
-        if (matches && matches.length === 3) {
-          const path = matches[2];
-          console.log("Trying to get signed URL for path:", path);
-          
-          if (!path) {
-            console.error("Failed to extract path from URL.");
-            toast({ title: "Error", description: "Could not parse document path.", variant: "destructive" });
-            return;
-          }
-          
-          try {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            
-            if (!session?.access_token) {
-              throw new Error("No active session - please log in");
-            }
-            
-            const response = await fetch(`/api/file-uploads?path=${encodeURIComponent(path)}`, {
-              headers: {
-                Authorization: `Bearer ${session.access_token}`
-              }
-            });
-            console.log("Signed URL API response status:", response.status);
-            if (response.ok) {
-              const data = await response.json();
-              console.log("Got signed URL data:", data);
-              if (data.url) {
-                console.log("Attempting to open signed URL:", data.url);
-                window.open(data.url, "_blank");
-              } else {
-                console.error("Signed URL missing in API response.");
-                toast({ title: "Error", description: "Could not retrieve document link.", variant: "destructive" });
-              }
-            } else {
-              const errorText = await response.text();
-              console.error("Failed to get signed URL:", response.status, errorText);
-              toast({ title: "Error", description: `Failed to get document link (${response.status}).`, variant: "destructive" });
-            }
-          } catch (fetchError) {
-            console.error("Error fetching signed URL:", fetchError);
-            toast({ title: "Error", description: "Error contacting server for document link.", variant: "destructive" });
-          }
-        } else {
-          console.log("URL doesn't match expected Supabase public path format for signed URL fallback.");
-          toast({ title: "Info", description: "Could not open document directly. Check pop-up blocker.", variant: "default" });
-        }
-      } else {
-        console.log("URL is not a Supabase public URL, not attempting signed URL fallback.");
-        toast({ title: "Info", description: "Could not open document directly. Check pop-up blocker.", variant: "default" });
-      }
-    } else {
-      console.log("window.open seemed successful for:", url);
-    }
-  } catch (error) {
-    console.error("Error in openDocumentWithFallback:", error);
-    toast({ title: "Error", description: "An error occurred while trying to open the document.", variant: "destructive" });
-  }
-};
+      {/* Stats Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {[...Array(4)].map((_, i) => (
+          <Skeleton key={i} className="h-32 w-full rounded-2xl" />
+        ))}
+      </div>
+      
+      {/* Content Skeleton */}
+      <div className="space-y-6">
+        <Skeleton className="h-16 w-full rounded-2xl" />
+        <Skeleton className="h-96 w-full rounded-2xl" />
+      </div>
+    </div>
+  </div>
+);
 
-// Helper function to generate pagination items
-const getPaginationItems = (currentPage: number, totalPages: number, siblingCount = 1) => {
-  const totalPageNumbers = siblingCount + 5; // siblingCount + firstPage + lastPage + currentPage + 2*ellipsis
-
-  if (totalPageNumbers >= totalPages) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-
-  const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
-  const rightSiblingIndex = Math.min(currentPage + siblingCount, totalPages);
-
-  const shouldShowLeftEllipsis = leftSiblingIndex > 2;
-  const shouldShowRightEllipsis = rightSiblingIndex < totalPages - 1;
-
-  const firstPageIndex = 1;
-  const lastPageIndex = totalPages;
-
-  if (!shouldShowLeftEllipsis && shouldShowRightEllipsis) {
-    let leftItemCount = 3 + 2 * siblingCount;
-    let leftRange = Array.from({ length: leftItemCount }, (_, i) => i + 1);
-    return [...leftRange, '...', lastPageIndex];
-  }
-
-  if (shouldShowLeftEllipsis && !shouldShowRightEllipsis) {
-    let rightItemCount = 3 + 2 * siblingCount;
-    let rightRange = Array.from({ length: rightItemCount }, (_, i) => totalPages - rightItemCount + 1 + i);
-    return [firstPageIndex, '...', ...rightRange];
-  }
-
-  if (shouldShowLeftEllipsis && shouldShowRightEllipsis) {
-    let middleRange = Array.from({ length: rightSiblingIndex - leftSiblingIndex + 1 }, (_, i) => leftSiblingIndex + i);
-    return [firstPageIndex, '...', ...middleRange, '...', lastPageIndex];
-  }
-
-  // Should not happen based on the first if condition, but added for completeness
-  return Array.from({ length: totalPages }, (_, i) => i + 1);
-};
-
-// Analytics component
-const AnalyticsPanel: React.FC<{ stats: JobApplicationStats }> = ({ stats }) => {
-  const chartData = [
-    { name: "Pending", value: stats.pendingApplications },
-    { name: "Approved", value: stats.approvedApplications },
-    { name: "Rejected", value: stats.rejectedApplications },
-    { name: "Interviewing", value: stats.interviewingApplications },
+// Modern Stats Overview Component
+const StatsOverview: React.FC<{ stats: JobApplicationStats }> = ({ stats }) => {
+  const statsCards = [
+    {
+      title: "Total Applications",
+      value: stats.totalApplications,
+      icon: <ClipboardList className="h-6 w-6" />,
+      color: "blue",
+      trend: "+12%",
+      trendUp: true
+    },
+    {
+      title: "Pending Review",
+      value: stats.pendingApplications,
+      icon: <Clock className="h-6 w-6" />,
+      color: "amber",
+      trend: "+5%",
+      trendUp: true
+    },
+    {
+      title: "Approved",
+      value: stats.approvedApplications,
+      icon: <CheckCircle className="h-6 w-6" />,
+      color: "emerald",
+      trend: "+8%",
+      trendUp: true
+    },
+    {
+      title: "In Interview",
+      value: stats.interviewingApplications,
+      icon: <Calendar className="h-6 w-6" />,
+      color: "purple",
+      trend: "-2%",
+      trendUp: false
+    },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Card className="p-6">
-        <div className="mb-5 flex items-center">
-          <Briefcase className="h-6 w-6 text-indigo-600 mr-2" />
-          <h3 className="text-xl font-medium">Applications by Position</h3>
-        </div>
-        <div className="space-y-6">
-          {stats?.applicationsByPosition &&
-            Object.entries(stats.applicationsByPosition).map(
-              ([position, count]) => (
-                <div key={position}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center">
-                      <div className="h-6 w-6 text-gray-500 mr-2">
-                        <Briefcase className="h-5 w-5" />
-                      </div>
-                      <span className="text-lg">{position}</span>
-                    </div>
-                    <span className="text-xl font-bold">{count}</span>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {statsCards.map((stat, index) => (
+        <motion.div
+          key={stat.title}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: index * 0.1 }}
+        >
+          <Card className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 rounded-2xl overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-600">{stat.title}</p>
+                  <p className="text-3xl font-bold text-slate-800">{stat.value}</p>
+                  <div className="flex items-center gap-1">
+                    {stat.trendUp ? (
+                      <TrendingUp className="h-3 w-3 text-emerald-500" />
+                    ) : (
+                      <TrendingDown className="h-3 w-3 text-red-500" />
+                    )}
+                    <span className={`text-xs font-medium ${stat.trendUp ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {stat.trend}
+                    </span>
                   </div>
-                  <div className="h-2 w-full bg-indigo-100 rounded-full overflow-hidden">
+                </div>
+                <div className={`p-3 rounded-xl bg-${stat.color}-100`}>
+                  <div className={`text-${stat.color}-600`}>
+                    {stat.icon}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ))}
+    </div>
+  );
+};
+
+// Modern Application Card Component
+const ApplicationCard: React.FC<{
+  application: JobApplication;
+  onView: (application: JobApplication) => void;
+  onStatusChange: (id: string, status: ApplicationStatus) => void;
+  onDelete: (application: JobApplication) => void;
+  isSubmitting: boolean;
+  canDelete: boolean;
+}> = ({ application, onView, onStatusChange, onDelete, isSubmitting, canDelete }) => {
+  const statusInfo = getStatusConfig(application.status);
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="bg-white rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all duration-200 overflow-hidden"
+    >
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-semibold text-lg">
+              {application.firstName[0]}{application.lastName[0]}
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-800">
+                {application.firstName} {application.lastName}
+              </h3>
+              <p className="text-sm text-slate-500">{application.position}</p>
+            </div>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => onView(application)}>
+                <Eye className="mr-2 h-4 w-4" />
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onStatusChange(application.id, ApplicationStatus.APPROVED)}
+                disabled={isSubmitting || application.status === ApplicationStatus.APPROVED}
+              >
+                <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+                Approve
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onStatusChange(application.id, ApplicationStatus.INTERVIEWING)}
+                disabled={isSubmitting || application.status === ApplicationStatus.INTERVIEWING}
+              >
+                <Calendar className="mr-2 h-4 w-4 text-blue-500" />
+                Schedule Interview
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onStatusChange(application.id, ApplicationStatus.REJECTED)}
+                disabled={isSubmitting || application.status === ApplicationStatus.REJECTED}
+              >
+                <XCircle className="mr-2 h-4 w-4 text-red-500" />
+                Reject
+              </DropdownMenuItem>
+              {canDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => onDelete(application)}
+                    disabled={isSubmitting}
+                    className="text-red-600 focus:bg-red-50"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="space-y-3 mb-4">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <Mail className="h-4 w-4" />
+            <span>{application.email}</span>
+          </div>
+          {application.phone && (
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <Phone className="h-4 w-4" />
+              <span>{application.phone}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <MapPin className="h-4 w-4" />
+            <span>{application.addressCity}, {application.addressState}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <Calendar className="h-4 w-4" />
+            <span>Applied {new Date(application.createdAt).toLocaleDateString()}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <Badge className={`${statusInfo.className} flex items-center gap-1 px-3 py-1.5 font-semibold text-sm rounded-full shadow-sm`}>
+            {statusInfo.icon}
+            {application.status}
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onView(application)}
+            className="hover:bg-slate-50"
+          >
+            View Details
+            <ChevronRight className="ml-1 h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// Analytics Panel Component
+const AnalyticsPanel: React.FC<{ stats: JobApplicationStats }> = ({ stats }) => {
+  const chartData = [
+    { name: "Pending", value: stats.pendingApplications, color: COLORS[0] },
+    { name: "Approved", value: stats.approvedApplications, color: COLORS[1] },
+    { name: "Rejected", value: stats.rejectedApplications, color: COLORS[2] },
+    { name: "Interviewing", value: stats.interviewingApplications, color: COLORS[3] },
+  ];
+
+  const positionData = Object.entries(stats.applicationsByPosition).map(([position, count]) => ({
+    position,
+    count,
+  }));
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <Card className="bg-white rounded-2xl shadow-sm border border-slate-200">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <PieChartIcon className="h-5 w-5 text-blue-600" />
+            Application Status Distribution
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            {chartData.map((item, index) => (
+              <div key={item.name} className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="text-sm text-slate-600">{item.name}: {item.value}</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-white rounded-2xl shadow-sm border border-slate-200">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <Briefcase className="h-5 w-5 text-purple-600" />
+            Applications by Position
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {positionData.map((item, index) => (
+              <div key={item.position} className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">{item.position}</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-24 bg-slate-200 rounded-full h-2">
                     <div
-                      className="h-full bg-indigo-600 rounded-full"
+                      className="bg-blue-600 h-2 rounded-full"
                       style={{
-                        width: `${Math.min(
-                          (count / (stats?.totalApplications ?? 1)) * 100,
-                          100
-                        )}%`,
+                        width: `${(item.count / Math.max(...positionData.map(p => p.count))) * 100}%`,
                       }}
                     />
                   </div>
+                  <span className="text-sm font-semibold text-slate-800 w-8 text-right">
+                    {item.count}
+                  </span>
                 </div>
-              )
-            )}
-        </div>
-      </Card>
-
-      <Card className="p-6">
-        <div className="mb-5 flex items-center">
-          <PieChartIcon className="h-6 w-6 text-indigo-600 mr-2" />
-          <h3 className="text-xl font-medium">Applications by Status</h3>
-        </div>
-        <div className="flex flex-col items-center justify-center" style={{ height: 300 }}>
-          {chartData.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => [`${value} Applications`, '']} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-2">
-                {chartData.map((entry, index) => (
-                  <div key={`legend-${index}`} className="flex items-center">
-                    <div
-                      className="w-4 h-4 mr-2"
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    />
-                    <span>{entry.name}: {entry.value}</span>
-                  </div>
-                ))}
               </div>
-            </>
-          ) : (
-            <div className="text-center text-gray-500">
-              No data available
-            </div>
-          )}
-        </div>
+            ))}
+          </div>
+        </CardContent>
       </Card>
     </div>
   );
 };
 
-// DeleteConfirmationDialog component
+// Delete Confirmation Dialog
 const DeleteConfirmationDialog: React.FC<{
   application: JobApplication | null;
   isOpen: boolean;
@@ -388,6 +509,7 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [applicationToDelete, setApplicationToDelete] = useState<JobApplication | null>(null);
   const [isDeletingApplication, setIsDeletingApplication] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // Check if user can delete applications (only admin and super_admin)
   const canDeleteApplications = ["admin", "super_admin"].includes(userType);
@@ -448,7 +570,7 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
       
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: "10",
+        limit: "12",
         search: searchTerm,
         status: statusFilter === "all" ? "" : statusFilter,
         position: positionFilter,
@@ -464,15 +586,6 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
         throw new Error("Failed to fetch applications");
       }
       const data = await response.json();
-      console.log("Applications API response:", {
-        totalCount: data.totalCount,
-        applicationCount: data.applications.length,
-        fileUploadSummary: data.applications.map((app: JobApplication) => ({
-          id: app.id,
-          hasFileUploads: !!app.fileUploads,
-          fileUploadCount: app.fileUploads?.length || 0
-        }))
-      });
       setApplications(data.applications);
       setTotalPages(data.totalPages);
     } catch (err) {
@@ -512,18 +625,13 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
       let updatedApp: JobApplication | undefined;
 
       if (newStatus === ApplicationStatus.APPROVED) {
-        console.log(`Attempting to approve application ID: ${id}`);
         const result = await approveJobApplication(id);
-        console.log("Server action result:", result);
-
         resultMessage = result.message || "Application approved successfully.";
         updatedApp = applications.find(app => app.id === id);
         if (updatedApp) {
             updatedApp = { ...updatedApp, status: newStatus };
         }
       } else {
-        console.log(`Attempting to update status for ${id} to ${newStatus} via API`);
-        
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         
@@ -539,14 +647,12 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
           },
           body: JSON.stringify({ status: newStatus }),
         });
-        console.log("API response status:", response.status);
 
         if (!response.ok) {
           let errorData = { error: `API error ${response.status}` };
           try {
             errorData = await response.json();
           } catch (e) { /* Ignore json parsing error */ }
-          console.error("API Error Data:", errorData);
           throw new Error(
             errorData.error || `Failed to update status to ${newStatus}`,
           );
@@ -554,12 +660,11 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
         const responseData = await response.json();
         if (!responseData.success || !responseData.application) {
           throw new Error(
-            responseData.error || `Failed to update status to ${newStatus} (API success was false or application missing)`
+            responseData.error || `Failed to update status to ${newStatus}`
           );
         }
         updatedApp = responseData.application as JobApplication;
         resultMessage = `Application status updated to ${updatedApp.status}`;
-        console.log("API update successful, new status:", updatedApp.status);
       }
 
       if (updatedApp) {
@@ -591,7 +696,6 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
 
       fetchStats();
 
-      // Close the dialog if the status was changed successfully via the dialog
       if (selectedApplication && selectedApplication.id === id && (newStatus === ApplicationStatus.REJECTED || newStatus === ApplicationStatus.APPROVED)) {
         setIsDetailDialogOpen(false);
       }
@@ -611,12 +715,6 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
 
   // Handle application view
   const handleViewApplication = (application: JobApplication) => {
-    console.log("Viewing application:", application);
-    console.log("File uploads data:", {
-      hasFileUploads: !!application.fileUploads,
-      fileUploadCount: application.fileUploads?.length || 0,
-      fileUploads: application.fileUploads
-    });
     setSelectedApplication(application);
     setIsDetailDialogOpen(true);
   };
@@ -627,15 +725,12 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
     setError(null);
 
     try {
-      console.log(`Attempting to delete application ID: ${id}`);
       const result = await deleteJobApplication(id);
-      console.log("Server action result:", result);
 
       if (!result.success) {
         throw new Error(result.message || "Failed to delete application");
       }
 
-      // Remove the deleted application from the list
       setApplications((prevApps) =>
         prevApps.filter((app) => app.id !== id)
       );
@@ -646,7 +741,6 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
         variant: "default",
       });
 
-      // Refresh stats
       fetchStats();
     } catch (error: any) {
       console.error("Error deleting application:", error);
@@ -670,335 +764,241 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
     setIsDeleteDialogOpen(true);
   };
 
-  const paginationItems = getPaginationItems(page, totalPages);
-
-  // Loading state
   if (isLoading && !stats) {
-    return <LoadingDashboard />;
+    return <ApplicationsSkeleton />;
   }
 
-  // Error state
   if (!stats) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-800">Error</h2>
-          <p className="mt-2 text-gray-600">Failed to load application statistics</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 flex items-center justify-center">
+        <motion.div 
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="text-center p-8 bg-white rounded-3xl shadow-xl border border-slate-200 max-w-md mx-4"
+        >
+          <div className="mb-6 mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
+            <AlertTriangle className="h-8 w-8 text-slate-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-3">Error Loading Data</h2>
+          <p className="text-slate-500 mb-6">Failed to load application statistics</p>
           <Button
-            className="mt-4"
+            variant="default"
             onClick={() => window.location.reload()}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
           >
             Retry
           </Button>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto space-y-8 py-8">
-      {/* Header */}
-      <div className="flex flex-col justify-between space-y-4 md:flex-row md:items-center md:space-y-0">
-        <div>
-          <h1 className="text-3xl font-bold">Job Applications</h1>
-          <p className="text-gray-500">
-            Manage and review candidate applications
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {stats && (
-            <div className="rounded-md bg-blue-50 px-3 py-1.5 text-sm text-blue-700 border border-blue-100">
-              <span className="font-semibold mr-1.5">{stats.totalApplications}</span>
-              Total Applications
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="container mx-auto px-6 py-8"
+      >
+        {/* Modern Header */}
+        <div className="mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-4 mb-3">
+                <h1 className="text-3xl font-bold text-slate-800">Job Applications</h1>
+                <Badge className="bg-blue-100 text-blue-800 border border-blue-200 px-3 py-1.5 font-semibold text-sm rounded-full">
+                  {stats.totalApplications} Total
+                </Badge>
+              </div>
+              <p className="text-slate-600">
+                Manage and review candidate applications efficiently
+              </p>
             </div>
-          )}
-          <Button variant="outline" className="flex items-center gap-2">
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
-          <Button 
-            variant="default" 
-            className="flex items-center gap-2"
-            onClick={() => {
-              fetchStats();
-              fetchApplications();
-            }}
-          >
-            <RefreshCw className="h-4 w-4" />
-            <span className="sr-only">Refresh</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Overview */}
-      {stats && <StatsOverview stats={stats} />}
-
-      {/* Tabs */}
-      <Tabs defaultValue="applications" className="w-full mt-6">
-        <div className="border-b mb-6">
-          <TabsList className="w-auto bg-transparent border-b-0 p-0 mb-0 flex">
-            <TabsTrigger 
-              value="applications" 
-              className="text-sm py-2 px-4 rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none"
-            >
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Applications
-            </TabsTrigger>
-            <TabsTrigger 
-              value="analytics" 
-              className="text-sm py-2 px-4 rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none"
-            >
-              <BarChart4 className="h-4 w-4 mr-2" />
-              Analytics
-            </TabsTrigger>
-          </TabsList>
+            
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="bg-white hover:bg-slate-50 text-slate-700 px-6 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </Button>
+              <Button
+                onClick={() => {
+                  fetchStats();
+                  fetchApplications();
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
+            </div>
+          </div>
         </div>
 
-        {/* Applications Tab */}
-        <TabsContent value="applications" className="mt-6">
-          <Card className="overflow-hidden shadow-sm">
-            <CardContent className="p-6">
-              <div className="mb-6 flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
-                <div className="flex flex-1 space-x-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Search applications..."
-                      className="pl-10"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+        {/* Stats Overview */}
+        <div className="mb-8">
+          <StatsOverview stats={stats} />
+        </div>
+
+        {/* Tabs */}
+        <Tabs defaultValue="applications" className="w-full">
+          <div className="border-b border-slate-200 mb-8">
+            <TabsList className="w-auto bg-transparent border-b-0 p-0 mb-0 flex">
+              <TabsTrigger 
+                value="applications" 
+                className="text-sm py-3 px-6 rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none font-medium"
+              >
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Applications
+              </TabsTrigger>
+              <TabsTrigger 
+                value="analytics" 
+                className="text-sm py-3 px-6 rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none font-medium"
+              >
+                <BarChart4 className="h-4 w-4 mr-2" />
+                Analytics
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          {/* Applications Tab */}
+          <TabsContent value="applications" className="mt-0">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              {/* Filters */}
+              <div className="p-6 border-b border-slate-100">
+                <div className="flex flex-col lg:flex-row gap-4">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <Input
+                        placeholder="Search applications..."
+                        className="pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline">
-                        <Filter className="mr-2 h-4 w-4" />
-                        Filter
+                  <div className="flex gap-3">
+                    <Select
+                      value={statusFilter}
+                      onValueChange={(value) => setStatusFilter(value as ApplicationStatus | "all")}
+                    >
+                      <SelectTrigger className="w-40 bg-slate-50 border-slate-200">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value={ApplicationStatus.PENDING}>Pending</SelectItem>
+                        <SelectItem value={ApplicationStatus.APPROVED}>Approved</SelectItem>
+                        <SelectItem value={ApplicationStatus.REJECTED}>Rejected</SelectItem>
+                        <SelectItem value={ApplicationStatus.INTERVIEWING}>Interviewing</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={positionFilter === "all" ? "all" : positionFilter}
+                      onValueChange={(value) => setPositionFilter(value === "all" ? "" : value)}
+                    >
+                      <SelectTrigger className="w-48 bg-slate-50 border-slate-200">
+                        <SelectValue placeholder="Position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Positions</SelectItem>
+                        <SelectItem value="Driver for Catering Deliveries">Driver</SelectItem>
+                        <SelectItem value="Virtual Assistant">Virtual Assistant</SelectItem>
+                        <SelectItem value="Other Positions">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Applications Grid */}
+              <div className="p-6">
+                {isLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {[...Array(6)].map((_, i) => (
+                      <Skeleton key={i} className="h-64 w-full rounded-2xl" />
+                    ))}
+                  </div>
+                ) : applications.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                      <ClipboardList className="h-8 w-8 text-slate-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-800 mb-2">No Applications Found</h3>
+                    <p className="text-slate-500">No applications match your current filters.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {applications.map((application) => (
+                      <ApplicationCard
+                        key={application.id}
+                        application={application}
+                        onView={handleViewApplication}
+                        onStatusChange={handleStatusChange}
+                        onDelete={openDeleteConfirmation}
+                        isSubmitting={isSubmitting}
+                        canDelete={canDeleteApplications}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center mt-8">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(page - 1)}
+                        disabled={page <= 1}
+                        className="rounded-xl"
+                      >
+                        Previous
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <div className="p-2">
-                        <Select
-                          value={statusFilter}
-                          onValueChange={(value) => setStatusFilter(value as ApplicationStatus | "all")}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Statuses</SelectItem>
-                            <SelectItem value={ApplicationStatus.PENDING}>
-                              Pending
-                            </SelectItem>
-                            <SelectItem value={ApplicationStatus.APPROVED}>
-                              Approved
-                            </SelectItem>
-                            <SelectItem value={ApplicationStatus.REJECTED}>
-                              Rejected
-                            </SelectItem>
-                            <SelectItem value={ApplicationStatus.INTERVIEWING}>
-                              Interviewing
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="p-2">
-                        <Select
-                          value={positionFilter === "all" ? "all" : positionFilter}
-                          onValueChange={(value) => setPositionFilter(value === "all" ? "" : value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Position" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Positions</SelectItem>
-                            <SelectItem value="Driver for Catering Deliveries">
-                              Driver
-                            </SelectItem>
-                            <SelectItem value="Virtual Assistant">
-                              Virtual Assistant
-                            </SelectItem>
-                            <SelectItem value="Other Positions">
-                              Other
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-
-              {/* Applications Table */}
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Applicant</TableHead>
-                      <TableHead>Position</TableHead>
-                      <TableHead>Date Applied</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {applications.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={5}
-                          className="h-24 text-center"
-                        >
-                          No applications found.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      applications.map((application) => (
-                        <TableRow key={application.id}>
-                          <TableCell className="font-medium">
-                            {application.firstName} {application.lastName}
-                            <div className="text-sm text-gray-500">
-                              {application.email}
-                            </div>
-                          </TableCell>
-                          <TableCell>{application.position}</TableCell>
-                          <TableCell>
-                            {formatDate(application.createdAt)}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={application.status} />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex space-x-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleViewApplication(application)}
-                              >
-                                View
-                              </Button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="outline" size="sm">
-                                    Actions
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      handleStatusChange(
-                                        application.id,
-                                        ApplicationStatus.APPROVED
-                                      )
-                                    }
-                                    disabled={isSubmitting || application.status === ApplicationStatus.APPROVED}
-                                  >
-                                    <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-                                    Approve
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      handleStatusChange(
-                                        application.id,
-                                        ApplicationStatus.REJECTED
-                                      )
-                                    }
-                                    disabled={isSubmitting || application.status === ApplicationStatus.REJECTED}
-                                  >
-                                    <XCircle className="mr-2 h-4 w-4 text-red-500" />
-                                    Reject
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      handleStatusChange(
-                                        application.id,
-                                        ApplicationStatus.INTERVIEWING
-                                      )
-                                    }
-                                    disabled={isSubmitting || application.status === ApplicationStatus.INTERVIEWING}
-                                  >
-                                    <Calendar className="mr-2 h-4 w-4 text-blue-500" />
-                                    Schedule Interview
-                                  </DropdownMenuItem>
-                                  {canDeleteApplications && (
-                                    <DropdownMenuItem
-                                      onClick={() => openDeleteConfirmation(application)}
-                                      disabled={isDeletingApplication}
-                                      className="text-red-600 focus:bg-red-50"
-                                    >
-                                      <Trash2 className="mr-2 h-4 w-4 text-red-500" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-6">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handlePageChange(page - 1);
-                          }}
-                          className={page <= 1 ? "pointer-events-none opacity-50" : ""}
-                          aria-disabled={page <= 1}
-                        />
-                      </PaginationItem>
-                      {paginationItems.map((item, index) => (
-                        <PaginationItem key={index}>
-                          {item === '...' ? (
-                            <PaginationEllipsis />
-                          ) : (
-                            <PaginationLink
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handlePageChange(item as number);
-                              }}
-                              isActive={page === item}
-                              aria-current={page === item ? "page" : undefined}
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          const pageNum = i + 1;
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={page === pageNum ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handlePageChange(pageNum)}
+                              className="w-10 h-10 rounded-xl"
                             >
-                              {item}
-                            </PaginationLink>
-                          )}
-                        </PaginationItem>
-                      ))}
-                      <PaginationItem>
-                        <PaginationNext
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handlePageChange(page + 1);
-                          }}
-                          className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
-                          aria-disabled={page >= totalPages}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                              {pageNum}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(page + 1)}
+                        disabled={page >= totalPages}
+                        className="rounded-xl"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
 
-        {/* Analytics Tab */}
-        <TabsContent value="analytics">
-          <AnalyticsPanel stats={stats} />
-        </TabsContent>
-      </Tabs>
+          {/* Analytics Tab */}
+          <TabsContent value="analytics">
+            <AnalyticsPanel stats={stats} />
+          </TabsContent>
+        </Tabs>
+      </motion.div>
 
       {/* Application Detail Dialog */}
       <ApplicationDetailDialog

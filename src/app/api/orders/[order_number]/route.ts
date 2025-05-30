@@ -47,8 +47,8 @@ type OnDemandOrder = Prisma.OnDemandGetPayload<{
 }>;
 
 type Order = 
-  | (CateringRequest & { orderType: "catering" })
-  | (OnDemandOrder & { orderType: "onDemand" });
+  | (CateringRequest & { order_type: "catering" })
+  | (OnDemandOrder & { order_type: "on_demand" });
 
 function serializeOrder(data: any): any {
   // Helper function to format dates with timezone
@@ -153,7 +153,7 @@ export async function GET(
     });
 
     if (cateringRequest) {
-      order = { ...cateringRequest, orderType: "catering" };
+      order = { ...cateringRequest, order_type: "catering" };
     } else {
       // If not found, try to find on-demand order using case-insensitive search and check soft delete
       const onDemandOrder = await prisma.onDemand.findFirst({
@@ -187,7 +187,7 @@ export async function GET(
       });
 
       if (onDemandOrder) {
-        order = { ...onDemandOrder, orderType: "onDemand" };
+        order = { ...onDemandOrder, order_type: "on_demand" };
       }
     }
 
@@ -275,7 +275,7 @@ export async function PATCH(
           fileUploads: true,
         },
       });
-      updatedOrder = { ...updated, orderType: "catering" };
+      updatedOrder = { ...updated, order_type: "catering" };
     } else {
       // If not found, try updating on-demand order
       const updated = await prisma.onDemand.update({
@@ -303,7 +303,7 @@ export async function PATCH(
           fileUploads: true,
         },
       });
-      updatedOrder = { ...updated, orderType: "onDemand" };
+      updatedOrder = { ...updated, order_type: "on_demand" };
     }
 
     if (updatedOrder) {
