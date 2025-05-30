@@ -94,4 +94,4 @@ pids
 
 # Temporary folders
 tmp/
-temp/
+temp/.prisma-initialized
