@@ -8,9 +8,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Clock, Target, Brain, BarChart } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChevronRight, Headphones, Clock, Target, Brain, BarChart, Globe, Zap, CheckCircle, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export function VAModal() {
@@ -31,99 +34,161 @@ export function VAModal() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button className="bg-yellow-400 text-gray-800 hover:bg-yellow-500">
+        <Button className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl font-semibold">
           Learn More <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl w-[calc(100%-2rem)] mx-auto mt-16 md:mt-24 overflow-y-auto max-h-[calc(100vh-6rem)] bg-white dark:bg-gray-900 shadow-lg border border-gray-200 dark:border-gray-800">
-        <DialogHeader className="bg-white dark:bg-gray-900">
-          <DialogTitle className="text-xl md:text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-            Join Ready Set as a Virtual Assistant
+      <DialogContent className="max-w-4xl w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] mx-auto my-2 sm:my-4 overflow-y-auto max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-2rem)] bg-white border-0 shadow-2xl rounded-2xl z-[1001] p-0">
+        <DialogHeader className="p-6 sm:p-8 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-t-2xl relative">
+          <DialogClose className="absolute right-4 top-4 rounded-full bg-white/20 p-2 text-white hover:bg-white/30 transition-colors z-10">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+              <Headphones className="h-6 w-6 text-white" />
+            </div>
+            <Badge className="bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm">
+              Remote Position
+            </Badge>
+          </div>
+          <DialogTitle className="text-2xl sm:text-3xl font-bold mb-3 text-left">
+            Virtual Assistant
           </DialogTitle>
-          <div className="space-y-4 md:space-y-6 overflow-y-auto pb-6">
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 md:p-6 rounded-lg">
-              <h3 className="text-lg md:text-xl font-semibold mb-2 md:mb-3 text-gray-900 dark:text-white">
+          <DialogDescription className="text-white/90 text-base sm:text-lg text-left">
+            Help businesses thrive while growing your career in a fully remote environment
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="p-6 sm:p-8 space-y-6 sm:space-y-8">
+          {/* Hero Section */}
+          <Card className="border-0 bg-gradient-to-br from-amber-50 to-orange-50">
+            <CardContent className="p-6">
+              <h3 className="text-xl font-bold mb-3 text-slate-800">
                 Be Part of Something Great
               </h3>
-              <div className="text-gray-700 dark:text-gray-300 text-sm md:text-base">
-                Join our team of skilled virtual assistants helping businesses across the US achieve sustainable growth and success. With over 50,000 project hours delivered, we&apos;re looking for dedicated professionals to help expand our impact.
+              <p className="text-slate-600 leading-relaxed mb-4">
+                Join our team of skilled virtual assistants helping businesses across the US achieve sustainable growth and success. With over 50,000 project hours delivered, we're looking for dedicated professionals to help expand our impact.
+              </p>
+              <div className="flex items-center gap-2 text-sm text-amber-700">
+                <Globe className="h-4 w-4" />
+                <span className="font-medium">100% Remote • Flexible Hours</span>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            <div>
-              <h3 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 text-gray-900 dark:text-white">
-                What We&apos;re Looking For
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                {[
-                  {
-                    icon: <Clock className="w-5 h-5" />,
-                    title: "Time Management",
-                    description: "Excellent organizational skills and ability to handle multiple tasks efficiently"
-                  },
-                  {
-                    icon: <Target className="w-5 h-5" />,
-                    title: "Problem Solving",
-                    description: "Creative problem-solver who can develop efficient workflows"
-                  },
-                  {
-                    icon: <Brain className="w-5 h-5" />,
-                    title: "Initiative",
-                    description: "Self-motivated with strong initiative and attention to detail"
-                  },
-                  {
-                    icon: <BarChart className="w-5 h-5" />,
-                    title: "Business Acumen",
-                    description: "Understanding of business operations and growth strategies"
-                  }
-                ].map((item, index) => (
-                  <div key={index} className="p-3 md:p-4 border border-yellow-200 dark:border-yellow-700 rounded-lg hover:border-yellow-300 dark:hover:border-yellow-600 transition-colors bg-white dark:bg-gray-800">
-                    <div className="flex items-center mb-2">
-                      <div className="text-yellow-600 dark:text-yellow-500 mr-2">
-                        {item.icon}
+          {/* What We're Looking For */}
+          <div>
+            <h3 className="text-xl font-bold mb-4 text-slate-800">
+              What We're Looking For
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[
+                {
+                  icon: Clock,
+                  title: "Time Management",
+                  description: "Excellent organizational skills and ability to handle multiple tasks efficiently",
+                  color: "amber"
+                },
+                {
+                  icon: Target,
+                  title: "Problem Solving",
+                  description: "Creative problem-solver who can develop efficient workflows",
+                  color: "orange"
+                },
+                {
+                  icon: Brain,
+                  title: "Initiative",
+                  description: "Self-motivated with strong initiative and attention to detail",
+                  color: "yellow"
+                },
+                {
+                  icon: BarChart,
+                  title: "Business Acumen",
+                  description: "Understanding of business operations and growth strategies",
+                  color: "red"
+                }
+              ].map((item, index) => (
+                <Card key={index} className="border-0 shadow-md hover:shadow-lg transition-all duration-300 group">
+                  <CardContent className="p-4">
+                    <div className="flex items-center mb-3">
+                      <div className={`w-10 h-10 bg-${item.color}-100 rounded-lg flex items-center justify-center mr-3 group-hover:scale-110 transition-transform duration-300`}>
+                        <item.icon className={`h-5 w-5 text-${item.color}-600`} />
                       </div>
-                      <span className="font-medium text-gray-900 dark:text-white">{item.title}</span>
+                      <h4 className="font-semibold text-slate-800">{item.title}</h4>
                     </div>
-                    <div className="text-gray-600 dark:text-gray-300 text-sm md:text-base">{item.description}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg md:text-xl font-semibold mb-2 md:mb-3 text-gray-900 dark:text-white">
-                What You&apos;ll Do
-              </h3>
-              <ul className="space-y-2 text-gray-700 dark:text-gray-300 text-sm md:text-base">
-                {[
-                  "Help businesses streamline their operations and create efficient workflows",
-                  "Manage daily tasks and priorities for business owners",
-                  "Implement systems and processes for sustainable growth",
-                  "Contribute to the success of businesses across various industries"
-                ].map((item, index) => (
-                  <li key={index} className="flex items-start">
-                    <span className="text-yellow-600 dark:text-yellow-500 mr-2">•</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 md:p-6 rounded-lg text-center border-l-4 border-yellow-400">
-              <div className="font-medium mb-3 md:mb-4 text-sm md:text-base text-gray-900 dark:text-white">
-                Ready to help businesses thrive while growing your career?
-              </div>
-              <Link href="/apply">
-                <Button 
-                  onClick={handleApplyClick}
-                  className="bg-yellow-400 hover:bg-yellow-500 text-gray-800 w-full md:w-auto"
-                >
-                  Apply Now
-                </Button>
-              </Link>
+                    <p className="text-sm text-slate-600 leading-relaxed">{item.description}</p>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
-        </DialogHeader>
+
+          {/* What You'll Do */}
+          <div>
+            <h3 className="text-xl font-bold mb-4 text-slate-800">
+              What You'll Do
+            </h3>
+            <div className="space-y-3">
+              {[
+                "Help businesses streamline their operations and create efficient workflows",
+                "Manage daily tasks and priorities for business owners",
+                "Implement systems and processes for sustainable growth",
+                "Contribute to the success of businesses across various industries"
+              ].map((item, index) => (
+                <div key={index} className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
+                  <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-slate-700">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Benefits */}
+          <div>
+            <h3 className="text-xl font-bold mb-4 text-slate-800">
+              Why Choose Us?
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { icon: Globe, label: "Remote Work", description: "Work from anywhere" },
+                { icon: Clock, label: "Flexible Hours", description: "Set your own schedule" },
+                { icon: Zap, label: "Professional Development", description: "Grow your skills" }
+              ].map((benefit, index) => (
+                <Card key={index} className="border-0 shadow-md hover:shadow-lg transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center mb-3">
+                      <benefit.icon className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <h4 className="font-semibold text-slate-800 mb-2">{benefit.label}</h4>
+                    <p className="text-sm text-slate-600">{benefit.description}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* CTA */}
+          <Card className="border-0 bg-gradient-to-r from-amber-500 to-orange-500 text-white">
+            <CardContent className="p-6 text-center">
+              <h4 className="text-xl font-bold mb-3">
+                Ready to Help Businesses Thrive?
+              </h4>
+              <p className="mb-6 text-white/90">
+                Join our team and help businesses achieve sustainable growth while advancing your own career in a supportive remote environment.
+              </p>
+              <Link href="/apply?role=Virtual Assistant">
+                <Button 
+                  onClick={handleApplyClick}
+                  size="lg"
+                  className="bg-white text-amber-600 hover:bg-gray-50 shadow-xl hover:shadow-2xl transition-all duration-300 px-8 py-3 rounded-xl font-semibold"
+                >
+                  Apply Now <ChevronRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
       </DialogContent>
     </Dialog>
   );

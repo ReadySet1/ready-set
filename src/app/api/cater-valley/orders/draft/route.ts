@@ -210,14 +210,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Calculate pricing
+    // 5. Calculate pricing with updated parameters
     const pricingResult = await calculateDeliveryPrice({
       pickupAddress: `${validatedData.pickupLocation.address}, ${validatedData.pickupLocation.city}, ${validatedData.pickupLocation.state}`,
       dropoffAddress: `${validatedData.dropOffLocation.address}, ${validatedData.dropOffLocation.city}, ${validatedData.dropOffLocation.state}`,
-      itemCount: validatedData.totalItem,
-      orderTotal: validatedData.priceTotal,
+      headCount: validatedData.totalItem, // Using totalItem as headCount
+      foodCost: validatedData.priceTotal, // Using priceTotal as foodCost
       deliveryDate: validatedData.deliveryDate,
       deliveryTime: validatedData.deliveryTime,
+      includeTip: true // Default to including tip for CaterValley orders
     });
 
     // 6. Create database entities
@@ -234,7 +235,7 @@ export async function POST(request: NextRequest) {
     const draftOrder = await prisma.cateringRequest.create({
       data: {
         orderNumber: `CV-${validatedData.orderCode}`,
-        status: 'PENDING',
+        status: 'ACTIVE',
         userId: systemUser.id,
         pickupAddressId: pickupAddress.id,
         deliveryAddressId: deliveryAddress.id,

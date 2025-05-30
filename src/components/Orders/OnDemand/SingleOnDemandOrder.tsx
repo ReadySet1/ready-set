@@ -1,24 +1,19 @@
-// src/components/Orders/SingleOrder.tsx
-
 import React, { useCallback, useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { motion } from "framer-motion";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ClipboardList, AlertCircle, Truck, User, Calendar, MapPin, FileText, ChevronUp, ChevronDown, Clock, Package, Phone, Mail } from "lucide-react";
+import { ClipboardList, AlertCircle, Truck, User, Calendar, MapPin, FileText, Clock, Package, Phone, Mail, Car, Bike, Zap } from "lucide-react";
 import toast from "react-hot-toast";
-import { DriverStatusCard } from "./DriverStatus";
-import OrderHeader from "./ui/OrderHeader";
-import OrderDetails from "./ui/OrderDetails";
-import AddressInfo from "./ui/AddressInfo";
-import CustomerInfo from "./ui/CustomerInfo";
-import AdditionalInfo from "./ui/AdditionalInfo";
-import DriverAssignmentDialog from "./ui/DriverAssignmentDialog";
-import OrderStatusCard from "./OrderStatus";
+import { DriverStatusCard } from "../DriverStatus";
+import OrderDetails from "../ui/OrderDetails";
+import AddressInfo from "../ui/AddressInfo";
+import AdditionalInfo from "../ui/AdditionalInfo";
+import DriverAssignmentDialog from "../ui/DriverAssignmentDialog";
+import OrderStatusCard from "../OrderStatus";
 import { usePathname, useRouter } from "next/navigation";
-import { OrderFilesManager } from "./ui/OrderFiles";
-import { Driver, Order, OrderStatus, OrderType, VehicleType, DriverStatus } from "@/types/order";
+import { OrderFilesManager } from "../ui/OrderFiles";
+import { Driver, Order, OrderStatus, VehicleType, DriverStatus, OnDemand, isOnDemand } from "@/types/order";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileUpload } from '@/types/file';
 import { createClient } from "@/utils/supabase/client";
@@ -28,7 +23,7 @@ import { UserType } from "@/types/user";
 // Make sure the bucket name is user-assets 
 const STORAGE_BUCKET = "user-assets";
 
-interface SingleOrderProps {
+interface SingleOnDemandOrderProps {
   onDeleteSuccess: () => void;
   showHeader?: boolean;
 }
@@ -65,9 +60,23 @@ const getStatusConfig = (status: string) => {
   };
 };
 
+// Vehicle type icons and labels
+const getVehicleInfo = (vehicleType: VehicleType) => {
+  switch (vehicleType) {
+    case VehicleType.CAR:
+      return { icon: <Car className="h-4 w-4" />, label: "Car", color: "text-blue-600" };
+    case VehicleType.VAN:
+      return { icon: <Truck className="h-4 w-4" />, label: "Van", color: "text-green-600" };
+    case VehicleType.TRUCK:
+      return { icon: <Truck className="h-4 w-4" />, label: "Truck", color: "text-orange-600" };
+    default:
+      return { icon: <Car className="h-4 w-4" />, label: "Vehicle", color: "text-gray-600" };
+  }
+};
+
 // Modern loading skeleton
 const OrderSkeleton: React.FC = () => (
-  <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+  <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-blue-50">
     <div className="container mx-auto px-6 py-8">
       {/* Header Skeleton */}
       <div className="mb-8">
@@ -91,7 +100,7 @@ const OrderSkeleton: React.FC = () => (
   </div>
 );
 
-const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader = true }) => {
+const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({ onDeleteSuccess, showHeader = true }) => {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -179,7 +188,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
     }
 
     setIsLoading(true);
-    console.log("Fetching order details for:", orderNumber);
+    console.log("Fetching on-demand order details for:", orderNumber);
 
     try {
       // Refresh auth session before making the request
@@ -226,7 +235,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
       }
 
       const orderData = await orderResponse.json();
-      console.log("Order data received:", orderData);
+      console.log("On-demand order data received:", orderData);
       
       // Transform the data to match our types
       const transformedOrder: Order = {
@@ -251,7 +260,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
 
       // Fetch files with improved error handling
       try {
-        console.log(`Fetching files for order: ${orderNumber}`);
+        console.log(`Fetching files for on-demand order: ${orderNumber}`);
         const filesResponse = await fetch(`/api/orders/${orderNumber}/files`, {
           credentials: 'include',
           headers: {
@@ -298,7 +307,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
         toast.error("Failed to load order files");
       }
     } catch (error) {
-      console.error("Error fetching order:", error);
+      console.error("Error fetching on-demand order:", error);
       // Log more details about the error
       if (error instanceof Error) {
         console.error("Error message:", error.message);
@@ -440,7 +449,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
         return;
       }
       
-      console.log(`Updating driver status for order ${order.orderNumber} to:`, newStatus);
+      console.log(`Updating driver status for on-demand order ${order.orderNumber} to:`, newStatus);
       
       const response = await fetch(`/api/orders/${order.orderNumber}`, {
         method: "PATCH",
@@ -472,14 +481,14 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
       }
 
       const updatedOrder = await response.json();
-      console.log(`Driver status for order ${order.orderNumber} updated response:`, updatedOrder);
+      console.log(`Driver status for on-demand order ${order.orderNumber} updated response:`, updatedOrder);
       setOrder(updatedOrder);
       toast.success("Driver status updated successfully!");
 
       // If driver status is updated to completed, also update the main order status
       console.log(`Checking if driver status '${newStatus}' requires order status update.`);
       if (newStatus === DriverStatus.COMPLETED) {
-        console.log(`Triggering order status update to COMPLETED for order ${order.orderNumber}`);
+        console.log(`Triggering order status update to COMPLETED for on-demand order ${order.orderNumber}`);
         await handleOrderStatusChange(OrderStatus.COMPLETED);
       }
     } catch (error) {
@@ -501,7 +510,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
         return;
       }
 
-      console.log(`Updating internal ORDER status for order ${order.orderNumber} to:`, newStatus);
+      console.log(`Updating internal ORDER status for on-demand order ${order.orderNumber} to:`, newStatus);
 
       const response = await fetch(`/api/orders/${order.orderNumber}`, {
         method: "PATCH",
@@ -530,7 +539,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
         throw new Error(`Failed to update internal order status: ${errorText || response.statusText}`);
       }
       const updatedOrderData = await response.json();
-      console.log(`Internal order status for order ${order.orderNumber} updated response:`, updatedOrderData);
+      console.log(`Internal order status for on-demand order ${order.orderNumber} updated response:`, updatedOrderData);
       return updatedOrderData as Order;
     };
 
@@ -593,24 +602,24 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-blue-50 flex items-center justify-center">
         <motion.div 
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.3 }}
           className="text-center p-8 bg-white rounded-3xl shadow-xl border border-slate-200 max-w-md mx-4"
         >
-          <div className="mb-6 mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
-            <AlertCircle className="h-8 w-8 text-slate-400" />
+          <div className="mb-6 mx-auto w-16 h-16 bg-cyan-100 rounded-full flex items-center justify-center">
+            <AlertCircle className="h-8 w-8 text-cyan-500" />
           </div>
           <h2 className="text-2xl font-bold text-slate-800 mb-3">Order Not Found</h2>
           <p className="text-slate-500 mb-6">
-            We couldn't find order: <span className="font-medium text-slate-700">{orderNumber}</span>
+            We couldn't find on-demand order: <span className="font-medium text-slate-700">{orderNumber}</span>
           </p>
           <Button
             variant="default"
             onClick={() => window.history.back()}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+            className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
           >
             Go Back
           </Button>
@@ -620,9 +629,11 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
   }
 
   const statusInfo = getStatusConfig(order.status as string);
+  const onDemandOrder = isOnDemand(order) ? order : null;
+  const vehicleInfo = onDemandOrder ? getVehicleInfo(onDemandOrder.vehicleType) : getVehicleInfo(VehicleType.CAR);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-blue-50">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -635,12 +646,18 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
             <div>
               <div className="flex items-center gap-4 mb-3">
                 <h1 className="text-3xl font-bold text-slate-800">
-                  {order.order_type === 'catering' ? 'Catering Request' : 'On-Demand Order'}
+                  On-Demand Order
                 </h1>
                 <Badge className={`${statusInfo.className} flex items-center gap-1 px-3 py-1.5 font-semibold text-sm rounded-full shadow-sm`}>
                   {statusInfo.icon}
                   {order.status}
                 </Badge>
+                {onDemandOrder && (
+                  <div className={`flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-full text-sm font-medium`}>
+                    <span className={vehicleInfo.color}>{vehicleInfo.icon}</span>
+                    {vehicleInfo.label}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-6 text-slate-600">
                 <div className="flex items-center gap-2">
@@ -677,7 +694,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
             <div className="flex gap-3">
               <Button
                 onClick={handleOpenDriverDialog}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white px-6 py-2.5 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
               >
                 <Truck className="h-4 w-4" />
                 {isDriverAssigned ? "Update Driver" : "Assign Driver"}
@@ -694,7 +711,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-6 border-b border-slate-100">
                 <h2 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
-                  <Truck className="h-5 w-5 text-blue-600" />
+                  <Truck className="h-5 w-5 text-cyan-600" />
                   Driver & Status
                 </h2>
               </div>
@@ -749,10 +766,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
                   {order.pickupAddress && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
                         Pickup Location
                       </div>
-                      <div className="pl-4 border-l-2 border-blue-100">
+                      <div className="pl-4 border-l-2 border-cyan-100">
                         <AddressInfo address={order.pickupAddress} title="" />
                       </div>
                     </div>
@@ -760,10 +777,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
                   {order.deliveryAddress && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                         Delivery Location
                       </div>
-                      <div className="pl-4 border-l-2 border-green-100">
+                      <div className="pl-4 border-l-2 border-blue-100">
                         <AddressInfo address={order.deliveryAddress} title="" />
                       </div>
                     </div>
@@ -816,7 +833,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-6 border-b border-slate-100">
                 <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                  <User className="h-5 w-5 text-blue-600" />
+                  <User className="h-5 w-5 text-cyan-600" />
                   Customer
                 </h2>
               </div>
@@ -833,7 +850,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
                       <div className="text-sm font-medium text-slate-500 mb-1">Email</div>
                       <div className="flex items-center gap-2 text-slate-800">
                         <Mail className="h-4 w-4 text-slate-400" />
-                        <a href={`mailto:${order.user.email}`} className="hover:text-blue-600 transition-colors">
+                        <a href={`mailto:${order.user.email}`} className="hover:text-cyan-600 transition-colors">
                           {order.user.email}
                         </a>
                       </div>
@@ -844,13 +861,42 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
                       <div className="text-sm font-medium text-slate-500 mb-1">Phone</div>
                       <div className="flex items-center gap-2 text-slate-800">
                         <Phone className="h-4 w-4 text-slate-400" />
-                        <a href={`tel:${order.user.contactNumber}`} className="hover:text-blue-600 transition-colors">
+                        <a href={`tel:${order.user.contactNumber}`} className="hover:text-cyan-600 transition-colors">
                           {order.user.contactNumber}
                         </a>
                       </div>
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Order Summary */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-6 border-b border-slate-100">
+                <h2 className="text-lg font-semibold text-slate-800">Order Summary</h2>
+              </div>
+              <div className="p-6 space-y-4">
+                {onDemandOrder && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600">Vehicle Type</span>
+                    <div className="flex items-center gap-2">
+                      <span className={vehicleInfo.color}>{vehicleInfo.icon}</span>
+                      <span className="font-medium">{vehicleInfo.label}</span>
+                    </div>
+                  </div>
+                )}
+                {order.orderTotal && (
+                  <div className="flex justify-between items-center pt-3 border-t">
+                    <span className="text-slate-600 font-medium">Total Amount</span>
+                    <span className="text-xl font-bold text-slate-800">
+                      ${parseFloat(order.orderTotal.toString()).toLocaleString(undefined, { 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 2 
+                      })}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -899,7 +945,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
               <div className="p-6">
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                    <div className="w-2 h-2 bg-cyan-500 rounded-full mt-2"></div>
                     <div>
                       <div className="text-sm font-medium text-slate-800">Order Created</div>
                       <div className="text-xs text-slate-500">
@@ -960,4 +1006,4 @@ const SingleOrder: React.FC<SingleOrderProps> = ({ onDeleteSuccess, showHeader =
   );
 };
 
-export default SingleOrder;
+export default SingleOnDemandOrder; 

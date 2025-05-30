@@ -233,14 +233,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 6. Calculate new pricing
+    // 4. Recalculate pricing with updated parameters
     const pricingResult = await calculateDeliveryPrice({
       pickupAddress: `${validatedData.pickupLocation.address}, ${validatedData.pickupLocation.city}, ${validatedData.pickupLocation.state}`,
       dropoffAddress: `${validatedData.dropOffLocation.address}, ${validatedData.dropOffLocation.city}, ${validatedData.dropOffLocation.state}`,
-      itemCount: validatedData.totalItem,
-      orderTotal: validatedData.priceTotal,
+      headCount: validatedData.totalItem, // Using totalItem as headCount
+      foodCost: validatedData.priceTotal, // Using priceTotal as foodCost
       deliveryDate: validatedData.deliveryDate,
       deliveryTime: validatedData.deliveryTime,
+      includeTip: true // Default to including tip for CaterValley orders
     });
 
     // 7. Update or create addresses
