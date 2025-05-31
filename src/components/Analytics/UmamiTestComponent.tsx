@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useUmami } from '@/hooks/useUmami';
 import { Button } from '@/components/ui/button';
 import { CONSTANTS } from '@/constants';
@@ -22,12 +22,12 @@ export default function UmamiTestComponent() {
   const [logs, setLogs] = useState<string[]>([]);
   const { trackEvent, trackPageView } = useUmami();
   
-  const addLog = (message: string) => {
+  const addLog = useCallback((message: string) => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => [...prev, `${timestamp} - ${message}`]);
-  };
+  }, []);
 
-  const checkUmamiStatus = () => {
+  const checkUmamiStatus = useCallback(() => {
     try {
       const scriptElement = document.getElementById('umami-script');
       const scriptLoaded = !!scriptElement;
@@ -53,7 +53,7 @@ export default function UmamiTestComponent() {
       addLog(`❌ Error checking status: ${errorMessage}`);
       return { scriptLoaded: false, umamiAvailable: false };
     }
-  };
+  }, [addLog]);
 
   useEffect(() => {
     addLog('🔍 UmamiTestComponent mounted');
@@ -82,7 +82,7 @@ export default function UmamiTestComponent() {
      }
     
     return () => clearInterval(interval);
-  }, []);
+  }, [checkUmamiStatus, addLog]);
 
   const testPageView = () => {
     addLog('🔄 Testing page view tracking...');

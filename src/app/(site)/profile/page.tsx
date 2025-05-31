@@ -229,16 +229,7 @@ export default function ProfilePage() {
     entityId: user?.id || '',
   });
 
-  useEffect(() => {
-    if (!isUserLoading && !session) {
-      router.push('/sign-in');
-    } else if (!isUserLoading && session && user) {
-      fetchProfile();
-      fetchUserFiles();
-    }
-  }, [session, isUserLoading, router, user, refreshTrigger]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!user?.id) return;
 
     try {
@@ -278,7 +269,7 @@ export default function ProfilePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id, supabase.auth, router]);
 
   const fetchUserFiles = useCallback(async () => {
     if (!user?.id) return;
@@ -317,6 +308,15 @@ export default function ProfilePage() {
       // Don't show toast error for files, as it's not critical
     }
   }, [user?.id, supabase.auth]);
+
+  useEffect(() => {
+    if (!isUserLoading && !session) {
+      router.push('/sign-in');
+    } else if (!isUserLoading && session && user) {
+      fetchProfile();
+      fetchUserFiles();
+    }
+  }, [session, isUserLoading, router, user, refreshTrigger, fetchProfile, fetchUserFiles]);
 
   const handleSave = async () => {
     if (!editedProfile || !user?.id) return;

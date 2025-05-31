@@ -56,7 +56,6 @@ backups/*
 
 /backups
 
-.github/
 .cursor/
 
 # Prisma
