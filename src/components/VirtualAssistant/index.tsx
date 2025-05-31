@@ -32,29 +32,28 @@ const HeroHeader: React.FC = () => {
 
   return (
     <div className="bg-white">
+      {" "}
+      {/* Changed from bg-transparent to bg-white */}
       <section className="relative isolate">
         <div className="relative isolate flex min-h-screen flex-col justify-between">
-          {/* Background Image - Limitada a la parte superior */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="relative h-[70vh] w-full">
-              <picture>
-                <source
-                  srcSet="/images/virtual/header-bg.webp"
-                  type="image/webp"
-                />
-                <Image
-                  src="/images/virtual/header-bg.jpg"
-                  alt="Background"
-                  fill
-                  className="object-cover brightness-50"
-                  priority
-                />
-              </picture>
-            </div>
-            {/* Fondo blanco sólido para la parte inferior */}
-            <div className="h-[30vh] w-full bg-white" />
+          {/* Background Image - Now covers full component height */}
+          <div className="absolute inset-0 min-h-full overflow-hidden">
+            {" "}
+            {/* Changed from h-screen to min-h-full */}
+            <picture>
+              <source
+                srcSet="/images/virtual/header-bg.webp"
+                type="image/webp"
+              />
+              <Image
+                src="/images/virtual/header-bg.jpg"
+                alt="Background"
+                fill
+                className="object-cover brightness-50"
+                priority
+              />
+            </picture>
           </div>
-
           <MaskBackground />
 
           {/* Main Content */}
@@ -96,7 +95,7 @@ const HeroHeader: React.FC = () => {
               </motion.div>
             </motion.div>
 
-            {/* Feature Carousel - Con esquinas redondeadas completas */}
+            {/* Feature Carousel */}
             <motion.div
               {...({
                 className: "mx-auto mb-4 w-full max-w-5xl px-4",
@@ -106,11 +105,11 @@ const HeroHeader: React.FC = () => {
                 transition: { delay: 0.5 },
               } as HTMLMotionProps<"div">)}
             >
-              <div className="overflow-hidden rounded-3xl">
-                <FeatureCarousel />
-              </div>
+              <FeatureCarousel />
             </motion.div>
           </div>
+
+          <MaskBackground />
         </div>
       </section>
     </div>
