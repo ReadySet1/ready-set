@@ -30,7 +30,7 @@ const baseMenuItems: MenuItem[] = [
     title: "Logistic",
     submenu: [
       { id: 1031, title: "Logistics", path: "/logistics" },
-      { id: 1032, title: "Catering Deliveries", path: "/food-delivery" },
+      { id: 1032, title: "Catering Deliveries", path: "/catering-deliveries" },
       { id: 1033, title: "Flowers Deliveries", path: "/flowers" },
       { id: 1034, title: "Bakery Deliveries", path: "/bakery-delivery" },
       { id: 1035, title: "Specialty Deliveries", path: "/specialty-delivery" },
@@ -43,23 +43,17 @@ const baseMenuItems: MenuItem[] = [
   },
   {
     id: 105,
-    title: "Join Us",
-    path: "/join-the-team",
-  },
-  {
-    id: 106,
     title: "Contact",
     path: "/contact",
   },
   {
-    id: 107,
-    title: "Blog",
-    path: "/blog",
-  },
-  {
-    id: 108,
+    id: 106,
     title: "Resources",
-    path: "/free-resources",
+    submenu: [
+      { id: 1036, title: "Blog", path: "/blog" },
+      { id: 1037, title: "Guide", path: "/free-resources" },
+      { id: 1037, title: "Join Us", path: "/join-the-team" },
+    ],
   },
 ];
 

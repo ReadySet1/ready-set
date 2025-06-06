@@ -47,9 +47,9 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
 
   // Dynamic classes based on screen size
   const marginTopClass = {
-    mobile: "mt-16",
-    tablet: "mt-20",
-    desktop: "mt-24",
+    mobile: "mt-8",
+    tablet: "mt-12",
+    desktop: "mt-14",
   }[screenSize];
 
   const circleSizeClass = {

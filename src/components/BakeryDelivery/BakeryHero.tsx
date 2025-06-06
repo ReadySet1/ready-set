@@ -13,9 +13,13 @@ const BakeryHero: React.FC<BakeryHeroProps> = ({ onRequestQuote }) => {
   const [screenSize, setScreenSize] = useState<"mobile" | "tablet" | "desktop">(
     "desktop",
   );
+  const [isHydrated, setIsHydrated] = useState(false);
+
   const { openForm, DialogForm } = FormManager();
 
   useEffect(() => {
+    setIsHydrated(true);
+
     const handleResize = () => {
       const width = window.innerWidth;
       if (width < 640) {
@@ -27,7 +31,6 @@ const BakeryHero: React.FC<BakeryHeroProps> = ({ onRequestQuote }) => {
       }
     };
 
-    // Initial check
     handleResize();
 
     // Add event listener
@@ -46,10 +49,10 @@ const BakeryHero: React.FC<BakeryHeroProps> = ({ onRequestQuote }) => {
 
   // Dynamic classes based on screen size
   const marginTopClass = {
-    mobile: "mt-16",
-    tablet: "mt-20",
-    desktop: "mt-24",
-  }[screenSize];
+    mobile: "mt-8",
+    tablet: "mt-12",
+    desktop: "mt-14",
+  }[isHydrated ? screenSize : "desktop"];
 
   const circleSizeClass = {
     mobile: "h-[280px] w-[280px]",

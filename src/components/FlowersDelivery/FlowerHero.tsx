@@ -32,7 +32,7 @@ const FlowerHero: React.FC<FlowerHeroProps> = ({
   ];
 
   return (
-    <section className="relative mt-24 flex min-h-[100dvh] w-full items-start justify-center overflow-hidden sm:mt-32 md:mt-16 md:min-h-screen md:items-center">
+    <section className="relative mt-16 flex min-h-[100dvh] w-full items-start justify-center overflow-hidden sm:mt-24 md:mt-14 md:min-h-screen md:items-center">
       {/* Mobile background */}
       <div
         className="absolute inset-0 z-0 bg-right-bottom bg-no-repeat sm:hidden"

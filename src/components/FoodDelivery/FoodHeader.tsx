@@ -23,11 +23,11 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
 
     const updateMarginTopClass = (width: number) => {
       if (width < 768) {
-        setMarginTopClass("mt-16");
+        setMarginTopClass("mt-6");
       } else if (width < 1024) {
-        setMarginTopClass("mt-20");
+        setMarginTopClass("mt-8");
       } else {
-        setMarginTopClass("mt-24");
+        setMarginTopClass("mt-4");
       }
     };
 
