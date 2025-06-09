@@ -319,7 +319,7 @@ const Footer = () => {
               <div className="my-1">
                 <div className="-mx-3 flex items-center justify-center md:justify-start">
                   <Link
-                    href="/#"
+                    href="/privacy-policy"
                     className="px-3 text-base text-gray-400 hover:text-gray-200 hover:underline"
                   >
                     Privacy policy
@@ -331,7 +331,7 @@ const Footer = () => {
                     Legal notice
                   </Link>
                   <Link
-                    href="/#"
+                    href="/terms-of-service"
                     className="px-3 text-base text-gray-400 hover:text-gray-200 hover:underline"
                   >
                     Terms of service
