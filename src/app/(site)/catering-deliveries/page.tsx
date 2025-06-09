@@ -8,46 +8,32 @@ import DeliveryTerms from "@/components/FoodDelivery/DeliveryTerms";
 import HostingChecklist from "@/components/FoodDelivery/HostingChecklist";
 import MainMeal from "@/components/FoodDelivery/MainMeal";
 import FoodHeader from "@/components/FoodDelivery/FoodHeader";
+import PromoPopup from "@/components/PopUpBanner/PromoPopup";
 
 export const metadata: Metadata = {
-  title: "Food Delivery Services for Events | Ready Set", // Replace with your title
+  title: "Food Delivery Services for Events | Ready Set",
   description:
-    "We offer reliable and efficient catering delivery services for your events. Delicious food delivered right to your door in Bay Area and Sillicon Valley!", // Replace with your description
+    "We offer reliable and efficient catering delivery services for your events. Delicious food delivered right to your door in Bay Area and Sillicon Valley!",
   keywords: [
     "food delivery",
     "catering delivery",
     "event food",
     "catering service",
     "banquet delivery",
-    // Add more relevant keywords for your service and location
   ],
   openGraph: {
-    title: "Exceptional Catering and Food Delivery Services | Ready Set", // Replace with your Open Graph title
+    title: "Exceptional Catering and Food Delivery Services | Ready Set",
     description:
-      "Make your event a success with our high-quality food delivery. Serving [Service Areas] and ensuring a memorable culinary experience.", // Replace with your Open Graph description
+      "Make your event a success with our high-quality food delivery. Serving in Bay Area and Sillicon Valley, always ensuring a memorable culinary experience.",
     type: "website",
-    locale: "en_US", // Set the language to English (United States)
-    siteName: "Ready Set", // Replace with your site name
-    // You can add a relevant image for Open Graph
-    // images: [
-    //   {
-    //     url: 'Your image URL',
-    //     width: 1200,
-    //     height: 630,
-    //     alt: 'Image description',
-    //   },
-    // ],
+    locale: "en_US",
+    siteName: "Ready Set",
   },
   twitter: {
-    card: "summary_large_image", // Or 'summary' if you don't have a large image
-    title: "Your Brand: Hassle-Free Food Delivery for Events", // Replace with your Twitter title
+    card: "summary_large_image",
+    title: "Your Brand: Hassle-Free Food Delivery for Events",
     description:
-      "Need delicious food for your next event? We handle the delivery in Bay Area and Sillicon Valley! Contact us today.", // Replace with your Twitter description
-    // You can add Twitter handles if you have them
-    // site: '@YourTwitter',
-    // creator: '@YourTwitter',
-    // You can add a relevant image for Twitter Card
-    // images: ['Your Twitter image URL'],
+      "Need delicious food for your next event? We handle the delivery in Bay Area and Sillicon Valley! Contact us today.",
   },
   robots: {
     index: true,
@@ -59,12 +45,12 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  // You can add more metadata as needed, such as 'authors', 'category', 'alternates', etc.
 };
 
 export default function FoodPage() {
   return (
     <div className="pt-20 md:pt-24">
+      <PromoPopup />
       <FoodHeader />
       <DeliveryPartners />
       <FoodIcons />
