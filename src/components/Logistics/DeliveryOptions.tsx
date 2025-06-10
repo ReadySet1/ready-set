@@ -16,31 +16,41 @@ const DeliveryOptionCard: React.FC<DeliveryOptionCardProps> = ({
 }) => {
   return (
     <div className="transform overflow-hidden rounded-lg bg-white shadow-md transition duration-300 hover:scale-105">
-      <div className="relative h-48 w-full">
+      <h3 className="p-6 pb-3 text-center text-2xl font-semibold text-gray-800">
+        {title}
+      </h3>
+      {/* Contenedor de imagen optimizado para mostrar la imagen completa */}
+      <div className="relative mx-4 mb-4 overflow-hidden rounded-lg">
         <Image
           src={imageSrc}
           alt={imageAlt}
-          layout="fill"
-          objectFit="cover"
-          className="rounded-t-lg"
+          width={500}
+          height={300}
+          className="h-auto w-full rounded-lg object-cover"
+          style={{
+            aspectRatio: "5/3",
+            objectFit: "cover",
+          }}
+          priority={false}
         />
       </div>
-      <div className="p-6">
-        <h3 className="mb-3 text-2xl font-semibold text-gray-800">{title}</h3>
+      <div className="p-6 pt-0">
         <p className="mb-6 text-base text-gray-600">{description}</p>
-        <div className="flex space-x-4">
-          <a
-            href="#"
-            className="rounded-lg bg-yellow-400 px-6 py-3 font-bold text-gray-800 transition duration-300 ease-in-out hover:bg-yellow-500"
+        <div className="flex items-center justify-center space-x-4">
+          {" "}
+          {/* AQUI ES DONDE SE HIZO EL CAMBIO */}
+          <button
+            type="button"
+            className="rounded-lg bg-yellow-400 px-6 py-3 font-bold text-gray-800 transition duration-300 ease-in-out hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50"
           >
             Get a Quote
-          </a>
-          <a
-            href="#"
-            className="rounded-lg bg-yellow-300 px-6 py-3 font-bold text-gray-800 transition duration-300 ease-in-out hover:bg-yellow-400"
+          </button>
+          <button
+            type="button"
+            className="rounded-lg bg-yellow-300 px-6 py-3 font-bold text-gray-800 transition duration-300 ease-in-out hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50"
           >
             Learn More
-          </a>
+          </button>
         </div>
       </div>
     </div>
@@ -60,39 +70,50 @@ const DeliveryOptions: React.FC = () => {
       title: "Catering Deliveries",
       description:
         "We deliver meals for daily team lunches, corporate events, and special occasions.",
-      imageSrc: "/images/catering-deliveries.jpg",
-      imageAlt: "Catering food display",
+      imageSrc: "/images/logistics/deliveries/cateringdeliveries.png",
+      imageAlt: "Catering food display with various dishes and trays",
     },
     {
       title: "Flower Deliveries",
       description:
         "We partner with local flower shops to help deliver joy and connection to communities.",
-      imageSrc: "/images/flower-deliveries.jpg",
-      imageAlt: "Bouquet of colorful flowers",
+      imageSrc: "/images/logistics/deliveries/flowerdeliveries.png",
+      imageAlt: "Bouquet of colorful tulips and flowers",
     },
     {
       title: "Bakery Deliveries",
       description:
         "We're not just about catering; we now deliver for local bakeries too.",
-      imageSrc: "/images/bakery-deliveries.jpg",
-      imageAlt: "Assortment of fresh baked goods",
+      imageSrc: "/images/logistics/deliveries/bakerydeliveries.png",
+      imageAlt: "Assortment of fresh baked breads and pastries",
     },
     {
       title: "Specialty Deliveries",
       description:
         "We offer Specialty Delivery for urgent, high-value items such as legal documents, medications, and custom orders.",
-      imageSrc: "/images/specialty-deliveries.jpg",
-      imageAlt: "Stack of neatly wrapped brown packages",
+      imageSrc: "/images/logistics/deliveries/specialtydeliveries.png",
+      imageAlt: "Stack of neatly wrapped brown delivery packages",
     },
   ];
 
   return (
     <section className="bg-gray-50 py-16">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+        <div className="mb-12 text-center">
+          <h2 className="text-4xl font-black leading-tight tracking-wider text-yellow-400">
+            OUR SERVICES
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-xl text-gray-600">
+            With Ready Set, you can trust your delivery needs are handled with
+            precision and professionalism. Let's keep your business moving,
+            fresh, fast, and on time.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:gap-10">
           {deliveryData.map((item, index) => (
             <DeliveryOptionCard
-              key={index}
+              key={`delivery-${index}-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
               title={item.title}
               description={item.description}
               imageSrc={item.imageSrc}
