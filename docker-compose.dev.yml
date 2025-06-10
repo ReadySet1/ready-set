@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # Development PostgreSQL Database
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: ready-set-postgres-dev
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: dev_user
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: ready_set_dev
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./scripts/init-dev-db.sql:/docker-entrypoint-initdb.d/init-dev-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev_user -d ready_set_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ready-set-network
+
+  # Test PostgreSQL Database  
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: ready-set-postgres-test
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: ready_set_test
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d ready_set_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ready-set-network
+
+  # pgAdmin for database management (optional but helpful)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ready-set-pgadmin
+    ports:
+      - "8080:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@readyset.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres-dev
+      - postgres-test
+    networks:
+      - ready-set-network
+    profiles:
+      - admin # Optional service, run with --profile admin
+
+  # Redis for caching (if needed)
+  redis:
+    image: redis:7-alpine
+    container_name: ready-set-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ready-set-network
+    profiles:
+      - cache # Optional service
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  postgres_test_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  ready-set-network:
+    driver: bridge 

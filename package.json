@@ -27,7 +27,17 @@
     "type-check": "tsc --noEmit",
     "pre-push": "node scripts/type-check.js",
     "env:list": "tsx scripts/list-coolify-resources.ts",
-    "env:sync": "tsx scripts/sync-env.ts"
+    "env:sync": "tsx scripts/sync-env.ts",
+    "dev:setup": "chmod +x scripts/dev-setup.sh && ./scripts/dev-setup.sh",
+    "dev:db:start": "docker-compose -f docker-compose.dev.yml up -d postgres-dev postgres-test",
+    "dev:db:stop": "docker-compose -f docker-compose.dev.yml down",
+    "dev:db:restart": "docker-compose -f docker-compose.dev.yml restart postgres-dev postgres-test",
+    "dev:db:logs": "docker-compose -f docker-compose.dev.yml logs -f postgres-dev",
+    "dev:db:seed": "dotenv -e .env.local -- tsx scripts/seed-dev-db.ts",
+    "dev:db:reset": "dotenv -e .env.local -- prisma db push --force-reset && pnpm dev:db:seed",
+    "dev:pgadmin": "docker-compose -f docker-compose.dev.yml up -d pgadmin",
+    "dev:redis": "docker-compose -f docker-compose.dev.yml up -d redis",
+    "test:db:reset": "DATABASE_URL=\"postgresql://test_user:test_password@localhost:5433/ready_set_test\" prisma db push --force-reset"
   },
   "jest": {
     "setupFilesAfterEnv": [
