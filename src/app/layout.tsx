@@ -7,7 +7,7 @@ import "../styles/index.css";
 import "../styles/prism-vsc-dark-plus.css";
 import ErrorBoundary from "@/components/ErrorBoundary/ErrorBoundary";
 import CookieConsentBanner from "../components/Cookies/Banner";
-import { UserProvider } from "@/contexts/UserContext";
+import { UserProvider } from "@/providers/UserProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { HighlightInit } from '@highlight-run/next/client';
 import { H } from 'highlight.run';

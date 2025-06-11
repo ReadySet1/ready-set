@@ -37,7 +37,8 @@
     "dev:db:reset": "dotenv -e .env.local -- prisma db push --force-reset && pnpm dev:db:seed",
     "dev:pgadmin": "docker-compose -f docker-compose.dev.yml up -d pgadmin",
     "dev:redis": "docker-compose -f docker-compose.dev.yml up -d redis",
-    "test:db:reset": "DATABASE_URL=\"postgresql://test_user:test_password@localhost:5433/ready_set_test\" prisma db push --force-reset"
+    "test:db:reset": "DATABASE_URL=\"postgresql://test_user:test_password@localhost:5433/ready_set_test\" prisma db push --force-reset",
+    "verify:local": "tsx scripts/verify-local-setup.ts"
   },
   "jest": {
     "setupFilesAfterEnv": [

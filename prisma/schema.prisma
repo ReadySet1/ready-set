@@ -6,11 +6,12 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  directUrl = env("DIRECT_URL") 
 }
 
 model Profile {
   id                  String            @id @default(uuid()) @db.Uuid
+  supabaseId          String?           @unique // Links to Supabase Auth user.id
   guid                String?
   name                String?
   email               String            @unique

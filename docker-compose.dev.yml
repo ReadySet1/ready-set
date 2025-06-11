@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   # Development PostgreSQL Database
   postgres-dev:
     image: postgres:15-alpine
     container_name: ready-set-postgres-dev
     ports:
-      - "5432:5432"
+      - "5434:5432"
     environment:
       POSTGRES_USER: dev_user
       POSTGRES_PASSWORD: dev_password
@@ -51,11 +49,13 @@ services:
     image: dpage/pgadmin4:latest
     container_name: ready-set-pgadmin
     ports:
-      - "8080:80"
+      - "8085:80"
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@readyset.local
+      PGADMIN_DEFAULT_EMAIL: admin@readyset.com
       PGADMIN_DEFAULT_PASSWORD: admin123
       PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_WTF_CSRF_CHECK_DEFAULT: 'False'
+      PGADMIN_CONFIG_WTF_CSRF_TIME_LIMIT: 'None'
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
