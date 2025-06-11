@@ -31,9 +31,13 @@ const baseMenuItems: MenuItem[] = [
     submenu: [
       { id: 1031, title: "Logistics", path: "/logistics" },
       { id: 1032, title: "Catering Deliveries", path: "/catering-deliveries" },
-      { id: 1033, title: "Flowers Deliveries", path: "/flowers" },
-      { id: 1034, title: "Bakery Deliveries", path: "/bakery-delivery" },
-      { id: 1035, title: "Specialty Deliveries", path: "/specialty-delivery" },
+      { id: 1033, title: "Flowers Deliveries", path: "/flowers-deliveries" },
+      { id: 1034, title: "Bakery Deliveries", path: "/bakery-deliveries" },
+      {
+        id: 1035,
+        title: "Specialty Deliveries",
+        path: "/specialty-deliveries",
+      },
     ],
   },
   {
