@@ -7,7 +7,7 @@ import { client } from "@/sanity/lib/client";
 import { postsQuery, getAllPosts } from "@/sanity/lib/queries";
 
 // Export with dynamic data fetching to avoid static generation problems
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export const revalidate = 30;
 
@@ -131,16 +131,20 @@ export default async function Blog() {
 
       {/* Visual content */}
       <Breadcrumb pageName="Welcome to our blog" />
-      
-      <section className="pb-[120px] pt-[180px]">
+
+      {/* Further adjusted padding-top for section and increased font size for the paragraph */}
+      <section className="pb-0 pt-[50px]">
+        {" "}
+        {/* Changed pt-[100px] to pt-[70px] */}
         <div className="container">
           <div className="-mx-4 flex flex-wrap items-center justify-between">
             <div className="mb-8 w-full px-4 md:mb-0 lg:mb-0">
-              <div className="mx-auto mb-[60px] max-w-[510px] text-center lg:mb-20">
-                <h1 className="mb-4 text-3xl font-bold text-black dark:text-white sm:text-4xl md:text-[40px]">
+              <div className="mx-auto mb-4 max-w-[510px] text-center lg:mb-4">
+                {/* <h1 className="mb-4 text-3xl font-bold text-black dark:text-white sm:text-4xl md:text-[40px]">
                   Our Blog
-                </h1>
-                <p className="text-base text-body-color dark:text-dark-5">
+                </h1> */}
+                {/* Increased font size from text-base to text-lg */}
+                <p className="mb-8 text-lg text-body-color dark:text-dark-5">
                   Insights, resources, and practical advice to optimize your
                   business operations and drive sustainable growth in today's
                   competitive market.

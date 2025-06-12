@@ -6,7 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Truck, Headphones, Users, LucideIcon } from "lucide-react";
 import { motion, MotionProps } from "framer-motion";
-import NewsletterForm from "../Resources/ui/NewsLetterForm";
+import NewsletterForm from "../Resources/ui/NewsLetterForm"; // Assuming this is below the Hero section
 
 // Type definitions
 interface ButtonLinkProps {
@@ -18,12 +18,13 @@ interface ButtonLinkProps {
 }
 
 // Motion component types
-type MotionDivProps = Omit<React.HTMLProps<HTMLDivElement>, keyof MotionProps> & MotionProps;
+type MotionDivProps = Omit<React.HTMLProps<HTMLDivElement>, keyof MotionProps> &
+  MotionProps;
 
 // Custom motion components
-const MotionDiv: React.FC<MotionDivProps> = motion('div');
-const MotionHeader: React.FC<MotionDivProps> = motion('header');
-const MotionHeading: React.FC<MotionDivProps> = motion('h2');
+const MotionDiv: React.FC<MotionDivProps> = motion("div");
+const MotionHeader: React.FC<MotionDivProps> = motion("header");
+const MotionHeading: React.FC<MotionDivProps> = motion("h2");
 
 const ButtonLink: React.FC<ButtonLinkProps> = ({
   href,
@@ -84,43 +85,77 @@ const Hero: React.FC = () => {
   };
 
   return (
-    <section className="relative min-h-screen p-4">
+    <section className="relative p-4">
+      {" "}
+      {/* Removed min-h-screen */}
       {/* Hidden SEO content */}
-      <div className="sr-only" role="complementary" aria-label="Company Overview">
-        <h1>Ready Set Group LLC - Bay Area&apos;s Premier Business Solutions Provider</h1>
-        <p>Ready Set Group LLC, founded in 2019, has established itself as a cornerstone of Silicon Valley&apos;s business infrastructure. Our comprehensive suite of services, including specialized catering delivery and virtual assistant solutions, has earned the trust of industry leaders like Apple, Google, and Facebook. As a HIPAA-compliant and food safety-certified organization, we maintain the highest standards of professionalism and reliability across the Bay Area.</p>
-        
+      <div
+        className="sr-only"
+        role="complementary"
+        aria-label="Company Overview"
+      >
+        <h1>
+          Ready Set Group LLC - Bay Area&apos;s Premier Business Solutions
+          Provider
+        </h1>
+        <p>
+          Ready Set Group LLC, founded in 2019, has established itself as a
+          cornerstone of Silicon Valley&apos;s business infrastructure. Our
+          comprehensive suite of services, including specialized catering
+          delivery and virtual assistant solutions, has earned the trust of
+          industry leaders like Apple, Google, and Facebook. As a
+          HIPAA-compliant and food safety-certified organization, we maintain
+          the highest standards of professionalism and reliability across the
+          Bay Area.
+        </p>
+
         <div role="navigation" aria-label="Main Services">
           <h2>Our Comprehensive Service Portfolio</h2>
           <ul>
             <li>
               <h3>Logistics Excellence</h3>
-              <p>Our logistics division specializes in time-sensitive deliveries, handling everything from corporate catering to specialized item transport. We maintain strict food safety protocols and offer same-day delivery options across the Bay Area.</p>
+              <p>
+                Our logistics division specializes in time-sensitive deliveries,
+                handling everything from corporate catering to specialized item
+                transport. We maintain strict food safety protocols and offer
+                same-day delivery options across the Bay Area.
+              </p>
             </li>
             <li>
               <h3>Virtual Assistant Solutions</h3>
-              <p>Our VA services support diverse sectors including real estate, education, and retail. We provide comprehensive administrative support, from order management to customer service, all backed by our commitment to confidentiality and efficiency.</p>
+              <p>
+                Our VA services support diverse sectors including real estate,
+                education, and retail. We provide comprehensive administrative
+                support, from order management to customer service, all backed
+                by our commitment to confidentiality and efficiency.
+              </p>
             </li>
             <li>
               <h3>Career Growth Opportunities</h3>
-              <p>Join our dynamic team of professionals serving Silicon Valley&apos;s most innovative companies. We offer competitive positions in logistics, customer service, and administrative support roles.</p>
+              <p>
+                Join our dynamic team of professionals serving Silicon
+                Valley&apos;s most innovative companies. We offer competitive
+                positions in logistics, customer service, and administrative
+                support roles.
+              </p>
             </li>
           </ul>
         </div>
-        
+
         <div role="contentinfo" aria-label="Company Highlights">
           <h2>Why Choose Ready Set Group LLC?</h2>
           <ul>
             <li>HIPAA-compliant operations ensuring data security</li>
             <li>Food safety certified delivery services</li>
-            <li>Trusted partner to Silicon Valley&apos;s leading tech companies</li>
+            <li>
+              Trusted partner to Silicon Valley&apos;s leading tech companies
+            </li>
             <li>Comprehensive business support solutions</li>
             <li>Professional team with industry expertise</li>
             <li>Flexible service options tailored to client needs</li>
           </ul>
         </div>
       </div>
-
       {/* Visual content */}
       <div className="fixed inset-0 -z-20 bg-primary" />
       <div className="fixed inset-0 -z-10">
@@ -133,17 +168,17 @@ const Hero: React.FC = () => {
           quality={100}
           onError={(e) => {
             const imgElement = e.currentTarget;
-            imgElement.src = '/images/hero/hero-bg.png';
+            imgElement.src = "/images/hero/hero-bg.png";
           }}
         />
       </div>
-
-      <div className="flex h-screen flex-col items-center">
+      {/* Changed h-screen to pt-16 (or higher as needed) and added padding-bottom */}
+      <div className="flex flex-col items-center pb-16 pt-16 sm:pb-24 sm:pt-20 md:pt-24 lg:pt-20">
         <MotionHeader
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="w-full flex flex-col items-center px-4 sm:px-6 pt-16 sm:pt-20 md:pt-24 lg:pt-20"
+          className="flex w-full flex-col items-center px-4 sm:px-6"
         >
           <MotionDiv
             initial={{ scale: 0.8, opacity: 0 }}
@@ -167,57 +202,57 @@ const Hero: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.7, duration: 0.5 }}
-            className="mt-4 text-balance text-xl font-bold text-white drop-shadow-lg dark:text-white sm:mt-6 sm:text-2xl md:text-3xl lg:text-4xl mb-8 sm:mb-12 md:mb-16"
+            className="mb-8 mt-4 text-balance text-xl font-bold text-white drop-shadow-lg dark:text-white sm:mb-12 sm:mt-6 sm:text-2xl md:mb-16 md:text-3xl lg:text-4xl"
           >
             How can we help?
           </MotionHeading>
         </MotionHeader>
 
-        <div className="flex-1 flex items-end pb-16 sm:pb-24">
-          <MotionDiv
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="grid w-full max-w-6xl grid-cols-1 gap-6 px-4 sm:grid-cols-2 sm:gap-8 sm:px-6 lg:grid-cols-3 lg:gap-12 lg:px-8"
-          >
-            <ButtonLink
-              href="/logistics"
-              icon={
-                <Truck
-                  strokeWidth={1.5}
-                  className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
-                />
-              }
-              title="Logistics"
-              description="Streamline your supply chain with our logistics solutions"
-              delay={0.9}
-            />
-            <ButtonLink
-              href="/va"
-              icon={
-                <Headphones
-                  strokeWidth={1.5}
-                  className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
-                />
-              }
-              title="Virtual Assistant"
-              description="Reclaim your time and boost your productivity!"
-              delay={1.1}
-            />
-            <ButtonLink
-              href="/apply"
-              icon={
-                <Users
-                  strokeWidth={1.5}
-                  className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
-                />
-              }
-              title="Join the Team"
-              description="Explore various exciting positions available in our growing company"
-              delay={1.3}
-            />
-          </MotionDiv>
-        </div>
+        {/* Removed flex-1 and items-end, added mt-auto to push buttons to bottom, or simply removed flex-1 and used a top margin */}
+        {/* We can also just give a top margin to the MotionDiv below to space it from the heading */}
+        <MotionDiv
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="mt-auto grid w-full max-w-6xl grid-cols-1 gap-6 px-4 sm:grid-cols-2 sm:gap-8 sm:px-6 lg:grid-cols-3 lg:gap-12 lg:px-8" // Added mt-auto to push it down
+        >
+          <ButtonLink
+            href="/logistics"
+            icon={
+              <Truck
+                strokeWidth={1.5}
+                className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
+              />
+            }
+            title="Logistics"
+            description="Streamline your supply chain with our logistics solutions"
+            delay={0.9}
+          />
+          <ButtonLink
+            href="/va"
+            icon={
+              <Headphones
+                strokeWidth={1.5}
+                className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
+              />
+            }
+            title="Virtual Assistant"
+            description="Reclaim your time and boost your productivity!"
+            delay={1.1}
+          />
+          <ButtonLink
+            href="/apply"
+            icon={
+              <Users
+                strokeWidth={1.5}
+                className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12"
+              />
+            }
+            title="Join the Team"
+            description="Explore various exciting positions available in our growing company"
+            delay={1.3}
+          />
+        </MotionDiv>
       </div>
     </section>
   );

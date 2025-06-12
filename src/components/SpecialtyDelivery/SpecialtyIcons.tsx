@@ -38,7 +38,7 @@ const ServiceFeature: React.FC<ServiceFeatureProps> = ({
           priority
         />
       </motion.div>
-      <p className="mt-6 w-full max-w-[280px] text-center text-base leading-snug text-black sm:text-justify">
+      <p className="mt-6 w-full max-w-[280px] text-center text-base leading-snug text-black">
         {description}
       </p>
     </motion.div>

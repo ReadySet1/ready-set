@@ -26,9 +26,7 @@ const FlowerHero: React.FC<FlowerHeroProps> = ({
   };
 
   const paragraphs = [
-    "We started in 2019 in the Bay Area, focusing on reliable, thoughtful catering deliveries.",
-    "During the pandemic, we partnered with local flower shops to help bring joy and connection to communities.",
-    "Today, we specialize in local floral deliveries across cities like San Francisco, Atlanta, and Austin, with real-time tracking and careful handling to ensure your blooms arrive on time and reflect your shop's reputation.",
+    "We specialize in local floral deliveries across cities such as San Francisco, Atlanta, and Austin, offering real-time tracking and careful handling to ensure your blooms arrive on time and maintain your shop's reputation.",
   ];
 
   return (
@@ -70,10 +68,12 @@ const FlowerHero: React.FC<FlowerHeroProps> = ({
                 className={`transition-all duration-700 ease-in-out ${isTextAnimated ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"}`}
               >
                 <h1 className="mb-3 text-3xl font-bold leading-tight tracking-tight text-gray-800 sm:text-4xl md:mb-8 lg:text-5xl">
-                  <span className="block text-gray-900">Not Just Flowers—</span>
-                  <span className="block text-gray-800">We Carry Your</span>
+                  <span className="block text-gray-900">
+                    Your Go-To Catering
+                  </span>
+                  <span className="block text-gray-800">Delivery Partner</span>
                   <span className="block bg-gradient-to-r from-yellow-600 to-yellow-500 bg-clip-text text-transparent">
-                    Standards.
+                    Since 2019
                   </span>
                 </h1>
               </div>

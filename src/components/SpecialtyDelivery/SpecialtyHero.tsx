@@ -18,7 +18,6 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
-      const height = window.innerHeight;
 
       if (width < 640) {
         setScreenSize("mobile");
@@ -29,13 +28,8 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
       }
     };
 
-    // Initial check
     handleResize();
-
-    // Add event listener
     window.addEventListener("resize", handleResize);
-
-    // Cleanup
     return () => {
       window.removeEventListener("resize", handleResize);
     };
@@ -45,7 +39,6 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
     openForm("specialty");
   };
 
-  // Dynamic classes based on screen size
   const marginTopClass = {
     mobile: "mt-8",
     tablet: "mt-12",
@@ -70,57 +63,61 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
     desktop: "scale-[1.5]",
   }[screenSize];
 
-  // New positioning classes for circle container
   const circlePositionClass = {
     mobile: "flex justify-center",
     tablet: "flex justify-center",
     desktop: "flex justify-end",
   }[screenSize];
 
-  // Background position classes - Ajustado para diferentes iPhones
   const getBackgroundPosition = () => {
     if (screenSize === "mobile") {
       const width = window.innerWidth;
       const height = window.innerHeight;
-
-      // iPhone 14 Pro Max (430x932) - ajustar proporcionalmente
       if (width === 430 && height === 932) {
-        return "top-[38rem]"; // Proporcionalmente ajustado para altura mayor
+        return "top-[38rem]";
       }
-      // iPhone 12 Pro y otros móviles (390x844)
-      return "top-[35rem]"; // Posición que funciona bien en iPhone 12 Pro
+      return "top-[35rem]";
     }
     return "top-0";
   };
 
   const backgroundPositionClass = getBackgroundPosition();
 
-  // Dynamic padding based on screen size for consistent proportions
   const getPaddingBottom = () => {
     if (screenSize === "mobile") {
       const width = window.innerWidth;
       const height = window.innerHeight;
-
-      // iPhone 14 Pro Max necesita más padding para mantener proporciones
       if (width === 430 && height === 932) {
-        return "pb-72"; // Ajustado para iPhone 14 Pro Max
+        return "pb-72";
       }
-      // iPhone 12 Pro y otros
-      return "pb-64"; // Padding que funciona bien en iPhone 12 Pro
+      return "pb-64";
+    } else if (screenSize === "desktop") {
+      return "pb-160";
     }
-    return "pb-32"; // Desktop/tablet
+    return "pb-32"; // Tablet
   };
 
   const paddingBottomClass = getPaddingBottom();
 
   return (
     <section
-      className={`relative w-full ${marginTopClass} overflow-hidden ${paddingBottomClass} sm:pb-56 lg:pb-32`}
+      className={`relative w-full ${marginTopClass} overflow-hidden ${paddingBottomClass} sm:pb-56`}
     >
-      {/* Background image with dynamic positioning */}
+      {/* Background container with solid gray color for desktop */}
       <div
         className={`absolute inset-0 z-0 ${backgroundPositionClass} ${screenSize === "mobile" ? "flex justify-center" : ""}`}
+        // *** MODIFICACIÓN CLAVE: FONDO GRIS PARA RESOLUCION 1920x1080 ***
+        style={
+          screenSize === "desktop"
+            ? {
+                backgroundColor: "#f5f5f5", // Color gris claro
+                // Eliminamos las propiedades de background-image que estaban aquí
+                // backgroundImage: 'none', // Opcional, para asegurar que no haya imagen de fondo si prefieres el color
+              }
+            : {}
+        }
       >
+        {/* La imagen de Next.js se mantiene con objectFit: "contain" encima del fondo gris */}
         <Image
           src="/images/specialty/specialtydelivery.png"
           alt="Delivery truck background"
@@ -128,9 +125,10 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
           sizes="100vw"
           priority
           style={{
-            objectFit: "cover",
+            objectFit: screenSize === "desktop" ? "contain" : "cover",
             objectPosition:
               screenSize === "mobile" ? "center top" : "center center",
+            zIndex: 1, // Asegura que esta imagen esté por encima del fondo gris CSS
           }}
         />
       </div>
