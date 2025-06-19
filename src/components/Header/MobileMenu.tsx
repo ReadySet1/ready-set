@@ -56,6 +56,9 @@ interface MobileMenuProps {
   navbarToggleHandler: () => void;
   pathUrl: string;
   sticky: boolean;
+  isHomePage: boolean; // Add this
+  isVirtualAssistantPage: boolean; // Add this
+  isLogisticsPage: boolean; // Add this
 }
 
 const DesktopMenu: React.FC<{
@@ -90,7 +93,7 @@ const DesktopMenu: React.FC<{
                 className={`flex items-center text-base font-medium ${
                   pathUrl === "/va"
                     ? "text-white hover:text-primary"
-                    : "text-dark dark:text-white hover:text-primary"
+                    : "text-dark hover:text-primary dark:text-white"
                 }`}
               >
                 {menuItem.title}
@@ -102,7 +105,7 @@ const DesktopMenu: React.FC<{
                   className={`flex items-center text-base font-medium ${
                     pathUrl === "/va"
                       ? "text-white hover:text-primary"
-                      : "text-dark dark:text-white hover:text-primary"
+                      : "text-dark hover:text-primary dark:text-white"
                   }`}
                 >
                   {menuItem.title}
@@ -113,7 +116,7 @@ const DesktopMenu: React.FC<{
                     <ChevronDown className="ml-2 h-4 w-4" />
                   </motion.div>
                 </button>
-                
+
                 <AnimatePresence>
                   {openIndex === index && (
                     <motion.div
@@ -171,7 +174,7 @@ const MobileMenuOverlay: React.FC<{
   closeNavbarOnNavigate,
   navbarToggleHandler,
   pathUrl,
-  sticky
+  sticky,
 }) => {
   const { user, userRole } = useUser();
   const [supabase, setSupabase] = useState<any>(null);
@@ -204,7 +207,7 @@ const MobileMenuOverlay: React.FC<{
       window.location.href = "/";
       navbarToggleHandler();
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error("Error signing out:", error);
     } finally {
       setIsSigningOut(false);
     }
@@ -215,7 +218,7 @@ const MobileMenuOverlay: React.FC<{
   return (
     <AnimatePresence>
       {navbarOpen && (
-        <motion.div 
+        <motion.div
           className="fixed inset-0 z-50 lg:hidden"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -230,10 +233,10 @@ const MobileMenuOverlay: React.FC<{
             transition={{ duration: 0.3 }}
             onClick={navbarToggleHandler}
           />
-          
+
           <motion.nav
-            className="fixed right-0 top-0 bottom-0 w-72 overflow-y-auto bg-white/90 backdrop-blur-md dark:bg-dark-2/90"
-            style={{ height: '100vh' }}
+            className="fixed bottom-0 right-0 top-0 w-72 overflow-y-auto bg-white/90 backdrop-blur-md dark:bg-dark-2/90"
+            style={{ height: "100vh" }}
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -272,7 +275,9 @@ const MobileMenuOverlay: React.FC<{
                           >
                             {menuItem.title}
                             <motion.div
-                              animate={{ rotate: openIndex === index ? 180 : 0 }}
+                              animate={{
+                                rotate: openIndex === index ? 180 : 0,
+                              }}
                               transition={{ duration: 0.2 }}
                             >
                               <ChevronDown className="h-4 w-4" />
@@ -368,7 +373,10 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
   closeNavbarOnNavigate,
   navbarToggleHandler,
   pathUrl,
-  sticky
+  sticky,
+  isHomePage, // Destructure
+  isVirtualAssistantPage, // Destructure
+  isLogisticsPage,
 }) => {
   const { user, userRole, isLoading } = useUser();
   const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole] : null;
@@ -388,9 +396,9 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                   } ${
                     navbarOpen || sticky
                       ? "text-dark dark:text-white"
-                      : pathUrl === "/va"
-                      ? "text-white"
-                      : "text-dark dark:text-white"
+                      : isVirtualAssistantPage || isHomePage || isLogisticsPage
+                        ? "text-white"
+                        : "text-dark dark:text-white"
                   }`}
                 >
                   {menuItem.title}
@@ -402,9 +410,11 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                     className={`flex items-center py-6 text-base font-medium hover:text-primary ${
                       navbarOpen || sticky
                         ? "text-dark dark:text-white"
-                        : pathUrl === "/va"
-                        ? "text-white"
-                        : "text-dark dark:text-white"
+                        : isVirtualAssistantPage ||
+                            isHomePage ||
+                            isLogisticsPage
+                          ? "text-white"
+                          : "text-dark dark:text-white"
                     }`}
                   >
                     {menuItem.title}
@@ -455,7 +465,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
       {/* Mobile Menu */}
       <AnimatePresence>
         {navbarOpen && (
-          <motion.div 
+          <motion.div
             className="fixed inset-0 z-50 lg:hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -470,10 +480,10 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
               transition={{ duration: 0.3 }}
               onClick={navbarToggleHandler}
             />
-            
+
             <motion.nav
-              className="fixed right-0 top-0 bottom-0 w-72 overflow-y-auto bg-white/90 backdrop-blur-md dark:bg-dark-2/90"
-              style={{ height: '100vh' }}
+              className="fixed bottom-0 right-0 top-0 w-72 overflow-y-auto bg-white/90 backdrop-blur-md dark:bg-dark-2/90"
+              style={{ height: "100vh" }}
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
@@ -489,17 +499,20 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
               </motion.button>
 
               <div className="flex h-full flex-col px-6 py-16">
-                <motion.ul 
+                <motion.ul
                   className="space-y-2"
                   initial="closed"
                   animate="open"
                   variants={{
                     open: {
-                      transition: { staggerChildren: 0.1, delayChildren: 0.2 }
+                      transition: { staggerChildren: 0.1, delayChildren: 0.2 },
                     },
                     closed: {
-                      transition: { staggerChildren: 0.05, staggerDirection: -1 }
-                    }
+                      transition: {
+                        staggerChildren: 0.05,
+                        staggerDirection: -1,
+                      },
+                    },
                   }}
                 >
                   {user && roleMenuItem && roleMenuItem.path && (
@@ -507,7 +520,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                       className="group"
                       variants={{
                         open: { opacity: 1, x: 0 },
-                        closed: { opacity: 0, x: 50 }
+                        closed: { opacity: 0, x: 50 },
                       }}
                     >
                       <Link
@@ -525,7 +538,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                       className="group"
                       variants={{
                         open: { opacity: 1, x: 0 },
-                        closed: { opacity: 0, x: 50 }
+                        closed: { opacity: 0, x: 50 },
                       }}
                     >
                       {menuItem.path ? (
@@ -545,13 +558,15 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                           >
                             {menuItem.title}
                             <motion.div
-                              animate={{ rotate: openIndex === index ? 180 : 0 }}
+                              animate={{
+                                rotate: openIndex === index ? 180 : 0,
+                              }}
                               transition={{ duration: 0.2 }}
                             >
                               <ChevronDown className="h-5 w-5" />
                             </motion.div>
                           </button>
-                          
+
                           <AnimatePresence>
                             {openIndex === index && (
                               <motion.div
@@ -576,7 +591,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                                           handleSubmenu(index);
                                           navbarToggleHandler();
                                         }}
-                                        className="block rounded-lg px-4 py-2 text-sm transition-colors text-gray-600 hover:bg-amber-100 dark:text-gray-300 dark:hover:bg-amber-400/10"
+                                        className="block rounded-lg px-4 py-2 text-sm text-gray-600 transition-colors hover:bg-amber-100 dark:text-gray-300 dark:hover:bg-amber-400/10"
                                       >
                                         {submenuItem.title}
                                       </Link>
@@ -600,7 +615,10 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                 >
                   {!user && !isLoading ? (
                     <div className="space-y-3">
-                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                      <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
                         <Link
                           onClick={closeNavbarOnNavigate}
                           href="/sign-in"
@@ -609,7 +627,10 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                           Sign In
                         </Link>
                       </motion.div>
-                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                      <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
                         <Link
                           onClick={closeNavbarOnNavigate}
                           href="/sign-up"
@@ -621,10 +642,15 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                     </div>
                   ) : user ? (
                     <div className="space-y-3">
-                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                      <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
                         <button
                           onClick={() => {
-                            document.dispatchEvent(new CustomEvent('user-sign-out'));
+                            document.dispatchEvent(
+                              new CustomEvent("user-sign-out"),
+                            );
                             closeNavbarOnNavigate();
                           }}
                           className="block w-full rounded-lg bg-amber-400 px-4 py-3 text-center font-medium text-white transition-colors hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-600"

@@ -31,9 +31,13 @@ const baseMenuItems: MenuItem[] = [
     submenu: [
       { id: 1031, title: "Logistics", path: "/logistics" },
       { id: 1032, title: "Catering Deliveries", path: "/catering-deliveries" },
-      { id: 1033, title: "Flowers Deliveries", path: "/flowers" },
-      { id: 1034, title: "Bakery Deliveries", path: "/bakery-delivery" },
-      { id: 1035, title: "Specialty Deliveries", path: "/specialty-delivery" },
+      { id: 1033, title: "Flowers Deliveries", path: "/flowers-deliveries" },
+      { id: 1034, title: "Bakery Deliveries", path: "/bakery-deliveries" },
+      {
+        id: 1035,
+        title: "Specialty Deliveries",
+        path: "/specialty-deliveries",
+      },
     ],
   },
   {
@@ -209,6 +213,7 @@ const Header: React.FC = () => {
 
   const isVirtualAssistantPage = pathUrl === "/va";
   const isHomePage = pathUrl === "/";
+  const isLogisticsPage = pathUrl === "/logistics";
 
   // Initialize Supabase client
   useEffect(() => {
@@ -300,6 +305,9 @@ const Header: React.FC = () => {
               navbarToggleHandler={toggleNavbar}
               pathUrl={pathUrl}
               sticky={sticky}
+              isHomePage={isHomePage}
+              isVirtualAssistantPage={isVirtualAssistantPage}
+              isLogisticsPage={isLogisticsPage}
             />
 
             {/* Auth Buttons (only visible on desktop; mobile handled by MobileMenu) */}
@@ -360,7 +368,9 @@ const Header: React.FC = () => {
                         className={`loginBtn hidden px-7 py-3 font-medium lg:block ${
                           sticky
                             ? "text-dark dark:text-white"
-                            : isVirtualAssistantPage || isHomePage
+                            : isVirtualAssistantPage ||
+                                isHomePage ||
+                                isLogisticsPage
                               ? "text-white"
                               : "text-dark dark:text-white"
                         }`}
@@ -410,7 +420,7 @@ const Header: React.FC = () => {
                       : index === 1
                         ? "opacity-100"
                         : ""
-                  } ${sticky ? "bg-dark dark:bg-white" : isVirtualAssistantPage || isHomePage ? "bg-white" : "bg-dark dark:bg-white"}`}
+                  } ${sticky ? "bg-dark dark:bg-white" : isVirtualAssistantPage || isHomePage || isLogisticsPage ? "bg-white" : "bg-dark dark:bg-white"}`}
                 />
               ))}
             </button>

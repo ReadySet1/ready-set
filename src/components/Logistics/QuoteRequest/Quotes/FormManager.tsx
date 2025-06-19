@@ -68,8 +68,8 @@ export const FormManager = () => {
   };
 
   const handleSubmit = async (formData: DeliveryFormData) => {
-    const loadingToast = toast.loading('Submitting your request...', {
-      duration: Infinity // Keep showing until we dismiss it
+    const loadingToast = toast.loading("Submitting your request...", {
+      duration: Infinity, // Keep showing until we dismiss it
     });
 
     try {
@@ -157,26 +157,28 @@ export const FormManager = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(baseSubmission),
       });
-  
+
       const result = await response.json();
-  
+
       if (!response.ok) {
-        console.error('Server response error:', result);
-        throw new Error(result.error || `HTTP error! status: ${response.status}`);
+        console.error("Server response error:", result);
+        throw new Error(
+          result.error || `HTTP error! status: ${response.status}`,
+        );
       }
-  
+
       toast.dismiss(loadingToast);
-      toast.success('Request submitted successfully!', { duration: 5000 });
+      toast.success("Request submitted successfully!", { duration: 5000 });
       closeForm();
-  
     } catch (error) {
       toast.dismiss(loadingToast);
-      const errorMessage = error instanceof Error ? error.message : 'Submission failed';
+      const errorMessage =
+        error instanceof Error ? error.message : "Submission failed";
       toast.error(errorMessage, { duration: 5000 });
       console.error("Submission error details:", error);
     }
   };
-  
+
   return {
     openForm,
     closeForm,
@@ -190,3 +192,5 @@ export const FormManager = () => {
     ),
   };
 };
+
+export type { FormType };

@@ -9,13 +9,13 @@ const Breadcrumb = ({
 }) => {
   return (
     <>
-      <div 
-        className="relative z-10 overflow-hidden pb-[60px] pt-[120px] md:pt-[130px] lg:pt-[160px] bg-no-repeat bg-cover bg-center"
+      <div
+        className="relative z-10 overflow-hidden bg-cover bg-center bg-no-repeat pb-[60px] pt-[120px] md:pt-[130px] lg:pt-[160px]"
         style={{
-          backgroundImage: "url('/images/header/header-bg.png')"
+          backgroundImage: "url('/images/header/header-bg.png')",
         }}
       >
-        <div className="from-stroke/0 via-stroke to-stroke/0 dark:via-dark-3 absolute bottom-0 left-0 h-px w-full bg-gradient-to-r"></div>
+        <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-stroke/0 via-stroke to-stroke/0 dark:via-dark-3"></div>
         <div className="container relative">
           <div className="-mx-4 flex flex-wrap items-center">
             <div className="w-full px-4">
@@ -36,11 +36,11 @@ const Breadcrumb = ({
                       Home
                     </Link>
                   </li>
-                  <li>
+                  {/* <li>
                     <p className="flex items-center gap-[10px] text-base font-medium text-gray-800">
                       {pageName}
                     </p>
-                  </li>
+                  </li> */}
                 </ul>
               </div>
             </div>
