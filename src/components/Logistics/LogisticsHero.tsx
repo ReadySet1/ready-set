@@ -21,7 +21,110 @@ interface Partner {
   logo: string;
 }
 
-const LogisticsPage = () => {
+// Background image settings interface
+interface BackgroundImageSettings {
+  src: string;
+  size: "cover" | "contain" | "auto" | string;
+  position: string;
+  repeat: "no-repeat" | "repeat" | "repeat-x" | "repeat-y";
+  attachment?: "fixed" | "scroll" | "local";
+}
+
+// Viewport dimensions interface
+interface ViewportDimensions {
+  width: number;
+  height: number;
+  aspectRatio: number;
+}
+
+// Utility function for debouncing
+function debounce<T extends (...args: any[]) => void>(
+  func: T,
+  wait: number,
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
+// Custom hook for responsive background
+const useResponsiveBackground = (imageSrc: string): BackgroundImageSettings => {
+  const [settings, setSettings] = useState<BackgroundImageSettings>({
+    src: imageSrc,
+    size: "cover",
+    position: "center center",
+    repeat: "no-repeat",
+    attachment: "fixed",
+  });
+
+  useEffect(() => {
+    const calculateBackgroundSettings = (): void => {
+      const viewport: ViewportDimensions = {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        aspectRatio: window.innerWidth / window.innerHeight,
+      };
+
+      let newSettings: BackgroundImageSettings;
+
+      // Optimize for 1920x1080 and similar widescreen resolutions
+      if (viewport.width >= 1920 && viewport.aspectRatio >= 1.7) {
+        newSettings = {
+          src: imageSrc,
+          size: "cover",
+          position: "center 20%", // Balanced positioning now that card is moved down
+          repeat: "no-repeat",
+          attachment: "fixed",
+        };
+      } else if (viewport.width >= 1366 && viewport.aspectRatio > 1.5) {
+        newSettings = {
+          src: imageSrc,
+          size: "cover",
+          position: "center 18%", // Balanced positioning for medium screens
+          repeat: "no-repeat",
+          attachment: "fixed",
+        };
+      } else if (viewport.aspectRatio > 1.3) {
+        newSettings = {
+          src: imageSrc,
+          size: "cover",
+          position: "center 15%", // Balanced positioning for smaller screens
+          repeat: "no-repeat",
+          attachment: "scroll",
+        };
+      } else {
+        // Mobile and portrait orientations
+        newSettings = {
+          src: imageSrc,
+          size: "cover",
+          position: "center 12%", // Balanced positioning for mobile
+          repeat: "no-repeat",
+          attachment: "scroll",
+        };
+      }
+
+      setSettings(newSettings);
+    };
+
+    calculateBackgroundSettings();
+
+    const debouncedResize = debounce(calculateBackgroundSettings, 150);
+    window.addEventListener("resize", debouncedResize);
+
+    return () => window.removeEventListener("resize", debouncedResize);
+  }, [imageSrc]);
+
+  return settings;
+};
+
+const LogisticsPage: React.FC = () => {
+  // Responsive background hook
+  const backgroundSettings = useResponsiveBackground(
+    "/images/logistics/bg-hero.png",
+  );
+
   // Partners list
   const partners: Partner[] = useMemo(
     () => [
@@ -51,38 +154,42 @@ const LogisticsPage = () => {
   // Client-side check
   const isClient = typeof window !== "undefined";
 
-  // Mobile detection
+  // Mobile detection with debouncing
   useEffect(() => {
-    const checkIfMobile = () => {
+    const checkIfMobile = (): void => {
       const width = window.innerWidth;
       setIsMobile(width < 768);
     };
 
     checkIfMobile();
-    window.addEventListener("resize", checkIfMobile);
-    return () => window.removeEventListener("resize", checkIfMobile);
+    const debouncedCheck = debounce(checkIfMobile, 150);
+    window.addEventListener("resize", debouncedCheck);
+    return () => window.removeEventListener("resize", debouncedCheck);
   }, []);
+
+  // Background style object
+  const backgroundStyle: React.CSSProperties = {
+    backgroundImage: `url('${backgroundSettings.src}')`,
+    backgroundSize: backgroundSettings.size,
+    backgroundPosition: backgroundSettings.position,
+    backgroundRepeat: backgroundSettings.repeat,
+    backgroundAttachment: backgroundSettings.attachment,
+  };
 
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Hero Section */}
       <div className="relative min-h-screen">
-        {/* Background Image */}
+        {/* Background Image with Responsive Settings */}
         <div className="absolute inset-0">
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              backgroundImage: "url('/images/logistics/bg-hero.png')",
-              backgroundSize: "cover",
-            }}
-          />
+          <div className="absolute inset-0" style={backgroundStyle} />
           <div className="absolute inset-0 bg-black/10" />
         </div>
 
         {/* Content */}
         <div className="relative z-10 flex min-h-screen flex-col">
-          {/* Centered Card */}
-          <div className="relative z-30 flex flex-1 items-center justify-center px-4 pb-8 pt-28 md:pt-40">
+          {/* Centered Card - Moved further down */}
+          <div className="relative z-30 flex flex-1 items-center justify-center px-4 pb-8 pt-48 md:pt-60">
             <div className="w-full max-w-2xl rounded-2xl bg-white/95 p-4 text-center shadow-lg backdrop-blur-sm md:p-10">
               <h1 className="mb-3 text-2xl font-bold text-gray-900 md:text-4xl">
                 Premium Logistics Services
@@ -100,9 +207,8 @@ const LogisticsPage = () => {
             </div>
           </div>
 
-          {/* Partners Carousel */}
-          <div className="z-40 px-4 pb-8 pt-8 md:pb-16 md:pt-16">
-            {" "}
+          {/* Partners Carousel - Moved further down as well */}
+          <div className="z-40 px-4 pb-16 pt-2 md:pb-24 md:pt-4">
             <div className="mx-auto max-w-[90%] md:max-w-[80%]">
               <Carousel
                 opts={{
@@ -141,6 +247,7 @@ const LogisticsPage = () => {
         </div>
       </div>
 
+      {/* Service Cards Section */}
       <div className="bg-gray-900 px-4 py-8 md:py-16">
         <div className="mx-auto max-w-6xl">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
