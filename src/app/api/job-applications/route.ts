@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { sendEmail } from "@/utils/email";
 import { createClient } from "@/utils/supabase/server"; // Import Supabase server client
-import { FileUpload } from "@prisma/client"; // Import FileUpload type if not already
+import { Prisma } from "@prisma/client";
 
 export async function POST(request: Request) {
   const supabase = await createClient(); // Initialize Supabase client AND AWAIT IT

@@ -1,23 +1,34 @@
 import { Prisma } from '@prisma/client';
 import { PrismaClientKnownRequestError, PrismaClientInitializationError, PrismaClientValidationError } from '@prisma/client/runtime/library';
 import { Decimal } from '@prisma/client/runtime/library';
-import { 
-  UserType, 
-  UserStatus, 
-  DriverStatus, 
-  CateringNeedHost, 
-  CateringStatus, 
-  OnDemandStatus,
-  VehicleType,
-  ApplicationStatus
-} from './user';
 
 // Export errors and Decimal for use in other files
 export { 
   PrismaClientKnownRequestError, 
   PrismaClientInitializationError, 
   PrismaClientValidationError, 
-  Decimal 
+  Decimal,
+  UserType,
+  UserStatus,
+  DriverStatus,
+  CateringNeedHost,
+  CateringStatus,
+  OnDemandStatus,
+  VehicleType,
+  ApplicationStatus,
+  Profile,
+  Address,
+  CateringRequest,
+  OnDemand,
+  Dispatch,
+  FileUpload,
+  UserAddress,
+  Account,
+  Session,
+  VerificationToken,
+  FormSubmission,
+  LeadCapture,
+  JobApplication
 };
 
 // Define constants for Prisma enum values
@@ -103,77 +114,8 @@ export type PrismaVehicleTypeValue = typeof PRISMA_VEHICLE_TYPE[keyof typeof PRI
 export type PrismaApplicationStatusValue = typeof PRISMA_APPLICATION_STATUS[keyof typeof PRISMA_APPLICATION_STATUS];
 export type PrismaFormTypeValue = typeof PRISMA_FORM_TYPE[keyof typeof PRISMA_FORM_TYPE];
 
-// Helper functions to convert between application enums and Prisma enums
-export function convertToPrismaUserType(type: UserType): PrismaUserTypeValue {
-  switch(type) {
-    case UserType.ADMIN: return PRISMA_USER_TYPE.ADMIN;
-    case UserType.VENDOR: return PRISMA_USER_TYPE.VENDOR;
-    case UserType.CLIENT: return PRISMA_USER_TYPE.CLIENT;
-    case UserType.DRIVER: return PRISMA_USER_TYPE.DRIVER;
-    case UserType.HELPDESK: return PRISMA_USER_TYPE.HELPDESK;
-    case UserType.SUPER_ADMIN: return PRISMA_USER_TYPE.SUPER_ADMIN;
-    default: return PRISMA_USER_TYPE.USER;
-  }
-}
-
-export function convertToPrismaUserStatus(status: UserStatus): PrismaUserStatusValue {
-  switch(status) {
-    case UserStatus.ACTIVE: return PRISMA_USER_STATUS.ACTIVE;
-    case UserStatus.PENDING: return PRISMA_USER_STATUS.PENDING;
-    case UserStatus.DELETED: return PRISMA_USER_STATUS.DELETED;
-    default: return PRISMA_USER_STATUS.PENDING;
-  }
-}
-
-export function convertToPrismaDriverStatus(status: DriverStatus): PrismaDriverStatusValue {
-  switch(status) {
-    case DriverStatus.ARRIVED_AT_VENDOR: return PRISMA_DRIVER_STATUS.ARRIVED_AT_VENDOR;
-    case DriverStatus.EN_ROUTE_TO_CLIENT: return PRISMA_DRIVER_STATUS.EN_ROUTE_TO_CLIENT;
-    case DriverStatus.ARRIVED_TO_CLIENT: return PRISMA_DRIVER_STATUS.ARRIVED_TO_CLIENT;
-    case DriverStatus.ASSIGNED: return PRISMA_DRIVER_STATUS.ASSIGNED;
-    case DriverStatus.COMPLETED: return PRISMA_DRIVER_STATUS.COMPLETED;
-    default: return PRISMA_DRIVER_STATUS.ASSIGNED;
-  }
-}
-
-export function convertToPrismaCateringStatus(status: CateringStatus): PrismaCateringStatusValue {
-  switch(status) {
-    case CateringStatus.ACTIVE: return PRISMA_CATERING_STATUS.ACTIVE;
-    case CateringStatus.ASSIGNED: return PRISMA_CATERING_STATUS.ASSIGNED;
-    case CateringStatus.CANCELLED: return PRISMA_CATERING_STATUS.CANCELLED;
-    case CateringStatus.COMPLETED: return PRISMA_CATERING_STATUS.COMPLETED;
-    default: return PRISMA_CATERING_STATUS.ACTIVE;
-  }
-}
-
-export function convertToPrismaOnDemandStatus(status: OnDemandStatus): PrismaOnDemandStatusValue {
-  switch(status) {
-    case OnDemandStatus.ACTIVE: return PRISMA_ON_DEMAND_STATUS.ACTIVE;
-    case OnDemandStatus.ASSIGNED: return PRISMA_ON_DEMAND_STATUS.ASSIGNED;
-    case OnDemandStatus.CANCELLED: return PRISMA_ON_DEMAND_STATUS.CANCELLED;
-    case OnDemandStatus.COMPLETED: return PRISMA_ON_DEMAND_STATUS.COMPLETED;
-    default: return PRISMA_ON_DEMAND_STATUS.ACTIVE;
-  }
-}
-
-export function convertToPrismaVehicleType(type: VehicleType): PrismaVehicleTypeValue {
-  switch(type) {
-    case VehicleType.CAR: return PRISMA_VEHICLE_TYPE.CAR;
-    case VehicleType.VAN: return PRISMA_VEHICLE_TYPE.VAN;
-    case VehicleType.TRUCK: return PRISMA_VEHICLE_TYPE.TRUCK;
-    default: return PRISMA_VEHICLE_TYPE.CAR;
-  }
-}
-
-export function convertToPrismaApplicationStatus(status: ApplicationStatus): PrismaApplicationStatusValue {
-  switch(status) {
-    case ApplicationStatus.PENDING: return PRISMA_APPLICATION_STATUS.PENDING;
-    case ApplicationStatus.APPROVED: return PRISMA_APPLICATION_STATUS.APPROVED;
-    case ApplicationStatus.REJECTED: return PRISMA_APPLICATION_STATUS.REJECTED;
-    case ApplicationStatus.INTERVIEWING: return PRISMA_APPLICATION_STATUS.INTERVIEWING;
-    default: return PRISMA_APPLICATION_STATUS.PENDING;
-  }
-}
+// Since we're using Prisma enums directly, the converter functions are no longer needed
+// The enums imported from @prisma/client can be used directly
 
 // Other Prisma helper types
 export type PrismaError = Error | PrismaClientKnownRequestError | PrismaClientInitializationError | PrismaClientValidationError;
