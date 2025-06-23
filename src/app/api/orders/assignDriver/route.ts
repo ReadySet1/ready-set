@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     }
 
     try {
-      const result = await prisma.$transaction(async (prisma) => {
+      const result = await prisma.$transaction(async (prisma: any) => {
         let order;
         let dispatch;
 
@@ -141,8 +141,8 @@ export async function POST(request: Request) {
       // Serialize the result before sending the response
       const serializedResult = serializeData(result);
       return NextResponse.json(serializedResult);
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    } catch (error: any) {
+      if (error?.code && error?.message) {
         console.error("Prisma Error:", error.message);
         console.error("Error Code:", error.code);
         console.error("Meta:", error.meta);

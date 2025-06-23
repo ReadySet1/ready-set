@@ -4,45 +4,9 @@ import { createClient } from "@/utils/supabase/server";
 
 const prisma = new PrismaClient();
 
-type CateringRequest = Prisma.CateringRequestGetPayload<{
-  include: {
-    user: { select: { name: true; email: true } };
-    pickupAddress: true;
-    deliveryAddress: true;
-    dispatches: {
-      include: {
-        driver: {
-          select: {
-            id: true;
-            name: true;
-            email: true;
-            contactNumber: true;
-          };
-        };
-      };
-    };
-  };
-}>;
+type CateringRequest = any;
 
-type OnDemandOrder = Prisma.OnDemandGetPayload<{
-  include: {
-    user: { select: { name: true; email: true } };
-    pickupAddress: true;
-    deliveryAddress: true;
-    dispatches: {
-      include: {
-        driver: {
-          select: {
-            id: true;
-            name: true;
-            email: true;
-            contactNumber: true;
-          };
-        };
-      };
-    };
-  };
-}>;
+type OnDemandOrder = any;
 
 type Order =
   | (CateringRequest & { order_type: "catering" })

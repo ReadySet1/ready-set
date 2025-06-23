@@ -1,7 +1,7 @@
 // src/app/api/users/current-user/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { UserType } from "@prisma/client";
+import { UserType } from "@/types/prisma";
 
 
 export async function GET(request: Request) {

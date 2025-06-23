@@ -141,7 +141,7 @@ export async function GET(
       activeOrders,
       todayOrders,
       webhookSuccess,
-      recentOrders: recentOrders.map(order => ({
+      recentOrders: recentOrders.map((order: any) => ({
         id: order.id,
         orderNumber: order.orderNumber,
         status: order.status,

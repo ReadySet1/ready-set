@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      const safeToDeleteIds = safeToDeleteFiles.map((file) => file.id);
+      const safeToDeleteIds = safeToDeleteFiles.map((file: any) => file.id);
 
       if (safeToDeleteIds.length < fileKeys.length) {
         console.log(
@@ -131,12 +131,12 @@ export async function POST(request: NextRequest) {
 
       // Extract file paths from URLs
       const filePaths = safeToDeleteFiles
-        .map((record) => {
+        .map((record: any) => {
           // Extract the path after "fileUploader/"
           const match = record.fileUrl.match(/fileUploader\/(.+)/);
           return match ? match[1] : null;
         })
-        .filter((path): path is string => path !== null);
+        .filter((path: any): path is string => path !== null);
 
       console.log("Files to delete from storage:", filePaths);
 
@@ -217,16 +217,16 @@ export async function POST(request: NextRequest) {
 
       // Extract file paths from URLs
       const filePaths = fileRecords
-        .map((record) => {
+        .map((record: any) => {
           // Extract the path after "fileUploader/"
           const match = record.fileUrl.match(/fileUploader\/(.+)/);
           return match ? match[1] : null;
         })
-        .filter((path): path is string => path !== null);
+        .filter((path: any): path is string => path !== null);
 
       console.log(
         `Found ${fileRecords.length} files to clean up for entity ${entityId}`,
-        fileRecords.map(f => ({ id: f.id, category: f.category }))
+        fileRecords.map((f: any) => ({ id: f.id, category: f.category }))
       );
 
       if (fileRecords.length === 0) {
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
       const deleteResult = await prisma.fileUpload.deleteMany({
         where: {
           id: {
-            in: fileRecords.map(f => f.id)
+            in: fileRecords.map((f: any) => f.id)
           },
           userId: userId || user.id,
           cateringRequestId: null,

@@ -3,7 +3,8 @@
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { createClient } from "@/utils/supabase/server";
-import { Prisma, UserStatus, UserType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { UserStatus, UserType } from '@/types/prisma';
 
 // GET: Fetch users with pagination, search, sort, filter
 export async function GET(request: NextRequest) {
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     // --- Build Prisma Where Clause ---
-    let where: Prisma.ProfileWhereInput = {};
+    let where: any = {};
 
     // Search filter (apply across relevant fields)
     if (search) {
@@ -90,7 +91,7 @@ export async function GET(request: NextRequest) {
     console.log("Final where clause:", where);
 
     // --- Build Prisma OrderBy Clause ---
-    let orderBy: Prisma.ProfileOrderByWithRelationInput = {};
+    let orderBy: any = {};
     if (sortField === 'name') {
       orderBy = { name: sortDirection };
     } else if (sortField === 'email') {
@@ -223,9 +224,9 @@ export async function POST(request: Request) {
     return NextResponse.json(newUser, { status: 201 });
   } catch (error) {
     console.error("Error creating user:", error);
-     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2002') {
-            return NextResponse.json({ error: `Unique constraint failed on field(s): ${error.meta?.target}` }, { status: 409 });
+     if ((error as any)?.code && (error as any)?.message) {
+        if ((error as any).code === 'P2002') {
+            return NextResponse.json({ error: `Unique constraint failed on field(s): ${(error as any).meta?.target}` }, { status: 409 });
         }
     }
     return NextResponse.json(

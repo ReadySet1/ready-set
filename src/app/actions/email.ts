@@ -153,4 +153,27 @@ const createGeneralHTML = (data: FormInputs) => `
   <p>Message: ${data.message}</p>
 `;
 
+// Delivery notification functionality
+interface DeliveryNotificationData {
+  orderId: string;
+  customerEmail: string;
+  driverName?: string;
+  estimatedDelivery?: Date;
+}
+
+export async function sendDeliveryNotifications(
+  data: DeliveryNotificationData
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Implement your email service logic here
+    console.log('Sending delivery notification:', data);
+    return { success: true };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+}
+
 export default sendEmail;

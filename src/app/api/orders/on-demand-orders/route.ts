@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { OrderStatus } from "@/types/order";
+import { OnDemandStatus, OnDemandWhereInput, OnDemandOrderByWithRelationInput, SortOrder } from "@/types/prisma";
 
 const prisma = new PrismaClient();
 const ITEMS_PER_PAGE = 10;
@@ -26,11 +26,11 @@ export async function GET(req: NextRequest) {
     const sortField = url.searchParams.get('sort') || 'pickupDateTime';
     const sortDirection = url.searchParams.get('direction') || 'desc';
 
-    let whereClause: Prisma.OnDemandWhereInput = {};
+    let whereClause: any = {};
 
     // Status filter
     if (status && status !== 'all') {
-      whereClause.status = status as OrderStatus;
+      whereClause.status = status as OnDemandStatus;
     }
 
     // Search filter
@@ -54,11 +54,11 @@ export async function GET(req: NextRequest) {
     }
 
     // Order By Clause
-    let orderByClause: Prisma.OnDemandOrderByWithRelationInput = {};
+    let orderByClause: any = {};
     if (sortField === 'user.name') {
-      orderByClause = { user: { name: sortDirection as Prisma.SortOrder } };
+      orderByClause = { user: { name: sortDirection as 'asc' | 'desc' } };
     } else if (['pickupDateTime', 'orderTotal', 'orderNumber'].includes(sortField)) {
-      orderByClause = { [sortField]: sortDirection as Prisma.SortOrder };
+      orderByClause = { [sortField]: sortDirection as 'asc' | 'desc' };
     } else {
       orderByClause = { pickupDateTime: 'desc' };
     }

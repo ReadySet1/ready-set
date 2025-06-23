@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import { JobApplication } from '@prisma/client';
+import { JobApplication } from '@/types/prisma';
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     // Convert to { [position]: count }
     const applicationsByPosition: Record<string, number> = {};
-    byPosition.forEach((item) => {
+    byPosition.forEach((item: any) => {
       applicationsByPosition[item.position] = item._count.position;
     });
 
@@ -49,14 +49,14 @@ export async function GET(request: NextRequest) {
     });
 
     // Convert to application objects
-    const recentApplications = recentApplicationsData.map(app => {
+    const recentApplications = recentApplicationsData.map((app: any) => {
       return {
         id: app.id,
         name: `${app.firstName} ${app.lastName}`,
         position: app.position,
         status: app.status,
         createdAt: app.createdAt,
-        hasResume: app.fileUploads?.some(file => file.category === 'resume') || false,
+        hasResume: app.fileUploads?.some((file: any) => file.category === 'resume') || false,
       };
     });
 

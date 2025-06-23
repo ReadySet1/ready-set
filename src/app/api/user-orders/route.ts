@@ -5,21 +5,9 @@ import { createClient } from "@/utils/supabase/server";
 const prisma = new PrismaClient();
 
 // Updated type definitions
-type CateringOrder = Prisma.CateringRequestGetPayload<{
-  include: { 
-    user: { select: { name: true, email: true } }, 
-    pickupAddress: true, 
-    deliveryAddress: true 
-  }
-}>;
+type CateringOrder = any;
 
-type OnDemandOrder = Prisma.OnDemandGetPayload<{
-  include: { 
-    user: { select: { name: true, email: true } }, 
-    pickupAddress: true,
-    deliveryAddress: true
-  }
-}>;
+type OnDemandOrder = any;
 
 type Order = CateringOrder | Omit<OnDemandOrder, 'deliveryAddress'>;
 

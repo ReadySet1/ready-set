@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
         })
       ]);
 
-      const applicationsByPosition = positionCounts.reduce((acc: Record<string, number>, curr) => {
+      const applicationsByPosition = positionCounts.reduce((acc: Record<string, number>, curr: any) => {
         acc[curr.position] = curr._count.position;
         return acc;
       }, {} as Record<string, number>);
@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Process applications to fix file upload inconsistency
-    const processedApplications = applications.map(app => {
+    const processedApplications = applications.map((app: any) => {
       const fileUploadCount = app.fileUploads?.length || 0;
       const hasFileUploads = fileUploadCount > 0;
       
@@ -183,12 +183,12 @@ export async function GET(request: NextRequest) {
         _fileUploadDebug: {
           actualCount: fileUploadCount,
           hasUploads: hasFileUploads,
-          uploadIds: app.fileUploads?.map(f => f.id) || [],
+          uploadIds: app.fileUploads?.map((f: any) => f.id) || [],
         },
       };
     });
 
-    console.log("API: Fetched applications with corrected fileUploads:", processedApplications.map(app => ({
+    console.log("API: Fetched applications with corrected fileUploads:", processedApplications.map((app: any) => ({
       id: app.id,
       hasFileUploads: app.hasFileUploads,
       fileUploadCount: app.fileUploadCount,

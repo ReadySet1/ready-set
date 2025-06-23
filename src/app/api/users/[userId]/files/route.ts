@@ -3,7 +3,7 @@ import { prisma } from "@/utils/prismaDB";
 import { NextRequest } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { storage } from '@/utils/supabase/storage';
-import { UserType } from "@prisma/client";
+import { UserType } from "@/types/prisma";
 
 
 // Updated helper function to fix authorization issues
@@ -94,7 +94,7 @@ export async function GET(
     console.log(`Found ${files.length} files for user ${userId}`);
     
     // Map the files to a more user-friendly format
-    const formattedFiles = files.map(file => ({
+    const formattedFiles = files.map((file: any) => ({
       id: file.id,
       fileName: file.fileName,
       fileUrl: file.fileUrl,

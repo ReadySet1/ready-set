@@ -4,6 +4,7 @@
  */
 
 import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@/types/prisma';
 import { prisma } from '@/lib/db/prisma';
 
 /**
@@ -44,8 +45,8 @@ export async function executeTransaction<T>(
 ): Promise<T> {
   try {
     return await prisma.$transaction(transactionFunction);
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      } catch (error) {
+    if (error instanceof PrismaClientKnownRequestError) {
       // Handle specific Prisma errors
       if (error.code === 'P2002') {
         throw new Error('A unique constraint would be violated.');

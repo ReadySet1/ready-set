@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
+// import { Pool } from 'pg';
+const Pool = require('pg').Pool;
 
 // Database connection for tracking system
 const pool = new Pool({
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
 
     const result = await pool.query(query, params);
     
-    const drivers = result.rows.map(row => ({
+    const drivers = result.rows.map((row: any) => ({
       ...row,
       last_known_location: row.location_geojson ? JSON.parse(row.location_geojson) : null,
     }));

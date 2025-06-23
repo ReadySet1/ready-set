@@ -3,7 +3,7 @@
  * Handles sending status updates from Ready Set to CaterValley
  */
 
-import { DriverStatus } from '@prisma/client';
+import { DriverStatus } from '@/types/prisma';
 
 interface WebhookPayload {
   orderNumber: string;

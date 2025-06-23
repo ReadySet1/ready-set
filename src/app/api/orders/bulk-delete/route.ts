@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server"; // Assumes this is your server client helper
 import { prisma } from "@/utils/prismaDB";
 import { storage } from "@/utils/supabase/storage"; // Import the new storage utility
-import { UserType } from "@prisma/client";
+import { UserType } from "@/types/prisma";
 import { PrismaTransaction } from "@/types/prisma-types";
 
 // Constants

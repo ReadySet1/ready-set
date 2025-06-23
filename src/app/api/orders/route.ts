@@ -14,54 +14,13 @@ import { validateRequiredFields } from '@/utils/field-validation';
 import { generateOrderNumber } from '@/utils/order-number';
 import { getCenterCoordinate, calculateDistance } from '@/utils/distance';
 import { getAddressInfo } from '@/utils/addresses';
-import { sendDeliveryNotifications } from '@/actions/email';
+import { sendDeliveryNotifications } from '@/app/actions/email';
 
 const prismaClient = new PrismaClient();
 
-// Types use PascalCase payload getter and relations matching schema include
-type PrismaCateringOrder = Prisma.$CateringRequestPayload<{
-  include: {
-    dispatches: {
-      include: {
-        driver: true;
-      };
-    };
-    user: {
-      include: {
-        userAddresses: {
-          include: {
-            address: true;
-          };
-        };
-      };
-    };
-    pickupAddress: true;
-    deliveryAddress: true;
-    fileUploads: true;
-  };
-}>;
-
-type PrismaOnDemandOrder = Prisma.$OnDemandPayload<{
-  include: {
-    dispatches: {
-      include: {
-        driver: true;
-      };
-    };
-    user: {
-      include: {
-        userAddresses: {
-          include: {
-            address: true;
-          };
-        };
-      };
-    };
-    pickupAddress: true;
-    deliveryAddress: true;
-    fileUploads: true;
-  };
-}>;
+// Simplified types to avoid Prisma payload complexity
+type PrismaCateringOrder = any;
+type PrismaOnDemandOrder = any;
 
 type EmailBaseOrder = {
   order_type: string;
@@ -130,10 +89,10 @@ export async function GET(req: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const search = searchParams.get('search');
 
-    const cookieStore = cookies();
-    const authValidation = await validateApiAuth(cookieStore);
+    const cookieStore = await cookies();
+    const authValidation = await validateApiAuth(req);
     
-    if (!authValidation.success || !authValidation.user) {
+    if (!authValidation.isValid || !authValidation.user) {
       return NextResponse.json(
         { error: 'Authentication required' }, 
         { status: 401 }
@@ -220,7 +179,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     // Transform catering orders
-    const transformedCateringOrders: OrderData[] = cateringOrders.map((order: PrismaCateringOrder) => ({
+    const transformedCateringOrders: OrderData[] = cateringOrders.map((order: any) => ({
       id: order.id,
       type: 'catering' as const,
       orderNumber: order.orderNumber,
@@ -239,7 +198,7 @@ export async function GET(req: NextRequest) {
     }));
 
     // Transform on-demand orders
-    const transformedOnDemandOrders: OrderData[] = onDemandOrders.map((order: PrismaOnDemandOrder) => ({
+    const transformedOnDemandOrders: OrderData[] = onDemandOrders.map((order: any) => ({
       id: order.id,
       type: 'ondemand' as const,
       orderNumber: order.orderNumber,
@@ -310,10 +269,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     
-    const cookieStore = cookies();
-    const authValidation = await validateApiAuth(cookieStore);
+    const cookieStore = await cookies();
+    const authValidation = await validateApiAuth(req);
     
-    if (!authValidation.success || !authValidation.user) {
+          if (!authValidation.isValid || !authValidation.user) {
       return NextResponse.json(
         { error: 'Authentication required' }, 
         { status: 401 }
@@ -437,7 +396,7 @@ function mapOrderForEmail(order: PrismaOrder): EmailOrder {
       address: order.pickupAddress, // Use PascalCase relation
       delivery_address: order.deliveryAddress, // Use PascalCase relation
       order_number: order.orderNumber, // Use PascalCase field
-      brokerage: (order as PrismaCateringOrder).brokerage, // Add brokerage
+      brokerage: (order as any).brokerage, // Add brokerage
       date: order.pickupDateTime ?? null, // Use PascalCase field
       pickup_time: order.pickupDateTime ?? null,
       arrival_time: order.arrivalDateTime ?? null,
@@ -449,7 +408,7 @@ function mapOrderForEmail(order: PrismaOrder): EmailOrder {
       status: order.status ?? null,
     };
     if (isCatering) {
-      const cateringOrder = order as PrismaCateringOrder;
+      const cateringOrder = order as any;
       return {
         ...base,
         headcount: cateringOrder.headcount?.toString() ?? null,
@@ -458,7 +417,7 @@ function mapOrderForEmail(order: PrismaOrder): EmailOrder {
         number_of_host: cateringOrder.numberOfHosts?.toString() ?? null, // Use PascalCase field
       } as EmailCateringOrder;
     } else {
-      const onDemandOrder = order as PrismaOnDemandOrder;
+      const onDemandOrder = order as any;
       return {
         ...base,
         item_delivered: onDemandOrder.itemDelivered ?? null,

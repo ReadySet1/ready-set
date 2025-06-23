@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
+// import { Pool } from 'pg';
+const Pool = require('pg').Pool;
 
 // Database connection for tracking system
 const pool = new Pool({
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
       `);
       
       const expectedTables = ['deliveries', 'driver_locations', 'drivers', 'geofences', 'tracking_events'];
-      const foundTables = tablesTest.rows.map(row => row.table_name);
+      const foundTables = tablesTest.rows.map((row: any) => row.table_name);
       const missingTables = expectedTables.filter(table => !foundTables.includes(table));
       
       tests.push({
