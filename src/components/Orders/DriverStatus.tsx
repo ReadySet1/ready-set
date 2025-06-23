@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { DriverStatus, OrderStatus } from "@/types/order";
 import { Clock, MapPin, Phone, Mail, Truck, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDateTimeForDisplay, getRelativeTime } from "@/lib/utils/date-display";
 
 interface Driver {
   id: string;
@@ -90,7 +90,7 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   // Format dates/times for better display
   const formatDateTime = (dateTime: string | Date | null | undefined) => {
     if (!dateTime) return "Not yet";
-    return format(new Date(dateTime), "MMM d, yyyy h:mm a");
+    return formatDateTimeForDisplay(dateTime);
   };
 
   // Calculate estimated time for delivery (simple placeholder implementation)
@@ -118,7 +118,7 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   };
 
   const getLastUpdated = (datetime: string | Date) => {
-    return formatDistanceToNow(new Date(datetime), { addSuffix: true });
+    return getRelativeTime(datetime);
   };
 
   return (

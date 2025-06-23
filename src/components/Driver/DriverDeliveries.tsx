@@ -272,12 +272,12 @@ const DriverDeliveries: React.FC = () => {
     return `${address.street1}${address.street2 ? `, ${address.street2}` : ''}, ${address.city}, ${address.state}${address.zip ? ` ${address.zip}` : ''}`;
   };
 
-  // Format date and time for display
+  // Format date and time for display with timezone awareness
   const formatDateTime = (dateTimeStr: string) => {
-    const dateTime = new Date(dateTimeStr);
-    const formattedDate = dateTime.toLocaleDateString();
-    const formattedTime = dateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    return { date: formattedDate, time: formattedTime, dateTime };
+    const { formatDateForDisplay, formatTimeForDisplay } = require('@/lib/utils/date-display');
+    const formattedDate = formatDateForDisplay(dateTimeStr);
+    const formattedTime = formatTimeForDisplay(dateTimeStr);
+    return { date: formattedDate, time: formattedTime, dateTime: new Date(dateTimeStr) };
   };
 
   // Calculate time until pickup

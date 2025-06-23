@@ -4,6 +4,8 @@
  * URGENT: Updated to address financial losses on deliveries
  */
 
+import { localTimeToUtc, utcToLocalTime } from '@/lib/utils/timezone';
+
 interface PricingParams {
   pickupAddress: string;
   dropoffAddress: string;
@@ -272,32 +274,51 @@ function extractCity(address: string): string {
 
 /**
  * Get estimated pickup time based on delivery time
+ * Now properly converts local time to UTC
  */
 export function calculatePickupTime(deliveryDate: string, deliveryTime: string, bufferMinutes: number = 45): string {
-  const deliveryDateTime = new Date(`${deliveryDate}T${deliveryTime}`);
+  // Convert local delivery time to UTC
+  const deliveryDateTimeUtc = localTimeToUtc(deliveryDate, deliveryTime);
+  const deliveryDateTime = new Date(deliveryDateTimeUtc);
+  
+  // Calculate pickup time (subtract buffer)
   const pickupDateTime = new Date(deliveryDateTime.getTime() - bufferMinutes * 60 * 1000);
+  
+  // Return as UTC ISO string
   return pickupDateTime.toISOString();
 }
 
 /**
  * Validate if a delivery time slot is available
+ * Updated to handle timezone properly
  */
 export function isDeliveryTimeAvailable(deliveryDate: string, deliveryTime: string): boolean {
-  const deliveryDateTime = new Date(`${deliveryDate}T${deliveryTime}`);
+  // Convert local delivery time to UTC for comparison
+  const deliveryDateTimeUtc = localTimeToUtc(deliveryDate, deliveryTime);
+  const deliveryDateTime = new Date(deliveryDateTimeUtc);
   const now = new Date();
   
   // Must be at least 2 hours in advance
   const minAdvanceTime = new Date(now.getTime() + 2 * 60 * 60 * 1000);
   
-  if (deliveryDateTime < minAdvanceTime) {
+  if (deliveryDateTime <= minAdvanceTime) {
     return false;
   }
   
-  // Check business hours (7 AM - 10 PM)
-  const hour = deliveryDateTime.getHours();
-  if (hour < 7 || hour > 22) {
-    return false;
+  // Check business hours (7 AM - 10 PM in local time)
+  const { time } = utcToLocalTime(deliveryDateTime);
+  const timeParts = time.split(':');
+  const hoursStr = timeParts[0];
+  
+  if (!hoursStr) {
+    return false; // Invalid time format
   }
   
-  return true;
+  const hours = parseInt(hoursStr, 10);
+  
+  if (isNaN(hours)) {
+    return false; // Invalid time format
+  }
+  
+  return hours >= 7 && hours < 22;
 } 

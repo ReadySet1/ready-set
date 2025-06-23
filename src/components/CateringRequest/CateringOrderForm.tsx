@@ -85,7 +85,9 @@ const CateringOrderForm: React.FC = () => {
 
   const handleDateTimeChange = (date: string, time: string) => {
     if (!date || !time) return "";
-    return `${date}T${time}`;
+    // Use timezone utility for proper conversion
+    const { localTimeToUtc } = require('@/lib/utils/timezone');
+    return localTimeToUtc(date, time);
   };
 
   const {

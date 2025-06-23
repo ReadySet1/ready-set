@@ -4,6 +4,7 @@ import { Decimal } from "@/types/prisma";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { CateringNeedHost } from "@/types/order";
+import { localTimeToUtc } from "@/lib/utils/timezone";
 
 // Validates and processes a catering request submission
 export async function POST(request: NextRequest) {
@@ -112,11 +113,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse date and time fields
-    const pickupDateTime = new Date(`${data.date}T${data.pickupTime}`);
-    const arrivalDateTime = new Date(`${data.date}T${data.arrivalTime}`);
+    // Parse date and time fields with proper timezone conversion
+    const pickupDateTime = new Date(localTimeToUtc(data.date, data.pickupTime));
+    const arrivalDateTime = new Date(localTimeToUtc(data.date, data.arrivalTime));
     const completeDateTime = data.completeTime
-      ? new Date(`${data.date}T${data.completeTime}`)
+      ? new Date(localTimeToUtc(data.date, data.completeTime))
       : null;
 
     // Convert numeric values
