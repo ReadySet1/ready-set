@@ -1,3 +1,5 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -9,16 +11,20 @@ const nextConfig = {
   experimental: {
     // Enable 'use cache' directive for static site generation
     useCache: true,
-    // Force dynamic rendering for all routes during build to avoid Prisma initialization issues
-    forceStaticGeneration: false,
   },
   skipTrailingSlashRedirect: true,
+  // Ensure all API routes are treated as dynamic
+  async rewrites() {
+    return [];
+  },
+
   webpack: (config, { isServer }) => {
     // Configure externals for server-side rendering
     if (isServer) {
       config.externals = config.externals || [];
       config.externals.push('pg');
     }
+    
     return config;
   },
   images: {

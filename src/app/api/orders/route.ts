@@ -16,7 +16,7 @@ import { getCenterCoordinate, calculateDistance } from '@/utils/distance';
 import { getAddressInfo } from '@/utils/addresses';
 import { sendDeliveryNotifications } from '@/app/actions/email';
 
-const prismaClient = new PrismaClient();
+import { prisma as prismaClient } from "@/utils/prismaDB";
 
 // Simplified types to avoid Prisma payload complexity
 type PrismaCateringOrder = any;

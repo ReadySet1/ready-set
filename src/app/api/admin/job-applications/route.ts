@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
-
-// Force dynamic rendering for this route
-export const dynamic = 'force-dynamic';
 import { ApplicationStatus } from "@/types/job-application";
 import { createClient } from "@/utils/supabase/server";
+
+// Route segment config
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const revalidate = 0;
 
 // GET handler for fetching job applications with filters and pagination
 export async function GET(request: NextRequest) {

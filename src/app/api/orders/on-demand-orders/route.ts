@@ -5,7 +5,7 @@ import { createClient } from "@/utils/supabase/server";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { OnDemandStatus, OnDemandWhereInput, OnDemandOrderByWithRelationInput, SortOrder } from "@/types/prisma";
 
-const prisma = new PrismaClient();
+import { prisma } from "@/utils/prismaDB";
 const ITEMS_PER_PAGE = 10;
 
 export async function GET(req: NextRequest) {

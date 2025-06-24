@@ -5,7 +5,7 @@ import { UserType } from "@/types/prisma";
 // Remove static import
 // import { createClient } from "@/utils/supabase/server";
 
-const prisma = new PrismaClient();
+import { prisma } from "@/utils/prismaDB";
 
 export async function validateAdminRole(request: Request) {
   try {

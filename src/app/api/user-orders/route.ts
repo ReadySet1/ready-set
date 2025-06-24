@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { createClient } from "@/utils/supabase/server";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/utils/prismaDB";
 
 // Updated type definitions
 type CateringOrder = any;

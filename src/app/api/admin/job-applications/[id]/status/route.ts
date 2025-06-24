@@ -3,6 +3,11 @@ import { prisma } from "@/utils/prismaDB";
 import { ApplicationStatus } from "@/types/job-application";
 import { createClient } from "@/utils/supabase/server";
 
+// Route segment config
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const revalidate = 0;
+
 export async function PATCH(
   request: NextRequest, 
   props: { params: Promise<{ id: string }> }

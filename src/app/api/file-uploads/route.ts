@@ -2,8 +2,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { PrismaClient } from "@prisma/client";
 import { STORAGE_BUCKETS } from "@/utils/file-service";
+import { prisma } from "@/utils/prismaDB";
 
 // Add a new route to get a signed URL for a file
 export async function GET(request: NextRequest) {
@@ -75,9 +75,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   console.log("File upload API endpoint called");
-
-  // Instantiate Prisma Client within the handler
-  const prisma = new PrismaClient();
 
   try {
     // Parse form data first to avoid issues with error handling
@@ -517,7 +514,6 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Initialize Prisma client to find and delete the file record
-    const prisma = new PrismaClient();
     let fileRecord;
 
     if (fileIdParam) {

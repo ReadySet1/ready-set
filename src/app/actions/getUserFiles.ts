@@ -4,7 +4,7 @@
 
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+import { prisma } from "@/utils/prismaDB";
 
 export type UserFile = {
   id: string;

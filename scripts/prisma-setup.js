@@ -2,7 +2,7 @@
 
 /**
  * This script ensures that Prisma client is generated before build
- * and handles any initialization issues that might occur in Vercel
+ * and handles any initialization issues that might occur in Vercel with pnpm
  */
 
 const { execSync } = require('child_process');
@@ -26,8 +26,13 @@ try {
   
   log('Found Prisma schema, generating client...');
   
-  // Generate Prisma client
-  execSync('npx prisma generate', { stdio: 'inherit' });
+  // Use pnpm to generate Prisma client
+  try {
+    execSync('pnpm prisma generate', { stdio: 'inherit' });
+  } catch (error) {
+    log('pnpm prisma generate failed, trying npx...');
+    execSync('npx prisma generate', { stdio: 'inherit' });
+  }
   
   // Verify that Prisma client was generated
   const prismaClientPath = path.join(process.cwd(), 'node_modules', '.prisma', 'client');
@@ -40,6 +45,17 @@ try {
   // Create a verification file to ensure Prisma client is initialized
   const verificationPath = path.join(process.cwd(), '.prisma-initialized');
   fs.writeFileSync(verificationPath, new Date().toISOString());
+  
+  // For pnpm, ensure the client is properly linked (skip if already running from postinstall)
+  const pnpmLockPath = path.join(process.cwd(), 'pnpm-lock.yaml');
+  if (fs.existsSync(pnpmLockPath) && !process.env.npm_lifecycle_event) {
+    log('Detected pnpm, ensuring proper client linking...');
+    try {
+      execSync('pnpm install --frozen-lockfile --ignore-scripts', { stdio: 'inherit' });
+    } catch (error) {
+      log('pnpm install failed, but continuing...');
+    }
+  }
   
   log('Prisma setup complete!');
   process.exit(0);

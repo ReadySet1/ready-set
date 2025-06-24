@@ -5,12 +5,27 @@ declare global {
   var prismaGlobal: PrismaClient | undefined;
 }
 
-// Initialize Prisma Client
+// Create Prisma client with proper error handling
+function createPrismaClient() {
+  if (typeof window !== 'undefined') {
+    throw new Error('PrismaClient should not be used on the client side');
+  }
+  
+  return new PrismaClient({
+    log: process.env.NODE_ENV === 'development' 
+      ? ['error', 'warn']
+      : ['error'],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    },
+  });
+}
+
+// Initialize Prisma Client with singleton pattern
 // Prevent multiple instances of Prisma Client in development
-const prismaInstance = globalThis.prismaGlobal || new PrismaClient({
-  // Optional: Add logging configuration if needed
-  // log: ['query', 'info', 'warn', 'error'],
-});
+const prismaInstance = globalThis.prismaGlobal || createPrismaClient();
 
 if (process.env.NODE_ENV !== 'production') {
   globalThis.prismaGlobal = prismaInstance;

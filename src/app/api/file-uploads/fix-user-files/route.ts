@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
 import { createClient } from "@/utils/supabase/server";
+import { prisma } from "@/utils/prismaDB";
 
 /**
  * This endpoint is designed to fix user files that were uploaded
@@ -10,9 +10,6 @@ import { createClient } from "@/utils/supabase/server";
  */
 export async function POST(request: NextRequest) {
   console.log("Fix user files API endpoint called");
-  
-  // Initialize Prisma client
-  const prisma = new PrismaClient();
   
   try {
     // Verify admin permissions
