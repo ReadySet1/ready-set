@@ -1,7 +1,7 @@
 // src/app/(site)/bakery/page.tsx
 
 import { Metadata } from "next";
-import FoodIcons from "@/components/FoodDelivery/FoodIcons";
+import { FoodServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
 import BakeryPartners from "@/components/BakeryDelivery/BakeryPartners";
 import BakeryTerms from "@/components/BakeryDelivery/BakeryTerms";
 import DownloadableResources from "@/components/BakeryDelivery/DownloadableResources";
@@ -79,7 +79,7 @@ export default function BakeryPage(): React.ReactElement {
     <div className="pt-20 md:pt-24">
       <BakeryHero />
       <BakeryPartners />
-      <FoodIcons />
+      <FoodServiceFeatures />
       <BakeryTerms />
       {/* <DownloadableResources /> */}
     </div>
