@@ -175,7 +175,7 @@
     "@types/webpack": "^5.28.5",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
-    "@vitejs/plugin-react": "4.2.1",
+    "@vitejs/plugin-react": "4.6.0",
     "autoprefixer": "^10.4.20",
     "cross-env": "^7.0.3",
     "dotenv-cli": "^8.0.0",
@@ -195,8 +195,8 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
-    "vite": "5.0.12",
-    "vitest": "1.2.2",
+    "vite": "7.0.0",
+    "vitest": "3.2.4",
     "vitest-mock-extended": "^3.1.0"
   },
   "overrides": {
