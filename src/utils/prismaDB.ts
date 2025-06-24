@@ -11,17 +11,21 @@ declare global {
   var prismaGlobal: PrismaClient | undefined;
 }
 
-// Check if we're in a build environment
+// Check if we're in a build environment or if DATABASE_URL is missing
 const isBuildTime = process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL;
+const isEdgeRuntime = process.env.NEXT_RUNTIME === 'edge';
+const forceMockClient = process.env.PRISMA_MOCK_BUILD === 'true';
 
 // Create a mock Prisma client for build time
 const createMockPrismaClient = (): PrismaClient => {
+  console.log('Creating mock Prisma client for build time or edge runtime');
   const mockClient = {} as PrismaClient;
   
   // Add common Prisma methods as mocks
   const models = [
-    'user', 'jobApplication', 'fileUpload', 'address', 'order', 
-    'driver', 'carrier', 'cateringRequest', 'profile'
+    'profile', 'user', 'jobApplication', 'fileUpload', 'address', 'order', 
+    'driver', 'carrier', 'cateringRequest', 'onDemand', 'dispatch',
+    'account', 'session', 'userAddress'
   ];
   
   models.forEach(model => {
@@ -54,12 +58,15 @@ const createMockPrismaClient = (): PrismaClient => {
   (mockClient as any).$disconnect = () => Promise.resolve();
   (mockClient as any).$executeRaw = () => Promise.resolve(0);
   (mockClient as any).$queryRaw = () => Promise.resolve([]);
+  (mockClient as any).$executeRawUnsafe = () => Promise.resolve(0);
+  (mockClient as any).$queryRawUnsafe = () => Promise.resolve([]);
   
   return mockClient;
 };
 
 // Create real Prisma client
 const createRealPrismaClient = (): PrismaClient => {
+  console.log('Creating real Prisma client');
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' 
       ? ['error', 'warn']
@@ -69,8 +76,8 @@ const createRealPrismaClient = (): PrismaClient => {
 
 // Create appropriate client based on environment
 const createPrismaClient = (): PrismaClient => {
-  if (isBuildTime) {
-    console.log('Using mock Prisma client for build time');
+  // Use mock client during build time, edge runtime, or when forced
+  if (isBuildTime || isEdgeRuntime || forceMockClient) {
     return createMockPrismaClient();
   }
   
@@ -108,9 +115,18 @@ class PrismaClientManager {
     
     return PrismaClientManager.instance;
   }
+  
+  static resetInstance(): void {
+    PrismaClientManager.instance = undefined;
+    globalThis.prismaGlobal = undefined;
+  }
 }
 
 // Export the singleton instance
 export const prisma = PrismaClientManager.getInstance();
 
+// Export default for compatibility
 export default prisma;
+
+// Export manager for testing/debugging
+export { PrismaClientManager };

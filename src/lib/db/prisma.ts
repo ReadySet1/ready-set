@@ -1,2 +1,2 @@
-// Re-export the improved Prisma client from utils
-export { prisma, default } from '@/utils/prismaDB'; 
+// Re-export the unified Prisma client
+export { prisma, default, PrismaClientManager } from '@/utils/prismaDB'; 
