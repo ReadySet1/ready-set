@@ -8,6 +8,9 @@ import { prisma } from '@/lib/db/prisma';
 import { CarrierService } from '@/lib/services/carrierService';
 import { startOfDay, endOfDay } from 'date-fns';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 interface CarrierStats {
   totalOrders: number;
   activeOrders: number;
@@ -141,7 +144,7 @@ export async function GET(
       activeOrders,
       todayOrders,
       webhookSuccess,
-      recentOrders: recentOrders.map(order => ({
+      recentOrders: recentOrders.map((order: any) => ({
         id: order.id,
         orderNumber: order.orderNumber,
         status: order.status,

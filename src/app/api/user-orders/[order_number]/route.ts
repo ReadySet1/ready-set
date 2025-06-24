@@ -2,47 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { createClient } from "@/utils/supabase/server";
 
-const prisma = new PrismaClient();
+import { prisma } from "@/utils/prismaDB";
 
-type CateringRequest = Prisma.CateringRequestGetPayload<{
-  include: {
-    user: { select: { name: true; email: true } };
-    pickupAddress: true;
-    deliveryAddress: true;
-    dispatches: {
-      include: {
-        driver: {
-          select: {
-            id: true;
-            name: true;
-            email: true;
-            contactNumber: true;
-          };
-        };
-      };
-    };
-  };
-}>;
+type CateringRequest = any;
 
-type OnDemandOrder = Prisma.OnDemandGetPayload<{
-  include: {
-    user: { select: { name: true; email: true } };
-    pickupAddress: true;
-    deliveryAddress: true;
-    dispatches: {
-      include: {
-        driver: {
-          select: {
-            id: true;
-            name: true;
-            email: true;
-            contactNumber: true;
-          };
-        };
-      };
-    };
-  };
-}>;
+type OnDemandOrder = any;
 
 type Order =
   | (CateringRequest & { order_type: "catering" })

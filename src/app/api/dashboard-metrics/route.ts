@@ -1,11 +1,10 @@
 // app/api/dashboard-metrics/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { PrismaClient, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 import { CateringStatus } from '@/types/order-status'
-
-const prisma = new PrismaClient();
+import { prisma } from '@/utils/prismaDB'
 
 // Define potential Enums if they exist in your schema - These are now imported above
 // import { OrderStatus } from '@prisma/client'; // Example if defined

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/utils/prismaDB';
 import { createClient } from '@/utils/supabase/server';
-import { UserType } from "@prisma/client";
+import { UserType } from "@/types/prisma";
 
 
 export async function POST(request: NextRequest, props: { params: Promise<{ userId: string }> }) {

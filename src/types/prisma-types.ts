@@ -1,16 +1,6 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from "@prisma/client";
 import { PrismaClientKnownRequestError, PrismaClientInitializationError, PrismaClientValidationError } from '@prisma/client/runtime/library';
 import { Decimal } from '@prisma/client/runtime/library';
-import { 
-  UserType, 
-  UserStatus, 
-  DriverStatus, 
-  CateringNeedHost, 
-  CateringStatus, 
-  OnDemandStatus,
-  VehicleType,
-  ApplicationStatus
-} from './user';
 
 // Export errors and Decimal for use in other files
 export { 
@@ -20,13 +10,12 @@ export {
   Decimal 
 };
 
-// Define constants for Prisma enum values
+// Define constants for Prisma enum values (matching the Prisma schema exactly)
 export const PRISMA_USER_TYPE = {
-  ADMIN: 'ADMIN',
-  USER: 'USER',
   VENDOR: 'VENDOR',
   CLIENT: 'CLIENT',
   DRIVER: 'DRIVER',
+  ADMIN: 'ADMIN',
   HELPDESK: 'HELPDESK',
   SUPER_ADMIN: 'SUPER_ADMIN'
 } as const;
@@ -43,11 +32,6 @@ export const PRISMA_DRIVER_STATUS = {
   ARRIVED_TO_CLIENT: 'ARRIVED_TO_CLIENT',
   ASSIGNED: 'ASSIGNED',
   COMPLETED: 'COMPLETED'
-} as const;
-
-export const PRISMA_CATERING_NEED_HOST = {
-  YES: 'YES',
-  NO: 'NO'
 } as const;
 
 export const PRISMA_CATERING_STATUS = {
@@ -70,6 +54,11 @@ export const PRISMA_ON_DEMAND_STATUS = {
   CONFIRMED: 'CONFIRMED',
   IN_PROGRESS: 'IN_PROGRESS',
   DELIVERED: 'DELIVERED'
+} as const;
+
+export const PRISMA_CATERING_NEED_HOST = {
+  YES: 'YES',
+  NO: 'NO'
 } as const;
 
 export const PRISMA_VEHICLE_TYPE = {
@@ -103,79 +92,108 @@ export type PrismaVehicleTypeValue = typeof PRISMA_VEHICLE_TYPE[keyof typeof PRI
 export type PrismaApplicationStatusValue = typeof PRISMA_APPLICATION_STATUS[keyof typeof PRISMA_APPLICATION_STATUS];
 export type PrismaFormTypeValue = typeof PRISMA_FORM_TYPE[keyof typeof PRISMA_FORM_TYPE];
 
+// Import application enums for converter functions
+import { 
+  UserType as AppUserType, 
+  UserStatus as AppUserStatus, 
+  DriverStatus as AppDriverStatus, 
+  CateringNeedHost as AppCateringNeedHost, 
+  CateringStatus as AppCateringStatus, 
+  OnDemandStatus as AppOnDemandStatus,
+  VehicleType as AppVehicleType,
+  ApplicationStatus as AppApplicationStatus
+} from './user';
+
 // Helper functions to convert between application enums and Prisma enums
-export function convertToPrismaUserType(type: UserType): PrismaUserTypeValue {
+export function convertToPrismaUserType(type: AppUserType): PrismaUserTypeValue {
   switch(type) {
-    case UserType.ADMIN: return PRISMA_USER_TYPE.ADMIN;
-    case UserType.VENDOR: return PRISMA_USER_TYPE.VENDOR;
-    case UserType.CLIENT: return PRISMA_USER_TYPE.CLIENT;
-    case UserType.DRIVER: return PRISMA_USER_TYPE.DRIVER;
-    case UserType.HELPDESK: return PRISMA_USER_TYPE.HELPDESK;
-    case UserType.SUPER_ADMIN: return PRISMA_USER_TYPE.SUPER_ADMIN;
-    default: return PRISMA_USER_TYPE.USER;
+    case AppUserType.ADMIN: return PRISMA_USER_TYPE.ADMIN;
+    case AppUserType.VENDOR: return PRISMA_USER_TYPE.VENDOR;
+    case AppUserType.CLIENT: return PRISMA_USER_TYPE.CLIENT;
+    case AppUserType.DRIVER: return PRISMA_USER_TYPE.DRIVER;
+    case AppUserType.HELPDESK: return PRISMA_USER_TYPE.HELPDESK;
+    case AppUserType.SUPER_ADMIN: return PRISMA_USER_TYPE.SUPER_ADMIN;
+    default: return PRISMA_USER_TYPE.VENDOR;
   }
 }
 
-export function convertToPrismaUserStatus(status: UserStatus): PrismaUserStatusValue {
+export function convertToPrismaUserStatus(status: AppUserStatus): PrismaUserStatusValue {
   switch(status) {
-    case UserStatus.ACTIVE: return PRISMA_USER_STATUS.ACTIVE;
-    case UserStatus.PENDING: return PRISMA_USER_STATUS.PENDING;
-    case UserStatus.DELETED: return PRISMA_USER_STATUS.DELETED;
+    case AppUserStatus.ACTIVE: return PRISMA_USER_STATUS.ACTIVE;
+    case AppUserStatus.PENDING: return PRISMA_USER_STATUS.PENDING;
+    case AppUserStatus.DELETED: return PRISMA_USER_STATUS.DELETED;
     default: return PRISMA_USER_STATUS.PENDING;
   }
 }
 
-export function convertToPrismaDriverStatus(status: DriverStatus): PrismaDriverStatusValue {
+export function convertToPrismaDriverStatus(status: AppDriverStatus): PrismaDriverStatusValue {
   switch(status) {
-    case DriverStatus.ARRIVED_AT_VENDOR: return PRISMA_DRIVER_STATUS.ARRIVED_AT_VENDOR;
-    case DriverStatus.EN_ROUTE_TO_CLIENT: return PRISMA_DRIVER_STATUS.EN_ROUTE_TO_CLIENT;
-    case DriverStatus.ARRIVED_TO_CLIENT: return PRISMA_DRIVER_STATUS.ARRIVED_TO_CLIENT;
-    case DriverStatus.ASSIGNED: return PRISMA_DRIVER_STATUS.ASSIGNED;
-    case DriverStatus.COMPLETED: return PRISMA_DRIVER_STATUS.COMPLETED;
+    case AppDriverStatus.ARRIVED_AT_VENDOR: return PRISMA_DRIVER_STATUS.ARRIVED_AT_VENDOR;
+    case AppDriverStatus.EN_ROUTE_TO_CLIENT: return PRISMA_DRIVER_STATUS.EN_ROUTE_TO_CLIENT;
+    case AppDriverStatus.ARRIVED_TO_CLIENT: return PRISMA_DRIVER_STATUS.ARRIVED_TO_CLIENT;
+    case AppDriverStatus.ASSIGNED: return PRISMA_DRIVER_STATUS.ASSIGNED;
+    case AppDriverStatus.COMPLETED: return PRISMA_DRIVER_STATUS.COMPLETED;
     default: return PRISMA_DRIVER_STATUS.ASSIGNED;
   }
 }
 
-export function convertToPrismaCateringStatus(status: CateringStatus): PrismaCateringStatusValue {
+export function convertToPrismaCateringStatus(status: AppCateringStatus): PrismaCateringStatusValue {
   switch(status) {
-    case CateringStatus.ACTIVE: return PRISMA_CATERING_STATUS.ACTIVE;
-    case CateringStatus.ASSIGNED: return PRISMA_CATERING_STATUS.ASSIGNED;
-    case CateringStatus.CANCELLED: return PRISMA_CATERING_STATUS.CANCELLED;
-    case CateringStatus.COMPLETED: return PRISMA_CATERING_STATUS.COMPLETED;
+    case AppCateringStatus.ACTIVE: return PRISMA_CATERING_STATUS.ACTIVE;
+    case AppCateringStatus.ASSIGNED: return PRISMA_CATERING_STATUS.ASSIGNED;
+    case AppCateringStatus.CANCELLED: return PRISMA_CATERING_STATUS.CANCELLED;
+    case AppCateringStatus.COMPLETED: return PRISMA_CATERING_STATUS.COMPLETED;
+    case AppCateringStatus.PENDING: return PRISMA_CATERING_STATUS.PENDING;
+    case AppCateringStatus.CONFIRMED: return PRISMA_CATERING_STATUS.CONFIRMED;
+    case AppCateringStatus.IN_PROGRESS: return PRISMA_CATERING_STATUS.IN_PROGRESS;
+    case AppCateringStatus.DELIVERED: return PRISMA_CATERING_STATUS.DELIVERED;
     default: return PRISMA_CATERING_STATUS.ACTIVE;
   }
 }
 
-export function convertToPrismaOnDemandStatus(status: OnDemandStatus): PrismaOnDemandStatusValue {
+export function convertToPrismaOnDemandStatus(status: AppOnDemandStatus): PrismaOnDemandStatusValue {
   switch(status) {
-    case OnDemandStatus.ACTIVE: return PRISMA_ON_DEMAND_STATUS.ACTIVE;
-    case OnDemandStatus.ASSIGNED: return PRISMA_ON_DEMAND_STATUS.ASSIGNED;
-    case OnDemandStatus.CANCELLED: return PRISMA_ON_DEMAND_STATUS.CANCELLED;
-    case OnDemandStatus.COMPLETED: return PRISMA_ON_DEMAND_STATUS.COMPLETED;
+    case AppOnDemandStatus.ACTIVE: return PRISMA_ON_DEMAND_STATUS.ACTIVE;
+    case AppOnDemandStatus.ASSIGNED: return PRISMA_ON_DEMAND_STATUS.ASSIGNED;
+    case AppOnDemandStatus.CANCELLED: return PRISMA_ON_DEMAND_STATUS.CANCELLED;
+    case AppOnDemandStatus.COMPLETED: return PRISMA_ON_DEMAND_STATUS.COMPLETED;
+    case AppOnDemandStatus.PENDING: return PRISMA_ON_DEMAND_STATUS.PENDING;
+    case AppOnDemandStatus.CONFIRMED: return PRISMA_ON_DEMAND_STATUS.CONFIRMED;
+    case AppOnDemandStatus.IN_PROGRESS: return PRISMA_ON_DEMAND_STATUS.IN_PROGRESS;
+    case AppOnDemandStatus.DELIVERED: return PRISMA_ON_DEMAND_STATUS.DELIVERED;
     default: return PRISMA_ON_DEMAND_STATUS.ACTIVE;
   }
 }
 
-export function convertToPrismaVehicleType(type: VehicleType): PrismaVehicleTypeValue {
+export function convertToPrismaVehicleType(type: AppVehicleType): PrismaVehicleTypeValue {
   switch(type) {
-    case VehicleType.CAR: return PRISMA_VEHICLE_TYPE.CAR;
-    case VehicleType.VAN: return PRISMA_VEHICLE_TYPE.VAN;
-    case VehicleType.TRUCK: return PRISMA_VEHICLE_TYPE.TRUCK;
+    case AppVehicleType.CAR: return PRISMA_VEHICLE_TYPE.CAR;
+    case AppVehicleType.VAN: return PRISMA_VEHICLE_TYPE.VAN;
+    case AppVehicleType.TRUCK: return PRISMA_VEHICLE_TYPE.TRUCK;
     default: return PRISMA_VEHICLE_TYPE.CAR;
   }
 }
 
-export function convertToPrismaApplicationStatus(status: ApplicationStatus): PrismaApplicationStatusValue {
+export function convertToPrismaApplicationStatus(status: AppApplicationStatus): PrismaApplicationStatusValue {
   switch(status) {
-    case ApplicationStatus.PENDING: return PRISMA_APPLICATION_STATUS.PENDING;
-    case ApplicationStatus.APPROVED: return PRISMA_APPLICATION_STATUS.APPROVED;
-    case ApplicationStatus.REJECTED: return PRISMA_APPLICATION_STATUS.REJECTED;
-    case ApplicationStatus.INTERVIEWING: return PRISMA_APPLICATION_STATUS.INTERVIEWING;
+    case AppApplicationStatus.PENDING: return PRISMA_APPLICATION_STATUS.PENDING;
+    case AppApplicationStatus.APPROVED: return PRISMA_APPLICATION_STATUS.APPROVED;
+    case AppApplicationStatus.REJECTED: return PRISMA_APPLICATION_STATUS.REJECTED;
+    case AppApplicationStatus.INTERVIEWING: return PRISMA_APPLICATION_STATUS.INTERVIEWING;
     default: return PRISMA_APPLICATION_STATUS.PENDING;
   }
 }
 
-// Other Prisma helper types
+// Helper function to convert from Prisma to application enum
+export function convertToCateringNeedHost(needHost: PrismaCateringNeedHostValue): AppCateringNeedHost {
+  switch(needHost) {
+    case PRISMA_CATERING_NEED_HOST.YES: return AppCateringNeedHost.YES;
+    case PRISMA_CATERING_NEED_HOST.NO: return AppCateringNeedHost.NO;
+    default: return AppCateringNeedHost.NO;
+  }
+}
+
+// Prisma helper types
 export type PrismaError = Error | PrismaClientKnownRequestError | PrismaClientInitializationError | PrismaClientValidationError;
 
 /**
@@ -187,90 +205,7 @@ export type PrismaTransaction = Omit<
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
 >;
 
-// Commonly used Prisma payload types
-export type ProfilePayload = Prisma.ProfileGetPayload<{
-  include: {
-    accounts: true;
-    userAddresses: {
-      include: {
-        address: true;
-      }
-    }
-  }
-}>;
-
-export type CateringRequestPayload = Prisma.CateringRequestGetPayload<{
-  include: {
-    dispatches: true;
-    user: { include: { userAddresses: { include: { address: true } } } };
-    pickupAddress: true;
-    deliveryAddress: true;
-    fileUploads: true;
-  }
-}>;
-
-export type OnDemandPayload = Prisma.OnDemandGetPayload<{
-  include: {
-    dispatches: true;
-    user: { include: { userAddresses: { include: { address: true } } } };
-    pickupAddress: true;
-    deliveryAddress: true;
-    fileUploads: true;
-  }
-}>;
-
-export type JobApplicationPayload = Prisma.JobApplicationGetPayload<{
-  include: {
-    fileUploads: true;
-    profile: true;
-  }
-}>;
-
-// Commonly used Prisma input types
-export type ProfileCreateInput = Prisma.ProfileCreateInput;
-export type ProfileUpdateInput = Prisma.ProfileUpdateInput;
-export type ProfileWhereInput = Prisma.ProfileWhereInput;
-export type ProfileOrderByWithRelationInput = Prisma.ProfileOrderByWithRelationInput;
-
-export type AddressCreateInput = Prisma.AddressCreateInput;
-export type AddressUpdateInput = Prisma.AddressUpdateInput;
-export type AddressWhereInput = Prisma.AddressWhereInput;
-
-export type CateringRequestCreateInput = Prisma.CateringRequestCreateInput;
-export type CateringRequestUpdateInput = Prisma.CateringRequestUpdateInput;
-export type CateringRequestWhereInput = Prisma.CateringRequestWhereInput;
-export type CateringRequestOrderByWithRelationInput = Prisma.CateringRequestOrderByWithRelationInput;
-
-export type OnDemandCreateInput = Prisma.OnDemandCreateInput;
-export type OnDemandUpdateInput = Prisma.OnDemandUpdateInput;
-export type OnDemandWhereInput = Prisma.OnDemandWhereInput;
-export type OnDemandOrderByWithRelationInput = Prisma.OnDemandOrderByWithRelationInput;
-
-export type FileUploadCreateInput = Prisma.FileUploadCreateInput;
-export type FileUploadUpdateInput = Prisma.FileUploadUpdateInput;
-export type FileUploadWhereInput = Prisma.FileUploadWhereInput;
-
-export type JobApplicationCreateInput = Prisma.JobApplicationCreateInput;
-export type JobApplicationUpdateInput = Prisma.JobApplicationUpdateInput;
-export type JobApplicationWhereInput = Prisma.JobApplicationWhereInput;
-
-// Model types without any relations
-export type Profile = Prisma.ProfileGetPayload<{}>;
-export type Address = Prisma.AddressGetPayload<{}>;
-export type CateringRequest = Prisma.CateringRequestGetPayload<{}>;
-export type OnDemand = Prisma.OnDemandGetPayload<{}>;
-export type Dispatch = Prisma.DispatchGetPayload<{}>;
-export type FileUpload = Prisma.FileUploadGetPayload<{}>;
-export type UserAddress = Prisma.UserAddressGetPayload<{}>;
-export type Account = Prisma.AccountGetPayload<{}>;
-export type Session = Prisma.SessionGetPayload<{}>;
-export type VerificationToken = Prisma.VerificationTokenGetPayload<{}>;
-export type FormSubmission = Prisma.FormSubmissionGetPayload<{}>;
-export type LeadCapture = Prisma.LeadCaptureGetPayload<{}>;
-export type JobApplication = Prisma.JobApplicationGetPayload<{}>;
-
-// Export Prisma's sort order enum
-export const SortOrder = Prisma.SortOrder;
+// Note: SortOrder can be accessed directly from Prisma if needed
 
 // Helper function for typesafe transactions
 export function withTransaction<T>(

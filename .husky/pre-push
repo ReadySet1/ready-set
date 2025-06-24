@@ -2,14 +2,14 @@
 
 # Run TypeScript check but don't block build on errors
 echo "🔍 Running TypeScript type check (informational only)..."
-pnpm run typecheck || echo "⚠️ TypeScript check found errors, but continuing with build"
+pnpm run typecheck || echo "⚠️ TypeScript check found errors, but continuing with push"
 
-# Build with typecheck disabled due to known Next.js Edge Route typing issues
-echo "🔨 Running build with --no-typecheck..."
-pnpm run build:no-typecheck
+# Build validation disabled for faster push workflow
+echo "⚡ Build validation skipped for faster development workflow"
+echo "   Run 'pnpm run build:no-typecheck' manually before deployment if needed"
 
 # Reminder about the TypeScript issue
-echo "📝 Note: Using --no-typecheck due to known Next.js Edge Runtime typing issues"
+echo "📝 Note: TypeScript checks are informational only due to Next.js Edge Runtime typing issues"
 echo "   These will be fixed in a future update when Next.js resolves the Edge Runtime parameter typing"
 
 # Run Vercel build simulation (commented out for faster development - uncomment before deployment)

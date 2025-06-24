@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
 import { CarrierService } from '@/lib/services/carrierService';
-import { DriverStatus } from '@prisma/client';
+import { DriverStatus } from '@/types/prisma';
 
 // Validation schema for status update request
 const StatusUpdateSchema = z.object({

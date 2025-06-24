@@ -2,20 +2,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-// Import correct Prisma types based on schema.prisma
+import { prisma } from "@/lib/db/prisma";
+import { Prisma } from "@prisma/client";
 import { 
-    Prisma, 
     CateringRequest, 
     Dispatch, 
-    Profile, // Use Profile instead of User/Driver
+    Profile, 
     Address, 
-    CateringStatus, // Use CateringStatus for this route
-    // DriverStatus // This exists, but isn't used directly in Dispatch status
-} from "@prisma/client"; 
-// Import error type from runtime library
+    CateringStatus,
+    CateringRequestWhereInput
+} from "@/types/prisma"; 
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library"; 
-
-import { prisma } from "@/lib/db/prisma"; 
 
 const ITEMS_PER_PAGE = 10;
 
@@ -66,8 +63,8 @@ export async function GET(req: NextRequest) {
     const sortDirection = url.searchParams.get('direction') || 'desc';
     const recentOnly = url.searchParams.get('recentOnly') === 'true';
 
-    // Build where clause
-    let whereClause: Prisma.CateringRequestWhereInput = {
+          // Build where clause
+    let whereClause: any = {
       deletedAt: null
     };
 
@@ -95,10 +92,10 @@ export async function GET(req: NextRequest) {
     }
 
     // Build order by clause
-    let orderByClause: Prisma.CateringRequestOrderByWithRelationInput = {};
+    let orderByClause: any = {};
     const effectiveSortDirection = sortDirection === 'asc' ? 'asc' : 'desc';
     
-    const validSortFields: { [key: string]: Prisma.CateringRequestOrderByWithRelationInput } = {
+    const validSortFields: { [key: string]: any } = {
       pickupDateTime: { pickupDateTime: effectiveSortDirection },
       date: { pickupDateTime: effectiveSortDirection },
       orderTotal: { orderTotal: effectiveSortDirection },

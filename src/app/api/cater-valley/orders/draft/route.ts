@@ -229,7 +229,9 @@ export async function POST(request: NextRequest) {
     ]);
 
     // 7. Create the draft order
-    const deliveryDateTime = new Date(`${validatedData.deliveryDate}T${validatedData.deliveryTime}`);
+    // Import timezone utility for proper conversion
+    const { localTimeToUtc } = await import('@/lib/utils/timezone');
+    const deliveryDateTime = new Date(localTimeToUtc(validatedData.deliveryDate, validatedData.deliveryTime));
     const pickupTime = calculatePickupTime(validatedData.deliveryDate, validatedData.deliveryTime);
 
     const draftOrder = await prisma.cateringRequest.create({

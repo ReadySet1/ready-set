@@ -1,6 +1,5 @@
 // src/utils/order-mappers.ts
 
-import { Prisma } from "@prisma/client";
 import { Decimal } from "@/types/prisma";
 import {
   CateringRequest,
@@ -17,7 +16,9 @@ import {
 } from "../types/order";
 
 // Type to represent a catering_request from Prisma with related fields included
-type PrismaCateringRequest = Prisma.CateringRequestGetPayload<{
+import { CateringRequestGetPayload, OnDemandGetPayload, DispatchGetPayload, FileUploadGetPayload } from '@/types/prisma';
+
+type PrismaCateringRequest = CateringRequestGetPayload<{
   include: {
     user: true;
     pickupAddress: true;
@@ -32,7 +33,7 @@ type PrismaCateringRequest = Prisma.CateringRequestGetPayload<{
 }>;
 
 // Type to represent an on_demand from Prisma with related fields included
-type PrismaOnDemand = Prisma.OnDemandGetPayload<{
+type PrismaOnDemand = OnDemandGetPayload<{
   include: {
     user: true;
     pickupAddress: true;
@@ -47,7 +48,7 @@ type PrismaOnDemand = Prisma.OnDemandGetPayload<{
 }>;
 
 // Helper function to convert Prisma Decimal to number
-function convertDecimalToNumber(decimal: Decimal | null): number | null {
+function convertDecimalToNumber(decimal: Decimal | null | undefined): number | null {
   return decimal ? Number(decimal) : null;
 }
 
@@ -116,7 +117,7 @@ export function mapPrismaCateringRequestToAppType(
       updatedAt: prismaRequest.deliveryAddress.updatedAt,
       createdBy: prismaRequest.deliveryAddress.createdBy,
     },
-    dispatches: prismaRequest.dispatches.map((d: Prisma.DispatchGetPayload<{ include: { driver: true } }>) => ({
+    dispatches: (prismaRequest as any).dispatches?.map((d: any) => ({
       id: d.id,
       cateringRequestId: d.cateringRequestId,
       onDemandId: d.onDemandId,
@@ -133,7 +134,7 @@ export function mapPrismaCateringRequestToAppType(
           }
         : undefined,
     })),
-    fileUploads: prismaRequest.fileUploads?.map((f: Prisma.FileUploadGetPayload<{}>) => ({
+    fileUploads: prismaRequest.fileUploads?.map((f: FileUploadGetPayload<{}>) => ({
       id: f.id,
       fileName: f.fileName,
       fileType: f.fileType,
@@ -225,7 +226,7 @@ export function mapPrismaOnDemandToAppType(
       updatedAt: prismaOnDemand.deliveryAddress.updatedAt,
       createdBy: prismaOnDemand.deliveryAddress.createdBy,
     },
-    dispatches: prismaOnDemand.dispatches.map((d: Prisma.DispatchGetPayload<{ include: { driver: true } }>) => ({
+    dispatches: (prismaOnDemand as any).dispatches?.map((d: any) => ({
       id: d.id,
       cateringRequestId: d.cateringRequestId,
       onDemandId: d.onDemandId,
@@ -242,7 +243,7 @@ export function mapPrismaOnDemandToAppType(
           }
         : undefined,
     })),
-    fileUploads: prismaOnDemand.fileUploads?.map((f: Prisma.FileUploadGetPayload<{}>) => ({
+    fileUploads: prismaOnDemand.fileUploads?.map((f: FileUploadGetPayload<{}>) => ({
       id: f.id,
       fileName: f.fileName,
       fileType: f.fileType,
@@ -261,9 +262,9 @@ export function mapPrismaOnDemandToAppType(
 
     // Specific on_demand fields
     order_type: "on_demand",
-    itemDelivered: prismaOnDemand.itemDelivered,
+    itemDelivered: (prismaOnDemand as any).itemDelivered,
     vehicleType: prismaOnDemand.vehicleType as VehicleType,
-    hoursNeeded: prismaOnDemand.hoursNeeded,
+    hoursNeeded: (prismaOnDemand as any).hoursNeeded,
     length: prismaOnDemand.length,
     width: prismaOnDemand.width,
     height: prismaOnDemand.height,

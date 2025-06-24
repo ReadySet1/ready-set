@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { sendEmail } from "@/utils/email";
 import { createClient } from "@/utils/supabase/server"; // Import Supabase server client
-import { FileUpload } from "@prisma/client"; // Import FileUpload type if not already
+import { Prisma } from "@prisma/client";
 
 export async function POST(request: Request) {
   const supabase = await createClient(); // Initialize Supabase client AND AWAIT IT
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       data.equipmentPhotoFileId
     ].filter((id): id is string => typeof id === 'string' && id !== '');
 
-    let temporaryFileUploads: FileUpload[] = [];
+    let temporaryFileUploads: any[] = [];
     if (fileIdsToProcess.length > 0) {
         console.log("Fetching FileUpload records for IDs:", fileIdsToProcess);
         temporaryFileUploads = await prisma.fileUpload.findMany({
@@ -196,7 +196,7 @@ export async function POST(request: Request) {
         const filePathUpdates: Record<string, string> = {};
         
         for (const file of temporaryFileUploads) {
-          const processedFile = processedFilesInfo.find(p => p.id === file.id);
+          const processedFile = processedFilesInfo.find((p: any) => p.id === file.id);
           if (!processedFile) continue;
           
           // Map category to the appropriate *FilePath field
@@ -297,7 +297,7 @@ export async function POST(request: Request) {
         // Add links for processed files
         if (applicationWithFiles.fileUploads && applicationWithFiles.fileUploads.length > 0) {
             htmlBody += `<h2>Uploaded Documents:</h2><ul>`;
-            applicationWithFiles.fileUploads.forEach(file => {
+            applicationWithFiles.fileUploads.forEach((file: any) => {
                 // Use category or fileName for the link text
                 const linkText = file.category ? file.category.charAt(0).toUpperCase() + file.category.slice(1) : file.fileName || 'View File';
                 if (file.fileUrl) { // Use the updated fileUrl

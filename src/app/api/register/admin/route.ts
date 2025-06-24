@@ -5,7 +5,8 @@ import { validateAdminRole } from "@/middleware/authMiddleware";
 import { Resend } from "resend";
 import { createClient, createAdminClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
-import { Prisma, UserStatus, UserType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { UserStatus, UserType, PrismaClientKnownRequestError } from '@/types/prisma';
 
 interface AdminRegistrationRequest {
   name: string;
@@ -122,8 +123,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create user in your database with the Supabase UUID as the ID
-    const userData: Prisma.ProfileCreateInput = {
+          // Create user in your database with the Supabase UUID as the ID
+    const userData: any = {
       id: authData.user.id,
       email: body.email.toLowerCase(),
       name: body.name,
@@ -194,7 +195,7 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Admin registration error:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error instanceof PrismaClientKnownRequestError) {
       return NextResponse.json(
         { error: "Database error" },
         { status: 500 }

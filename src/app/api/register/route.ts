@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
-import { Prisma, UserStatus, UserType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { UserStatus, UserType, PrismaClientKnownRequestError, PrismaClientInitializationError, PrismaClientValidationError } from '@/types/prisma';
 
 // Map between our form input types and the Prisma enum values
 const userTypeMap: Record<string, string> = {
@@ -230,8 +231,8 @@ export async function POST(request: Request) {
       return isNaN(num) ? null : num;
     };
 
-    // Prepare user data for Prisma
-    const userData: Prisma.ProfileCreateInput = {
+          // Prepare user data for Prisma
+    const userData: any = {
       id: supabaseUserId,
       email: email.toLowerCase(),
       contactNumber: phoneNumber,
@@ -339,35 +340,22 @@ export async function POST(request: Request) {
       },
       { status: 200 }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Registration error:", error);
     
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2002") {
-        return NextResponse.json(
-          {
-            error: "A unique constraint would be violated on the User model. (Duplicate email)",
-          },
-          { status: 400 }
-        );
-      }
+    if (error?.code === "P2002") {
+      return NextResponse.json(
+        {
+          error: "A unique constraint would be violated on the User model. (Duplicate email)",
+        },
+        { status: 400 }
+      );
+    }
+    
+    if (error?.code && error?.message) {
       return NextResponse.json(
         { error: "Database error", details: error.message },
         { status: 500 }
-      );
-    }
-    
-    if (error instanceof Prisma.PrismaClientInitializationError) {
-      return NextResponse.json(
-        { error: "Database connection error", details: error.message },
-        { status: 500 }
-      );
-    }
-    
-    if (error instanceof Prisma.PrismaClientValidationError) {
-      return NextResponse.json(
-        { error: "Invalid data provided", details: error.message },
-        { status: 400 }
       );
     }
 

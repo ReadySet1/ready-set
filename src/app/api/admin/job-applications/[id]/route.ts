@@ -3,6 +3,11 @@ import { prisma } from "@/utils/prismaDB";
 import { createClient } from "@/utils/supabase/server";
 import { PrismaTransaction } from "@/types/prisma-types";
 
+// Route segment config
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const revalidate = 0;
+
 export async function DELETE(
   request: NextRequest,
   props: { params: Promise<{ id: string }> }

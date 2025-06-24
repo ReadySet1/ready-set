@@ -4,7 +4,9 @@ import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from "@prisma/client";
 
-type CateringRequest = Prisma.CateringRequestGetPayload<{
+import { CateringRequestGetPayload, OnDemandGetPayload } from '@/types/prisma';
+
+type CateringRequest = CateringRequestGetPayload<{
   include: {
     user: { select: { name: true; email: true } };
     pickupAddress: true;
@@ -25,7 +27,7 @@ type CateringRequest = Prisma.CateringRequestGetPayload<{
   };
 }>;
 
-type OnDemandOrder = Prisma.OnDemandGetPayload<{
+type OnDemandOrder = OnDemandGetPayload<{
   include: {
     user: { select: { name: true; email: true } };
     pickupAddress: true;

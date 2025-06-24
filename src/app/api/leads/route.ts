@@ -5,7 +5,7 @@ import { Client } from "@sendgrid/client";
 import { ClientRequest } from "@sendgrid/client/src/request";
 import { sendDownloadEmail } from "@/app/actions/send-download-email";
 
-const prisma = new PrismaClient();
+import { prisma } from "@/utils/prismaDB";
 const client = new Client();
 
 // We're still using SendGrid for list management

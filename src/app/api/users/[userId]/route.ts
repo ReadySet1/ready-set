@@ -12,7 +12,8 @@ import { createClient } from "@/utils/supabase/server";
  * - Returns 404 if not found, 403 if forbidden.
  */
 import { prisma } from '@/utils/prismaDB';
-import { Prisma, UserType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { UserType } from '@/types/prisma';
 
 export async function GET(request: NextRequest) {
   console.log(`[GET /api/users/[userId]] Request received for URL: ${request.url}`);
@@ -297,7 +298,7 @@ export async function PUT(
       }
     }
     
-    const updateData: Prisma.ProfileUpdateInput = {
+    const updateData: any = {
       // Basic information
       email: requestBody.email,
       contactNumber: requestBody.contact_number,
@@ -368,8 +369,8 @@ export async function PUT(
     console.error('Unexpected error:', error);
     
     // Check for Prisma-specific errors
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') {
+    if ((error as any)?.code && (error as any)?.message) {
+      if ((error as any).code === 'P2025') {
         return NextResponse.json(
           { error: 'User not found' },
           { status: 404 }

@@ -1,4 +1,25 @@
 /**
+ * Global polyfill for Edge Runtime compatibility
+ * Prevents "r.arrayBuffer is not a function" errors
+ */
+if (typeof global !== 'undefined' && typeof global.Response !== 'undefined') {
+  const OriginalResponse = global.Response;
+  global.Response = class extends OriginalResponse {
+    constructor(...args: any[]) {
+      super(...args);
+    }
+    
+    arrayBuffer(): Promise<ArrayBuffer> {
+      if (typeof super.arrayBuffer === 'function') {
+        return super.arrayBuffer();
+      }
+      // Fallback for environments where arrayBuffer is not available
+      return this.text().then(text => new TextEncoder().encode(text).buffer as ArrayBuffer);
+    }
+  } as any;
+}
+
+/**
  * Safely handles fetch responses with proper type checking for arrayBuffer
  * This resolves issues with arrayBuffer not being a function in some environments
  * 
@@ -33,8 +54,9 @@ export async function safeFetch<T = any>(url: string, options?: RequestInit): Pr
     // Only try arrayBuffer if it's available as a function (not in Edge Runtime)
     // This helps avoid the "r.arrayBuffer is not a function" error
     if (typeof response.arrayBuffer === 'function' && 
-        // Additional check to avoid Edge Runtime issues
-        typeof window !== 'undefined') {
+        // Check if we're NOT in Edge Runtime or during build
+        process.env.NEXT_RUNTIME !== 'edge' &&
+        typeof global !== 'undefined') {
       try {
         const buffer = await response.arrayBuffer();
         // Try to detect if this is text/JSON content that should be parsed

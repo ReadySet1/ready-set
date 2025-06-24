@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { createClient } from "@/utils/supabase/server";
+import { prisma } from "@/utils/prismaDB";
 
-const prisma = new PrismaClient();
+import { CateringRequestGetPayload, OnDemandGetPayload } from '@/types/prisma';
 
-type CateringDelivery = Prisma.CateringRequestGetPayload<{
+type CateringDelivery = CateringRequestGetPayload<{
   include: {
     user: { select: { name: true; email: true } };
     pickupAddress: true;
@@ -12,7 +13,7 @@ type CateringDelivery = Prisma.CateringRequestGetPayload<{
   };
 }>;
 
-type OnDemandDelivery = Prisma.OnDemandGetPayload<{
+type OnDemandDelivery = OnDemandGetPayload<{
   include: {
     user: { select: { name: true; email: true } };
     pickupAddress: true;
@@ -54,11 +55,11 @@ export async function GET(req: NextRequest) {
 
     // Separate catering and on-demand IDs
     const cateringIds = driverDispatches
-      .filter((d) => d.cateringRequestId !== null)
-      .map((d) => d.cateringRequestId!);
+      .filter((d: any) => d.cateringRequestId !== null)
+      .map((d: any) => d.cateringRequestId!);
     const onDemandIds = driverDispatches
-      .filter((d) => d.onDemandId !== null)
-      .map((d) => d.onDemandId!);
+      .filter((d: any) => d.onDemandId !== null)
+      .map((d: any) => d.onDemandId!);
 
     // Fetch catering deliveries
     const cateringDeliveries = await prisma.cateringRequest.findMany({
@@ -87,22 +88,22 @@ export async function GET(req: NextRequest) {
     // Fetch delivery addresses for on-demand deliveries
     const onDemandDeliveryAddresses = await prisma.address.findMany({
       where: {
-        id: { in: onDemandDeliveries.map((d) => d.deliveryAddressId) },
+        id: { in: onDemandDeliveries.map((d: any) => d.deliveryAddressId) },
       },
     });
 
     // Combine and sort deliveries
     const allDeliveries: Delivery[] = [
-      ...cateringDeliveries.map((d) => ({
+      ...cateringDeliveries.map((d: any) => ({
         ...d,
         delivery_type: "catering" as const,
         user: d.user,
         address: d.pickupAddress,
         delivery_address: d.deliveryAddress,
       })),
-      ...onDemandDeliveries.map((d) => {
+      ...onDemandDeliveries.map((d: any) => {
         const deliveryAddress = onDemandDeliveryAddresses.find(
-          (addr) => addr.id === d.deliveryAddressId,
+          (addr: any) => addr.id === d.deliveryAddressId,
         );
         return {
           ...d,
@@ -113,7 +114,7 @@ export async function GET(req: NextRequest) {
         };
       }),
     ]
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(skip, skip + limit);
 
     const serializedDeliveries = allDeliveries.map((delivery) => ({

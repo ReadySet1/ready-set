@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      files: files.map((file) => ({
+      files: files.map((file: any) => ({
         key: file.id,
         name: file.fileName,
         url: file.fileUrl,

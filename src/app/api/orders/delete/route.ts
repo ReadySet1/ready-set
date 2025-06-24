@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient, UserType } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import { UserType } from '@/types/prisma';
 import { createClient } from "@/utils/supabase/server";
 import { PrismaTransaction } from "@/types/prisma-types";
 
-const prisma = new PrismaClient();
+import { prisma } from "@/utils/prismaDB";
 
 export async function DELETE(req: NextRequest) {
   try {

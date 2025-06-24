@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-
-import { prisma } from "@/utils/prismaDB";
-import { UserType } from "@prisma/client";
-
+import { cookies } from "next/headers";
+import { prisma } from "@/lib/db/prisma-client";
+import { UserType } from "@/types/prisma";
 
 /**
  * Gets the authenticated user from an API request using the Authorization header
@@ -116,4 +115,45 @@ export async function authenticateAdminRequest(request: NextRequest) {
     userType: adminResult.userType,
     isAdmin: true
   };
+}
+
+export async function validateApiAuth(request: NextRequest): Promise<{
+  isValid: boolean;
+  user?: any;
+  userType?: UserType;
+  error?: string;
+}> {
+  try {
+    // Get session from cookies
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get("session")?.value;
+
+    if (!sessionToken) {
+      return { isValid: false, error: "No session token found" };
+    }
+
+    // Find user session
+    const session = await prisma.session.findUnique({
+      where: { sessionToken },
+      include: { user: true }
+    });
+
+    if (!session || !session.user) {
+      return { isValid: false, error: "Invalid session" };
+    }
+
+    // Check if session is expired
+    if (session.expires < new Date()) {
+      return { isValid: false, error: "Session expired" };
+    }
+
+    return {
+      isValid: true,
+      user: session.user,
+      userType: session.user.type as UserType
+    };
+  } catch (error) {
+    console.error("Auth validation error:", error);
+    return { isValid: false, error: "Authentication failed" };
+  }
 } 

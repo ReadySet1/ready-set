@@ -3,7 +3,7 @@
  * Handles multiple carrier integrations in a scalable way
  */
 
-import { DriverStatus } from '@prisma/client';
+import { DriverStatus } from '@/types/prisma';
 
 export interface CarrierConfig {
   id: string;
