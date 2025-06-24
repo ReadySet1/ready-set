@@ -320,7 +320,10 @@ export async function POST(req: NextRequest) {
 
         // Send notifications
         try {
-          await sendDeliveryNotifications(cateringOrder);
+          await sendDeliveryNotifications({
+            orderId: cateringOrder.id,
+            customerEmail: cateringOrder.user.email,
+          });
         } catch (notificationError) {
           console.error('Failed to send notifications:', notificationError);
           // Don't fail the order creation if notifications fail
@@ -339,7 +342,10 @@ export async function POST(req: NextRequest) {
 
         // Send notifications
         try {
-          await sendDeliveryNotifications(onDemandOrder);
+          await sendDeliveryNotifications({
+            orderId: onDemandOrder.id,
+            customerEmail: onDemandOrder.user.email,
+          });
         } catch (notificationError) {
           console.error('Failed to send notifications:', notificationError);
           // Don't fail the order creation if notifications fail
