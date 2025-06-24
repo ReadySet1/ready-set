@@ -3,7 +3,7 @@ import { Metadata } from "next";
 import { FormType } from "@/components/Logistics/QuoteRequest/types";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 import DeliveryPartners from "@/components/FoodDelivery/DeliveryPartners";
-import FoodIcons from "@/components/FoodDelivery/FoodIcons";
+import { FoodServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
 import DeliveryTerms from "@/components/FoodDelivery/DeliveryTerms";
 import HostingChecklist from "@/components/FoodDelivery/HostingChecklist";
 import MainMeal from "@/components/FoodDelivery/MainMeal";
@@ -53,7 +53,7 @@ export default function FoodPage() {
       <PromoPopup />
       <FoodHeader />
       <DeliveryPartners />
-      <FoodIcons />
+      <FoodServiceFeatures />
       <DeliveryTerms />
       <HostingChecklist />
       <MainMeal />

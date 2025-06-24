@@ -1,5 +1,5 @@
 import FlowerHero from "@/components/FlowersDelivery/FlowerHero";
-import ServiceFeaturesSection from "@/components/FlowersDelivery/ServiceFeaturesSection";
+import { FlowersServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
 import DeliveryTermsAndPricing from "@/components/FlowersDelivery/DeliveryTermsAndPricing";
 import { Metadata } from "next";
 import ExpertSupportSection from "@/components/FlowersDelivery/ExpertSupportSection";
@@ -95,12 +95,12 @@ const FlowersPage = () => {
   return (
     <main>
       <FlowerHero />
-      <ServiceFeaturesSection />
+      <FlowersServiceFeatures />
       <DeliveryTermsAndPricing />
       <ExpertSupportSection />
       <ServiceProcessCarousel />
       <DelicateBlooms />
-      <FAQSection />  
+      <FAQSection />
     </main>
   );
 };
