@@ -11,9 +11,13 @@ declare global {
   var prismaGlobal: PrismaClient | undefined;
 }
 
-// Prevent multiple instances of Prisma Client in development mode
-export const prisma = globalThis.prismaGlobal || 
-  new PrismaClient({
+// Lazy initialization to prevent build-time database connection
+function createPrismaClient() {
+  if (typeof window !== 'undefined') {
+    throw new Error('PrismaClient should not be used on the client side');
+  }
+  
+  return new PrismaClient({
     log: process.env.NODE_ENV === 'development' 
       ? [
           'error',
@@ -22,6 +26,10 @@ export const prisma = globalThis.prismaGlobal ||
         ]
       : ['error'],
   });
+}
+
+// Prevent multiple instances of Prisma Client in development mode
+export const prisma = globalThis.prismaGlobal || createPrismaClient();
 
 // If we're not in production, attach prisma to the global object
 if (process.env.NODE_ENV !== 'production') {

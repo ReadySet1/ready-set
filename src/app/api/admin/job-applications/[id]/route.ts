@@ -3,6 +3,9 @@ import { prisma } from "@/utils/prismaDB";
 import { createClient } from "@/utils/supabase/server";
 import { PrismaTransaction } from "@/types/prisma-types";
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(
   request: NextRequest,
   props: { params: Promise<{ id: string }> }

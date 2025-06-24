@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
+
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
 import { ApplicationStatus } from "@/types/job-application";
 import { createClient } from "@/utils/supabase/server";
 
