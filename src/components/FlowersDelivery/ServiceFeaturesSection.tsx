@@ -4,18 +4,37 @@ import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
-interface ServiceFeatureProps {
+interface ServiceFeatureData {
   icon: string;
-  title: string;
+  title?: string;
+  altText?: string;
   description: React.ReactNode;
   delay?: number;
+}
+
+interface ServiceFeatureProps extends ServiceFeatureData {
+  showTitleInBox?: boolean;
+  variant?: "box" | "specialty";
+}
+
+interface ServiceFeaturesSectionProps {
+  features: ServiceFeatureData[];
+  showTitleInBox?: boolean;
+  backgroundImage?: string;
+  backgroundColor?: string;
+  variant?: "box" | "specialty";
+  title?: string;
+  subtitle?: string;
 }
 
 const FeatureBox: React.FC<ServiceFeatureProps> = ({
   icon,
   title,
+  altText,
   description,
   delay = 0,
+  showTitleInBox = true,
+  variant = "box",
 }) => {
   const adjustedTitle =
     title === "Bulk Orders? No Problem!" ? (
@@ -27,6 +46,35 @@ const FeatureBox: React.FC<ServiceFeatureProps> = ({
     ) : (
       title
     );
+
+  if (variant === "specialty") {
+    return (
+      <motion.div
+        className="flex flex-1 flex-col items-center px-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: delay / 1000 }}
+      >
+        <motion.div
+          className="relative aspect-square w-full max-w-[280px] overflow-hidden rounded-[24px]"
+          whileHover={{ scale: 1.03, y: -5 }}
+          transition={{ type: "spring", stiffness: 300 }}
+        >
+          <Image
+            src={icon}
+            alt={altText || (typeof title === "string" ? title : "")}
+            fill
+            sizes="(max-width: 768px) 100vw, 280px"
+            className="object-cover"
+            priority
+          />
+        </motion.div>
+        <p className="mt-6 w-full max-w-[280px] text-center text-base leading-snug text-black">
+          {description}
+        </p>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -42,15 +90,17 @@ const FeatureBox: React.FC<ServiceFeatureProps> = ({
       >
         <Image
           src={icon}
-          alt={typeof title === "string" ? title : ""}
-          width={220}
-          height={220}
-          className="mb-6"
+          alt={altText || (typeof title === "string" ? title : "")}
+          width={450}
+          height={450}
+          className={showTitleInBox ? "" : "mb-1"}
           priority
         />
-        <h3 className="text-center text-3xl font-black leading-tight text-black">
-          {adjustedTitle}
-        </h3>
+        {showTitleInBox && title && (
+          <h3 className="text-center text-3xl font-black leading-tight text-black">
+            {adjustedTitle}
+          </h3>
+        )}
       </motion.div>
       <div className="mt-6 max-w-[340px] px-4">
         <p className="text-center text-base leading-relaxed text-black">
@@ -61,8 +111,87 @@ const FeatureBox: React.FC<ServiceFeatureProps> = ({
   );
 };
 
-const ServiceFeaturesSection: React.FC = () => {
-  const serviceFeatures = [
+const ServiceFeaturesSection: React.FC<ServiceFeaturesSectionProps> = ({
+  features,
+  showTitleInBox = true,
+  backgroundImage,
+  backgroundColor,
+  variant = "box",
+  title = "It's Not Just What We Do",
+  subtitle = "It's How We Do It",
+}) => {
+  const containerStyle = backgroundImage
+    ? {
+        backgroundImage: `url('${backgroundImage}')`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }
+    : backgroundColor
+      ? { backgroundColor }
+      : {};
+
+  const containerClasses =
+    variant === "specialty"
+      ? "w-full bg-cover bg-center bg-no-repeat"
+      : "w-full";
+
+  const innerContainerClasses =
+    variant === "specialty"
+      ? "mx-auto max-w-7xl px-4 py-8"
+      : "mx-auto max-w-7xl px-4 py-16";
+
+  const titleClasses =
+    variant === "specialty"
+      ? "text-[clamp(1.5rem,5vw,2.25rem)] font-bold leading-tight text-black"
+      : "text-4xl font-bold text-gray-800 md:text-5xl";
+
+  const gridClasses =
+    variant === "specialty"
+      ? "flex flex-col items-center justify-between gap-8 md:flex-row md:items-stretch md:gap-4 lg:gap-8"
+      : "grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-10";
+
+  return (
+    <div className={containerClasses} style={containerStyle}>
+      <div className={innerContainerClasses}>
+        <div
+          className={
+            variant === "specialty" ? "mb-12 text-center" : "mb-14 text-center"
+          }
+        >
+          <h2 className={`mb-2 ${titleClasses}`}>{title}</h2>
+          <h2
+            className={`${titleClasses} ${variant === "specialty" ? "mb-8" : ""}`}
+          >
+            {subtitle}
+          </h2>
+        </div>
+
+        <div className={gridClasses}>
+          {features.map((feature, index) => (
+            <FeatureBox
+              key={index}
+              icon={feature.icon}
+              title={feature.title}
+              altText={feature.altText}
+              description={feature.description}
+              delay={feature.delay}
+              showTitleInBox={showTitleInBox}
+              variant={variant}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Export both the main component and a configured version for flowers
+export default ServiceFeaturesSection;
+
+// Pre-configured component for flowers delivery (backward compatibility)
+export const FlowersServiceFeatures: React.FC = () => {
+  const flowersFeatures = [
     {
       icon: "/images/flowers/computer.svg",
       title: "Bulk Orders? No Problem!",
@@ -92,31 +221,76 @@ const ServiceFeaturesSection: React.FC = () => {
   ];
 
   return (
-    <div className="py-16">
-      <div className="mx-auto max-w-7xl px-4">
-        <div className="mb-14 text-center">
-          <h2 className="mb-2 text-4xl font-bold text-gray-800 md:text-5xl">
-            It's Not Just What We Do
-          </h2>
-          <h2 className="text-4xl font-bold text-gray-800 md:text-5xl">
-            It's How We Do It
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-10">
-          {serviceFeatures.map((feature, index) => (
-            <FeatureBox
-              key={index}
-              icon={feature.icon}
-              title={feature.title}
-              description={feature.description}
-              delay={feature.delay}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
+    <ServiceFeaturesSection features={flowersFeatures} showTitleInBox={true} />
   );
 };
 
-export default ServiceFeaturesSection;
+// Pre-configured component for food/catering delivery
+export const FoodServiceFeatures: React.FC = () => {
+  const foodFeatures = [
+    {
+      icon: "/images/food/cards/truck.png",
+      altText: "Reliable Delivery Truck",
+      description:
+        "Our professional, reliable drivers act as an extension of your brand—punctual, presentable and committed to handling every delivery with care.",
+      delay: 0,
+    },
+    {
+      icon: "/images/food/cards/bag.png",
+      altText: "Proper Equipment Bag",
+      description:
+        "We use insulated bags and pro-grade gear to keep food fresh, presentable and at the right temperature—solving a major pain point for restaurants.",
+      delay: 200,
+    },
+    {
+      icon: "/images/food/cards/headset.png",
+      altText: "Delivery Support Headset",
+      description:
+        "We go beyond delivery, streamlining operations to align with industry needs and elevate the experience into a seamless extension of your service.",
+      delay: 400,
+    },
+  ];
+
+  return (
+    <ServiceFeaturesSection
+      features={foodFeatures}
+      showTitleInBox={false}
+      backgroundImage="/images/food/bagbg.png"
+    />
+  );
+};
+
+// Pre-configured component for specialty delivery
+export const SpecialtyServiceFeatures: React.FC = () => {
+  const specialtyFeatures = [
+    {
+      icon: "/images/food/cards/truck.png",
+      altText: "Reliable Delivery Truck",
+      description:
+        "Our HIPAA-trained drivers and support team act as a seamless extension of your brand, punctual, professional, and committed to every delivery.",
+      delay: 0,
+    },
+    {
+      icon: "/images/specialty/handling.png",
+      altText: "Handling Specialty Items",
+      description:
+        "We ensure your items, whether medications, legal documents, equipment, or parcels, are delivered with the utmost care and strict confidentiality.",
+      delay: 200,
+    },
+    {
+      icon: "/images/food/cards/headset.png",
+      altText: "Delivery Support Headset",
+      description:
+        "We go beyond delivery, streamlining operations to align with industry needs and elevate the experience into a seamless extension of your service.",
+      delay: 400,
+    },
+  ];
+
+  return (
+    <ServiceFeaturesSection
+      features={specialtyFeatures}
+      showTitleInBox={false}
+      backgroundImage="/images/food/bagbg.png"
+    />
+  );
+};
