@@ -43,8 +43,10 @@ vi.mock('@/utils/supabase/client', () => ({
 }));
 
 describe('AdminProfileView - No Redirect Behavior', () => {
+  const TEST_USER_ID = 'test-user-id';
+  
   const mockUserData: UserFormValues = {
-    id: 'test-user-id',
+    id: TEST_USER_ID,
     displayName: 'Test User',
     name: 'Test User',
     contact_name: 'Test Contact',
@@ -89,12 +91,12 @@ describe('AdminProfileView - No Redirect Behavior', () => {
   });
 
   it('should call useUserForm without redirect callback', () => {
-    render(<AdminProfileView />);
+    render(<AdminProfileView userId={TEST_USER_ID} />);
 
     // Verify that useUserForm was called with only userId and fetchUser
     // No third parameter (onSaveSuccess callback) should be passed
     expect(mockUseUserForm).toHaveBeenCalledWith(
-      'test-user-id',
+      TEST_USER_ID,
       expect.any(Function)
       // Note: no third parameter means no redirect callback
     );
@@ -105,7 +107,7 @@ describe('AdminProfileView - No Redirect Behavior', () => {
   });
 
   it('should stay on form page after save (no redirect)', async () => {
-    render(<AdminProfileView />);
+    render(<AdminProfileView userId={TEST_USER_ID} />);
 
     // Simulate successful save by calling the onSubmit function
     await act(async () => {
