@@ -125,7 +125,17 @@
 }
 
 body {
-  font-family: var(--font-montserrat);
+  font-family: var(--font-montserrat), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Ensure Montserrat is applied to all text elements */
+* {
+  font-family: inherit;
+}
+
+/* Specific text elements that might not inherit properly */
+p, span, div, li, a, button, input, textarea, select, label {
+  font-family: var(--font-montserrat), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
 
 h1, h2 {
