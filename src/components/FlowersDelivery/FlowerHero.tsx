@@ -68,9 +68,7 @@ const FlowerHero: React.FC<FlowerHeroProps> = ({
                 className={`transition-all duration-700 ease-in-out ${isTextAnimated ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"}`}
               >
                 <h1 className="mb-3 text-3xl font-bold leading-tight tracking-tight text-gray-800 sm:text-4xl md:mb-8 lg:text-5xl">
-                  <span className="block text-gray-900">
-                    Your Go-To Catering
-                  </span>
+                  <span className="block text-gray-900">Your Go-To Flower</span>
                   <span className="block text-gray-800">Delivery Partner</span>
                   <span className="block bg-gradient-to-r from-yellow-600 to-yellow-500 bg-clip-text text-transparent">
                     Since 2019
