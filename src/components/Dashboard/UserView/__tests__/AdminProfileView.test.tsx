@@ -97,7 +97,7 @@ describe("AdminProfileView - No Redirect Behavior", () => {
     // No third parameter (onSaveSuccess callback) should be passed
     expect(mockUseUserForm).toHaveBeenCalledWith(
       TEST_USER_ID,
-      expect.any(Function),
+      expect.any(Function)
       // Note: no third parameter means no redirect callback
     );
 
