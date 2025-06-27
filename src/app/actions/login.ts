@@ -43,8 +43,25 @@ export async function login(
   const password = formData.get("password")?.toString() || "";
   const returnTo = formData.get("returnTo")?.toString();
 
+  console.log("🔍 Login attempt for email:", email);
+
   if (!email || !password) {
     return { error: "Email and password are required" };
+  }
+
+  // Test connection to Supabase first
+  try {
+    const { data: connectionTest, error: connectionError } = await supabase
+      .from("profiles")
+      .select("count")
+      .limit(1);
+    
+    console.log("✅ Supabase connection test:", connectionTest ? "SUCCESS" : "FAILED");
+    if (connectionError) {
+      console.error("❌ Supabase connection error:", connectionError);
+    }
+  } catch (testError) {
+    console.error("❌ Supabase connection test failed:", testError);
   }
 
   const { error } = await supabase.auth.signInWithPassword({
@@ -52,12 +69,21 @@ export async function login(
     password,
   });
 
+  console.log("🔐 Auth attempt result:", error ? `FAILED: ${error.message}` : "SUCCESS");
+
   if (error) {
-    const { data: userData } = await supabase
+    // Check if user exists in profiles table
+    const { data: userData, error: profileError } = await supabase
       .from("profiles")
       .select("email")
       .eq("email", email)
       .maybeSingle();
+
+    console.log("👤 Profile lookup result:", {
+      found: !!userData,
+      email: userData?.email,
+      error: profileError?.message
+    });
 
     return userData 
       ? { error: "Incorrect password. Please try again or use Magic Link." }

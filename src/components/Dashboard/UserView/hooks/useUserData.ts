@@ -8,6 +8,28 @@ import { useUploadFile } from "@/hooks/use-upload-file"; // Keep this import
 import { User, UserFormValues } from "../types";
 import { UseFormSetValue } from "react-hook-form"; // Import UseFormSetValue
 
+// Helper function to get the correct display name based on user type
+const getDisplayNameByUserType = (
+  userType: string | null | undefined,
+  name: string | null | undefined,
+  contactName: string | null | undefined
+): string => {
+  const type = userType?.toLowerCase();
+  
+  // For drivers, admin, helpdesk, super_admin use 'name' field
+  if (type === "driver" || type === "admin" || type === "helpdesk" || type === "super_admin") {
+    return name || "";
+  }
+  
+  // For vendors and clients use 'contactName' field
+  if (type === "vendor" || type === "client") {
+    return contactName || "";
+  }
+  
+  // Fallback: try contactName first, then name
+  return contactName || name || "";
+};
+
 export const useUserData = (
   userId: string,
   refreshTrigger: number,
@@ -71,19 +93,19 @@ export const useUserData = (
       // Transform the API data to match form structure
       const formData: UserFormValues = {
         id: data.id,
-        displayName: data.name || data.contact_name || "",
+        displayName: getDisplayNameByUserType(data.type, data.name, data.contactName),
         email: data.email,
-        contact_number: data.contact_number,
+        contact_number: data.contactNumber,
         type: (data.type?.toLowerCase() as UserFormValues['type']) || "client",
-        company_name: data.company_name,
+        company_name: data.companyName,
         website: data.website,
         street1: data.street1 || "",
         street2: data.street2 || "",
         city: data.city || "",
         state: data.state || "",
         zip: data.zip || "",
-        location_number: data.location_number || "",
-        parking_loading: data.parking_loading || "",
+        location_number: data.locationNumber || "",
+        parking_loading: data.parkingLoading || "",
         
         // Counties - Use the array provided by the API (already split)
         countiesServed: Array.isArray(data.countiesServed) ? data.countiesServed : [],
@@ -99,11 +121,11 @@ export const useUserData = (
         // Provisions - Use the array directly from the API
         provisions: Array.isArray(data.provisions) ? data.provisions : [],
         frequency: data.frequency || null,
-        headCount: data.headCount ?? data.head_count ?? null, // Use camelCase or snake_case from API
+        headCount: data.headCount ?? null,
         status: data.status || "pending",
         name: data.name,
-        contact_name: data.contact_name,
-        sideNotes: data.sideNotes // Make sure sideNotes exists in API response or handle null
+        contact_name: data.contactName,
+        sideNotes: data.sideNotes
       };
       
       console.log("[useUserData] fetchUser returning transformed data:", JSON.stringify(formData, null, 2));

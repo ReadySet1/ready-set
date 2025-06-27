@@ -305,9 +305,9 @@ export async function PUT(
       // Use the validated enum value
       type: userTypeEnum,
       
-      // Name handling based on user type
+      // Name handling based on user type - Fix field mapping
       name: requestBody.name,
-      contactName: requestBody.contact_name,
+      contactName: requestBody.contact_name, // Fix: use contactName (camelCase) for Prisma
       
       // Company information
       companyName: requestBody.company_name,

@@ -12,10 +12,28 @@ interface UserHeaderProps {
   watchedValues: UserFormValues;
 }
 
-const UserHeader: React.FC<UserHeaderProps> = ({
-  watchedValues,
-}) => {
-  const { displayName, type, status, email } = watchedValues;
+export default function UserHeader({ watchedValues }: UserHeaderProps) {
+  const { type, email } = watchedValues;
+
+  // Helper function to get the correct display name based on user type
+  const getDisplayName = () => {
+    const userType = type?.toLowerCase();
+    
+    // For drivers, admin, helpdesk, super_admin use 'name' field
+    if (userType === "driver" || userType === "admin" || userType === "helpdesk" || userType === "super_admin") {
+      return watchedValues.name || watchedValues.displayName || "User Profile";
+    }
+    
+    // For vendors and clients use 'contactName' field  
+    if (userType === "vendor" || userType === "client") {
+      return watchedValues.contact_name || watchedValues.displayName || "User Profile";
+    }
+    
+    // Fallback to displayName
+    return watchedValues.displayName || "User Profile";
+  };
+
+  const displayName = getDisplayName();
 
   // Status colors 
   const statusColors = {
@@ -41,8 +59,8 @@ const UserHeader: React.FC<UserHeaderProps> = ({
     : roleColors.client;
 
   // Get the appropriate status class based on the status
-  const statusClass = status ? 
-    statusColors[status as keyof typeof statusColors] || statusColors.pending
+  const statusClass = watchedValues.status ? 
+    statusColors[watchedValues.status as keyof typeof statusColors] || statusColors.pending
     : statusColors.pending;
 
   return (
@@ -53,7 +71,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
         </div>
         <div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            {displayName || "User Profile"}
+            {displayName}
           </h2>
           {email && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{email}</p>
@@ -67,14 +85,12 @@ const UserHeader: React.FC<UserHeaderProps> = ({
             {type.toLowerCase().replace("_", " ")}
           </Badge>
         )}
-        {status && (
+        {watchedValues.status && (
           <Badge className={cn("font-medium rounded-md px-2.5 py-1 capitalize", statusClass)}>
-            {status.toLowerCase()}
+            {watchedValues.status.toLowerCase()}
           </Badge>
         )}
       </div>
     </div>
   );
-};
-
-export default UserHeader;
+}
