@@ -1,13 +1,11 @@
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, UseFormReturn } from "react-hook-form";
 import toast from "react-hot-toast";
 import { UserFormValues } from "../types";
 import { createClient } from "@/utils/supabase/client";
 import { useUser } from "@/contexts/UserContext";
 
 // Define a type that extends UseFormReturn with our custom properties
-import { UseFormReturn } from "react-hook-form";
-
 type ExtendedUseFormReturn = UseFormReturn<UserFormValues> & {
   watchedValues: UserFormValues;
   hasUnsavedChanges: boolean;
@@ -16,7 +14,8 @@ type ExtendedUseFormReturn = UseFormReturn<UserFormValues> & {
 
 export const useUserForm = (
   userId: string,
-  fetchUser: () => Promise<UserFormValues | null>
+  fetchUser: () => Promise<UserFormValues | null>,
+  onSaveSuccess?: () => void
 ): ExtendedUseFormReturn => {
   // Get user session from context
   const { session } = useUser();
@@ -38,11 +37,11 @@ export const useUserForm = (
       website: "",
       location_number: "",
       parking_loading: "",
-      countiesServed: null,
-      counties: null,
-      timeNeeded: null,
-      cateringBrokerage: null,
-      provisions: null,
+      countiesServed: [],
+      counties: [],
+      timeNeeded: [],
+      cateringBrokerage: [],
+      provisions: [],
       frequency: null,
       headCount: null,
       status: "pending",
@@ -60,8 +59,17 @@ export const useUserForm = (
       if (userData) {
         console.log("[useUserForm] User data fetched, attempting reset with:", JSON.stringify(userData, null, 2));
         try {
-          methods.reset(userData);
-          console.log("[useUserForm] Form reset executed successfully.");
+          // Ensure array fields are arrays, not null
+          const formattedUserData = {
+            ...userData,
+            countiesServed: userData.countiesServed || [],
+            counties: userData.counties || [],
+            timeNeeded: userData.timeNeeded || [],
+            cateringBrokerage: userData.cateringBrokerage || [],
+            provisions: userData.provisions || [],
+          };
+          methods.reset(formattedUserData);
+          console.log("[useUserForm] Form reset executed successfully with formatted data.");
         } catch (error) {
           console.error("[useUserForm] Error during form reset:", error);
         }
@@ -90,30 +98,45 @@ export const useUserForm = (
         ...baseSubmitData
       } = data;
 
+      console.log("DEBUG - Form submission data:");
+      console.log("  - User type:", type);
+      console.log("  - countiesServed:", countiesServed);
+      console.log("  - counties:", counties);
+
       // Prepare data for the API, matching Prisma schema fields
       const submitData: any = {
         ...baseSubmitData, // Includes id, email, address fields, headCount, frequency, status, etc.
         type: type,
-        // Convert arrays back to strings/JSON based on Prisma schema
-        // counties field in Prisma is Json?, but API likely expects array or specific structure.
-        // Let's assume for now API/Prisma handles array assignment to Json field correctly.
-        counties: type === 'client' ? counties : (type === 'vendor' ? countiesServed : null),
+        
+        // Fix: Handle counties field properly - both vendors and clients use 'counties' field in database
+        counties: (() => {
+          if (type === 'vendor' && countiesServed && Array.isArray(countiesServed)) {
+            console.log("Using countiesServed for vendor:", countiesServed);
+            return countiesServed.join(",");
+          } else if (type === 'client' && counties && Array.isArray(counties)) {
+            console.log("Using counties for client:", counties);
+            return counties.join(",");
+          }
+          console.log("No counties data found or not arrays");
+          return null;
+        })(),
         
         // timeNeeded field in Prisma is String?
-        timeNeeded: timeNeeded?.join(",") || null, // Join array to comma-separated string
+        timeNeeded: timeNeeded && Array.isArray(timeNeeded) ? timeNeeded.join(",") : null,
         
         // cateringBrokerage field in Prisma is String?
-        cateringBrokerage: type === 'vendor' ? (cateringBrokerage?.join(",") || null) : null, // Only for vendors
+        cateringBrokerage: type === 'vendor' && cateringBrokerage && Array.isArray(cateringBrokerage) ? cateringBrokerage.join(",") : null,
         
         // provide field in Prisma is String?
-        provide: type === 'vendor' ? (provisions?.join(",") || null) : null, // Only for vendors
+        provide: type === 'vendor' && provisions && Array.isArray(provisions) ? provisions.join(",") : null,
         
         // headCount is handled by baseSubmitData as it's number | null
         // frequency is handled by baseSubmitData as it's string | null
       };
 
       // Set name/contact_name based on the form's 'type' field
-      // Only update the relevant field, don't nullify the other
+      // Since the users list displays 'name' first, we should always update 'name' 
+      // to ensure consistency across the UI
       if (
         type === "driver" ||
         type === "helpdesk" ||
@@ -121,21 +144,19 @@ export const useUserForm = (
         type === "super_admin"
       ) {
         submitData.name = displayName;
-        // Keep existing contactName if it exists, don't clear it
         submitData.contact_name = data.contact_name || null;
       } else if (type === "vendor" || type === "client") {
-        submitData.contact_name = displayName;
-        // Keep existing name if it exists, don't clear it  
-        submitData.name = data.name || null;
+        // For vendors and clients, update both fields to ensure consistency
+        submitData.name = displayName;        // Users list displays this field
+        submitData.contact_name = displayName; // Form expects this field
       } else {
-         // Optional: Handle unexpected types 
-         console.warn(`Unexpected user type ${type} in form submission`);
-         // Default to setting both if type is unknown, might need review
-         submitData.name = displayName;
-         submitData.contact_name = displayName;
+        console.warn(`Unexpected user type ${type} in form submission`);
+        submitData.name = displayName;
+        submitData.contact_name = displayName;
       }
       
-      console.log("Data being sent to API:", submitData); // Add log
+      console.log("Final data being sent to API:", submitData);
+      console.log("Counties field value:", submitData.counties);
 
       // Get the current auth token
       let authToken = session?.access_token;
@@ -175,15 +196,26 @@ export const useUserForm = (
         try {
           const errorData = await response.json();
           errorMsg = errorData.message || errorData.error || errorMsg;
+          console.error("API Error:", errorData);
         } catch (_) {
           /* Ignore JSON parsing error */
         }
         throw new Error(errorMsg);
       }
 
-      await response.json();
-      await fetchUser();
+      const result = await response.json();
+      console.log("API Response:", result);
+      
+      await fetchUser(); // Refetch to ensure UI is updated
       toast.success("User saved successfully!");
+      
+      // Call the success callback if provided (for navigation/refresh)
+      if (onSaveSuccess) {
+        // Add a small delay to allow the toast to show before navigation
+        setTimeout(() => {
+          onSaveSuccess();
+        }, 1000);
+      }
     } catch (error) {
       console.error("Error updating user:", error);
       toast.error(

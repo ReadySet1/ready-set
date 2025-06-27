@@ -23,7 +23,10 @@ interface ModernUserProfileProps {
   isUserProfile?: boolean;
 }
 
-export default function ModernUserProfile({ userId, isUserProfile = false }: ModernUserProfileProps) {
+export default function ModernUserProfile({
+  userId,
+  isUserProfile = false,
+}: ModernUserProfileProps) {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [activeTab, setActiveTab] = useState("profile");
   const router = useRouter();
@@ -39,7 +42,7 @@ export default function ModernUserProfile({ userId, isUserProfile = false }: Mod
     handleStatusChange: baseHandleStatusChange,
     handleRoleChange,
     handleUploadSuccess,
-    useUploadFileHook
+    useUploadFileHook,
   } = useUserData(userId, refreshTrigger, setRefreshTrigger);
 
   // Initialize form hook, passing only userId and fetchUser
@@ -52,14 +55,16 @@ export default function ModernUserProfile({ userId, isUserProfile = false }: Mod
     onSubmit,
     reset,
     setValue,
-    formState: { isDirty }
+    formState: { isDirty },
   } = formMethods;
-  
+
   // Wrapped handleStatusChange
-  const handleStatusChange = async (newStatus: NonNullable<UserFormValues["status"]>) => {
+  const handleStatusChange = async (
+    newStatus: NonNullable<UserFormValues["status"]>,
+  ) => {
     try {
       // First, update the form field directly for immediate UI feedback
-      setValue('status', newStatus, { shouldDirty: false });
+      setValue("status", newStatus, { shouldDirty: false });
 
       // Then call the API and refresh data
       await baseHandleStatusChange(newStatus);
@@ -76,10 +81,15 @@ export default function ModernUserProfile({ userId, isUserProfile = false }: Mod
   // Effect to fetch initial data only
   useEffect(() => {
     if (!isUserLoading && userId) {
-      console.log("[AdminProfileView] useEffect triggered. Fetching initial user...");
+      console.log(
+        "[AdminProfileView] useEffect triggered. Fetching initial user...",
+      );
       fetchUser();
     } else {
-      console.log("[AdminProfileView] useEffect skipped. Conditions not met:", { isUserLoading, userId });
+      console.log("[AdminProfileView] useEffect skipped. Conditions not met:", {
+        isUserLoading,
+        userId,
+      });
     }
     // Dependencies: only run when auth state loads or the user ID/trigger changes.
   }, [userId, refreshTrigger, isUserLoading, fetchUser]); // Keep fetchUser OUT to avoid re-fetching when its identity changes (should be stable anyway)
@@ -102,7 +112,7 @@ export default function ModernUserProfile({ userId, isUserProfile = false }: Mod
   const handleBack = () => {
     if (hasUnsavedChanges) {
       const confirmed = window.confirm(
-        "You have unsaved changes. Are you sure you want to discard them?"
+        "You have unsaved changes. Are you sure you want to discard them?",
       );
       if (confirmed) {
         router.push("/admin/users");
@@ -124,7 +134,9 @@ export default function ModernUserProfile({ userId, isUserProfile = false }: Mod
   // --- Render Logic ---
 
   // Check if we're in admin mode using localStorage
-  const isAdminMode = typeof window !== 'undefined' && localStorage.getItem('admin_mode') === 'true';
+  const isAdminMode =
+    typeof window !== "undefined" &&
+    localStorage.getItem("admin_mode") === "true";
 
   // Loading state: Authentication check - bypass if in admin mode
   if (isUserLoading && !session && !isAdminMode) {
@@ -210,9 +222,7 @@ const AuthenticationRequired = ({ router }: { router: any }) => (
   <div className="bg-muted/40 flex h-screen flex-col items-center justify-center space-y-4 p-4">
     <AlertOctagon className="text-destructive h-16 w-16" />
     <h2 className="text-2xl font-bold">Authentication Required</h2>
-    <p className="text-muted-foreground">
-      Please sign in to access this page
-    </p>
+    <p className="text-muted-foreground">Please sign in to access this page</p>
     <Button onClick={() => router.push("/login")} className="mt-4">
       Sign In
     </Button>
@@ -259,16 +269,16 @@ interface HeaderNavigationProps {
   isUserProfile?: boolean; // Added prop to conditionally hide breadcrumb
 }
 
-const HeaderNavigation = ({ 
+const HeaderNavigation = ({
   handleBack,
   handleDiscard,
   handleSubmit,
   onSubmit,
   hasUnsavedChanges,
   loading,
-  isUserProfile = false
+  isUserProfile = false,
 }: HeaderNavigationProps) => (
-  <div className="sticky top-0 z-10 bg-white py-4 shadow-sm dark:bg-gray-800 border-b dark:border-gray-700 mb-6">
+  <div className="sticky top-0 z-10 mb-6 border-b bg-white py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
     <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
@@ -296,11 +306,15 @@ const HeaderNavigation = ({
                 Users
               </Link>
               {" / "}
-              <span className="text-foreground dark:text-gray-100">Edit User</span>
+              <span className="text-foreground dark:text-gray-100">
+                Edit User
+              </span>
             </div>
           )}
           {isUserProfile && (
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">My Profile</h1>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              My Profile
+            </h1>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -318,7 +332,7 @@ const HeaderNavigation = ({
             size="sm"
             onClick={handleSubmit(onSubmit)}
             disabled={!hasUnsavedChanges || loading}
-            className="h-9 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white dark:from-blue-600 dark:to-indigo-700 dark:hover:from-blue-700 dark:hover:to-indigo-800"
+            className="h-9 bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 dark:from-blue-600 dark:to-indigo-700 dark:hover:from-blue-700 dark:hover:to-indigo-800"
           >
             <Save className="mr-1.5 h-4 w-4" />
             Save Changes
