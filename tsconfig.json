@@ -38,7 +38,8 @@
     },
     "types": [
       "node",
-      "vitest"
+      "vitest",
+      "@playwright/test"
     ],
     "baseUrl": ".",
     "strictNullChecks": true,
@@ -58,7 +59,9 @@
     "next-env.d.ts",
     "src/app/(backend)/admin/drives-calculator",
     "src/scripts/sync-users.mts",
-    "dist/types/**/*.ts"
+    "dist/types/**/*.ts",
+    "e2e/**/*.ts",
+    "playwright.config.ts"
   ],
   "exclude": [
     "node_modules"
