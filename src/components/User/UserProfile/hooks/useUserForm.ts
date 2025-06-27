@@ -102,8 +102,12 @@ export const useUserForm = (
         type === "super_admin"
       ) {
         submitData.name = displayName;
+        // Keep existing contactName if it exists, don't clear it
+        submitData.contact_name = data.contact_name || null;
       } else if (type === "vendor" || type === "client") {
         submitData.contact_name = displayName;
+        // Keep existing name if it exists, don't clear it  
+        submitData.name = data.name || null;
       } else {
          // Optional: Handle unexpected types 
          console.warn(`Unexpected user type ${type} in form submission`);
