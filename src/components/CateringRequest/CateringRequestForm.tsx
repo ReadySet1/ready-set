@@ -1,4 +1,4 @@
-// User side 
+// User side
 
 import React, { useCallback, useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -259,7 +259,11 @@ const BROKERAGE_OPTIONS = [
   { value: "Zero Cater", label: "Zero Cater" },
   { value: "Platterz", label: "Platterz" },
   { value: "Direct Delivery", label: "Direct Delivery" },
-  { value: "CaterValley", label: "CaterValley ⚡", description: "Integrated partner with real-time updates" },
+  {
+    value: "CaterValley",
+    label: "CaterValley ⚡",
+    description: "Integrated partner with real-time updates",
+  },
   { value: "Other", label: "Other" },
 ];
 
@@ -273,7 +277,10 @@ interface CateringRequestFormProps {
   isAdminMode?: boolean;
 }
 
-const CateringRequestForm: React.FC<CateringRequestFormProps> = ({ client, isAdminMode = false }) => {
+const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
+  client,
+  isAdminMode = false,
+}) => {
   const router = useRouter();
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -305,7 +312,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({ client, isAdm
       defaultValues: {
         brokerage: "",
         orderNumber: "",
-        date: new Date().toISOString().split('T')[0],
+        date: new Date().toISOString().split("T")[0],
         pickupTime: "",
         arrivalTime: "",
         completeTime: "",
@@ -561,60 +568,55 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({ client, isAdm
 
       if (!response.ok) {
         if (response.status === 400) {
-          const errorMessage = responseData.message || 'Invalid request data';
-          console.error('API validation error:', responseData);
+          const errorMessage = responseData.message || "Invalid request data";
+          console.error("API validation error:", responseData);
           setErrorMessage(errorMessage);
           return;
         } else if (response.status === 401) {
-          setErrorMessage('Please log in to submit an order');
+          setErrorMessage("Please log in to submit an order");
           return;
         } else if (response.status === 409) {
-          setErrorMessage('This order number already exists');
+          setErrorMessage("This order number already exists");
           return;
         } else {
-          console.error('API error response:', responseData);
-          setErrorMessage(responseData.message || 'Failed to submit order');
+          console.error("API error response:", responseData);
+          setErrorMessage(responseData.message || "Failed to submit order");
           return;
         }
       }
 
       console.log("Order submitted successfully:", responseData);
-      
+
       // IMPORTANT FIX: Update the file entity IDs to link them to the catering request
       if (responseData.orderId && uploadedFiles.length > 0) {
-        console.log(`Updating file entity IDs to associate with catering request ID: ${responseData.orderId}`);
+        console.log(
+          `Updating file entity IDs to associate with catering request ID: ${responseData.orderId}`,
+        );
         try {
           await updateEntityId(responseData.orderId);
           console.log("Files successfully linked to catering request");
         } catch (fileUpdateError) {
-          console.error("Error linking files to catering request:", fileUpdateError);
+          console.error(
+            "Error linking files to catering request:",
+            fileUpdateError,
+          );
           // Don't fail the whole submission, just log the error
         }
       }
-      
+
       reset();
       toast.success("Catering request submitted successfully!");
       setErrorMessage("");
 
-      // --- Add Robust Redirect Logic ---
-      let userRole: string | undefined = undefined;
-      if (session && session.user) {
-        userRole = session.user.app_metadata?.role || session.user.role;
-      }
-      if (userRole === 'client') {
-        console.log("Redirecting client user to /client");
-        router.push("/client");
-      } else if (userRole === 'vendor') {
-        console.log("Redirecting vendor user to /vendor");
-        router.push("/vendor");
-      } else {
-        console.log("Redirecting user to /dashboard");
-        router.push("/dashboard");
-      }
-      // --- End Robust Redirect Logic ---
+      // --- Redirect to Vendor Dashboard ---
+      console.log("Redirecting user to vendor dashboard");
+      router.push("/vendor");
+      // --- End Redirect Logic ---
     } catch (error) {
       console.error("Error submitting order:", error);
-      setErrorMessage(error instanceof Error ? error.message : "An unexpected error occurred");
+      setErrorMessage(
+        error instanceof Error ? error.message : "An unexpected error occurred",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -622,7 +624,10 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({ client, isAdm
 
   // --- Return the form JSX ---
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-md">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="mx-auto max-w-3xl rounded-lg bg-white p-6 shadow-md"
+    >
       {errorMessage && (
         <div className="mb-6 flex rounded-md bg-red-50 p-4 text-red-700">
           <AlertCircle className="h-5 w-5 text-red-400" />

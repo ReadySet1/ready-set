@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { OrderData, VendorMetrics } from "@/lib/services/vendor";
+import { AllOrdersModal } from "@/components/Orders/AllOrdersModal";
 
 const VendorPage = () => {
   const [orders, setOrders] = useState<OrderData[]>([]);
@@ -44,6 +45,7 @@ const VendorPage = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAllOrdersModal, setShowAllOrdersModal] = useState(false);
 
   useEffect(() => {
     const fetchVendorData = async () => {
@@ -228,10 +230,18 @@ const VendorPage = () => {
               {/* Orders Table */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent Orders</CardTitle>
-                  <CardDescription>
-                    Manage your recent and upcoming orders across the platform
-                  </CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Recent Orders</CardTitle>
+                      <CardDescription>
+                        Manage your recent and upcoming orders across the
+                        platform
+                      </CardDescription>
+                    </div>
+                    <Button asChild>
+                      <Link href="/catering-request">Create New Order</Link>
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {orders.length === 0 ? (
@@ -318,8 +328,8 @@ const VendorPage = () => {
 
                       <div className="mt-4 flex justify-between">
                         <Button variant="outline">Previous</Button>
-                        <Button asChild>
-                          <Link href="/vendor/orders">View All Orders</Link>
+                        <Button onClick={() => setShowAllOrdersModal(true)}>
+                          View All Orders
                         </Button>
                         <Button>Next</Button>
                       </div>
@@ -358,6 +368,12 @@ const VendorPage = () => {
           )}
         </div>
       </section>
+
+      {/* All Orders Modal */}
+      <AllOrdersModal
+        isOpen={showAllOrdersModal}
+        onClose={() => setShowAllOrdersModal(false)}
+      />
     </>
   );
 };

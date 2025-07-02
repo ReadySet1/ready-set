@@ -2,6 +2,7 @@
 
 import React, { useCallback, useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,9 +10,20 @@ import { Button } from "@/components/ui/button";
 import AddressManager from "@/components/AddressManager";
 import toast from "react-hot-toast";
 import { createClient } from "@/utils/supabase/client";
-import { SupabaseClient, User, Session, AuthChangeEvent } from "@supabase/supabase-js";
+import {
+  SupabaseClient,
+  User,
+  Session,
+  AuthChangeEvent,
+} from "@supabase/supabase-js";
 import { Address } from "@/types/address";
-import { CateringRequest, OnDemand, CateringNeedHost, VehicleType, OrderType } from "@/types/order";
+import {
+  CateringRequest,
+  OnDemand,
+  CateringNeedHost,
+  VehicleType,
+  OrderType,
+} from "@/types/order";
 import { CateringFormData } from "@/types/catering";
 
 interface FormData {
@@ -25,11 +37,12 @@ interface FormData {
 }
 
 const CateringOrderForm: React.FC = () => {
+  const router = useRouter();
   // 1. Set up state with proper types
   const [user, setUser] = useState<User | null>(null);
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // 2. Initialize the Supabase client
   useEffect(() => {
     const initSupabase = async () => {
@@ -38,21 +51,26 @@ const CateringOrderForm: React.FC = () => {
         setSupabase(client);
       } catch (error) {
         console.error("Error initializing Supabase client:", error);
-        toast.error("Error connecting to the database. Please try again later.");
+        toast.error(
+          "Error connecting to the database. Please try again later.",
+        );
         setIsLoading(false);
       }
     };
 
     initSupabase();
   }, []);
-  
+
   // 3. Add useEffect hook for authentication that depends on supabase being initialized
   useEffect(() => {
     if (!supabase) return;
-    
+
     const getUser = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
         if (error) throw error;
         if (user) {
           setUser(user);
@@ -63,9 +81,9 @@ const CateringOrderForm: React.FC = () => {
         setIsLoading(false);
       }
     };
-    
+
     getUser();
-    
+
     // Set up auth state listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, session: Session | null) => {
@@ -74,9 +92,9 @@ const CateringOrderForm: React.FC = () => {
         } else if (event === "SIGNED_OUT") {
           setUser(null);
         }
-      }
+      },
     );
-    
+
     // Clean up subscription
     return () => {
       authListener.subscription.unsubscribe();
@@ -86,7 +104,7 @@ const CateringOrderForm: React.FC = () => {
   const handleDateTimeChange = (date: string, time: string) => {
     if (!date || !time) return "";
     // Use timezone utility for proper conversion
-    const { localTimeToUtc } = require('@/lib/utils/timezone');
+    const { localTimeToUtc } = require("@/lib/utils/timezone");
     return localTimeToUtc(date, time);
   };
 
@@ -157,12 +175,18 @@ const CateringOrderForm: React.FC = () => {
         setValue("specialInstructions", "");
         setValue("addressId", "");
         toast.success("Catering request submitted successfully!");
+
+        // Redirect to vendor dashboard
+        console.log("Redirecting user to vendor dashboard");
+        router.push("/vendor");
       } else {
         const errorData = await response.json();
         console.error("Failed to create catering request", errorData);
 
         if (errorData.message === "Order number already exists") {
-          setErrorMessage("This order number already exists. Please use a different order number.");
+          setErrorMessage(
+            "This order number already exists. Please use a different order number.",
+          );
         } else {
           toast.error("Failed to submit catering request. Please try again.");
         }
@@ -175,7 +199,7 @@ const CateringOrderForm: React.FC = () => {
 
   // Show loading indicator while Supabase is initializing
   if (isLoading) return <div>Loading...</div>;
-  
+
   // Show sign in message if user is not authenticated
   if (!user) return <div>Please sign in to create orders.</div>;
 
@@ -190,13 +214,15 @@ const CateringOrderForm: React.FC = () => {
               required: "Event name is required",
               minLength: {
                 value: 3,
-                message: "Event name must be at least 3 characters"
-              }
+                message: "Event name must be at least 3 characters",
+              },
             })}
             placeholder="Enter event name"
           />
           {errors.eventName && (
-            <p className="text-sm text-red-500 mt-1">{errors.eventName.message}</p>
+            <p className="mt-1 text-sm text-red-500">
+              {errors.eventName.message}
+            </p>
           )}
         </div>
 
@@ -212,13 +238,17 @@ const CateringOrderForm: React.FC = () => {
                   const selectedDate = new Date(value);
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
-                  return selectedDate >= today || "Event date must be in the future";
-                }
-              }
+                  return (
+                    selectedDate >= today || "Event date must be in the future"
+                  );
+                },
+              },
             })}
           />
           {errors.eventDate && (
-            <p className="text-sm text-red-500 mt-1">{errors.eventDate.message}</p>
+            <p className="mt-1 text-sm text-red-500">
+              {errors.eventDate.message}
+            </p>
           )}
         </div>
 
@@ -228,11 +258,13 @@ const CateringOrderForm: React.FC = () => {
             id="eventTime"
             type="time"
             {...register("eventTime", {
-              required: "Event time is required"
+              required: "Event time is required",
             })}
           />
           {errors.eventTime && (
-            <p className="text-sm text-red-500 mt-1">{errors.eventTime.message}</p>
+            <p className="mt-1 text-sm text-red-500">
+              {errors.eventTime.message}
+            </p>
           )}
         </div>
 
@@ -246,16 +278,16 @@ const CateringOrderForm: React.FC = () => {
               required: "Number of guests is required",
               min: {
                 value: 1,
-                message: "Must have at least 1 guest"
+                message: "Must have at least 1 guest",
               },
               max: {
                 value: 1000,
-                message: "Maximum 1000 guests allowed"
-              }
+                message: "Maximum 1000 guests allowed",
+              },
             })}
           />
           {errors.guests && (
-            <p className="text-sm text-red-500 mt-1">{errors.guests.message}</p>
+            <p className="mt-1 text-sm text-red-500">{errors.guests.message}</p>
           )}
         </div>
 
@@ -270,12 +302,12 @@ const CateringOrderForm: React.FC = () => {
               required: "Budget is required",
               min: {
                 value: 0,
-                message: "Budget must be a positive number"
-              }
+                message: "Budget must be a positive number",
+              },
             })}
           />
           {errors.budget && (
-            <p className="text-sm text-red-500 mt-1">{errors.budget.message}</p>
+            <p className="mt-1 text-sm text-red-500">{errors.budget.message}</p>
           )}
         </div>
 
@@ -298,7 +330,9 @@ const CateringOrderForm: React.FC = () => {
           defaultFilter="all"
         />
         {errors.addressId && (
-          <p className="text-sm text-red-500 mt-1">{errors.addressId.message}</p>
+          <p className="mt-1 text-sm text-red-500">
+            {errors.addressId.message}
+          </p>
         )}
       </div>
 
