@@ -24,6 +24,7 @@ This platform allows users to register as drivers, vendors, and clients, facilit
 ### Catering Delivery & Setup
 - Event planning assistance
 - Food transport and presentation services
+- **CaterValley Discount System**: Automated tiered pricing based on head count and food cost
 
 ### Versatile Delivery Options
 - Handling various items beyond food (documents, medical supplies, etc.)
@@ -44,6 +45,19 @@ This platform allows users to register as drivers, vendors, and clients, facilit
 - **Backend**: Next.js API routes
 - **Database**: PostgreSQL with Prisma ORM
 - **UI Components**: Shadcn
+- **Pricing Engine**: CaterValley Discount System with tiered pricing
+
+## CaterValley Discount System
+
+The platform includes an advanced discount system for catering orders with automated pricing calculation based on:
+
+- **5-tier pricing structure** covering different head count and food cost ranges
+- **Fixed pricing** for smaller orders (1-99 heads)
+- **Percentage-based pricing** for large orders (100+ heads)
+- **Tip-aware pricing** with different rates for orders with and without tips
+- **Real-time calculation** with debounced API calls for optimal performance
+
+See [`docs/CATERVALLEY_DISCOUNT_SYSTEM.md`](docs/CATERVALLEY_DISCOUNT_SYSTEM.md) for complete documentation.
 
 ## Getting Started
 
