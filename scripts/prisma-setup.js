@@ -38,16 +38,16 @@ try {
     log('Using pnpm to generate Prisma client...');
     execSync('pnpm prisma generate', { stdio: 'inherit' });
   } catch (error) {
-    log('pnpm prisma failed, trying pnpm run prisma...');
+    log('pnpm prisma failed, trying npx...');
     try {
-      execSync('pnpm run prisma', { stdio: 'inherit' });
-    } catch (pnpmRunError) {
-      log('pnpm run prisma failed, trying npx...');
+      execSync('npx prisma generate', { stdio: 'inherit' });
+    } catch (npxError) {
+      log('npx prisma generate failed, trying npm...');
       try {
-        execSync('npx prisma generate', { stdio: 'inherit' });
-      } catch (npxError) {
-        log('npx prisma generate failed, trying npm...');
-        execSync('npm run prisma', { stdio: 'inherit' });
+        execSync('npm run db:generate', { stdio: 'inherit' });
+      } catch (npmError) {
+        log('All Prisma generation attempts failed');
+        throw error;
       }
     }
   }
