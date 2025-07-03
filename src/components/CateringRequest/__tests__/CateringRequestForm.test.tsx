@@ -20,6 +20,16 @@ vi.mock("next/navigation", () => ({
   useRouter: () => mockRouter,
 }));
 
+// Mock Next.js Link component
+vi.mock("next/link", () => ({
+  __esModule: true,
+  default: ({ children, href, ...props }: any) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
 // Mock react-hot-toast
 vi.mock("react-hot-toast", () => ({
   default: {
@@ -325,6 +335,149 @@ describe("CateringRequestForm", () => {
 
       // Verify redirect happened
       expect(mockPush).toHaveBeenCalledWith("/vendor");
+    });
+  });
+
+  describe("Manage Addresses Button", () => {
+    it("renders the Manage Addresses button in the delivery details section", async () => {
+      await act(async () => {
+        render(<CateringRequestForm />);
+      });
+
+      // Check that the Delivery Details section is rendered
+      expect(screen.getByText(/delivery details/i)).toBeInTheDocument();
+
+      // Check that the Manage Addresses button is rendered
+      const manageAddressesButton = screen.getByRole("link", {
+        name: /manage addresses/i,
+      });
+      expect(manageAddressesButton).toBeInTheDocument();
+    });
+
+    it("has the correct href attribute pointing to /addresses", async () => {
+      await act(async () => {
+        render(<CateringRequestForm />);
+      });
+
+      const manageAddressesButton = screen.getByRole("link", {
+        name: /manage addresses/i,
+      });
+      expect(manageAddressesButton).toHaveAttribute("href", "/addresses");
+    });
+
+    it("has the correct styling classes", async () => {
+      await act(async () => {
+        render(<CateringRequestForm />);
+      });
+
+      const manageAddressesButton = screen.getByRole("link", {
+        name: /manage addresses/i,
+      });
+
+      // Check for the expected CSS classes
+      expect(manageAddressesButton).toHaveClass(
+        "rounded-md",
+        "bg-blue-500",
+        "px-4",
+        "py-2",
+        "text-white",
+        "transition",
+        "hover:bg-blue-600",
+      );
+    });
+
+    it("is accessible and properly labeled", async () => {
+      await act(async () => {
+        render(<CateringRequestForm />);
+      });
+
+      const manageAddressesButton = screen.getByRole("link", {
+        name: /manage addresses/i,
+      });
+
+      // Check that the button is accessible
+      expect(manageAddressesButton).toBeVisible();
+      expect(manageAddressesButton).not.toHaveAttribute("aria-disabled");
+
+      // Check that it has proper focus styles
+      expect(manageAddressesButton).toHaveClass(
+        "focus:outline-none",
+        "focus:ring-2",
+        "focus:ring-blue-500",
+        "focus:ring-offset-2",
+      );
+    });
+
+    it("is positioned correctly within the delivery details section", async () => {
+      await act(async () => {
+        render(<CateringRequestForm />);
+      });
+
+      // Find the delivery details section
+      const deliveryDetailsSection = screen
+        .getByText(/delivery details/i)
+        .closest("div");
+      expect(deliveryDetailsSection).toBeInTheDocument();
+
+      // Check that the Manage Addresses button is within the delivery details section
+      const manageAddressesButton = screen.getByRole("link", {
+        name: /manage addresses/i,
+      });
+
+      // The button should be a descendant of the delivery details section
+      expect(deliveryDetailsSection).toContainElement(manageAddressesButton);
+    });
+
+    it("does not interfere with form submission", async () => {
+      const user = userEvent.setup();
+      await act(async () => {
+        render(<CateringRequestForm />);
+      });
+
+      // First, verify the button is there
+      const manageAddressesButton = screen.getByRole("link", {
+        name: /manage addresses/i,
+      });
+      expect(manageAddressesButton).toBeInTheDocument();
+
+      // Fill out the form and submit (similar to existing tests)
+      await act(async () => {
+        const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
+        await user.selectOptions(brokerageSelect, "Ez Cater");
+        await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
+        await user.type(screen.getByLabelText(/date/i), "2024-12-31");
+        await user.type(screen.getByLabelText(/headcount/i), "50");
+        await user.type(screen.getByLabelText(/pick up time/i), "10:00");
+        await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+        await user.type(
+          screen.getByLabelText(/client.*attention/i),
+          "John Doe",
+        );
+        await user.type(screen.getByLabelText(/order total/i), "1000");
+
+        const hostNoRadio = screen.getByRole("radio", { name: /no/i });
+        await user.click(hostNoRadio);
+
+        mockHandleAddressSelect(mockAddress);
+      });
+
+      // Submit the form
+      await act(async () => {
+        const submitButton = screen.getByRole("button", {
+          name: /submit catering request/i,
+        });
+        await user.click(submitButton);
+      });
+
+      // Verify that form submission still works normally
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith("/api/catering-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: expect.stringContaining("TEST-12345"),
+        });
+        expect(mockPush).toHaveBeenCalledWith("/vendor");
+      });
     });
   });
 });

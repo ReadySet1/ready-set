@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Session, SupabaseClient } from "@supabase/supabase-js";
 import { CateringFormData, Address } from "@/types/catering";
 import { CateringNeedHost } from "@/types/order";
@@ -179,7 +180,7 @@ const AddressSection: React.FC<{
       <h3 className="mb-5 text-lg font-medium text-gray-800">
         Delivery Address
       </h3>
-      <div className="mb-2">
+      <div className="mb-4">
         <label className="mb-3 block text-sm font-medium text-gray-700">
           Select a delivery address
         </label>
@@ -223,6 +224,16 @@ const AddressSection: React.FC<{
             </div>
           )}
         />
+      </div>
+
+      {/* Manage Addresses Button */}
+      <div className="flex">
+        <Link
+          href="/addresses"
+          className="rounded-md bg-blue-500 px-4 py-2 text-white transition hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
+          Manage Addresses
+        </Link>
       </div>
     </div>
   );
