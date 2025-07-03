@@ -15,7 +15,7 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/',
 }));
 
-// Mock Supabase
+// Mock Supabase client
 jest.mock('@/utils/supabase/client', () => ({
   createClient: jest.fn(() => ({
     auth: {
@@ -24,8 +24,11 @@ jest.mock('@/utils/supabase/client', () => ({
       onAuthStateChange: jest.fn(() => ({
         data: { subscription: { unsubscribe: jest.fn() } }
       })),
+      refreshSession: jest.fn(),
     },
   })),
+  clearSupabaseCookies: jest.fn(),
+  retryAuth: jest.fn(),
 }));
 
 // Mock window methods
