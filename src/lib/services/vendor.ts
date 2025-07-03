@@ -44,6 +44,14 @@ export interface VendorMetrics {
   orderGrowth: number;
 }
 
+export interface PaginatedOrdersResponse {
+  orders: OrderData[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 // Helper function to get the current authenticated user's ID
 export async function getCurrentUserId() {
   const user = await getCurrentUser();
@@ -78,11 +86,31 @@ export async function checkVendorAccess() {
 }
 
 // Get vendor's orders
-export async function getVendorOrders(limit = 10) {
+export async function getVendorOrders(limit = 10, page = 1): Promise<PaginatedOrdersResponse> {
   const userId = await getCurrentUserId();
   if (!userId) {
     throw new Error("Unauthorized");
   }
+
+  const skip = (page - 1) * limit;
+
+  // Get total count first
+  const [cateringTotal, onDemandTotal] = await Promise.all([
+    prisma.cateringRequest.count({
+      where: {
+        userId: userId,
+        deletedAt: null
+      }
+    }),
+    prisma.onDemand.count({
+      where: {
+        userId: userId,
+        deletedAt: null
+      }
+    })
+  ]);
+
+  const totalOrders = cateringTotal + onDemandTotal;
 
   // Fetch catering requests
   const cateringRequests = await prisma.cateringRequest.findMany({
@@ -95,7 +123,6 @@ export async function getVendorOrders(limit = 10) {
       deliveryAddress: true,
     },
     orderBy: { pickupDateTime: 'desc' },
-    take: limit
   });
 
   // Fetch on-demand requests
@@ -109,7 +136,6 @@ export async function getVendorOrders(limit = 10) {
       deliveryAddress: true,
     },
     orderBy: { pickupDateTime: 'desc' },
-    take: limit
   });
 
   // Transform the data to a unified format
@@ -244,9 +270,19 @@ export async function getVendorOrders(limit = 10) {
   }));
 
   // Combine and sort all orders by pickup date
-  return [...cateringOrders, ...onDemandOrders]
-    .sort((a, b) => new Date(b.pickupDateTime).getTime() - new Date(a.pickupDateTime).getTime())
-    .slice(0, limit);
+  const allOrders = [...cateringOrders, ...onDemandOrders]
+    .sort((a, b) => new Date(b.pickupDateTime).getTime() - new Date(a.pickupDateTime).getTime());
+  
+  // Apply pagination
+  const paginatedOrders = allOrders.slice(skip, skip + limit);
+  
+  return {
+    orders: paginatedOrders,
+    total: totalOrders,
+    page: page,
+    limit: limit,
+    totalPages: Math.ceil(totalOrders / limit)
+  };
 }
 
 // Get vendor metrics

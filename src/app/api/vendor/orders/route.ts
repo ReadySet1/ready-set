@@ -12,16 +12,19 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get limit from query params
+    // Get pagination params from query
     const searchParams = req.nextUrl.searchParams;
+    const page = searchParams.get("page") 
+      ? parseInt(searchParams.get("page") as string, 10) 
+      : 1;
     const limit = searchParams.get("limit") 
       ? parseInt(searchParams.get("limit") as string, 10) 
       : 10;
 
-    // Get vendor orders
-    const orders = await getVendorOrders(limit);
+    // Get vendor orders with pagination
+    const result = await getVendorOrders(limit, page);
     
-    return NextResponse.json(orders);
+    return NextResponse.json(result);
   } catch (error: any) {
     console.error("Error fetching vendor orders:", error);
     
