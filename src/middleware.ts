@@ -9,7 +9,8 @@ const PROTECTED_ROUTES = [
   '/admin/catering-orders',
   '/admin/users',
   '/admin/job-applications',
-  '/dashboard'
+  '/dashboard',
+  '/vendor'
 ];
 
 export async function middleware(request: NextRequest) {
@@ -75,6 +76,28 @@ export async function middleware(request: NextRequest) {
             .single();
           
           if (!profile || !['admin', 'super_admin', 'helpdesk'].includes((profile.type ?? '').toLowerCase())) {
+            // User is authenticated but not authorized
+            const response = NextResponse.redirect(new URL('/', request.url));
+            
+            // Add tracking headers
+            response.headers.set('x-auth-redirect', 'true');
+            response.headers.set('x-redirect-from', pathname);
+            response.headers.set('x-redirect-reason', 'unauthorized');
+            
+            return response;
+          }
+        }
+
+        // Check for vendor-only routes
+        if (pathname.startsWith('/vendor')) {
+          // Get user profile to check role
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('type')
+            .eq('id', user.id)
+            .single();
+          
+          if (!profile || profile.type !== 'VENDOR') {
             // User is authenticated but not authorized
             const response = NextResponse.redirect(new URL('/', request.url));
             
