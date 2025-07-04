@@ -2,7 +2,6 @@
 
 import { Button } from '@/components/ui/button'
 import { useEffect } from 'react'
-import { H } from 'highlight.run'
 
 // Standard error props interface that follows Next.js pattern
 interface ErrorProps {
@@ -14,15 +13,6 @@ export default function Error({ error, reset }: ErrorProps) {
   // Log the error to the console
   useEffect(() => {
     console.error('App Router Error:', error)
-    
-    // Report the error to Highlight if available
-    if (typeof window !== 'undefined' && window.H) {
-      try {
-        H.consumeError(error)
-      } catch (e) {
-        console.error('Failed to report error to Highlight:', e)
-      }
-    }
   }, [error])
 
   return (

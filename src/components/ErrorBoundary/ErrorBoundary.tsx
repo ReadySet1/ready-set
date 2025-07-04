@@ -2,8 +2,6 @@
 "use client";
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { H } from 'highlight.run';
-import { CONSTANTS } from '@/constants';
 
 interface Props {
   children: ReactNode;
@@ -31,63 +29,11 @@ class ErrorBoundary extends Component<Props, State> {
     };
   }
 
-  componentDidMount(): void {
-    // Ensure Highlight is initialized
-    if (typeof window !== 'undefined' && !(window.H as any)?.__initialized) {
-      try {
-        H.init(CONSTANTS.NEXT_PUBLIC_HIGHLIGHT_PROJECT_ID, {
-          debug: true,
-          networkRecording: {
-            enabled: true,
-            recordHeadersAndBody: true,
-            urlBlocklist: ['/api/auth', '/api/login'],
-          }
-        });
-        (window.H as any).__initialized = true;
-      } catch (err) {
-        console.error('Failed to initialize Highlight in ErrorBoundary:', err);
-      }
-    }
-  }
+
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     console.error('Error caught by ErrorBoundary:', error, errorInfo);
     
-    // Report the error to Highlight.run if we're in a browser environment
-    if (typeof window !== 'undefined') {
-      try {
-        // Ensure Highlight is initialized
-        if (!(window.H as any)?.__initialized) {
-          H.init(CONSTANTS.NEXT_PUBLIC_HIGHLIGHT_PROJECT_ID, {
-            debug: true,
-            networkRecording: {
-              enabled: true,
-              recordHeadersAndBody: true,
-              urlBlocklist: ['/api/auth', '/api/login'],
-            }
-          });
-          (window.H as any).__initialized = true;
-        }
-        
-        // Pass the error directly to Highlight
-        H.consumeError(error);
-        
-        // Also record additional error info as a custom event
-        H.track('error_boundary_caught', {
-          errorMessage: error.message,
-          errorStack: error.stack,
-          componentStack: errorInfo.componentStack,
-          errorName: error.name,
-          timeStamp: new Date().toISOString(),
-          url: window.location.href,
-          path: window.location.pathname,
-          userAgent: navigator.userAgent
-        });
-      } catch (highlightError) {
-        console.error('Failed to report error to Highlight.run:', highlightError);
-      }
-    }
-
     // Update state to include errorInfo
     this.setState({ errorInfo });
   }

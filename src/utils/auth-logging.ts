@@ -1,4 +1,3 @@
-import { H } from 'highlight.run';
 import { NextRequest } from 'next/server';
 import { serverLogger } from './server-logger';
 
@@ -12,24 +11,17 @@ export function trackAuthRedirect(
   reason: 'unauthenticated' | 'unauthorized' | 'expired' | 'invalid_session' | 'other',
   details?: Record<string, any>
 ) {
-  // Only track in client-side code where Highlight is available
-  if (typeof window !== 'undefined' && window.H) {
-    try {
-      H.track('auth_redirect', {
-        from,
-        to,
-        reason,
-        timestamp: new Date().toISOString(),
-        details,
-        // Get current URL parameters if available
-        params: typeof window !== 'undefined' 
-          ? Object.fromEntries(new URLSearchParams(window.location.search)) 
-          : {}
-      });
-    } catch (err) {
-      console.error('Failed to track auth redirect:', err);
-    }
-  }
+  // Log authentication redirect for debugging
+  console.log('Auth redirect:', {
+    from,
+    to,
+    reason,
+    timestamp: new Date().toISOString(),
+    details,
+    params: typeof window !== 'undefined' 
+      ? Object.fromEntries(new URLSearchParams(window.location.search)) 
+      : {}
+  });
 }
 
 /**

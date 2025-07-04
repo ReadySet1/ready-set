@@ -111,7 +111,7 @@ export async function PUT(
         }
       );
       
-      // Track the error with Highlight.io
+      
       trackProfileError(error, error.type, error.context);
       
       // Return appropriate error response

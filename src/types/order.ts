@@ -155,6 +155,8 @@ export interface CateringRequest extends BaseOrder {
   needHost: CateringNeedHost; // Prisma: CateringNeedHost (camelCase) - Use Enum
   hoursNeeded?: number | null; // Prisma: Float? (camelCase)
   numberOfHosts?: number | null; // Prisma: Int? (camelCase)
+  appliedDiscount?: number | null; // Prisma: Decimal?
+  pricingTierId?: string | null; // Prisma: String?
 }
 
 // Updated OnDemand interface (based on Prisma OnDemand)

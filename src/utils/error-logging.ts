@@ -1,4 +1,3 @@
-import { H } from 'highlight.run';
 import { NextRequest, NextResponse } from 'next/server';
 
 type ErrorSource = 
@@ -49,18 +48,8 @@ export function logError(error: Error | unknown, details: ErrorDetails): void {
     context
   });
   
-  // Only attempt to use Highlight in browser environment
-  if (typeof window !== 'undefined' && window.H) {
-    try {
-      // Report the error to Highlight
-      window.H.consumeError(errorObject);
-      
-      // Also track as an event for better filtering
-      window.H.track(`error_${details.source.replace(':', '_')}`, context);
-    } catch (highlightError) {
-      console.error('Failed to report error to Highlight:', highlightError);
-    }
-  }
+  // Additional error tracking could be added here if needed
+  // For now, we rely on console logging and any other error tracking services
 }
 
 /**

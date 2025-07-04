@@ -303,7 +303,7 @@ export async function POST(req: NextRequest) {
         }
       );
       
-      // Track the error with Highlight.io
+      
       trackClientDashboardError(error, error.type, error.context);
       
       // Return appropriate error response

@@ -96,18 +96,11 @@ export function initializeMonitoring(): void {
 }
 
 /**
- * Client-side Highlight initialization for browser environments
- * 
- * Note: In the browser, Highlight will be initialized by the @highlight-run/next client integration
- * which is automatically set up by the next.js framework. This function is mainly for reference
- * and manual initialization if needed.
+ * Client-side monitoring initialization for browser environments
  */
 export function initializeClientMonitoring() {
-  // This is intentionally simplified to avoid TypeScript errors
-  // The actual initialization will be handled by Next.js integration
-  
   // Only log during development
   if (process.env.NODE_ENV === 'development') {
-    console.log('Client-side monitoring is handled by Next.js Highlight integration');
+    console.log('Client-side monitoring initialized');
   }
 } 

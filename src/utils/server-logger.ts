@@ -1,4 +1,3 @@
-import { CONSTANTS } from '@/constants';
 import { NextRequest } from 'next/server';
 
 // Types for logging events
@@ -28,14 +27,12 @@ interface LogEntry {
 }
 
 /**
- * Server-side logger that sends data to Highlight
+ * Server-side logger for application events
  */
 class ServerLogger {
-  private projectId: string;
   private enableConsoleOutput: boolean;
 
   constructor() {
-    this.projectId = CONSTANTS.NEXT_PUBLIC_HIGHLIGHT_PROJECT_ID;
     this.enableConsoleOutput = true;
   }
 
@@ -80,11 +77,8 @@ class ServerLogger {
       ...data
     };
     
-    // Log to console and Highlight
+    // Log to console
     this.log('error', message, category, errorData, request);
-    
-    // Send error to Highlight via API (since we're on server-side)
-    this.sendToHighlight('error', message, category, errorData, request);
   }
 
   /**
@@ -166,45 +160,7 @@ class ServerLogger {
     return logEntry;
   }
 
-  /**
-   * Send log data to Highlight via API
-   */
-  private async sendToHighlight(
-    level: LogLevel, 
-    message: string, 
-    category: LogCategory, 
-    data?: Record<string, any>,
-    request?: NextRequest
-  ): Promise<void> {
-    // Only send errors and warnings to Highlight
-    if (level !== 'error' && level !== 'warn') return;
-    
-    try {
-      const logEntry = this.createLogEntry(level, message, category, data, request);
-      
-      // Send to Highlight's API (this would need to be implemented with their backend API)
-      // For now, we're going to use a simple fetch to demonstrate
-      const payload = {
-        projectId: this.projectId,
-        level,
-        message: `[${category}] ${message}`,
-        context: JSON.stringify(logEntry),
-        timestamp: logEntry.timestamp,
-        service: 'api-server',
-      };
-      
-      // Store in a local database or queue for batch processing
-      // This is a placeholder - in a real implementation, you'd store these
-      // logs somewhere and potentially send them in batches to Highlight or
-      // another logging service
-      
-      // Save to console at minimum
-      console.info(`[Highlight] Would send log to Highlight: ${JSON.stringify(payload)}`);
-      
-    } catch (e) {
-      console.error('Failed to send log to Highlight:', e);
-    }
-  }
+
 
   /**
    * Sanitize sensitive data before logging

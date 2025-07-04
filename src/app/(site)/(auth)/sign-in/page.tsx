@@ -1,7 +1,6 @@
 import Signin from "@/components/Auth/SignIn";
 import Breadcrumb from "@/components/Common/Breadcrumb";
 import { Metadata } from "next";
-import AuthRedirectTracker from "@/components/Auth/AuthRedirectTracker";
 import { Suspense } from "react";
 import AuthErrorRecovery from "@/components/Auth/SignIn/AuthErrorRecovery";
 
@@ -45,10 +44,6 @@ const SigninPage = async ({
       ) : (
         <Signin searchParams={signinParams} />
       )}
-      
-      <Suspense fallback={null}>
-        <AuthRedirectTracker />
-      </Suspense>
     </>
   );
 };
