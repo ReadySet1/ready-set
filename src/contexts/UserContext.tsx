@@ -5,7 +5,6 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { createClient } from "@/utils/supabase/client";
 import { Session, User } from '@supabase/supabase-js';
 import { UserType } from "@/types/user";
-import { H } from 'highlight.run';
 
 // Define user context types
 type UserContextType = {
@@ -36,16 +35,7 @@ export const useUser = () => {
   return context;
 };
 
-// Helper function to identify user to Highlight
-const identifyUserToHighlight = (user: User, role?: UserType) => {
-  if (typeof window !== 'undefined') {
-    H.identify(user.email || user.id, {
-      id: user.id,
-      email: user.email || 'no-email',
-      role: role || 'unknown'
-    });
-  }
-};
+
 
 // Helper function to fetch user role
 const fetchUserRole = async (supabase: any, user: User, setUserRole: (role: UserType) => void) => {
@@ -132,7 +122,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           setUser(currentUser);
           console.log("UserContext: User found. Fetching user role...");
           const role = await fetchUserRole(supabase, currentUser, setUserRole);
-          identifyUserToHighlight(currentUser, role || undefined);
         } else {
           console.log("UserContext: No user found. Setting loading to false.");
           setUser(null);
@@ -158,7 +147,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
             
             if (newUser?.id !== currentUser?.id) {
               const role = await fetchUserRole(supabase, newUser, setUserRole);
-              identifyUserToHighlight(newUser, role || undefined);
             }
           }
         );
@@ -199,7 +187,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       
       if (currentUser) {
         const role = await fetchUserRole(supabase, currentUser, setUserRole);
-        identifyUserToHighlight(currentUser, role || undefined);
       } else {
         setUserRole(null);
       }

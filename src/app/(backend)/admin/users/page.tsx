@@ -2,8 +2,6 @@ import { redirect } from "next/navigation";
 import { validateAdminRole } from "@/middleware/authMiddleware";
 import UsersClient from "./UsersClient";
 import { createClient } from "@/utils/supabase/server";
-import AdminHighlightInit from "@/app/admin-highlight-init";
-import { HighlightErrorBoundary } from '@/components/ErrorBoundary/HighlightErrorBoundary';
 import Link from "next/link";
 
 // Server component for authentication and protection
@@ -33,12 +31,6 @@ export default async function UsersPage() {
   }
 
   return (
-    <>
-      <AdminHighlightInit />
-     
-      <HighlightErrorBoundary>
-        <UsersClient userType={userType} />
-      </HighlightErrorBoundary>
-    </>
+    <UsersClient userType={userType} />
   );
 }

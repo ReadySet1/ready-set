@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
         }
       );
       
-      // Track the error with Highlight.io
+      
       trackDispatchError(error, error.type, error.context);
       
       // Return appropriate error response

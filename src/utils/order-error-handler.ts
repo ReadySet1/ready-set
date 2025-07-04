@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serverLogger } from './server-logger';
 import { logError } from './error-logging';
-import { H } from 'highlight.run';
 
 // Order-specific error types
 export enum OrderErrorType {
@@ -97,28 +96,17 @@ export function handleOrderError(
     req
   );
   
-  // Also use our client-side error logging (will only report in browser contexts)
-  if (typeof window !== 'undefined' && window.H) {
-    try {
-      const errorObj = error instanceof Error ? error : new Error(message);
-      
-      // Report directly to Highlight
-      H.consumeError(errorObj);
-      
-      // Also track as an event for better filtering and context
-      H.track('order_error', {
-        type: isOrderError ? orderError.type : 'unknown',
-        orderId: isOrderError ? orderError.orderId : undefined,
-        userId: isOrderError ? orderError.userId : undefined,
-        message,
-        path: req.nextUrl.pathname,
-        timestamp: new Date().toISOString(),
-        details: isOrderError ? orderError.details : undefined
-      });
-    } catch (highlightError) {
-      console.error('Failed to report to Highlight:', highlightError);
-    }
-  }
+  // Log to our error logging system
+  logError(error instanceof Error ? error : new Error(message), {
+    message: `Order error: ${message}`,
+    source: 'api:other',
+    additionalContext: {
+      orderId: isOrderError ? orderError.orderId : undefined,
+      userId: isOrderError ? orderError.userId : undefined,
+      errorType: isOrderError ? orderError.type : 'unknown',
+      ...contextData
+    },
+  });
   
   // Return appropriate response
   return NextResponse.json(

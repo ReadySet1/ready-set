@@ -1,7 +1,6 @@
 // src/middleware.ts
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
-import { highlightMiddleware } from '@highlight-run/next/server';
 
 // Protected admin routes that require authentication
 const PROTECTED_ROUTES = [
@@ -13,14 +12,6 @@ const PROTECTED_ROUTES = [
 ];
 
 export async function middleware(request: NextRequest) {
-  // Apply Highlight.run middleware for cookie-based session tracking
-  try {
-    await highlightMiddleware(request);
-  } catch (error) {
-    console.error('Highlight middleware error:', error);
-    // Continue processing the request even if highlight has an error
-  }
-
   // Skip middleware for specific paths
   if (request.nextUrl.pathname.startsWith('/auth/callback') ||
       request.nextUrl.pathname === "/complete-profile") {

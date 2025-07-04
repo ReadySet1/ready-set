@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { H } from 'highlight.run';
 import { Button } from '@/components/ui/button';
 import { logError } from '@/utils/error-logging';
 
@@ -19,33 +18,9 @@ export default function UsersClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   
-  // Track component mounting for performance analysis
+  // Fetch users on component mount
   useEffect(() => {
-    try {
-      // Track component mount in Highlight
-      H.track('admin_users_component_mounted', {
-        timestamp: new Date().toISOString(),
-        path: window.location.pathname
-      });
-    } catch (err) {
-      console.error('Failed to track component mount:', err);
-    }
-    
-    // Fetch users on component mount
     fetchUsers();
-    
-    return () => {
-      // Track component unmount
-      try {
-        H.track('admin_users_component_unmounted', {
-          timestamp: new Date().toISOString(),
-          path: window.location.pathname,
-          duration: Date.now() - performance.now() // Approximate time on page
-        });
-      } catch (err) {
-        console.error('Failed to track component unmount:', err);
-      }
-    };
   }, []);
   
   // Fetch users with error handling
@@ -54,10 +29,7 @@ export default function UsersClient() {
       setLoading(true);
       setError(null);
       
-      // Track fetch attempt
-      H.track('admin_users_fetch_started', {
-        timestamp: new Date().toISOString()
-      });
+
       
       // Simulated API call
       const response = await fetch('/api/admin/users');
@@ -70,11 +42,7 @@ export default function UsersClient() {
       const data = await response.json();
       setUsers(data.users || []);
       
-      // Track successful fetch
-      H.track('admin_users_fetch_success', {
-        timestamp: new Date().toISOString(),
-        userCount: data.users?.length || 0
-      });
+
       
     } catch (err) {
       // Set local state
@@ -91,12 +59,7 @@ export default function UsersClient() {
         }
       });
       
-      // Also track as a specific event for analytics
-      H.track('admin_users_fetch_error', {
-        error: error.message,
-        timestamp: new Date().toISOString(),
-        component: 'UsersClient'
-      });
+
       
     } finally {
       setLoading(false);
@@ -109,13 +72,7 @@ export default function UsersClient() {
       // Determine new status
       const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
       
-      // Track action start
-      H.track('admin_user_status_change_started', {
-        userId,
-        fromStatus: currentStatus,
-        toStatus: newStatus,
-        timestamp: new Date().toISOString()
-      });
+
       
       // Make API call
       const response = await fetch(`/api/admin/users/${userId}/status`, {
@@ -137,13 +94,7 @@ export default function UsersClient() {
           : user
       ));
       
-      // Track success
-      H.track('admin_user_status_change_success', {
-        userId,
-        fromStatus: currentStatus,
-        toStatus: newStatus,
-        timestamp: new Date().toISOString()
-      });
+
       
     } catch (err) {
       // Create proper error object
@@ -161,13 +112,7 @@ export default function UsersClient() {
         }
       });
       
-      // Also track specific event
-      H.track('admin_user_status_change_error', {
-        userId,
-        currentStatus,
-        error: error.message,
-        timestamp: new Date().toISOString()
-      });
+
       
       // Show error to user (in a real app, you'd likely use a toast notification)
       alert(`Error: ${error.message}`);
