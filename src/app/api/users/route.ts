@@ -1,110 +1,68 @@
 // src/app/api/users/route.ts
 
 import { NextResponse, NextRequest } from "next/server";
-import { prisma } from "@/utils/prismaDB";
-import { createClient } from "@/utils/supabase/server";
-import { Prisma } from '@prisma/client';
-import { UserStatus, UserType } from '@/types/prisma';
+import { getCurrentUser } from '@/lib/auth';
+import { prisma } from '@/lib/db/prisma';
+import { createClient } from '@/utils/supabase/server';
 
 // GET: Fetch users with pagination, search, sort, filter
 export async function GET(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: "Unauthorized - Invalid authorization header" }, { status: 401 });
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-    
-    // Initialize Supabase client
-    const supabase = await createClient();
-    
-    // Verify the token by getting the user
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+    // Extract query parameters
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const search = searchParams.get('search') || '';
+    const statusFilter = searchParams.get('status') || 'all';
+    const typeFilter = searchParams.get('type') || 'all';
+    const sortField = searchParams.get('sort') || 'createdAt';
+    const sortDirection = searchParams.get('direction') || 'desc';
 
-    if (authError || !authUser) {
-      console.error('Auth error:', authError);
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const dbUser = await prisma.profile.findUnique({
-      where: { id: authUser.id },
-      select: { type: true },
+    console.log('Filter values:', {
+      statusFilter,
+      typeFilter,
+      search,
+      sortField,
+      sortDirection
     });
 
-    if (!dbUser?.type || (dbUser.type !== UserType.ADMIN && dbUser.type !== UserType.SUPER_ADMIN && dbUser.type !== UserType.HELPDESK)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // Build where clause using Profile model
+    const where: any = {};
 
-    // --- Parse Query Parameters ---
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "10", 10);
-    const search = searchParams.get("search") || "";
-    const statusFilter = (searchParams.get("status") ?? "all") as UserStatus | 'all';
-    const typeFilter = (searchParams.get("type") ?? "all") as UserType | 'all';
-    const sortField = searchParams.get("sort") || "createdAt";
-    const sortDirection = searchParams.get("direction") === "asc" ? "asc" : "desc";
-
-    console.log("Filter values:", { statusFilter, typeFilter, search, sortField, sortDirection });
-
-    const skip = (page - 1) * limit;
-
-    // --- Build Prisma Where Clause ---
-    let where: any = {};
-
-    // Search filter (apply across relevant fields)
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
-        { contactName: { contains: search, mode: 'insensitive' } },
-        { companyName: { contains: search, mode: 'insensitive' } },
-        { contactNumber: { contains: search, mode: 'insensitive' } },
+        { companyName: { contains: search, mode: 'insensitive' } }
       ];
     }
 
-    // Status filter
-    if (statusFilter && statusFilter !== "all") {
-        const upperCaseStatus = statusFilter.toUpperCase() as UserStatus;
-        const validStatuses = Object.values(UserStatus); // Get all enum values
-        if (validStatuses.includes(upperCaseStatus)) {
-            where.status = upperCaseStatus;
-        } else {
-             console.warn(`Invalid status filter received: ${statusFilter}`);
-        }
+    if (statusFilter !== 'all') {
+      where.status = statusFilter.toUpperCase();
     }
 
-    // Type filter
-    if (typeFilter && typeFilter !== "all") {
-        const upperCaseType = typeFilter.toUpperCase() as UserType;
-        const validTypes = Object.values(UserType); // Get all enum values
-        if (validTypes.includes(upperCaseType)) {
-             where.type = upperCaseType;
-        } else {
-             console.warn(`Invalid type filter received: ${typeFilter}`);
-        }
+    if (typeFilter !== 'all') {
+      where.type = typeFilter.toUpperCase();
     }
 
-    console.log("Final where clause:", where);
+    // Add soft delete filter (deletedAt exists in Profile model)
+    where.deletedAt = null;
 
-    // --- Build Prisma OrderBy Clause ---
-    let orderBy: any = {};
-    if (sortField === 'name') {
-      orderBy = { name: sortDirection };
-    } else if (sortField === 'email') {
-       orderBy = { email: sortDirection };
-    } else if (sortField === 'type') {
-       orderBy = { type: sortDirection };
-    } else if (sortField === 'status') {
-       orderBy = { status: sortDirection };
-    } else {
-       orderBy = { createdAt: sortDirection };
-    }
+    console.log('Final where clause:', where);
 
-    // --- Fetch Data and Count ---
+    // Build orderBy clause
+    const orderBy = {
+      [sortField]: sortDirection
+    };
+
+    const skip = (page - 1) * limit;
+
+    // --- Fetch Data and Count using Profile model ---
     const [users, totalUsers] = await Promise.all([
       prisma.profile.findMany({
         where,
@@ -122,18 +80,29 @@ export async function GET(request: NextRequest) {
           createdAt: true,
         },
       }),
-      prisma.profile.count({ where }),
+      prisma.profile.count({
+        where,
+      }),
     ]);
 
     const totalPages = Math.ceil(totalUsers / limit);
 
-    return NextResponse.json({ users, totalPages });
-
+    return NextResponse.json({
+      users,
+      pagination: {
+        page,
+        limit,
+        totalUsers,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    });
   } catch (error) {
-    console.error("Error fetching users:", error);
+    console.error('Error fetching users:', error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 },
+      { error: 'Internal server error' },
+      { status: 500 }
     );
   }
 }
@@ -167,7 +136,7 @@ export async function POST(request: Request) {
     });
 
     // Allow admin and super_admin to create users
-    if (dbUser?.type !== UserType.ADMIN && dbUser?.type !== UserType.SUPER_ADMIN) {
+    if (dbUser?.type !== 'ADMIN' && dbUser?.type !== 'SUPER_ADMIN') {
         return NextResponse.json({ error: "Forbidden: Only admins can create users" }, { status: 403 });
     }
 

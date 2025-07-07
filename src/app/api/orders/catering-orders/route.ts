@@ -106,30 +106,47 @@ export async function GET(req: NextRequest) {
 
     orderByClause = validSortFields[sortField] || { pickupDateTime: 'desc' };
 
-    // Fetch data with optimized query
-    const [cateringOrders, totalCount] = await Promise.all([
-      prisma.cateringRequest.findMany({
-        where: whereClause,
-        skip,
-        take: limit,
-        orderBy: orderByClause,
-        include: {
-          user: {
-            select: { id: true, name: true, email: true, contactNumber: true }
-          },
-          pickupAddress: true,
-          deliveryAddress: true,
-          dispatches: {
-            include: {
-              driver: {
-                select: { id: true, name: true, email: true, contactNumber: true }
-              }
-            }
-          }
-        },
-      }),
-      prisma.cateringRequest.count({ where: whereClause }),
-    ]) as [CateringOrderWithDetails[], number]; 
+    // Initialize Supabase client
+    const supabaseClient = await createClient();
+    
+    // Build Supabase query
+    let query = (supabaseClient as any)
+      .from('catering_requests')
+      .select(`
+        *,
+        user:profiles!catering_requests_user_id_fkey(id, name, email, contact_number),
+        pickup_address:addresses!catering_requests_pickup_address_id_fkey(*),
+        delivery_address:addresses!catering_requests_delivery_address_id_fkey(*)
+      `)
+      .range(skip, skip + limit - 1)
+      .order('created_at', { ascending: false });
+
+    // Apply filters
+    if (statusParam && statusParam !== 'all') {
+      query = query.eq('status', statusParam);
+    }
+    
+    if (recentOnly) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      query = query.gte('created_at', thirtyDaysAgo.toISOString());
+    }
+
+    if (searchTerm) {
+      // For search, we'll need to use a simpler approach
+      query = query.ilike('order_number', `%${searchTerm}%`);
+    }
+
+    // Fetch data and count
+    const [ordersResult, countResult] = await Promise.all([
+      query,
+      (supabaseClient as any)
+        .from('catering_requests')
+        .select('*', { count: 'exact', head: true })
+    ]);
+
+    const cateringOrders = ordersResult.data || [];
+    const totalCount = countResult.count || 0; 
 
     const totalPages = Math.ceil(totalCount / limit);
 

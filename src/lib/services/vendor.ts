@@ -5,6 +5,30 @@ import { Prisma } from "@prisma/client";
 import { CateringRequest, OnDemand, Decimal } from "@/types/prisma";
 import { notFound } from "next/navigation";
 
+// Helper function to diagnose authentication and database connection issues
+export async function diagnoseDatabaseConnection() {
+  try {
+    console.log('diagnoseDatabaseConnection: Testing database connection...');
+    
+    // Test basic database connection
+    const testResult = await prisma.$queryRaw`SELECT 1 as test`;
+    console.log('diagnoseDatabaseConnection: Database connection test:', testResult);
+    
+    // Test profile table access
+    const profileCount = await prisma.profile.count();
+    console.log('diagnoseDatabaseConnection: Profile count:', profileCount);
+    
+    // Test auth function
+    const user = await getCurrentUser();
+    console.log('diagnoseDatabaseConnection: Auth user:', user ? `User ID: ${user.id}, Email: ${user.email}` : 'No user found');
+    
+    return { success: true, user, profileCount };
+  } catch (error) {
+    console.error('diagnoseDatabaseConnection: Error in diagnosis:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
 // Custom types for cleaner data structure
 export interface OrderData {
   id: string;
@@ -54,41 +78,70 @@ export interface PaginatedOrdersResponse {
 
 // Helper function to get the current authenticated user's ID
 export async function getCurrentUserId() {
-  const user = await getCurrentUser();
-  if (!user?.email) {
+  try {
+    console.log('getCurrentUserId: Starting authentication check...');
+    const user = await getCurrentUser();
+    console.log('getCurrentUserId: User from auth:', user ? `User ID: ${user.id}` : 'No user found');
+    
+    if (!user?.email) {
+      console.log('getCurrentUserId: No user email found');
+      return null;
+    }
+
+    console.log('getCurrentUserId: Looking up profile for email:', user.email);
+    const profile = await prisma.profile.findUnique({
+      where: { email: user.email },
+      select: { id: true, type: true }
+    });
+
+    console.log('getCurrentUserId: Profile found:', profile ? `Profile ID: ${profile.id}, Type: ${profile.type}` : 'No profile found');
+    return profile ? profile.id : null;
+  } catch (error) {
+    console.error('getCurrentUserId: Error getting user ID:', error);
     return null;
   }
-
-  const profile = await prisma.profile.findUnique({
-    where: { email: user.email },
-    select: { id: true, type: true }
-  });
-
-  return profile ? profile.id : null;
 }
 
 export async function checkVendorAccess() {
-  const user = await getCurrentUser();
-  if (!user?.email) {
+  try {
+    console.log('checkVendorAccess: Starting vendor access check...');
+    const user = await getCurrentUser();
+    console.log('checkVendorAccess: User from auth:', user ? `User ID: ${user.id}` : 'No user found');
+    
+    if (!user?.email) {
+      console.log('checkVendorAccess: No user email found');
+      return false;
+    }
+
+    console.log('checkVendorAccess: Looking up profile for email:', user.email);
+    const profile = await prisma.profile.findUnique({
+      where: { email: user.email },
+      select: { id: true, type: true }
+    });
+
+    console.log('checkVendorAccess: Profile found:', profile ? `Profile ID: ${profile.id}, Type: ${profile.type}` : 'No profile found');
+    
+    if (!profile || profile.type !== 'VENDOR') {
+      console.log('checkVendorAccess: User is not a vendor or profile not found');
+      return false;
+    }
+
+    console.log('checkVendorAccess: Vendor access granted');
+    return true;
+  } catch (error) {
+    console.error('checkVendorAccess: Error checking vendor access:', error);
     return false;
   }
-
-  const profile = await prisma.profile.findUnique({
-    where: { email: user.email },
-    select: { id: true, type: true }
-  });
-
-  if (!profile || profile.type !== 'VENDOR') {
-    return false;
-  }
-
-  return true;
 }
 
 // Get vendor's orders
 export async function getVendorOrders(limit = 10, page = 1): Promise<PaginatedOrdersResponse> {
+  console.log('getVendorOrders: Starting order fetch...');
   const userId = await getCurrentUserId();
+  console.log('getVendorOrders: User ID obtained:', userId);
+  
   if (!userId) {
+    console.log('getVendorOrders: No user ID available, throwing Unauthorized error');
     throw new Error("Unauthorized");
   }
 

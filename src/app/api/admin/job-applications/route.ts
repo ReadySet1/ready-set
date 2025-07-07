@@ -84,59 +84,46 @@ export async function GET(request: NextRequest) {
 
     // If statsOnly is true, just return the statistics
     if (statsOnly) {
-      // Use Promise.all for better performance
+      // Initialize Supabase client for stats
+      const supabaseStats = await createClient();
+      
+      // Use Promise.all for better performance with Supabase
       const [
-        totalApplications,
-        pendingApplications,
-        approvedApplications,
-        rejectedApplications,
-        interviewingApplications,
-        positionCounts,
-        recentApplications
+        totalResult,
+        pendingResult,
+        approvedResult,
+        rejectedResult,
+        interviewingResult,
+        positionsResult,
+        recentResult
       ] = await Promise.all([
-        prisma.jobApplication.count({
-          where: { deletedAt: null }
-        }),
-        prisma.jobApplication.count({
-          where: { 
-            deletedAt: null,
-            status: ApplicationStatus.PENDING
-          }
-        }),
-        prisma.jobApplication.count({
-          where: { 
-            deletedAt: null,
-            status: ApplicationStatus.APPROVED
-          }
-        }),
-        prisma.jobApplication.count({
-          where: { 
-            deletedAt: null,
-            status: ApplicationStatus.REJECTED
-          }
-        }),
-        prisma.jobApplication.count({
-          where: { 
-            deletedAt: null,
-            status: ApplicationStatus.INTERVIEWING
-          }
-        }),
-        prisma.jobApplication.groupBy({
-          by: ['position'],
-          _count: {
-            position: true
-          },
-          where: { deletedAt: null }
-        }),
-        prisma.jobApplication.findMany({
-          where: { deletedAt: null },
-          orderBy: { createdAt: 'desc' },
-          take: 5
-        })
+        (supabaseStats as any).from('job_applications').select('*', { count: 'exact', head: true }),
+        (supabaseStats as any).from('job_applications').select('*', { count: 'exact', head: true }).eq('status', 'PENDING'),
+        (supabaseStats as any).from('job_applications').select('*', { count: 'exact', head: true }).eq('status', 'APPROVED'),
+        (supabaseStats as any).from('job_applications').select('*', { count: 'exact', head: true }).eq('status', 'REJECTED'),
+        (supabaseStats as any).from('job_applications').select('*', { count: 'exact', head: true }).eq('status', 'INTERVIEWING'),
+        (supabaseStats as any).from('job_applications').select('position'),
+        (supabaseStats as any).from('job_applications').select('*').order('created_at', { ascending: false }).limit(5)
       ]);
 
-      const applicationsByPosition = positionCounts.reduce((acc: Record<string, number>, curr: any) => {
-        acc[curr.position] = curr._count.position;
+      const totalApplications = totalResult.count || 0;
+      const pendingApplications = pendingResult.count || 0;
+      const approvedApplications = approvedResult.count || 0;
+      const rejectedApplications = rejectedResult.count || 0;
+      const interviewingApplications = interviewingResult.count || 0;
+      const recentApplications = recentResult.data || [];
+      
+      // Process position counts
+      const positionCounts: Record<string, number> = {};
+      if (positionsResult.data) {
+        positionsResult.data.forEach((app: any) => {
+          const pos = app.position;
+          positionCounts[pos] = (positionCounts[pos] || 0) + 1;
+        });
+      }
+
+      const applicationsByPosition = Object.entries(positionCounts).reduce((acc: Record<string, number>, [pos, count]) => {
+        acc[pos] = count;
         return acc;
       }, {} as Record<string, number>);
 
@@ -151,29 +138,45 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get total count for pagination
-    const totalCount = await prisma.jobApplication.count({ where });
-    const totalPages = Math.ceil(totalCount / limit);
+    // Initialize Supabase client
+    const supabaseClient = await createClient();
 
-    // Fetch applications with pagination and optimized file upload query
-    const applications = await prisma.jobApplication.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit,
-      include: {
-        fileUploads: {
-          select: {
-            id: true,
-            fileName: true,
-            fileType: true,
-            fileSize: true,
-            uploadedAt: true,
-            category: true,
-          },
-        },
-      },
-    });
+    // Build Supabase query with filters
+    let query = (supabaseClient as any)
+      .from('job_applications')
+      .select(`
+        *,
+        file_uploads:file_uploads!file_uploads_job_application_id_fkey(
+          id, file_name, file_type, file_size, uploaded_at, category
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .range(skip, skip + limit - 1);
+
+    // Apply filters
+    if (status) {
+      query = query.eq('status', status);
+    }
+    
+    if (position) {
+      query = query.eq('position', position);
+    }
+    
+    if (search) {
+      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    // Get total count and applications
+    const [applicationsResult, countResult] = await Promise.all([
+      query,
+      (supabaseClient as any)
+        .from('job_applications')
+        .select('*', { count: 'exact', head: true })
+    ]);
+
+    const applications = applicationsResult.data || [];
+    const totalCount = countResult.count || 0;
+    const totalPages = Math.ceil(totalCount / limit);
 
     // Process applications to fix file upload inconsistency
     const processedApplications = applications.map((app: any) => {

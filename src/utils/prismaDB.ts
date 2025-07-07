@@ -21,11 +21,11 @@ const createMockPrismaClient = (): PrismaClient => {
   console.log('Creating mock Prisma client for build time or edge runtime');
   const mockClient = {} as PrismaClient;
   
-  // Add common Prisma methods as mocks
+  // Add common Prisma methods as mocks (using actual generated model names)
   const models = [
-    'profile', 'user', 'jobApplication', 'fileUpload', 'address', 'order', 
-    'driver', 'carrier', 'cateringRequest', 'onDemand', 'dispatch',
-    'account', 'session', 'userAddress'
+    'profile', 'address', 'userAddress', 'account', 'session', 'verificationToken',
+    'cateringRequest', 'onDemand', 'dispatch', 'fileUpload', 'formSubmission', 
+    'leadCapture', 'pricingTier', 'jobApplication'
   ];
   
   models.forEach(model => {
