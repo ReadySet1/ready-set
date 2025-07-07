@@ -46,9 +46,6 @@ const VendorPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAllOrdersModal, setShowAllOrdersModal] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalOrders, setTotalOrders] = useState(0);
-  const ordersPerPage = 1;
 
   useEffect(() => {
     const fetchVendorData = async () => {
@@ -56,9 +53,7 @@ const VendorPage = () => {
         setIsLoading(true);
         // Fetch orders and metrics in parallel
         const [ordersResponse, metricsResponse] = await Promise.all([
-          fetch(
-            `/api/vendor/orders?page=${currentPage}&limit=${ordersPerPage}`,
-          ),
+          fetch("/api/vendor/orders"),
           fetch("/api/vendor/metrics"),
         ]);
 
@@ -77,8 +72,7 @@ const VendorPage = () => {
         const ordersData = await ordersResponse.json();
         const metricsData = await metricsResponse.json();
 
-        setOrders(ordersData.orders || ordersData);
-        setTotalOrders(ordersData.total || ordersData.length);
+        setOrders(ordersData);
         setMetrics(metricsData);
       } catch (error) {
         console.error("Error fetching vendor data:", error);
@@ -89,7 +83,7 @@ const VendorPage = () => {
     };
 
     fetchVendorData();
-  }, [currentPage, ordersPerPage]);
+  }, []);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -333,33 +327,11 @@ const VendorPage = () => {
                       </Table>
 
                       <div className="mt-4 flex justify-between">
-                        <Button
-                          variant="outline"
-                          onClick={() =>
-                            setCurrentPage((prev) => Math.max(1, prev - 1))
-                          }
-                          disabled={currentPage === 1}
-                        >
-                          Previous
+                        <Button variant="outline">Previous</Button>
+                        <Button onClick={() => setShowAllOrdersModal(true)}>
+                          View All Orders
                         </Button>
-                        <div className="flex items-center gap-4">
-                          <span className="text-sm text-gray-600">
-                            Page {currentPage} of{" "}
-                            {Math.ceil(totalOrders / ordersPerPage)}
-                          </span>
-                          <Button onClick={() => setShowAllOrdersModal(true)}>
-                            View All Orders
-                          </Button>
-                        </div>
-                        <Button
-                          onClick={() => setCurrentPage((prev) => prev + 1)}
-                          disabled={
-                            currentPage >=
-                            Math.ceil(totalOrders / ordersPerPage)
-                          }
-                        >
-                          Next
-                        </Button>
+                        <Button>Next</Button>
                       </div>
                     </div>
                   )}

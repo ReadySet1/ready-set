@@ -141,26 +141,6 @@ export async function getVendorOrders(limit = 10, page = 1): Promise<PaginatedOr
     throw new Error("Unauthorized");
   }
 
-  const skip = (page - 1) * limit;
-
-  // Get total count first
-  const [cateringTotal, onDemandTotal] = await Promise.all([
-    prisma.cateringRequest.count({
-      where: {
-        userId: userId,
-        deletedAt: null
-      }
-    }),
-    prisma.onDemand.count({
-      where: {
-        userId: userId,
-        deletedAt: null
-      }
-    })
-  ]);
-
-  const totalOrders = cateringTotal + onDemandTotal;
-
   // Fetch catering requests
   const cateringRequests = await prisma.cateringRequest.findMany({
     where: {
@@ -172,6 +152,7 @@ export async function getVendorOrders(limit = 10, page = 1): Promise<PaginatedOr
       deliveryAddress: true,
     },
     orderBy: { pickupDateTime: 'desc' },
+    take: limit
   });
 
   // Fetch on-demand requests
@@ -185,6 +166,7 @@ export async function getVendorOrders(limit = 10, page = 1): Promise<PaginatedOr
       deliveryAddress: true,
     },
     orderBy: { pickupDateTime: 'desc' },
+    take: limit
   });
 
   // Transform the data to a unified format
@@ -322,15 +304,14 @@ export async function getVendorOrders(limit = 10, page = 1): Promise<PaginatedOr
   const allOrders = [...cateringOrders, ...onDemandOrders]
     .sort((a, b) => new Date(b.pickupDateTime).getTime() - new Date(a.pickupDateTime).getTime());
   
-  // Apply pagination
-  const paginatedOrders = allOrders.slice(skip, skip + limit);
+  const paginatedOrders = allOrders.slice((page - 1) * limit, page * limit);
   
   return {
     orders: paginatedOrders,
-    total: totalOrders,
-    page: page,
-    limit: limit,
-    totalPages: Math.ceil(totalOrders / limit)
+    total: allOrders.length,
+    page,
+    limit,
+    totalPages: Math.ceil(allOrders.length / limit)
   };
 }
 
