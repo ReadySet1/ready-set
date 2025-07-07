@@ -14,15 +14,11 @@ export async function diagnoseDatabaseConnection() {
     const testResult = await prisma.$queryRaw`SELECT 1 as test`;
     console.log('diagnoseDatabaseConnection: Database connection test:', testResult);
     
-    // Test profile table access
-    const profileCount = await prisma.profile.count();
-    console.log('diagnoseDatabaseConnection: Profile count:', profileCount);
-    
     // Test auth function
     const user = await getCurrentUser();
     console.log('diagnoseDatabaseConnection: Auth user:', user ? `User ID: ${user.id}, Email: ${user.email}` : 'No user found');
     
-    return { success: true, user, profileCount };
+    return { success: true, user, testResult };
   } catch (error) {
     console.error('diagnoseDatabaseConnection: Error in diagnosis:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
