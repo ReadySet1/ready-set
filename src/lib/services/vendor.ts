@@ -5,26 +5,6 @@ import { Prisma } from "@prisma/client";
 import { CateringRequest, OnDemand, Decimal } from "@/types/prisma";
 import { notFound } from "next/navigation";
 
-// Helper function to diagnose authentication and database connection issues
-export async function diagnoseDatabaseConnection() {
-  try {
-    console.log('diagnoseDatabaseConnection: Testing database connection...');
-    
-    // Test basic database connection
-    const testResult = await prisma.$queryRaw`SELECT 1 as test`;
-    console.log('diagnoseDatabaseConnection: Database connection test:', testResult);
-    
-    // Test auth function
-    const user = await getCurrentUser();
-    console.log('diagnoseDatabaseConnection: Auth user:', user ? `User ID: ${user.id}, Email: ${user.email}` : 'No user found');
-    
-    return { success: true, user, testResult };
-  } catch (error) {
-    console.error('diagnoseDatabaseConnection: Error in diagnosis:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-  }
-}
-
 // Custom types for cleaner data structure
 export interface OrderData {
   id: string;
@@ -64,85 +44,48 @@ export interface VendorMetrics {
   orderGrowth: number;
 }
 
-export interface PaginatedOrdersResponse {
-  orders: OrderData[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
 // Helper function to get the current authenticated user's ID
 export async function getCurrentUserId() {
-  try {
-    console.log('getCurrentUserId: Starting authentication check...');
-    const user = await getCurrentUser();
-    console.log('getCurrentUserId: User from auth:', user ? `User ID: ${user.id}` : 'No user found');
-    
-    if (!user?.email) {
-      console.log('getCurrentUserId: No user email found');
-      return null;
-    }
-
-    console.log('getCurrentUserId: Looking up profile for email:', user.email);
-    const profile = await prisma.profile.findUnique({
-      where: { email: user.email },
-      select: { id: true, type: true }
-    });
-
-    console.log('getCurrentUserId: Profile found:', profile ? `Profile ID: ${profile.id}, Type: ${profile.type}` : 'No profile found');
-    return profile ? profile.id : null;
-  } catch (error) {
-    console.error('getCurrentUserId: Error getting user ID:', error);
+  const user = await getCurrentUser();
+  if (!user?.email) {
     return null;
   }
+
+  const profile = await prisma.user.findUnique({
+    where: { email: user.email },
+    select: { id: true, type: true }
+  });
+
+  return profile ? profile.id : null;
 }
 
 export async function checkVendorAccess() {
-  try {
-    console.log('checkVendorAccess: Starting vendor access check...');
-    const user = await getCurrentUser();
-    console.log('checkVendorAccess: User from auth:', user ? `User ID: ${user.id}` : 'No user found');
-    
-    if (!user?.email) {
-      console.log('checkVendorAccess: No user email found');
-      return false;
-    }
-
-    console.log('checkVendorAccess: Looking up profile for email:', user.email);
-    const profile = await prisma.profile.findUnique({
-      where: { email: user.email },
-      select: { id: true, type: true }
-    });
-
-    console.log('checkVendorAccess: Profile found:', profile ? `Profile ID: ${profile.id}, Type: ${profile.type}` : 'No profile found');
-    
-    if (!profile || profile.type !== 'VENDOR') {
-      console.log('checkVendorAccess: User is not a vendor or profile not found');
-      return false;
-    }
-
-    console.log('checkVendorAccess: Vendor access granted');
-    return true;
-  } catch (error) {
-    console.error('checkVendorAccess: Error checking vendor access:', error);
+  const user = await getCurrentUser();
+  if (!user?.email) {
     return false;
   }
+
+  const profile = await prisma.user.findUnique({
+    where: { email: user.email },
+    select: { id: true, type: true }
+  });
+
+  if (!profile || profile.type !== 'vendor') {
+    return false;
+  }
+
+  return true;
 }
 
 // Get vendor's orders
-export async function getVendorOrders(limit = 10, page = 1): Promise<PaginatedOrdersResponse> {
-  console.log('getVendorOrders: Starting order fetch...');
+export async function getVendorOrders(limit = 10) {
   const userId = await getCurrentUserId();
-  console.log('getVendorOrders: User ID obtained:', userId);
-  
   if (!userId) {
-    console.log('getVendorOrders: No user ID available, throwing Unauthorized error');
     throw new Error("Unauthorized");
   }
 
   // Fetch catering requests
-  const cateringRequests = await prisma.cateringRequest.findMany({
+  const cateringRequests = await prisma.catering_request.findMany({
     where: {
       userId: userId,
       deletedAt: null
@@ -156,7 +99,7 @@ export async function getVendorOrders(limit = 10, page = 1): Promise<PaginatedOr
   });
 
   // Fetch on-demand requests
-  const onDemandRequests = await prisma.onDemand.findMany({
+  const onDemandRequests = await prisma.on_demand.findMany({
     where: {
       userId: userId,
       deletedAt: null
@@ -170,53 +113,17 @@ export async function getVendorOrders(limit = 10, page = 1): Promise<PaginatedOr
   });
 
   // Transform the data to a unified format
-  const cateringOrders: OrderData[] = cateringRequests.map((order: {
-    id: string;
-    orderNumber: string;
-    status: CateringRequest['status'];
-    pickupDateTime: Date | null;
-    arrivalDateTime: Date | null;
-    completeDateTime: Date | null;
-    orderTotal: Decimal | null;
-    tip: Decimal | null;
-    clientAttention: string | null;
-    pickupAddress: {
-      id: string;
-      name: string | null;
-      street1: string;
-      street2: string | null;
-      city: string;
-      state: string;
-      zip: string;
-      locationNumber: string | null;
-      parkingLoading: string | null;
-      longitude: number | null;
-      latitude: number | null;
-    };
-    deliveryAddress: {
-      id: string;
-      name: string | null;
-      street1: string;
-      street2: string | null;
-      city: string;
-      state: string;
-      zip: string;
-      locationNumber: string | null;
-      parkingLoading: string | null;
-      longitude: number | null;
-      latitude: number | null;
-    };
-  }) => ({
+  const cateringOrders: OrderData[] = cateringRequests.map((order: any) => ({
     id: order.id,
-    orderNumber: order.orderNumber,
+    orderNumber: order.order_number,
     orderType: "catering",
     status: order.status,
-    pickupDateTime: order.pickupDateTime?.toISOString() || new Date().toISOString(),
-    arrivalDateTime: order.arrivalDateTime?.toISOString() || "",
-    completeDateTime: order.completeDateTime?.toISOString() || null,
-    orderTotal: Number(order.orderTotal) || 0,
+    pickupDateTime: order.pickup_time?.toISOString() || new Date().toISOString(),
+    arrivalDateTime: order.arrival_time?.toISOString() || "",
+    completeDateTime: order.complete_time?.toISOString() || null,
+    orderTotal: Number(order.order_total) || 0,
     tip: Number(order.tip) || 0,
-    clientAttention: order.clientAttention,
+    clientAttention: order.client_attention,
     pickupAddress: {
       id: order.pickupAddress.id,
       street1: order.pickupAddress.street1,
@@ -235,53 +142,17 @@ export async function getVendorOrders(limit = 10, page = 1): Promise<PaginatedOr
     }
   }));
 
-  const onDemandOrders: OrderData[] = onDemandRequests.map((order: {
-    id: string;
-    orderNumber: string;
-    status: OnDemand['status'];
-    pickupDateTime: Date | null;
-    arrivalDateTime: Date | null;
-    completeDateTime: Date | null;
-    orderTotal: Decimal | null;
-    tip: Decimal | null;
-    clientAttention: string | null;
-    pickupAddress: {
-      id: string;
-      name: string | null;
-      street1: string;
-      street2: string | null;
-      city: string;
-      state: string;
-      zip: string;
-      locationNumber: string | null;
-      parkingLoading: string | null;
-      longitude: number | null;
-      latitude: number | null;
-    };
-    deliveryAddress: {
-      id: string;
-      name: string | null;
-      street1: string;
-      street2: string | null;
-      city: string;
-      state: string;
-      zip: string;
-      locationNumber: string | null;
-      parkingLoading: string | null;
-      longitude: number | null;
-      latitude: number | null;
-    };
-  }) => ({
+  const onDemandOrders: OrderData[] = onDemandRequests.map((order: any) => ({
     id: order.id,
-    orderNumber: order.orderNumber,
+    orderNumber: order.order_number,
     orderType: "on_demand",
     status: order.status,
-    pickupDateTime: order.pickupDateTime?.toISOString() || new Date().toISOString(),
-    arrivalDateTime: order.arrivalDateTime?.toISOString() || "",
-    completeDateTime: order.completeDateTime?.toISOString() || null,
-    orderTotal: Number(order.orderTotal) || 0,
+    pickupDateTime: order.pickup_time?.toISOString() || new Date().toISOString(),
+    arrivalDateTime: order.arrival_time?.toISOString() || "",
+    completeDateTime: order.complete_time?.toISOString() || null,
+    orderTotal: Number(order.order_total) || 0,
     tip: Number(order.tip) || 0,
-    clientAttention: order.clientAttention,
+    clientAttention: order.client_attention,
     pickupAddress: {
       id: order.pickupAddress.id,
       street1: order.pickupAddress.street1,
@@ -301,18 +172,9 @@ export async function getVendorOrders(limit = 10, page = 1): Promise<PaginatedOr
   }));
 
   // Combine and sort all orders by pickup date
-  const allOrders = [...cateringOrders, ...onDemandOrders]
-    .sort((a, b) => new Date(b.pickupDateTime).getTime() - new Date(a.pickupDateTime).getTime());
-  
-  const paginatedOrders = allOrders.slice((page - 1) * limit, page * limit);
-  
-  return {
-    orders: paginatedOrders,
-    total: allOrders.length,
-    page,
-    limit,
-    totalPages: Math.ceil(allOrders.length / limit)
-  };
+  return [...cateringOrders, ...onDemandOrders]
+    .sort((a, b) => new Date(b.pickupDateTime).getTime() - new Date(a.pickupDateTime).getTime())
+    .slice(0, limit);
 }
 
 // Get vendor metrics
@@ -323,88 +185,88 @@ export async function getVendorMetrics() {
   }
 
   // Count active catering orders
-  const activeCateringCount = await prisma.cateringRequest.count({
+  const activeCateringCount = await prisma.catering_request.count({
     where: {
-      userId: userId,
-      status: "ACTIVE",
-      deletedAt: null
+      user_id: userId,
+      status: "active",
+      deleted_at: null
     }
   });
 
   // Count active on-demand orders
-  const activeOnDemandCount = await prisma.onDemand.count({
+  const activeOnDemandCount = await prisma.on_demand.count({
     where: {
-      userId: userId,
-      status: "ACTIVE",
-      deletedAt: null
+      user_id: userId,
+      status: "active",
+      deleted_at: null
     }
   });
 
   // Count completed catering orders
-  const completedCateringCount = await prisma.cateringRequest.count({
+  const completedCateringCount = await prisma.catering_request.count({
     where: {
-      userId: userId,
-      status: "COMPLETED",
-      deletedAt: null
+      user_id: userId,
+      status: "completed",
+      deleted_at: null
     }
   });
 
   // Count completed on-demand orders
-  const completedOnDemandCount = await prisma.onDemand.count({
+  const completedOnDemandCount = await prisma.on_demand.count({
     where: {
-      userId: userId,
-      status: "COMPLETED",
-      deletedAt: null
+      user_id: userId,
+      status: "completed",
+      deleted_at: null
     }
   });
 
   // Count cancelled catering orders
-  const cancelledCateringCount = await prisma.cateringRequest.count({
+  const cancelledCateringCount = await prisma.catering_request.count({
     where: {
-      userId: userId,
-      status: "CANCELLED",
-      deletedAt: null
+      user_id: userId,
+      status: "cancelled",
+      deleted_at: null
     }
   });
 
   // Count cancelled on-demand orders
-  const cancelledOnDemandCount = await prisma.onDemand.count({
+  const cancelledOnDemandCount = await prisma.on_demand.count({
     where: {
-      userId: userId,
-      status: "CANCELLED",
-      deletedAt: null
+      user_id: userId,
+      status: "cancelled",
+      deleted_at: null
     }
   });
 
   // Count assigned catering orders (treated as pending)
-  const assignedCateringCount = await prisma.cateringRequest.count({
+  const assignedCateringCount = await prisma.catering_request.count({
     where: {
-      userId: userId,
-      status: "ASSIGNED",
-      deletedAt: null
+      user_id: userId,
+      status: "assigned",
+      deleted_at: null
     }
   });
 
   // Count assigned on-demand orders (treated as pending)
-  const assignedOnDemandCount = await prisma.onDemand.count({
+  const assignedOnDemandCount = await prisma.on_demand.count({
     where: {
-      userId: userId,
-      status: "ASSIGNED",
-      deletedAt: null
+      user_id: userId,
+      status: "assigned",
+      deleted_at: null
     }
   });
 
   // Calculate total revenue from completed orders
   const completedOrders = await prisma.$queryRaw`
     SELECT 
-      COALESCE(SUM(CAST("orderTotal" AS DECIMAL(10,2))), 0) as total 
+      COALESCE(SUM(CAST("order_total" AS DECIMAL(10,2))), 0) as total 
     FROM 
       (
-        SELECT "orderTotal" FROM "catering_requests" 
-        WHERE "userId" = ${userId}::uuid AND "status" = 'COMPLETED' AND "deletedAt" IS NULL
+        SELECT "order_total" FROM "catering_requests" 
+        WHERE "user_id" = ${userId}::uuid AND "status" = 'completed' AND "deleted_at" IS NULL
         UNION ALL
-        SELECT "orderTotal" FROM "on_demand_requests" 
-        WHERE "userId" = ${userId}::uuid AND "status" = 'COMPLETED' AND "deletedAt" IS NULL
+        SELECT "order_total" FROM "on_demand_requests" 
+        WHERE "user_id" = ${userId}::uuid AND "status" = 'completed' AND "deleted_at" IS NULL
       ) as combined
   `;
 
@@ -418,10 +280,10 @@ export async function getVendorMetrics() {
     SELECT COUNT(*) as count
     FROM (
       SELECT id FROM "catering_requests" 
-      WHERE "userId" = ${userId}::uuid AND "createdAt" >= ${currentMonthStart} AND "deletedAt" IS NULL
+      WHERE "user_id" = ${userId}::uuid AND "created_at" >= ${currentMonthStart} AND "deleted_at" IS NULL
       UNION ALL
       SELECT id FROM "on_demand_requests" 
-      WHERE "userId" = ${userId}::uuid AND "createdAt" >= ${currentMonthStart} AND "deletedAt" IS NULL
+      WHERE "user_id" = ${userId}::uuid AND "created_at" >= ${currentMonthStart} AND "deleted_at" IS NULL
     ) as combined
   `;
 
@@ -430,10 +292,10 @@ export async function getVendorMetrics() {
     SELECT COUNT(*) as count
     FROM (
       SELECT id FROM "catering_requests" 
-      WHERE "userId" = ${userId}::uuid AND "createdAt" >= ${lastMonthStart} AND "createdAt" < ${currentMonthStart} AND "deletedAt" IS NULL
+      WHERE "user_id" = ${userId}::uuid AND "created_at" >= ${lastMonthStart} AND "created_at" < ${currentMonthStart} AND "deleted_at" IS NULL
       UNION ALL
       SELECT id FROM "on_demand_requests" 
-      WHERE "userId" = ${userId}::uuid AND "createdAt" >= ${lastMonthStart} AND "createdAt" < ${currentMonthStart} AND "deletedAt" IS NULL
+      WHERE "user_id" = ${userId}::uuid AND "created_at" >= ${lastMonthStart} AND "created_at" < ${currentMonthStart} AND "deleted_at" IS NULL
     ) as combined
   `;
 
@@ -467,11 +329,11 @@ export async function getOrderByNumber(orderNumber: string) {
   }
 
   // Try to find it in catering requests
-  const cateringRequest = await prisma.cateringRequest.findFirst({
+  const cateringRequest = await prisma.catering_request.findFirst({
     where: {
-      orderNumber: orderNumber,
-      userId: userId,
-      deletedAt: null
+      order_number: orderNumber,
+      user_id: userId,
+      deleted_at: null
     },
     include: {
       pickupAddress: true,
@@ -488,24 +350,24 @@ export async function getOrderByNumber(orderNumber: string) {
   if (cateringRequest) {
     return {
       id: cateringRequest.id,
-      orderNumber: cateringRequest.orderNumber,
+      orderNumber: cateringRequest.order_number,
       orderType: "catering",
       status: cateringRequest.status,
-      pickupDateTime: cateringRequest.pickupDateTime?.toISOString() || null,
-      arrivalDateTime: cateringRequest.arrivalDateTime?.toISOString() || null,
-      completeDateTime: cateringRequest.completeDateTime?.toISOString() || null,
-      orderTotal: Number(cateringRequest.orderTotal) || 0,
+      pickupDateTime: cateringRequest.pickup_time?.toISOString() || null,
+      arrivalDateTime: cateringRequest.arrival_time?.toISOString() || null,
+      completeDateTime: cateringRequest.complete_time?.toISOString() || null,
+      orderTotal: Number(cateringRequest.order_total) || 0,
       tip: Number(cateringRequest.tip) || 0,
       brokerage: cateringRequest.brokerage,
-      clientAttention: cateringRequest.clientAttention,
-      pickupNotes: cateringRequest.pickupNotes,
-      specialNotes: cateringRequest.specialNotes,
+      clientAttention: cateringRequest.client_attention,
+      pickupNotes: cateringRequest.pickup_notes,
+      specialNotes: cateringRequest.special_notes,
       headcount: cateringRequest.headcount,
-      needHost: cateringRequest.needHost,
-      hoursNeeded: cateringRequest.hoursNeeded,
-      numberOfHosts: cateringRequest.numberOfHosts,
+      needHost: cateringRequest.need_host,
+      hoursNeeded: cateringRequest.hours_needed,
+      numberOfHosts: cateringRequest.number_of_hosts,
       image: cateringRequest.image,
-      driverStatus: cateringRequest.driverStatus,
+      driverStatus: cateringRequest.driver_status,
       pickupAddress: cateringRequest.pickupAddress,
       deliveryAddress: cateringRequest.deliveryAddress,
       dispatches: cateringRequest.dispatches,
@@ -514,11 +376,11 @@ export async function getOrderByNumber(orderNumber: string) {
   }
 
   // If not found in catering, try on-demand
-  const onDemandRequest = await prisma.onDemand.findFirst({
+  const onDemandRequest = await prisma.on_demand.findFirst({
     where: {
-      orderNumber: orderNumber,
-      userId: userId,
-      deletedAt: null
+      order_number: orderNumber,
+      user_id: userId,
+      deleted_at: null
     },
     include: {
       pickupAddress: true,
@@ -535,22 +397,22 @@ export async function getOrderByNumber(orderNumber: string) {
   if (onDemandRequest) {
     return {
       id: onDemandRequest.id,
-      orderNumber: onDemandRequest.orderNumber,
+      orderNumber: onDemandRequest.order_number,
       orderType: "on_demand",
       status: onDemandRequest.status,
-      pickupDateTime: onDemandRequest.pickupDateTime?.toISOString() || null,
-      arrivalDateTime: onDemandRequest.arrivalDateTime?.toISOString() || null,
-      completeDateTime: onDemandRequest.completeDateTime?.toISOString() || null,
-      orderTotal: Number(onDemandRequest.orderTotal) || 0,
+      pickupDateTime: onDemandRequest.pickup_time?.toISOString() || null,
+      arrivalDateTime: onDemandRequest.arrival_time?.toISOString() || null,
+      completeDateTime: onDemandRequest.complete_time?.toISOString() || null,
+      orderTotal: Number(onDemandRequest.order_total) || 0,
       tip: Number(onDemandRequest.tip) || 0,
-      clientAttention: onDemandRequest.clientAttention,
-      pickupNotes: onDemandRequest.pickupNotes,
-      specialNotes: onDemandRequest.specialNotes,
-      hoursNeeded: onDemandRequest.hoursNeeded,
-      vehicleType: onDemandRequest.vehicleType,
-      itemDelivered: onDemandRequest.itemDelivered,
+      clientAttention: onDemandRequest.client_attention,
+      pickupNotes: onDemandRequest.pickup_notes,
+      specialNotes: onDemandRequest.special_notes,
+      hoursNeeded: onDemandRequest.hours_needed,
+      vehicleType: onDemandRequest.vehicle_type,
+      itemDelivered: onDemandRequest.item_delivered,
       image: onDemandRequest.image,
-      driverStatus: onDemandRequest.driverStatus,
+      driverStatus: onDemandRequest.driver_status,
       length: onDemandRequest.length,
       width: onDemandRequest.width,
       height: onDemandRequest.height,

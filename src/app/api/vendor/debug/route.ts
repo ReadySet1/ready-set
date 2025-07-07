@@ -1,28 +1,72 @@
 import { NextRequest, NextResponse } from "next/server";
-import { diagnoseDatabaseConnection, checkVendorAccess } from "@/lib/services/vendor";
+import { checkVendorAccess } from "@/lib/services/vendor";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { prisma as prismaUtilsImport } from "@/utils/prismaDB";
+import { PrismaClient } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
   try {
     console.log('🔍 Vendor Debug API: Starting comprehensive diagnosis...');
     
-    // Test 1: Database connection
-    console.log('🔍 Test 1: Database connection...');
-    const dbTest = await diagnoseDatabaseConnection();
-    console.log('🔍 Database test result:', dbTest);
-    
-    // Test 2: Prisma client
-    console.log('🔍 Test 2: Prisma client direct test...');
+    // Test 1: Prisma client and database connection
+    console.log('🔍 Test 1: Prisma client and database connection...');
     let prismaTest: any = { success: false, error: 'Unknown error' };
     try {
       const testQuery = await prisma.$queryRaw`SELECT 1 as test`;
-      // Note: profile table may not exist in the schema, using a safer test
+      
+      // Debug prisma client properties
+      const prismaKeys = Object.getOwnPropertyNames(prisma);
+      const profileAvailable = 'user' in prisma;
+      const cateringRequestAvailable = 'catering_request' in prisma;
+      const onDemandAvailable = 'on_demand' in prisma;
+      
+      // Compare with direct utils import
+      const utilsKeys = Object.getOwnPropertyNames(prismaUtilsImport);
+      const utilsProfileAvailable = 'user' in prismaUtilsImport;
+      const utilsCateringRequestAvailable = 'catering_request' in prismaUtilsImport;
+      const utilsOnDemandAvailable = 'on_demand' in prismaUtilsImport;
+      
+      // Test with fresh client
+      const freshClient = new PrismaClient();
+      const freshKeys = Object.getOwnPropertyNames(freshClient);
+      const freshProfileAvailable = 'user' in freshClient;
+      const freshCateringRequestAvailable = 'catering_request' in freshClient;
+      const freshOnDemandAvailable = 'on_demand' in freshClient;
+      
       prismaTest = { 
         success: true, 
         testQuery, 
-        message: 'Prisma client working correctly'
+        message: 'Prisma client and database connection working correctly',
+        debug: {
+          prismaKeys: prismaKeys.slice(0, 20), // Show first 20 keys
+          profileAvailable,
+          cateringRequestAvailable,
+          onDemandAvailable,
+          prismaType: typeof prisma,
+          prismaConstructor: prisma.constructor.name,
+          utils: {
+            utilsKeys: utilsKeys.slice(0, 20),
+            utilsProfileAvailable,
+            utilsCateringRequestAvailable,
+            utilsOnDemandAvailable,
+            utilsType: typeof prismaUtilsImport,
+            utilsConstructor: prismaUtilsImport.constructor.name
+          },
+          fresh: {
+            freshKeys: freshKeys.slice(0, 20),
+            freshProfileAvailable,
+            freshCateringRequestAvailable,
+            freshOnDemandAvailable,
+            freshType: typeof freshClient,
+            freshConstructor: freshClient.constructor.name
+          }
+        }
       };
+      
+      // Don't forget to disconnect the fresh client
+      await freshClient.$disconnect();
+      
     } catch (error) {
       prismaTest = { 
         success: false, 
@@ -30,8 +74,8 @@ export async function GET(req: NextRequest) {
       };
     }
     
-    // Test 3: Authentication
-    console.log('🔍 Test 3: Authentication test...');
+    // Test 2: Authentication
+    console.log('🔍 Test 2: Authentication test...');
     let authTest: any = { success: false, error: 'Unknown error' };
     try {
       const user = await getCurrentUser();
@@ -47,8 +91,8 @@ export async function GET(req: NextRequest) {
       };
     }
     
-    // Test 4: Vendor access
-    console.log('🔍 Test 4: Vendor access test...');
+    // Test 3: Vendor access with detailed debugging
+    console.log('🔍 Test 3: Vendor access test...');
     let vendorTest: any = { success: false, error: 'Unknown error' };
     try {
       const hasAccess = await checkVendorAccess();
@@ -58,6 +102,27 @@ export async function GET(req: NextRequest) {
       };
     } catch (error) {
       vendorTest = {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      };
+    }
+    
+    // Test 4: Direct profile test with fresh client
+    console.log('🔍 Test 4: Direct profile test with fresh client...');
+    let profileTest: any = { success: false, error: 'Unknown error' };
+    try {
+      const freshClientForTest = new PrismaClient();
+      const profileCount = await freshClientForTest.user.count();
+      await freshClientForTest.$disconnect();
+      
+      profileTest = {
+        success: true,
+        profileCount,
+        message: `Found ${profileCount} profiles in database`
+      };
+    } catch (error) {
+      profileTest = {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
@@ -76,10 +141,10 @@ export async function GET(req: NextRequest) {
       timestamp: new Date().toISOString(),
       status: 'Debug information collected',
       tests: {
-        database: dbTest,
         prisma: prismaTest,
         authentication: authTest,
         vendorAccess: vendorTest,
+        profileTest: profileTest,
         environment: envTest
       }
     });
