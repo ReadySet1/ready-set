@@ -46,6 +46,12 @@ const VendorPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAllOrdersModal, setShowAllOrdersModal] = useState(false);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [ordersPerPage] = useState(1); // Show 1 order per page as requested
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
 
   useEffect(() => {
     const fetchVendorData = async () => {
@@ -53,7 +59,9 @@ const VendorPage = () => {
         setIsLoading(true);
         // Fetch orders and metrics in parallel
         const [ordersResponse, metricsResponse] = await Promise.all([
-          fetch("/api/vendor/orders"),
+          fetch(
+            `/api/vendor/orders?page=${currentPage}&limit=${ordersPerPage}`,
+          ),
           fetch("/api/vendor/metrics"),
         ]);
 
@@ -72,8 +80,13 @@ const VendorPage = () => {
         const ordersData = await ordersResponse.json();
         const metricsData = await metricsResponse.json();
 
-        setOrders(ordersData);
+        setOrders(ordersData.orders);
         setMetrics(metricsData);
+
+        // Update pagination state using the hasMore flag from the API
+        setHasPrevPage(currentPage > 1);
+        setHasNextPage(ordersData.hasMore);
+        setTotalOrders(ordersData.total);
       } catch (error) {
         console.error("Error fetching vendor data:", error);
         setError("Failed to load dashboard data. Please try again later.");
@@ -83,7 +96,7 @@ const VendorPage = () => {
     };
 
     fetchVendorData();
-  }, []);
+  }, [currentPage, ordersPerPage]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -131,6 +144,19 @@ const VendorPage = () => {
         {type === "catering" ? "Catering" : "On Demand"}
       </Badge>
     );
+  };
+
+  // Pagination handlers
+  const handlePrevPage = () => {
+    if (hasPrevPage) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (hasNextPage) {
+      setCurrentPage(currentPage + 1);
+    }
   };
 
   if (error) {
@@ -327,11 +353,27 @@ const VendorPage = () => {
                       </Table>
 
                       <div className="mt-4 flex justify-between">
-                        <Button variant="outline">Previous</Button>
-                        <Button onClick={() => setShowAllOrdersModal(true)}>
-                          View All Orders
+                        <Button
+                          variant="outline"
+                          onClick={handlePrevPage}
+                          disabled={!hasPrevPage}
+                        >
+                          Previous
                         </Button>
-                        <Button>Next</Button>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-500">
+                            Page {currentPage}
+                          </span>
+                          <Button onClick={() => setShowAllOrdersModal(true)}>
+                            View All Orders
+                          </Button>
+                        </div>
+                        <Button
+                          onClick={handleNextPage}
+                          disabled={!hasNextPage}
+                        >
+                          Next
+                        </Button>
                       </div>
                     </div>
                   )}

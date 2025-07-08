@@ -22,9 +22,15 @@ export async function GET(req: NextRequest) {
       : 10;
 
     // Get vendor orders
-    const orders = await getVendorOrders(limit);
+    const result = await getVendorOrders(limit, page);
     
-    return NextResponse.json(orders);
+    return NextResponse.json({
+      orders: result.orders,
+      hasMore: result.hasMore,
+      total: result.total,
+      page,
+      limit
+    });
   } catch (error: any) {
     console.error("Error fetching vendor orders:", error);
     

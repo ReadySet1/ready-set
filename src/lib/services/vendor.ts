@@ -77,11 +77,17 @@ export async function checkVendorAccess() {
 }
 
 // Get vendor's orders
-export async function getVendorOrders(limit = 10) {
+export async function getVendorOrders(limit = 10, page = 1) {
   const userId = await getCurrentUserId();
   if (!userId) {
     throw new Error("Unauthorized");
   }
+
+  // Calculate offset for pagination
+  const offset = (page - 1) * limit;
+
+  // Fetch more records than needed to properly sort and paginate
+  const fetchLimit = Math.max(limit * 10, 50); // Fetch more to ensure proper sorting
 
   // Fetch catering requests
   const cateringRequests = await prisma.cateringRequest.findMany({
@@ -93,7 +99,7 @@ export async function getVendorOrders(limit = 10) {
       deliveryAddress: true,
     },
     orderBy: { pickupDateTime: 'desc' },
-    take: limit
+    take: fetchLimit
   });
 
   // Fetch on-demand requests
@@ -106,7 +112,7 @@ export async function getVendorOrders(limit = 10) {
       deliveryAddress: true,
     },
     orderBy: { pickupDateTime: 'desc' },
-    take: limit
+    take: fetchLimit
   });
 
   // Transform the data to a unified format
@@ -169,9 +175,18 @@ export async function getVendorOrders(limit = 10) {
   }));
 
   // Combine and sort all orders by pickup date
-  return [...cateringOrders, ...onDemandOrders]
-    .sort((a, b) => new Date(b.pickupDateTime).getTime() - new Date(a.pickupDateTime).getTime())
-    .slice(0, limit);
+  const allOrders = [...cateringOrders, ...onDemandOrders]
+    .sort((a, b) => new Date(b.pickupDateTime).getTime() - new Date(a.pickupDateTime).getTime());
+
+  // Get one extra order to check if there are more pages
+  const requestedOrders = allOrders.slice(offset, offset + limit + 1);
+  
+  // Return the requested number of orders and hasMore flag
+  return {
+    orders: requestedOrders.slice(0, limit),
+    hasMore: requestedOrders.length > limit,
+    total: allOrders.length
+  };
 }
 
 // Get vendor metrics
