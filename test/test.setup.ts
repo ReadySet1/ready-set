@@ -15,18 +15,18 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/',
 }));
 
-// Mock Supabase
-jest.mock('@/utils/supabase/client', () => ({
-  createClient: jest.fn(() => ({
-    auth: {
-      getUser: jest.fn(),
-      getSession: jest.fn(),
-      onAuthStateChange: jest.fn(() => ({
-        data: { subscription: { unsubscribe: jest.fn() } }
-      })),
-    },
-  })),
-}));
+// Mock Supabase client (if needed)
+// jest.mock('@/utils/supabase/client', () => ({
+//   createClient: jest.fn(() => ({
+//     auth: {
+//       getUser: jest.fn(),
+//       getSession: jest.fn(),
+//       onAuthStateChange: jest.fn(() => ({
+//         data: { subscription: { unsubscribe: jest.fn() } }
+//       })),
+//     },
+//   })),
+// }));
 
 // Mock window methods
 Object.defineProperty(window, 'matchMedia', {

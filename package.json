@@ -34,15 +34,6 @@
     "env:list": "tsx scripts/list-coolify-resources.ts",
     "env:sync": "tsx scripts/sync-env.ts"
   },
-  "jest": {
-    "setupFilesAfterEnv": [
-      "<rootDir>/jest.setup.ts"
-    ],
-    "testEnvironment": "jsdom",
-    "moduleNameMapper": {
-      "^@/(.*)$": "<rootDir>/src/$1"
-    }
-  },
   "trustedDependencies": [
     "@testing-library/react"
   ],

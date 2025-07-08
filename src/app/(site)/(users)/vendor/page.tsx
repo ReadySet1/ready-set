@@ -264,9 +264,17 @@ const VendorPage = () => {
                         platform
                       </CardDescription>
                     </div>
-                    <Button asChild>
-                      <Link href="/catering-request">Create New Order</Link>
-                    </Button>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowAllOrdersModal(true)}
+                      >
+                        View All Orders
+                      </Button>
+                      <Button asChild>
+                        <Link href="/catering-request">Create New Order</Link>
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -352,7 +360,7 @@ const VendorPage = () => {
                         </TableBody>
                       </Table>
 
-                      <div className="mt-4 flex justify-between">
+                      <div className="mt-4 flex items-center justify-between">
                         <Button
                           variant="outline"
                           onClick={handlePrevPage}
@@ -360,14 +368,9 @@ const VendorPage = () => {
                         >
                           Previous
                         </Button>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-500">
-                            Page {currentPage}
-                          </span>
-                          <Button onClick={() => setShowAllOrdersModal(true)}>
-                            View All Orders
-                          </Button>
-                        </div>
+                        <span className="text-sm text-gray-500">
+                          Page {currentPage}
+                        </span>
                         <Button
                           onClick={handleNextPage}
                           disabled={!hasNextPage}
