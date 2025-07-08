@@ -63,21 +63,21 @@ async function runTests() {
     console.log('✅ Connection test passed');
 
     // Test basic queries
-    await prisma.user.findFirst();
-    console.log('✅ User model query test passed');
+    await prisma.profile.findFirst();
+    console.log('✅ Profile model query test passed');
 
     // Test transactions
     await prisma.$transaction(async (tx: Omit<typeof PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use'>) => {
-      await tx.user.findFirst();
+      await tx.profile.findFirst();
       console.log('✅ Transaction test passed');
     });
 
     // Test relationships
     const testQueries = await Promise.all([
-      prisma.user.findFirst({
+      prisma.profile.findFirst({
         include: {
           accounts: true,
-          savedAddresses: true
+          userAddresses: true
         }
       }),
       prisma.address.findFirst({
@@ -85,10 +85,10 @@ async function runTests() {
           creator: true
         }
       }),
-      prisma.catering_request.findFirst({
+      prisma.cateringRequest.findFirst({
         include: {
           user: true,
-          address: true
+          pickupAddress: true
         }
       })
     ]);

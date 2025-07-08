@@ -50,7 +50,7 @@ export async function getCurrentUserId() {
     return null;
   }
 
-  const profile = await prisma.profiles.findUnique({
+  const profile = await prisma.profile.findUnique({
     where: { email: user.email },
     select: { id: true, type: true }
   });
@@ -64,7 +64,7 @@ export async function checkVendorAccess() {
     return false;
   }
 
-  const profile = await prisma.profiles.findUnique({
+  const profile = await prisma.profile.findUnique({
     where: { email: user.email },
     select: { id: true, type: true }
   });
@@ -84,7 +84,7 @@ export async function getVendorOrders(limit = 10) {
   }
 
   // Fetch catering requests
-  const cateringRequests = await prisma.catering_requests.findMany({
+  const cateringRequests = await prisma.cateringRequest.findMany({
     where: {
       userId: userId
     },
@@ -97,7 +97,7 @@ export async function getVendorOrders(limit = 10) {
   });
 
   // Fetch on-demand requests
-  const onDemandRequests = await prisma.on_demand_requests.findMany({
+  const onDemandRequests = await prisma.onDemand.findMany({
     where: {
       userId: userId
     },
@@ -182,7 +182,7 @@ export async function getVendorMetrics() {
   }
 
   // Count active catering orders
-  const activeCateringCount = await prisma.catering_requests.count({
+  const activeCateringCount = await prisma.cateringRequest.count({
     where: {
       userId: userId,
       status: "ACTIVE"
@@ -190,7 +190,7 @@ export async function getVendorMetrics() {
   });
 
   // Count active on-demand orders
-  const activeOnDemandCount = await prisma.on_demand_requests.count({
+  const activeOnDemandCount = await prisma.onDemand.count({
     where: {
       userId: userId,
       status: "ACTIVE"
@@ -198,7 +198,7 @@ export async function getVendorMetrics() {
   });
 
   // Count completed catering orders
-  const completedCateringCount = await prisma.catering_requests.count({
+  const completedCateringCount = await prisma.cateringRequest.count({
     where: {
       userId: userId,
       status: "COMPLETED"
@@ -206,7 +206,7 @@ export async function getVendorMetrics() {
   });
 
   // Count completed on-demand orders
-  const completedOnDemandCount = await prisma.on_demand_requests.count({
+  const completedOnDemandCount = await prisma.onDemand.count({
     where: {
       userId: userId,
       status: "COMPLETED"
@@ -214,7 +214,7 @@ export async function getVendorMetrics() {
   });
 
   // Count cancelled catering orders
-  const cancelledCateringCount = await prisma.catering_requests.count({
+  const cancelledCateringCount = await prisma.cateringRequest.count({
     where: {
       userId: userId,
       status: "CANCELLED"
@@ -222,7 +222,7 @@ export async function getVendorMetrics() {
   });
 
   // Count cancelled on-demand orders
-  const cancelledOnDemandCount = await prisma.on_demand_requests.count({
+  const cancelledOnDemandCount = await prisma.onDemand.count({
     where: {
       userId: userId,
       status: "CANCELLED"
@@ -230,7 +230,7 @@ export async function getVendorMetrics() {
   });
 
   // Count pending catering orders
-  const pendingCateringCount = await prisma.catering_requests.count({
+  const pendingCateringCount = await prisma.cateringRequest.count({
     where: {
       userId: userId,
       status: "PENDING"
@@ -238,7 +238,7 @@ export async function getVendorMetrics() {
   });
 
   // Count pending on-demand orders
-  const pendingOnDemandCount = await prisma.on_demand_requests.count({
+  const pendingOnDemandCount = await prisma.onDemand.count({
     where: {
       userId: userId,
       status: "PENDING"
@@ -246,7 +246,7 @@ export async function getVendorMetrics() {
   });
 
   // Calculate total revenue from catering orders
-  const cateringRevenue = await prisma.catering_requests.aggregate({
+  const cateringRevenue = await prisma.cateringRequest.aggregate({
     where: {
       userId: userId,
       status: "COMPLETED"
@@ -258,7 +258,7 @@ export async function getVendorMetrics() {
   });
 
   // Calculate total revenue from on-demand orders
-  const onDemandRevenue = await prisma.on_demand_requests.aggregate({
+  const onDemandRevenue = await prisma.onDemand.aggregate({
     where: {
       userId: userId,
       status: "COMPLETED"
@@ -282,14 +282,14 @@ export async function getVendorMetrics() {
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-  const recentOrders = await prisma.catering_requests.count({
+  const recentOrders = await prisma.cateringRequest.count({
     where: {
       userId: userId,
       createdAt: {
         gte: thirtyDaysAgo
       }
     }
-  }) + await prisma.on_demand_requests.count({
+  }) + await prisma.onDemand.count({
     where: {
       userId: userId,
       createdAt: {
@@ -298,7 +298,7 @@ export async function getVendorMetrics() {
     }
   });
 
-  const previousOrders = await prisma.catering_requests.count({
+  const previousOrders = await prisma.cateringRequest.count({
     where: {
       userId: userId,
       createdAt: {
@@ -306,7 +306,7 @@ export async function getVendorMetrics() {
         lt: thirtyDaysAgo
       }
     }
-  }) + await prisma.on_demand_requests.count({
+  }) + await prisma.onDemand.count({
     where: {
       userId: userId,
       createdAt: {
@@ -338,7 +338,7 @@ export async function getOrderByNumber(orderNumber: string) {
   }
 
   // Try to find it in catering requests first
-  const cateringRequest = await prisma.catering_requests.findFirst({
+  const cateringRequest = await prisma.cateringRequest.findFirst({
     where: {
       orderNumber: orderNumber,
       userId: userId
@@ -381,7 +381,7 @@ export async function getOrderByNumber(orderNumber: string) {
   }
 
   // Try to find it in on-demand requests
-  const onDemandRequest = await prisma.on_demand_requests.findFirst({
+  const onDemandRequest = await prisma.onDemand.findFirst({
     where: {
       orderNumber: orderNumber,
       userId: userId

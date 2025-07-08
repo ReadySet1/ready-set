@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
     let profileTest: any = { success: false, error: 'Unknown error' };
     try {
       const freshClientForTest = new PrismaClient();
-      const profileCount = await freshClientForTest.user.count();
+      const profileCount = await freshClientForTest.profile.count();
       await freshClientForTest.$disconnect();
       
       profileTest = {
