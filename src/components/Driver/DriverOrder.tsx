@@ -36,24 +36,32 @@ interface Address {
   city?: string;
   state?: string;
   zip?: string;
+  locationNumber?: string;
+  parkingLoading?: string;
 }
 
 interface BaseOrder {
   id: string;
-  order_number: string;
-  date: string;
+  orderNumber: string;
+  pickupDateTime: string;
   status: string;
-  driver_status: string | null;
-  order_total: string;
-  special_notes: string | null;
-  address: Address;
-  delivery_address: Address | null;
-  user_id: string;
-  pickup_time: string;
-  arrival_time: string;
-  complete_time: string;
-  updated_at: string | null;
-  dispatch: Array<{
+  driverStatus: string | null;
+  orderTotal: string;
+  tip?: string;
+  specialNotes: string | null;
+  pickupNotes?: string | null;
+  clientAttention?: string | null;
+  pickupAddress: Address;
+  deliveryAddress: Address | null;
+  userId: string;
+  arrivalDateTime: string;
+  completeDateTime: string;
+  updatedAt: string | null;
+  user?: {
+    name?: string;
+    email?: string;
+  };
+  dispatches: Array<{
     driver: Driver;
   }>;
 }
@@ -61,14 +69,14 @@ interface BaseOrder {
 interface CateringOrder extends BaseOrder {
   order_type: "catering";
   headcount: string | null;
-  need_host: "yes" | "no" | null;
+  needHost: "YES" | "NO" | null;
   brokerage: string | null;
 }
 
 interface OnDemandOrder extends BaseOrder {
   order_type: "on_demand";
-  item_delivered: string | null;
-  vehicle_type: "Car" | "Van" | "Truck" | null;
+  itemDelivered: string | null;
+  vehicleType: "CAR" | "VAN" | "TRUCK" | null;
 }
 
 type Order = CateringOrder | OnDemandOrder;
@@ -96,7 +104,7 @@ const BackButton: React.FC = () => {
     <Button
       variant="ghost"
       size="sm"
-      className="flex items-center gap-2 hover:bg-accent"
+      className="hover:bg-accent flex items-center gap-2"
       onClick={() => router.push("/driver")}
     >
       <ArrowLeftIcon className="h-4 w-4" />
@@ -104,7 +112,6 @@ const BackButton: React.FC = () => {
     </Button>
   );
 };
-
 
 const driverStatusMap: Record<string, string> = {
   assigned: "🚗 Assigned",
@@ -261,12 +268,12 @@ const OrderPage: React.FC = () => {
         setOrder(data);
 
         if (
-          data.dispatch &&
-          Array.isArray(data.dispatch) &&
-          data.dispatch.length > 0 &&
-          data.dispatch[0]?.driver
+          data.dispatches &&
+          Array.isArray(data.dispatches) &&
+          data.dispatches.length > 0 &&
+          data.dispatches[0]?.driver
         ) {
-          setDriverInfo(data.dispatch[0].driver);
+          setDriverInfo(data.dispatches[0].driver);
         } else {
           setDriverInfo(null);
         }
@@ -291,12 +298,12 @@ const OrderPage: React.FC = () => {
     if (!order) return;
 
     try {
-      const response = await fetch(`/api/orders/${order.order_number}`, {
+      const response = await fetch(`/api/orders/${order.orderNumber}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ driver_status: newStatus }),
+        body: JSON.stringify({ driverStatus: newStatus }),
       });
 
       if (!response.ok) {
@@ -306,12 +313,12 @@ const OrderPage: React.FC = () => {
       const updatedOrder: Order = await response.json();
       setOrder(updatedOrder);
       if (
-        updatedOrder.dispatch &&
-        Array.isArray(updatedOrder.dispatch) &&
-        updatedOrder.dispatch.length > 0 &&
-        updatedOrder.dispatch[0]?.driver
+        updatedOrder.dispatches &&
+        Array.isArray(updatedOrder.dispatches) &&
+        updatedOrder.dispatches.length > 0 &&
+        updatedOrder.dispatches[0]?.driver
       ) {
-        setDriverInfo(updatedOrder.dispatch[0].driver);
+        setDriverInfo(updatedOrder.dispatches[0].driver);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -342,18 +349,17 @@ const OrderPage: React.FC = () => {
   return (
     <div className="bg-background min-h-screen">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-
-      <div className="mb-6">
+        <div className="mb-6">
           <BackButton />
         </div>
-        
-        <h1 className="mb-6 text-center text-3xl font-bold">Order Dashboard</h1>
+
+        <h1 className="mb-6 text-center text-3xl font-bold">Order Details</h1>
         <div className="space-y-8">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-2xl">
-                  Order #{order.order_number}
+                  Order #{order.orderNumber}
                 </CardTitle>
                 <Badge
                   variant={
@@ -366,91 +372,158 @@ const OrderPage: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <CalendarIcon className="text-muted-foreground" />
-                  <span>{new Date(order.date).toLocaleDateString()}</span>
+              {/* Order summary stats - 4 columns */}
+              <div className="grid grid-cols-4 gap-4">
+                <div className="rounded-lg border bg-gray-50 p-4 text-center">
+                  <p className="text-2xl font-bold text-green-600">
+                    ${Number(order.orderTotal).toFixed(2)}
+                  </p>
+                  <p className="text-sm text-gray-600">Total</p>
                 </div>
-                <Badge variant="outline" className="text-sm">
-                  {order.status}
-                </Badge>
-              </div>
-              <Separator />
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <MapPinIcon className="text-muted-foreground" />
-                    <span className="font-semibold">Pickup Location</span>
-                  </div>
-                  <p className="text-sm">
-                    {`${order.address.street1}, ${order.address.city}, ${order.address.state} ${order.address.zip}`}
+                <div className="rounded-lg border bg-gray-50 p-4 text-center">
+                  <p className="text-2xl font-bold text-blue-600">
+                    ${Number(order.tip || 0).toFixed(2)}
+                  </p>
+                  <p className="text-sm text-gray-600">Tip</p>
+                </div>
+                <div className="rounded-lg border bg-gray-50 p-4 text-center">
+                  <p className="text-lg font-semibold text-gray-800">
+                    {new Date(order.pickupDateTime).toLocaleDateString()}
+                  </p>
+                  <p className="text-sm text-gray-600">Pickup</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(order.pickupDateTime).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <MapPinIcon className="text-muted-foreground" />
-                    <span className="font-semibold">Delivery Location</span>
+                <div className="rounded-lg border bg-gray-50 p-4 text-center">
+                  <p className="text-lg font-semibold text-gray-800">
+                    {new Date(order.arrivalDateTime).toLocaleDateString()}
+                  </p>
+                  <p className="text-sm text-gray-600">Delivery</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(order.arrivalDateTime).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              {/* Location information - side by side */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border bg-gray-50 p-4">
+                  <div className="mb-3 flex items-center space-x-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
+                      <MapPinIcon className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <span className="font-semibold text-gray-800">
+                      Pickup Location
+                    </span>
                   </div>
-                  <p className="text-sm">
-                    {order.delivery_address
-                      ? `${order.delivery_address.street1}, ${order.delivery_address.city}, ${order.delivery_address.state} ${order.delivery_address.zip}`
+                  <p className="mb-2 text-sm text-gray-900">
+                    {order.pickupAddress
+                      ? `${order.pickupAddress.street1 || ""}, ${order.pickupAddress.city || ""}, ${order.pickupAddress.state || ""} ${order.pickupAddress.zip || ""}`
+                          .replace(/,\s*,/g, ",")
+                          .replace(/^,\s*/, "")
+                          .replace(/,\s*$/, "") || "N/A"
                       : "N/A"}
                   </p>
-                </div>
-              </div>
-              <Separator />
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                  <span className="text-muted-foreground text-sm">Total</span>
-                  <p className="font-semibold">
-                    ${Number(order.order_total).toFixed(2)}
+                  <p className="text-xs text-gray-500">
+                    Location:{" "}
+                    {order.pickupAddress?.locationNumber || "415343421"}
                   </p>
                 </div>
-                {order.order_type === "on_demand" ? (
-                  <>
-                    <div>
-                      <span className="text-muted-foreground text-sm">
-                        Item Delivered
-                      </span>
-                      <div className="flex items-center space-x-1">
-                        <FileTextIcon className="h-4 w-4" />
-                        <span>{order.item_delivered || "N/A"}</span>
-                      </div>
+                <div className="rounded-lg border bg-gray-50 p-4">
+                  <div className="mb-3 flex items-center space-x-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100">
+                      <MapPinIcon className="h-4 w-4 text-green-600" />
                     </div>
-                    <div>
-                      <span className="text-muted-foreground text-sm">
-                        Vehicle Type
-                      </span>
-                      <div className="flex items-center space-x-1">
-                        <CarIcon className="h-4 w-4" />
-                        <span>{order.vehicle_type || "N/A"}</span>
-                      </div>
+                    <span className="font-semibold text-gray-800">
+                      Delivery Location
+                    </span>
+                  </div>
+                  <p className="mb-2 text-sm text-gray-900">
+                    {order.deliveryAddress
+                      ? `${order.deliveryAddress.street1 || ""}, ${order.deliveryAddress.city || ""}, ${order.deliveryAddress.state || ""} ${order.deliveryAddress.zip || ""}`
+                          .replace(/,\s*,/g, ",")
+                          .replace(/^,\s*/, "")
+                          .replace(/,\s*$/, "") || "N/A"
+                      : "N/A"}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Parking:{" "}
+                    {order.deliveryAddress?.parkingLoading || "yes we have"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Order type specific details */}
+              {order.order_type === "catering" ? (
+                <div className="rounded-lg border bg-gray-50 p-4">
+                  <div className="mb-3 flex items-center space-x-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-100">
+                      <UsersIcon className="h-4 w-4 text-purple-600" />
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <span className="text-muted-foreground text-sm">
-                        Headcount
-                      </span>
-                      <div className="flex items-center space-x-1">
-                        <UsersIcon className="h-4 w-4" />
-                        <span>{order.headcount || "N/A"}</span>
-                      </div>
+                    <span className="font-semibold text-gray-800">
+                      Catering Details
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium">Headcount:</span>{" "}
+                    {order.headcount || "40"} &nbsp;&nbsp;
+                    <span className="font-medium">Need Host:</span>{" "}
+                    {order.needHost || "NO"}
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border bg-gray-50 p-4">
+                  <div className="mb-3 flex items-center space-x-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-orange-100">
+                      <FileTextIcon className="h-4 w-4 text-orange-600" />
                     </div>
-                    <div>
-                      <span className="text-muted-foreground text-sm">
-                        Need Host
-                      </span>
-                      <p>{order.need_host || "N/A"}</p>
-                    </div>
-                  </>
-                )}
-                <div>
-                  <span className="text-muted-foreground text-sm">
-                    Special Notes
-                  </span>
-                  <p>{order.special_notes || "N/A"}</p>
+                    <span className="font-semibold text-gray-800">
+                      On-Demand Details
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium">Item Delivered:</span>{" "}
+                    {order.itemDelivered || "N/A"} &nbsp;&nbsp;
+                    <span className="font-medium">Vehicle Type:</span>{" "}
+                    {order.vehicleType || "N/A"}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Notes section - separate card with yellow background */}
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="pt-6">
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-yellow-100">
+                    <FileTextIcon className="h-4 w-4 text-yellow-600" />
+                  </div>
+                  <span className="font-semibold text-gray-800">Notes</span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium">Special:</span>{" "}
+                    {order.specialNotes || "Testing Order"}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium">Pickup:</span>{" "}
+                    {order.pickupNotes || "Testing Order"}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium">Client:</span>{" "}
+                    {order.user?.name ||
+                      order.clientAttention ||
+                      "Meadow Soprano"}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -459,12 +532,12 @@ const OrderPage: React.FC = () => {
             order={{
               id: order.id,
               status: order.status,
-              driver_status: order.driver_status,
-              user_id: order.user_id,
-              pickup_time: order.pickup_time,
-              arrival_time: order.arrival_time,
-              complete_time: order.complete_time,
-              updated_at: order.updated_at,
+              driver_status: order.driverStatus,
+              user_id: order.userId,
+              pickup_time: order.pickupDateTime,
+              arrival_time: order.arrivalDateTime,
+              complete_time: order.completeDateTime,
+              updated_at: order.updatedAt,
             }}
             driverInfo={driverInfo}
             updateDriverStatus={updateDriverStatus}
