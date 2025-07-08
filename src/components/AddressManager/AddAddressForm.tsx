@@ -56,7 +56,7 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableCounties, setAvailableCounties] = useState<
     Array<{ value: string; label: string }>
-  >([...COUNTIES]); // Initialize with all counties as fallback
+  >([...COUNTIES]); // Initialize with all counties as fallback to prevent empty dropdown
 
   // Set up form with validation
   const {
@@ -89,7 +89,7 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
       let countiesToUse = [...COUNTIES]; // Default to all counties
 
       if (allowedCounties && allowedCounties.length > 0) {
-        // Filter counties based on allowedCounties
+        // Filter counties based on allowedCounties prop
         const filteredCounties = COUNTIES.filter((county) =>
           allowedCounties.includes(county.value),
         );
@@ -97,7 +97,9 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
         if (filteredCounties.length > 0) {
           countiesToUse = filteredCounties;
         }
+        // If no filtered counties found, fall back to all counties
       } else {
+        // Only try API call if no allowedCounties prop is provided
         try {
           const response = await fetch("/api/user-counties");
           if (response.ok) {
@@ -115,14 +117,16 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
               if (filteredCounties.length > 0) {
                 countiesToUse = filteredCounties;
               }
+              // If no filtered counties found, fall back to all counties
             }
           }
         } catch (error) {
           console.error("AddAddressForm: Error fetching counties:", error);
+          // API error - fall back to all counties
         }
       }
 
-      // Always set counties, even if it's the full list
+      // Always set counties, ensuring we have at least the full list
       setAvailableCounties([...countiesToUse]);
     };
 
@@ -177,7 +181,7 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
                         <SelectValue placeholder="Select County" />
                       </SelectTrigger>
                       <SelectContent className="z-[9999] max-h-[200px] overflow-y-auto">
-                        {availableCounties.length > 0 ? (
+                        {availableCounties && availableCounties.length > 0 ? (
                           availableCounties.map((county) => (
                             <SelectItem key={county.value} value={county.value}>
                               {county.label}
@@ -185,7 +189,7 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
                           ))
                         ) : (
                           <SelectItem value="" disabled>
-                            No counties available
+                            Loading counties...
                           </SelectItem>
                         )}
                       </SelectContent>

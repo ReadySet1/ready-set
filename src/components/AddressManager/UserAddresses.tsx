@@ -45,8 +45,11 @@ const UserAddresses: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [addressToEdit, setAddressToEdit] = useState<Address | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [filterType, setFilterType] = useState<"all" | "shared" | "private">("all");
-  const [deleteConfirmAddress, setDeleteConfirmAddress] = useState<Address | null>(null);
+  const [filterType, setFilterType] = useState<"all" | "shared" | "private">(
+    "all",
+  );
+  const [deleteConfirmAddress, setDeleteConfirmAddress] =
+    useState<Address | null>(null);
   const router = useRouter();
 
   // Initialize Supabase client and auth
@@ -54,22 +57,27 @@ const UserAddresses: React.FC = () => {
     const initAuth = async () => {
       try {
         const supabase = await createClient();
-        const { data: { user }, error } = await supabase.auth.getUser();
-        
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
+
         if (error) throw error;
-        
+
         setUser(user);
-        
+
         // Set up auth listener
-        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-          if (event === "SIGNED_IN") {
-            setUser(session?.user || null);
-          } else if (event === "SIGNED_OUT") {
-            setUser(null);
-            router.push("/sign-in");
-          }
-        });
-        
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+          (event, session) => {
+            if (event === "SIGNED_IN") {
+              setUser(session?.user || null);
+            } else if (event === "SIGNED_OUT") {
+              setUser(null);
+              router.push("/sign-in");
+            }
+          },
+        );
+
         return () => {
           authListener.subscription.unsubscribe();
         };
@@ -79,7 +87,7 @@ const UserAddresses: React.FC = () => {
         setIsLoading(false);
       }
     };
-    
+
     initAuth();
   }, [router]);
 
@@ -94,23 +102,53 @@ const UserAddresses: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetch(`/api/addresses?filter=${filterType}`);
-      
+      // Get current session for authentication
+      const supabase = await createClient();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        throw new Error("Authentication required. Please sign in again.");
+      }
+
+      const response = await fetch(`/api/addresses?filter=${filterType}`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Session expired. Please sign in again.");
+        }
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
-      console.log(`Fetched ${data.length} addresses for user ${user.id} with filter "${filterType}"`);
+      console.log(
+        `Fetched ${data.length} addresses for user ${user.id} with filter "${filterType}"`,
+      );
       setAddresses(data);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       console.error("Error fetching addresses:", errorMessage);
       setError(`Failed to load addresses: ${errorMessage}`);
+
+      // If it's an auth error, redirect to sign-in
+      if (
+        errorMessage.includes("Authentication") ||
+        errorMessage.includes("Session expired")
+      ) {
+        router.push("/sign-in");
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [user, filterType]);
+  }, [user, filterType, router]);
 
   useEffect(() => {
     if (user) {
@@ -123,22 +161,49 @@ const UserAddresses: React.FC = () => {
     setError(null);
 
     try {
+      // Get current session for authentication
+      const supabase = await createClient();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        throw new Error("Authentication required. Please sign in again.");
+      }
+
       const response = await fetch(`/api/addresses?id=${addressId}`, {
         method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Session expired. Please sign in again.");
+        }
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to delete address");
       }
 
       // Update the local state to remove the deleted address
-      setAddresses(prev => prev.filter(addr => addr.id !== addressId));
+      setAddresses((prev) => prev.filter((addr) => addr.id !== addressId));
       setDeleteConfirmAddress(null);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       console.error("Error deleting address:", errorMessage);
       setError(`Failed to delete address: ${errorMessage}`);
+
+      // If it's an auth error, redirect to sign-in
+      if (
+        errorMessage.includes("Authentication") ||
+        errorMessage.includes("Session expired")
+      ) {
+        router.push("/sign-in");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -168,7 +233,7 @@ const UserAddresses: React.FC = () => {
   if (isLoading && !user) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
-        <Spinner  />
+        <Spinner />
         <p className="mt-4 text-gray-600">Loading...</p>
       </div>
     );
@@ -177,11 +242,10 @@ const UserAddresses: React.FC = () => {
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
-        <h2 className="text-xl font-semibold">Please sign in to manage addresses</h2>
-        <Button 
-          className="mt-4" 
-          onClick={() => router.push("/sign-in")}
-        >
+        <h2 className="text-xl font-semibold">
+          Please sign in to manage addresses
+        </h2>
+        <Button className="mt-4" onClick={() => router.push("/sign-in")}>
           Sign In
         </Button>
       </div>
@@ -195,27 +259,34 @@ const UserAddresses: React.FC = () => {
         <CardDescription>
           Manage your saved addresses for deliveries and pickups
         </CardDescription>
-        <div className="flex justify-between items-center mt-4">
-          <Tabs defaultValue={filterType} onValueChange={(value) => setFilterType(value as any)}>
+        <div className="mt-4 flex items-center justify-between">
+          <Tabs
+            defaultValue={filterType}
+            onValueChange={(value) => setFilterType(value as any)}
+          >
             <TabsList className="gap-1">
-              <TabsTrigger value="all" className="text-xs sm:text-sm">All Addresses</TabsTrigger>
-              <TabsTrigger value="private" className="text-xs sm:text-sm">Your Private Addresses</TabsTrigger>
-              <TabsTrigger value="shared" className="text-xs sm:text-sm">Shared Addresses</TabsTrigger>
+              <TabsTrigger value="all" className="text-xs sm:text-sm">
+                All Addresses
+              </TabsTrigger>
+              <TabsTrigger value="private" className="text-xs sm:text-sm">
+                Your Private Addresses
+              </TabsTrigger>
+              <TabsTrigger value="shared" className="text-xs sm:text-sm">
+                Shared Addresses
+              </TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button onClick={handleAddNewAddress}>
-            + Add New Address
-          </Button>
+          <Button onClick={handleAddNewAddress}>+ Add New Address</Button>
         </div>
       </CardHeader>
       <CardContent>
         {error && (
           <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-500">
             {error}
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setError(null)} 
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setError(null)}
               className="ml-2 h-auto p-1 text-red-700"
             >
               Dismiss
@@ -228,9 +299,11 @@ const UserAddresses: React.FC = () => {
             <Spinner />
           </div>
         ) : addresses.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-500 mb-4">No addresses found</p>
-            <Button onClick={handleAddNewAddress}>Add Your First Address</Button>
+          <div className="py-8 text-center">
+            <p className="mb-4 text-gray-500">No addresses found</p>
+            <Button onClick={handleAddNewAddress}>
+              Add Your First Address
+            </Button>
           </div>
         ) : (
           <Table>
@@ -249,8 +322,12 @@ const UserAddresses: React.FC = () => {
                 <TableRow key={address.id}>
                   <TableCell className="font-medium">
                     {address.name || "Unnamed Location"}
-                    {address.isShared && <Badge className="ml-2 bg-blue-500">Shared</Badge>}
-                    {isAddressOwner(address) && <Badge className="ml-2 bg-green-500">Owner</Badge>}
+                    {address.isShared && (
+                      <Badge className="ml-2 bg-blue-500">Shared</Badge>
+                    )}
+                    {isAddressOwner(address) && (
+                      <Badge className="ml-2 bg-green-500">Owner</Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     {address.street1}
@@ -258,7 +335,7 @@ const UserAddresses: React.FC = () => {
                     <br />
                     {address.city}, {address.state} {address.zip}
                     {address.locationNumber && (
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="mt-1 text-xs text-gray-500">
                         Phone: {address.locationNumber}
                       </div>
                     )}
@@ -277,16 +354,21 @@ const UserAddresses: React.FC = () => {
                       >
                         Edit
                       </Button>
-                      
-                      <AlertDialog open={deleteConfirmAddress?.id === address.id} onOpenChange={(open) => {
-                        if (!open) setDeleteConfirmAddress(null);
-                      }}>
+
+                      <AlertDialog
+                        open={deleteConfirmAddress?.id === address.id}
+                        onOpenChange={(open) => {
+                          if (!open) setDeleteConfirmAddress(null);
+                        }}
+                      >
                         <AlertDialogTrigger asChild>
                           <Button
                             variant="destructive"
                             size="sm"
                             onClick={() => setDeleteConfirmAddress(address)}
-                            disabled={!isAddressOwner(address) || address.isShared}
+                            disabled={
+                              !isAddressOwner(address) || address.isShared
+                            }
                           >
                             Delete
                           </Button>
@@ -295,7 +377,8 @@ const UserAddresses: React.FC = () => {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Are you sure you want to delete this address? This action cannot be undone.
+                              Are you sure you want to delete this address? This
+                              action cannot be undone.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -323,7 +406,7 @@ const UserAddresses: React.FC = () => {
           onAddressUpdated={handleAddressUpdated}
           addressToEdit={addressToEdit}
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)} 
+          onClose={() => setIsModalOpen(false)}
         />
       )}
     </Card>
