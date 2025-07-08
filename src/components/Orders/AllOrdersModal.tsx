@@ -52,7 +52,14 @@ export const AllOrdersModal: React.FC<AllOrdersModalProps> = ({
       }
 
       const ordersData = await response.json();
-      setOrders(ordersData);
+
+      // Extract the orders array from the response
+      if (ordersData && Array.isArray(ordersData.orders)) {
+        setOrders(ordersData.orders);
+      } else {
+        console.error("Invalid response format:", ordersData);
+        setError("Invalid response format from server.");
+      }
     } catch (error) {
       console.error("Error fetching all orders:", error);
       setError("Failed to load orders. Please try again.");

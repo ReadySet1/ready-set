@@ -38,7 +38,7 @@
     },
     "types": [
       "node",
-      "vitest",
+      "vitest/globals",
       "@playwright/test"
     ],
     "baseUrl": ".",
