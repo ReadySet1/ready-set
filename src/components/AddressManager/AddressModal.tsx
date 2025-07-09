@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { COUNTIES } from "@/components/Auth/SignUp/ui/FormData";
 import { Address } from "@/types/address";
+import { createClient } from "@/utils/supabase/client";
 
 interface AddressModalProps {
   onAddressUpdated: () => void;
@@ -33,9 +34,6 @@ const AddressModal: React.FC<AddressModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const [selectedCounty, setSelectedCounty] = useState<string>(
-    addressToEdit?.county || "",
-  );
   const { control, register, handleSubmit, setValue, reset } =
     useForm<Address>();
 
@@ -44,23 +42,26 @@ const AddressModal: React.FC<AddressModalProps> = ({
       Object.entries(addressToEdit).forEach(([key, value]) => {
         setValue(key as keyof Address, value);
       });
-      setSelectedCounty(addressToEdit.county || "");
     } else {
       reset({
+        county: "",
         isRestaurant: false,
         isShared: false,
       });
-      setSelectedCounty("");
     }
   }, [addressToEdit, setValue, reset]);
 
-  const handleCountySelect = (county: string) => {
-    setSelectedCounty(county);
-    setValue("county", county);
-  };
-
   const onSubmit = async (data: Address) => {
     try {
+      const supabase = await createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error("Authentication required");
+      }
+
       const url = addressToEdit
         ? `/api/addresses?id=${addressToEdit.id}`
         : "/api/addresses";
@@ -70,10 +71,11 @@ const AddressModal: React.FC<AddressModalProps> = ({
         method: method,
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           ...data,
-          county: selectedCounty,
+          county: data.county,
           isRestaurant: Boolean(data.isRestaurant),
           isShared: Boolean(data.isShared),
         }),
@@ -92,7 +94,6 @@ const AddressModal: React.FC<AddressModalProps> = ({
       );
 
       reset();
-      setSelectedCounty("");
       onAddressUpdated();
       onClose();
     } catch (error) {
@@ -105,7 +106,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] bg-white dark:bg-gray-950 border shadow-lg">
+      <DialogContent className="border bg-white shadow-lg dark:bg-gray-950 sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
             {addressToEdit ? "Edit Address" : "Add Address"}
@@ -117,18 +118,28 @@ const AddressModal: React.FC<AddressModalProps> = ({
               <Label htmlFor="county" className="text-right">
                 County
               </Label>
-              <Select onValueChange={handleCountySelect} value={selectedCounty}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Please Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {COUNTIES.map((county) => (
-                    <SelectItem key={county.value} value={county.value}>
-                      {county.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Controller
+                name="county"
+                control={control}
+                defaultValue=""
+                render={({ field }) => (
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || ""}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Please Select" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[1002]">
+                      {COUNTIES.map((county) => (
+                        <SelectItem key={county.value} value={county.value}>
+                          {county.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="name" className="text-right">
