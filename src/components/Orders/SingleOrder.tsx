@@ -136,17 +136,19 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
-  
+
   // Extract order number from URL params with proper decoding for slashes
   const orderNumber = (() => {
     if (params?.order_number) {
-      const rawOrderNumber = Array.isArray(params.order_number) 
-        ? params.order_number[0] 
+      const rawOrderNumber = Array.isArray(params.order_number)
+        ? params.order_number[0]
         : params.order_number;
-      
-      return decodeOrderNumber(rawOrderNumber);
+
+      if (rawOrderNumber) {
+        return decodeOrderNumber(rawOrderNumber);
+      }
     }
-    
+
     // Fallback to pathname parsing for non-dynamic routes
     return decodeURIComponent((pathname ?? "").split("/").pop() || "");
   })();

@@ -30,8 +30,10 @@ const OrderPage = () => {
         ? params.order_number[0] 
         : params.order_number;
       
-      const decodedOrderNumber = decodeOrderNumber(rawOrderNumber);
-      setOrderNumber(decodedOrderNumber);
+      if (rawOrderNumber) {
+        const decodedOrderNumber = decodeOrderNumber(rawOrderNumber);
+        setOrderNumber(decodedOrderNumber);
+      }
     }
   }, [params]);
 
