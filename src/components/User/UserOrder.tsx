@@ -94,11 +94,13 @@ const UserOrderDetail: React.FC = () => {
 
   useEffect(() => {
     const fetchOrder = async () => {
-      const orderNumber = (pathname ?? '').split("/").pop();
+      const orderNumber = decodeURIComponent(
+        (pathname ?? "").split("/").pop() || "",
+      );
 
       try {
         const response = await fetch(
-          `/api/user-orders/${orderNumber}?include=dispatch.driver`,
+          `/api/user-orders/${encodeURIComponent(orderNumber)}?include=dispatch.driver`,
         );
         if (!response.ok) {
           throw new Error("Failed to fetch order");
@@ -135,13 +137,16 @@ const UserOrderDetail: React.FC = () => {
     if (!order) return;
 
     try {
-      const response = await fetch(`/api/user-orders/${order.order_number}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/user-orders/${encodeURIComponent(order.order_number)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ driver_status: newStatus }),
         },
-        body: JSON.stringify({ driver_status: newStatus }),
-      });
+      );
 
       if (response.ok) {
         const updatedOrder = await response.json();
