@@ -207,7 +207,7 @@ GET /api/admin/carriers/[carrierId]/stats
 ### Environment Variables
 ```bash
 # CaterValley Integration
-CATERVALLEY_WEBHOOK_URL=https://api-courier.catervalley.com/api/order/update-order-status
+CATERVALLEY_WEBHOOK_URL=https://api.catervalley.com/api/operation/order/update-order-status
 CATERVALLEY_API_KEY=your_catervalley_api_key
 
 # Database

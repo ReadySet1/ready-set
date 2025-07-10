@@ -33,7 +33,7 @@ export async function updateCaterValleyOrderStatus(
   status: CaterValleyOrderStatus
 ): Promise<CaterValleyApiResponse> {
   const CATER_VALLEY_API_URL =
-    process.env.NEXT_PUBLIC_CATER_VALLEY_API_URL || 'https://api-courier.catervalley.com/api/order/update-order-status';
+    process.env.NEXT_PUBLIC_CATER_VALLEY_API_URL || 'https://api.catervalley.com/api/operation/order/update-order-status';
   const PARTNER_HEADER = process.env.NEXT_PUBLIC_CATER_VALLEY_PARTNER_HEADER || 'ready-set';
 
   // --- Input Validation ---

@@ -129,7 +129,7 @@ Confirms or cancels an order.
 Ready Set sends status updates to CaterValley via webhooks when driver status changes.
 
 ### Webhook Endpoint
-CaterValley receives updates at: `https://api-courier.catervalley.com/api/order/update-order-status`
+CaterValley receives updates at: `https://api.catervalley.com/api/operation/order/update-order-status`
 
 ### Status Mapping
 
@@ -217,7 +217,7 @@ Add these variables to your `.env` file:
 
 ```bash
 # CaterValley Integration
-CATERVALLEY_WEBHOOK_URL=https://api-courier.catervalley.com/api/order/update-order-status
+CATERVALLEY_WEBHOOK_URL=https://api.catervalley.com/api/operation/order/update-order-status
 CATERVALLEY_API_KEY=your-secure-api-key-here
 ```
 

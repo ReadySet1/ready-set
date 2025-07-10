@@ -248,7 +248,9 @@ const OrderPage: React.FC = () => {
 
   useEffect(() => {
     const fetchOrder = async (currentPathname: string) => {
-      const orderNumber = currentPathname.split("/").pop();
+      const orderNumber = decodeURIComponent(
+        currentPathname.split("/").pop() || "",
+      );
 
       // Prevent fetching if orderNumber is somehow undefined or empty after splitting
       if (!orderNumber) {
@@ -260,7 +262,9 @@ const OrderPage: React.FC = () => {
       try {
         setLoading(true); // Set loading true only when fetching
         setError(null);
-        const response = await fetch(`/api/orders/${orderNumber}`);
+        const response = await fetch(
+          `/api/orders/${encodeURIComponent(orderNumber)}`,
+        );
         if (!response.ok) {
           throw new Error("Failed to fetch order");
         }
@@ -298,13 +302,16 @@ const OrderPage: React.FC = () => {
     if (!order) return;
 
     try {
-      const response = await fetch(`/api/orders/${order.orderNumber}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/orders/${encodeURIComponent(order.orderNumber)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ driver_status: newStatus }),
         },
-        body: JSON.stringify({ driverStatus: newStatus }),
-      });
+      );
 
       if (!response.ok) {
         throw new Error("Failed to update driver status");
@@ -353,7 +360,7 @@ const OrderPage: React.FC = () => {
           <BackButton />
         </div>
 
-        <h1 className="mb-6 text-center text-3xl font-bold">Order Details</h1>
+        <h1 className="mb-6 text-center text-3xl font-bold">Order Dashboard</h1>
         <div className="space-y-8">
           <Card>
             <CardHeader>
