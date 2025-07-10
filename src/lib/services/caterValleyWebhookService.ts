@@ -25,7 +25,7 @@ interface WebhookDeliveryResult {
 
 type CaterValleyStatus = 'CONFIRM' | 'READY' | 'ON_THE_WAY' | 'COMPLETED' | 'CANCELLED' | 'REFUNDED';
 
-const CATERVALLEY_WEBHOOK_URL = process.env.CATERVALLEY_WEBHOOK_URL || 'https://api-courier.catervalley.com/api/order/update-order-status';
+const CATERVALLEY_WEBHOOK_URL = process.env.CATERVALLEY_WEBHOOK_URL || 'https://api.catervalley.com/api/operation/order/update-order-status';
 const WEBHOOK_TIMEOUT = 10000; // 10 seconds
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 1000; // Start with 1 second, then exponential backoff

@@ -70,7 +70,7 @@ The order doesn't exist in CaterValley's system. This happens when:
 1. **Test basic connectivity**:
    ```bash
    # Test the webhook endpoint directly
-   curl -v https://api-courier.catervalley.com/api/order/update-order-status
+   curl -v https://api.catervalley.com/api/operation/order/update-order-status
    ```
 
 2. **Check firewall/proxy settings**:
@@ -158,7 +158,7 @@ curl -s -X POST http://localhost:3000/api/test/catervalley-webhook \
 
 ```bash
 # CaterValley Integration
-CATERVALLEY_WEBHOOK_URL=https://api-courier.catervalley.com/api/order/update-order-status
+CATERVALLEY_WEBHOOK_URL=https://api.catervalley.com/api/operation/order/update-order-status
 CATERVALLEY_API_KEY=your_api_key_here
 
 # Optional: For development/staging

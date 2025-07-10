@@ -24,7 +24,7 @@ interface TestResult {
  * GET /api/test/catervalley-webhook
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const webhookUrl = process.env.CATERVALLEY_WEBHOOK_URL || 'https://api-courier.catervalley.com/api/order/update-order-status';
+  const webhookUrl = process.env.CATERVALLEY_WEBHOOK_URL || 'https://api.catervalley.com/api/operation/order/update-order-status';
   const apiKey = process.env.CATERVALLEY_API_KEY;
 
   const testHeaders: Record<string, string> = {
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log(`Testing real webhook for order ${orderNumber} with status ${status}`);
 
-    const webhookUrl = process.env.CATERVALLEY_WEBHOOK_URL || 'https://api-courier.catervalley.com/api/order/update-order-status';
+    const webhookUrl = process.env.CATERVALLEY_WEBHOOK_URL || 'https://api.catervalley.com/api/operation/order/update-order-status';
     const apiKey = process.env.CATERVALLEY_API_KEY;
 
     const headers: Record<string, string> = {

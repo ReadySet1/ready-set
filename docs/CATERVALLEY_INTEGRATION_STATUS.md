@@ -123,7 +123,7 @@ The pricing system has been completely rewritten to match the new requirements:
 ```bash
 # Existing
 CATERVALLEY_API_KEY=ready-set
-CATERVALLEY_WEBHOOK_URL=https://api-courier.catervalley.com/api/order/update-order-status
+CATERVALLEY_WEBHOOK_URL=https://api.catervalley.com/api/operation/order/update-order-status
 
 # NEW - Required for accurate distance calculation
 GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
@@ -154,7 +154,7 @@ x-api-key: ready-set
 
 ### CaterValley → Ready Set Webhook (Unchanged)
 ```
-URL: https://api-courier.catervalley.com/api/order/update-order-status
+URL: https://api.catervalley.com/api/operation/order/update-order-status
 Headers: partner: ready-set, Content-Type: application/json
 ```
 

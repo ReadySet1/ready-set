@@ -8,7 +8,7 @@ Add these to your `.env.local` file:
 
 ```bash
 # CaterValley Integration
-CATERVALLEY_WEBHOOK_URL=https://api-courier.catervalley.com/api/order/update-order-status
+CATERVALLEY_WEBHOOK_URL=https://api.catervalley.com/api/operation/order/update-order-status
 CATERVALLEY_API_KEY=your_api_key_here
 
 # For local testing (optional mock endpoints)

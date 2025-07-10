@@ -40,7 +40,7 @@ const CARRIER_CONFIGS: Record<string, CarrierConfig> = {
   catervalley: {
     id: 'catervalley',
     name: 'CaterValley',
-    webhookUrl: process.env.CATERVALLEY_WEBHOOK_URL || 'https://api-courier.catervalley.com/api/order/update-order-status',
+    webhookUrl: process.env.CATERVALLEY_WEBHOOK_URL || 'https://api.catervalley.com/api/operation/order/update-order-status',
     apiKey: process.env.CATERVALLEY_API_KEY,
     enabled: true,
     statusMapping: {
