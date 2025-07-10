@@ -42,6 +42,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   showManagementButtons = true,
   onRefresh,
 }) => {
+  const addressFormRef = useRef<HTMLDivElement>(null);
   const [user, setUser] = useState<User | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [filteredAddresses, setFilteredAddresses] = useState<Address[]>([]);
@@ -315,7 +316,18 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   );
 
   const handleToggleAddForm = () => {
-    setShowAddForm((prev) => !prev);
+    setShowAddForm((prev) => {
+      if (!prev) {
+        // Only scroll when opening the form
+        setTimeout(() => {
+          addressFormRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 100); // Small delay to ensure form is rendered
+      }
+      return !prev;
+    });
   };
 
   const handleAddressSelection = (addressId: string) => {
@@ -465,14 +477,24 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       )}
 
       {showAddForm && (
-        <AddAddressForm
-          onSubmit={handleAddAddress}
-          onClose={() => setShowAddForm(false)}
-          initialValues={{
-            isShared: false,
-            isRestaurant: false,
-          }}
-        />
+        <div ref={addressFormRef}>
+          <AddAddressForm
+            onSubmit={async (data) => {
+              try {
+                await handleAddAddress(data);
+                setShowAddForm(false);
+              } catch (error) {
+                // Error handling is done inside handleAddAddress
+                console.error("Error in address submission:", error);
+              }
+            }}
+            onClose={() => setShowAddForm(false)}
+            initialValues={{
+              isShared: false,
+              isRestaurant: false,
+            }}
+          />
+        </div>
       )}
     </div>
   );

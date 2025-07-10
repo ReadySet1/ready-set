@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { AddressFormData } from "@/types/address";
 import { COUNTIES } from "@/components/Auth/SignUp/ui/FormData"; // Make sure this import path is correct
+import { useToast } from "@/components/ui/use-toast";
 
 // Validation schema with zod
 const addressSchema = z.object({
@@ -41,7 +42,7 @@ const addressSchema = z.object({
 });
 
 interface AddAddressFormProps {
-  onSubmit: (data: AddressFormData) => void;
+  onSubmit: (data: AddressFormData) => Promise<void>;
   onClose: () => void;
   initialValues?: Partial<AddressFormData>;
   allowedCounties?: string[];
@@ -54,9 +55,12 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
   allowedCounties,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [availableCounties, setAvailableCounties] = useState<
     Array<{ value: string; label: string }>
   >([...COUNTIES]); // Initialize with all counties as fallback to prevent empty dropdown
+
+  const { toast } = useToast();
 
   // Set up form with validation
   const {
@@ -137,11 +141,16 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
     data,
   ) => {
     setIsSubmitting(true);
+    setSubmitError(null); // Clear previous errors
     try {
       await onSubmit(data as AddressFormData);
       reset();
+      // onSubmit is responsible for closing the dialog on success
     } catch (error) {
       console.error("Error submitting form:", error);
+      setSubmitError(
+        error instanceof Error ? error.message : "Failed to save address",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -151,8 +160,15 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
     <Card className="w-full">
       <CardHeader className="pb-3">
         <CardTitle>Add New Address</CardTitle>
+        {submitError && (
+          <div className="mt-2 rounded-md border border-red-200 bg-red-50 p-3">
+            <div className="flex">
+              <div className="text-sm text-red-600">{submitError}</div>
+            </div>
+          </div>
+        )}
       </CardHeader>
-      <form onSubmit={handleSubmit(submitHandler)}>
+      <div>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* County Field */}
@@ -366,15 +382,24 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
             </div>
           </div>
         </CardContent>
-        <CardFooter className="justify-between pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+        <CardFooter className="flex justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button
+            type="button"
+            onClick={() => handleSubmit(submitHandler)()}
+            disabled={isSubmitting}
+          >
             {isSubmitting ? "Saving..." : "Save Address"}
           </Button>
         </CardFooter>
-      </form>
+      </div>
     </Card>
   );
 };

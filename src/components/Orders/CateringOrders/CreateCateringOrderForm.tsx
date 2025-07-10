@@ -69,6 +69,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { useUploadFile, UploadedFile } from "@/hooks/use-upload-file"; // Import the upload hook
 import { FileWithPath } from "react-dropzone"; // Import FileWithPath type
+import { useToast } from "@/components/ui/use-toast";
 
 interface CreateCateringOrderFormProps {
   clients: ClientListItem[];
@@ -204,6 +205,7 @@ export const CreateCateringOrderForm: React.FC<
   CreateCateringOrderFormProps
 > = ({ clients }) => {
   const router = useRouter();
+  const { toast } = useToast();
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clientComboboxOpen, setClientComboboxOpen] = useState(false);
@@ -577,17 +579,27 @@ export const CreateCateringOrderForm: React.FC<
   };
 
   const handleAddressFormSubmit = async (addressData: AddressFormData) => {
+    console.log("🏠 Starting address form submission", {
+      addressData,
+      addressDialogType,
+      isDialogOpen: addressDialogOpen,
+    });
+
     try {
       // Check authentication before submitting
       const {
         data: { session },
       } = await supabase.auth.getSession();
+      console.log("🔐 Session check result", { hasSession: !!session });
 
       if (!session) {
-        setIsAuthenticated(false);
-        return;
+        console.log("❌ No session - throwing auth error");
+        throw new Error(
+          "Please log in to add an address. You can continue with manual entry if needed.",
+        );
       }
 
+      console.log("📤 Making API request to create address");
       const response = await fetch("/api/addresses", {
         method: "POST",
         headers: {
@@ -597,48 +609,79 @@ export const CreateCateringOrderForm: React.FC<
         body: JSON.stringify(addressData),
       });
 
+      console.log("📥 API response", {
+        status: response.status,
+        ok: response.ok,
+      });
+
       if (!response.ok) {
         if (response.status === 401) {
-          setIsAuthenticated(false);
-          return;
+          console.log("❌ 401 Unauthorized - session may be expired");
+          setIsAuthenticated(false); // Trigger auth dialog
+          throw new Error(
+            "Your session has expired. Please log in again to add addresses.",
+          );
         }
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+
+        // Try to get error details from response
+        let errorMessage = `Error ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (e) {
+          console.log("Could not parse error response");
+        }
+
+        console.log("❌ API error", { status: response.status, errorMessage });
+        throw new Error(`Failed to add address: ${errorMessage}`);
       }
 
       const addedAddress = await response.json();
+      console.log("✅ Address created successfully", { addedAddress });
 
       if (addressDialogType === "pickup") {
+        console.log("🚚 Setting up pickup address");
         // Update local state with new address
-        setPickupAddresses([...pickupAddresses, addedAddress]);
+        setPickupAddresses((prev) => [...prev, addedAddress]);
 
         // Refresh the AddressManager to show the new address
         if (pickupAddressRefreshRef.current) {
+          console.log("🔄 Refreshing pickup address manager");
           pickupAddressRefreshRef.current();
         }
 
         // Select the new address after a short delay to ensure it's loaded
         setTimeout(() => {
+          console.log("🎯 Selecting new pickup address", addedAddress.id);
           handlePickupAddressSelected(addedAddress.id);
         }, 300);
       } else {
+        console.log("🏠 Setting up delivery address");
         // Update local state with new address
-        setDeliveryAddresses([...deliveryAddresses, addedAddress]);
+        setDeliveryAddresses((prev) => [...prev, addedAddress]);
 
         // Refresh the AddressManager to show the new address
         if (deliveryAddressRefreshRef.current) {
+          console.log("🔄 Refreshing delivery address manager");
           deliveryAddressRefreshRef.current();
         }
 
         // Select the new address after a short delay to ensure it's loaded
         setTimeout(() => {
+          console.log("🎯 Selecting new delivery address", addedAddress.id);
           handleDeliveryAddressSelected(addedAddress.id);
         }, 300);
       }
 
+      console.log("✅ Address setup complete, closing dialog");
       setAddressDialogOpen(false);
     } catch (error) {
-      console.error("Error adding address:", error);
-      setGeneralError("Failed to add address. Please try again.");
+      console.error("💥 Exception in address submission", error);
+      // Throw the error so AddAddressForm can display it in the dialog
+      // This prevents the form from resetting and keeps the dialog open
+      throw error;
     }
   };
 
@@ -785,17 +828,20 @@ export const CreateCateringOrderForm: React.FC<
     }
   };
 
-  // Add effect to reset form state on page load or when returning to the form
+  // Clear form state only on mount, not on every form change
   useEffect(() => {
-    // Clear any previous error states
-    setGeneralError(null);
-    form.clearErrors();
+    // Only clear errors on mount, not on every form change
+    if (generalError === null) {
+      form.clearErrors();
+    }
+  }, []); // Empty dependency array - only run on mount
 
+  // Keep the cleanup function separate
+  useEffect(() => {
     return () => {
-      // Cleanup function when component unmounts
       setGeneralError(null);
     };
-  }, [form]);
+  }, []);
 
   // Direct manual submit that bypasses the form's validation
   const manualDirectSubmit = async () => {

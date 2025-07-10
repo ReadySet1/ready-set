@@ -169,76 +169,6 @@ const SelectField: React.FC<{
   </div>
 );
 
-// Address Section Component
-const AddressSection: React.FC<{
-  control: any;
-  addresses: Address[];
-  onAddressSelected: (address: Address) => void;
-}> = ({ control, addresses, onAddressSelected }) => {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-6">
-      <h3 className="mb-5 text-lg font-medium text-gray-800">
-        Delivery Address
-      </h3>
-      <div className="mb-4">
-        <label className="mb-3 block text-sm font-medium text-gray-700">
-          Select a delivery address
-        </label>
-        <Controller
-          name="deliveryAddress.id"
-          control={control}
-          rules={{ required: "Delivery address is required" }}
-          render={({ field, fieldState: { error } }) => (
-            <div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-                  <MapPin size={16} />
-                </div>
-                <select
-                  {...field}
-                  onChange={(e) => {
-                    field.onChange(e);
-                    const selectedAddress = addresses.find(
-                      (addr) => addr.id === e.target.value,
-                    );
-                    if (selectedAddress) {
-                      onAddressSelected(selectedAddress);
-                    }
-                  }}
-                  className={`w-full rounded-md border ${
-                    error ? "border-red-500" : "border-gray-300"
-                  } py-2 pl-10 shadow-sm focus:border-blue-500 focus:ring-blue-500`}
-                >
-                  <option value="">Select address</option>
-                  {addresses.map((address) => (
-                    <option key={address.id} value={address.id}>
-                      {address.street1}, {address.city}, {address.state}{" "}
-                      {address.zip}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {error && (
-                <p className="mt-2 text-xs text-red-500">{error.message}</p>
-              )}
-            </div>
-          )}
-        />
-      </div>
-
-      {/* Manage Addresses Button */}
-      <div className="flex">
-        <Link
-          href="/addresses"
-          className="rounded-md bg-blue-500 px-4 py-2 text-white transition hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-        >
-          Manage Addresses
-        </Link>
-      </div>
-    </div>
-  );
-};
-
 // Form Component
 interface ExtendedCateringFormData extends CateringFormData {
   attachments?: UploadedFile[];
@@ -660,6 +590,8 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
               setValue("pickupAddress", selectedAddress);
             }
           }}
+          showFilters={true}
+          showManagementButtons={true}
         />
       </div>
 
@@ -781,10 +713,18 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         <h3 className="mb-5 border-b border-gray-200 pb-3 text-lg font-medium text-gray-800">
           Delivery Details
         </h3>
-        <AddressSection
-          control={control}
-          addresses={addresses}
-          onAddressSelected={(address) => setValue("deliveryAddress", address)}
+        <AddressManager
+          onAddressesLoaded={handleAddressesLoaded}
+          onAddressSelected={(addressId) => {
+            const selectedAddress = addresses.find(
+              (addr) => addr.id === addressId,
+            );
+            if (selectedAddress) {
+              setValue("deliveryAddress", selectedAddress);
+            }
+          }}
+          showFilters={true}
+          showManagementButtons={true}
         />
       </div>
 
