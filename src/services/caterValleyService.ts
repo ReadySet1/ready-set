@@ -19,19 +19,28 @@ export interface CaterValleyApiResponse {
     message: string;
     data: Record<string, never>; // Empty object based on docs
 }
+
+// Enhanced response interface that includes error handling info
+export interface CaterValleyUpdateResult {
+  success: boolean;
+  orderFound: boolean;
+  response?: CaterValleyApiResponse;
+  error?: string;
+  statusCode?: number;
+}
   
   /**
    * Updates the order status via the CaterValley API.
+   * Enhanced with better error handling for common scenarios like order not found.
    * 
    * @param orderNumber - The CaterValley order number.
    * @param status - The new status to set.
-   * @returns The response from the CaterValley API.
-   * @throws Error if the API call fails or input is invalid.
+   * @returns A structured result indicating success, error details, and whether the order was found.
    */
 export async function updateCaterValleyOrderStatus(
     orderNumber: string,
     status: OrderStatus
-  ): Promise<CaterValleyApiResponse> {
+  ): Promise<CaterValleyUpdateResult> {
     const CATER_VALLEY_API_URL =
       'https://api.catervalley.com/api/operation/order/update-order-status';
     // Hardcode the partner header as specified in the CaterValley documentation
@@ -39,10 +48,18 @@ export async function updateCaterValleyOrderStatus(
   
     // Input validation
     if (!orderNumber || typeof orderNumber !== 'string' || orderNumber.trim() === '') {
-        throw new Error('Invalid orderNumber provided for CaterValley update.');
+        return {
+          success: false,
+          orderFound: false,
+          error: 'Invalid orderNumber provided for CaterValley update.',
+        };
     }
     if (!status || !ALLOWED_STATUSES.includes(status)) {
-        throw new Error(`Invalid status provided for CaterValley update: ${status}. Must be one of ${ALLOWED_STATUSES.join(', ')}.`);
+        return {
+          success: false,
+          orderFound: false,
+          error: `Invalid status provided for CaterValley update: ${status}. Must be one of ${ALLOWED_STATUSES.join(', ')}.`,
+        };
     }
   
     // Ensure status is always uppercase as expected by the API
@@ -70,7 +87,36 @@ export async function updateCaterValleyOrderStatus(
       console.log(`CaterValley API response for ${orderNumber} (${normalizedStatus}): Status ${response.status}, Body: ${responseText}`);
 
       if (!response.ok) {
-        // Attempt to parse error message from CaterValley if available
+        // Handle specific HTTP status codes
+        if (response.status === 404) {
+          // Order not found - this is a common scenario that should be handled gracefully
+          let errorMessage = 'Order not found in CaterValley system';
+          let errorDetails = {};
+          
+          try {
+            const errorBody = JSON.parse(responseText);
+            if (errorBody.message) {
+              errorMessage = errorBody.message;
+            }
+            errorDetails = errorBody;
+          } catch (parseError) {
+            // Use default message if can't parse response
+            if (responseText) {
+              errorMessage += `. Response: ${responseText}`;
+            }
+          }
+          
+          console.warn(`[CaterValley Service] Order ${orderNumber} not found in CaterValley system:`, errorDetails);
+          
+          return {
+            success: false,
+            orderFound: false,
+            error: errorMessage,
+            statusCode: 404,
+          };
+        }
+        
+        // Handle other HTTP errors
         let errorMessage = `CaterValley API request failed with status ${response.status}`;
         try {
           // Try parsing the already read text
@@ -82,8 +128,19 @@ export async function updateCaterValleyOrderStatus(
           // Use the raw text if JSON parsing fails
           errorMessage += `. Response body: ${responseText}`; 
         }
-        console.error(errorMessage);
-        throw new Error(errorMessage);
+        
+        console.error(`[CaterValley Service] API Error for order ${orderNumber}:`, { 
+          status: response.status, 
+          message: errorMessage, 
+          responseText 
+        });
+        
+        return {
+          success: false,
+          orderFound: response.status !== 404, // Assume order exists for non-404 errors
+          error: errorMessage,
+          statusCode: response.status,
+        };
       }
   
       // Parse the successful JSON response from the text
@@ -92,26 +149,56 @@ export async function updateCaterValleyOrderStatus(
       // Optional: Add more specific checks based on expected response structure
       if (typeof responseData.result !== 'boolean') {
           console.warn("CaterValley response 'result' field has unexpected type:", responseData);
-          // Decide if this should be a hard error or just a warning
-          // throw new Error('Received malformed response from CaterValley API.');
       }
 
-      // Log success or logical failure from CaterValley
-      if (responseData.result) {
-        console.log(`CaterValley status update successful for order ${orderNumber} to ${normalizedStatus}.`);
-      } else {
+      // Handle logical failure reported by the API
+      if (responseData.result === false) {
         console.warn(`CaterValley status update logically failed for order ${orderNumber} to ${normalizedStatus}: ${responseData.message}`);
+        
+        return {
+          success: false,
+          orderFound: true, // Order exists but operation failed
+          response: responseData,
+          error: responseData.message || 'Unknown logical failure',
+          statusCode: 200,
+        };
+      } else {
+        console.log(`CaterValley status update successful for order ${orderNumber} to ${normalizedStatus}.`);
       }
   
-      return responseData;
+      // Success case
+      return {
+        success: true,
+        orderFound: true,
+        response: responseData,
+      };
   
     } catch (error) {
       console.error('Error calling CaterValley API:', error);
-      // Re-throw or handle specific error types
-      if (error instanceof Error) {
-          // Append context for better debugging
-          throw new Error(`Failed to update CaterValley order status for ${orderNumber}: ${error.message}`);
-      }
-      throw new Error(`An unknown error occurred while updating CaterValley order status for ${orderNumber}.`);
+      
+      const errorMessage = error instanceof Error 
+        ? `Network/API error: ${error.message}`
+        : 'An unknown error occurred while updating status.';
+      
+      return {
+        success: false,
+        orderFound: false, // Can't determine if order exists due to network error
+        error: `Failed to update CaterValley order status for ${orderNumber}: ${errorMessage}`,
+      };
     }
+}
+
+// Legacy function that maintains backward compatibility by throwing errors
+// Deprecated: Use updateCaterValleyOrderStatus instead for better error handling
+export async function updateCaterValleyOrderStatusLegacy(
+  orderNumber: string,
+  status: OrderStatus
+): Promise<CaterValleyApiResponse> {
+  const result = await updateCaterValleyOrderStatus(orderNumber, status);
+  
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to update CaterValley order status');
+  }
+  
+  return result.response!;
 } 

@@ -529,7 +529,7 @@ export function ModernDashboardHome() {
       key: 'id', 
       label: 'Order ID',
       render: (order: CateringRequest) => (
-        <Link href={`/admin/catering-orders/${order.orderNumber}`} className="font-medium text-blue-600 hover:text-blue-800 hover:underline">
+        <Link href={`/admin/catering-orders/${encodeURIComponent(order.orderNumber)}`} className="font-medium text-blue-600 hover:text-blue-800 hover:underline">
           #{order.orderNumber}
         </Link>
       )
@@ -735,7 +735,7 @@ export function ModernDashboardHome() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem asChild>
-                        <Link href={`/admin/catering-orders/${order.orderNumber}`} className="flex items-center">
+                        <Link href={`/admin/catering-orders/${encodeURIComponent(order.orderNumber)}`} className="flex items-center">
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </Link>
