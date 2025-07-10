@@ -9,10 +9,7 @@ import ErrorBoundary from "@/components/ErrorBoundary/ErrorBoundary";
 import CookieConsentBanner from "../components/Cookies/Banner";
 import { UserProvider } from "@/contexts/UserContext";
 import { Toaster } from "@/components/ui/toaster";
-import { HighlightInit } from "@highlight-run/next/client";
-import { H } from "highlight.run";
 import { CONSTANTS } from "@/constants";
-import { HighlightErrorBoundary } from "@/components/ErrorBoundary/HighlightErrorBoundary";
 import UmamiAnalytics from "@/components/Analytics/UmamiAnalytics";
 import type { Metadata } from "next";
 
@@ -70,10 +67,7 @@ const montserrat = Montserrat({
   weight: ["300", "400", "500", "600", "700", "800", "900"],
 });
 
-// Expose Highlight globally for easier debugging
-if (typeof window !== "undefined") {
-  window.H = H;
-}
+
 
 export default function RootLayout({
   children,
@@ -87,43 +81,11 @@ export default function RootLayout({
       lang="en"
     >
       <head>
-        {/* Directly include Highlight.js script for more reliable loading */}
-        <Script id="highlight-init" strategy="beforeInteractive">
-          {`
-            window.HIGHLIGHT_DEBUG = true;
-            window.HIGHLIGHT_PROJECT_ID = "${CONSTANTS.NEXT_PUBLIC_HIGHLIGHT_PROJECT_ID}";
-          `}
-        </Script>
       </head>
       <body className="overflow-x-hidden">
         <ErrorBoundary fallback={<div>Something went wrong</div>}>
           <UserProvider>
-            <HighlightInit
-              projectId={CONSTANTS.NEXT_PUBLIC_HIGHLIGHT_PROJECT_ID}
-              serviceName="ready-set-frontend"
-              debug={process.env.NODE_ENV === "development"}
-              networkRecording={{
-                enabled: true,
-                recordHeadersAndBody: true,
-                urlBlocklist: [
-                  // Add sensitive URLs here that shouldn't be recorded
-                  "/api/auth",
-                  "/api/login",
-                  "/api/user",
-                  "/api/users",
-                  "sanity.io", // Don't record Sanity API requests
-                ],
-              }}
-              tracingOrigins={[
-                "localhost",
-                "readysetllc.com",
-                "ready-set.vercel.app",
-                "vercel.app", // Match all Vercel preview deployments
-              ]}
-            />
-            <HighlightErrorBoundary>
-              <ClientLayout>{children}</ClientLayout>
-            </HighlightErrorBoundary>
+            <ClientLayout>{children}</ClientLayout>
           </UserProvider>
         </ErrorBoundary>
         <Toaster />

@@ -11,8 +11,6 @@ import { login, FormState } from "@/app/actions/login";
 import GoogleAuthButton from "@/components/Auth/GoogleAuthButton";
 import { useUser } from "@/contexts/UserContext";
 import { useRouter } from "next/navigation";
-import { H } from 'highlight.run';
-import { logAuthError, trackAuthSuccess } from '@/utils/highlight-auth-logger';
 
 const Signin = ({
   searchParams,
@@ -61,33 +59,14 @@ const Signin = ({
       setErrors((prev) => ({ ...prev, general: state.error || "" }));
       setLoading(false);
       
-      // Track login error with Highlight
-      try {
-        logAuthError(state.error, {
-          action: 'login',
-          email: loginData.email,
-          returnTo: returnTo
-        });
-      } catch (err) {
-        console.error('Failed to log auth error:', err);
-      }
+
     }
     
     // If redirectTo is set in the state, we're being redirected by the server
     if (state?.redirectTo) {
       console.log("Login action is handling redirect to:", state.redirectTo);
       
-      // Track successful login
-      try {
-        trackAuthSuccess({
-          action: 'login',
-          email: loginData.email,
-          returnTo: returnTo,
-          redirectTo: state.redirectTo
-        });
-      } catch (err) {
-        console.error('Failed to track auth success:', err);
-      }
+
       
       // Let the server handle the redirect
     }
@@ -161,30 +140,7 @@ const Signin = ({
     }
   };
 
-  // Add new useEffect to track errors and auth redirects
-  useEffect(() => {
-    try {
-      // Track page view with context
-      if (typeof window !== 'undefined' && window.H) {
-        H.track('auth_signin_page_view', {
-          hasError: !!errors.general || !!searchParams?.error,
-          hasReturnTo: !!returnTo,
-          returnTo: returnTo,
-          timestamp: new Date().toISOString()
-        });
-      }
-      
-      // Track auth errors from URL parameters
-      if (searchParams?.error) {
-        logAuthError(searchParams.error, {
-          action: 'login',
-          returnTo: returnTo
-        });
-      }
-    } catch (err) {
-      console.error('Failed to track auth page view:', err);
-    }
-  }, [searchParams, returnTo, errors.general]);
+
 
   if (isUserLoading) {
     return (

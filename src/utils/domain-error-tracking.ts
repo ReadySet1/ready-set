@@ -1,4 +1,3 @@
-import { H } from 'highlight.run';
 import { logError } from './error-logging';
 
 // Define ErrorSource type to match what's expected
@@ -183,17 +182,6 @@ export function trackOrderError(
   type: OrderErrorType,
   context: OrderErrorContext
 ) {
-  // Log to Highlight.io - passing the error directly
-  H.consumeError(error);
-  
-  // Add tags with a separate track event for categorization
-  H.track('highlight_error_metadata', {
-    errorType: type,
-    domain: 'order-management',
-    orderId: context.orderId || 'unknown',
-    customerId: context.customerId || 'unknown',
-  });
-
   // Log to our error logging system
   logError(error, {
     message: `Order Management Error: ${type}`,
@@ -204,13 +192,6 @@ export function trackOrderError(
       ...context,
     },
   });
-
-  // Track as custom event for analytics
-  H.track('order_management_error', {
-    errorType: type,
-    timestamp: new Date().toISOString(),
-    ...context,
-  });
 }
 
 // Dispatch System error tracking
@@ -219,18 +200,6 @@ export function trackDispatchError(
   type: DispatchErrorType,
   context: DispatchErrorContext
 ) {
-  // Log to Highlight.io - passing the error directly
-  H.consumeError(error);
-  
-  // Add tags with a separate track event for categorization
-  H.track('highlight_error_metadata', {
-    errorType: type,
-    domain: 'dispatch-system',
-    dispatchId: context.dispatchId || 'unknown',
-    driverId: context.driverId || 'unknown',
-    orderId: context.orderId || 'unknown',
-  });
-
   // Log to our error logging system
   logError(error, {
     message: `Dispatch System Error: ${type}`,
@@ -241,13 +210,6 @@ export function trackDispatchError(
       ...context,
     },
   });
-
-  // Track as custom event for analytics
-  H.track('dispatch_system_error', {
-    errorType: type,
-    timestamp: new Date().toISOString(),
-    ...context,
-  });
 }
 
 // Address Management error tracking
@@ -256,17 +218,6 @@ export function trackAddressError(
   type: AddressErrorType,
   context: AddressErrorContext
 ) {
-  // Log to Highlight.io - passing the error directly
-  H.consumeError(error);
-  
-  // Add tags with a separate track event for categorization
-  H.track('highlight_error_metadata', {
-    errorType: type,
-    domain: 'address-management',
-    addressId: context.addressId || 'unknown',
-    userId: context.userId || 'unknown',
-  });
-
   // Log to our error logging system
   logError(error, {
     message: `Address Management Error: ${type}`,
@@ -277,13 +228,6 @@ export function trackAddressError(
       ...context,
     },
   });
-
-  // Track as custom event for analytics
-  H.track('address_management_error', {
-    errorType: type,
-    timestamp: new Date().toISOString(),
-    ...context,
-  });
 }
 
 // File Upload error tracking
@@ -292,18 +236,6 @@ export function trackFileUploadError(
   type: FileUploadErrorType,
   context: FileUploadErrorContext
 ) {
-  // Log to Highlight.io - passing the error directly
-  H.consumeError(error);
-  
-  // Add tags with a separate track event for categorization
-  H.track('highlight_error_metadata', {
-    errorType: type,
-    domain: 'file-upload-system',
-    fileId: context.fileId || 'unknown',
-    userId: context.userId || 'unknown',
-    fileType: context.fileType || 'unknown',
-  });
-
   // Log to our error logging system
   logError(error, {
     message: `File Upload Error: ${type}`,
@@ -314,13 +246,6 @@ export function trackFileUploadError(
       ...context,
     },
   });
-
-  // Track as custom event for analytics
-  H.track('file_upload_error', {
-    errorType: type,
-    timestamp: new Date().toISOString(),
-    ...context,
-  });
 }
 
 // User Profile error tracking
@@ -329,17 +254,6 @@ export function trackProfileError(
   type: ProfileErrorType,
   context: ProfileErrorContext
 ) {
-  // Log to Highlight.io - passing the error directly
-  H.consumeError(error);
-  
-  // Add tags with a separate track event for categorization
-  H.track('highlight_error_metadata', {
-    errorType: type,
-    domain: 'profile-management',
-    userId: context.userId || 'unknown',
-    attemptedAction: context.attemptedAction || 'unknown',
-  });
-
   // Log to our error logging system
   logError(error, {
     message: `Profile Management Error: ${type}`,
@@ -350,13 +264,6 @@ export function trackProfileError(
       ...context,
     },
   });
-
-  // Track as custom event for analytics
-  H.track('profile_management_error', {
-    errorType: type,
-    timestamp: new Date().toISOString(),
-    ...context,
-  });
 }
 
 // Job Application error tracking
@@ -365,18 +272,6 @@ export function trackJobApplicationError(
   type: JobApplicationErrorType,
   context: JobApplicationErrorContext
 ) {
-  // Log to Highlight.io - passing the error directly
-  H.consumeError(error);
-  
-  // Add tags with a separate track event for categorization
-  H.track('highlight_error_metadata', {
-    errorType: type,
-    domain: 'job-application-system',
-    applicationId: context.applicationId || 'unknown',
-    userId: context.userId || 'unknown',
-    attemptedAction: context.attemptedAction || 'unknown',
-  });
-
   // Log to our error logging system
   logError(error, {
     message: `Job Application Error: ${type}`,
@@ -387,13 +282,6 @@ export function trackJobApplicationError(
       ...context,
     },
   });
-
-  // Track as custom event for analytics
-  H.track('job_application_error', {
-    errorType: type,
-    timestamp: new Date().toISOString(),
-    ...context,
-  });
 }
 
 // Client Dashboard error tracking
@@ -402,18 +290,6 @@ export function trackClientDashboardError(
   type: ClientDashboardErrorType,
   context: ClientDashboardErrorContext
 ) {
-  // Log to Highlight.io - passing the error directly
-  H.consumeError(error);
-  
-  // Add tags with a separate track event for categorization
-  H.track('highlight_error_metadata', {
-    errorType: type,
-    domain: 'client-dashboard',
-    clientId: context.clientId || 'unknown',
-    dashboardType: context.dashboardType || 'unknown',
-    endpoint: context.endpoint || 'unknown',
-  });
-
   // Log to our error logging system
   logError(error, {
     message: `Client Dashboard Error: ${type}`,
@@ -424,14 +300,6 @@ export function trackClientDashboardError(
       ...context,
     },
   });
-
-  // Track as custom event for analytics
-  H.track('client_dashboard_error', {
-    errorType: type,
-    timestamp: new Date().toISOString(),
-    responseTimeMs: context.responseTimeMs,
-    ...context,
-  });
 }
 
 // Admin Operations error tracking
@@ -440,18 +308,6 @@ export function trackAdminOperationsError(
   type: AdminOperationsErrorType,
   context: AdminOperationsErrorContext
 ) {
-  // Log to Highlight.io - passing the error directly
-  H.consumeError(error);
-  
-  // Add tags with a separate track event for categorization
-  H.track('highlight_error_metadata', {
-    errorType: type,
-    domain: 'admin-operations',
-    adminId: context.adminId || 'unknown',
-    action: context.action || 'unknown',
-    targetResourceType: context.targetResourceType || 'unknown',
-  });
-
   // Log to our error logging system
   logError(error, {
     message: `Admin Operations Error: ${type}`,
@@ -461,13 +317,6 @@ export function trackAdminOperationsError(
       errorType: type,
       ...context,
     },
-  });
-
-  // Track as custom event for analytics
-  H.track('admin_operations_error', {
-    errorType: type,
-    timestamp: new Date().toISOString(),
-    ...context,
   });
 }
 
