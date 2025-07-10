@@ -497,6 +497,7 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [stats, setStats] = useState<JobApplicationStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | "all">("all");
@@ -525,6 +526,7 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
 
   // Fetch stats
   const fetchStats = useCallback(async () => {
+    setIsStatsLoading(true);
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -553,6 +555,8 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
         description: "Failed to load application statistics",
         variant: "destructive",
       });
+    } finally {
+      setIsStatsLoading(false);
     }
   }, []);
 
@@ -764,7 +768,7 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
     setIsDeleteDialogOpen(true);
   };
 
-  if (isLoading && !stats) {
+  if ((isLoading || isStatsLoading) && !stats) {
     return <ApplicationsSkeleton />;
   }
 
@@ -830,9 +834,10 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
                   fetchStats();
                   fetchApplications();
                 }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                disabled={isLoading || isStatsLoading}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 disabled:opacity-70"
               >
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className={`h-4 w-4 ${(isLoading || isStatsLoading) ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
             </div>
