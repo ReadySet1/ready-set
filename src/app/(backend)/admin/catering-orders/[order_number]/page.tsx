@@ -29,7 +29,8 @@ const OrderPage = () => {
       const pathSegments = pathname.split("/");
       const lastSegment = pathSegments[pathSegments.length - 1];
       if (lastSegment) {
-        setOrderNumber(lastSegment);
+        // Decode the order number to handle special characters like slashes
+        setOrderNumber(decodeURIComponent(lastSegment));
       }
     }
   }, [pathname]);
@@ -39,7 +40,7 @@ const OrderPage = () => {
   };
 
   return (
-    <div className="bg-slate-50 flex min-h-screen w-full flex-col">
+    <div className="flex min-h-screen w-full flex-col bg-slate-50">
       <div className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white px-6 shadow-sm">
         <Button
           onClick={() => router.push("/admin/catering-orders")}
@@ -55,7 +56,7 @@ const OrderPage = () => {
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
                 <Link href="/admin/" className="flex items-center">
-                  <Home className="h-4 w-4 mr-1" />
+                  <Home className="mr-1 h-4 w-4" />
                   Dashboard
                 </Link>
               </BreadcrumbLink>
@@ -63,8 +64,11 @@ const OrderPage = () => {
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link href="/admin/catering-orders" className="flex items-center">
-                  <ClipboardList className="h-4 w-4 mr-1" />
+                <Link
+                  href="/admin/catering-orders"
+                  className="flex items-center"
+                >
+                  <ClipboardList className="mr-1 h-4 w-4" />
                   Catering Orders
                 </Link>
               </BreadcrumbLink>
@@ -78,7 +82,7 @@ const OrderPage = () => {
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      
+
       <div className="flex-1">
         <SingleOrder onDeleteSuccess={handleDeleteSuccess} showHeader={false} />
       </div>

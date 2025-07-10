@@ -43,7 +43,9 @@ export function OrderFilesManager({
         setIsLoading(true);
         console.log("Fetching files for order:", orderNumber);
 
-        const response = await fetch(`/api/orders/${orderNumber}/files`);
+        const response = await fetch(
+          `/api/orders/${encodeURIComponent(orderNumber)}/files`,
+        );
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -62,40 +64,50 @@ export function OrderFilesManager({
           throw new Error("Invalid response format");
         }
 
-        const processedFiles = filesArray.map((file: {
-          id: string;
-          fileName: string;
-          fileType: string | null;
-          fileSize: number;
-          fileUrl: string;
-          entityType?: string;
-          entityId?: string;
-          category?: string;
-          uploadedAt: string | null;
-          updatedAt: string | null;
-          userId?: string;
-          cateringRequestId?: number;
-          onDemandId?: number;
-          isTemporary?: boolean;
-        }): FileUpload => {
-          // Ensure all required fields are present with proper types
-          return {
-            id: file.id || "",
-            fileName: file.fileName || "",
-            fileType: file.fileType || null,
-            fileSize: typeof file.fileSize === 'number' ? file.fileSize : 0,
-            fileUrl: file.fileUrl || "",
-            entityType: file.entityType || order_type,
-            entityId: file.entityId || orderId,
-            category: file.category || "catering-order", // Use "catering-order" as the default category
-            uploadedAt: new Date(file.uploadedAt || Date.now()),
-            updatedAt: new Date(file.updatedAt || file.uploadedAt || Date.now()),
-            userId: file.userId,
-            cateringRequestId: typeof file.cateringRequestId === 'number' ? file.cateringRequestId : undefined,
-            onDemandId: typeof file.onDemandId === 'number' ? file.onDemandId : undefined,
-            isTemporary: file.isTemporary || false,
-          };
-        });
+        const processedFiles = filesArray.map(
+          (file: {
+            id: string;
+            fileName: string;
+            fileType: string | null;
+            fileSize: number;
+            fileUrl: string;
+            entityType?: string;
+            entityId?: string;
+            category?: string;
+            uploadedAt: string | null;
+            updatedAt: string | null;
+            userId?: string;
+            cateringRequestId?: number;
+            onDemandId?: number;
+            isTemporary?: boolean;
+          }): FileUpload => {
+            // Ensure all required fields are present with proper types
+            return {
+              id: file.id || "",
+              fileName: file.fileName || "",
+              fileType: file.fileType || null,
+              fileSize: typeof file.fileSize === "number" ? file.fileSize : 0,
+              fileUrl: file.fileUrl || "",
+              entityType: file.entityType || order_type,
+              entityId: file.entityId || orderId,
+              category: file.category || "catering-order", // Use "catering-order" as the default category
+              uploadedAt: new Date(file.uploadedAt || Date.now()),
+              updatedAt: new Date(
+                file.updatedAt || file.uploadedAt || Date.now(),
+              ),
+              userId: file.userId,
+              cateringRequestId:
+                typeof file.cateringRequestId === "number"
+                  ? file.cateringRequestId
+                  : undefined,
+              onDemandId:
+                typeof file.onDemandId === "number"
+                  ? file.onDemandId
+                  : undefined,
+              isTemporary: file.isTemporary || false,
+            };
+          },
+        );
 
         setAllFiles(processedFiles);
       } catch (error) {
@@ -125,19 +137,16 @@ export function OrderFilesManager({
   }));
 
   // Add console logs for debugging
-  console.log(`OrderFilesManager - Order type: ${order_type}, Order ID: ${orderId}`);
+  console.log(
+    `OrderFilesManager - Order type: ${order_type}, Order ID: ${orderId}`,
+  );
 
   // Updated to use single object parameter
-  const { 
-    onUpload, 
-    uploadedFiles, 
-    progresses, 
-    isUploading 
-  } = useUploadFile({
-    bucketName: "fileUploader",  // Use the fileUploader bucket consistently
+  const { onUpload, uploadedFiles, progresses, isUploading } = useUploadFile({
+    bucketName: "fileUploader", // Use the fileUploader bucket consistently
     defaultUploadedFiles: safeInitialFiles,
     category: "catering-order", // Fixed category to ensure consistency
-    entityType: "catering",     // Always use "catering" for proper DB association
+    entityType: "catering", // Always use "catering" for proper DB association
     entityId: orderId,
     maxFileCount: 10,
     maxFileSize: 4 * 1024 * 1024,
@@ -152,7 +161,7 @@ export function OrderFilesManager({
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ],
   });
-  
+
   // Add a console log to see what entity type we're passing to the FileUploader
   console.log("FileUploader props:", {
     category: "catering-order",
@@ -222,9 +231,10 @@ export function OrderFilesManager({
       console.error("Upload error:", error);
       toast({
         title: "Error",
-        description: error instanceof Error 
-          ? error.message 
-          : "Failed to upload files. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to upload files. Please try again.",
         variant: "destructive",
       });
       throw error;
@@ -245,39 +255,39 @@ export function OrderFilesManager({
 
   return (
     <>
-        <CardHeader>
-          <CardDescription className="text-lg">
-            {getDisplayText(order_type)}  #{orderNumber}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <FileUploader
-            onUpload={handleUpload}
-            progresses={progresses}
-            isUploading={isUploading}
-            category="catering-order"
-            entityType="catering"
-            entityId={orderId}
-            accept={{
-              "image/*": [],
-              "application/pdf": [".pdf"],
-              "application/msword": [".doc"],
-              "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-                [".docx"],
-              "application/vnd.ms-excel": [".xls"],
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-                [".xlsx"],
-            }}
-            maxSize={5 * 1024 * 1024}
-            maxFileCount={10}
-            multiple={true}
-          />
-          <UploadedFilesViewer 
-            files={allFiles} 
-            isLoading={isLoading} 
-            onFileClick={handleFileClick}
-          />
-        </CardContent>
+      <CardHeader>
+        <CardDescription className="text-lg">
+          {getDisplayText(order_type)} #{orderNumber}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <FileUploader
+          onUpload={handleUpload}
+          progresses={progresses}
+          isUploading={isUploading}
+          category="catering-order"
+          entityType="catering"
+          entityId={orderId}
+          accept={{
+            "image/*": [],
+            "application/pdf": [".pdf"],
+            "application/msword": [".doc"],
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+              [".docx"],
+            "application/vnd.ms-excel": [".xls"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+              [".xlsx"],
+          }}
+          maxSize={5 * 1024 * 1024}
+          maxFileCount={10}
+          multiple={true}
+        />
+        <UploadedFilesViewer
+          files={allFiles}
+          isLoading={isLoading}
+          onFileClick={handleFileClick}
+        />
+      </CardContent>
       <FileViewer
         file={selectedFile}
         isOpen={isViewerOpen}

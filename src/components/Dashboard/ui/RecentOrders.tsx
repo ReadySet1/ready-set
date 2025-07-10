@@ -1,30 +1,39 @@
 // src/components/Dashboard/ui/RecentOrders.tsx
 
-import React from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import Link from 'next/link';
-import { CateringOrder } from '@/types/user'; // Import the shared type
+import React from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import { CateringOrder } from "@/types/user"; // Import the shared type
 
 interface RecentOrdersTableProps {
   orders: CateringOrder[];
 }
 
-export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders }) => {
+export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({
+  orders,
+}) => {
   // Function to determine badge color based on order status
   const getBadgeVariant = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'active':
+      case "active":
         return "secondary";
-      case 'pending':
+      case "pending":
         return "warning";
-      case 'confirmed':
+      case "confirmed":
         return "default";
-      case 'in_progress':
+      case "in_progress":
         return "info";
-      case 'completed':
+      case "completed":
         return "success";
-      case 'cancelled':
+      case "cancelled":
         return "destructive";
       default:
         return "outline";
@@ -32,7 +41,7 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders }) 
   };
 
   return (
-    <div className="flex flex-col min-h-[320px] justify-between">
+    <div className="flex min-h-[320px] flex-col justify-between">
       <div>
         {orders.length > 0 ? (
           <Table>
@@ -48,7 +57,10 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders }) 
               {orders.map((order) => (
                 <TableRow key={order.id}>
                   <TableCell className="font-medium">
-                    <Link href={`/admin/catering-orders/${order.orderNumber}`} className="hover:underline">
+                    <Link
+                      href={`/admin/catering-orders/${encodeURIComponent(order.orderNumber)}`}
+                      className="hover:underline"
+                    >
                       {order.orderNumber}
                     </Link>
                   </TableCell>
@@ -58,13 +70,17 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders }) 
                       {order.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>${order.orderTotal?.toFixed(2) || "0.00"}</TableCell>
+                  <TableCell>
+                    ${order.orderTotal?.toFixed(2) || "0.00"}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         ) : (
-          <div className="text-center py-4 text-gray-500">No active orders at this moment</div>
+          <div className="py-4 text-center text-gray-500">
+            No active orders at this moment
+          </div>
         )}
       </div>
     </div>
