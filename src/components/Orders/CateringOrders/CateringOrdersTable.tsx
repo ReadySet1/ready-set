@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -8,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import Link from "next/link";
+import { encodeOrderNumber } from "@/utils/order";
 import { Badge } from "@/components/ui/badge";
 import { Order, StatusFilter, UserRole } from "./types";
 import DeleteCateringOrder from "./DeleteCateringOrder";
@@ -88,7 +89,7 @@ export const CateringOrdersTable: React.FC<CateringOrdersTableProps> = ({
               <TableRow key={order.id}>
                 <TableCell>
                   <Link
-                    href={`/admin/catering-orders/${encodeURIComponent(order.order_number)}`}
+                    href={`/admin/catering-orders/${encodeOrderNumber(order.order_number)}`}
                     className="font-medium hover:underline"
                   >
                     {order.order_number}

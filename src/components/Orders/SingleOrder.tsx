@@ -30,7 +30,7 @@ import CustomerInfo from "./ui/CustomerInfo";
 import AdditionalInfo from "./ui/AdditionalInfo";
 import DriverAssignmentDialog from "./ui/DriverAssignmentDialog";
 import OrderStatusCard from "./OrderStatus";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useParams } from "next/navigation";
 import { OrderFilesManager } from "./ui/OrderFiles";
 import {
   Driver,
@@ -45,6 +45,7 @@ import { FileUpload } from "@/types/file";
 import { createClient } from "@/utils/supabase/client";
 import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
 import { UserType } from "@/types/user";
+import { decodeOrderNumber } from "@/utils/order";
 
 // Make sure the bucket name is user-assets
 const STORAGE_BUCKET = "user-assets";
@@ -134,9 +135,21 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
   const router = useRouter();
   const pathname = usePathname();
-  const orderNumber = decodeURIComponent(
-    (pathname ?? "").split("/").pop() || "",
-  );
+  const params = useParams();
+  
+  // Extract order number from URL params with proper decoding for slashes
+  const orderNumber = (() => {
+    if (params?.order_number) {
+      const rawOrderNumber = Array.isArray(params.order_number) 
+        ? params.order_number[0] 
+        : params.order_number;
+      
+      return decodeOrderNumber(rawOrderNumber);
+    }
+    
+    // Fallback to pathname parsing for non-dynamic routes
+    return decodeURIComponent((pathname ?? "").split("/").pop() || "");
+  })();
   const supabase = createClient();
   const [userRoles, setUserRoles] = useState<{
     isAdmin: boolean;

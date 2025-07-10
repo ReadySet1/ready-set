@@ -3,9 +3,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import SingleOrder from "@/components/Orders/SingleOrder";
+import { decodeOrderNumber } from "@/utils/order";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -19,21 +20,20 @@ import { ArrowLeft, Home, ClipboardList } from "lucide-react";
 
 const OrderPage = () => {
   const [orderNumber, setOrderNumber] = useState("");
-
-  const pathname = usePathname();
+  const params = useParams();
   const router = useRouter();
 
   useEffect(() => {
-    // Get the order number from the URL using pathname
-    if (pathname) {
-      const pathSegments = pathname.split("/");
-      const lastSegment = pathSegments[pathSegments.length - 1];
-      if (lastSegment) {
-        // Decode the order number to handle special characters like slashes
-        setOrderNumber(decodeURIComponent(lastSegment));
-      }
+    // Get the order number from the URL params
+    if (params?.order_number) {
+      const rawOrderNumber = Array.isArray(params.order_number) 
+        ? params.order_number[0] 
+        : params.order_number;
+      
+      const decodedOrderNumber = decodeOrderNumber(rawOrderNumber);
+      setOrderNumber(decodedOrderNumber);
     }
-  }, [pathname]);
+  }, [params]);
 
   const handleDeleteSuccess = () => {
     router.push("/admin/catering-orders");
