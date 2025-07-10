@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
         },
         webhook: {
           method: 'POST',
-          url: process.env.CATERVALLEY_WEBHOOK_URL || 'https://api-courier.catervalley.com/api/order/update-order-status',
+          url: process.env.CATERVALLEY_WEBHOOK_URL || 'https://api.catervalley.com/api/operation/order/update-order-status',
           description: 'Ready Set sends status updates to CaterValley',
           authentication: 'Required: partner: ready-set',
         },

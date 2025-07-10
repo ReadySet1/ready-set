@@ -33,7 +33,7 @@ export async function updateCaterValleyOrderStatus(
     status: OrderStatus
   ): Promise<CaterValleyApiResponse> {
     const CATER_VALLEY_API_URL =
-      'https://api-courier.catervalley.com/api/order/update-order-status';
+      'https://api.catervalley.com/api/operation/order/update-order-status';
     // Hardcode the partner header as specified in the CaterValley documentation
     const PARTNER_HEADER = 'ready-set';
   
