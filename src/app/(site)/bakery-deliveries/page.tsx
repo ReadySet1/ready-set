@@ -1,4 +1,4 @@
-// src/app/(site)/bakery/page.tsx
+// src/app/(site)/bakery-deliveries/page.tsx
 
 import { Metadata } from "next";
 import { FoodServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     siteName: "Ready Set",
-    url: "/food",
+    url: "/bakery-deliveries",
     images: [
       {
         url: "/images/og-food-delivery.jpg", // Add your actual image path
@@ -66,7 +66,7 @@ export const metadata: Metadata = {
     },
   },
   alternates: {
-    canonical: "/food",
+    canonical: "/bakery-deliveries",
   },
   other: {
     "geo.region": "US-CA",
