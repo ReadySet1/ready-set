@@ -909,7 +909,9 @@ export const CreateCateringOrderForm: React.FC<
         }
 
         alert("Order created successfully!");
-        router.push(`/admin/catering-orders/${result.orderNumber}`);
+        if (result.orderNumber) {
+          router.push(`/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`);
+        }
       } else {
         alert("Failed to create order: " + (result.error || "Unknown error"));
         setGeneralError(result.error || "Unknown error");
@@ -962,7 +964,9 @@ export const CreateCateringOrderForm: React.FC<
             console.log("Server action result:", result);
             if (result.success) {
               alert("Order created successfully!");
-              router.push(`/admin/catering-orders/${result.orderNumber}`);
+              if (result.orderNumber) {
+                router.push(`/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`);
+              }
             } else {
               alert(
                 "Order creation failed: " + (result.error || "Unknown error"),

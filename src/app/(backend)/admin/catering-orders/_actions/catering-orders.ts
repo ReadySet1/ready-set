@@ -627,7 +627,7 @@ export async function deleteCateringOrder(orderId: string): Promise<DeleteOrderR
 
     // Revalidate relevant paths
     revalidatePath('/admin/catering-orders');
-    revalidatePath(`/admin/catering-orders/${order.orderNumber}`);
+    revalidatePath(`/admin/catering-orders/${encodeURIComponent(order.orderNumber)}`);
     
     return { 
       success: true,

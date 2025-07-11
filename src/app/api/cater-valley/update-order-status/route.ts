@@ -5,8 +5,8 @@ import {
   updateCaterValleyOrderStatus,
   ALLOWED_STATUSES,
   type OrderStatus,
-  type CaterValleyApiResponse, // Keep for potential future use if needed
-} from '@/services/caterValleyService'; // Import from the new service file
+  type CaterValleyUpdateResult,
+} from '@/services/caterValleyService'; // Import from the service file
 
 // Interface for the request body expected by this route handler
 interface UpdateStatusRequestBody {
@@ -61,22 +61,46 @@ export async function POST(request: NextRequest) {
 
     // 3. Call the External API via the service function
     // The core logic is now in the service function
-    const caterValleyResponse = await updateCaterValleyOrderStatus(
+    const result: CaterValleyUpdateResult = await updateCaterValleyOrderStatus(
       orderNumber,
       status
     );
 
-    // 4. Handle External API Response
-    if (!caterValleyResponse.result) {
-      // The service function already logs the warning
-      // Return a specific status code indicating logical failure from CaterValley
+    // 4. Handle External API Response based on the structured result
+    if (!result.success) {
+      // Handle specific error cases
+      if (!result.orderFound && result.statusCode === 404) {
+        // Order not found in CaterValley - this is a common scenario
+        console.warn(`Order ${orderNumber} not found in CaterValley system during status update to ${status}`);
+        return NextResponse.json(
+          {
+            message: `Order ${orderNumber} not found in CaterValley system`,
+            orderFound: false,
+            details: result.error,
+          },
+          { status: 404 }
+        );
+      }
+      
+      // Handle validation errors
+      if (result.error && (result.error.includes('Invalid orderNumber') || result.error.includes('Invalid status'))) {
+        return NextResponse.json(
+          {
+            message: result.error,
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Handle other CaterValley API errors
+      const statusCode = result.statusCode || 422;
       return NextResponse.json(
         {
-          message: `Failed to update status in CaterValley: ${caterValleyResponse.message}`,
-          // Only include details if they are safe and useful for the client
-          // caterValleyDetails: { result: caterValleyResponse.result, message: caterValleyResponse.message },
+          message: `Failed to update status in CaterValley: ${result.error}`,
+          orderFound: result.orderFound,
+          caterValleyStatusCode: result.statusCode,
         },
-        { status: 422 } // Unprocessable Entity - request ok, but couldn't process
+        { status: statusCode }
       );
     }
 
@@ -102,22 +126,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         message: 'Order status successfully updated in CaterValley.',
-        // Optionally include details from the response if needed by the client
-        // caterValleyResponse: { result: caterValleyResponse.result, message: caterValleyResponse.message }
+        orderNumber,
+        status,
+        orderFound: true,
+        caterValleyResponse: result.response,
       },
       { status: 200 }
     );
 
   } catch (error: unknown) {
-    // Catch errors from input parsing, validation, or the service function call
+    // Catch unexpected errors
     console.error('Error in /api/cater-valley/update-order-status:', error);
 
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
 
     // Return a generic server error response
-    // Avoid exposing detailed internal error messages unless necessary
     return NextResponse.json(
-      { message: `Internal Server Error. Failed to process status update.` },
+      { message: `Internal Server Error: ${errorMessage}` },
       { status: 500 }
     );
   }

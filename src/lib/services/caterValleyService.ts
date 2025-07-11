@@ -20,33 +20,48 @@ interface CaterValleyApiResponse {
   data: Record<string, never>; // Empty object based on docs
 }
 
+// Enhanced response interface that includes error handling info
+export interface CaterValleyUpdateResult {
+  success: boolean;
+  orderFound: boolean;
+  response?: CaterValleyApiResponse;
+  error?: string;
+  statusCode?: number;
+}
+
 /**
  * Updates the order status in the CaterValley system via their API.
+ * Enhanced with better error handling for common scenarios like order not found.
  *
  * @param orderNumber - The order number recognized by CaterValley.
  * @param status - The new status to set, must be a valid CaterValleyOrderStatus.
- * @returns A promise that resolves with the CaterValley API response.
- * @throws An error if the API call fails or validation fails.
+ * @returns A promise that resolves with a structured result indicating success, error details, and whether the order was found.
  */
 export async function updateCaterValleyOrderStatus(
   orderNumber: string,
   status: CaterValleyOrderStatus
-): Promise<CaterValleyApiResponse> {
+): Promise<CaterValleyUpdateResult> {
   const CATER_VALLEY_API_URL =
     process.env.NEXT_PUBLIC_CATER_VALLEY_API_URL || 'https://api.catervalley.com/api/operation/order/update-order-status';
   const PARTNER_HEADER = process.env.NEXT_PUBLIC_CATER_VALLEY_PARTNER_HEADER || 'ready-set';
 
   // --- Input Validation ---
   if (!orderNumber || typeof orderNumber !== 'string' || orderNumber.trim() === '') {
-    throw new Error('[CaterValley Service] Invalid orderNumber provided.');
+    return {
+      success: false,
+      orderFound: false,
+      error: '[CaterValley Service] Invalid orderNumber provided.',
+    };
   }
+  
   // Validate against the specific CaterValley statuses
   if (!status || !CATER_VALLEY_ALLOWED_STATUSES.includes(status)) {
-    throw new Error(`[CaterValley Service] Invalid status provided: ${status}. Must be one of ${CATER_VALLEY_ALLOWED_STATUSES.join(', ')}.`);
+    return {
+      success: false,
+      orderFound: false,
+      error: `[CaterValley Service] Invalid status provided: ${status}. Must be one of ${CATER_VALLEY_ALLOWED_STATUSES.join(', ')}.`,
+    };
   }
-  // Developer Note Check: Once an order is marked as "COMPLETED", its status can no longer be updated.
-  // Although the API might handle this, adding a client-side check might prevent unnecessary calls.
-  // However, we don't know the *previous* status here easily, so we rely on CaterValley's API to reject it.
 
   console.log(`[CaterValley Service] Attempting to update order ${orderNumber} to status ${status}`);
 
@@ -63,23 +78,61 @@ export async function updateCaterValleyOrderStatus(
       // signal: AbortSignal.timeout(15000) // 15 seconds timeout
     });
 
-    // --- Response Handling ---
+    // --- Enhanced Response Handling ---
     if (!response.ok) {
-      // Attempt to parse error message from CaterValley if available
+      // Handle specific HTTP status codes
+      if (response.status === 404) {
+        // Order not found - this is a common scenario that should be handled gracefully
+        let errorMessage = 'Order not found in CaterValley system';
+        let errorDetails = {};
+        
+        try {
+          const errorBody = await response.json();
+          if (errorBody.message) {
+            errorMessage = errorBody.message;
+          }
+          errorDetails = errorBody;
+        } catch (parseError) {
+          // Use default message if can't parse response
+        }
+        
+        console.warn(`[CaterValley Service] Order ${orderNumber} not found in CaterValley system:`, errorDetails);
+        
+        return {
+          success: false,
+          orderFound: false,
+          error: errorMessage,
+          statusCode: 404,
+        };
+      }
+      
+      // Handle other HTTP errors
       let errorMessage = `CaterValley API request failed with status ${response.status}`;
       let errorDetails = {};
+      
       try {
         const errorBody = await response.json();
         if (errorBody.message) {
           errorMessage += `: ${errorBody.message}`;
         }
-        errorDetails = errorBody; // Keep the full error body for context
+        errorDetails = errorBody;
       } catch (parseError) {
         // Ignore if error body isn't valid JSON
         errorMessage += `: ${response.statusText}`;
       }
-      console.error(`[CaterValley Service] API Error for order ${orderNumber}:`, { status: response.status, message: errorMessage, details: errorDetails });
-      throw new Error(errorMessage);
+      
+      console.error(`[CaterValley Service] API Error for order ${orderNumber}:`, { 
+        status: response.status, 
+        message: errorMessage, 
+        details: errorDetails 
+      });
+      
+      return {
+        success: false,
+        orderFound: response.status !== 404, // Assume order exists for non-404 errors
+        error: errorMessage,
+        statusCode: response.status,
+      };
     }
 
     const responseData: CaterValleyApiResponse = await response.json();
@@ -88,30 +141,58 @@ export async function updateCaterValleyOrderStatus(
     // Optional: Add more specific checks based on expected response structure
     if (typeof responseData.result !== 'boolean') {
       console.warn("[CaterValley Service] Response 'result' field has unexpected type:", responseData);
-      // Decide if this should be a thrown error or just a warning
-      // throw new Error('[CaterValley Service] Received malformed response from API.');
     }
 
     // Handle logical failure reported by the API
     if (responseData.result === false) {
-       console.warn(`[CaterValley Service] API reported logical failure for order ${orderNumber}: ${responseData.message}`);
-       // We might still return the response data but let the caller decide how to handle 'result: false'
-       // Or throw an error:
-       // throw new Error(`[CaterValley Service] Update failed for order ${orderNumber}: ${responseData.message || 'Unknown reason'}`);
+      console.warn(`[CaterValley Service] API reported logical failure for order ${orderNumber}: ${responseData.message}`);
+      
+      return {
+        success: false,
+        orderFound: true, // Order exists but operation failed
+        response: responseData,
+        error: responseData.message || 'Unknown logical failure',
+        statusCode: 200,
+      };
     }
 
-
-    return responseData;
+    // Success case
+    console.log(`[CaterValley Service] Successfully updated order ${orderNumber} to status ${status}`);
+    
+    return {
+      success: true,
+      orderFound: true,
+      response: responseData,
+    };
 
   } catch (error) {
     console.error(`[CaterValley Service] Error calling API for order ${orderNumber}:`, error);
-    // Re-throw or handle specific error types
-    if (error instanceof Error) {
-      // Prepend context for better traceability
-      throw new Error(`[CaterValley Service] ${error.message}`);
-    }
-    throw new Error('[CaterValley Service] An unknown error occurred while updating status.');
+    
+    const errorMessage = error instanceof Error 
+      ? `Network/API error: ${error.message}`
+      : 'An unknown error occurred while updating status.';
+    
+    return {
+      success: false,
+      orderFound: false, // Can't determine if order exists due to network error
+      error: `[CaterValley Service] ${errorMessage}`,
+    };
   }
+}
+
+// Legacy function that maintains backward compatibility by throwing errors
+// Deprecated: Use updateCaterValleyOrderStatus instead for better error handling
+export async function updateCaterValleyOrderStatusLegacy(
+  orderNumber: string,
+  status: CaterValleyOrderStatus
+): Promise<CaterValleyApiResponse> {
+  const result = await updateCaterValleyOrderStatus(orderNumber, status);
+  
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to update CaterValley order status');
+  }
+  
+  return result.response!;
 }
 
 // Potential future functions:
