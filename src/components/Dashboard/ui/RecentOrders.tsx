@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { CateringOrder } from "@/types/user"; // Import the shared type
+import { encodeOrderNumber } from "@/utils/order";
 
 interface RecentOrdersTableProps {
   orders: CateringOrder[];
@@ -58,7 +59,7 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({
                 <TableRow key={order.id}>
                   <TableCell className="font-medium">
                     <Link
-                      href={`/admin/catering-orders/${encodeURIComponent(order.orderNumber)}`}
+                      href={`/admin/catering-orders/${encodeOrderNumber(order.orderNumber)}`}
                       className="hover:underline"
                     >
                       {order.orderNumber}

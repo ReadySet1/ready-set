@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import Breadcrumb from "@/components/Common/Breadcrumb";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import {
   Table,
@@ -19,9 +19,19 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Package, Clock, CheckCircle, XCircle, TrendingUp, CalendarDays, Truck } from "lucide-react";
+import {
+  Loader2,
+  Package,
+  Clock,
+  CheckCircle,
+  XCircle,
+  TrendingUp,
+  CalendarDays,
+  Truck,
+} from "lucide-react";
 import Link from "next/link";
 import { OrderData, VendorMetrics } from "@/lib/services/vendor";
+import { AllOrdersModal } from "@/components/Orders/AllOrdersModal";
 
 const VendorPage = () => {
   const [orders, setOrders] = useState<OrderData[]>([]);
@@ -31,10 +41,17 @@ const VendorPage = () => {
     cancelledOrders: 0,
     pendingOrders: 0,
     totalRevenue: 0,
-    orderGrowth: 0
+    orderGrowth: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAllOrdersModal, setShowAllOrdersModal] = useState(false);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [ordersPerPage] = useState(1); // Show 1 order per page as requested
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
 
   useEffect(() => {
     const fetchVendorData = async () => {
@@ -42,23 +59,34 @@ const VendorPage = () => {
         setIsLoading(true);
         // Fetch orders and metrics in parallel
         const [ordersResponse, metricsResponse] = await Promise.all([
-          fetch("/api/vendor/orders"),
-          fetch("/api/vendor/metrics")
+          fetch(
+            `/api/vendor/orders?page=${currentPage}&limit=${ordersPerPage}`,
+          ),
+          fetch("/api/vendor/metrics"),
         ]);
-        
+
         if (!ordersResponse.ok) {
-          throw new Error(`Failed to fetch orders: ${ordersResponse.statusText}`);
+          throw new Error(
+            `Failed to fetch orders: ${ordersResponse.statusText}`,
+          );
         }
-        
+
         if (!metricsResponse.ok) {
-          throw new Error(`Failed to fetch metrics: ${metricsResponse.statusText}`);
+          throw new Error(
+            `Failed to fetch metrics: ${metricsResponse.statusText}`,
+          );
         }
-        
+
         const ordersData = await ordersResponse.json();
         const metricsData = await metricsResponse.json();
-        
-        setOrders(ordersData);
+
+        setOrders(ordersData.orders);
         setMetrics(metricsData);
+
+        // Update pagination state using the hasMore flag from the API
+        setHasPrevPage(currentPage > 1);
+        setHasNextPage(ordersData.hasMore);
+        setTotalOrders(ordersData.total);
       } catch (error) {
         console.error("Error fetching vendor data:", error);
         setError("Failed to load dashboard data. Please try again later.");
@@ -68,58 +96,81 @@ const VendorPage = () => {
     };
 
     fetchVendorData();
-  }, []);
+  }, [currentPage, ordersPerPage]);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: 'USD',
-      minimumFractionDigits: 2
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
     }).format(amount);
   };
 
   // Get badge style based on order status
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", label: string }> = {
-      "ACTIVE": { variant: "default", label: "Active" },
-      "PENDING": { variant: "secondary", label: "Pending" },
-      "COMPLETED": { variant: "outline", label: "Completed" },
-      "ASSIGNED": { variant: "secondary", label: "Assigned" },
-      "CANCELLED": { variant: "destructive", label: "Cancelled" }
+    const statusMap: Record<
+      string,
+      {
+        variant: "default" | "secondary" | "destructive" | "outline";
+        label: string;
+      }
+    > = {
+      ACTIVE: { variant: "default", label: "Active" },
+      PENDING: { variant: "secondary", label: "Pending" },
+      COMPLETED: { variant: "outline", label: "Completed" },
+      ASSIGNED: { variant: "secondary", label: "Assigned" },
+      CANCELLED: { variant: "destructive", label: "Cancelled" },
     };
 
-    const statusConfig = statusMap[status] || { variant: "outline", label: status };
-    
-    return (
-      <Badge variant={statusConfig.variant}>
-        {statusConfig.label}
-      </Badge>
-    );
+    const statusConfig = statusMap[status] || {
+      variant: "outline",
+      label: status,
+    };
+
+    return <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>;
   };
 
   // Get badge for order type
   const getOrderTypeBadge = (type: string) => {
     return (
-      <Badge variant="outline" className={
-        type === "catering" 
-          ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" 
-          : "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-      }>
+      <Badge
+        variant="outline"
+        className={
+          type === "catering"
+            ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+            : "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+        }
+      >
         {type === "catering" ? "Catering" : "On Demand"}
       </Badge>
     );
   };
 
+  // Pagination handlers
+  const handlePrevPage = () => {
+    if (hasPrevPage) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (hasNextPage) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <Card className="max-w-md w-full">
+        <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Error</CardTitle>
-            <CardDescription>We encountered a problem loading your dashboard</CardDescription>
+            <CardDescription>
+              We encountered a problem loading your dashboard
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-red-600 mb-4">{error}</p>
+            <p className="mb-4 text-sm text-red-600">{error}</p>
             <Button onClick={() => window.location.reload()}>Try Again</Button>
           </CardContent>
         </Card>
@@ -135,27 +186,29 @@ const VendorPage = () => {
         <div className="absolute left-0 top-0 -z-[1] h-1/2 w-full bg-[#E9F9FF] dark:bg-dark-700 lg:h-[45%] xl:h-1/2"></div>
         <div className="container px-4">
           {isLoading ? (
-            <div className="flex items-center justify-center min-h-[400px]">
+            <div className="flex min-h-[400px] items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
             <div className="space-y-6">
               {/* Metrics Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                 {/* Active Orders */}
                 <Card className="overflow-hidden">
                   <div className="h-1 bg-blue-500"></div>
                   <CardContent className="p-6">
-                    <div className="flex justify-between items-center">
-                      <div className="bg-blue-50 text-blue-600 p-3 rounded-full">
+                    <div className="flex items-center justify-between">
+                      <div className="rounded-full bg-blue-50 p-3 text-blue-600">
                         <Clock className="h-5 w-5" />
                       </div>
-                      <span className="text-xs flex items-center gap-1 text-green-600">
+                      <span className="flex items-center gap-1 text-xs text-green-600">
                         <TrendingUp className="h-3 w-3" /> Active now
                       </span>
                     </div>
-                    <h3 className="text-3xl font-bold mt-3">{metrics.activeOrders}</h3>
-                    <p className="text-sm text-gray-500 mt-1">Active Orders</p>
+                    <h3 className="mt-3 text-3xl font-bold">
+                      {metrics.activeOrders}
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500">Active Orders</p>
                   </CardContent>
                 </Card>
 
@@ -163,14 +216,20 @@ const VendorPage = () => {
                 <Card className="overflow-hidden">
                   <div className="h-1 bg-green-500"></div>
                   <CardContent className="p-6">
-                    <div className="flex justify-between items-center">
-                      <div className="bg-green-50 text-green-600 p-3 rounded-full">
+                    <div className="flex items-center justify-between">
+                      <div className="rounded-full bg-green-50 p-3 text-green-600">
                         <CheckCircle className="h-5 w-5" />
                       </div>
-                      <span className="text-xs text-gray-500">Last 30 days</span>
+                      <span className="text-xs text-gray-500">
+                        Last 30 days
+                      </span>
                     </div>
-                    <h3 className="text-3xl font-bold mt-3">{metrics.completedOrders}</h3>
-                    <p className="text-sm text-gray-500 mt-1">Completed Orders</p>
+                    <h3 className="mt-3 text-3xl font-bold">
+                      {metrics.completedOrders}
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Completed Orders
+                    </p>
                   </CardContent>
                 </Card>
 
@@ -178,16 +237,18 @@ const VendorPage = () => {
                 <Card className="overflow-hidden">
                   <div className="h-1 bg-yellow-500"></div>
                   <CardContent className="p-6">
-                    <div className="flex justify-between items-center">
-                      <div className="bg-yellow-50 text-yellow-600 p-3 rounded-full">
+                    <div className="flex items-center justify-between">
+                      <div className="rounded-full bg-yellow-50 p-3 text-yellow-600">
                         <CalendarDays className="h-5 w-5" />
                       </div>
-                      <span className="text-xs flex items-center gap-1 text-yellow-600">
+                      <span className="flex items-center gap-1 text-xs text-yellow-600">
                         Needs attention
                       </span>
                     </div>
-                    <h3 className="text-3xl font-bold mt-3">{metrics.pendingOrders}</h3>
-                    <p className="text-sm text-gray-500 mt-1">Pending Orders</p>
+                    <h3 className="mt-3 text-3xl font-bold">
+                      {metrics.pendingOrders}
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500">Pending Orders</p>
                   </CardContent>
                 </Card>
               </div>
@@ -195,10 +256,26 @@ const VendorPage = () => {
               {/* Orders Table */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent Orders</CardTitle>
-                  <CardDescription>
-                    Manage your recent and upcoming orders across the platform
-                  </CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Recent Orders</CardTitle>
+                      <CardDescription>
+                        Manage your recent and upcoming orders across the
+                        platform
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowAllOrdersModal(true)}
+                      >
+                        View All Orders
+                      </Button>
+                      <Button asChild>
+                        <Link href="/catering-request">Create New Order</Link>
+                      </Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {orders.length === 0 ? (
@@ -208,7 +285,8 @@ const VendorPage = () => {
                         No Orders Found
                       </h3>
                       <p className="max-w-md text-gray-500 dark:text-gray-400">
-                        There are no orders to display at the moment. Check back later or create a new order.
+                        There are no orders to display at the moment. Check back
+                        later or create a new order.
                       </p>
                       <Button className="mt-4" asChild>
                         <Link href="/catering-request">Create New Order</Link>
@@ -220,10 +298,18 @@ const VendorPage = () => {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Order Number</TableHead>
-                            <TableHead className="hidden sm:table-cell">Type</TableHead>
-                            <TableHead className="hidden sm:table-cell">Status</TableHead>
-                            <TableHead className="hidden md:table-cell">Pickup</TableHead>
-                            <TableHead className="hidden md:table-cell">Delivery</TableHead>
+                            <TableHead className="hidden sm:table-cell">
+                              Type
+                            </TableHead>
+                            <TableHead className="hidden sm:table-cell">
+                              Status
+                            </TableHead>
+                            <TableHead className="hidden md:table-cell">
+                              Pickup
+                            </TableHead>
+                            <TableHead className="hidden md:table-cell">
+                              Delivery
+                            </TableHead>
                             <TableHead className="text-right">Total</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -237,11 +323,6 @@ const VendorPage = () => {
                                 >
                                   {order.orderNumber}
                                 </Link>
-                                {order.clientAttention && (
-                                  <div className="text-muted-foreground hidden text-sm md:inline">
-                                    {order.clientAttention}
-                                  </div>
-                                )}
                               </TableCell>
                               <TableCell className="hidden sm:table-cell">
                                 {getOrderTypeBadge(order.orderType)}
@@ -250,20 +331,26 @@ const VendorPage = () => {
                                 {getStatusBadge(order.status)}
                               </TableCell>
                               <TableCell className="hidden md:table-cell">
-                                {new Date(order.pickupDateTime).toLocaleString(undefined, { 
-                                  month: 'short', 
-                                  day: 'numeric', 
-                                  hour: '2-digit', 
-                                  minute: '2-digit' 
-                                })}
+                                {new Date(order.pickupDateTime).toLocaleString(
+                                  undefined,
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  },
+                                )}
                               </TableCell>
                               <TableCell className="hidden md:table-cell">
-                                {new Date(order.arrivalDateTime).toLocaleString(undefined, { 
-                                  month: 'short', 
-                                  day: 'numeric', 
-                                  hour: '2-digit', 
-                                  minute: '2-digit' 
-                                })}
+                                {new Date(order.arrivalDateTime).toLocaleString(
+                                  undefined,
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  },
+                                )}
                               </TableCell>
                               <TableCell className="text-right font-medium">
                                 {formatCurrency(order.orderTotal)}
@@ -272,13 +359,24 @@ const VendorPage = () => {
                           ))}
                         </TableBody>
                       </Table>
-                      
-                      <div className="mt-4 flex justify-between">
-                        <Button variant="outline">Previous</Button>
-                        <Button asChild>
-                          <Link href="/vendor/orders">View All Orders</Link>
+
+                      <div className="mt-4 flex items-center justify-between">
+                        <Button
+                          variant="outline"
+                          onClick={handlePrevPage}
+                          disabled={!hasPrevPage}
+                        >
+                          Previous
                         </Button>
-                        <Button>Next</Button>
+                        <span className="text-sm text-gray-500">
+                          Page {currentPage}
+                        </span>
+                        <Button
+                          onClick={handleNextPage}
+                          disabled={!hasNextPage}
+                        >
+                          Next
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -294,15 +392,18 @@ const VendorPage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="p-4 rounded-md bg-blue-50 flex items-start">
-                    <div className="p-2 bg-blue-100 rounded-full mr-4">
+                  <div className="flex items-start rounded-md bg-blue-50 p-4">
+                    <div className="mr-4 rounded-full bg-blue-100 p-2">
                       <Truck className="h-5 w-5 text-blue-600" />
                     </div>
                     <div>
-                      <h4 className="font-medium text-blue-800">Delivery Insights</h4>
-                      <p className="text-sm text-blue-600 mt-1">
-                        You have {metrics.activeOrders + metrics.pendingOrders} upcoming deliveries in the next 48 hours. 
-                        Make sure your items are prepared and ready for pickup.
+                      <h4 className="font-medium text-blue-800">
+                        Delivery Insights
+                      </h4>
+                      <p className="mt-1 text-sm text-blue-600">
+                        You have {metrics.activeOrders + metrics.pendingOrders}{" "}
+                        upcoming deliveries in the next 48 hours. Make sure your
+                        items are prepared and ready for pickup.
                       </p>
                     </div>
                   </div>
@@ -312,6 +413,12 @@ const VendorPage = () => {
           )}
         </div>
       </section>
+
+      {/* All Orders Modal */}
+      <AllOrdersModal
+        isOpen={showAllOrdersModal}
+        onClose={() => setShowAllOrdersModal(false)}
+      />
     </>
   );
 };

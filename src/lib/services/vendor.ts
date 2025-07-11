@@ -2,7 +2,6 @@ import { prisma } from "@/lib/db/prisma";
 import { createClient } from "@/utils/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
-import { CateringRequest, OnDemand, Decimal } from "@/types/prisma";
 import { notFound } from "next/navigation";
 
 // Custom types for cleaner data structure
@@ -78,78 +77,46 @@ export async function checkVendorAccess() {
 }
 
 // Get vendor's orders
-export async function getVendorOrders(limit = 10) {
+export async function getVendorOrders(limit = 10, page = 1) {
   const userId = await getCurrentUserId();
   if (!userId) {
     throw new Error("Unauthorized");
   }
 
+  // Calculate offset for pagination
+  const offset = (page - 1) * limit;
+
+  // Fetch more records than needed to properly sort and paginate
+  const fetchLimit = Math.max(limit * 10, 50); // Fetch more to ensure proper sorting
+
   // Fetch catering requests
   const cateringRequests = await prisma.cateringRequest.findMany({
     where: {
-      userId: userId,
-      deletedAt: null
+      userId: userId
     },
     include: {
       pickupAddress: true,
       deliveryAddress: true,
     },
     orderBy: { pickupDateTime: 'desc' },
-    take: limit
+    take: fetchLimit
   });
 
   // Fetch on-demand requests
   const onDemandRequests = await prisma.onDemand.findMany({
     where: {
-      userId: userId,
-      deletedAt: null
+      userId: userId
     },
     include: {
       pickupAddress: true,
       deliveryAddress: true,
     },
     orderBy: { pickupDateTime: 'desc' },
-    take: limit
+    take: fetchLimit
   });
 
   // Transform the data to a unified format
-  const cateringOrders: OrderData[] = cateringRequests.map((order: {
-    id: string;
-    orderNumber: string;
-    status: CateringRequest['status'];
-    pickupDateTime: Date | null;
-    arrivalDateTime: Date | null;
-    completeDateTime: Date | null;
-    orderTotal: Decimal | null;
-    tip: Decimal | null;
-    clientAttention: string | null;
-    pickupAddress: {
-      id: string;
-      name: string | null;
-      street1: string;
-      street2: string | null;
-      city: string;
-      state: string;
-      zip: string;
-      locationNumber: string | null;
-      parkingLoading: string | null;
-      longitude: number | null;
-      latitude: number | null;
-    };
-    deliveryAddress: {
-      id: string;
-      name: string | null;
-      street1: string;
-      street2: string | null;
-      city: string;
-      state: string;
-      zip: string;
-      locationNumber: string | null;
-      parkingLoading: string | null;
-      longitude: number | null;
-      latitude: number | null;
-    };
-  }) => ({
+  const cateringOrders: OrderData[] = cateringRequests.map((order: any) => ({
     id: order.id,
     orderNumber: order.orderNumber,
     orderType: "catering",
@@ -178,43 +145,7 @@ export async function getVendorOrders(limit = 10) {
     }
   }));
 
-  const onDemandOrders: OrderData[] = onDemandRequests.map((order: {
-    id: string;
-    orderNumber: string;
-    status: OnDemand['status'];
-    pickupDateTime: Date | null;
-    arrivalDateTime: Date | null;
-    completeDateTime: Date | null;
-    orderTotal: Decimal | null;
-    tip: Decimal | null;
-    clientAttention: string | null;
-    pickupAddress: {
-      id: string;
-      name: string | null;
-      street1: string;
-      street2: string | null;
-      city: string;
-      state: string;
-      zip: string;
-      locationNumber: string | null;
-      parkingLoading: string | null;
-      longitude: number | null;
-      latitude: number | null;
-    };
-    deliveryAddress: {
-      id: string;
-      name: string | null;
-      street1: string;
-      street2: string | null;
-      city: string;
-      state: string;
-      zip: string;
-      locationNumber: string | null;
-      parkingLoading: string | null;
-      longitude: number | null;
-      latitude: number | null;
-    };
-  }) => ({
+  const onDemandOrders: OrderData[] = onDemandRequests.map((order: any) => ({
     id: order.id,
     orderNumber: order.orderNumber,
     orderType: "on_demand",
@@ -244,9 +175,18 @@ export async function getVendorOrders(limit = 10) {
   }));
 
   // Combine and sort all orders by pickup date
-  return [...cateringOrders, ...onDemandOrders]
-    .sort((a, b) => new Date(b.pickupDateTime).getTime() - new Date(a.pickupDateTime).getTime())
-    .slice(0, limit);
+  const allOrders = [...cateringOrders, ...onDemandOrders]
+    .sort((a, b) => new Date(b.pickupDateTime).getTime() - new Date(a.pickupDateTime).getTime());
+
+  // Get one extra order to check if there are more pages
+  const requestedOrders = allOrders.slice(offset, offset + limit + 1);
+  
+  // Return the requested number of orders and hasMore flag
+  return {
+    orders: requestedOrders.slice(0, limit),
+    hasMore: requestedOrders.length > limit,
+    total: allOrders.length
+  };
 }
 
 // Get vendor metrics
@@ -260,8 +200,7 @@ export async function getVendorMetrics() {
   const activeCateringCount = await prisma.cateringRequest.count({
     where: {
       userId: userId,
-      status: "ACTIVE",
-      deletedAt: null
+      status: "ACTIVE"
     }
   });
 
@@ -269,8 +208,7 @@ export async function getVendorMetrics() {
   const activeOnDemandCount = await prisma.onDemand.count({
     where: {
       userId: userId,
-      status: "ACTIVE",
-      deletedAt: null
+      status: "ACTIVE"
     }
   });
 
@@ -278,8 +216,7 @@ export async function getVendorMetrics() {
   const completedCateringCount = await prisma.cateringRequest.count({
     where: {
       userId: userId,
-      status: "COMPLETED",
-      deletedAt: null
+      status: "COMPLETED"
     }
   });
 
@@ -287,8 +224,7 @@ export async function getVendorMetrics() {
   const completedOnDemandCount = await prisma.onDemand.count({
     where: {
       userId: userId,
-      status: "COMPLETED",
-      deletedAt: null
+      status: "COMPLETED"
     }
   });
 
@@ -296,8 +232,7 @@ export async function getVendorMetrics() {
   const cancelledCateringCount = await prisma.cateringRequest.count({
     where: {
       userId: userId,
-      status: "CANCELLED",
-      deletedAt: null
+      status: "CANCELLED"
     }
   });
 
@@ -305,117 +240,127 @@ export async function getVendorMetrics() {
   const cancelledOnDemandCount = await prisma.onDemand.count({
     where: {
       userId: userId,
-      status: "CANCELLED",
-      deletedAt: null
+      status: "CANCELLED"
     }
   });
 
-  // Count assigned catering orders (treated as pending)
-  const assignedCateringCount = await prisma.cateringRequest.count({
+  // Count pending catering orders
+  const pendingCateringCount = await prisma.cateringRequest.count({
     where: {
       userId: userId,
-      status: "ASSIGNED",
-      deletedAt: null
+      status: "PENDING"
     }
   });
 
-  // Count assigned on-demand orders (treated as pending)
-  const assignedOnDemandCount = await prisma.onDemand.count({
+  // Count pending on-demand orders
+  const pendingOnDemandCount = await prisma.onDemand.count({
     where: {
       userId: userId,
-      status: "ASSIGNED",
-      deletedAt: null
+      status: "PENDING"
     }
   });
 
-  // Calculate total revenue from completed orders
-  const completedOrders = await prisma.$queryRaw`
-    SELECT 
-      COALESCE(SUM(CAST("orderTotal" AS DECIMAL(10,2))), 0) as total 
-    FROM 
-      (
-        SELECT "orderTotal" FROM "catering_requests" 
-        WHERE "userId" = ${userId}::uuid AND "status" = 'COMPLETED' AND "deletedAt" IS NULL
-        UNION ALL
-        SELECT "orderTotal" FROM "on_demand_requests" 
-        WHERE "userId" = ${userId}::uuid AND "status" = 'COMPLETED' AND "deletedAt" IS NULL
-      ) as combined
-  `;
+  // Calculate total revenue from catering orders
+  const cateringRevenue = await prisma.cateringRequest.aggregate({
+    where: {
+      userId: userId,
+      status: "COMPLETED"
+    },
+    _sum: {
+      orderTotal: true,
+      tip: true
+    }
+  });
 
-  // Calculate order growth (comparing current month to previous month)
-  const now = new Date();
-  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  // Calculate total revenue from on-demand orders
+  const onDemandRevenue = await prisma.onDemand.aggregate({
+    where: {
+      userId: userId,
+      status: "COMPLETED"
+    },
+    _sum: {
+      orderTotal: true,
+      tip: true
+    }
+  });
 
-  // Current month orders
-  const currentMonthOrders = await prisma.$queryRaw`
-    SELECT COUNT(*) as count
-    FROM (
-      SELECT id FROM "catering_requests" 
-      WHERE "userId" = ${userId}::uuid AND "createdAt" >= ${currentMonthStart} AND "deletedAt" IS NULL
-      UNION ALL
-      SELECT id FROM "on_demand_requests" 
-      WHERE "userId" = ${userId}::uuid AND "createdAt" >= ${currentMonthStart} AND "deletedAt" IS NULL
-    ) as combined
-  `;
+  const totalRevenue = 
+    Number(cateringRevenue._sum.orderTotal || 0) + 
+    Number(cateringRevenue._sum.tip || 0) +
+    Number(onDemandRevenue._sum.orderTotal || 0) + 
+    Number(onDemandRevenue._sum.tip || 0);
 
-  // Previous month orders
-  const previousMonthOrders = await prisma.$queryRaw`
-    SELECT COUNT(*) as count
-    FROM (
-      SELECT id FROM "catering_requests" 
-      WHERE "userId" = ${userId}::uuid AND "createdAt" >= ${lastMonthStart} AND "createdAt" < ${currentMonthStart} AND "deletedAt" IS NULL
-      UNION ALL
-      SELECT id FROM "on_demand_requests" 
-      WHERE "userId" = ${userId}::uuid AND "createdAt" >= ${lastMonthStart} AND "createdAt" < ${currentMonthStart} AND "deletedAt" IS NULL
-    ) as combined
-  `;
+  // Calculate order growth (simplified - comparing last 30 days vs previous 30 days)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // Calculate growth percentage
-  const currentCount = Number((currentMonthOrders as any)[0]?.count || 0);
-  const previousCount = Number((previousMonthOrders as any)[0]?.count || 0);
-  
-  let orderGrowth = 0;
-  if (previousCount > 0) {
-    orderGrowth = Math.round(((currentCount - previousCount) / previousCount) * 100);
-  } else if (currentCount > 0) {
-    orderGrowth = 100; // If there were 0 orders last month and some this month, that's 100% growth
-  }
+  const sixtyDaysAgo = new Date();
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-  // Combine all metrics
+  const recentOrders = await prisma.cateringRequest.count({
+    where: {
+      userId: userId,
+      createdAt: {
+        gte: thirtyDaysAgo
+      }
+    }
+  }) + await prisma.onDemand.count({
+    where: {
+      userId: userId,
+      createdAt: {
+        gte: thirtyDaysAgo
+      }
+    }
+  });
+
+  const previousOrders = await prisma.cateringRequest.count({
+    where: {
+      userId: userId,
+      createdAt: {
+        gte: sixtyDaysAgo,
+        lt: thirtyDaysAgo
+      }
+    }
+  }) + await prisma.onDemand.count({
+    where: {
+      userId: userId,
+      createdAt: {
+        gte: sixtyDaysAgo,
+        lt: thirtyDaysAgo
+      }
+    }
+  });
+
+  const orderGrowth = previousOrders > 0 
+    ? ((recentOrders - previousOrders) / previousOrders) * 100 
+    : 0;
+
   return {
     activeOrders: activeCateringCount + activeOnDemandCount,
     completedOrders: completedCateringCount + completedOnDemandCount,
     cancelledOrders: cancelledCateringCount + cancelledOnDemandCount,
-    pendingOrders: assignedCateringCount + assignedOnDemandCount,
-    totalRevenue: Number((completedOrders as any)[0]?.total || 0),
+    pendingOrders: pendingCateringCount + pendingOnDemandCount,
+    totalRevenue,
     orderGrowth
   };
 }
 
-// Get a specific order by orderNumber
+// Get order by order number
 export async function getOrderByNumber(orderNumber: string) {
   const userId = await getCurrentUserId();
   if (!userId) {
     throw new Error("Unauthorized");
   }
 
-  // Try to find it in catering requests
+  // Try to find it in catering requests first
   const cateringRequest = await prisma.cateringRequest.findFirst({
     where: {
       orderNumber: orderNumber,
-      userId: userId,
-      deletedAt: null
+      userId: userId
     },
     include: {
       pickupAddress: true,
       deliveryAddress: true,
-      dispatches: {
-        include: {
-          driver: true
-        }
-      },
-      fileUploads: true
     }
   });
 
@@ -425,44 +370,40 @@ export async function getOrderByNumber(orderNumber: string) {
       orderNumber: cateringRequest.orderNumber,
       orderType: "catering",
       status: cateringRequest.status,
-      pickupDateTime: cateringRequest.pickupDateTime?.toISOString() || null,
-      arrivalDateTime: cateringRequest.arrivalDateTime?.toISOString() || null,
+      pickupDateTime: cateringRequest.pickupDateTime?.toISOString() || "",
+      arrivalDateTime: cateringRequest.arrivalDateTime?.toISOString() || "",
       completeDateTime: cateringRequest.completeDateTime?.toISOString() || null,
       orderTotal: Number(cateringRequest.orderTotal) || 0,
       tip: Number(cateringRequest.tip) || 0,
-      brokerage: cateringRequest.brokerage,
       clientAttention: cateringRequest.clientAttention,
-      pickupNotes: cateringRequest.pickupNotes,
-      specialNotes: cateringRequest.specialNotes,
-      headcount: cateringRequest.headcount,
-      needHost: cateringRequest.needHost,
-      hoursNeeded: cateringRequest.hoursNeeded,
-      numberOfHosts: cateringRequest.numberOfHosts,
-      image: cateringRequest.image,
-      driverStatus: cateringRequest.driverStatus,
-      pickupAddress: cateringRequest.pickupAddress,
-      deliveryAddress: cateringRequest.deliveryAddress,
-      dispatches: cateringRequest.dispatches,
-      fileUploads: cateringRequest.fileUploads
+      pickupAddress: {
+        id: cateringRequest.pickupAddress.id,
+        street1: cateringRequest.pickupAddress.street1,
+        street2: cateringRequest.pickupAddress.street2,
+        city: cateringRequest.pickupAddress.city,
+        state: cateringRequest.pickupAddress.state,
+        zip: cateringRequest.pickupAddress.zip
+      },
+      deliveryAddress: {
+        id: cateringRequest.deliveryAddress.id,
+        street1: cateringRequest.deliveryAddress.street1,
+        street2: cateringRequest.deliveryAddress.street2,
+        city: cateringRequest.deliveryAddress.city,
+        state: cateringRequest.deliveryAddress.state,
+        zip: cateringRequest.deliveryAddress.zip
+      }
     };
   }
 
-  // If not found in catering, try on-demand
+  // Try to find it in on-demand requests
   const onDemandRequest = await prisma.onDemand.findFirst({
     where: {
       orderNumber: orderNumber,
-      userId: userId,
-      deletedAt: null
+      userId: userId
     },
     include: {
       pickupAddress: true,
       deliveryAddress: true,
-      dispatches: {
-        include: {
-          driver: true
-        }
-      },
-      fileUploads: true
     }
   });
 
@@ -472,30 +413,30 @@ export async function getOrderByNumber(orderNumber: string) {
       orderNumber: onDemandRequest.orderNumber,
       orderType: "on_demand",
       status: onDemandRequest.status,
-      pickupDateTime: onDemandRequest.pickupDateTime?.toISOString() || null,
-      arrivalDateTime: onDemandRequest.arrivalDateTime?.toISOString() || null,
+      pickupDateTime: onDemandRequest.pickupDateTime?.toISOString() || "",
+      arrivalDateTime: onDemandRequest.arrivalDateTime?.toISOString() || "",
       completeDateTime: onDemandRequest.completeDateTime?.toISOString() || null,
       orderTotal: Number(onDemandRequest.orderTotal) || 0,
       tip: Number(onDemandRequest.tip) || 0,
       clientAttention: onDemandRequest.clientAttention,
-      pickupNotes: onDemandRequest.pickupNotes,
-      specialNotes: onDemandRequest.specialNotes,
-      hoursNeeded: onDemandRequest.hoursNeeded,
-      vehicleType: onDemandRequest.vehicleType,
-      itemDelivered: onDemandRequest.itemDelivered,
-      image: onDemandRequest.image,
-      driverStatus: onDemandRequest.driverStatus,
-      length: onDemandRequest.length,
-      width: onDemandRequest.width,
-      height: onDemandRequest.height,
-      weight: onDemandRequest.weight,
-      pickupAddress: onDemandRequest.pickupAddress,
-      deliveryAddress: onDemandRequest.deliveryAddress,
-      dispatches: onDemandRequest.dispatches,
-      fileUploads: onDemandRequest.fileUploads
+      pickupAddress: {
+        id: onDemandRequest.pickupAddress.id,
+        street1: onDemandRequest.pickupAddress.street1,
+        street2: onDemandRequest.pickupAddress.street2,
+        city: onDemandRequest.pickupAddress.city,
+        state: onDemandRequest.pickupAddress.state,
+        zip: onDemandRequest.pickupAddress.zip
+      },
+      deliveryAddress: {
+        id: onDemandRequest.deliveryAddress.id,
+        street1: onDemandRequest.deliveryAddress.street1,
+        street2: onDemandRequest.deliveryAddress.street2,
+        city: onDemandRequest.deliveryAddress.city,
+        state: onDemandRequest.deliveryAddress.state,
+        zip: onDemandRequest.deliveryAddress.zip
+      }
     };
   }
 
-  // If order is not found in either table
-  notFound();
+  return null;
 } 

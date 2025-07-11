@@ -8,14 +8,14 @@ import { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { Address } from "@/types/address";
-import { 
-  Select, 
-  SelectContent, 
-  SelectGroup, 
-  SelectItem, 
-  SelectLabel, 
-  SelectTrigger, 
-  SelectValue
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ interface AddressManagerProps {
   defaultFilter?: "all" | "shared" | "private";
   showFilters?: boolean;
   showManagementButtons?: boolean;
+  onRefresh?: (refreshFn: () => void) => void;
 }
 
 const AddressManager: React.FC<AddressManagerProps> = ({
@@ -39,11 +40,15 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   defaultFilter = "all",
   showFilters = true,
   showManagementButtons = true,
+  onRefresh,
 }) => {
+  const addressFormRef = useRef<HTMLDivElement>(null);
   const [user, setUser] = useState<User | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [filteredAddresses, setFilteredAddresses] = useState<Address[]>([]);
-  const [filterType, setFilterType] = useState<"all" | "shared" | "private">(defaultFilter);
+  const [filterType, setFilterType] = useState<"all" | "shared" | "private">(
+    defaultFilter,
+  );
   const [showAddForm, setShowAddForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,10 +63,13 @@ const AddressManager: React.FC<AddressManagerProps> = ({
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const fetchUser = async () => {
       try {
-        const { data: { user }, error: getUserError } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error: getUserError,
+        } = await supabase.auth.getUser();
         if (isMounted) {
           setUser(user);
           if (!user) {
@@ -69,7 +77,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
             if (onError) {
               onError("Authentication required to load addresses.");
             }
-            setIsLoading(false); 
+            setIsLoading(false);
           }
         }
       } catch (err) {
@@ -83,25 +91,27 @@ const AddressManager: React.FC<AddressManagerProps> = ({
         }
       }
     };
-    
+
     fetchUser();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!isMounted) return;
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (!isMounted) return;
 
-      const newUser = session?.user ?? null;
-      setUser(newUser);
-      
-      if (event === 'SIGNED_IN' && newUser) {
-        setError(null);
-      } else if (event === 'SIGNED_OUT') {
-        setAddresses([]);
-        setError("Authentication required to load addresses.");
-        if (onError) {
-          onError("Authentication required to load addresses.");
+        const newUser = session?.user ?? null;
+        setUser(newUser);
+
+        if (event === "SIGNED_IN" && newUser) {
+          setError(null);
+        } else if (event === "SIGNED_OUT") {
+          setAddresses([]);
+          setError("Authentication required to load addresses.");
+          if (onError) {
+            onError("Authentication required to load addresses.");
+          }
         }
-      }
-    });
+      },
+    );
 
     return () => {
       isMounted = false;
@@ -116,12 +126,14 @@ const AddressManager: React.FC<AddressManagerProps> = ({
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
     }
-    
+
     if (fetchAttempts.current >= MAX_FETCH_ATTEMPTS) {
-      console.warn(`Maximum fetch attempts (${MAX_FETCH_ATTEMPTS}) reached. Stopping further requests.`);
+      console.warn(
+        `Maximum fetch attempts (${MAX_FETCH_ATTEMPTS}) reached. Stopping further requests.`,
+      );
       return;
     }
-    
+
     fetchTimeoutRef.current = setTimeout(() => {
       fn();
       fetchTimeoutRef.current = null;
@@ -138,22 +150,33 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       console.log("No user available, skipping fetchAddresses call");
       return;
     }
-    
+
     fetchAttempts.current += 1;
-    console.log(`Fetch attempt ${fetchAttempts.current} of ${MAX_FETCH_ATTEMPTS}`);
-    
+    console.log(
+      `Fetch attempt ${fetchAttempts.current} of ${MAX_FETCH_ATTEMPTS}`,
+    );
+
     if (fetchAttempts.current > MAX_FETCH_ATTEMPTS) {
-      console.warn(`Maximum fetch attempts (${MAX_FETCH_ATTEMPTS}) reached. Stopping.`);
-      setError(`Address loading failed after ${MAX_FETCH_ATTEMPTS} attempts. Please try again later or enter address manually.`);
+      console.warn(
+        `Maximum fetch attempts (${MAX_FETCH_ATTEMPTS}) reached. Stopping.`,
+      );
+      setError(
+        `Address loading failed after ${MAX_FETCH_ATTEMPTS} attempts. Please try again later or enter address manually.`,
+      );
       if (onError) {
-        onError(`Address loading failed after ${MAX_FETCH_ATTEMPTS} attempts. Please try again later or enter address manually.`);
+        onError(
+          `Address loading failed after ${MAX_FETCH_ATTEMPTS} attempts. Please try again later or enter address manually.`,
+        );
       }
       return;
     }
 
     // Get current session with refresh if needed
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
     if (sessionError || !session) {
       setIsLoading(false);
       setError("Authentication required to load addresses.");
@@ -171,11 +194,11 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       console.log(`Fetching addresses with filter=${filterType}`);
       const response = await fetch(`/api/addresses?filter=${filterType}`, {
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
         },
       });
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           setError("Unauthorized: Please log in again.");
@@ -190,13 +213,13 @@ const AddressManager: React.FC<AddressManagerProps> = ({
         }
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       const validAddresses = Array.isArray(data) ? data : [];
       setAddresses(validAddresses);
-      
+
       fetchAttempts.current = 0;
-      
+
       if (onAddressesLoaded) {
         onAddressesLoaded(validAddresses);
       }
@@ -207,7 +230,14 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       setIsLoading(false);
       isRequestPending.current = false;
     }
-  }, [user, filterType, onAddressesLoaded, onError, MAX_FETCH_ATTEMPTS, supabase.auth]);
+  }, [
+    user,
+    filterType,
+    onAddressesLoaded,
+    onError,
+    MAX_FETCH_ATTEMPTS,
+    supabase.auth,
+  ]);
 
   useEffect(() => {
     if (user) {
@@ -215,9 +245,22 @@ const AddressManager: React.FC<AddressManagerProps> = ({
     }
   }, [user, filterType, fetchAddresses, debouncedFetch]);
 
+  // Expose refresh function to parent component
+  useEffect(() => {
+    if (onRefresh) {
+      onRefresh(() => {
+        fetchAttempts.current = 0; // Reset attempts for manual refresh
+        fetchAddresses();
+      });
+    }
+  }, [onRefresh, fetchAddresses]);
+
   const handleAddAddress = useCallback(
     async (newAddress: Partial<Address>) => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
       if (sessionError || !session) {
         setError("Authentication required to add an address.");
         if (onError) {
@@ -234,7 +277,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            'Authorization': `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({ ...newAddress, createdBy: session.user.id }),
         });
@@ -269,11 +312,22 @@ const AddressManager: React.FC<AddressManagerProps> = ({
         setIsLoading(false);
       }
     },
-    [fetchAddresses, onError, setUser, supabase.auth]
+    [fetchAddresses, onError, setUser, supabase.auth],
   );
 
   const handleToggleAddForm = () => {
-    setShowAddForm((prev) => !prev);
+    setShowAddForm((prev) => {
+      if (!prev) {
+        // Only scroll when opening the form
+        setTimeout(() => {
+          addressFormRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 100); // Small delay to ensure form is rendered
+      }
+      return !prev;
+    });
   };
 
   const handleAddressSelection = (addressId: string) => {
@@ -300,27 +354,37 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       {error && (
         <div className="rounded-md bg-red-50 p-3 text-red-500">
           <p>{error}</p>
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setError(null)}
-            className="mt-2 text-red-700 hover:text-red-900 hover:bg-red-100"
+            className="mt-2 text-red-700 hover:bg-red-100 hover:text-red-900"
           >
             Dismiss
           </Button>
         </div>
       )}
-      
+
       {showFilters && (
-        <Tabs defaultValue={filterType} onValueChange={handleFilterChange} className="w-full">
+        <Tabs
+          defaultValue={filterType}
+          onValueChange={handleFilterChange}
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-3 gap-1">
-            <TabsTrigger value="all" className="text-xs sm:text-sm">All Addresses</TabsTrigger>
-            <TabsTrigger value="private" className="text-xs sm:text-sm">Your Addresses</TabsTrigger>
-            <TabsTrigger value="shared" className="text-xs sm:text-sm">Shared Addresses</TabsTrigger>
+            <TabsTrigger value="all" className="text-xs sm:text-sm">
+              All Addresses
+            </TabsTrigger>
+            <TabsTrigger value="private" className="text-xs sm:text-sm">
+              Your Addresses
+            </TabsTrigger>
+            <TabsTrigger value="shared" className="text-xs sm:text-sm">
+              Shared Addresses
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       )}
-      
+
       {isLoading ? (
         <div className="flex items-center justify-center p-4">
           <Spinner />
@@ -342,32 +406,14 @@ const AddressManager: React.FC<AddressManagerProps> = ({
                 <SelectContent>
                   <SelectGroup>
                     <SelectLabel>Your Addresses</SelectLabel>
-                    {Array.isArray(addresses) && addresses
-                      .filter(a => !a.isShared && a.createdBy === user?.id)
-                      .map((address) => (
-                        <SelectItem key={address.id} value={address.id}>
-                          <div className="flex items-center">
-                            <span>
-                              {address.name ? `${address.name} - ` : ''}
-                              {address.street1}
-                              {address.street2 ? `, ${address.street2}` : ""}
-                              {`, ${address.city}, ${address.state} ${address.zip}`}
-                            </span>
-                            {getAddressBadge(address)}
-                          </div>
-                        </SelectItem>
-                      ))}
-                  </SelectGroup>
-                  {Array.isArray(addresses) && addresses.some(a => a.isShared) && (
-                    <SelectGroup>
-                      <SelectLabel>Shared Addresses</SelectLabel>
-                      {addresses
-                        .filter(a => a.isShared)
+                    {Array.isArray(addresses) &&
+                      addresses
+                        .filter((a) => !a.isShared && a.createdBy === user?.id)
                         .map((address) => (
                           <SelectItem key={address.id} value={address.id}>
                             <div className="flex items-center">
                               <span>
-                                {address.name ? `${address.name} - ` : ''}
+                                {address.name ? `${address.name} - ` : ""}
                                 {address.street1}
                                 {address.street2 ? `, ${address.street2}` : ""}
                                 {`, ${address.city}, ${address.state} ${address.zip}`}
@@ -376,15 +422,37 @@ const AddressManager: React.FC<AddressManagerProps> = ({
                             </div>
                           </SelectItem>
                         ))}
-                    </SelectGroup>
-                  )}
+                  </SelectGroup>
+                  {Array.isArray(addresses) &&
+                    addresses.some((a) => a.isShared) && (
+                      <SelectGroup>
+                        <SelectLabel>Shared Addresses</SelectLabel>
+                        {addresses
+                          .filter((a) => a.isShared)
+                          .map((address) => (
+                            <SelectItem key={address.id} value={address.id}>
+                              <div className="flex items-center">
+                                <span>
+                                  {address.name ? `${address.name} - ` : ""}
+                                  {address.street1}
+                                  {address.street2
+                                    ? `, ${address.street2}`
+                                    : ""}
+                                  {`, ${address.city}, ${address.state} ${address.zip}`}
+                                </span>
+                                {getAddressBadge(address)}
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </SelectGroup>
+                    )}
                 </SelectContent>
               </Select>
             )}
           />
         </div>
       )}
-      
+
       {showManagementButtons && (
         <div className="flex space-x-4 pb-6">
           <Link
@@ -393,11 +461,15 @@ const AddressManager: React.FC<AddressManagerProps> = ({
           >
             Manage Addresses
           </Link>
-          
+
           <Button
             onClick={handleToggleAddForm}
             variant={showAddForm ? "destructive" : "default"}
-            className={showAddForm ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}
+            className={
+              showAddForm
+                ? "bg-red-500 hover:bg-red-600"
+                : "bg-green-500 hover:bg-green-600"
+            }
           >
             {showAddForm ? "Cancel" : "Add New Address"}
           </Button>
@@ -405,14 +477,24 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       )}
 
       {showAddForm && (
-        <AddAddressForm
-          onSubmit={handleAddAddress}
-          onClose={() => setShowAddForm(false)}
-          initialValues={{
-            isShared: false,
-            isRestaurant: false,
-          }}
-        />
+        <div ref={addressFormRef}>
+          <AddAddressForm
+            onSubmit={async (data) => {
+              try {
+                await handleAddAddress(data);
+                setShowAddForm(false);
+              } catch (error) {
+                // Error handling is done inside handleAddAddress
+                console.error("Error in address submission:", error);
+              }
+            }}
+            onClose={() => setShowAddForm(false)}
+            initialValues={{
+              isShared: false,
+              isRestaurant: false,
+            }}
+          />
+        </div>
       )}
     </div>
   );

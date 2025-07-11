@@ -4,26 +4,27 @@ import React, { useState, useEffect } from "react";
 import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { 
-  Card, 
-  CardHeader, 
-  CardTitle, 
-  CardContent, 
-  CardFooter 
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { AddressFormData } from "@/types/address";
-import { COUNTIES } from "@/components/Auth/SignUp/ui/FormData";  // Make sure this import path is correct
+import { COUNTIES } from "@/components/Auth/SignUp/ui/FormData"; // Make sure this import path is correct
+import { useToast } from "@/components/ui/use-toast";
 
 // Validation schema with zod
 const addressSchema = z.object({
@@ -41,28 +42,33 @@ const addressSchema = z.object({
 });
 
 interface AddAddressFormProps {
-  onSubmit: (data: AddressFormData) => void;
+  onSubmit: (data: AddressFormData) => Promise<void>;
   onClose: () => void;
   initialValues?: Partial<AddressFormData>;
   allowedCounties?: string[];
 }
 
-const AddAddressForm: React.FC<AddAddressFormProps> = ({ 
-  onSubmit, 
-  onClose, 
+const AddAddressForm: React.FC<AddAddressFormProps> = ({
+  onSubmit,
+  onClose,
   initialValues = {},
-  allowedCounties 
+  allowedCounties,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [availableCounties, setAvailableCounties] = useState<Array<{value: string, label: string}>>([]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [availableCounties, setAvailableCounties] = useState<
+    Array<{ value: string; label: string }>
+  >([...COUNTIES]); // Initialize with all counties as fallback to prevent empty dropdown
+
+  const { toast } = useToast();
 
   // Set up form with validation
-  const { 
-    register, 
-    handleSubmit, 
+  const {
+    register,
+    handleSubmit,
     control,
     formState: { errors },
-    reset
+    reset,
   } = useForm<z.infer<typeof addressSchema>>({
     resolver: zodResolver(addressSchema),
     defaultValues: {
@@ -80,49 +86,71 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
     },
   });
 
-  // Fetch allowed counties if not provided as props
+  // Set up counties with improved error handling
   useEffect(() => {
     const fetchCounties = async () => {
+      // Always ensure we have counties available
+      let countiesToUse = [...COUNTIES]; // Default to all counties
+
       if (allowedCounties && allowedCounties.length > 0) {
-        // Create a mutable copy of the filtered counties
-        setAvailableCounties(
-          [...COUNTIES.filter(county => allowedCounties.includes(county.value))]
+        // Filter counties based on allowedCounties prop
+        const filteredCounties = COUNTIES.filter((county) =>
+          allowedCounties.includes(county.value),
         );
+
+        if (filteredCounties.length > 0) {
+          countiesToUse = filteredCounties;
+        }
+        // If no filtered counties found, fall back to all counties
       } else {
+        // Only try API call if no allowedCounties prop is provided
         try {
-          const response = await fetch('/api/user-counties');
+          const response = await fetch("/api/user-counties");
           if (response.ok) {
             const data = await response.json();
-            if (data.counties && Array.isArray(data.counties)) {
-              // Create a mutable copy of the filtered counties
-              setAvailableCounties(
-                [...COUNTIES.filter(county => data.counties.includes(county.value))]
+            if (
+              data.counties &&
+              Array.isArray(data.counties) &&
+              data.counties.length > 0
+            ) {
+              // Filter counties based on API response
+              const filteredCounties = COUNTIES.filter((county) =>
+                data.counties.includes(county.value),
               );
-            } else {
-              // Create a mutable copy of all counties
-              setAvailableCounties([...COUNTIES]);
+
+              if (filteredCounties.length > 0) {
+                countiesToUse = filteredCounties;
+              }
+              // If no filtered counties found, fall back to all counties
             }
-          } else {
-            console.error("Failed to fetch counties");
-            setAvailableCounties([...COUNTIES]);
           }
         } catch (error) {
-          console.error("Error fetching counties:", error);
-          setAvailableCounties([...COUNTIES]);
+          console.error("AddAddressForm: Error fetching counties:", error);
+          // API error - fall back to all counties
         }
       }
+
+      // Always set counties, ensuring we have at least the full list
+      setAvailableCounties([...countiesToUse]);
     };
-  
+
     fetchCounties();
   }, [allowedCounties]);
 
-  const submitHandler: SubmitHandler<z.infer<typeof addressSchema>> = async (data) => {
+  const submitHandler: SubmitHandler<z.infer<typeof addressSchema>> = async (
+    data,
+  ) => {
     setIsSubmitting(true);
+    setSubmitError(null); // Clear previous errors
     try {
       await onSubmit(data as AddressFormData);
       reset();
+      // onSubmit is responsible for closing the dialog on success
     } catch (error) {
       console.error("Error submitting form:", error);
+      setSubmitError(
+        error instanceof Error ? error.message : "Failed to save address",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -132,46 +160,69 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
     <Card className="w-full">
       <CardHeader className="pb-3">
         <CardTitle>Add New Address</CardTitle>
+        {submitError && (
+          <div className="mt-2 rounded-md border border-red-200 bg-red-50 p-3">
+            <div className="flex">
+              <div className="text-sm text-red-600">{submitError}</div>
+            </div>
+          </div>
+        )}
       </CardHeader>
-      <form onSubmit={handleSubmit(submitHandler)}>
+      <div>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* County Field */}
             <div className="space-y-2">
-              <Label htmlFor="county" className={errors.county ? "text-red-500" : ""}>
+              <Label
+                htmlFor="county"
+                className={errors.county ? "text-red-500" : ""}
+              >
                 County <span className="text-red-500">*</span>
               </Label>
               <Controller
                 name="county"
                 control={control}
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger id="county" className={errors.county ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select County" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableCounties.map((county) => (
-                        <SelectItem key={county.value} value={county.value}>
-                          {county.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                render={({ field }) => {
+                  return (
+                    <Select
+                      value={field.value || ""}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                      }}
+                    >
+                      <SelectTrigger
+                        id="county"
+                        className={errors.county ? "border-red-500" : ""}
+                      >
+                        <SelectValue placeholder="Select County" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[9999] max-h-[200px] overflow-y-auto">
+                        {availableCounties && availableCounties.length > 0 ? (
+                          availableCounties.map((county) => (
+                            <SelectItem key={county.value} value={county.value}>
+                              {county.label}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="" disabled>
+                            Loading counties...
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  );
+                }}
               />
               {errors.county && (
-                <p className="text-red-500 text-xs mt-1">{errors.county.message}</p>
+                <p className="mt-1 text-xs text-red-500">
+                  {errors.county.message}
+                </p>
               )}
             </div>
 
             {/* Name Field */}
             <div className="space-y-2">
-              <Label htmlFor="name">
-                Location Name
-              </Label>
+              <Label htmlFor="name">Location Name</Label>
               <Input
                 id="name"
                 placeholder="e.g. Main Office, Downtown Store"
@@ -181,7 +232,10 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
 
             {/* Street Address 1 */}
             <div className="space-y-2">
-              <Label htmlFor="street1" className={errors.street1 ? "text-red-500" : ""}>
+              <Label
+                htmlFor="street1"
+                className={errors.street1 ? "text-red-500" : ""}
+              >
                 Street Address <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -191,15 +245,15 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
                 className={errors.street1 ? "border-red-500" : ""}
               />
               {errors.street1 && (
-                <p className="text-red-500 text-xs mt-1">{errors.street1.message}</p>
+                <p className="mt-1 text-xs text-red-500">
+                  {errors.street1.message}
+                </p>
               )}
             </div>
 
             {/* Street Address 2 */}
             <div className="space-y-2">
-              <Label htmlFor="street2">
-                Street Address 2
-              </Label>
+              <Label htmlFor="street2">Street Address 2</Label>
               <Input
                 id="street2"
                 placeholder="Apt 4B, Suite 100, etc."
@@ -209,7 +263,10 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
 
             {/* City */}
             <div className="space-y-2">
-              <Label htmlFor="city" className={errors.city ? "text-red-500" : ""}>
+              <Label
+                htmlFor="city"
+                className={errors.city ? "text-red-500" : ""}
+              >
                 City <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -219,13 +276,18 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
                 className={errors.city ? "border-red-500" : ""}
               />
               {errors.city && (
-                <p className="text-red-500 text-xs mt-1">{errors.city.message}</p>
+                <p className="mt-1 text-xs text-red-500">
+                  {errors.city.message}
+                </p>
               )}
             </div>
 
             {/* State */}
             <div className="space-y-2">
-              <Label htmlFor="state" className={errors.state ? "text-red-500" : ""}>
+              <Label
+                htmlFor="state"
+                className={errors.state ? "text-red-500" : ""}
+              >
                 State <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -235,7 +297,9 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
                 className={errors.state ? "border-red-500" : ""}
               />
               {errors.state && (
-                <p className="text-red-500 text-xs mt-1">{errors.state.message}</p>
+                <p className="mt-1 text-xs text-red-500">
+                  {errors.state.message}
+                </p>
               )}
             </div>
 
@@ -251,15 +315,15 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
                 className={errors.zip ? "border-red-500" : ""}
               />
               {errors.zip && (
-                <p className="text-red-500 text-xs mt-1">{errors.zip.message}</p>
+                <p className="mt-1 text-xs text-red-500">
+                  {errors.zip.message}
+                </p>
               )}
             </div>
 
             {/* Location Phone Number */}
             <div className="space-y-2">
-              <Label htmlFor="locationNumber">
-                Location Phone Number
-              </Label>
+              <Label htmlFor="locationNumber">Location Phone Number</Label>
               <Input
                 id="locationNumber"
                 placeholder="415-555-1234"
@@ -318,15 +382,24 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
             </div>
           </div>
         </CardContent>
-        <CardFooter className="justify-between pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+        <CardFooter className="flex justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button
+            type="button"
+            onClick={() => handleSubmit(submitHandler)()}
+            disabled={isSubmitting}
+          >
             {isSubmitting ? "Saving..." : "Save Address"}
           </Button>
         </CardFooter>
-      </form>
+      </div>
     </Card>
   );
 };

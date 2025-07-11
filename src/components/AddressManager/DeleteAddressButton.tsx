@@ -42,11 +42,30 @@ const DeleteAddressButton: React.FC<DeleteAddressButtonProps> = ({
     setIsLoading(true);
 
     try {
+      // Get current session for authentication
+      const { createClient } = await import("@/utils/supabase/client");
+      const supabase = await createClient();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        throw new Error("Authentication required. Please sign in again.");
+      }
+
       const response = await fetch(`/api/addresses?id=${addressId}`, {
         method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Session expired. Please sign in again.");
+        }
         const data = await response
           .json()
           .catch(() => ({ error: "Unknown error" }));

@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
+import { useRouter } from "next/navigation";
 import { User, AuthChangeEvent, Session } from "@supabase/supabase-js";
 import AddressManager from "../AddressManager";
 import toast from "react-hot-toast";
@@ -201,30 +202,33 @@ interface OnDemandFormData {
 }
 
 const OnDemandOrderForm: React.FC = () => {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [supabase, setSupabase] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Initialize Supabase client
   useEffect(() => {
     const initSupabase = async () => {
       const client = await createClient();
       setSupabase(client);
     };
-    
+
     initSupabase();
   }, []);
-  
+
   useEffect(() => {
     if (!supabase) return;
-    
+
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       setUser(user);
     };
-    
+
     getUser();
-    
+
     // Set up auth state listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, session: Session | null) => {
@@ -233,15 +237,15 @@ const OnDemandOrderForm: React.FC = () => {
         } else if (event === "SIGNED_OUT") {
           setUser(null);
         }
-      }
+      },
     );
-    
+
     // Clean up subscription
     return () => {
       authListener.subscription.unsubscribe();
     };
   }, [supabase]);
-  
+
   const {
     control,
     handleSubmit,
@@ -285,34 +289,34 @@ const OnDemandOrderForm: React.FC = () => {
       },
     },
   });
-  
+
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
+
   const handleAddressesLoaded = useCallback((loadedAddresses: Address[]) => {
     setAddresses(loadedAddresses);
   }, []);
-  
+
   const onSubmit = async (data: OnDemandFormData) => {
     if (!user?.id) {
       console.error("User not authenticated");
       return;
     }
-    
+
     if (!data.address) {
       console.error("Pickup address not selected");
       toast.error("Please select a pickup address");
       return;
     }
-    
+
     if (!data.delivery_address) {
       console.error("Delivery address not selected for on-demand order");
       toast.error("Please select a delivery address for on-demand order");
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
       const endpoint = "/api/orders";
       const response = await fetch(endpoint, {
@@ -340,15 +344,19 @@ const OnDemandOrderForm: React.FC = () => {
           tip: data.tip ? parseFloat(data.tip) : undefined,
         }),
       });
-      
+
       if (response.ok) {
         const result = await response.json();
         reset();
         toast.success("On-demand request submitted successfully!");
+
+        // Redirect to vendor dashboard
+        console.log("Redirecting user to vendor dashboard");
+        router.push("/vendor");
       } else {
         const errorData = await response.json();
         console.error("Failed to create on-demand request", errorData);
-        
+
         if (errorData.message === "Order number already exists") {
           setErrorMessage(
             "This order number already exists. Please use a different order number.",
@@ -364,7 +372,7 @@ const OnDemandOrderForm: React.FC = () => {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
@@ -376,9 +384,11 @@ const OnDemandOrderForm: React.FC = () => {
           <p>{errorMessage}</p>
         </div>
       )}
-      
+
       <div className="mb-8">
-        <h3 className="mb-4 text-xl font-semibold text-gray-800">Pickup Location</h3>
+        <h3 className="mb-4 text-xl font-semibold text-gray-800">
+          Pickup Location
+        </h3>
         <div className="rounded-md bg-gray-50 p-4">
           <AddressManager
             onAddressesLoaded={handleAddressesLoaded}
@@ -400,9 +410,11 @@ const OnDemandOrderForm: React.FC = () => {
           />
         </div>
       </div>
-      
+
       <div className="mb-8">
-        <h3 className="mb-4 text-xl font-semibold text-gray-800">Delivery Location</h3>
+        <h3 className="mb-4 text-xl font-semibold text-gray-800">
+          Delivery Location
+        </h3>
         <div className="rounded-md bg-gray-50 p-4">
           <AddressManager
             onAddressesLoaded={handleAddressesLoaded}
@@ -426,7 +438,7 @@ const OnDemandOrderForm: React.FC = () => {
           />
         </div>
       </div>
-      
+
       <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
         <SelectField
           control={control}
@@ -442,7 +454,7 @@ const OnDemandOrderForm: React.FC = () => {
             { value: "direct", label: "Direct" },
           ]}
         />
-        
+
         <InputField
           control={control}
           name="order_number"
@@ -452,7 +464,7 @@ const OnDemandOrderForm: React.FC = () => {
           placeholder="e.g., ORD-12345"
         />
       </div>
-      
+
       <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
         <InputField
           control={control}
@@ -462,7 +474,7 @@ const OnDemandOrderForm: React.FC = () => {
           required
           icon={<Calendar size={16} />}
         />
-        
+
         <InputField
           control={control}
           name="pickup_time"
@@ -472,7 +484,7 @@ const OnDemandOrderForm: React.FC = () => {
           icon={<Clock size={16} />}
         />
       </div>
-      
+
       <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
         <InputField
           control={control}
@@ -482,7 +494,7 @@ const OnDemandOrderForm: React.FC = () => {
           required
           icon={<Clock size={16} />}
         />
-        
+
         <InputField
           control={control}
           name="client_attention"
@@ -492,9 +504,11 @@ const OnDemandOrderForm: React.FC = () => {
           placeholder="Client or Recipient Name"
         />
       </div>
-      
+
       <div className="mb-8">
-        <h3 className="mb-4 text-xl font-semibold text-gray-800">Order Details</h3>
+        <h3 className="mb-4 text-xl font-semibold text-gray-800">
+          Order Details
+        </h3>
         <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
           <InputField
             control={control}
@@ -503,7 +517,7 @@ const OnDemandOrderForm: React.FC = () => {
             required
             icon={<Package size={16} />}
           />
-          
+
           <SelectField
             control={control}
             name="vehicle_type"
@@ -518,7 +532,7 @@ const OnDemandOrderForm: React.FC = () => {
           />
         </div>
       </div>
-      
+
       <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
         <InputField
           control={control}
@@ -529,7 +543,7 @@ const OnDemandOrderForm: React.FC = () => {
           icon={<DollarSign size={16} />}
           placeholder="0.00"
         />
-        
+
         <InputField
           control={control}
           name="tip"
@@ -540,7 +554,7 @@ const OnDemandOrderForm: React.FC = () => {
           placeholder="0.00"
         />
       </div>
-      
+
       <div className="mb-8">
         <InputField
           control={control}
@@ -551,7 +565,7 @@ const OnDemandOrderForm: React.FC = () => {
           placeholder="Any special instructions for pickup"
         />
       </div>
-      
+
       <div className="mb-8">
         <InputField
           control={control}
@@ -562,7 +576,7 @@ const OnDemandOrderForm: React.FC = () => {
           placeholder="Any special delivery instructions or requirements"
         />
       </div>
-      
+
       <div className="flex justify-end">
         <button
           type="submit"

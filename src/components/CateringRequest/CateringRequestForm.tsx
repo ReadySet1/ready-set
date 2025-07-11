@@ -1,9 +1,10 @@
-// User side 
+// User side
 
 import React, { useCallback, useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Session, SupabaseClient } from "@supabase/supabase-js";
 import { CateringFormData, Address } from "@/types/catering";
 import { CateringNeedHost } from "@/types/order";
@@ -168,66 +169,6 @@ const SelectField: React.FC<{
   </div>
 );
 
-// Address Section Component
-const AddressSection: React.FC<{
-  control: any;
-  addresses: Address[];
-  onAddressSelected: (address: Address) => void;
-}> = ({ control, addresses, onAddressSelected }) => {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-6">
-      <h3 className="mb-5 text-lg font-medium text-gray-800">
-        Delivery Address
-      </h3>
-      <div className="mb-2">
-        <label className="mb-3 block text-sm font-medium text-gray-700">
-          Select a delivery address
-        </label>
-        <Controller
-          name="deliveryAddress.id"
-          control={control}
-          rules={{ required: "Delivery address is required" }}
-          render={({ field, fieldState: { error } }) => (
-            <div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-                  <MapPin size={16} />
-                </div>
-                <select
-                  {...field}
-                  onChange={(e) => {
-                    field.onChange(e);
-                    const selectedAddress = addresses.find(
-                      (addr) => addr.id === e.target.value,
-                    );
-                    if (selectedAddress) {
-                      onAddressSelected(selectedAddress);
-                    }
-                  }}
-                  className={`w-full rounded-md border ${
-                    error ? "border-red-500" : "border-gray-300"
-                  } py-2 pl-10 shadow-sm focus:border-blue-500 focus:ring-blue-500`}
-                >
-                  <option value="">Select address</option>
-                  {addresses.map((address) => (
-                    <option key={address.id} value={address.id}>
-                      {address.street1}, {address.city}, {address.state}{" "}
-                      {address.zip}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {error && (
-                <p className="mt-2 text-xs text-red-500">{error.message}</p>
-              )}
-            </div>
-          )}
-        />
-      </div>
-    </div>
-  );
-};
-
 // Form Component
 interface ExtendedCateringFormData extends CateringFormData {
   attachments?: UploadedFile[];
@@ -259,7 +200,11 @@ const BROKERAGE_OPTIONS = [
   { value: "Zero Cater", label: "Zero Cater" },
   { value: "Platterz", label: "Platterz" },
   { value: "Direct Delivery", label: "Direct Delivery" },
-  { value: "CaterValley", label: "CaterValley ⚡", description: "Integrated partner with real-time updates" },
+  {
+    value: "CaterValley",
+    label: "CaterValley ⚡",
+    description: "Integrated partner with real-time updates",
+  },
   { value: "Other", label: "Other" },
 ];
 
@@ -273,7 +218,10 @@ interface CateringRequestFormProps {
   isAdminMode?: boolean;
 }
 
-const CateringRequestForm: React.FC<CateringRequestFormProps> = ({ client, isAdminMode = false }) => {
+const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
+  client,
+  isAdminMode = false,
+}) => {
   const router = useRouter();
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -305,7 +253,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({ client, isAdm
       defaultValues: {
         brokerage: "",
         orderNumber: "",
-        date: new Date().toISOString().split('T')[0],
+        date: new Date().toISOString().split("T")[0],
         pickupTime: "",
         arrivalTime: "",
         completeTime: "",
@@ -561,60 +509,55 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({ client, isAdm
 
       if (!response.ok) {
         if (response.status === 400) {
-          const errorMessage = responseData.message || 'Invalid request data';
-          console.error('API validation error:', responseData);
+          const errorMessage = responseData.message || "Invalid request data";
+          console.error("API validation error:", responseData);
           setErrorMessage(errorMessage);
           return;
         } else if (response.status === 401) {
-          setErrorMessage('Please log in to submit an order');
+          setErrorMessage("Please log in to submit an order");
           return;
         } else if (response.status === 409) {
-          setErrorMessage('This order number already exists');
+          setErrorMessage("This order number already exists");
           return;
         } else {
-          console.error('API error response:', responseData);
-          setErrorMessage(responseData.message || 'Failed to submit order');
+          console.error("API error response:", responseData);
+          setErrorMessage(responseData.message || "Failed to submit order");
           return;
         }
       }
 
       console.log("Order submitted successfully:", responseData);
-      
+
       // IMPORTANT FIX: Update the file entity IDs to link them to the catering request
       if (responseData.orderId && uploadedFiles.length > 0) {
-        console.log(`Updating file entity IDs to associate with catering request ID: ${responseData.orderId}`);
+        console.log(
+          `Updating file entity IDs to associate with catering request ID: ${responseData.orderId}`,
+        );
         try {
           await updateEntityId(responseData.orderId);
           console.log("Files successfully linked to catering request");
         } catch (fileUpdateError) {
-          console.error("Error linking files to catering request:", fileUpdateError);
+          console.error(
+            "Error linking files to catering request:",
+            fileUpdateError,
+          );
           // Don't fail the whole submission, just log the error
         }
       }
-      
+
       reset();
       toast.success("Catering request submitted successfully!");
       setErrorMessage("");
 
-      // --- Add Robust Redirect Logic ---
-      let userRole: string | undefined = undefined;
-      if (session && session.user) {
-        userRole = session.user.app_metadata?.role || session.user.role;
-      }
-      if (userRole === 'client') {
-        console.log("Redirecting client user to /client");
-        router.push("/client");
-      } else if (userRole === 'vendor') {
-        console.log("Redirecting vendor user to /vendor");
-        router.push("/vendor");
-      } else {
-        console.log("Redirecting user to /dashboard");
-        router.push("/dashboard");
-      }
-      // --- End Robust Redirect Logic ---
+      // --- Redirect to Vendor Dashboard ---
+      console.log("Redirecting user to vendor dashboard");
+      router.push("/vendor");
+      // --- End Redirect Logic ---
     } catch (error) {
       console.error("Error submitting order:", error);
-      setErrorMessage(error instanceof Error ? error.message : "An unexpected error occurred");
+      setErrorMessage(
+        error instanceof Error ? error.message : "An unexpected error occurred",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -622,7 +565,10 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({ client, isAdm
 
   // --- Return the form JSX ---
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-md">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="mx-auto max-w-3xl rounded-lg bg-white p-6 shadow-md"
+    >
       {errorMessage && (
         <div className="mb-6 flex rounded-md bg-red-50 p-4 text-red-700">
           <AlertCircle className="h-5 w-5 text-red-400" />
@@ -644,6 +590,8 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({ client, isAdm
               setValue("pickupAddress", selectedAddress);
             }
           }}
+          showFilters={true}
+          showManagementButtons={true}
         />
       </div>
 
@@ -765,10 +713,18 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({ client, isAdm
         <h3 className="mb-5 border-b border-gray-200 pb-3 text-lg font-medium text-gray-800">
           Delivery Details
         </h3>
-        <AddressSection
-          control={control}
-          addresses={addresses}
-          onAddressSelected={(address) => setValue("deliveryAddress", address)}
+        <AddressManager
+          onAddressesLoaded={handleAddressesLoaded}
+          onAddressSelected={(addressId) => {
+            const selectedAddress = addresses.find(
+              (addr) => addr.id === addressId,
+            );
+            if (selectedAddress) {
+              setValue("deliveryAddress", selectedAddress);
+            }
+          }}
+          showFilters={true}
+          showManagementButtons={true}
         />
       </div>
 
