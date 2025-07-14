@@ -1,8 +1,5 @@
 // app/api/dashboard-metrics/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
-import { Prisma } from '@prisma/client'
-import { Decimal } from '@prisma/client/runtime/library'
 import { CateringStatus } from '@/types/order-status'
 import { prisma } from '@/utils/prismaDB'
 
@@ -52,21 +49,8 @@ export async function GET() {
     const revenueValue = totalRevenue._sum.orderTotal;
     console.log("Raw Revenue Value:", revenueValue);
 
-    // Properly handle Decimal type from Prisma
-    let finalRevenue = 0;
-    if (revenueValue !== null && revenueValue !== undefined) {
-      if (revenueValue instanceof Decimal) {
-        finalRevenue = revenueValue.toNumber();
-      } else if (typeof revenueValue === 'string') {
-        // Handle case where Decimal might be serialized as string
-        finalRevenue = parseFloat(revenueValue);
-      } else if (typeof revenueValue === 'number') {
-        finalRevenue = revenueValue;
-      } else {
-        console.warn("Unexpected revenue value type:", typeof revenueValue, revenueValue);
-        finalRevenue = 0;
-      }
-    }
+    // Handle Decimal type from Prisma using Number() for reliable conversion
+    const finalRevenue = revenueValue ? Number(revenueValue) : 0;
     
     console.log("Processed Revenue Value:", finalRevenue);
 
