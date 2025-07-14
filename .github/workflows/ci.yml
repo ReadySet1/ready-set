@@ -32,22 +32,46 @@ jobs:
 
     - name: Generate Prisma Client
       run: pnpm prisma generate
+      env:
+        DATABASE_URL: "postgresql://test:test@localhost:5432/test"
 
     - name: Type check
       run: pnpm typecheck
+      env:
+        DATABASE_URL: "postgresql://test:test@localhost:5432/test"
+        DIRECT_URL: "postgresql://test:test@localhost:5432/test"
+        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
+        NEXTAUTH_SECRET: "test-secret"
 
     - name: Lint code
       run: pnpm lint
+      env:
+        DATABASE_URL: "postgresql://test:test@localhost:5432/test"
+        DIRECT_URL: "postgresql://test:test@localhost:5432/test"
+        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
+        NEXTAUTH_SECRET: "test-secret"
 
     - name: Run tests
       run: pnpm test
       env:
         CI: true
+        DATABASE_URL: "postgresql://test:test@localhost:5432/test"
+        DIRECT_URL: "postgresql://test:test@localhost:5432/test"
+        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
+        NEXTAUTH_SECRET: "test-secret"
 
     - name: Build application
       run: pnpm build:no-typecheck
       env:
         NEXT_TELEMETRY_DISABLED: 1
+        DATABASE_URL: "postgresql://test:test@localhost:5432/test"
+        DIRECT_URL: "postgresql://test:test@localhost:5432/test"
+        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
+        NEXTAUTH_SECRET: "test-secret"
 
   security:
     name: Security Audit
@@ -71,6 +95,18 @@ jobs:
 
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
+      env:
+        DATABASE_URL: "postgresql://test:test@localhost:5432/test"
+        DIRECT_URL: "postgresql://test:test@localhost:5432/test"
+        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
+        NEXTAUTH_SECRET: "test-secret"
 
     - name: Run security audit
-      run: pnpm audit --audit-level moderate 
+      run: pnpm audit --audit-level moderate
+      env:
+        DATABASE_URL: "postgresql://test:test@localhost:5432/test"
+        DIRECT_URL: "postgresql://test:test@localhost:5432/test"
+        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
+        NEXTAUTH_SECRET: "test-secret" 
