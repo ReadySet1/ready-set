@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -36,43 +36,46 @@ export const AllOrdersModal: React.FC<AllOrdersModalProps> = ({
   const [ordersPerPage] = useState(10); // More orders in modal view
   const [totalOrders, setTotalOrders] = useState(0);
 
+  const fetchAllOrders = useCallback(
+    async (page = 1) => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Fetch paginated orders
+        const response = await fetch(
+          `/api/vendor/orders?page=${page}&limit=${ordersPerPage}`,
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch orders: ${response.statusText}`);
+        }
+
+        const ordersData = await response.json();
+
+        // Extract the orders array and total from the response
+        if (ordersData && Array.isArray(ordersData.orders)) {
+          setOrders(ordersData.orders);
+          setTotalOrders(ordersData.total || 0);
+        } else {
+          console.error("Invalid response format:", ordersData);
+          setError("Invalid response format from server.");
+        }
+      } catch (error) {
+        console.error("Error fetching all orders:", error);
+        setError("Failed to load orders. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [ordersPerPage],
+  );
+
   useEffect(() => {
     if (isOpen) {
       fetchAllOrders(currentPage);
     }
-  }, [isOpen, currentPage, ordersPerPage]);
-
-  const fetchAllOrders = async (page = 1) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Fetch paginated orders
-      const response = await fetch(
-        `/api/vendor/orders?page=${page}&limit=${ordersPerPage}`,
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch orders: ${response.statusText}`);
-      }
-
-      const ordersData = await response.json();
-
-      // Extract the orders array and total from the response
-      if (ordersData && Array.isArray(ordersData.orders)) {
-        setOrders(ordersData.orders);
-        setTotalOrders(ordersData.total || 0);
-      } else {
-        console.error("Invalid response format:", ordersData);
-        setError("Invalid response format from server.");
-      }
-    } catch (error) {
-      console.error("Error fetching all orders:", error);
-      setError("Failed to load orders. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [isOpen, currentPage, fetchAllOrders]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
