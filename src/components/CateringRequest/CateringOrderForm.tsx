@@ -167,6 +167,9 @@ const CateringOrderForm: React.FC = () => {
       });
 
       if (response.ok) {
+        const result = await response.json();
+        const orderNumber =
+          result?.order?.orderNumber || result?.order?.order_number;
         setValue("eventName", "");
         setValue("eventDate", "");
         setValue("eventTime", "");
@@ -176,9 +179,14 @@ const CateringOrderForm: React.FC = () => {
         setValue("addressId", "");
         toast.success("Catering request submitted successfully!");
 
-        // Redirect to vendor dashboard
-        console.log("Redirecting user to vendor dashboard");
-        router.push("/vendor");
+        if (orderNumber) {
+          router.push(`/vendor/order-confirmation/${orderNumber}`);
+        } else {
+          toast.error(
+            "Order created but no order number returned. Please check your dashboard.",
+          );
+          router.push("/vendor");
+        }
       } else {
         const errorData = await response.json();
         console.error("Failed to create catering request", errorData);
