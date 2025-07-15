@@ -495,3 +495,21 @@ describe("VendorPage Pagination", () => {
     });
   });
 });
+
+describe("Vendor Order Detail Navigation", () => {
+  it("renders a single BackToDashboard button at the top of the order detail page", async () => {
+    // Simulate the order detail page rendering the BackToDashboard at the parent level
+    // We'll mock the DriverOrder to NOT render the button (as per new logic)
+    jest.mock("@/components/Driver/DriverOrder", () => () => (
+      <div>Order Details</div>
+    ));
+    const { default: OrderPage } = await import(
+      "../deliveries/[order_number]/page"
+    );
+    render(<OrderPage />);
+    // The button should be present once
+    expect(
+      screen.getAllByText(/Back to Vendor Dashboard|Back to Dashboard/i),
+    ).toHaveLength(1);
+  });
+});

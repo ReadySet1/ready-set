@@ -86,6 +86,15 @@ export async function getVendorOrders(limit = 10, page = 1) {
   // Calculate offset for pagination
   const offset = (page - 1) * limit;
 
+  // Count total orders in DB for pagination
+  const cateringCount = await prisma.cateringRequest.count({
+    where: { userId: userId }
+  });
+  const onDemandCount = await prisma.onDemand.count({
+    where: { userId: userId }
+  });
+  const totalCount = cateringCount + onDemandCount;
+
   // Fetch more records than needed to properly sort and paginate
   const fetchLimit = Math.max(limit * 10, 50); // Fetch more to ensure proper sorting
 
@@ -185,7 +194,7 @@ export async function getVendorOrders(limit = 10, page = 1) {
   return {
     orders: requestedOrders.slice(0, limit),
     hasMore: requestedOrders.length > limit,
-    total: allOrders.length
+    total: totalCount
   };
 }
 

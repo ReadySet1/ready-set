@@ -1,10 +1,20 @@
 // src/contexts/UserContext.tsx
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 import { createClient } from "@/utils/supabase/client";
-import { Session, User } from '@supabase/supabase-js';
+import { Session, User } from "@supabase/supabase-js";
 import { UserType } from "@/types/user";
+import {
+  getDashboardRouteByRole,
+  getOrderDetailPath as getOrderDetailPathUtil,
+} from "@/utils/navigation";
 
 // Define user context types
 type UserContextType = {
@@ -14,6 +24,8 @@ type UserContextType = {
   isLoading: boolean;
   error: string | null;
   refreshUserData: () => Promise<void>;
+  getDashboardPath: () => string;
+  getOrderDetailPath: (orderNumber: string) => string;
 };
 
 // Create the context
@@ -24,41 +36,47 @@ const UserContext = createContext<UserContextType>({
   isLoading: true,
   error: null,
   refreshUserData: async () => {},
+  getDashboardPath: () => "/",
+  getOrderDetailPath: (orderNumber: string) => "/",
 });
 
 // Export the hook for using the context
 export const useUser = () => {
   const context = useContext(UserContext);
   if (!context) {
-    throw new Error('useUser must be used within a UserProvider');
+    throw new Error("useUser must be used within a UserProvider");
   }
   return context;
 };
 
-
-
 // Helper function to fetch user role
-const fetchUserRole = async (supabase: any, user: User, setUserRole: (role: UserType) => void) => {
+const fetchUserRole = async (
+  supabase: any,
+  user: User,
+  setUserRole: (role: UserType) => void,
+) => {
   try {
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('type')
-      .eq('id', user.id)
+      .from("profiles")
+      .select("type")
+      .eq("id", user.id)
       .single();
 
     let role = UserType.CLIENT;
     if (profile?.type) {
       const typeUpper = profile.type.toUpperCase();
-      const enumValues = Object.values(UserType).map(val => val.toUpperCase());
-      
+      const enumValues = Object.values(UserType).map((val) =>
+        val.toUpperCase(),
+      );
+
       if (enumValues.includes(typeUpper)) {
         const originalEnumValue = Object.values(UserType).find(
-          val => val.toUpperCase() === typeUpper
+          (val) => val.toUpperCase() === typeUpper,
         );
         role = originalEnumValue as UserType;
       }
     }
-    
+
     setUserRole(role);
     return role;
   } catch (err) {
@@ -75,7 +93,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [supabase, setSupabase] = useState<any>(null);
-  
+
   // Initialize Supabase
   useEffect(() => {
     const initSupabase = async () => {
@@ -90,34 +108,37 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     };
-    
+
     initSupabase();
   }, []);
-  
+
   // Load user data
   useEffect(() => {
     if (!supabase) {
       console.log("Waiting for Supabase client...");
       return;
     }
-    
+
     console.log("Setting up auth state...");
     let mounted = true;
     let authListener: any = null;
-    
+
     const setupAuth = async () => {
       try {
         console.log("UserContext: Getting initial user data...");
-        const { data: { user: currentUser }, error: getUserError } = await supabase.auth.getUser();
-        
+        const {
+          data: { user: currentUser },
+          error: getUserError,
+        } = await supabase.auth.getUser();
+
         if (!mounted) return;
-        
+
         if (getUserError) {
           console.error("Error getting user:", getUserError);
           setIsLoading(false);
           return;
         }
-        
+
         if (currentUser) {
           setUser(currentUser);
           console.log("UserContext: User found. Fetching user role...");
@@ -127,30 +148,30 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           setUser(null);
           setUserRole(null);
         }
-        
+
         setIsLoading(false);
-        
+
         const { data: listener } = supabase.auth.onAuthStateChange(
           async (_event: string, session: Session | null) => {
             if (!mounted) return;
-            
+
             console.log("Auth state changed:", _event);
             setSession(session);
-            
+
             const newUser = session?.user || null;
             setUser(newUser);
-            
+
             if (!newUser) {
               setUserRole(null);
               return;
             }
-            
+
             if (newUser?.id !== currentUser?.id) {
               const role = await fetchUserRole(supabase, newUser, setUserRole);
             }
-          }
+          },
         );
-        
+
         authListener = listener;
       } catch (error) {
         console.error("Error in auth setup:", error);
@@ -160,9 +181,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         }
       }
     };
-    
+
     setupAuth();
-    
+
     return () => {
       mounted = false;
       if (authListener) {
@@ -170,21 +191,24 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       }
     };
   }, [supabase]);
-  
+
   // Function to manually refresh user data
   const refreshUserData = async () => {
     if (!supabase) return;
-    
+
     setIsLoading(true);
     try {
-      const { data: { user: currentUser }, error: getUserError } = await supabase.auth.getUser();
-      
+      const {
+        data: { user: currentUser },
+        error: getUserError,
+      } = await supabase.auth.getUser();
+
       if (getUserError) {
         throw getUserError;
       }
-      
+
       setUser(currentUser);
-      
+
       if (currentUser) {
         const role = await fetchUserRole(supabase, currentUser, setUserRole);
       } else {
@@ -197,16 +221,31 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }
   };
-  
+
+  // Navigation helpers
+  const getDashboardPath = () => {
+    if (!userRole) return "/";
+    return getDashboardRouteByRole(userRole).path;
+  };
+
+  const getOrderDetailPath = (orderNumber: string) => {
+    if (!userRole) return "/";
+    return getOrderDetailPathUtil(orderNumber, userRole);
+  };
+
   return (
-    <UserContext.Provider value={{ 
-      session, 
-      user, 
-      userRole, 
-      isLoading, 
-      error, 
-      refreshUserData 
-    }}>
+    <UserContext.Provider
+      value={{
+        session,
+        user,
+        userRole,
+        isLoading,
+        error,
+        refreshUserData,
+        getDashboardPath,
+        getOrderDetailPath,
+      }}
+    >
       {children}
     </UserContext.Provider>
   );
@@ -214,9 +253,5 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
 // Export the provider component
 export function UserProvider({ children }: { children: ReactNode }) {
-  return (
-    <UserProviderClient>
-      {children}
-    </UserProviderClient>
-  );
+  return <UserProviderClient>{children}</UserProviderClient>;
 }

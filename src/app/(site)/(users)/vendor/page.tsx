@@ -48,7 +48,7 @@ const VendorPage = () => {
   const [showAllOrdersModal, setShowAllOrdersModal] = useState(false);
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [ordersPerPage] = useState(1); // Show 1 order per page as requested
+  const [ordersPerPage] = useState(5); // Show 5 orders per page
   const [totalOrders, setTotalOrders] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPrevPage, setHasPrevPage] = useState(false);
@@ -369,7 +369,9 @@ const VendorPage = () => {
                           Previous
                         </Button>
                         <span className="text-sm text-gray-500">
-                          Page {currentPage}
+                          Page {currentPage} of{" "}
+                          {Math.max(1, Math.ceil(totalOrders / ordersPerPage))}{" "}
+                          ({totalOrders} total orders)
                         </span>
                         <Button
                           onClick={handleNextPage}

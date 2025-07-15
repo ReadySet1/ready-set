@@ -21,7 +21,8 @@ import {
   ArrowLeftIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { BackToDashboard } from "@/components/Navigation/BackToDashboard";
 
 // Shared types
 interface Driver {
@@ -96,22 +97,6 @@ interface DriverStatusCardProps {
   driverInfo: Driver | null;
   updateDriverStatus: (newStatus: string) => Promise<void>;
 }
-
-const BackButton: React.FC = () => {
-  const router = useRouter();
-
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="hover:bg-accent flex items-center gap-2"
-      onClick={() => router.push("/driver")}
-    >
-      <ArrowLeftIcon className="h-4 w-4" />
-      Back to Dashboard
-    </Button>
-  );
-};
 
 const driverStatusMap: Record<string, string> = {
   assigned: "🚗 Assigned",
@@ -356,10 +341,6 @@ const OrderPage: React.FC = () => {
   return (
     <div className="bg-background min-h-screen">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <BackButton />
-        </div>
-
         <h1 className="mb-6 text-center text-3xl font-bold">Order Dashboard</h1>
         <div className="space-y-8">
           <Card>

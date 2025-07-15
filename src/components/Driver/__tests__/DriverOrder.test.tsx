@@ -202,6 +202,25 @@ describe("DriverDashboardPage", () => {
     });
   });
 
+  describe("BackToDashboard button rendering", () => {
+    it("should NOT render the back button if not rendered at the top level", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockCateringOrder,
+      });
+
+      render(<DriverDashboardPage />);
+
+      // Wait for the main content to load
+      await waitFor(() => {
+        expect(screen.getByText("Order Dashboard")).toBeInTheDocument();
+      });
+
+      // The back button should NOT be present (since it's now the parent's responsibility)
+      expect(screen.queryByText("Back to Dashboard")).not.toBeInTheDocument();
+    });
+  });
+
   describe("Order Information Display", () => {
     it("should display order summary stats with proper styling", async () => {
       mockFetch.mockResolvedValueOnce({

@@ -5,6 +5,7 @@ import DriverOrder from "@/components/Driver/DriverOrder";
 import { BreadcrumbNavigation } from "@/components/Dashboard";
 import Breadcrumb from "@/components/Common/Breadcrumb";
 import { usePathname } from "next/navigation";
+import { BackToDashboard } from "@/components/Navigation/BackToDashboard";
 
 const OrderPage = () => {
   const [orderNumber, setOrderNumber] = useState("");
@@ -26,6 +27,7 @@ const OrderPage = () => {
       <div className="container">
         <div className="-mx-4 flex flex-wrap items-center">
           <div className="w-full px-4">
+            <BackToDashboard />
             <DriverOrder />
           </div>
         </div>

@@ -32,20 +32,25 @@ export const AllOrdersModal: React.FC<AllOrdersModalProps> = ({
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [ordersPerPage] = useState(10); // More orders in modal view
+  const [totalOrders, setTotalOrders] = useState(0);
 
   useEffect(() => {
     if (isOpen) {
-      fetchAllOrders();
+      fetchAllOrders(currentPage);
     }
-  }, [isOpen]);
+  }, [isOpen, currentPage, ordersPerPage]);
 
-  const fetchAllOrders = async () => {
+  const fetchAllOrders = async (page = 1) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Fetch all orders (no limit)
-      const response = await fetch("/api/vendor/orders?limit=1000");
+      // Fetch paginated orders
+      const response = await fetch(
+        `/api/vendor/orders?page=${page}&limit=${ordersPerPage}`,
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to fetch orders: ${response.statusText}`);
@@ -53,9 +58,10 @@ export const AllOrdersModal: React.FC<AllOrdersModalProps> = ({
 
       const ordersData = await response.json();
 
-      // Extract the orders array from the response
+      // Extract the orders array and total from the response
       if (ordersData && Array.isArray(ordersData.orders)) {
         setOrders(ordersData.orders);
+        setTotalOrders(ordersData.total || 0);
       } else {
         console.error("Invalid response format:", ordersData);
         setError("Invalid response format from server.");
@@ -134,7 +140,10 @@ export const AllOrdersModal: React.FC<AllOrdersModalProps> = ({
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <p className="mb-4 text-red-600">{error}</p>
-              <Button onClick={fetchAllOrders} variant="outline">
+              <Button
+                onClick={() => fetchAllOrders(currentPage)}
+                variant="outline"
+              >
                 Try Again
               </Button>
             </div>
@@ -211,10 +220,32 @@ export const AllOrdersModal: React.FC<AllOrdersModalProps> = ({
           )}
         </div>
 
-        <div className="flex justify-end pt-4">
-          <Button onClick={onClose} variant="outline">
-            Close
-          </Button>
+        <div className="flex flex-col gap-2 pt-4">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-gray-500">
+              Page {currentPage} of{" "}
+              {Math.max(1, Math.ceil(totalOrders / ordersPerPage))} (
+              {totalOrders} total orders)
+            </span>
+            <Button
+              onClick={() => setCurrentPage((p) => p + 1)}
+              disabled={orders.length < ordersPerPage}
+            >
+              Next
+            </Button>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={onClose} variant="outline">
+              Close
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
