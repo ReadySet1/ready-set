@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import AddressManager from "@/components/AddressManager";
 import toast from "react-hot-toast";
+import { useOrderSuccess } from "@/hooks/useOrderSuccess";
+import { OrderSuccessModal } from "@/components/Orders/CateringOrders/OrderSuccess/OrderSuccessModal";
 import { createClient } from "@/utils/supabase/client";
 import {
   SupabaseClient,
@@ -25,6 +27,7 @@ import {
   OrderType,
 } from "@/types/order";
 import { CateringFormData } from "@/types/catering";
+import { transformOrderToSuccessData } from "@/lib/order-success-utils";
 
 interface FormData {
   eventName: string;
@@ -42,6 +45,14 @@ const CateringOrderForm: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  /* ---------------- Success Modal Hook ---------------- */
+  const {
+    isModalOpen: isSuccessModalOpen,
+    orderData: successOrderData,
+    showSuccessModal,
+    handleAction: handleSuccessAction,
+  } = useOrderSuccess();
 
   // 2. Initialize the Supabase client
   useEffect(() => {
@@ -170,6 +181,8 @@ const CateringOrderForm: React.FC = () => {
         const result = await response.json();
         const orderNumber =
           result?.order?.orderNumber || result?.order?.order_number;
+
+        // Reset form fields
         setValue("eventName", "");
         setValue("eventDate", "");
         setValue("eventTime", "");
@@ -177,15 +190,48 @@ const CateringOrderForm: React.FC = () => {
         setValue("budget", 0);
         setValue("specialInstructions", "");
         setValue("addressId", "");
+
         toast.success("Catering request submitted successfully!");
 
         if (orderNumber) {
-          router.push(`/vendor/order-confirmation/${orderNumber}`);
+          const clientName = user.user_metadata?.name || "Client";
+          const pickupDateTime = new Date(
+            `${data.eventDate}T${data.eventTime || "00:00"}`,
+          );
+          const arrivalDateTime = pickupDateTime;
+          const orderData = transformOrderToSuccessData(
+            { orderNumber },
+            {
+              clientName,
+              orderNumber,
+              pickupDateTime,
+              arrivalDateTime,
+              pickupAddress: {},
+              deliveryAddress: {},
+              needHost: "NO",
+            },
+          );
+
+          showSuccessModal(orderData);
         } else {
           toast.error(
-            "Order created but no order number returned. Please check your dashboard.",
+            "Order created but no order number returned. Showing basic confirmation instead.",
           );
-          router.push("/vendor");
+
+          const orderData = transformOrderToSuccessData(
+            {},
+            {
+              clientName: user.user_metadata?.name || "Client",
+              orderNumber: "N/A",
+              pickupDateTime: new Date(),
+              arrivalDateTime: new Date(),
+              pickupAddress: {},
+              deliveryAddress: {},
+              needHost: "NO",
+            },
+          );
+
+          showSuccessModal(orderData);
         }
       } else {
         const errorData = await response.json();
@@ -212,142 +258,165 @@ const CateringOrderForm: React.FC = () => {
   if (!user) return <div>Please sign in to create orders.</div>;
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="eventName">Event Name</Label>
-          <Input
-            id="eventName"
-            {...register("eventName", {
-              required: "Event name is required",
-              minLength: {
-                value: 3,
-                message: "Event name must be at least 3 characters",
-              },
-            })}
-            placeholder="Enter event name"
-          />
-          {errors.eventName && (
-            <p className="mt-1 text-sm text-red-500">
-              {errors.eventName.message}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="eventDate">Event Date</Label>
-          <Input
-            id="eventDate"
-            type="date"
-            {...register("eventDate", {
-              required: "Event date is required",
-              validate: {
-                futureDate: (value) => {
-                  const selectedDate = new Date(value);
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
-                  return (
-                    selectedDate >= today || "Event date must be in the future"
-                  );
+    <>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="eventName">Event Name</Label>
+            <Input
+              id="eventName"
+              {...register("eventName", {
+                required: "Event name is required",
+                minLength: {
+                  value: 3,
+                  message: "Event name must be at least 3 characters",
                 },
-              },
-            })}
+              })}
+              placeholder="Enter event name"
+            />
+            {errors.eventName && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.eventName.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="eventDate">Event Date</Label>
+            <Input
+              id="eventDate"
+              type="date"
+              {...register("eventDate", {
+                required: "Event date is required",
+                validate: {
+                  futureDate: (value) => {
+                    const selectedDate = new Date(value);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return (
+                      selectedDate >= today ||
+                      "Event date must be in the future"
+                    );
+                  },
+                },
+              })}
+            />
+            {errors.eventDate && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.eventDate.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="eventTime">Event Time</Label>
+            <Input
+              id="eventTime"
+              type="time"
+              {...register("eventTime", {
+                required: "Event time is required",
+              })}
+            />
+            {errors.eventTime && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.eventTime.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="guests">Number of Guests</Label>
+            <Input
+              id="guests"
+              type="number"
+              min="1"
+              {...register("guests", {
+                required: "Number of guests is required",
+                min: {
+                  value: 1,
+                  message: "Must have at least 1 guest",
+                },
+                max: {
+                  value: 1000,
+                  message: "Maximum 1000 guests allowed",
+                },
+              })}
+            />
+            {errors.guests && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.guests.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="budget">Budget (USD)</Label>
+            <Input
+              id="budget"
+              type="number"
+              min="0"
+              step="0.01"
+              {...register("budget", {
+                required: "Budget is required",
+                min: {
+                  value: 0,
+                  message: "Budget must be a positive number",
+                },
+              })}
+            />
+            {errors.budget && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.budget.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="specialInstructions">Special Instructions</Label>
+            <Textarea
+              id="specialInstructions"
+              {...register("specialInstructions")}
+              placeholder="Any special requirements or preferences?"
+              rows={4}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <Label>Event Location</Label>
+          <AddressManager
+            onAddressSelected={handleAddressSelect}
+            onAddressesLoaded={handleAddressesLoaded}
+            defaultFilter="all"
           />
-          {errors.eventDate && (
+          {errors.addressId && (
             <p className="mt-1 text-sm text-red-500">
-              {errors.eventDate.message}
+              {errors.addressId.message}
             </p>
           )}
         </div>
 
-        <div>
-          <Label htmlFor="eventTime">Event Time</Label>
-          <Input
-            id="eventTime"
-            type="time"
-            {...register("eventTime", {
-              required: "Event time is required",
-            })}
-          />
-          {errors.eventTime && (
-            <p className="mt-1 text-sm text-red-500">
-              {errors.eventTime.message}
-            </p>
-          )}
-        </div>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Submitting..." : "Submit Request"}
+        </Button>
+      </form>
 
-        <div>
-          <Label htmlFor="guests">Number of Guests</Label>
-          <Input
-            id="guests"
-            type="number"
-            min="1"
-            {...register("guests", {
-              required: "Number of guests is required",
-              min: {
-                value: 1,
-                message: "Must have at least 1 guest",
-              },
-              max: {
-                value: 1000,
-                message: "Maximum 1000 guests allowed",
-              },
-            })}
-          />
-          {errors.guests && (
-            <p className="mt-1 text-sm text-red-500">{errors.guests.message}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="budget">Budget (USD)</Label>
-          <Input
-            id="budget"
-            type="number"
-            min="0"
-            step="0.01"
-            {...register("budget", {
-              required: "Budget is required",
-              min: {
-                value: 0,
-                message: "Budget must be a positive number",
-              },
-            })}
-          />
-          {errors.budget && (
-            <p className="mt-1 text-sm text-red-500">{errors.budget.message}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="specialInstructions">Special Instructions</Label>
-          <Textarea
-            id="specialInstructions"
-            {...register("specialInstructions")}
-            placeholder="Any special requirements or preferences?"
-            rows={4}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <Label>Event Location</Label>
-        <AddressManager
-          onAddressSelected={handleAddressSelect}
-          onAddressesLoaded={handleAddressesLoaded}
-          defaultFilter="all"
+      {/* Success Modal */}
+      {isSuccessModalOpen && successOrderData && (
+        <OrderSuccessModal
+          isOpen={isSuccessModalOpen}
+          onClose={() => handleSuccessAction("GO_TO_DASHBOARD")}
+          orderData={successOrderData}
+          onViewDetails={() => handleSuccessAction("VIEW_DETAILS")}
+          onCreateAnother={() => handleSuccessAction("CREATE_ANOTHER")}
+          onGoToDashboard={() => handleSuccessAction("GO_TO_DASHBOARD")}
+          onDownloadConfirmation={() =>
+            handleSuccessAction("DOWNLOAD_CONFIRMATION")
+          }
+          onShareOrder={() => handleSuccessAction("SHARE_ORDER")}
         />
-        {errors.addressId && (
-          <p className="mt-1 text-sm text-red-500">
-            {errors.addressId.message}
-          </p>
-        )}
-      </div>
-
-      <Button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? "Submitting..." : "Submit Request"}
-      </Button>
-    </form>
+      )}
+    </>
   );
 };
 

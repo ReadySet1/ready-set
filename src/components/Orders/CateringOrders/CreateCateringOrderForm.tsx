@@ -70,6 +70,9 @@ import { createClient } from "@/utils/supabase/client";
 import { useUploadFile, UploadedFile } from "@/hooks/use-upload-file"; // Import the upload hook
 import { FileWithPath } from "react-dropzone"; // Import FileWithPath type
 import { useToast } from "@/components/ui/use-toast";
+import { useOrderSuccess } from "@/hooks/useOrderSuccess";
+import { OrderSuccessModal } from "./OrderSuccess/OrderSuccessModal";
+import { transformOrderToSuccessData } from "@/lib/order-success-utils";
 
 interface CreateCateringOrderFormProps {
   clients: ClientListItem[];
@@ -231,6 +234,18 @@ export const CreateCateringOrderForm: React.FC<
   // Refs to store refresh functions from AddressManager components
   const pickupAddressRefreshRef = useRef<(() => void) | null>(null);
   const deliveryAddressRefreshRef = useRef<(() => void) | null>(null);
+
+  // Order success hook
+  const {
+    isModalOpen: isSuccessModalOpen,
+    orderData: successOrderData,
+    showSuccessModal,
+    handleAction: handleSuccessAction,
+  } = useOrderSuccess({
+    onSuccess: (orderData) => {
+      console.log("Order success triggered:", orderData);
+    },
+  });
 
   // File upload state
   const [uploadedFileKeys, setUploadedFileKeys] = useState<string[]>([]);
@@ -505,7 +520,28 @@ export const CreateCateringOrderForm: React.FC<
         return;
       }
 
-      router.push("/admin/catering-orders");
+      // If we have uploaded files, update their entity ID
+      if (uploadedFiles.length > 0 && result.orderId) {
+        console.log(
+          `Updating file entities from temp ID to actual order ID: ${result.orderId}`,
+        );
+        await updateEntityId(result.orderId);
+      }
+
+      // Get client name for success data
+      const selectedClient = clients.find(
+        (client) => client.id === data.userId,
+      );
+      const clientName = selectedClient?.name || "Unknown Client";
+
+      // Transform the result into success data
+      const successData = transformOrderToSuccessData(result, {
+        ...data,
+        clientName,
+      });
+
+      // Show success modal instead of redirecting
+      showSuccessModal(successData);
     } catch (err) {
       console.error("Form submission error:", err);
       setGeneralError("An unexpected error occurred. Please try again.");
@@ -910,7 +946,9 @@ export const CreateCateringOrderForm: React.FC<
 
         alert("Order created successfully!");
         if (result.orderNumber) {
-          router.push(`/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`);
+          router.push(
+            `/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`,
+          );
         }
       } else {
         alert("Failed to create order: " + (result.error || "Unknown error"));
@@ -965,7 +1003,9 @@ export const CreateCateringOrderForm: React.FC<
             if (result.success) {
               alert("Order created successfully!");
               if (result.orderNumber) {
-                router.push(`/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`);
+                router.push(
+                  `/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`,
+                );
               }
             } else {
               alert(
@@ -1938,6 +1978,22 @@ export const CreateCateringOrderForm: React.FC<
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Order Success Modal */}
+      {isSuccessModalOpen && successOrderData && (
+        <OrderSuccessModal
+          isOpen={isSuccessModalOpen}
+          onClose={() => handleSuccessAction("GO_TO_DASHBOARD")}
+          orderData={successOrderData}
+          onViewDetails={() => handleSuccessAction("VIEW_DETAILS")}
+          onCreateAnother={() => handleSuccessAction("CREATE_ANOTHER")}
+          onGoToDashboard={() => handleSuccessAction("GO_TO_DASHBOARD")}
+          onDownloadConfirmation={() =>
+            handleSuccessAction("DOWNLOAD_CONFIRMATION")
+          }
+          onShareOrder={() => handleSuccessAction("SHARE_ORDER")}
+        />
+      )}
     </>
   );
 };
