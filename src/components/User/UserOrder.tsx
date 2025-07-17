@@ -98,18 +98,54 @@ const UserOrderDetail: React.FC = () => {
         (pathname ?? "").split("/").pop() || "",
       );
 
+      console.log(`Attempting to fetch order details for orderId: ${orderId}`);
+
       try {
-        const response = await fetch(
-          `/api/dispatch/${encodeURIComponent(orderId)}`,
+        // First, try to fetch from orders API (most comprehensive route)
+        let response = await fetch(
+          `/api/orders/${encodeURIComponent(orderId)}`,
         );
+
+        console.log("Orders API response status:", response.status);
+
+        // If orders API fails, try dispatch API
         if (!response.ok) {
-          throw new Error("Failed to fetch order");
+          console.log("Orders API fetch failed, attempting dispatch API");
+          response = await fetch(
+            `/api/dispatch/${encodeURIComponent(orderId)}`,
+          );
+
+          console.log("Dispatch API response status:", response.status);
         }
+
+        // If dispatch API fails, try user-orders API
+        if (!response.ok) {
+          console.log("Dispatch API fetch failed, attempting user-orders API");
+          response = await fetch(
+            `/api/user-orders/${encodeURIComponent(orderId)}`,
+          );
+
+          console.log("User-orders API response status:", response.status);
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(
+            `Failed to fetch order details. Status: ${response.status}, Error: ${errorText}`,
+          );
+          throw new Error(`Failed to fetch order: ${errorText}`);
+        }
+
         const data = await response.json();
-        setOrder(data.order);
+        console.log("Fetched order details:", data);
+
+        setOrder(data);
+        setLoading(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
+        console.error("Error in fetchOrder:", err);
+        setError(
+          err instanceof Error ? err.message : "An unknown error occurred",
+        );
         setLoading(false);
       }
     };
@@ -160,24 +196,9 @@ const UserOrderDetail: React.FC = () => {
     }
   };
 
-  if (loading)
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <p className="ml-4 text-lg font-semibold">Loading...</p>
-      </div>
-    );
-  if (error)
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <p className="ml-4 text-lg font-semibold">Error: {error}</p>
-      </div>
-    );
-  if (!order)
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <p className="ml-4 text-lg font-semibold">Sorry, order not found.</p>
-      </div>
-    );
+  if (loading) return <div>Loading order details...</div>;
+  if (error) return <div>Error: {error}</div>;
+  if (!order) return <div>No order found</div>;
 
   const isCatering = order.order_type === "catering";
   const driverInfo =

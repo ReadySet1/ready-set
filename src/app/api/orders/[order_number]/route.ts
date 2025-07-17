@@ -123,6 +123,12 @@ export async function GET(
     // Extract order_number from params
     const { order_number } = resolvedParams;
 
+    // Validate order number
+    if (!order_number) {
+      console.error("Missing order number in request");
+      return NextResponse.json({ error: "Order number is required" }, { status: 400 });
+    }
+
     let order: Order | null = null;
 
     // Try to find catering request using case-insensitive search and check soft delete
@@ -132,6 +138,7 @@ export async function GET(
           equals: order_number,
           mode: 'insensitive'
         },
+        userId: user.id, // Ensure user can only access their own orders
         deletedAt: null // Add soft delete check
       },
       include: {
@@ -149,12 +156,16 @@ export async function GET(
               },
             },
           },
+          orderBy: {
+            createdAt: 'desc'
+          }
         },
         fileUploads: true,
       },
     });
 
     if (cateringRequest) {
+      console.log(`Found catering order: ${cateringRequest.orderNumber}`);
       order = { ...cateringRequest, order_type: "catering" };
     } else {
       // If not found, try to find on-demand order using case-insensitive search and check soft delete
@@ -164,8 +175,7 @@ export async function GET(
             equals: order_number,
             mode: 'insensitive'
           },
-          // Assuming onDemand table also has a deletedAt field for soft deletes
-          // If not, this line might need adjustment based on your schema
+          userId: user.id, // Ensure user can only access their own orders
           deletedAt: null // Add soft delete check 
         },
         include: {
@@ -183,12 +193,16 @@ export async function GET(
                 },
               },
             },
+            orderBy: {
+              createdAt: 'desc'
+            }
           },
           fileUploads: true,
         },
       });
 
       if (onDemandOrder) {
+        console.log(`Found on-demand order: ${onDemandOrder.orderNumber}`);
         order = { ...onDemandOrder, order_type: "on_demand" };
       }
     }
@@ -198,13 +212,22 @@ export async function GET(
       return NextResponse.json(serializedOrder);
     }
 
-    return NextResponse.json({ message: "Order not found" }, { status: 404 });
+    console.error(`No order found with order number: ${order_number} for user ${user.id}`);
+    return NextResponse.json({ 
+      error: "Order not found", 
+      details: `No order found with order number: ${order_number}` 
+    }, { status: 404 });
   } catch (error) {
     console.error("Error fetching order:", error);
     return NextResponse.json(
-      { message: "Error fetching order", error: (error as Error).message },
-      { status: 500 },
+      { 
+        error: "Error fetching order", 
+        details: error instanceof Error ? error.message : 'Unknown error' 
+      }, 
+      { status: 500 }
     );
+  } finally {
+    await prisma.$disconnect();
   }
 }
 

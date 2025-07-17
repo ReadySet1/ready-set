@@ -1,23 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma, PrismaClient } from "@prisma/client";
 import { createClient } from "@/utils/supabase/server";
-
 import { prisma } from "@/utils/prismaDB";
-
-type CateringRequest = any;
-
-type OnDemandOrder = any;
-
-type Order =
-  | (CateringRequest & { order_type: "catering" })
-  | (OnDemandOrder & { order_type: "on_demand" });
-
-function serializeBigInt(data: any): any {
-  return JSON.parse(JSON.stringify(data, (_, value) =>
-    typeof value === "bigint" ? value.toString() : 
-    value === null ? null : value
-  ));
-}
 
 export async function GET(req: NextRequest, props: { params: Promise<{ order_number: string }> }) {
   const params = await props.params;
@@ -30,16 +13,22 @@ export async function GET(req: NextRequest, props: { params: Promise<{ order_num
 
     // Check authentication
     if (!user?.id) {
+      console.error("Unauthorized access attempt to user-orders API");
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
     const { order_number } = params;
-
-    let order: Order | null = null;
+    console.log(`Fetching order details for order number: ${order_number}`);
 
     // Try to find catering request
-    const cateringRequest = await prisma.cateringRequest.findUnique({
-      where: { orderNumber: order_number },
+    let order: any = await prisma.cateringRequest.findFirst({
+      where: { 
+        orderNumber: {
+          equals: order_number,
+          mode: 'insensitive'
+        },
+        userId: user.id  // Ensure user can only access their own orders
+      },
       include: {
         user: { select: { name: true, email: true } },
         pickupAddress: true,
@@ -55,19 +44,23 @@ export async function GET(req: NextRequest, props: { params: Promise<{ order_num
               },
             },
           },
+          orderBy: {
+            createdAt: 'desc'
+          }
         },
       },
     });
 
-    if (cateringRequest) {
-      order = {
-        ...cateringRequest,
-        order_type: "catering",
-      };
-    } else {
-      // If not found, try to find on-demand order
-      const onDemandOrder = await prisma.onDemand.findUnique({
-        where: { orderNumber: order_number },
+    // If not found in catering requests, try on-demand orders
+    if (!order) {
+      order = await prisma.onDemand.findFirst({
+        where: { 
+          orderNumber: {
+            equals: order_number,
+            mode: 'insensitive'
+          },
+          userId: user.id  // Ensure user can only access their own orders
+        },
         include: {
           user: { select: { name: true, email: true } },
           pickupAddress: true,
@@ -83,29 +76,69 @@ export async function GET(req: NextRequest, props: { params: Promise<{ order_num
                 },
               },
             },
+            orderBy: {
+              createdAt: 'desc'
+            }
           },
         },
       });
-
-      if (onDemandOrder) {
-        order = { ...onDemandOrder, order_type: "on_demand" };
-      }
     }
 
-    if (order) {
-      const serializedOrder = serializeBigInt(order);
-      return NextResponse.json(serializedOrder);
+    // If no order found, return 404
+    if (!order) {
+      console.error(`No order found with order number: ${order_number}`);
+      return NextResponse.json({ 
+        error: "Order not found", 
+        details: `No order found with order number: ${order_number}` 
+      }, { status: 404 });
     }
 
-    return NextResponse.json({ message: "Order not found" }, { status: 404 });
+    // Determine order type
+    const orderType = 'brokerage' in order ? 'catering' : 'on_demand';
+    console.log(`Order found: ${order.orderNumber}, Type: ${orderType}`);
+
+    // Serialize the order, handling BigInt and adding order type
+    const serializedOrder = {
+      ...JSON.parse(JSON.stringify(order, (key, value) =>
+        typeof value === 'bigint'
+          ? value.toString()
+          : value
+      )),
+      order_type: orderType,
+      address: {
+        street1: order.pickupAddress?.street1 || 'N/A',
+        city: order.pickupAddress?.city || 'N/A',
+        state: order.pickupAddress?.state || 'N/A',
+        zip: order.pickupAddress?.zip || 'N/A'
+      },
+      delivery_address: order.deliveryAddress ? {
+        street1: order.deliveryAddress.street1 || 'N/A',
+        city: order.deliveryAddress.city || 'N/A',
+        state: order.deliveryAddress.state || 'N/A',
+        zip: order.deliveryAddress.zip || 'N/A'
+      } : null,
+      dispatch: order.dispatches && order.dispatches.length > 0 ? {
+        id: order.dispatches[0].id.toString(),
+        driver: order.dispatches[0].driver ? {
+          id: order.dispatches[0].driver.id,
+          name: order.dispatches[0].driver.name,
+          email: order.dispatches[0].driver.email,
+          contact_number: order.dispatches[0].driver.contactNumber
+        } : null
+      } : null
+    };
+
+    return NextResponse.json(serializedOrder);
   } catch (error) {
     console.error("Error fetching order:", error);
     return NextResponse.json(
-      { message: "Error fetching order", error: (error as Error).message },
-      { status: 500 },
+      { 
+        error: "Error fetching order", 
+        details: error instanceof Error ? error.message : 'Unknown error' 
+      }, 
+      { status: 500 }
     );
   } finally {
-    // Disconnect Prisma client
     await prisma.$disconnect();
   }
 }

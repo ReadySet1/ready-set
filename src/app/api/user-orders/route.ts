@@ -70,14 +70,39 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit);
 
-    const serializedOrders = allOrders.map(order => ({
-      ...JSON.parse(JSON.stringify(order, (key, value) =>
-        typeof value === 'bigint'
-          ? value.toString()
-          : value
-      )),
-      order_type: 'brokerage' in order ? 'catering' : 'on_demand',
-    }));
+    // Modify the serializedOrders mapping to ensure robust address handling
+    const serializedOrders = allOrders.map(order => {
+      // Normalize address fields with fallback values
+      const pickupAddress = order.pickupAddress || order.address || {};
+      const deliveryAddress = order.deliveryAddress || order.delivery_address || null;
+
+      return {
+        ...JSON.parse(JSON.stringify(order, (key, value) =>
+          typeof value === 'bigint'
+            ? value.toString()
+            : value
+        )),
+        order_type: 'brokerage' in order ? 'catering' : 'on_demand',
+        address: {
+          street1: pickupAddress.street1 || 'N/A',
+          city: pickupAddress.city || 'N/A',
+          state: pickupAddress.state || 'N/A',
+          zip: pickupAddress.zip || 'N/A'
+        },
+        delivery_address: deliveryAddress ? {
+          street1: deliveryAddress.street1 || 'N/A',
+          city: deliveryAddress.city || 'N/A',
+          state: deliveryAddress.state || 'N/A',
+          zip: deliveryAddress.zip || 'N/A'
+        } : null,
+        client_attention: order.client_attention || order.specialNotes || 'No special notes',
+        status: order.status || 'Unknown',
+        date: order.date || order.createdAt || new Date().toISOString(),
+        pickup_time: order.pickupDateTime || order.pickup_time || 'N/A',
+        arrival_time: order.arrivalDateTime || order.arrival_time || 'N/A',
+        order_total: order.orderTotal || order.order_total || '0.00'
+      };
+    });
 
     return NextResponse.json(serializedOrders, { status: 200 });
   } catch (error) {

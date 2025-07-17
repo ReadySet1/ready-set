@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Truck } from "lucide-react";
+import { Loader2, Truck, AlertTriangle } from "lucide-react";
 
 interface Order {
   id: string;
@@ -53,6 +53,7 @@ const ClientOrders: React.FC = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       setIsLoading(true);
+      setError(null);
       const apiUrl = `/api/user-orders?page=${page}&limit=${limit}`;
       try {
         const response = await fetch(apiUrl);
@@ -60,9 +61,37 @@ const ClientOrders: React.FC = () => {
           throw new Error("Failed to fetch orders");
         }
         const data: Order[] = await response.json();
-        setOrders(data);
+
+        // Validate and sanitize order data
+        const sanitizedOrders = data.map((order) => ({
+          ...order,
+          address: {
+            street1: order.address?.street1 || "N/A",
+            city: order.address?.city || "N/A",
+            state: order.address?.state || "N/A",
+          },
+          delivery_address: order.delivery_address
+            ? {
+                street1: order.delivery_address.street1 || "N/A",
+                city: order.delivery_address.city || "N/A",
+                state: order.delivery_address.state || "N/A",
+              }
+            : null,
+          order_total: order.order_total
+            ? parseFloat(order.order_total).toFixed(2)
+            : "0.00",
+          status: order.status || "Unknown",
+          date: order.date ? new Date(order.date).toLocaleDateString() : "N/A",
+        }));
+
+        setOrders(sanitizedOrders);
       } catch (error) {
-        setError(error instanceof Error ? error.message : "An error occurred");
+        console.error("Error fetching orders:", error);
+        setError(
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred while fetching orders",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -85,8 +114,20 @@ const ClientOrders: React.FC = () => {
     }
   };
 
+  // Render error state
   if (error) {
-    return <div>Error: {error}</div>;
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-center">
+        <AlertTriangle className="mb-4 h-16 w-16 text-red-500" />
+        <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+          Error Loading Orders
+        </h3>
+        <p className="max-w-md text-gray-500 dark:text-gray-400">{error}</p>
+        <Button onClick={() => window.location.reload()} className="mt-4">
+          Try Again
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -95,12 +136,12 @@ const ClientOrders: React.FC = () => {
       <div className="absolute left-0 top-0 -z-[1] h-1/2 w-full bg-[#E9F9FF] dark:bg-dark-700 lg:h-[45%] xl:h-1/2"></div>
       <div className="container px-4">
         <div className="-mx-4 flex flex-wrap items-center">
-          <div className="w-full px-4 ">
+          <div className="w-full px-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle>Your Orders</CardTitle>
                 <CardDescription className="max-w-lg text-balance leading-relaxed">
-                  View and manage your orders. 
+                  View and manage your orders.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -115,8 +156,8 @@ const ClientOrders: React.FC = () => {
                       No orders found
                     </h3>
                     <p className="max-w-md text-gray-500 dark:text-gray-400">
-                      You don&apos;t have any orders at the moment.
-                      Check back soon or contact us if you need support. 
+                      You don&apos;t have any orders at the moment. Check back
+                      soon or contact us if you need support.
                     </p>
                   </div>
                 ) : (
@@ -145,7 +186,9 @@ const ClientOrders: React.FC = () => {
                       </TableHeader>
                       <TableBody>
                         {orders.map((order, index) => (
-                          <TableRow key={`${order.id}-${order.order_number}-${index}`}>
+                          <TableRow
+                            key={`${order.id}-${order.order_number}-${index}`}
+                          >
                             <TableCell>
                               <Link
                                 href={`/order-status/${order.order_number}`}
@@ -178,7 +221,7 @@ const ClientOrders: React.FC = () => {
                               </Badge>
                             </TableCell>
                             <TableCell className="hidden md:table-cell">
-                              {new Date(order.date).toLocaleDateString()}
+                              {order.date}
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
                               {order.address.street1}, {order.address.city},{" "}
