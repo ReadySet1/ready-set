@@ -8,6 +8,9 @@ import {
   MessageSquare,
   PlusCircle,
   User,
+  Home,
+  Package,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
@@ -432,10 +435,10 @@ const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
               className="flex items-center rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
             >
               <div className="mr-3 rounded-md bg-purple-50 p-2">
-                <User className="h-5 w-5 text-purple-600" />
+                <Settings className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <h4 className="font-medium text-gray-900">Update Profile</h4>
+                <h4 className="font-medium text-gray-900">Account Settings</h4>
                 <p className="text-xs text-gray-500">
                   Manage your account details
                 </p>
@@ -453,6 +456,36 @@ const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
                 <h4 className="font-medium text-gray-900">Contact Us</h4>
                 <p className="text-xs text-gray-500">
                   Get in touch with our team
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              href="/client"
+              className="flex items-center rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
+            >
+              <div className="mr-3 rounded-md bg-green-50 p-2">
+                <Home className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900">View Dashboard</h4>
+                <p className="text-xs text-gray-500">
+                  Return to client dashboard
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              href="/order-status"
+              className="flex items-center rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
+            >
+              <div className="mr-3 rounded-md bg-blue-50 p-2">
+                <Package className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900">My Orders</h4>
+                <p className="text-xs text-gray-500">
+                  View all your current and past orders
                 </p>
               </div>
             </Link>

@@ -445,3 +445,139 @@ export async function DELETE(
     );
   }
 }
+
+// PATCH: Update a user's own profile
+export async function PATCH(
+  request: NextRequest
+) {
+  console.log(`[PATCH /api/users/[userId]] Request received for URL: ${request.url}`);
+  try {
+    // Get userId from URL path
+    const url = new URL(request.url);
+    const userId = url.pathname.split('/').pop();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error("[PATCH /api/users/[userId]] Supabase auth error:", authError);
+      return NextResponse.json({ error: 'Authentication error' }, { status: 500 });
+    }
+
+    if (!user) {
+      console.log("[PATCH /api/users/[userId]] No authenticated user found.");
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required' },
+        { status: 401 }
+      );
+    }
+    
+    console.log(`[PATCH /api/users/[userId]] Authenticated user ID: ${user.id}`);
+
+    // For PATCH, users can only update their own profiles, or admins can update any profile
+    let requesterProfile;
+    try {
+      requesterProfile = await prisma.profile.findUnique({
+        where: { id: user.id },
+        select: { type: true }
+      });
+      console.log(`[PATCH /api/users/[userId]] Requester profile fetched:`, requesterProfile);
+      
+      const isAdminOrHelpdesk =
+        requesterProfile?.type === UserType.ADMIN ||
+        requesterProfile?.type === UserType.SUPER_ADMIN ||
+        requesterProfile?.type === UserType.HELPDESK;
+        
+      // Allow if requesting own profile OR admin/super_admin/helpdesk
+      const isSelf = user.id === userId;
+
+      console.log(`[PATCH /api/users/[userId]] Authorization check: isSelf=${isSelf}, isAdminOrHelpdesk=${isAdminOrHelpdesk}, requesterType=${requesterProfile?.type}`);
+
+      if (!isSelf && !isAdminOrHelpdesk) {
+        console.log(`[PATCH /api/users/[userId]] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to update profile ${userId}.`);
+        return NextResponse.json(
+          { error: 'Forbidden: Insufficient permissions' },
+          { status: 403 }
+        );
+      }
+    } catch (profileError) {
+      console.error(`[PATCH /api/users/[userId]] Error fetching requester profile (ID: ${user.id}):`, profileError);
+      return NextResponse.json({ error: 'Failed to fetch requester profile' }, { status: 500 });
+    }
+    
+    // Parse request body
+    const requestBody = await request.json();
+    console.log('[PATCH /api/users/[userId]] Request body:', requestBody);
+    
+    // Validate required fields
+    if (!requestBody) {
+      return NextResponse.json(
+        { error: 'Request body is required' },
+        { status: 400 }
+      );
+    }
+    
+    // Prepare data for update - allow basic profile fields for users
+    const updateData: any = {
+      // Basic information
+      name: requestBody.name,
+      contactNumber: requestBody.contact_number || requestBody.contactNumber,
+      
+      // Company information
+      companyName: requestBody.company_name || requestBody.companyName,
+      website: requestBody.website,
+      
+      // Address information
+      street1: requestBody.street1,
+      street2: requestBody.street2,
+      city: requestBody.city,
+      state: requestBody.state,
+      zip: requestBody.zip,
+    };
+    
+    // Remove undefined values from updateData
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key as keyof typeof updateData] === undefined) {
+        delete updateData[key as keyof typeof updateData];
+      }
+    });
+    
+    console.log('[PATCH /api/users/[userId]] Update data:', updateData);
+
+    // Update user profile
+    const updatedProfile = await prisma.profile.update({
+      where: { id: userId },
+      data: updateData,
+    });
+    
+    console.log('[PATCH /api/users/[userId]] Profile updated successfully');
+
+    return NextResponse.json({
+      message: 'User profile updated successfully',
+      user: updatedProfile
+    });
+  } catch (error) {
+    console.error('[PATCH /api/users/[userId]] Unexpected error:', error);
+    
+    // Check for Prisma-specific errors
+    if ((error as any)?.code && (error as any)?.message) {
+      if ((error as any).code === 'P2025') {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        );
+      }
+    }
+    
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
