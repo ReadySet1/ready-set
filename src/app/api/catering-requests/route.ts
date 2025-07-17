@@ -180,14 +180,67 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       message: "Catering request created successfully", 
-      orderId: cateringRequest.id 
+      orderId: cateringRequest.id,
+      orderNumber: cateringRequest.orderNumber
     }, { status: 201 });
     
   } catch (error) {
     console.error("Error processing catering request:", error);
     
+    // Handle different types of errors with user-friendly messages
+    if (error instanceof Error) {
+      // Handle validation errors
+      if (error.message.includes('required') || error.message.includes('invalid')) {
+        return NextResponse.json(
+          { 
+            message: "Please check your form data and try again.",
+            details: error.message,
+            type: "validation_error"
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Handle authentication errors
+      if (error.message.includes('authenticate') || error.message.includes('unauthorized')) {
+        return NextResponse.json(
+          { 
+            message: "Please sign in to submit a catering request.",
+            type: "auth_error"
+          },
+          { status: 401 }
+        );
+      }
+      
+      // Handle duplicate order number
+      if (error.message.includes('unique constraint') || error.message.includes('duplicate')) {
+        return NextResponse.json(
+          { 
+            message: "This order number already exists. Please use a different order number.",
+            type: "duplicate_error"
+          },
+          { status: 409 }
+        );
+      }
+      
+      // Handle database connection errors
+      if (error.message.includes('connect') || error.message.includes('timeout')) {
+        return NextResponse.json(
+          { 
+            message: "We're experiencing technical difficulties. Please try again in a moment.",
+            type: "connection_error"
+          },
+          { status: 503 }
+        );
+      }
+    }
+    
+    // Generic error fallback
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Failed to process catering request" },
+      { 
+        message: "We encountered an unexpected error. Please try again or contact support if the problem persists.",
+        type: "server_error"
+      },
       { status: 500 }
     );
   } finally {

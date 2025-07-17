@@ -2,14 +2,13 @@
 
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { Session, AuthChangeEvent } from "@supabase/supabase-js";
-import { Loader2, ChevronDown } from "lucide-react";
-import Faq from "@/components/Faq";
-import SectionTitle from "@/components/Common/SectionTitle";
-import CateringRequestForm from "@/components/CateringRequest/CateringRequestForm";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import CateringRequestForm from "@/components/CateringRequest/CateringRequestForm";
+import { CateringFormErrorBoundary } from "@/components/ErrorBoundary/CateringFormErrorBoundary";
 
 // Checklist Component
 const DeliveryChecklist = () => {
@@ -23,19 +22,21 @@ const DeliveryChecklist = () => {
     "Check if a host is needed and for how long",
     "Note any special delivery or setup instructions",
     "Confirm payment details are accurate",
-    "Include any necessary dietary restrictions or allergen information"
+    "Include any necessary dietary restrictions or allergen information",
   ];
 
   return (
     <div className="mx-auto mb-8 max-w-3xl py-4">
-      <div 
+      <div
         className="flex cursor-pointer items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:bg-gray-50"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <h3 className="text-lg font-medium text-gray-800">8-Point Delivery Checklist</h3>
-        <ChevronDown className={`h-5 w-5 transform text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <h3 className="text-lg font-medium text-gray-800">
+          8-Point Delivery Checklist
+        </h3>
+        {/* <ChevronDown className={`h-5 w-5 transform text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} /> */}
       </div>
-      
+
       {isOpen && (
         <div className="mt-2 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <ul className="space-y-2">
@@ -54,7 +55,8 @@ const DeliveryChecklist = () => {
   );
 };
 
-const CateringPage = () => {
+// --- Main Page Component ---
+const CateringPageContent = () => {
   const router = useRouter();
   const [supabase, setSupabase] = useState<any>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -66,14 +68,14 @@ const CateringPage = () => {
       const client = await createClient();
       setSupabase(client);
     };
-    
+
     initSupabase();
   }, []);
 
   useEffect(() => {
     // Skip if Supabase client is not yet initialized
     if (!supabase) return;
-    
+
     // Fetch the session when the component mounts
     const fetchSession = async () => {
       try {
@@ -90,10 +92,12 @@ const CateringPage = () => {
     fetchSession();
 
     // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, session: Session | null) => {
         setSession(session);
-      }
+      },
     );
 
     // Clean up subscription on unmount
@@ -123,34 +127,28 @@ const CateringPage = () => {
   }
 
   return (
-    <section
-      id="catering-request"
-      className="bg-gray-50 pb-16 dark:bg-gray-900 lg:pb-24 pt-32"
-    >
-      <div className="container px-4 sm:px-6 lg:px-8">
-        <div className="mb-12">
-          <SectionTitle
-            title="Catering Request"
-            subtitle="Professional Delivery"
-            paragraph="Complete the form below to request catering services. We follow our 8-point checklist to ensure flawless delivery and setup."
-            center
-          />
+    <div className="bg-gray-50 py-8 sm:py-12">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">
+            Catering Request
+          </h1>
+          <p className="mt-4 text-lg text-gray-600">
+            Submit your catering delivery request
+          </p>
         </div>
-        
-        <DeliveryChecklist />
-        
-        <div className="mx-auto">
-          <CateringRequestForm />
-        </div>
-        
-        {/* <div className="mt-16">
-          <h2 className="mb-8 text-center text-2xl font-bold text-gray-800 dark:text-white">
-            Frequently Asked Questions
-          </h2>
-          <Faq />
-        </div> */}
+
+        <CateringRequestForm />
       </div>
-    </section>
+    </div>
+  );
+};
+
+const CateringPage = () => {
+  return (
+    <CateringFormErrorBoundary>
+      <CateringPageContent />
+    </CateringFormErrorBoundary>
   );
 };
 

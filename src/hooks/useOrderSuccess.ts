@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { OrderSuccessData, SuccessAction } from '@/types/order-success';
+import { useSmartRedirect } from '@/hooks/useSmartRedirect';
 
 interface UseOrderSuccessOptions {
   onSuccess?: (orderData: OrderSuccessData) => void;
@@ -12,6 +13,7 @@ export const useOrderSuccess = (options: UseOrderSuccessOptions = {}) => {
   const [orderData, setOrderData] = useState<OrderSuccessData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const router = useRouter();
+  const { redirectToDashboard, redirectToOrderSuccess } = useSmartRedirect();
   
   const { onSuccess, redirectDelay = 0 } = options;
 
@@ -37,10 +39,10 @@ export const useOrderSuccess = (options: UseOrderSuccessOptions = {}) => {
           setIsModalOpen(false);
           if (redirectDelay > 0) {
             setTimeout(() => {
-              router.push(`/vendor/order-success/${encodeURIComponent(orderData.orderNumber)}`);
+              redirectToOrderSuccess(orderData.orderNumber);
             }, redirectDelay);
           } else {
-            router.push(`/vendor/order-success/${encodeURIComponent(orderData.orderNumber)}`);
+            redirectToOrderSuccess(orderData.orderNumber);
           }
           break;
           
@@ -54,10 +56,10 @@ export const useOrderSuccess = (options: UseOrderSuccessOptions = {}) => {
           setIsModalOpen(false);
           if (redirectDelay > 0) {
             setTimeout(() => {
-              router.push('/vendor');
+              redirectToDashboard();
             }, redirectDelay);
           } else {
-            router.push('/vendor');
+            redirectToDashboard();
           }
           break;
           
@@ -109,7 +111,7 @@ export const useOrderSuccess = (options: UseOrderSuccessOptions = {}) => {
     } finally {
       setIsProcessing(false);
     }
-  }, [orderData, router, redirectDelay]);
+  }, [orderData, router, redirectDelay, redirectToDashboard, redirectToOrderSuccess]);
 
   const reset = useCallback(() => {
     setIsModalOpen(false);

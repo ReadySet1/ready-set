@@ -24,6 +24,12 @@ import {
 import { useUploadFile, UploadedFile } from "@/hooks/use-upload-file";
 import { FileWithPath } from "react-dropzone";
 import { HostSection } from "./HostSection";
+import {
+  OrderSuccessWrapper,
+  useOrderSuccessWrapper,
+} from "@/components/Common/OrderSuccessWrapper";
+import { transformOrderToSuccessData } from "@/lib/order-success-utils";
+import { useSmartRedirect } from "@/hooks/useSmartRedirect";
 
 // Form field components
 const InputField: React.FC<{
@@ -230,6 +236,12 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadedFileKeys, setUploadedFileKeys] = useState<string[]>([]);
+
+  // Success modal hook from wrapper
+  const { showSuccessModal } = useOrderSuccessWrapper();
+
+  // Smart redirect hook
+  const { redirectToDashboard } = useSmartRedirect();
 
   // Initialize Supabase client
   useEffect(() => {
@@ -509,19 +521,36 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
 
       if (!response.ok) {
         if (response.status === 400) {
-          const errorMessage = responseData.message || "Invalid request data";
+          const errorMessage =
+            responseData.message ||
+            "Please check your form data and try again.";
           console.error("API validation error:", responseData);
           setErrorMessage(errorMessage);
           return;
         } else if (response.status === 401) {
-          setErrorMessage("Please log in to submit an order");
+          setErrorMessage("Please sign in to submit a catering request.");
           return;
         } else if (response.status === 409) {
-          setErrorMessage("This order number already exists");
+          setErrorMessage(
+            "This order number already exists. Please use a different order number.",
+          );
+          return;
+        } else if (response.status === 403) {
+          setErrorMessage(
+            "You don't have permission to submit this request. Please contact support.",
+          );
+          return;
+        } else if (response.status === 503) {
+          setErrorMessage(
+            "We're experiencing technical difficulties. Please try again in a moment.",
+          );
           return;
         } else {
           console.error("API error response:", responseData);
-          setErrorMessage(responseData.message || "Failed to submit order");
+          const errorMessage =
+            responseData.message ||
+            "We encountered an unexpected error. Please try again or contact support.";
+          setErrorMessage(errorMessage);
           return;
         }
       }
@@ -549,10 +578,33 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
       toast.success("Catering request submitted successfully!");
       setErrorMessage("");
 
-      // --- Redirect to Vendor Dashboard ---
-      console.log("Redirecting user to vendor dashboard");
-      router.push("/vendor");
-      // --- End Redirect Logic ---
+      // --- Show Success Modal ---
+      console.log("Order submitted successfully:", responseData);
+
+      // Create order data for success modal
+      const orderNumber = responseData.orderNumber || data.orderNumber;
+      const clientName =
+        isAdminMode && client
+          ? client.title
+          : session?.user?.user_metadata?.name || "Client";
+
+      // Transform the response into success data
+      const successData = transformOrderToSuccessData(responseData, {
+        ...data,
+        clientName,
+        orderNumber,
+        pickupDateTime: new Date(`${data.date}T${data.pickupTime || "00:00"}`),
+        arrivalDateTime: new Date(
+          `${data.date}T${data.arrivalTime || "00:00"}`,
+        ),
+        pickupAddress: data.pickupAddress || {},
+        deliveryAddress: data.deliveryAddress || {},
+        needHost: data.needHost,
+      });
+
+      // Show success modal instead of redirecting
+      showSuccessModal(successData);
+      // --- End Success Modal Logic ---
     } catch (error) {
       console.error("Error submitting order:", error);
       setErrorMessage(
@@ -859,4 +911,15 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   );
 };
 
-export default CateringRequestForm;
+// Wrapper component that provides success handling
+const CateringRequestFormWithWrapper: React.FC<CateringRequestFormProps> = (
+  props,
+) => {
+  return (
+    <OrderSuccessWrapper>
+      <CateringRequestForm {...props} />
+    </OrderSuccessWrapper>
+  );
+};
+
+export default CateringRequestFormWithWrapper;

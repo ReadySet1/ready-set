@@ -9,8 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import AddressManager from "@/components/AddressManager";
 import toast from "react-hot-toast";
-import { useOrderSuccess } from "@/hooks/useOrderSuccess";
-import { OrderSuccessModal } from "@/components/Orders/CateringOrders/OrderSuccess/OrderSuccessModal";
+import {
+  OrderSuccessWrapper,
+  useOrderSuccessWrapper,
+} from "@/components/Common/OrderSuccessWrapper";
 import { createClient } from "@/utils/supabase/client";
 import {
   SupabaseClient,
@@ -39,20 +41,15 @@ interface FormData {
   addressId: string;
 }
 
-const CateringOrderForm: React.FC = () => {
+const CateringOrderFormInner: React.FC = () => {
   const router = useRouter();
   // 1. Set up state with proper types
   const [user, setUser] = useState<User | null>(null);
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  /* ---------------- Success Modal Hook ---------------- */
-  const {
-    isModalOpen: isSuccessModalOpen,
-    orderData: successOrderData,
-    showSuccessModal,
-    handleAction: handleSuccessAction,
-  } = useOrderSuccess();
+  /* ---------------- Success Modal Hook from wrapper ---------------- */
+  const { showSuccessModal } = useOrderSuccessWrapper();
 
   // 2. Initialize the Supabase client
   useEffect(() => {
@@ -400,23 +397,15 @@ const CateringOrderForm: React.FC = () => {
           {isSubmitting ? "Submitting..." : "Submit Request"}
         </Button>
       </form>
-
-      {/* Success Modal */}
-      {isSuccessModalOpen && successOrderData && (
-        <OrderSuccessModal
-          isOpen={isSuccessModalOpen}
-          onClose={() => handleSuccessAction("GO_TO_DASHBOARD")}
-          orderData={successOrderData}
-          onViewDetails={() => handleSuccessAction("VIEW_DETAILS")}
-          onCreateAnother={() => handleSuccessAction("CREATE_ANOTHER")}
-          onGoToDashboard={() => handleSuccessAction("GO_TO_DASHBOARD")}
-          onDownloadConfirmation={() =>
-            handleSuccessAction("DOWNLOAD_CONFIRMATION")
-          }
-          onShareOrder={() => handleSuccessAction("SHARE_ORDER")}
-        />
-      )}
     </>
+  );
+};
+
+const CateringOrderForm: React.FC = () => {
+  return (
+    <OrderSuccessWrapper>
+      <CateringOrderFormInner />
+    </OrderSuccessWrapper>
   );
 };
 

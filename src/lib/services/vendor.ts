@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 import { notFound } from "next/navigation";
+import { UserType } from "@/types/prisma";
 
 // Custom types for cleaner data structure
 export interface OrderData {
@@ -43,8 +44,8 @@ export interface VendorMetrics {
   orderGrowth: number;
 }
 
-// Helper function to get the current authenticated user's ID
-export async function getCurrentUserId() {
+// Helper function to get the current authenticated user's ID and type
+export async function getCurrentUserInfo() {
   const user = await getCurrentUser();
   if (!user?.email) {
     return null;
@@ -55,43 +56,62 @@ export async function getCurrentUserId() {
     select: { id: true, type: true }
   });
 
-  return profile ? profile.id : null;
+  return profile ? { id: profile.id, type: profile.type } : null;
 }
 
+// Enhanced vendor access check that considers both order ownership and creation
 export async function checkVendorAccess() {
-  const user = await getCurrentUser();
-  if (!user?.email) {
-    return false;
+  const userInfo = await getCurrentUserInfo();
+  if (!userInfo) {
+    return { hasAccess: false, userInfo: null };
   }
 
-  const profile = await prisma.profile.findUnique({
-    where: { email: user.email },
-    select: { id: true, type: true }
-  });
+  // Allow access for vendors, admins, super admins, and helpdesk
+  const allowedTypes: UserType[] = [UserType.VENDOR, UserType.ADMIN, UserType.SUPER_ADMIN, UserType.HELPDESK];
+  const hasAccess = allowedTypes.includes(userInfo.type);
 
-  if (!profile || profile.type !== 'VENDOR') {
-    return false;
-  }
-
-  return true;
+  return { hasAccess, userInfo };
 }
 
-// Get vendor's orders
+// Build where clause for order queries considering both ownership and creation
+function buildOrderWhereClause(userId: string, userType: UserType) {
+  const adminTypes = [UserType.ADMIN, UserType.SUPER_ADMIN, UserType.HELPDESK];
+  
+  if (userType === UserType.VENDOR) {
+    // Vendors can only see orders they own (userId)
+    // TODO: Add createdByUserId support when schema is updated
+    return { userId: userId };
+  } else if (adminTypes.includes(userType as any)) {
+    // Admins can see all orders for now
+    // TODO: Add createdByUserId filtering when schema is updated
+    return {};
+  } else {
+    // Default: only orders they own
+    return { userId: userId };
+  }
+}
+
+// Get vendor's orders with enhanced access control
 export async function getVendorOrders(limit = 10, page = 1) {
-  const userId = await getCurrentUserId();
-  if (!userId) {
+  const accessCheck = await checkVendorAccess();
+  if (!accessCheck.hasAccess || !accessCheck.userInfo) {
     throw new Error("Unauthorized");
   }
+
+  const { id: userId, type: userType } = accessCheck.userInfo;
 
   // Calculate offset for pagination
   const offset = (page - 1) * limit;
 
+  // Build where clause based on user type and access rules
+  const whereClause = buildOrderWhereClause(userId, userType);
+
   // Count total orders in DB for pagination
   const cateringCount = await prisma.cateringRequest.count({
-    where: { userId: userId }
+    where: whereClause
   });
   const onDemandCount = await prisma.onDemand.count({
-    where: { userId: userId }
+    where: whereClause
   });
   const totalCount = cateringCount + onDemandCount;
 
@@ -100,12 +120,13 @@ export async function getVendorOrders(limit = 10, page = 1) {
 
   // Fetch catering requests
   const cateringRequests = await prisma.cateringRequest.findMany({
-    where: {
-      userId: userId
-    },
+    where: whereClause,
     include: {
       pickupAddress: true,
       deliveryAddress: true,
+      user: {
+        select: { name: true, email: true }
+      }
     },
     orderBy: { pickupDateTime: 'desc' },
     take: fetchLimit
@@ -113,18 +134,20 @@ export async function getVendorOrders(limit = 10, page = 1) {
 
   // Fetch on-demand requests
   const onDemandRequests = await prisma.onDemand.findMany({
-    where: {
-      userId: userId
-    },
+    where: whereClause,
     include: {
       pickupAddress: true,
       deliveryAddress: true,
+      user: {
+        select: { name: true, email: true }
+      }
     },
     orderBy: { pickupDateTime: 'desc' },
     take: fetchLimit
   });
 
   // Transform the data to a unified format
+  // Note: Using any type temporarily due to Prisma client typing issues
   const cateringOrders: OrderData[] = cateringRequests.map((order: any) => ({
     id: order.id,
     orderNumber: order.orderNumber,
@@ -137,20 +160,20 @@ export async function getVendorOrders(limit = 10, page = 1) {
     tip: Number(order.tip) || 0,
     clientAttention: order.clientAttention,
     pickupAddress: {
-      id: order.pickupAddress.id,
-      street1: order.pickupAddress.street1,
-      street2: order.pickupAddress.street2,
-      city: order.pickupAddress.city,
-      state: order.pickupAddress.state,
-      zip: order.pickupAddress.zip
+      id: order.pickupAddress?.id || '',
+      street1: order.pickupAddress?.street1 || '',
+      street2: order.pickupAddress?.street2 || null,
+      city: order.pickupAddress?.city || '',
+      state: order.pickupAddress?.state || '',
+      zip: order.pickupAddress?.zip || ''
     },
     deliveryAddress: {
-      id: order.deliveryAddress.id,
-      street1: order.deliveryAddress.street1,
-      street2: order.deliveryAddress.street2,
-      city: order.deliveryAddress.city,
-      state: order.deliveryAddress.state,
-      zip: order.deliveryAddress.zip
+      id: order.deliveryAddress?.id || '',
+      street1: order.deliveryAddress?.street1 || '',
+      street2: order.deliveryAddress?.street2 || null,
+      city: order.deliveryAddress?.city || '',
+      state: order.deliveryAddress?.state || '',
+      zip: order.deliveryAddress?.zip || ''
     }
   }));
 
@@ -166,20 +189,20 @@ export async function getVendorOrders(limit = 10, page = 1) {
     tip: Number(order.tip) || 0,
     clientAttention: order.clientAttention,
     pickupAddress: {
-      id: order.pickupAddress.id,
-      street1: order.pickupAddress.street1,
-      street2: order.pickupAddress.street2,
-      city: order.pickupAddress.city,
-      state: order.pickupAddress.state,
-      zip: order.pickupAddress.zip
+      id: order.pickupAddress?.id || '',
+      street1: order.pickupAddress?.street1 || '',
+      street2: order.pickupAddress?.street2 || null,
+      city: order.pickupAddress?.city || '',
+      state: order.pickupAddress?.state || '',
+      zip: order.pickupAddress?.zip || ''
     },
     deliveryAddress: {
-      id: order.deliveryAddress.id,
-      street1: order.deliveryAddress.street1,
-      street2: order.deliveryAddress.street2,
-      city: order.deliveryAddress.city,
-      state: order.deliveryAddress.state,
-      zip: order.deliveryAddress.zip
+      id: order.deliveryAddress?.id || '',
+      street1: order.deliveryAddress?.street1 || '',
+      street2: order.deliveryAddress?.street2 || null,
+      city: order.deliveryAddress?.city || '',
+      state: order.deliveryAddress?.state || '',
+      zip: order.deliveryAddress?.zip || ''
     }
   }));
 
@@ -198,17 +221,22 @@ export async function getVendorOrders(limit = 10, page = 1) {
   };
 }
 
-// Get vendor metrics
+// Get vendor metrics with enhanced access control
 export async function getVendorMetrics() {
-  const userId = await getCurrentUserId();
-  if (!userId) {
+  const accessCheck = await checkVendorAccess();
+  if (!accessCheck.hasAccess || !accessCheck.userInfo) {
     throw new Error("Unauthorized");
   }
+
+  const { id: userId, type: userType } = accessCheck.userInfo;
+
+  // Build where clause based on user type and access rules
+  const whereClause = buildOrderWhereClause(userId, userType);
 
   // Count active catering orders
   const activeCateringCount = await prisma.cateringRequest.count({
     where: {
-      userId: userId,
+      ...whereClause,
       status: "ACTIVE"
     }
   });
@@ -216,7 +244,7 @@ export async function getVendorMetrics() {
   // Count active on-demand orders
   const activeOnDemandCount = await prisma.onDemand.count({
     where: {
-      userId: userId,
+      ...whereClause,
       status: "ACTIVE"
     }
   });
@@ -224,7 +252,7 @@ export async function getVendorMetrics() {
   // Count completed catering orders
   const completedCateringCount = await prisma.cateringRequest.count({
     where: {
-      userId: userId,
+      ...whereClause,
       status: "COMPLETED"
     }
   });
@@ -232,7 +260,7 @@ export async function getVendorMetrics() {
   // Count completed on-demand orders
   const completedOnDemandCount = await prisma.onDemand.count({
     where: {
-      userId: userId,
+      ...whereClause,
       status: "COMPLETED"
     }
   });
@@ -240,7 +268,7 @@ export async function getVendorMetrics() {
   // Count cancelled catering orders
   const cancelledCateringCount = await prisma.cateringRequest.count({
     where: {
-      userId: userId,
+      ...whereClause,
       status: "CANCELLED"
     }
   });
@@ -248,7 +276,7 @@ export async function getVendorMetrics() {
   // Count cancelled on-demand orders
   const cancelledOnDemandCount = await prisma.onDemand.count({
     where: {
-      userId: userId,
+      ...whereClause,
       status: "CANCELLED"
     }
   });
@@ -256,7 +284,7 @@ export async function getVendorMetrics() {
   // Count pending catering orders
   const pendingCateringCount = await prisma.cateringRequest.count({
     where: {
-      userId: userId,
+      ...whereClause,
       status: "PENDING"
     }
   });
@@ -264,7 +292,7 @@ export async function getVendorMetrics() {
   // Count pending on-demand orders
   const pendingOnDemandCount = await prisma.onDemand.count({
     where: {
-      userId: userId,
+      ...whereClause,
       status: "PENDING"
     }
   });
@@ -272,7 +300,7 @@ export async function getVendorMetrics() {
   // Calculate total revenue from catering orders
   const cateringRevenue = await prisma.cateringRequest.aggregate({
     where: {
-      userId: userId,
+      ...whereClause,
       status: "COMPLETED"
     },
     _sum: {
@@ -284,7 +312,7 @@ export async function getVendorMetrics() {
   // Calculate total revenue from on-demand orders
   const onDemandRevenue = await prisma.onDemand.aggregate({
     where: {
-      userId: userId,
+      ...whereClause,
       status: "COMPLETED"
     },
     _sum: {
@@ -308,14 +336,14 @@ export async function getVendorMetrics() {
 
   const recentOrders = await prisma.cateringRequest.count({
     where: {
-      userId: userId,
+      ...whereClause,
       createdAt: {
         gte: thirtyDaysAgo
       }
     }
   }) + await prisma.onDemand.count({
     where: {
-      userId: userId,
+      ...whereClause,
       createdAt: {
         gte: thirtyDaysAgo
       }
@@ -324,7 +352,7 @@ export async function getVendorMetrics() {
 
   const previousOrders = await prisma.cateringRequest.count({
     where: {
-      userId: userId,
+      ...whereClause,
       createdAt: {
         gte: sixtyDaysAgo,
         lt: thirtyDaysAgo
@@ -332,7 +360,7 @@ export async function getVendorMetrics() {
     }
   }) + await prisma.onDemand.count({
     where: {
-      userId: userId,
+      ...whereClause,
       createdAt: {
         gte: sixtyDaysAgo,
         lt: thirtyDaysAgo
@@ -354,98 +382,114 @@ export async function getVendorMetrics() {
   };
 }
 
-// Get order by order number
+// Get order by order number with enhanced access control
 export async function getOrderByNumber(orderNumber: string) {
-  const userId = await getCurrentUserId();
-  if (!userId) {
+  const accessCheck = await checkVendorAccess();
+  if (!accessCheck.hasAccess || !accessCheck.userInfo) {
     throw new Error("Unauthorized");
   }
 
+  const { id: userId, type: userType } = accessCheck.userInfo;
+
+  // Build where clause based on user type and access rules
+  const whereClause = {
+    orderNumber: orderNumber,
+    ...buildOrderWhereClause(userId, userType)
+  };
+
   // Try to find it in catering requests first
   const cateringRequest = await prisma.cateringRequest.findFirst({
-    where: {
-      orderNumber: orderNumber,
-      userId: userId
-    },
+    where: whereClause,
     include: {
       pickupAddress: true,
       deliveryAddress: true,
+      user: {
+        select: { name: true, email: true }
+      }
     }
   });
 
   if (cateringRequest) {
+    const order = cateringRequest as any; // Type assertion for address relations
     return {
-      id: cateringRequest.id,
-      orderNumber: cateringRequest.orderNumber,
+      id: order.id,
+      orderNumber: order.orderNumber,
       orderType: "catering",
-      status: cateringRequest.status,
-      pickupDateTime: cateringRequest.pickupDateTime?.toISOString() || "",
-      arrivalDateTime: cateringRequest.arrivalDateTime?.toISOString() || "",
-      completeDateTime: cateringRequest.completeDateTime?.toISOString() || null,
-      orderTotal: Number(cateringRequest.orderTotal) || 0,
-      tip: Number(cateringRequest.tip) || 0,
-      clientAttention: cateringRequest.clientAttention,
+      status: order.status,
+      pickupDateTime: order.pickupDateTime?.toISOString() || "",
+      arrivalDateTime: order.arrivalDateTime?.toISOString() || "",
+      completeDateTime: order.completeDateTime?.toISOString() || null,
+      orderTotal: Number(order.orderTotal) || 0,
+      tip: Number(order.tip) || 0,
+      clientAttention: order.clientAttention,
       pickupAddress: {
-        id: cateringRequest.pickupAddress.id,
-        street1: cateringRequest.pickupAddress.street1,
-        street2: cateringRequest.pickupAddress.street2,
-        city: cateringRequest.pickupAddress.city,
-        state: cateringRequest.pickupAddress.state,
-        zip: cateringRequest.pickupAddress.zip
+        id: order.pickupAddress?.id || '',
+        street1: order.pickupAddress?.street1 || '',
+        street2: order.pickupAddress?.street2 || null,
+        city: order.pickupAddress?.city || '',
+        state: order.pickupAddress?.state || '',
+        zip: order.pickupAddress?.zip || ''
       },
       deliveryAddress: {
-        id: cateringRequest.deliveryAddress.id,
-        street1: cateringRequest.deliveryAddress.street1,
-        street2: cateringRequest.deliveryAddress.street2,
-        city: cateringRequest.deliveryAddress.city,
-        state: cateringRequest.deliveryAddress.state,
-        zip: cateringRequest.deliveryAddress.zip
+        id: order.deliveryAddress?.id || '',
+        street1: order.deliveryAddress?.street1 || '',
+        street2: order.deliveryAddress?.street2 || null,
+        city: order.deliveryAddress?.city || '',
+        state: order.deliveryAddress?.state || '',
+        zip: order.deliveryAddress?.zip || ''
       }
     };
   }
 
   // Try to find it in on-demand requests
   const onDemandRequest = await prisma.onDemand.findFirst({
-    where: {
-      orderNumber: orderNumber,
-      userId: userId
-    },
+    where: whereClause,
     include: {
       pickupAddress: true,
       deliveryAddress: true,
+      user: {
+        select: { name: true, email: true }
+      }
     }
   });
 
   if (onDemandRequest) {
+    const order = onDemandRequest as any; // Type assertion for address relations
     return {
-      id: onDemandRequest.id,
-      orderNumber: onDemandRequest.orderNumber,
+      id: order.id,
+      orderNumber: order.orderNumber,
       orderType: "on_demand",
-      status: onDemandRequest.status,
-      pickupDateTime: onDemandRequest.pickupDateTime?.toISOString() || "",
-      arrivalDateTime: onDemandRequest.arrivalDateTime?.toISOString() || "",
-      completeDateTime: onDemandRequest.completeDateTime?.toISOString() || null,
-      orderTotal: Number(onDemandRequest.orderTotal) || 0,
-      tip: Number(onDemandRequest.tip) || 0,
-      clientAttention: onDemandRequest.clientAttention,
+      status: order.status,
+      pickupDateTime: order.pickupDateTime?.toISOString() || "",
+      arrivalDateTime: order.arrivalDateTime?.toISOString() || "",
+      completeDateTime: order.completeDateTime?.toISOString() || null,
+      orderTotal: Number(order.orderTotal) || 0,
+      tip: Number(order.tip) || 0,
+      clientAttention: order.clientAttention,
       pickupAddress: {
-        id: onDemandRequest.pickupAddress.id,
-        street1: onDemandRequest.pickupAddress.street1,
-        street2: onDemandRequest.pickupAddress.street2,
-        city: onDemandRequest.pickupAddress.city,
-        state: onDemandRequest.pickupAddress.state,
-        zip: onDemandRequest.pickupAddress.zip
+        id: order.pickupAddress?.id || '',
+        street1: order.pickupAddress?.street1 || '',
+        street2: order.pickupAddress?.street2 || null,
+        city: order.pickupAddress?.city || '',
+        state: order.pickupAddress?.state || '',
+        zip: order.pickupAddress?.zip || ''
       },
       deliveryAddress: {
-        id: onDemandRequest.deliveryAddress.id,
-        street1: onDemandRequest.deliveryAddress.street1,
-        street2: onDemandRequest.deliveryAddress.street2,
-        city: onDemandRequest.deliveryAddress.city,
-        state: onDemandRequest.deliveryAddress.state,
-        zip: onDemandRequest.deliveryAddress.zip
+        id: order.deliveryAddress?.id || '',
+        street1: order.deliveryAddress?.street1 || '',
+        street2: order.deliveryAddress?.street2 || null,
+        city: order.deliveryAddress?.city || '',
+        state: order.deliveryAddress?.state || '',
+        zip: order.deliveryAddress?.zip || ''
       }
     };
   }
 
   return null;
+}
+
+// Legacy function for backward compatibility
+export async function getCurrentUserId() {
+  const userInfo = await getCurrentUserInfo();
+  return userInfo ? userInfo.id : null;
 } 

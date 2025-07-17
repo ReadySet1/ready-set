@@ -32,8 +32,9 @@ import {
 import Link from "next/link";
 import { OrderData, VendorMetrics } from "@/lib/services/vendor";
 import { AllOrdersModal } from "@/components/Orders/AllOrdersModal";
+import { VendorDashboardErrorBoundary } from "@/components/ErrorBoundary/VendorDashboardErrorBoundary";
 
-const VendorPage = () => {
+const VendorPageContent = () => {
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [metrics, setMetrics] = useState<VendorMetrics>({
     activeOrders: 0,
@@ -160,22 +161,7 @@ const VendorPage = () => {
   };
 
   if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-            <CardDescription>
-              We encountered a problem loading your dashboard
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-4 text-sm text-red-600">{error}</p>
-            <Button onClick={() => window.location.reload()}>Try Again</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    throw new Error(error);
   }
 
   return (
@@ -422,6 +408,14 @@ const VendorPage = () => {
         onClose={() => setShowAllOrdersModal(false)}
       />
     </>
+  );
+};
+
+const VendorPage = () => {
+  return (
+    <VendorDashboardErrorBoundary>
+      <VendorPageContent />
+    </VendorDashboardErrorBoundary>
   );
 };
 

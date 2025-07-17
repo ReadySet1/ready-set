@@ -18,6 +18,12 @@ import {
   Package,
   Truck,
 } from "lucide-react";
+import {
+  OrderSuccessWrapper,
+  useOrderSuccessWrapper,
+} from "@/components/Common/OrderSuccessWrapper";
+import { transformOrderToSuccessData } from "@/lib/order-success-utils";
+import { useSmartRedirect } from "@/hooks/useSmartRedirect";
 
 // Form field components
 const InputField: React.FC<{
@@ -207,6 +213,12 @@ const OnDemandOrderForm: React.FC = () => {
   const [supabase, setSupabase] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Success modal hook from wrapper
+  const { showSuccessModal } = useOrderSuccessWrapper();
+
+  // Smart redirect hook
+  const { redirectToDashboard } = useSmartRedirect();
+
   // Initialize Supabase client
   useEffect(() => {
     const initSupabase = async () => {
@@ -350,9 +362,28 @@ const OnDemandOrderForm: React.FC = () => {
         reset();
         toast.success("On-demand request submitted successfully!");
 
-        // Redirect to vendor dashboard
-        console.log("Redirecting user to vendor dashboard");
-        router.push("/vendor");
+        // --- Show Success Modal ---
+        console.log("On-demand order submitted successfully:", result);
+
+        // Create order data for success modal
+        const orderNumber =
+          result?.order?.orderNumber || result?.order?.order_number || "N/A";
+        const clientName = user?.user_metadata?.name || "Client";
+
+        // Transform the response into success data
+        const successData = transformOrderToSuccessData(result, {
+          clientName,
+          orderNumber,
+          pickupDateTime: new Date(), // On-demand orders are immediate
+          arrivalDateTime: new Date(),
+          pickupAddress: data.address || {},
+          deliveryAddress: data.delivery_address || {},
+          needHost: "NO",
+        });
+
+        // Show success modal instead of redirecting
+        showSuccessModal(successData);
+        // --- End Success Modal Logic ---
       } else {
         const errorData = await response.json();
         console.error("Failed to create on-demand request", errorData);
@@ -374,227 +405,238 @@ const OnDemandOrderForm: React.FC = () => {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="mx-auto w-full max-w-3xl rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
-    >
-      {errorMessage && (
-        <div className="mb-6 flex items-center rounded-md bg-red-50 p-4 text-red-800">
-          <AlertCircle className="mr-2 h-5 w-5" />
-          <p>{errorMessage}</p>
+    <>
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="mx-auto w-full max-w-3xl rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+      >
+        {errorMessage && (
+          <div className="mb-6 flex items-center rounded-md bg-red-50 p-4 text-red-800">
+            <AlertCircle className="mr-2 h-5 w-5" />
+            <p>{errorMessage}</p>
+          </div>
+        )}
+
+        <div className="mb-8">
+          <h3 className="mb-4 text-xl font-semibold text-gray-800">
+            Pickup Location
+          </h3>
+          <div className="rounded-md bg-gray-50 p-4">
+            <AddressManager
+              onAddressesLoaded={handleAddressesLoaded}
+              onAddressSelected={(addressId) => {
+                const selectedAddress = addresses.find(
+                  (addr) => addr.id === addressId,
+                );
+                if (selectedAddress) {
+                  setValue("address", {
+                    id: selectedAddress.id,
+                    street1: selectedAddress.street1,
+                    street2: selectedAddress.street2 || null,
+                    city: selectedAddress.city,
+                    state: selectedAddress.state,
+                    zip: selectedAddress.zip,
+                  });
+                }
+              }}
+            />
+          </div>
         </div>
-      )}
 
-      <div className="mb-8">
-        <h3 className="mb-4 text-xl font-semibold text-gray-800">
-          Pickup Location
-        </h3>
-        <div className="rounded-md bg-gray-50 p-4">
-          <AddressManager
-            onAddressesLoaded={handleAddressesLoaded}
-            onAddressSelected={(addressId) => {
-              const selectedAddress = addresses.find(
-                (addr) => addr.id === addressId,
-              );
-              if (selectedAddress) {
-                setValue("address", {
-                  id: selectedAddress.id,
-                  street1: selectedAddress.street1,
-                  street2: selectedAddress.street2 || null,
-                  city: selectedAddress.city,
-                  state: selectedAddress.state,
-                  zip: selectedAddress.zip,
-                });
-              }
-            }}
-          />
+        <div className="mb-8">
+          <h3 className="mb-4 text-xl font-semibold text-gray-800">
+            Delivery Location
+          </h3>
+          <div className="rounded-md bg-gray-50 p-4">
+            <AddressManager
+              onAddressesLoaded={handleAddressesLoaded}
+              onAddressSelected={(addressId) => {
+                const selectedAddress = addresses.find(
+                  (addr) => addr.id === addressId,
+                );
+                if (selectedAddress) {
+                  setValue("delivery_address", {
+                    id: selectedAddress.id,
+                    street1: selectedAddress.street1,
+                    street2: selectedAddress.street2 || null,
+                    city: selectedAddress.city,
+                    state: selectedAddress.state,
+                    zip: selectedAddress.zip,
+                  });
+                }
+              }}
+              showFilters={false}
+              showManagementButtons={false}
+            />
+          </div>
         </div>
-      </div>
 
-      <div className="mb-8">
-        <h3 className="mb-4 text-xl font-semibold text-gray-800">
-          Delivery Location
-        </h3>
-        <div className="rounded-md bg-gray-50 p-4">
-          <AddressManager
-            onAddressesLoaded={handleAddressesLoaded}
-            onAddressSelected={(addressId) => {
-              const selectedAddress = addresses.find(
-                (addr) => addr.id === addressId,
-              );
-              if (selectedAddress) {
-                setValue("delivery_address", {
-                  id: selectedAddress.id,
-                  street1: selectedAddress.street1,
-                  street2: selectedAddress.street2 || null,
-                  city: selectedAddress.city,
-                  state: selectedAddress.state,
-                  zip: selectedAddress.zip,
-                });
-              }
-            }}
-            showFilters={false}
-            showManagementButtons={false}
-          />
-        </div>
-      </div>
-
-      <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
-        <SelectField
-          control={control}
-          name="brokerage"
-          label="Brokerage / Direct"
-          required
-          icon={<Clipboard size={16} />}
-          options={[
-            { value: "doordash", label: "DoorDash" },
-            { value: "ubereats", label: "UberEats" },
-            { value: "postmates", label: "Postmates" },
-            { value: "grubhub", label: "GrubHub" },
-            { value: "direct", label: "Direct" },
-          ]}
-        />
-
-        <InputField
-          control={control}
-          name="order_number"
-          label="Order Number"
-          required
-          icon={<Clipboard size={16} />}
-          placeholder="e.g., ORD-12345"
-        />
-      </div>
-
-      <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
-        <InputField
-          control={control}
-          name="date"
-          label="Date"
-          type="date"
-          required
-          icon={<Calendar size={16} />}
-        />
-
-        <InputField
-          control={control}
-          name="pickup_time"
-          label="Pickup Time"
-          type="time"
-          required
-          icon={<Clock size={16} />}
-        />
-      </div>
-
-      <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
-        <InputField
-          control={control}
-          name="arrival_time"
-          label="Arrival Time"
-          type="time"
-          required
-          icon={<Clock size={16} />}
-        />
-
-        <InputField
-          control={control}
-          name="client_attention"
-          label="Client Attention"
-          required
-          icon={<Users size={16} />}
-          placeholder="Client or Recipient Name"
-        />
-      </div>
-
-      <div className="mb-8">
-        <h3 className="mb-4 text-xl font-semibold text-gray-800">
-          Order Details
-        </h3>
-        <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
-          <InputField
-            control={control}
-            name="item_delivered"
-            label="Item Being Delivered"
-            required
-            icon={<Package size={16} />}
-          />
-
+        <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
           <SelectField
             control={control}
-            name="vehicle_type"
-            label="Vehicle Type"
+            name="brokerage"
+            label="Brokerage / Direct"
             required
-            icon={<Truck size={16} />}
+            icon={<Clipboard size={16} />}
             options={[
-              { value: "Car", label: "Car" },
-              { value: "Van", label: "Van" },
-              { value: "Truck", label: "Truck" },
+              { value: "doordash", label: "DoorDash" },
+              { value: "ubereats", label: "UberEats" },
+              { value: "postmates", label: "Postmates" },
+              { value: "grubhub", label: "GrubHub" },
+              { value: "direct", label: "Direct" },
             ]}
           />
+
+          <InputField
+            control={control}
+            name="order_number"
+            label="Order Number"
+            required
+            icon={<Clipboard size={16} />}
+            placeholder="e.g., ORD-12345"
+          />
         </div>
-      </div>
 
-      <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
-        <InputField
-          control={control}
-          name="order_total"
-          label="Order Total"
-          type="number"
-          required
-          icon={<DollarSign size={16} />}
-          placeholder="0.00"
-        />
+        <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+          <InputField
+            control={control}
+            name="date"
+            label="Date"
+            type="date"
+            required
+            icon={<Calendar size={16} />}
+          />
 
-        <InputField
-          control={control}
-          name="tip"
-          label="Tip"
-          type="number"
-          optional
-          icon={<DollarSign size={16} />}
-          placeholder="0.00"
-        />
-      </div>
+          <InputField
+            control={control}
+            name="pickup_time"
+            label="Pickup Time"
+            type="time"
+            required
+            icon={<Clock size={16} />}
+          />
+        </div>
 
-      <div className="mb-8">
-        <InputField
-          control={control}
-          name="pickup_notes"
-          label="Pickup Notes"
-          type="textarea"
-          optional
-          placeholder="Any special instructions for pickup"
-        />
-      </div>
+        <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+          <InputField
+            control={control}
+            name="arrival_time"
+            label="Arrival Time"
+            type="time"
+            required
+            icon={<Clock size={16} />}
+          />
 
-      <div className="mb-8">
-        <InputField
-          control={control}
-          name="special_notes"
-          label="Special Notes"
-          type="textarea"
-          optional
-          placeholder="Any special delivery instructions or requirements"
-        />
-      </div>
+          <InputField
+            control={control}
+            name="client_attention"
+            label="Client Attention"
+            required
+            icon={<Users size={16} />}
+            placeholder="Client or Recipient Name"
+          />
+        </div>
 
-      <div className="flex justify-end">
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded-md bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-400"
-        >
-          {isSubmitting ? (
-            <span className="flex items-center">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Submitting...
-            </span>
-          ) : (
-            "Submit Request"
-          )}
-        </button>
-      </div>
-    </form>
+        <div className="mb-8">
+          <h3 className="mb-4 text-xl font-semibold text-gray-800">
+            Order Details
+          </h3>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+            <InputField
+              control={control}
+              name="item_delivered"
+              label="Item Being Delivered"
+              required
+              icon={<Package size={16} />}
+            />
+
+            <SelectField
+              control={control}
+              name="vehicle_type"
+              label="Vehicle Type"
+              required
+              icon={<Truck size={16} />}
+              options={[
+                { value: "Car", label: "Car" },
+                { value: "Van", label: "Van" },
+                { value: "Truck", label: "Truck" },
+              ]}
+            />
+          </div>
+        </div>
+
+        <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+          <InputField
+            control={control}
+            name="order_total"
+            label="Order Total"
+            type="number"
+            required
+            icon={<DollarSign size={16} />}
+            placeholder="0.00"
+          />
+
+          <InputField
+            control={control}
+            name="tip"
+            label="Tip"
+            type="number"
+            optional
+            icon={<DollarSign size={16} />}
+            placeholder="0.00"
+          />
+        </div>
+
+        <div className="mb-8">
+          <InputField
+            control={control}
+            name="pickup_notes"
+            label="Pickup Notes"
+            type="textarea"
+            optional
+            placeholder="Any special instructions for pickup"
+          />
+        </div>
+
+        <div className="mb-8">
+          <InputField
+            control={control}
+            name="special_notes"
+            label="Special Notes"
+            type="textarea"
+            optional
+            placeholder="Any special delivery instructions or requirements"
+          />
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="rounded-md bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-400"
+          >
+            {isSubmitting ? (
+              <span className="flex items-center">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Submitting...
+              </span>
+            ) : (
+              "Submit Request"
+            )}
+          </button>
+        </div>
+      </form>
+    </>
   );
 };
 
-export default OnDemandOrderForm;
+// Wrapper component that provides success handling
+const OnDemandOrderFormWithWrapper: React.FC = () => {
+  return (
+    <OrderSuccessWrapper>
+      <OnDemandOrderForm />
+    </OrderSuccessWrapper>
+  );
+};
+
+export default OnDemandOrderFormWithWrapper;

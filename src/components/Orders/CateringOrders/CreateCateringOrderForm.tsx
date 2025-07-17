@@ -70,8 +70,10 @@ import { createClient } from "@/utils/supabase/client";
 import { useUploadFile, UploadedFile } from "@/hooks/use-upload-file"; // Import the upload hook
 import { FileWithPath } from "react-dropzone"; // Import FileWithPath type
 import { useToast } from "@/components/ui/use-toast";
-import { useOrderSuccess } from "@/hooks/useOrderSuccess";
-import { OrderSuccessModal } from "./OrderSuccess/OrderSuccessModal";
+import {
+  OrderSuccessWrapper,
+  useOrderSuccessWrapper,
+} from "@/components/Common/OrderSuccessWrapper";
 import { transformOrderToSuccessData } from "@/lib/order-success-utils";
 
 interface CreateCateringOrderFormProps {
@@ -204,9 +206,9 @@ const BROKERAGE_OPTIONS = [
   { value: "Other", label: "Other" },
 ];
 
-export const CreateCateringOrderForm: React.FC<
-  CreateCateringOrderFormProps
-> = ({ clients }) => {
+const CreateCateringOrderForm: React.FC<CreateCateringOrderFormProps> = ({
+  clients,
+}) => {
   const router = useRouter();
   const { toast } = useToast();
   const [generalError, setGeneralError] = useState<string | null>(null);
@@ -235,17 +237,8 @@ export const CreateCateringOrderForm: React.FC<
   const pickupAddressRefreshRef = useRef<(() => void) | null>(null);
   const deliveryAddressRefreshRef = useRef<(() => void) | null>(null);
 
-  // Order success hook
-  const {
-    isModalOpen: isSuccessModalOpen,
-    orderData: successOrderData,
-    showSuccessModal,
-    handleAction: handleSuccessAction,
-  } = useOrderSuccess({
-    onSuccess: (orderData) => {
-      console.log("Order success triggered:", orderData);
-    },
-  });
+  // Order success hook from wrapper
+  const { showSuccessModal } = useOrderSuccessWrapper();
 
   // File upload state
   const [uploadedFileKeys, setUploadedFileKeys] = useState<string[]>([]);
@@ -1978,22 +1971,23 @@ export const CreateCateringOrderForm: React.FC<
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Order Success Modal */}
-      {isSuccessModalOpen && successOrderData && (
-        <OrderSuccessModal
-          isOpen={isSuccessModalOpen}
-          onClose={() => handleSuccessAction("GO_TO_DASHBOARD")}
-          orderData={successOrderData}
-          onViewDetails={() => handleSuccessAction("VIEW_DETAILS")}
-          onCreateAnother={() => handleSuccessAction("CREATE_ANOTHER")}
-          onGoToDashboard={() => handleSuccessAction("GO_TO_DASHBOARD")}
-          onDownloadConfirmation={() =>
-            handleSuccessAction("DOWNLOAD_CONFIRMATION")
-          }
-          onShareOrder={() => handleSuccessAction("SHARE_ORDER")}
-        />
-      )}
     </>
   );
 };
+
+// Wrapper component that provides success handling
+const CreateCateringOrderFormWithWrapper: React.FC<
+  CreateCateringOrderFormProps
+> = (props) => {
+  return (
+    <OrderSuccessWrapper
+      onSuccess={(orderData) => {
+        console.log("Order success triggered:", orderData);
+      }}
+    >
+      <CreateCateringOrderForm {...props} />
+    </OrderSuccessWrapper>
+  );
+};
+
+export default CreateCateringOrderFormWithWrapper;
