@@ -20,6 +20,7 @@ import {
   Package,
   Phone,
   Mail,
+  ChevronLeft,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { DriverStatusCard } from "./DriverStatus";
@@ -46,6 +47,7 @@ import { createClient } from "@/utils/supabase/client";
 import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
 import { UserType } from "@/types/user";
 import { decodeOrderNumber } from "@/utils/order";
+import Link from "next/link";
 
 // Make sure the bucket name is user-assets
 const STORAGE_BUCKET = "user-assets";
@@ -740,6 +742,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     return <OrderSkeleton />;
   }
 
+  // Comprehensive fix for linter errors and return statement
   if (!order) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -782,68 +785,59 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         className="container mx-auto px-6 py-8"
       >
         {/* Modern Header */}
-        <div className="mb-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="mb-3 flex items-center gap-4">
-                <h1 className="text-3xl font-bold text-slate-800">
-                  {order.order_type === "catering"
-                    ? "Catering Request"
-                    : "On-Demand Order"}
-                </h1>
-                <Badge
-                  className={`${statusInfo.className} flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold shadow-sm`}
+        <div className="sticky top-0 z-10 mb-6 border-b bg-white py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => router.push("/dashboard")}
+                  className="text-muted-foreground hover:text-foreground h-9 w-9 dark:text-gray-400 dark:hover:text-gray-200"
                 >
-                  {statusInfo.icon}
-                  {order.status}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-6 text-slate-600">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  <span className="font-medium">{order.orderNumber}</span>
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+                <div className="text-muted-foreground text-sm dark:text-gray-400">
+                  <Link
+                    href="/dashboard"
+                    className="hover:text-foreground hover:underline dark:hover:text-gray-200"
+                  >
+                    Dashboard
+                  </Link>
+                  {" / "}
+                  <span className="text-foreground dark:text-gray-100">
+                    {order.order_type === "catering"
+                      ? "Catering Request"
+                      : "On-Demand Order"}
+                  </span>
                 </div>
-                {order.pickupDateTime && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {new Date(order.pickupDateTime).toLocaleDateString(
-                        undefined,
-                        {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        },
-                      )}
-                    </span>
-                  </div>
-                )}
-                {order.pickupDateTime && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {new Date(order.pickupDateTime).toLocaleTimeString(
-                        undefined,
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
-                      )}
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
+          </div>
+        </div>
 
-            <div className="flex gap-3">
-              <Button
-                onClick={handleOpenDriverDialog}
-                className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-white shadow-lg transition-all duration-200 hover:bg-blue-700 hover:shadow-xl"
+        {/* Order Title and Status */}
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <Button
+            variant="outline"
+            onClick={() => router.push("/dashboard")}
+            className="mb-4 self-start lg:mb-0"
+          >
+            Back to Dashboard
+          </Button>
+          <div className="flex-grow text-center">
+            <div className="mb-3 flex items-center justify-center gap-4">
+              <h1 className="text-3xl font-bold text-slate-800">
+                {order.order_type === "catering"
+                  ? "Catering Request"
+                  : "On-Demand Order"}
+              </h1>
+              <Badge
+                className={`${statusInfo.className} flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold shadow-sm`}
               >
-                <Truck className="h-4 w-4" />
-                {isDriverAssigned ? "Update Driver" : "Assign Driver"}
-              </Button>
+                {statusInfo.icon}
+                {order.status}
+              </Badge>
             </div>
           </div>
         </div>

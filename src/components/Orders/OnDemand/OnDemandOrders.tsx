@@ -52,6 +52,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "next/navigation";
 
 // --- Interface specific to On Demand Orders (ensure it matches API response) ---
 interface OnDemandOrder {
@@ -141,6 +142,8 @@ const LoadingSkeleton = () => (
 const ITEMS_PER_PAGE = 10; // Define items per page, match backend if possible
 
 const OnDemandOrdersPage: React.FC = () => {
+  const router = useRouter();
+
   // --- State ---
   const [orders, setOrders] = useState<OnDemandOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -298,10 +301,15 @@ const OnDemandOrdersPage: React.FC = () => {
     <div className="space-y-6 p-6">
       {/* --- Page Title and New Order Button --- */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
+        <Button
+          variant="outline"
+          onClick={() => router.push("/dashboard")}
+          className="mb-4 self-start lg:mb-0"
+        >
+          Back to Dashboard
+        </Button>
+        <div className="flex-grow text-center">
           <h1 className="bg-gradient-to-r from-cyan-500 to-blue-500 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
-            {" "}
-            {/* Changed Gradient */}
             On Demand Orders
           </h1>
           <p className="mt-1 text-slate-500">
@@ -310,11 +318,7 @@ const OnDemandOrdersPage: React.FC = () => {
         </div>
         {/* --- Update Link to On Demand creation page --- */}
         <Link href="/on-demand-request">
-          {" "}
-          {/* ADJUST LINK AS NEEDED */}
-          <Button
-            className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md transition-all hover:from-cyan-600 hover:to-blue-600 hover:shadow-lg lg:w-auto" /* Changed Gradient */
-          >
+          <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md transition-all hover:from-cyan-600 hover:to-blue-600 hover:shadow-lg lg:w-auto">
             <PlusCircle className="mr-2 h-4 w-4" />
             New On Demand Order
           </Button>

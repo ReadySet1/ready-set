@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Truck, AlertTriangle } from "lucide-react";
+import { Loader2, Truck, AlertTriangle, ChevronLeft } from "lucide-react";
 
 interface Order {
   id: string;
@@ -49,6 +50,7 @@ const ClientOrders: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -138,11 +140,22 @@ const ClientOrders: React.FC = () => {
         <div className="-mx-4 flex flex-wrap items-center">
           <div className="w-full px-4">
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle>Your Orders</CardTitle>
-                <CardDescription className="max-w-lg text-balance leading-relaxed">
-                  View and manage your orders.
-                </CardDescription>
+              <CardHeader className="relative pb-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push("/client")}
+                  className="text-muted-foreground hover:text-foreground absolute left-4 top-4 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-2"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="hidden sm:inline">Back to Dashboard</span>
+                </Button>
+                <div className="text-center">
+                  <CardTitle className="mb-2">Your Orders</CardTitle>
+                  <CardDescription className="mx-auto max-w-lg text-center leading-relaxed">
+                    View and manage your orders.
+                  </CardDescription>
+                </div>
               </CardHeader>
               <CardContent>
                 {isLoading ? (

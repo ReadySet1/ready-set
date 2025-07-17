@@ -1,30 +1,26 @@
 /// <reference types="vitest" />
 /// <reference types="vite/client" />
 
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
-import path from 'path'; // Import path for resolving aliases
-import type { UserConfig } from 'vite';
+import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
   test: {
-    globals: true, // Enable Vitest globals (describe, it, expect, etc.)
-    environment: 'jsdom', // Set environment for browser-like testing
-    setupFiles: './vitest.setup.ts', // Specify setup file
-    // Increase timeout if tests involving DB setup/reset take longer
-    // testTimeout: 10000, 
-    // poolOptions: {
-    //   threads: {
-    //     // Necessary for Prisma interaction in tests sometimes
-    //     // useAtomics: true, 
-    //   }
-    // }
-  },
-  resolve: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./vitest.setup.ts'],
+    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.{js,jsx,ts,tsx}'],
+      exclude: ['**/node_modules/**', '**/dist/**', '**/*.d.ts', '**/*.spec.ts', '**/*.test.ts'],
+    },
     alias: {
-      // Configure path aliases to match tsconfig.json
-      '@': path.resolve(__dirname, './src'), 
+      '@': path.resolve(__dirname, './src'),
     },
   },
-} as UserConfig); 
+}); 

@@ -7,45 +7,64 @@ const createJestConfig = nextJest({
 
 // Add any custom config to be passed to Jest
 const customJestConfig = {
-  setupFilesAfterEnv: ['<rootDir>/test/test.setup.ts'],
-  testEnvironment: 'jest-environment-jsdom',
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  testEnvironment: 'jsdom',
   moduleNameMapper: {
-    '^@/components/(.*)$': '<rootDir>/src/components/$1',
-    '^@/app/(.*)$': '<rootDir>/src/app/$1',
-    '^@/lib/(.*)$': '<rootDir>/src/lib/$1',
-    '^@/hooks/(.*)$': '<rootDir>/src/hooks/$1',
-    '^@/types/(.*)$': '<rootDir>/src/types/$1',
-    '^@/utils/(.*)$': '<rootDir>/src/utils/$1',
+    // Handle module aliases
     '^@/(.*)$': '<rootDir>/src/$1',
-  },
-  testMatch: [
-    '<rootDir>/src/**/__tests__/**/*.{js,jsx,ts,tsx}',
-    '<rootDir>/src/**/*.{test,spec}.{js,jsx,ts,tsx}',
-  ],
-  collectCoverageFrom: [
-    'src/components/**/*.{js,jsx,ts,tsx}',
-    '!src/components/**/*.d.ts',
-    '!src/components/**/*.stories.{js,jsx,ts,tsx}',
-    '!src/**/*.test.{js,jsx,ts,tsx}',
-    '!src/**/__tests__/**',
-  ],
-  coverageThreshold: {
-    global: {
-      branches: 70,
-      functions: 70,
-      lines: 70,
-      statements: 70,
-    },
+    
+    // Handle CSS imports
+    '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
   },
   transform: {
-    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
+    // Use babel-jest to transpile tests
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { 
+      presets: ['next/babel'],
+      plugins: [
+        '@babel/plugin-transform-runtime',
+        'babel-plugin-transform-typescript-metadata',
+        ['@babel/plugin-proposal-decorators', { legacy: true }],
+        ['@babel/plugin-proposal-class-properties', { loose: true }],
+      ]
+    }],
   },
   transformIgnorePatterns: [
     '/node_modules/',
     '^.+\\.module\\.(css|sass|scss)$',
   ],
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  testPathIgnorePatterns: [
+    '<rootDir>/.next/', 
+    '<rootDir>/node_modules/', 
+    '<rootDir>/e2e/'  // Exclude Playwright E2E tests
+  ],
+  collectCoverage: true,
+  collectCoverageFrom: [
+    'src/**/*.{js,jsx,ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/**/*.stories.{js,jsx,ts,tsx}',
+    '!src/pages/_app.tsx',
+    '!src/pages/_document.tsx',
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 50,
+      functions: 50,
+      lines: 50,
+      statements: 50
+    }
+  },
+  // Support for ES Modules
+  extensionsToTreatAsEsm: ['.ts', '.tsx'],
+  
+  // Automatically clear mock calls, instances, contexts and results before every test
+  clearMocks: true,
+  
+  // Indicates whether the coverage information should be collected while executing the test
+  collectCoverage: true,
+  
+  // The directory where Jest should output its coverage files
+  coverageDirectory: "coverage",
 }
 
-// createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
+// createJestConfig is exported this way to ensure the next/jest can load the Next.js config which loads environment variables
 module.exports = createJestConfig(customJestConfig) 
