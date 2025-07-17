@@ -1,15 +1,14 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { vi, describe, it, expect, beforeEach } from "vitest";
 import "@testing-library/jest-dom";
 import FlowerHero from "../FlowerHero";
 
 // Mock the FormManager
-const mockOpenForm = vi.fn();
+const mockOpenForm = jest.fn();
 const mockDialogForm = <div data-testid="mock-dialog-form">Dialog Form</div>;
 
-vi.mock("@/components/Logistics/QuoteRequest/Quotes/FormManager", () => ({
+jest.mock("@/components/Logistics/QuoteRequest/Quotes/FormManager", () => ({
   FormManager: () => ({
     openForm: mockOpenForm,
     DialogForm: mockDialogForm,
@@ -17,7 +16,7 @@ vi.mock("@/components/Logistics/QuoteRequest/Quotes/FormManager", () => ({
 }));
 
 // Mock ScheduleDialog
-vi.mock("../../Logistics/Schedule", () => ({
+jest.mock("../../Logistics/Schedule", () => ({
   default: ({ buttonText, customButton, calendarUrl }: any) => (
     <div data-testid="mock-schedule-dialog">
       {customButton || (
@@ -29,7 +28,7 @@ vi.mock("../../Logistics/Schedule", () => ({
 
 describe("FlowerHero", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   describe("Rendering", () => {
@@ -117,7 +116,7 @@ describe("FlowerHero", () => {
       
       const quoteButton = screen.getByRole("button", { name: "Get a Quote" });
       const mockEvent = {
-        preventDefault: vi.fn(),
+        preventDefault: jest.fn(),
         currentTarget: quoteButton,
       };
       

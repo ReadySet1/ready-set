@@ -3,24 +3,23 @@ import '@testing-library/jest-dom'
 import { render, screen } from '@testing-library/react'
 import Home, { metadata } from '@/app/page'
 import { Metadata } from 'next'
-import { vi } from 'vitest'
 
-// Mock the child components using vi.mock
-vi.mock('@/components/Common/ScrollUp', () => ({
+// Mock the child components using jest.mock
+jest.mock('@/components/Common/ScrollUp', () => ({
   default: () => <div data-testid="mock-scroll-up">ScrollUp Component</div>,
 }));
-vi.mock('@/components/Hero', () => ({
+jest.mock('@/components/Hero', () => ({
   default: () => <div data-testid="mock-hero">Hero Component</div>,
 }));
-vi.mock('@/components/Features', () => ({ default: () => <div data-testid="mock-features">Features</div> }));
-vi.mock('@/components/About', () => ({ default: () => <div data-testid="mock-about">About</div> }));
-vi.mock('@/components/FeaturesTab', () => ({ default: () => <div data-testid="mock-features-tab">FeaturesTab</div> }));
-vi.mock('@/components/FunFact', () => ({ default: () => <div data-testid="mock-fun-fact">FunFact</div> }));
-vi.mock('@/components/Integration', () => ({ default: () => <div data-testid="mock-integration">Integration</div> }));
-vi.mock('@/components/CTA', () => ({ default: () => <div data-testid="mock-cta">CTA</div> }));
-vi.mock('@/components/FAQ', () => ({ default: () => <div data-testid="mock-faq">FAQ</div> }));
-vi.mock('@/components/Testimonial', () => ({ default: () => <div data-testid="mock-testimonial">Testimonial</div> }));
-vi.mock('@/components/Contact', () => ({ default: () => <div data-testid="mock-contact">Contact</div> }));
+jest.mock('@/components/Features', () => ({ default: () => <div data-testid="mock-features">Features</div> }));
+jest.mock('@/components/About', () => ({ default: () => <div data-testid="mock-about">About</div> }));
+jest.mock('@/components/FeaturesTab', () => ({ default: () => <div data-testid="mock-features-tab">FeaturesTab</div> }));
+jest.mock('@/components/FunFact', () => ({ default: () => <div data-testid="mock-fun-fact">FunFact</div> }));
+jest.mock('@/components/Integration', () => ({ default: () => <div data-testid="mock-integration">Integration</div> }));
+jest.mock('@/components/CTA', () => ({ default: () => <div data-testid="mock-cta">CTA</div> }));
+jest.mock('@/components/FAQ', () => ({ default: () => <div data-testid="mock-faq">FAQ</div> }));
+jest.mock('@/components/Testimonial', () => ({ default: () => <div data-testid="mock-testimonial">Testimonial</div> }));
+jest.mock('@/components/Contact', () => ({ default: () => <div data-testid="mock-contact">Contact</div> }));
 
 describe('Home Page', () => {
   it('renders mocked components', () => {

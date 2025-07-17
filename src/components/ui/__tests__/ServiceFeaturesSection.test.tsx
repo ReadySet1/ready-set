@@ -8,11 +8,10 @@ import {
 } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { Clock, Truck, Shield } from "lucide-react";
-import { vi } from "vitest";
 import ServiceFeaturesSection from "../ServiceFeaturesSection";
 
 // Mock Next.js Image component
-vi.mock("next/image", () => ({
+jest.mock("next/image", () => ({
   __esModule: true,
   default: ({ src, alt, onLoad, className, ...props }: any) => {
     return (
@@ -29,7 +28,7 @@ vi.mock("next/image", () => ({
 }));
 
 // Mock carousel components
-vi.mock("@/components/ui/carousel", () => ({
+jest.mock("@/components/ui/carousel", () => ({
   Carousel: ({ children, ...props }: any) => (
     <div data-testid="carousel" {...props}>
       {children}
@@ -48,9 +47,9 @@ vi.mock("@/components/ui/carousel", () => ({
 }));
 
 // Mock embla-carousel-autoplay
-vi.mock("embla-carousel-autoplay", () => ({
+jest.mock("embla-carousel-autoplay", () => ({
   __esModule: true,
-  default: vi.fn(() => ({})),
+  default: jest.fn(() => ({})),
 }));
 
 // Mock window.innerWidth and window.innerHeight
@@ -100,14 +99,14 @@ describe("ServiceFeaturesSection", () => {
     mockWindowDimensions(1920, 1080);
 
     // Clear all mocks
-    vi.clearAllMocks();
+    jest.clearAllMocks();
 
     // Mock console.error to avoid error boundary logs in tests
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    jest.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe("Basic Rendering", () => {
@@ -254,7 +253,7 @@ describe("ServiceFeaturesSection", () => {
 
   describe("Button Interactions", () => {
     it("renders primary button when onPrimaryClick is provided", async () => {
-      const mockPrimaryClick = vi.fn();
+      const mockPrimaryClick = jest.fn();
 
       render(
         <ServiceFeaturesSection
@@ -273,7 +272,7 @@ describe("ServiceFeaturesSection", () => {
     });
 
     it("renders secondary button when onSecondaryClick is provided", async () => {
-      const mockSecondaryClick = vi.fn();
+      const mockSecondaryClick = jest.fn();
 
       render(
         <ServiceFeaturesSection
@@ -390,8 +389,8 @@ describe("ServiceFeaturesSection", () => {
 
   describe("Accessibility", () => {
     it("has proper aria-labels for buttons", async () => {
-      const mockPrimaryClick = vi.fn();
-      const mockSecondaryClick = vi.fn();
+      const mockPrimaryClick = jest.fn();
+      const mockSecondaryClick = jest.fn();
 
       render(
         <ServiceFeaturesSection

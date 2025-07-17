@@ -1,21 +1,22 @@
 // app/api/storage/delete/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
 import { deleteFile } from '@/utils/file-service';
+import { withAuth } from '@/lib/auth-middleware';
+import { prisma } from '@/utils/prismaDB';
 
 export async function DELETE(request: NextRequest) {
-  const supabase = await createClient();
-
-  // Check authentication
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Unauthorized', message: 'You must be logged in to delete files' },
-      { status: 401 }
-    );
-  }
-
   try {
+    // Use standardized authentication
+    const authResult = await withAuth(request, {
+      requireAuth: true
+    });
+
+    if (!authResult.success) {
+      return authResult.response;
+    }
+
+    const { context } = authResult;
+    const { user } = context;
     const { searchParams } = new URL(request.url);
     const fileKey = searchParams.get('key');
     const bucketName = searchParams.get('bucket');
@@ -27,9 +28,44 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // TODO: Implement proper file metadata ownership check
-    // Current implementation has type issues with the file_metadata table
-    
+    // SECURITY FIX: Implement proper file ownership check
+    const isAdmin = context.isAdmin || context.isSuperAdmin || context.isHelpdesk;
+
+    // For non-admin users, verify they own the file or it's associated with their entities
+    if (!isAdmin) {
+      // Check if file belongs to user's orders, applications, or profile
+      const userFiles = await prisma.$queryRaw`
+        SELECT 1 FROM (
+          -- Check catering orders
+          SELECT co.user_id FROM catering_orders co 
+          JOIN json_array_elements(co.attachments::json) AS att(value) ON att.value->>'key' = ${fileKey}
+          WHERE co.user_id = ${user.id}
+          
+          UNION
+          
+          -- Check on-demand orders  
+          SELECT odo.user_id FROM on_demand_orders odo
+          JOIN json_array_elements(odo.attachments::json) AS att(value) ON att.value->>'key' = ${fileKey}
+          WHERE odo.user_id = ${user.id}
+          
+          UNION
+          
+          -- Check job applications
+          SELECT ja.user_id FROM job_applications ja
+          WHERE (ja.resume_file->>'key' = ${fileKey} OR ja.cover_letter_file->>'key' = ${fileKey})
+          AND ja.user_id = ${user.id}
+        ) AS user_files
+        LIMIT 1
+      `;
+
+      if (!userFiles || (Array.isArray(userFiles) && userFiles.length === 0)) {
+        return NextResponse.json(
+          { error: 'Forbidden', message: 'You do not have permission to delete this file' },
+          { status: 403 }
+        );
+      }
+    }
+
     // Delete the file
     await deleteFile(fileKey, bucketName);
 

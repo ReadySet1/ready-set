@@ -1,23 +1,22 @@
 import React from "react";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { vi, describe, it, expect, beforeEach } from "vitest";
 import AdminProfileView from "../AdminProfileView";
 import { UserFormValues } from "../types";
 
 // Mock the router
-const mockPush = vi.fn();
-vi.mock("next/navigation", () => ({
+const mockPush = jest.fn();
+jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
   }),
   useSearchParams: () => ({
-    get: vi.fn().mockReturnValue("test-user-id"),
+    get: jest.fn().mockReturnValue("test-user-id"),
   }),
 }));
 
 // Mock the UserContext
-vi.mock("@/contexts/UserContext", () => ({
+jest.mock("@/contexts/UserContext", () => ({
   useUser: () => ({
     session: { access_token: "mock-token" },
     user: { id: "current-user-id" },
@@ -25,16 +24,16 @@ vi.mock("@/contexts/UserContext", () => ({
 }));
 
 // Mock the useUserForm hook
-const mockUseUserForm = vi.fn();
-vi.mock("../hooks/useUserForm", () => ({
+const mockUseUserForm = jest.fn();
+jest.mock("../hooks/useUserForm", () => ({
   useUserForm: mockUseUserForm,
 }));
 
 // Mock Supabase client
-vi.mock("@/utils/supabase/client", () => ({
-  createClient: vi.fn(() => ({
+jest.mock("@/utils/supabase/client", () => ({
+  createClient: jest.fn(() => ({
     auth: {
-      getSession: vi.fn().mockResolvedValue({
+      getSession: jest.fn().mockResolvedValue({
         data: { session: { access_token: "mock-token" } },
         error: null,
       }),
@@ -73,20 +72,20 @@ describe("AdminProfileView - No Redirect Behavior", () => {
   };
 
   const mockFormMethods = {
-    register: vi.fn(),
-    handleSubmit: vi.fn(),
-    setValue: vi.fn(),
-    watch: vi.fn(),
+    register: jest.fn(),
+    handleSubmit: jest.fn(),
+    setValue: jest.fn(),
+    watch: jest.fn(),
     watchedValues: mockUserData,
     hasUnsavedChanges: false,
-    onSubmit: vi.fn(),
+    onSubmit: jest.fn(),
     formState: { errors: {} },
     control: {},
-    reset: vi.fn(),
+    reset: jest.fn(),
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     mockUseUserForm.mockReturnValue(mockFormMethods);
   });
 

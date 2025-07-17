@@ -1,13 +1,12 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach } from "vitest";
 import OrderPage from "../[order_number]/page";
 
 // Mock Next.js navigation hooks
-const mockPush = vi.fn();
-const mockPathname = vi.fn();
+const mockPush = jest.fn();
+const mockPathname = jest.fn();
 
-vi.mock("next/navigation", () => ({
+jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
   }),
@@ -15,7 +14,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 // Mock SingleOrder component
-vi.mock("@/components/Orders/SingleOrder", () => ({
+jest.mock("@/components/Orders/SingleOrder", () => ({
   __esModule: true,
   default: ({
     onDeleteSuccess,
@@ -34,7 +33,7 @@ vi.mock("@/components/Orders/SingleOrder", () => ({
 }));
 
 // Mock Next.js Link component
-vi.mock("next/link", () => ({
+jest.mock("next/link", () => ({
   __esModule: true,
   default: ({
     href,
@@ -52,7 +51,7 @@ vi.mock("next/link", () => ({
 }));
 
 // Mock Lucide icons
-vi.mock("lucide-react", () => ({
+jest.mock("lucide-react", () => ({
   ArrowLeft: () => <span data-testid="arrow-left-icon">←</span>,
   Home: () => <span data-testid="home-icon">🏠</span>,
   ClipboardList: () => <span data-testid="clipboard-icon">📋</span>,
@@ -60,7 +59,7 @@ vi.mock("lucide-react", () => ({
 
 describe("CateringOrderPage - URL Decoding", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   it("should decode order number with forward slash from URL", () => {

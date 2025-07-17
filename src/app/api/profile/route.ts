@@ -1,22 +1,25 @@
 // src/app/api/profile/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/utils/prismaDB";
+import { withAuth } from '@/lib/auth-middleware';
 import { createClient } from "@/utils/supabase/server";
 import { PrismaTransaction } from "@/types/prisma-types";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Initialize Supabase client
-    const supabase = await createClient();
-    
-    // Get user session from Supabase
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Use standardized authentication
+    const authResult = await withAuth(request, {
+      requireAuth: true
+    });
+
+    if (!authResult.success) {
+      return authResult.response;
     }
+
+    const { context } = authResult;
+    const { user } = context;
     
-    // Get the user's profile from your database
+    // Get the user's profile from database
     const userData = await prisma.profile.findUnique({
       where: { id: user.id },
       select: {
@@ -44,8 +47,18 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // Use standardized authentication
+    const authResult = await withAuth(request, {
+      allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
+      requireAuth: true
+    });
+
+    if (!authResult.success) {
+      return authResult.response;
+    }
+
     // Parse request body
     const { profileData, userTableData } = await request.json();
     
