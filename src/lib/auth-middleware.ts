@@ -138,7 +138,7 @@ export async function withAuth(
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const parts = authHeader.split(' ');
-      token = parts.length > 1 ? parts[1] : null;
+      token = parts.length > 1 ? (parts[1] || null) : null;
     }
 
     // Get user from Supabase
@@ -287,7 +287,7 @@ export function extractUserIdFromPath(request: NextRequest): string | null {
   );
   
   if (userIndex !== -1 && pathSegments[userIndex + 1]) {
-    return pathSegments[userIndex + 1];
+    return pathSegments[userIndex + 1] || null;
   }
   
   return null;

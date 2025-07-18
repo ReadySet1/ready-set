@@ -25,8 +25,8 @@ jest.mock("@/utils/supabase/server", () => ({
 }));
 
 // Override the getCurrentUserId import
-jest.mock("../vendor", async (importOriginal) => {
-  const mod = await importOriginal() as any;
+jest.mock("../vendor", async () => {
+  const mod = await jest.requireActual("../vendor") as any;
   return {
     ...mod,
     getCurrentUserId: mockGetCurrentUserId,

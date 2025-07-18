@@ -21,6 +21,9 @@ jest.mock("@/utils/supabase/client", () => ({
 // Mock fetch
 global.fetch = jest.fn();
 
+// Mock AddressManagerWrapper component
+const mockAddressManagerWrapper = jest.fn();
+
 const mockCateringRequest = {
   id: "catering-123",
   orderNumber: "ORD-123",

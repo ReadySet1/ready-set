@@ -21,7 +21,9 @@ import {
   ArrowLeftIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useParams } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
+import { decodeOrderNumber } from "@/utils/order";
 
 // Shared types
 interface Driver {
@@ -244,15 +246,25 @@ const OrderPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
-  const pathname = usePathname();
+  const params = useParams();
+
+  // Extract order number from URL params with proper decoding for slashes
+  const orderNumber = (() => {
+    if (params?.order_number) {
+      const rawOrderNumber = Array.isArray(params.order_number)
+        ? params.order_number[0]
+        : params.order_number;
+
+      if (rawOrderNumber) {
+        return decodeOrderNumber(rawOrderNumber);
+      }
+    }
+    return "";
+  })();
 
   useEffect(() => {
-    const fetchOrder = async (currentPathname: string) => {
-      const orderNumber = decodeURIComponent(
-        currentPathname.split("/").pop() || "",
-      );
-
-      // Prevent fetching if orderNumber is somehow undefined or empty after splitting
+    const fetchOrder = async () => {
+      // Prevent fetching if orderNumber is somehow undefined or empty
       if (!orderNumber) {
         setError("Could not determine order number from URL.");
         setLoading(false);
@@ -288,15 +300,12 @@ const OrderPage: React.FC = () => {
       }
     };
 
-    if (pathname) {
-      fetchOrder(pathname);
+    if (orderNumber) {
+      fetchOrder();
     } else {
-      // Handle the case where pathname is null initially if necessary
-      // For example, set an error or loading state specific to this case
-      // setError("Pathname is not available yet.");
-      setLoading(false); // Or keep loading true until pathname is available
+      setLoading(false);
     }
-  }, [pathname]);
+  }, [orderNumber]);
 
   const updateDriverStatus = async (newStatus: string) => {
     if (!order) return;

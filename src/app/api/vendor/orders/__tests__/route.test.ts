@@ -230,8 +230,25 @@ describe.skip("Vendor Orders API Route", () => {
         {
           id: "1",
           orderNumber: "TEST-001",
-          orderType: "catering",
+          orderType: "catering" as const,
           status: "ACTIVE",
+          pickupDateTime: "2024-01-15T10:00:00Z",
+          arrivalDateTime: "2024-01-15T12:00:00Z",
+          orderTotal: 250.00,
+          pickupAddress: {
+            id: "pickup-1",
+            street1: "123 Main St",
+            city: "San Jose",
+            state: "CA",
+            zip: "95113"
+          },
+          deliveryAddress: {
+            id: "delivery-1", 
+            street1: "456 Oak Ave",
+            city: "San Jose",
+            state: "CA",
+            zip: "95112"
+          }
         }
       ],
       hasMore: false, // Last page
@@ -257,8 +274,25 @@ describe.skip("Vendor Orders API Route", () => {
         {
           id: "2",
           orderNumber: "TEST-002",
-          orderType: "on_demand",
+          orderType: "on_demand" as const,
           status: "PENDING",
+          pickupDateTime: "2024-01-16T14:00:00Z",
+          arrivalDateTime: "2024-01-16T16:00:00Z",
+          orderTotal: 180.00,
+          pickupAddress: {
+            id: "pickup-2",
+            street1: "789 Pine St",
+            city: "San Jose", 
+            state: "CA",
+            zip: "95114"
+          },
+          deliveryAddress: {
+            id: "delivery-2",
+            street1: "321 Elm St",
+            city: "San Jose",
+            state: "CA", 
+            zip: "95115"
+          }
         }
       ],
       hasMore: true, // More pages available
