@@ -110,7 +110,7 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[700px] max-h-[90vh] bg-white border-none shadow-2xl rounded-2xl overflow-hidden p-0 gap-0">
+      <DialogContent className="w-[95vw] max-w-[700px] max-h-[90vh] m-4 bg-white border-none shadow-2xl rounded-2xl overflow-hidden p-0 gap-0 z-[9999]">
         <DialogHeader className="pt-6 px-4 sm:px-6 pb-4 bg-gradient-to-r from-yellow-50 via-primary/10 to-white border-b">
           <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl font-bold bg-gradient-to-r from-primary to-custom-yellow bg-clip-text text-transparent">
             <Truck className="h-5 w-5 text-primary" />
