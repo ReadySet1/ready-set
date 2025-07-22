@@ -1,7 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { CreateCateringOrderForm } from "../CreateCateringOrderForm";
+import CreateCateringOrderForm from "../CreateCateringOrderForm";
 import { Address } from "@/types/address";
 
 // Mock the AddressManager component

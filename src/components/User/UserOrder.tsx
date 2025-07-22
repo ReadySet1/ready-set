@@ -7,6 +7,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   CalendarIcon,
@@ -14,9 +15,10 @@ import {
   FileTextIcon,
   UsersIcon,
   ClockIcon,
+  ChevronLeft,
 } from "lucide-react";
 import OrderStatusCard from "./OrderStatus";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 type OrderStatus = "active" | "assigned" | "cancelled" | "completed";
 type DriverStatus =
@@ -91,6 +93,7 @@ const UserOrderDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -218,6 +221,18 @@ const UserOrderDetail: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4">
+      {/* Back to Dashboard Button */}
+      <div className="mb-4 flex justify-start">
+        <Button
+          variant="ghost"
+          onClick={() => router.push("/client")}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-800"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Button>
+      </div>
+
       <h1 className="mb-6 text-center text-3xl font-bold">Order Details</h1>
       <Card className="mx-auto w-full max-w-3xl">
         <CardHeader>

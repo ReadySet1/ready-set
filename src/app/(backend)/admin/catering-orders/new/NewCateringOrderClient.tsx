@@ -1,78 +1,99 @@
 "use client";
 
-import React from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { CreateCateringOrderForm } from '@/components/Orders/CateringOrders/CreateCateringOrderForm';
-import { ClientListItem } from '../_actions/schemas';
-import { Plus, Users, ClipboardList } from 'lucide-react';
+import React from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import CreateCateringOrderForm from "@/components/Orders/CateringOrders/CreateCateringOrderForm";
+import { ClientListItem } from "../_actions/schemas";
+import { Plus, Users, ClipboardList } from "lucide-react";
 
 interface NewCateringOrderClientProps {
   clients: ClientListItem[];
 }
 
-const NewCateringOrderClient: React.FC<NewCateringOrderClientProps> = ({ clients }) => {
+const NewCateringOrderClient: React.FC<NewCateringOrderClientProps> = ({
+  clients,
+}) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="container mx-auto px-4 sm:px-6 py-6 sm:py-8"
+        className="container mx-auto px-4 py-6 sm:px-6 sm:py-8"
       >
         {/* Modern Header */}
         <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-6">
+          <div className="mb-6 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
                 <Plus className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">Create New Catering Order</h1>
-                <p className="text-slate-600 mt-1">Set up a new catering request for your clients</p>
+                <h1 className="text-2xl font-bold text-slate-800 sm:text-3xl">
+                  Create New Catering Order
+                </h1>
+                <p className="mt-1 text-slate-600">
+                  Set up a new catering request for your clients
+                </p>
               </div>
             </div>
-            
+
             {/* Stats Cards - Mobile Hidden, Desktop Visible */}
-            <div className="hidden lg:flex items-center gap-4">
-              <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-slate-200">
+            <div className="hidden items-center gap-4 lg:flex">
+              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-blue-600" />
                   <span className="text-sm font-medium text-slate-600">
-                    {clients.length} Client{clients.length !== 1 ? 's' : ''} Available
+                    {clients.length} Client{clients.length !== 1 ? "s" : ""}{" "}
+                    Available
                   </span>
                 </div>
               </div>
             </div>
           </div>
-          
+
           {/* Breadcrumbs */}
           <nav className="flex items-center space-x-2 text-sm text-slate-500">
-            <Link href="/admin" className="hover:text-slate-700 transition-colors">Dashboard</Link>
+            <Link
+              href="/admin"
+              className="transition-colors hover:text-slate-700"
+            >
+              Dashboard
+            </Link>
             <span>/</span>
-            <Link href="/admin/catering-orders" className="hover:text-slate-700 transition-colors">Catering Orders</Link>
+            <Link
+              href="/admin/catering-orders"
+              className="transition-colors hover:text-slate-700"
+            >
+              Catering Orders
+            </Link>
             <span>/</span>
-            <span className="text-slate-800 font-medium">New Order</span>
+            <span className="font-medium text-slate-800">New Order</span>
           </nav>
         </div>
 
         {/* Main Content */}
-        <div className="max-w-4xl mx-auto">
+        <div className="mx-auto max-w-4xl">
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.3, delay: 0.1 }}
-            className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
           >
             {/* Form Header */}
-            <div className="p-6 sm:p-8 border-b border-slate-100">
+            <div className="border-b border-slate-100 p-6 sm:p-8">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-600">
                   <ClipboardList className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-800">Order Information</h2>
-                  <p className="text-slate-600 text-sm mt-1">Fill in the details below to create a new catering order</p>
+                  <h2 className="text-xl font-semibold text-slate-800">
+                    Order Information
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Fill in the details below to create a new catering order
+                  </p>
                 </div>
               </div>
             </div>
@@ -88,19 +109,26 @@ const NewCateringOrderClient: React.FC<NewCateringOrderClientProps> = ({ clients
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.3, delay: 0.2 }}
-            className="lg:hidden mt-6 bg-white rounded-2xl shadow-sm border border-slate-200 p-6"
+            className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:hidden"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-green-600">
                   <Users className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-800">Available Clients</h3>
-                  <p className="text-sm text-slate-600">{clients.length} client{clients.length !== 1 ? 's' : ''} ready for orders</p>
+                  <h3 className="font-semibold text-slate-800">
+                    Available Clients
+                  </h3>
+                  <p className="text-sm text-slate-600">
+                    {clients.length} client{clients.length !== 1 ? "s" : ""}{" "}
+                    ready for orders
+                  </p>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-green-600">{clients.length}</div>
+              <div className="text-2xl font-bold text-green-600">
+                {clients.length}
+              </div>
             </div>
           </motion.div>
         </div>
@@ -109,4 +137,4 @@ const NewCateringOrderClient: React.FC<NewCateringOrderClientProps> = ({ clients
   );
 };
 
-export default NewCateringOrderClient; 
+export default NewCateringOrderClient;

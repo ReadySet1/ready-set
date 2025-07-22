@@ -255,8 +255,8 @@ const UpcomingOrderCard = ({ order }: { order: CombinedOrder }) => {
   // Determine the correct route based on order type
   const orderDetailsLink =
     order.orderType === "catering"
-      ? `/order-status/${order.id}`
-      : `/order-status/${order.id}`;
+      ? `/order-status/${order.orderNumber}`
+      : `/order-status/${order.orderNumber}`;
 
   return (
     <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">

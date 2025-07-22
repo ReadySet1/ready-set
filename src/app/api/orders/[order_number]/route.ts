@@ -81,9 +81,8 @@ function serializeOrder(data: any): any {
   // Get the state from the delivery address
   const state = data.deliveryAddress?.state || null;
 
-  // Create a copy of the data with formatted dates
-  const formattedData = {
-    ...data,
+  // Format dates first
+  const formattedDates = {
     pickupDateTime: formatDate(data.pickupDateTime, state),
     arrivalDateTime: formatDate(data.arrivalDateTime, state),
     completeDateTime: formatDate(data.completeDateTime, state),
@@ -91,10 +90,51 @@ function serializeOrder(data: any): any {
     updatedAt: formatDate(data.updatedAt, state)
   };
 
-  // Convert any BigInt values to strings
-  return JSON.parse(JSON.stringify(formattedData, (_, value) =>
-    typeof value === "bigint" ? value.toString() : value
-  ));
+  // Map fields to match what UserOrder component expects (snake_case)
+  const serializedOrder = {
+    ...JSON.parse(JSON.stringify(data, (_, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    )),
+    // Override with properly mapped field names
+    order_number: data.orderNumber,
+    order_total: data.orderTotal?.toString() || "0.00",
+    special_notes: data.specialNotes,
+    date: data.pickupDateTime || data.createdAt,
+    pickup_time: formattedDates.pickupDateTime,
+    arrival_time: formattedDates.arrivalDateTime,
+    complete_time: formattedDates.completeDateTime,
+    updated_at: formattedDates.updatedAt,
+    user_id: data.userId,
+    driver_status: data.driverStatus,
+    address: {
+      street1: data.pickupAddress?.street1 || null,
+      city: data.pickupAddress?.city || null,
+      state: data.pickupAddress?.state || null,
+      zip: data.pickupAddress?.zip || null
+    },
+    delivery_address: data.deliveryAddress ? {
+      street1: data.deliveryAddress.street1 || null,
+      city: data.deliveryAddress.city || null,
+      state: data.deliveryAddress.state || null,
+      zip: data.deliveryAddress.zip || null
+    } : null,
+    dispatch: data.dispatches && data.dispatches.length > 0 ? data.dispatches : null,
+    // Add catering-specific fields if present
+    ...(data.headcount && { headcount: data.headcount }),
+    ...(data.brokerage && { brokerage: data.brokerage }),
+    ...(data.needHost && { need_host: data.needHost }),
+    ...(data.hoursNeeded && { hours_needed: data.hoursNeeded }),
+    ...(data.numberOfHosts && { number_of_hosts: data.numberOfHosts }),
+    // Add on-demand specific fields if present  
+    ...(data.itemDelivered && { item_delivered: data.itemDelivered }),
+    ...(data.vehicleType && { vehicle_type: data.vehicleType }),
+    ...(data.length && { length: data.length }),
+    ...(data.width && { width: data.width }),
+    ...(data.height && { height: data.height }),
+    ...(data.weight && { weight: data.weight })
+  };
+
+  return serializedOrder;
 }
 
 export async function GET(
