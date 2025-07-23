@@ -60,6 +60,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   const [userRole, setUserRole] = useState<UserType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   // Memoized function to fetch user role with retry logic
   const fetchUserRoleWithRetry = useCallback(
@@ -69,6 +70,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
+          console.log(`[UserContext] Fetching user role, attempt ${attempt}`);
           const { data: profile } = await supabase
             .from("profiles")
             .select("type")
@@ -90,12 +92,18 @@ function UserProviderClient({ children }: { children: ReactNode }) {
             }
           }
 
+          console.log(`[UserContext] User role fetched successfully: ${role}`);
           return role;
         } catch (err) {
-          console.warn(`User role fetch attempt ${attempt} failed:`, err);
+          console.warn(
+            `[UserContext] User role fetch attempt ${attempt} failed:`,
+            err,
+          );
 
           if (attempt === MAX_RETRIES) {
-            console.error("Failed to fetch user role after max retries");
+            console.error(
+              "[UserContext] Failed to fetch user role after max retries",
+            );
             return null;
           }
 
@@ -109,16 +117,20 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     [],
   );
 
-  // Simplified auth state setup with improved error handling
+  // Enhanced auth state setup with improved error handling and session persistence
   useEffect(() => {
     let mounted = true;
     let authListener: any = null;
 
     const setupAuth = async () => {
       try {
-        const supabase = await supabaseClient;
+        console.log("[UserContext] Starting authentication setup");
+        const supabase = supabaseClient;
 
-        // Get initial user data
+        // Get initial session and user data
+        const {
+          data: { session: initialSession },
+        } = await supabase.auth.getSession();
         const {
           data: { user: currentUser },
           error: getUserError,
@@ -127,48 +139,82 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         if (!mounted) return;
 
         if (getUserError) {
+          console.error("[UserContext] Error getting user:", getUserError);
           throw getUserError;
         }
 
+        console.log("[UserContext] Initial auth state:", {
+          hasSession: !!initialSession,
+          hasUser: !!currentUser,
+          userId: currentUser?.id,
+        });
+
+        // Set session first
+        setSession(initialSession);
+
         if (currentUser) {
+          console.log("[UserContext] Setting authenticated user");
           setUser(currentUser);
+
+          // Fetch user role with loading state
+          setIsLoading(true);
           const role = await fetchUserRoleWithRetry(supabase, currentUser);
           if (role) {
             setUserRole(role);
           }
+        } else {
+          console.log("[UserContext] No authenticated user found");
+          // Explicitly set user to null when no authentication
+          setUser(null);
+          setUserRole(null);
         }
 
+        // Mark auth as initialized and set loading to false
+        setAuthInitialized(true);
         setIsLoading(false);
+        console.log("[UserContext] Authentication setup completed");
 
         // Set up auth state change listener
         const { data: listener } = supabase.auth.onAuthStateChange(
-          async (_event: string, session: Session | null) => {
+          async (event: string, session: Session | null) => {
             if (!mounted) return;
 
-            setSession(session);
+            console.log(`[UserContext] Auth state change: ${event}`, {
+              hasSession: !!session,
+              hasUser: !!session?.user,
+              userId: session?.user?.id,
+            });
 
+            setSession(session);
             const newUser = session?.user || null;
             setUser(newUser);
 
             if (!newUser) {
+              console.log("[UserContext] User signed out, clearing state");
               setUserRole(null);
+              setIsLoading(false);
               return;
             }
 
-            if (newUser?.id !== currentUser?.id) {
+            // Only fetch role if user changed or we don't have a role yet
+            if (newUser?.id !== currentUser?.id || !userRole) {
+              console.log("[UserContext] Fetching role for new/changed user");
+              setIsLoading(true);
               const role = await fetchUserRoleWithRetry(supabase, newUser);
               if (role) {
                 setUserRole(role);
               }
+              setIsLoading(false);
             }
           },
         );
 
         authListener = listener;
       } catch (error) {
-        console.error("Authentication setup failed:", error);
+        console.error("[UserContext] Authentication setup failed:", error);
         if (mounted) {
           setError("Authentication setup failed");
+          setAuthInitialized(true);
           setIsLoading(false);
         }
       }
@@ -182,14 +228,17 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         authListener.subscription.unsubscribe();
       }
     };
-  }, []); // Empty dependency array ensures this runs only once
+  }, [fetchUserRoleWithRetry]); // Include fetchUserRoleWithRetry in dependencies
 
-  // Improved refresh user data with retry logic
+  // Enhanced refresh user data with retry logic
   const refreshUserData = useCallback(async () => {
     try {
-      const supabase = await supabaseClient;
+      console.log("[UserContext] Refreshing user data");
+      const supabase = supabaseClient;
 
       setIsLoading(true);
+      setError(null);
+
       const {
         data: { user: currentUser },
         error: getUserError,
@@ -209,8 +258,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       } else {
         setUserRole(null);
       }
+
+      console.log("[UserContext] User data refreshed successfully");
     } catch (err) {
-      console.error("Error refreshing user data:", err);
+      console.error("[UserContext] Error refreshing user data:", err);
       setError("Failed to refresh user data");
     } finally {
       setIsLoading(false);
@@ -228,13 +279,16 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     return getOrderDetailPathUtil(orderNumber, userRole);
   };
 
+  // Enhanced loading state - only show loading if auth is not initialized
+  const effectiveLoading = isLoading || !authInitialized;
+
   return (
     <UserContext.Provider
       value={{
         session,
         user,
         userRole,
-        isLoading,
+        isLoading: effectiveLoading,
         error,
         refreshUserData,
         getDashboardPath,
