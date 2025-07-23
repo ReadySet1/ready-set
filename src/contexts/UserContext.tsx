@@ -7,6 +7,7 @@ import React, {
   useState,
   useEffect,
   ReactNode,
+  useCallback,
 } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
@@ -49,41 +50,8 @@ export const useUser = () => {
   return context;
 };
 
-// Helper function to fetch user role
-const fetchUserRole = async (
-  supabase: any,
-  user: User,
-  setUserRole: (role: UserType) => void,
-) => {
-  try {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("type")
-      .eq("id", user.id)
-      .single();
-
-    let role = UserType.CLIENT;
-    if (profile?.type) {
-      const typeUpper = profile.type.toUpperCase();
-      const enumValues = Object.values(UserType).map((val) =>
-        val.toUpperCase(),
-      );
-
-      if (enumValues.includes(typeUpper)) {
-        const originalEnumValue = Object.values(UserType).find(
-          (val) => val.toUpperCase() === typeUpper,
-        );
-        role = originalEnumValue as UserType;
-      }
-    }
-
-    setUserRole(role);
-    return role;
-  } catch (err) {
-    console.error("Error fetching user role:", err);
-    return null;
-  }
-};
+// Initialize Supabase client outside the component
+const supabaseClient = createClient();
 
 // Create a client component wrapper
 function UserProviderClient({ children }: { children: ReactNode }) {
@@ -92,40 +60,65 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   const [userRole, setUserRole] = useState<UserType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [supabase, setSupabase] = useState<any>(null);
 
-  // Initialize Supabase
-  useEffect(() => {
-    const initSupabase = async () => {
-      console.log("Initializing Supabase client...");
-      try {
-        const client = await createClient();
-        console.log("Supabase client initialized successfully");
-        setSupabase(client);
-      } catch (err) {
-        console.error("Failed to initialize Supabase client:", err);
-        setError("Authentication initialization failed");
-        setIsLoading(false);
+  // Memoized function to fetch user role with retry logic
+  const fetchUserRoleWithRetry = useCallback(
+    async (supabase: any, user: User) => {
+      const MAX_RETRIES = 3;
+      const RETRY_DELAY = 1000; // 1 second
+
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("type")
+            .eq("id", user.id)
+            .single();
+
+          let role = UserType.CLIENT;
+          if (profile?.type) {
+            const typeUpper = profile.type.toUpperCase();
+            const enumValues = Object.values(UserType).map((val) =>
+              val.toUpperCase(),
+            );
+
+            if (enumValues.includes(typeUpper)) {
+              const originalEnumValue = Object.values(UserType).find(
+                (val) => val.toUpperCase() === typeUpper,
+              );
+              role = originalEnumValue as UserType;
+            }
+          }
+
+          return role;
+        } catch (err) {
+          console.warn(`User role fetch attempt ${attempt} failed:`, err);
+
+          if (attempt === MAX_RETRIES) {
+            console.error("Failed to fetch user role after max retries");
+            return null;
+          }
+
+          // Wait before retrying
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+        }
       }
-    };
 
-    initSupabase();
-  }, []);
+      return null;
+    },
+    [],
+  );
 
-  // Load user data
+  // Simplified auth state setup with improved error handling
   useEffect(() => {
-    if (!supabase) {
-      console.log("Waiting for Supabase client...");
-      return;
-    }
-
-    console.log("Setting up auth state...");
     let mounted = true;
     let authListener: any = null;
 
     const setupAuth = async () => {
       try {
-        console.log("UserContext: Getting initial user data...");
+        const supabase = await supabaseClient;
+
+        // Get initial user data
         const {
           data: { user: currentUser },
           error: getUserError,
@@ -134,28 +127,24 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         if (!mounted) return;
 
         if (getUserError) {
-          console.error("Error getting user:", getUserError);
-          setIsLoading(false);
-          return;
+          throw getUserError;
         }
 
         if (currentUser) {
           setUser(currentUser);
-          console.log("UserContext: User found. Fetching user role...");
-          const role = await fetchUserRole(supabase, currentUser, setUserRole);
-        } else {
-          console.log("UserContext: No user found. Setting loading to false.");
-          setUser(null);
-          setUserRole(null);
+          const role = await fetchUserRoleWithRetry(supabase, currentUser);
+          if (role) {
+            setUserRole(role);
+          }
         }
 
         setIsLoading(false);
 
+        // Set up auth state change listener
         const { data: listener } = supabase.auth.onAuthStateChange(
           async (_event: string, session: Session | null) => {
             if (!mounted) return;
 
-            console.log("Auth state changed:", _event);
             setSession(session);
 
             const newUser = session?.user || null;
@@ -167,14 +156,17 @@ function UserProviderClient({ children }: { children: ReactNode }) {
             }
 
             if (newUser?.id !== currentUser?.id) {
-              const role = await fetchUserRole(supabase, newUser, setUserRole);
+              const role = await fetchUserRoleWithRetry(supabase, newUser);
+              if (role) {
+                setUserRole(role);
+              }
             }
           },
         );
 
         authListener = listener;
       } catch (error) {
-        console.error("Error in auth setup:", error);
+        console.error("Authentication setup failed:", error);
         if (mounted) {
           setError("Authentication setup failed");
           setIsLoading(false);
@@ -190,14 +182,14 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         authListener.subscription.unsubscribe();
       }
     };
-  }, [supabase]);
+  }, []); // Empty dependency array ensures this runs only once
 
-  // Function to manually refresh user data
-  const refreshUserData = async () => {
-    if (!supabase) return;
-
-    setIsLoading(true);
+  // Improved refresh user data with retry logic
+  const refreshUserData = useCallback(async () => {
     try {
+      const supabase = await supabaseClient;
+
+      setIsLoading(true);
       const {
         data: { user: currentUser },
         error: getUserError,
@@ -210,7 +202,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       setUser(currentUser);
 
       if (currentUser) {
-        const role = await fetchUserRole(supabase, currentUser, setUserRole);
+        const role = await fetchUserRoleWithRetry(supabase, currentUser);
+        if (role) {
+          setUserRole(role);
+        }
       } else {
         setUserRole(null);
       }
@@ -220,7 +215,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [fetchUserRoleWithRetry]);
 
   // Navigation helpers
   const getDashboardPath = () => {
