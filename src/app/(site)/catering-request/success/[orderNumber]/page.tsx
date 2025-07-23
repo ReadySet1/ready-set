@@ -14,14 +14,15 @@ import { format } from "date-fns";
 import Link from "next/link";
 
 interface Props {
-  params: { orderNumber: string };
+  params: Promise<{ orderNumber: string }>;
 }
 
 const CateringRequestSuccessPage = async ({ params }: Props) => {
-  const orderNumber = decodeURIComponent(params.orderNumber);
+  const { orderNumber } = await params;
+  const decodedOrderNumber = decodeURIComponent(orderNumber);
 
   // Basic validation
-  if (!orderNumber) {
+  if (!decodedOrderNumber) {
     notFound();
   }
 
@@ -57,7 +58,7 @@ const CateringRequestSuccessPage = async ({ params }: Props) => {
                 <p className="text-sm font-medium text-gray-700">
                   Order Number
                 </p>
-                <p className="text-lg font-semibold">{orderNumber}</p>
+                <p className="text-lg font-semibold">{decodedOrderNumber}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-700">Status</p>

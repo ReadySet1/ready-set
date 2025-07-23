@@ -3,8 +3,8 @@ import { prisma } from '@/lib/db/prisma';
 import { OrderConfirmationData } from '@/types/order-confirmation';
 import { defaultNextSteps } from '@/lib/order-confirmation';
 
-export async function GET(req: NextRequest, { params }: { params: { order_number: string } }) {
-  const { order_number } = params;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ order_number: string }> }) {
+  const { order_number } = await params;
   if (!order_number) {
     return NextResponse.json({ error: 'Order number is required' }, { status: 400 });
   }

@@ -3,17 +3,18 @@ import { fetchOrderConfirmationData } from "../../../../../../lib/order-confirma
 import OrderConfirmationCard from "../../../../../../components/Vendor/OrderConfirmation/OrderConfirmationCard";
 
 interface Props {
-  params: { orderNumber: string };
+  params: Promise<{ orderNumber: string }>;
 }
 
 const OrderConfirmationPage = async ({ params }: Props) => {
-  const data = await fetchOrderConfirmationData(params.orderNumber);
+  const { orderNumber } = await params;
+  const data = await fetchOrderConfirmationData(orderNumber);
 
   if (!data) {
     return (
       <div className="order-confirmation-error">
         <h1>Order Not Found</h1>
-        <p>We couldn't find an order with number {params.orderNumber}.</p>
+        <p>We couldn't find an order with number {orderNumber}.</p>
       </div>
     );
   }
