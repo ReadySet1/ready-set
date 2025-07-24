@@ -182,7 +182,7 @@ const MobileMenuOverlay: React.FC<{
   const router = useRouter();
 
   // Get role-specific menu item
-  const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole] : null;
+  const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole as UserType] : null;
 
   // Initialize Supabase client
   useEffect(() => {
@@ -379,7 +379,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
   isLogisticsPage,
 }) => {
   const { user, userRole, isLoading } = useUser();
-  const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole] : null;
+  const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole as UserType] : null;
 
   return (
     <>

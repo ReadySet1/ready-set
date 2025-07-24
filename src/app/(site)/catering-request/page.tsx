@@ -129,7 +129,7 @@ const CateringPageContent = () => {
   return (
     <div className="bg-gray-50 py-8 sm:py-12">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8 text-center">
+        <div className="mb-8 mt-20 text-center">
           <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">
             Catering Request
           </h1>
@@ -138,7 +138,10 @@ const CateringPageContent = () => {
           </p>
         </div>
 
-        <CateringRequestForm />
+        <div className="mt-20">
+          <DeliveryChecklist />
+          <CateringRequestForm />
+        </div>
       </div>
     </div>
   );

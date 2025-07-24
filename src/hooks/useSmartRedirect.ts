@@ -15,7 +15,7 @@ export const useSmartRedirect = () => {
     }
 
     try {
-      const dashboardRoute = getDashboardRouteByRole(userRole);
+      const dashboardRoute = getDashboardRouteByRole(userRole as UserType);
       router.push(dashboardRoute.path);
     } catch (error) {
       console.error('Error determining dashboard route:', error);

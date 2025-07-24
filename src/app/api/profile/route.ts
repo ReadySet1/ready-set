@@ -137,7 +137,7 @@ const fetchUserProfile = async (userId: string, requestContext: AuthRequestConte
       setTimeout(() => reject(new Error('Database query timeout')), 10000)
     );
     
-    const userData = await Promise.race([queryPromise, timeoutPromise]);
+    const userData = await Promise.race([queryPromise, timeoutPromise]) as any;
     
     const duration = Date.now() - startTime;
     console.log(`[Profile API] [${requestContext.requestId}] Database query completed in ${duration}ms:`, {

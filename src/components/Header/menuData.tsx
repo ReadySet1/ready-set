@@ -131,6 +131,7 @@ const menuData: MenuItem[] = [
     path: "/free-resources",
     newTab: false,
   },
+  cateringRequestMenuItem,
 ];
 
 export default menuData;

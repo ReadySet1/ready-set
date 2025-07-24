@@ -28,11 +28,11 @@ describe("Profile API Route", () => {
     from: vi.fn(() => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
-          single: vi.fn(() => ({ data: null, error: null })),
+          single: vi.fn(),
         })),
       })),
       insert: vi.fn(() => ({
-        select: vi.fn(() => ({ data: null, error: null })),
+        select: vi.fn(),
       })),
     })),
   };

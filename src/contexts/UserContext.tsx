@@ -260,7 +260,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           const sessionResult = await supabase.auth.getSession();
           initialSession = sessionResult.data.session;
         } catch (err) {
-          if (err?.name === "AuthSessionMissingError") {
+          if ((err as any)?.name === "AuthSessionMissingError") {
             initialSession = null;
           } else {
             throw err;
@@ -271,7 +271,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           currentUser = userResult.data.user;
           getUserError = userResult.error;
         } catch (err) {
-          if (err?.name === "AuthSessionMissingError") {
+          if ((err as any)?.name === "AuthSessionMissingError") {
             currentUser = null;
             getUserError = null;
           } else {

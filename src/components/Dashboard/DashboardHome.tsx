@@ -612,7 +612,7 @@ export function ModernDashboardHome() {
             Error Loading Dashboard
           </h3>
           <p className="mb-6 text-center text-sm text-red-600">
-            {combinedError}
+            {String(combinedError)}
           </p>
           <Button
             onClick={() => window.location.reload()}

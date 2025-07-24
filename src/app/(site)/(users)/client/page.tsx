@@ -461,21 +461,6 @@ const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
             </Link>
 
             <Link
-              href="/client"
-              className="flex items-center rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
-            >
-              <div className="mr-3 rounded-md bg-green-50 p-2">
-                <Home className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">View Dashboard</h4>
-                <p className="text-xs text-gray-500">
-                  Return to client dashboard
-                </p>
-              </div>
-            </Link>
-
-            <Link
               href="/order-status"
               className="flex items-center rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
             >

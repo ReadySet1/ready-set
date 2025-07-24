@@ -197,7 +197,7 @@ export default function ProfileTestPage() {
                   <strong>Session:</strong> {session ? "Present" : "Missing"}
                 </div>
                 <div>
-                  <strong>Error:</strong> {error || "None"}
+                  <strong>Error:</strong> {error ? String(error) : "None"}
                 </div>
                 <div>
                   <strong>Can Access Profile:</strong>{" "}

@@ -5,6 +5,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/UserContext";
 import { getDashboardRouteByRole } from "@/utils/navigation";
+import { UserType } from "@/types/user";
 
 interface BackToDashboardProps {
   className?: string;
@@ -27,7 +28,7 @@ export const BackToDashboard: React.FC<BackToDashboardProps> = ({
       return;
     }
 
-    const dashboardRoute = getDashboardRouteByRole(userRole);
+    const dashboardRoute = getDashboardRouteByRole(userRole as UserType);
     router.push(dashboardRoute.path);
   };
 
@@ -41,7 +42,7 @@ export const BackToDashboard: React.FC<BackToDashboardProps> = ({
   }
 
   const dashboardName = userRole
-    ? getDashboardRouteByRole(userRole).name
+    ? getDashboardRouteByRole(userRole as UserType).name
     : "Dashboard";
 
   return (

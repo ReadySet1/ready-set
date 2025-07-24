@@ -250,7 +250,7 @@ export async function middleware(request: NextRequest) {
         
         // Handle different types of authentication errors
         if (error instanceof Error && 'type' in error) {
-          const authError = error as AuthError;
+          const authError = error as unknown as AuthError;
           
           if (authError.type === AuthErrorType.USER_NOT_FOUND) {
             // User is not authenticated, redirect to sign-in

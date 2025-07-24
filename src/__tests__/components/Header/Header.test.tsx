@@ -140,4 +140,25 @@ describe("Header Component", () => {
       expect(signUpLinks.length).toBeGreaterThan(0);
     });
   });
+
+  it("should have 'Orders' menu at the end with 'Catering Request' submenu", () => {
+    mockUsePathname.mockReturnValue("/about");
+    mockUseUser.mockReturnValue({
+      user: null,
+      userRole: null,
+      isLoading: false,
+    });
+
+    render(<Header />);
+
+    // Find the Orders menu button
+    const ordersMenu = screen.getByText(/Orders/i);
+    expect(ordersMenu).toBeDefined();
+
+    // Simulate mouse over or click to open submenu
+    ordersMenu.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+
+    // Now check for Catering Request in the document
+    expect(screen.findByText(/Catering Request/i)).resolves.toBeDefined();
+  });
 });

@@ -272,7 +272,7 @@ const Header: React.FC = () => {
   };
 
   // Get role-specific menu item
-  const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole] : null;
+  const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole as UserType] : null;
 
   // Use base menu items without adding role-specific item (it will be shown separately)
   const menuItems = baseMenuItems;

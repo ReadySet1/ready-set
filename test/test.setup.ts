@@ -6,7 +6,7 @@ import { vi } from 'vitest';
 vi.mock('next/navigation', async (importOriginal) => {
   const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as any),
     useRouter: vi.fn(() => ({
       push: vi.fn(),
       replace: vi.fn(),

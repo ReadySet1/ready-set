@@ -136,7 +136,7 @@ export default function DiagnosticPage() {
                 {error && (
                   <div>
                     <strong>Error:</strong>{" "}
-                    <span className="text-red-600">{error}</span>
+                    <span className="text-red-600">{String(error)}</span>
                   </div>
                 )}
               </div>
