@@ -4,8 +4,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Mock the sitemap function
-jest.mock('../../app/sitemap', () => {
-  return jest.fn().mockReturnValue([
+vi.mock('../../app/sitemap', () => {
+  return vi.fn().mockReturnValue([
     {
       url: 'https://readysetllc.com',
       lastModified: '2025-01-01T00:00:00.000Z',

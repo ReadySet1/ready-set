@@ -1,6 +1,7 @@
 /**
- * @jest-environment node
+ * @vitest-environment node
  */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import sitemap from '../../app/sitemap';
 
 // Mock environment variable
@@ -18,7 +19,7 @@ describe('Sitemap Generation', () => {
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('should generate a sitemap with all expected URLs', () => {

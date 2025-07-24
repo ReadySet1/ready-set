@@ -39,6 +39,23 @@ describe("ProfilePage Component", () => {
     isLoading: false,
     error: null,
     refreshUserData: vi.fn(),
+    retryAuth: vi.fn(),
+    clearError: vi.fn(),
+    authState: {
+      isInitialized: true,
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+      retryCount: 0,
+      lastAuthCheck: new Date(),
+    },
+    profileState: {
+      data: null,
+      isLoading: false,
+      error: null,
+      lastFetched: null,
+      retryCount: 0,
+    },
   };
 
   const mockProfileData = {
@@ -70,6 +87,11 @@ describe("ProfilePage Component", () => {
     (useUser as any).mockReturnValueOnce({
       ...mockUserContext,
       isLoading: true,
+      authState: {
+        ...mockUserContext.authState,
+        isInitialized: false,
+        isLoading: true,
+      },
     });
 
     render(<ProfilePage />);
@@ -83,6 +105,10 @@ describe("ProfilePage Component", () => {
     (useUser as any).mockReturnValueOnce({
       ...mockUserContext,
       user: null,
+      authState: {
+        ...mockUserContext.authState,
+        isAuthenticated: false,
+      },
     });
 
     render(<ProfilePage />);
@@ -239,7 +265,7 @@ describe("ProfilePage Component", () => {
   });
 
   it("should handle API errors gracefully", async () => {
-    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+    mockFetch.mockRejectedValueOnce(new Error("Failed to fetch"));
 
     render(<ProfilePage />);
 
@@ -254,6 +280,10 @@ describe("ProfilePage Component", () => {
     // Test retry button
     const retryButton = screen.getByText("Retry");
     fireEvent.click(retryButton);
-    expect(mockUserContext.refreshUserData).toHaveBeenCalled();
+    
+    // The retry button should trigger a new fetch attempt
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2); // Initial fetch + retry fetch
+    });
   });
 });

@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import ClientOrders from "@/components/User/UserOrdersTable";
 
 // Mock Next.js router
-jest.mock("next/navigation", () => ({
-  useRouter: jest.fn(),
+vi.mock("next/navigation", () => ({
+  useRouter: vi.fn(),
 }));
 
 // Mock fetch globally

@@ -5,7 +5,7 @@ import AddAddressForm from "../AddAddressForm";
 import { COUNTIES } from "@/components/Auth/SignUp/ui/FormData";
 
 // Mock the FormData import
-jest.mock("@/components/Auth/SignUp/ui/FormData", () => ({
+vi.mock("@/components/Auth/SignUp/ui/FormData", () => ({
   COUNTIES: [
     { value: "san-francisco", label: "San Francisco" },
     { value: "san-mateo", label: "San Mateo" },

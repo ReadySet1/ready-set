@@ -311,92 +311,26 @@ const Header: React.FC = () => {
             />
 
             {/* Auth Buttons (only visible on desktop; mobile handled by MobileMenu) */}
-            <div className="hidden items-center justify-end pr-16 sm:flex lg:pr-0">
-              {!user && !isLoading ? (
-                <>
-                  {pathUrl !== "/" || isVirtualAssistantPage ? (
-                    <div className="flex items-center gap-3">
-                      <Link
-                        href="/sign-in"
-                        className={`hidden rounded-lg px-7 py-3 text-base font-semibold transition-all duration-300 lg:block ${
-                          sticky
-                            ? "bg-white/90 text-dark shadow-md hover:bg-white dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
-                            : isVirtualAssistantPage
-                              ? "bg-white/90 text-dark shadow-md hover:bg-white"
-                              : "bg-white/90 text-dark shadow-md hover:bg-white dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
-                        } `}
-                      >
-                        Sign In
-                      </Link>
-                      <Link
-                        href="/sign-up"
-                        className="hidden rounded-lg bg-amber-400 px-6 py-3 text-base font-medium text-black duration-300 ease-in-out hover:bg-amber-500 dark:bg-white/10 dark:hover:bg-white/20 lg:block"
-                      >
-                        Sign Up
-                      </Link>
-                    </div>
-                  ) : (
-                    <>
-                      <Link
-                        href="/sign-in"
-                        className={`hidden rounded-lg px-7 py-3 text-base font-semibold transition-all duration-300 md:block ${
-                          sticky
-                            ? "bg-white/90 text-dark shadow-md hover:bg-white dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
-                            : "bg-white/90 text-dark shadow-md hover:bg-white"
-                        } `}
-                      >
-                        Sign In
-                      </Link>
-                      <Link
-                        href="/sign-up"
-                        className={`hidden rounded-lg px-6 py-3 text-base font-medium text-white duration-300 ease-in-out md:block ${
-                          sticky
-                            ? "bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800"
-                            : "bg-blue-500 hover:bg-blue-600"
-                        }`}
-                      >
-                        Sign Up
-                      </Link>
-                    </>
-                  )}
-                </>
-              ) : user ? (
-                <>
-                  {roleMenuItem && roleMenuItem.path && (
-                    <Link href={roleMenuItem.path}>
-                      <p
-                        className={`loginBtn hidden px-7 py-3 font-medium lg:block ${
-                          sticky
-                            ? "text-dark dark:text-white"
-                            : isVirtualAssistantPage ||
-                                isHomePage ||
-                                isLogisticsPage
-                              ? "text-white"
-                              : "text-dark dark:text-white"
-                        }`}
-                      >
-                        {roleMenuItem.title}
-                      </p>
-                    </Link>
-                  )}
-                  {isVirtualAssistantPage || isHomePage ? (
-                    <button
-                      onClick={handleSignOut}
-                      disabled={isSigningOut}
-                      className="signUpBtn hidden rounded-lg bg-blue-800 bg-opacity-20 px-6 py-3 text-base font-medium text-white duration-300 ease-in-out hover:bg-opacity-100 hover:text-white md:block"
-                    >
-                      {isSigningOut ? "Signing Out..." : "Sign Out"}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleSignOut}
-                      disabled={isSigningOut}
-                      className="signUpBtn hidden rounded-lg bg-blue-800 bg-opacity-100 px-6 py-3 text-base font-medium text-white duration-300 ease-in-out hover:bg-opacity-20 hover:text-dark md:block"
-                    >
-                      {isSigningOut ? "Signing Out..." : "Sign Out"}
-                    </button>
-                  )}
-                </>
+            <div className="items-center justify-end pr-16 sm:flex lg:pr-0">
+              {pathUrl !== "/" ? (
+                <div className="flex items-center gap-3">
+                  <Link
+                    href="/sign-in"
+                    className={`rounded-lg px-7 py-3 text-base font-semibold transition-all duration-300 ${
+                      sticky
+                        ? "bg-white/90 text-dark shadow-md hover:bg-white dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+                        : "bg-white/90 text-dark shadow-md hover:bg-white dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+                    } `}
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/sign-up"
+                    className="rounded-lg bg-amber-400 px-6 py-3 text-base font-medium text-black duration-300 ease-in-out hover:bg-amber-500 dark:bg-white/10 dark:hover:bg-white/20"
+                  >
+                    Sign Up
+                  </Link>
+                </div>
               ) : null}
             </div>
 

@@ -7,7 +7,7 @@ import CustomNextSeo from "../../components/Blog/CustomSeo";
 import type { SeoType } from "@/sanity/schemaTypes/seo";
 
 // Mock Next.js Head component
-jest.mock("next/head", () => {
+vi.mock("next/head", () => {
   return function MockHead({ children }: { children: React.ReactNode }) {
     return <div data-testid="mock-head">{children}</div>;
   };

@@ -131,18 +131,6 @@ const menuData: MenuItem[] = [
     path: "/free-resources",
     newTab: false,
   },
-  {
-    id: 9,
-    title: "Sign In",
-    path: "/signin",
-    newTab: false,
-  },
-  {
-    id: 10,
-    title: "Sign Up",
-    path: "/signup",
-    newTab: false,
-  },
 ];
 
 export default menuData;

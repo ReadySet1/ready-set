@@ -58,16 +58,12 @@ const Signin = ({
     if (state?.error) {
       setErrors((prev) => ({ ...prev, general: state.error || "" }));
       setLoading(false);
-      
-
     }
-    
+
     // If redirectTo is set in the state, we're being redirected by the server
     if (state?.redirectTo) {
       console.log("Login action is handling redirect to:", state.redirectTo);
-      
 
-      
       // Let the server handle the redirect
     }
   }, [state, loginData.email, returnTo]);
@@ -127,9 +123,10 @@ const Signin = ({
       setMagicLinkSent(true);
     } catch (error: any) {
       console.error("Magic link error:", error);
-      let errorMessage = "Unable to send magic link. Please check your email and try again.";
+      let errorMessage =
+        "Unable to send magic link. Please check your email and try again.";
       if (error?.message?.includes("User not found")) {
-         errorMessage = "Email not found. Please sign up first.";
+        errorMessage = "Email not found. Please sign up first.";
       }
       setErrors((prev) => ({
         ...prev,
@@ -139,29 +136,6 @@ const Signin = ({
       setMagicLinkLoading(false);
     }
   };
-
-
-
-  if (isUserLoading) {
-    return (
-      <section className="bg-[#F4F7FF] py-14 dark:bg-dark lg:py-20">
-        <div className="container">
-          <div className="flex h-64 items-center justify-center">
-            <div className="text-center">
-              <Loader />
-              <p className="mt-4 text-gray-600 dark:text-gray-400">
-                Loading...
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  if (session) {
-     return null;
-  }
 
   return (
     <section className="bg-[#F4F7FF] py-14 dark:bg-dark lg:py-20">
@@ -232,7 +206,7 @@ const Signin = ({
                 </span>
                 <div className="flex-grow border-t border-gray-300 dark:border-dark-3"></div>
               </div>
-              
+
               {/* Secondary options: Email/Password or Magic Link */}
               <div className="mb-5 flex rounded border">
                 <button
@@ -273,7 +247,9 @@ const Signin = ({
                       required
                     />
                     {errors.email && (
-                      <p className="mt-1 text-sm text-red-500">{errors.email}</p>
+                      <p className="mt-1 text-sm text-red-500">
+                        {errors.email}
+                      </p>
                     )}
                   </div>
                   <div className="mb-4">
@@ -295,11 +271,7 @@ const Signin = ({
                     )}
                   </div>
                   {/* Hidden input for returnTo */}
-                  <input
-                    type="hidden"
-                    name="returnTo"
-                    value={returnTo}
-                  />
+                  <input type="hidden" name="returnTo" value={returnTo} />
                   <div className="mb-6">
                     <button
                       type="submit"
@@ -379,7 +351,7 @@ const Signin = ({
                   )}
                 </form>
               )}
-              
+
               <div>
                 <span className="absolute right-1 top-1">
                   <svg

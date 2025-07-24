@@ -76,12 +76,12 @@ const Navigation: React.FC<NavigationProps> = ({
         {!session?.user && (
           <>
             <AuthLink
-              href="/signin"
+              href="/sign-in"
               title="Sign In"
               navbarToggleHandler={navbarToggleHandler}
             />
             <AuthLink
-              href="/signup"
+              href="/sign-up"
               title="Sign Up"
               navbarToggleHandler={navbarToggleHandler}
             />

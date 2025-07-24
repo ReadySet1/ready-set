@@ -4,9 +4,9 @@ import "@testing-library/jest-dom";
 import DriverDashboardPage from "../DriverOrder";
 
 // Mock Next.js modules
-jest.mock("next/navigation", () => ({
-  usePathname: jest.fn(),
-  useRouter: jest.fn(),
+vi.mock("next/navigation", () => ({
+      usePathname: vi.fn(),
+    useRouter: vi.fn(),
 }));
 
 // Mock fetch globally

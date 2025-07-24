@@ -1,65 +1,82 @@
 import '@testing-library/jest-dom';
 import { TextEncoder, TextDecoder } from 'util';
+import { vi } from 'vitest';
 
 // Mock Next.js router
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: jest.fn(),
-    replace: jest.fn(),
-    prefetch: jest.fn(),
-    back: jest.fn(),
-    forward: jest.fn(),
-    refresh: jest.fn(),
-  }),
-  useSearchParams: () => new URLSearchParams(),
-  usePathname: () => '/',
-}));
+vi.mock('next/navigation', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    useRouter: vi.fn(() => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      prefetch: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      refresh: vi.fn(),
+    })),
+    useSearchParams: vi.fn(() => new URLSearchParams()),
+    usePathname: vi.fn(() => '/'),
+    useParams: vi.fn(() => ({})),
+  };
+});
 
-// Mock Supabase client (if needed)
-// jest.mock('@/utils/supabase/client', () => ({
-//   createClient: jest.fn(() => ({
-//     auth: {
-//       getUser: jest.fn(),
-//       getSession: jest.fn(),
-//       onAuthStateChange: jest.fn(() => ({
-//         data: { subscription: { unsubscribe: jest.fn() } }
-//       })),
-//     },
-//   })),
-// }));
+// Mock Supabase client
+vi.mock('@/utils/supabase/client', () => ({
+  createClient: vi.fn(() => ({
+    auth: {
+      getSession: vi.fn(),
+      getUser: vi.fn(),
+      onAuthStateChange: vi.fn(() => ({ 
+        data: { subscription: { unsubscribe: vi.fn() } } 
+      })),
+      updateUser: vi.fn(),
+    },
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn(() => ({ data: null, error: null })),
+        })),
+      })),
+      insert: vi.fn(() => ({
+        select: vi.fn(() => ({ data: null, error: null })),
+      })),
+    })),
+  })),
+}));
 
 // Mock window methods (only if window is available)
 if (typeof window !== 'undefined') {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
-    value: jest.fn().mockImplementation(query => ({
+    value: vi.fn().mockImplementation(query => ({
       matches: false,
       media: query,
       onchange: null,
-      addListener: jest.fn(), // Deprecated
-      removeListener: jest.fn(), // Deprecated
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-      dispatchEvent: jest.fn(),
+      addListener: vi.fn(), // Deprecated
+      removeListener: vi.fn(), // Deprecated
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
     })),
   });
 
   // Mock scrollTo
   Object.defineProperty(window, 'scrollTo', {
     writable: true,
-    value: jest.fn(),
+    value: vi.fn(),
   });
 }
 
 // Mock IntersectionObserver
-global.IntersectionObserver = jest.fn().mockImplementation(() => ({
-  disconnect: jest.fn(),
-  observe: jest.fn(),
-  unobserve: jest.fn(),
+global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+  disconnect: vi.fn(),
+  observe: vi.fn(),
+  unobserve: vi.fn(),
   root: null,
   rootMargin: '',
   thresholds: [],
-  takeRecords: jest.fn(),
+  takeRecords: vi.fn(),
 }));
 
 // Mock ResizeObserver
@@ -71,59 +88,52 @@ global.ResizeObserver = class ResizeObserver {
 };
 
 // Increase timeout for async operations
-jest.setTimeout(30000);
-
-// Mock Next.js navigation
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: jest.fn(),
-    replace: jest.fn(),
-    prefetch: jest.fn(),
-    back: jest.fn(),
-  }),
-  usePathname: () => '/',
-  useSearchParams: () => new URLSearchParams(),
-}));
+vi.setConfig({ testTimeout: 30000 });
 
 // Mock Supabase server client
-jest.mock('@/utils/supabase/server', () => ({
-  createClient: jest.fn().mockReturnValue({
+vi.mock('@/utils/supabase/server', () => ({
+  createClient: vi.fn().mockReturnValue({
     auth: {
-      getUser: jest.fn(),
+      getUser: vi.fn(),
     },
   }),
 }));
 
 // Mock Prisma client
-jest.mock('@prisma/client', () => ({
-  PrismaClient: jest.fn().mockImplementation(() => ({
-    $transaction: jest.fn(),
+vi.mock('@prisma/client', () => ({
+  PrismaClient: vi.fn().mockImplementation(() => ({
+    $transaction: vi.fn(),
     cateringRequest: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
     },
     onDemand: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
     },
     address: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
+      create: vi.fn(),
+      findUnique: vi.fn(),
     },
-    $disconnect: jest.fn(),
+    $disconnect: vi.fn(),
   })),
 }));
 
 // Mock email sender
-jest.mock('@/utils/emailSender', () => ({
-  sendOrderEmail: jest.fn(),
+vi.mock('@/utils/emailSender', () => ({
+  sendOrderEmail: vi.fn(),
 }));
 
 // Add TextEncoder and TextDecoder to global scope
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder as any;
 
+// Mock environment variables
+process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
+process.env.SUPABASE_URL = 'https://test.supabase.co';
+process.env.SUPABASE_ANON_KEY = 'test-key';
+
 // Mock fetch
-global.fetch = jest.fn();
+global.fetch = vi.fn();

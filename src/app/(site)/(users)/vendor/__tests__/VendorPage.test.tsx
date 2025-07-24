@@ -5,8 +5,8 @@ import userEvent from "@testing-library/user-event";
 import VendorPage from "../page";
 
 // Mock Next.js router
-const mockPush = jest.fn();
-jest.mock("next/navigation", () => ({
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
     replace: jest.fn(),

@@ -39,6 +39,23 @@ describe("Profile Edit Functionality", () => {
     isLoading: false,
     error: null,
     refreshUserData: vi.fn(),
+    retryAuth: vi.fn(),
+    clearError: vi.fn(),
+    authState: {
+      isInitialized: true,
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+      retryCount: 0,
+      lastAuthCheck: new Date(),
+    },
+    profileState: {
+      data: null,
+      isLoading: false,
+      error: null,
+      lastFetched: null,
+      retryCount: 0,
+    },
   };
 
   const mockProfileData = {

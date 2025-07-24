@@ -6,7 +6,7 @@ import { AllOrdersModal } from "../AllOrdersModal";
 import { OrderData } from "@/lib/services/vendor";
 
 // Mock fetch globally
-const mockFetch = jest.fn();
+const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 // Mock UI components

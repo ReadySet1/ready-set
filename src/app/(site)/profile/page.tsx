@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/UserContext";
 import { motion } from "framer-motion";
@@ -28,6 +28,8 @@ import {
   Download,
   Trash2,
   RefreshCw,
+  AlertCircle,
+  CheckCircle,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useUploadFile } from "@/hooks/use-upload-file";
@@ -35,10 +37,14 @@ import { FileUploader } from "@/components/Uploader/file-uploader";
 import { FileWithPath } from "react-dropzone";
 import { Loading } from "@/components/ui/loading";
 import ErrorBoundary from "@/components/ErrorBoundary/ErrorBoundary";
+import { AuthErrorType } from "@/types/auth";
 
 // Profile Loading Skeleton
 const ProfileSkeleton = () => (
-  <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+  <div
+    data-testid="profile-skeleton"
+    className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50"
+  >
     <div className="container mx-auto px-6 py-8">
       <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="space-y-4">
@@ -65,7 +71,7 @@ const ProfileSkeleton = () => (
   </div>
 );
 
-// Profile Error Boundary Fallback
+// Enhanced Profile Error Boundary Fallback
 const ProfileErrorFallback = ({
   error,
   resetErrorBoundary,
@@ -117,11 +123,18 @@ export default function ProfilePage() {
     isLoading: userLoading,
     error: userError,
     refreshUserData,
+    retryAuth,
+    clearError,
+    authState,
+    profileState,
   } = useUser();
+
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authCheckComplete, setAuthCheckComplete] = useState(false);
+  const [profileFetchAttempts, setProfileFetchAttempts] = useState(0);
+  const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -129,24 +142,31 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Enhanced authentication check with timeout
+  // Enhanced authentication check with improved coordination
   useEffect(() => {
     const checkAuthentication = async () => {
-      console.log("[ProfilePage] Starting authentication check", {
+      console.log("[ProfilePage] Starting enhanced authentication check", {
         userLoading,
         hasUser: !!user,
-        userError,
+        userError: userError?.message,
         authCheckComplete,
+        authState: {
+          isInitialized: authState.isInitialized,
+          isAuthenticated: authState.isAuthenticated,
+          isLoading: authState.isLoading,
+        },
       });
 
-      // Wait for UserContext to finish loading
-      if (userLoading) {
-        console.log("[ProfilePage] UserContext still loading, waiting...");
+      // Wait for UserContext to finish loading and be initialized
+      if (userLoading || !authState.isInitialized) {
+        console.log(
+          "[ProfilePage] UserContext still loading or not initialized, waiting...",
+        );
         return;
       }
 
-      // If we have a user, authentication is successful
-      if (user) {
+      // If we have a user and are authenticated, proceed
+      if (user && authState.isAuthenticated) {
         console.log(
           "[ProfilePage] User authenticated, proceeding to fetch profile",
         );
@@ -155,7 +175,7 @@ export default function ProfilePage() {
       }
 
       // If no user and context is loaded, check if we should redirect
-      if (!user && !userLoading && !userError) {
+      if (!user && !userLoading && !userError && authState.isInitialized) {
         console.log(
           "[ProfilePage] No user found, checking if redirect is needed",
         );
@@ -167,40 +187,50 @@ export default function ProfilePage() {
           );
 
           // Double-check authentication state before redirecting
-          if (!user && !userLoading) {
+          if (!user && !userLoading && authState.isInitialized) {
             console.log(
               "[ProfilePage] Confirmed no user, redirecting to sign-in",
             );
             router.push("/sign-in");
           }
-        }, 500); // Increased timeout for better reliability
+        }, 750); // Increased timeout for better reliability
 
         return () => clearTimeout(redirectTimeout);
       }
 
-      // If there's an error, mark check as complete
+      // If there's an error, mark check as complete and handle appropriately
       if (userError) {
-        console.log("[ProfilePage] UserContext error detected:", userError);
+        console.log(
+          "[ProfilePage] UserContext error detected:",
+          userError.message,
+        );
         setAuthCheckComplete(true);
+
+        // If it's a retryable error, we might want to retry
+        if (userError.retryable && profileFetchAttempts < 3) {
+          console.log("[ProfilePage] Retryable error detected, will retry");
+        }
       }
     };
 
     checkAuthentication();
-  }, [user, userLoading, userError, router]);
+  }, [user, userLoading, userError, router, authState, profileFetchAttempts]);
 
-  // Fetch profile data when authentication is confirmed
-  useEffect(() => {
-    const fetchProfile = async () => {
-      // Only proceed if authentication check is complete and we have a user
+  // Enhanced profile fetching with retry logic and better error handling
+  const fetchProfileData = useCallback(
+    async (retryCount: number = 0) => {
       if (!authCheckComplete || !user) {
         return;
       }
 
-      console.log("[ProfilePage] Fetching profile data for user:", user.id);
+      console.log(
+        `[ProfilePage] Fetching profile data for user: ${user.id} (attempt ${retryCount + 1})`,
+      );
 
       try {
         setLoading(true);
         setError(null);
+        setLastFetchTime(new Date());
 
         const response = await fetch("/api/profile", {
           headers: {
@@ -221,24 +251,48 @@ export default function ProfilePage() {
             setProfile(null);
             return;
           }
+
+          if (response.status === 404) {
+            console.log("[ProfilePage] 404 Profile not found");
+            setError("Profile not found. Please contact support.");
+            setProfile(null);
+            return;
+          }
+
           throw new Error(`Failed to fetch profile data: ${response.status}`);
         }
 
         const userData = await response.json();
         console.log("[ProfilePage] Profile data received:", userData);
         setProfile(userData);
+        setProfileFetchAttempts(0); // Reset attempts on success
       } catch (err) {
         console.error("[ProfilePage] Profile fetch error:", err);
-        setError(
-          err instanceof Error ? err.message : "An unexpected error occurred",
-        );
+
+        const errorMessage =
+          err instanceof Error ? err.message : "An unexpected error occurred";
+        setError(errorMessage);
+
+        // Implement retry logic for network errors
+        if (retryCount < 2 && errorMessage.includes("Failed to fetch")) {
+          console.log(`[ProfilePage] Retrying profile fetch in 2 seconds...`);
+          setTimeout(() => {
+            fetchProfileData(retryCount + 1);
+          }, 2000);
+        }
       } finally {
         setLoading(false);
       }
-    };
+    },
+    [user, authCheckComplete],
+  );
 
-    fetchProfile();
-  }, [user, authCheckComplete]);
+  // Fetch profile data when authentication is confirmed
+  useEffect(() => {
+    if (authCheckComplete && user) {
+      fetchProfileData();
+    }
+  }, [authCheckComplete, user, fetchProfileData]);
 
   // Initialize edit data when profile is loaded
   useEffect(() => {
@@ -284,7 +338,7 @@ export default function ProfilePage() {
     setSaveError(null); // Clear any previous errors
   };
 
-  // Handle save
+  // Enhanced save with better error handling
   const handleSave = async () => {
     if (!user) return;
 
@@ -334,21 +388,42 @@ export default function ProfilePage() {
     }
   };
 
+  // Enhanced retry function
+  const handleRetry = useCallback(async () => {
+    console.log("[ProfilePage] Retrying profile fetch");
+    setError(null);
+    setProfileFetchAttempts((prev) => prev + 1);
+    await fetchProfileData();
+  }, [fetchProfileData]);
+
   // Enhanced loading states with better coordination
-  if (userLoading || !authCheckComplete) {
+  if (
+    userLoading ||
+    !authState.isInitialized ||
+    !authCheckComplete ||
+    loading
+  ) {
     console.log("[ProfilePage] Showing loading skeleton", {
       userLoading,
+      authStateInitialized: authState.isInitialized,
       authCheckComplete,
+      loading,
     });
     return <ProfileSkeleton />;
   }
 
-  // Error states
+  // Enhanced error states with better error differentiation
   if (userError || error) {
-    console.log("[ProfilePage] Showing error state", { userError, error });
-    const errorObject = new Error(
-      userError || error || "Unable to load profile information",
-    );
+    console.log("[ProfilePage] Showing error state", {
+      userError: userError?.message,
+      error,
+      userErrorType: userError?.type,
+    });
+
+    const isRetryable =
+      userError?.retryable || error?.includes("Failed to fetch");
+    const errorMessage =
+      userError?.message || error || "Unable to load profile information";
 
     return (
       <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -359,22 +434,24 @@ export default function ProfilePage() {
           className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
         >
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-            <Shield className="h-6 w-6 text-red-600" />
+            <AlertCircle className="h-6 w-6 text-red-600" />
           </div>
           <h3 className="mb-2 text-center text-xl font-semibold text-slate-900">
             Profile Error
           </h3>
           <p className="mb-6 text-center text-sm text-red-600">
-            {errorObject.message}
+            {errorMessage}
           </p>
           <div className="flex justify-center space-x-4">
-            <Button
-              onClick={refreshUserData}
-              className="bg-blue-600 text-white hover:bg-blue-700"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Retry
-            </Button>
+            {isRetryable && (
+              <Button
+                onClick={userError ? retryAuth : handleRetry}
+                className="bg-blue-600 text-white hover:bg-blue-700"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {userError ? "Retry Auth" : "Retry"}
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => router.push("/")}
@@ -388,8 +465,8 @@ export default function ProfilePage() {
     );
   }
 
-  // No profile found
-  if (!profile) {
+  // No profile found with enhanced messaging
+  if (!profile && !loading) {
     console.log("[ProfilePage] No profile found, showing not found state");
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -406,15 +483,26 @@ export default function ProfilePage() {
             Profile Not Found
           </h2>
           <p className="mb-6 text-slate-500">
-            We couldn't load your profile information.
+            We couldn't load your profile information. This might be a temporary
+            issue.
           </p>
-          <Button
-            variant="default"
-            onClick={() => router.push("/client")}
-            className="rounded-xl bg-blue-600 px-6 py-2 text-white shadow-lg transition-all duration-200 hover:bg-blue-700 hover:shadow-xl"
-          >
-            Go to Dashboard
-          </Button>
+          <div className="flex flex-col gap-3">
+            <Button
+              variant="default"
+              onClick={handleRetry}
+              className="rounded-xl bg-blue-600 px-6 py-2 text-white shadow-lg transition-all duration-200 hover:bg-blue-700 hover:shadow-xl"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try Again
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push("/client")}
+              className="rounded-xl border-slate-300 px-6 py-2 text-slate-700 transition-all duration-200 hover:bg-slate-100"
+            >
+              Go to Dashboard
+            </Button>
+          </div>
         </motion.div>
       </div>
     );
@@ -443,7 +531,7 @@ export default function ProfilePage() {
           },
         }}
       />
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 pt-32">
         <div className="container mx-auto px-6 py-8">
           {/* Header */}
           <div className="mb-8">
@@ -472,6 +560,11 @@ export default function ProfilePage() {
                   </Badge>
                 </div>
                 <p className="text-slate-600">{profile.name || user?.email}</p>
+                {lastFetchTime && (
+                  <p className="mt-1 text-xs text-slate-400">
+                    Last updated: {lastFetchTime.toLocaleTimeString()}
+                  </p>
+                )}
               </div>
 
               {/* Edit Profile Button / Save & Cancel */}

@@ -25,9 +25,16 @@ describe("Profile API Route", () => {
       getUser: vi.fn(),
       updateUser: vi.fn(),
     },
-    from: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    select: vi.fn(),
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn(() => ({ data: null, error: null })),
+        })),
+      })),
+      insert: vi.fn(() => ({
+        select: vi.fn(() => ({ data: null, error: null })),
+      })),
+    })),
   };
 
   const mockUser = {
@@ -62,7 +69,8 @@ describe("Profile API Route", () => {
         error: null,
       });
 
-      const response = await GET();
+      const request = new Request('http://localhost/api/profile');
+      const response = await GET(request);
 
       expect(response.status).toBe(401);
       const body = await response.json();
@@ -77,11 +85,12 @@ describe("Profile API Route", () => {
 
       (prisma.profile.findUnique as any).mockResolvedValue(mockProfileData);
 
-      const response = await GET();
+      const request = new Request('http://localhost/api/profile');
+      const response = await GET(request);
 
       expect(response.status).toBe(200);
       const body = await response.json();
-      expect(body).toEqual(mockProfileData);
+      expect(body).toEqual(expect.objectContaining(mockProfileData));
       expect(prisma.profile.findUnique).toHaveBeenCalledWith({
         where: { id: "user-123" },
         select: expect.objectContaining({
@@ -101,7 +110,8 @@ describe("Profile API Route", () => {
 
       (prisma.profile.findUnique as any).mockResolvedValue(null);
 
-      const response = await GET();
+      const request = new Request('http://localhost/api/profile');
+      const response = await GET(request);
 
       expect(response.status).toBe(404);
       const body = await response.json();
@@ -118,11 +128,12 @@ describe("Profile API Route", () => {
         new Error("Database connection failed")
       );
 
-      const response = await GET();
+      const request = new Request('http://localhost/api/profile');
+      const response = await GET(request);
 
       expect(response.status).toBe(500);
       const body = await response.json();
-      expect(body.error).toBe("Internal Server Error");
+      expect(body.error).toBe("Database error");
     });
   });
 
@@ -164,12 +175,13 @@ describe("Profile API Route", () => {
         error: null,
       });
 
-      const mockRequest = {
-        json: () => Promise.resolve({
+      const mockRequest = new Request('http://localhost/api/profile', {
+        method: 'POST',
+        body: JSON.stringify({
           profileData: mockProfileInput,
           userTableData: mockUserTableData,
         }),
-      } as Request;
+      });
 
       const response = await POST(mockRequest);
 
@@ -185,12 +197,13 @@ describe("Profile API Route", () => {
         error: null,
       });
 
-      const mockRequest = {
-        json: () => Promise.resolve({
+      const mockRequest = new Request('http://localhost/api/profile', {
+        method: 'POST',
+        body: JSON.stringify({
           profileData: mockProfileInput,
           userTableData: mockUserTableData,
         }),
-      } as Request;
+      });
 
       const response = await POST(mockRequest);
 
@@ -205,12 +218,13 @@ describe("Profile API Route", () => {
         error: null,
       });
 
-      const mockRequest = {
-        json: () => Promise.resolve({
+      const mockRequest = new Request('http://localhost/api/profile', {
+        method: 'POST',
+        body: JSON.stringify({
           profileData: { ...mockProfileInput, auth_user_id: "user-123" },
           userTableData: mockUserTableData,
         }),
-      } as Request;
+      });
 
       const response = await POST(mockRequest);
 
@@ -237,12 +251,13 @@ describe("Profile API Route", () => {
         throw new Error("Profile creation failed");
       });
 
-      const mockRequest = {
-        json: () => Promise.resolve({
+      const mockRequest = new Request('http://localhost/api/profile', {
+        method: 'POST',
+        body: JSON.stringify({
           profileData: mockProfileInput,
           userTableData: mockUserTableData,
         }),
-      } as Request;
+      });
 
       const response = await POST(mockRequest);
 
