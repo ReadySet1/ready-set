@@ -12,6 +12,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { MenuItem } from "@/types/menu";
 import { UserType } from "@/types/user";
 import MobileMenu from "./MobileMenu";
+import AuthButtons from "./AuthButtons";
 
 // Define base menu items (visible to all users)
 const baseMenuItems: MenuItem[] = [
@@ -106,6 +107,9 @@ const Logo: React.FC<LogoProps> = ({
   sticky,
   isVirtualAssistantPage,
 }) => {
+  if (isHomePage && !sticky) {
+    return null;
+  }
   if (isVirtualAssistantPage) {
     return (
       <Link
@@ -296,68 +300,51 @@ const Header: React.FC = () => {
           </div>
 
           <div className="flex w-full items-center justify-between">
-            <MobileMenu
-              navbarOpen={navbarOpen}
-              menuData={menuItems}
-              openIndex={activeSubmenu}
-              handleSubmenu={handleSubmenu}
-              closeNavbarOnNavigate={closeNavbar}
-              navbarToggleHandler={toggleNavbar}
-              pathUrl={pathUrl}
-              sticky={sticky}
-              isHomePage={isHomePage}
-              isVirtualAssistantPage={isVirtualAssistantPage}
-              isLogisticsPage={isLogisticsPage}
-            />
-
-            {/* Auth Buttons (only visible on desktop; mobile handled by MobileMenu) */}
-            <div className="items-center justify-end pr-16 sm:flex lg:pr-0">
-              {pathUrl !== "/" ? (
-                <div className="flex items-center gap-3">
-                  <Link
-                    href="/sign-in"
-                    className={`rounded-lg px-7 py-3 text-base font-semibold transition-all duration-300 ${
-                      sticky
-                        ? "bg-white/90 text-dark shadow-md hover:bg-white dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
-                        : "bg-white/90 text-dark shadow-md hover:bg-white dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
-                    } `}
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    href="/sign-up"
-                    className="rounded-lg bg-amber-400 px-6 py-3 text-base font-medium text-black duration-300 ease-in-out hover:bg-amber-500 dark:bg-white/10 dark:hover:bg-white/20"
-                  >
-                    Sign Up
-                  </Link>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Mobile Menu Toggle */}
-            <button
-              onClick={toggleNavbar}
-              id="navbarToggler"
-              aria-label="Mobile Menu"
-              className="absolute right-4 top-1/2 block -translate-y-1/2 rounded-lg px-3 py-[6px] ring-primary focus:ring-2 lg:hidden"
-            >
-              {[1, 2, 3].map((_, index) => (
-                <span
-                  key={index}
-                  className={`relative my-1.5 block h-0.5 w-[30px] transition-all duration-300 ${
-                    navbarOpen
-                      ? index === 1
-                        ? "opacity-0"
-                        : index === 0
-                          ? "top-[7px] rotate-45"
-                          : "top-[-8px] -rotate-45"
-                      : index === 1
-                        ? "opacity-100"
-                        : ""
-                  } ${sticky ? "bg-dark dark:bg-white" : isVirtualAssistantPage || isHomePage || isLogisticsPage ? "bg-white" : "bg-dark dark:bg-white"}`}
+            {!isHomePage && (
+              <>
+                <MobileMenu
+                  navbarOpen={navbarOpen}
+                  menuData={menuItems}
+                  openIndex={activeSubmenu}
+                  handleSubmenu={handleSubmenu}
+                  closeNavbarOnNavigate={closeNavbar}
+                  navbarToggleHandler={toggleNavbar}
+                  pathUrl={pathUrl}
+                  sticky={sticky}
+                  isHomePage={isHomePage}
+                  isVirtualAssistantPage={isVirtualAssistantPage}
+                  isLogisticsPage={isLogisticsPage}
                 />
-              ))}
-            </button>
+                {/* Auth Buttons (only visible on desktop; mobile handled by MobileMenu) */}
+                <div className="items-center justify-end pr-16 sm:flex lg:pr-0">
+                  <AuthButtons sticky={sticky} pathUrl={pathUrl} />
+                </div>
+                {/* Mobile Menu Toggle */}
+                <button
+                  onClick={toggleNavbar}
+                  id="navbarToggler"
+                  aria-label="Mobile Menu"
+                  className="absolute right-4 top-1/2 block -translate-y-1/2 rounded-lg px-3 py-[6px] ring-primary focus:ring-2 lg:hidden"
+                >
+                  {[1, 2, 3].map((_, index) => (
+                    <span
+                      key={index}
+                      className={`relative my-1.5 block h-0.5 w-[30px] transition-all duration-300 ${
+                        navbarOpen
+                          ? index === 1
+                            ? "opacity-0"
+                            : index === 0
+                              ? "top-[7px] rotate-45"
+                              : "top-[-8px] -rotate-45"
+                          : index === 1
+                            ? "opacity-100"
+                            : ""
+                      } ${sticky ? "bg-dark dark:bg-white" : isVirtualAssistantPage || isHomePage || isLogisticsPage ? "bg-white" : "bg-dark dark:bg-white"}`}
+                    />
+                  ))}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

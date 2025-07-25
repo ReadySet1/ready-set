@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Truck, AlertTriangle, ChevronLeft } from "lucide-react";
+import { format } from "date-fns";
 
 interface Order {
   id: string;
@@ -28,6 +29,7 @@ interface Order {
   order_type: "catering" | "on_demand";
   status: string;
   date: string;
+  delivery_date?: string | null;
   pickup_time: string;
   arrival_time: string;
   order_total: string;
@@ -100,7 +102,10 @@ const ClientOrders: React.FC = () => {
             ? parseFloat(order.order_total).toFixed(2)
             : "0.00",
           status: order.status || "Unknown",
-          date: order.date ? new Date(order.date).toLocaleDateString() : "N/A",
+          delivery_date: order.delivery_date
+            ? format(new Date(order.delivery_date), "MMM d, yyyy")
+            : "N/A",
+          order_number: order.order_number || "N/A",
         }));
         setOrders(sanitizedOrders);
         if (typeof total === "number" && total > 0) {
@@ -234,7 +239,7 @@ const ClientOrders: React.FC = () => {
                             Status
                           </TableHead>
                           <TableHead className="hidden md:table-cell">
-                            Date
+                            Delivery Date
                           </TableHead>
                           <TableHead className="hidden lg:table-cell">
                             Pickup
@@ -255,7 +260,7 @@ const ClientOrders: React.FC = () => {
                                 href={`/order-status/${order.order_number}`}
                                 className="font-medium hover:underline"
                               >
-                                {order.order_number}
+                                {order.order_number || "N/A"}
                               </Link>
                               <br />
                               <div className="text-muted-foreground hidden text-sm md:inline">
@@ -282,7 +287,7 @@ const ClientOrders: React.FC = () => {
                               </Badge>
                             </TableCell>
                             <TableCell className="hidden md:table-cell">
-                              {order.date}
+                              {order.delivery_date}
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
                               {order.address.street1}, {order.address.city},{" "}

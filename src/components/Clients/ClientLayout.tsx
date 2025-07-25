@@ -30,7 +30,7 @@ export default function ClientLayout({
   return (
     <ThemeProvider attribute="class" enableSystem={true} defaultTheme="light">
       <ToasterContext />
-      {!isBackendAdminRoute && !isStudioRoute && !isHomePage && <Header />}
+      {!isBackendAdminRoute && !isStudioRoute && <Header />}
       <main className="flex-grow">{children}</main>
       {!isBackendAdminRoute && !isStudioRoute && <Footer />}
       <ScrollToTop />

@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
-import { User, SupabaseClient, Session, AuthChangeEvent } from "@supabase/supabase-js";
+import {
+  User,
+  SupabaseClient,
+  Session,
+  AuthChangeEvent,
+} from "@supabase/supabase-js";
 
 interface AuthButtonsProps {
   sticky: boolean;
@@ -29,34 +34,69 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
   }, []);
 
   useEffect(() => {
+    // Optimistic UI: Check for cached session in localStorage
+    if (typeof window !== "undefined") {
+      try {
+        const cachedSession = localStorage.getItem("sb-auth-token");
+        if (cachedSession) {
+          const sessionObj = JSON.parse(cachedSession);
+          if (sessionObj?.user) {
+            setUser(sessionObj.user);
+            setIsLoading(false);
+          }
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (!supabase) return;
-    
+
     // Get the current user when component mounts
     const getUser = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
+        const {
+          data: { user, session },
+          error,
+        } = await supabase.auth.getUser();
         if (error) throw error;
         setUser(user);
+        // Store session in localStorage for optimistic UI
+        if (typeof window !== "undefined" && session) {
+          localStorage.setItem("sb-auth-token", JSON.stringify(session));
+        }
       } catch (error) {
-        console.error("Error fetching user:", error);
+        // If Supabase validation fails, clear cache
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("sb-auth-token");
+        }
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
     };
-    
+
     getUser();
-    
+
     // Set up auth state listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, session: Session | null) => {
         if (event === "SIGNED_IN" && session) {
           setUser(session.user);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("sb-auth-token", JSON.stringify(session));
+          }
         } else if (event === "SIGNED_OUT") {
           setUser(null);
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("sb-auth-token");
+          }
         }
-      }
+      },
     );
-  
+
     // Clean up subscription
     return () => {
       authListener.subscription.unsubscribe();
@@ -64,26 +104,34 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
   }, [supabase]);
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center gap-4">
+        <div className="h-10 w-24 animate-pulse rounded-lg bg-gray-200"></div>
+        <div className="h-10 w-24 animate-pulse rounded-lg bg-gray-200"></div>
+      </div>
+    );
   }
 
   if (user) {
     return (
       <>
-        <Link href={`/user/${user.id}`}>
+        <Link href={"/client"}>
           <p
             className={`loginBtn px-7 py-3 text-base font-medium ${
               !sticky && pathUrl === "/" ? "text-white" : "text-black"
             }`}
           >
-            {user.user_metadata?.name || user.email}
+            {user.user_metadata?.name ||
+              user.user_metadata?.full_name ||
+              user.email?.split("@")[0] ||
+              "User"}
           </p>
         </Link>
         <SignOutButton sticky={sticky} pathUrl={pathUrl} />
       </>
     );
   }
-  
+
   return (
     <>
       <SignInButton sticky={sticky} pathUrl={pathUrl} />
@@ -99,7 +147,7 @@ interface ButtonProps {
 
 const SignOutButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => {
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
-  
+
   // Initialize Supabase client
   useEffect(() => {
     const initSupabase = async () => {
@@ -119,7 +167,7 @@ const SignOutButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => {
       console.error("Supabase client not initialized");
       return;
     }
-    
+
     try {
       await supabase.auth.signOut();
       window.location.href = "/";
@@ -127,7 +175,7 @@ const SignOutButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => {
       console.error("Error signing out:", error);
     }
   };
-  
+
   return (
     <button
       onClick={handleSignOut}
@@ -145,11 +193,8 @@ const SignOutButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => {
 const SignInButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => (
   <Link
     href="/sign-in"
-    className={`px-7 py-3 text-base font-medium hover:opacity-70 ${
-      pathUrl !== "/" || sticky
-        ? "dark:text-white"
-        : "text-black dark:text-white"
-    }`}
+    className="rounded-lg bg-white px-7 py-3 text-base font-medium text-black shadow-md transition duration-200 hover:bg-gray-100"
+    style={{ marginRight: "12px" }}
   >
     Sign In
   </Link>
@@ -158,11 +203,7 @@ const SignInButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => (
 const SignUpButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => (
   <Link
     href="/sign-up"
-    className={`rounded-lg px-6 py-3 text-base font-medium text-white duration-300 ease-in-out ${
-      pathUrl !== "/" || sticky
-        ? "bg-primary hover:bg-primary/90 dark:bg-white/10 dark:hover:bg-white/20"
-        : "bg-white/10 hover:bg-white/20"
-    }`}
+    className="rounded-lg bg-amber-400 px-7 py-3 text-base font-medium text-black transition duration-200 hover:bg-amber-500"
   >
     Sign Up
   </Link>
