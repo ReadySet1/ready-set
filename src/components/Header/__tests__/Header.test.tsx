@@ -30,7 +30,7 @@ describe("Header", () => {
     desktopMenuTitles.forEach((title) => {
       expect(
         screen.queryAllByText((content, node) =>
-          node?.textContent?.match(new RegExp(title, "i")),
+          !!node?.textContent?.match(new RegExp(title, "i")),
         ).length,
       ).toBeGreaterThan(0);
     });

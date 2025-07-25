@@ -28,17 +28,21 @@ describe("MobileMenu", () => {
         sticky={false}
         isHomePage={false}
         isVirtualAssistantPage={false}
+        isLogisticsPage={false}
       />,
     );
     // Select the last nav (mobile)
     const navs = screen.getAllByRole("navigation");
     const nav = navs[navs.length - 1];
     menuData.forEach((item) => {
-      expect(
-        within(nav).queryAllByText((content, node) =>
-          node?.textContent?.match(new RegExp(item.title, "i")),
-        ).length,
-      ).toBeGreaterThan(0);
+      if (nav) {
+        expect(
+          within(nav).queryAllByText(
+            (content, node) =>
+              !!node?.textContent?.match(new RegExp(item.title, "i")),
+          ).length,
+        ).toBeGreaterThan(0);
+      }
     });
   });
 
@@ -55,21 +59,24 @@ describe("MobileMenu", () => {
         sticky={false}
         isHomePage={false}
         isVirtualAssistantPage={false}
+        isLogisticsPage={false}
       />,
     );
     const navs = screen.getAllByRole("navigation");
     const nav = navs[navs.length - 1];
     menuData.forEach((item) => {
-      const links = within(nav).queryAllByRole("link", {
-        name: new RegExp(item.title, "i"),
-      });
-      if (item.path && links.length > 0) {
-        expect(links[0]).toHaveAttribute("href", item.path);
-      } else {
-        const buttons = within(nav).queryAllByRole("button", {
+      if (nav) {
+        const links = within(nav).queryAllByRole("link", {
           name: new RegExp(item.title, "i"),
         });
-        expect(buttons.length).toBeGreaterThan(0);
+        if (item.path && links.length > 0) {
+          expect(links[0]).toHaveAttribute("href", item.path);
+        } else {
+          const buttons = within(nav).queryAllByRole("button", {
+            name: new RegExp(item.title, "i"),
+          });
+          expect(buttons.length).toBeGreaterThan(0);
+        }
       }
     });
   });

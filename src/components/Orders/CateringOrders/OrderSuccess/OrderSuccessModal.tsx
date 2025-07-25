@@ -176,21 +176,10 @@ export const OrderSuccessModal: React.FC<SuccessModalProps> = ({
                     <div className="flex-1">
                       <div className="mb-1 flex items-center gap-2">
                         <p className="font-medium">{step.title}</p>
-                        <Badge
-                          variant="outline"
-                          className={getPriorityColor(step.priority)}
-                        >
-                          {step.priority}
-                        </Badge>
                       </div>
                       <p className="text-sm text-gray-600">
                         {step.description}
                       </p>
-                      {step.dueDate && (
-                        <p className="mt-1 text-xs text-gray-500">
-                          Due: {format(step.dueDate, "PPp")}
-                        </p>
-                      )}
                     </div>
                   </div>
                 ))}
@@ -227,7 +216,8 @@ export const OrderSuccessModal: React.FC<SuccessModalProps> = ({
             </Button>
           </div>
 
-          {/* Secondary Actions */}
+          {/* Secondary Actions - Hidden per client request */}
+          {/* 
           <div className="flex justify-center gap-4 border-t pt-2">
             <Button
               variant="ghost"
@@ -249,6 +239,7 @@ export const OrderSuccessModal: React.FC<SuccessModalProps> = ({
               Share Order
             </Button>
           </div>
+          */}
         </div>
       </DialogContent>
     </Dialog>

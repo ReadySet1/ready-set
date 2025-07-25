@@ -27,7 +27,7 @@ import {
 } from "@/utils/navigation";
 
 // Create the context with enhanced types
-const UserContext = createContext<AuthContextType | null>(null);
+export const UserContext = createContext<AuthContextType | null>(null);
 
 // Export the hook for using the context
 export const useUser = () => {

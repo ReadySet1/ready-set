@@ -13,7 +13,7 @@ export const useOrderSuccess = (options: UseOrderSuccessOptions = {}) => {
   const [orderData, setOrderData] = useState<OrderSuccessData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const router = useRouter();
-  const { redirectToDashboard, redirectToOrderSuccess } = useSmartRedirect();
+  const { redirectToDashboard, redirectToOrderSuccess, getSuccessPageUrl, userRole } = useSmartRedirect();
   
   const { onSuccess, redirectDelay = 0 } = options;
 
@@ -37,23 +37,35 @@ export const useOrderSuccess = (options: UseOrderSuccessOptions = {}) => {
       switch (action) {
         case 'VIEW_DETAILS':
           setIsModalOpen(false);
+          console.log('Navigating to order details for orderNumber:', orderData.orderNumber);
+          // Navigate to the universal order status page
+          const orderDetailsUrl = `/order-status/${encodeURIComponent(orderData.orderNumber)}`;
           if (redirectDelay > 0) {
             setTimeout(() => {
-              redirectToOrderSuccess(orderData.orderNumber);
+              router.push(orderDetailsUrl);
             }, redirectDelay);
           } else {
-            redirectToOrderSuccess(orderData.orderNumber);
+            router.push(orderDetailsUrl);
           }
           break;
           
         case 'CREATE_ANOTHER':
           setIsModalOpen(false);
-          // Refresh the current page to reset the form
-          window.location.reload();
+          console.log('Navigating to create new order form');
+          // Navigate to the appropriate form based on user role instead of reloading
+          
+          if (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'HELPDESK') {
+            // Admin users go to admin catering order form
+            router.push('/admin/catering-orders/new');
+          } else {
+            // Regular users go to public catering request form  
+            router.push('/catering-request');
+          }
           break;
           
         case 'GO_TO_DASHBOARD':
           setIsModalOpen(false);
+          console.log('Navigating to dashboard');
           if (redirectDelay > 0) {
             setTimeout(() => {
               redirectToDashboard();
@@ -66,17 +78,22 @@ export const useOrderSuccess = (options: UseOrderSuccessOptions = {}) => {
         case 'DOWNLOAD_CONFIRMATION':
           // Handle PDF download
           try {
-            const response = await fetch(`/api/orders/${orderData.orderNumber}/confirmation.pdf`);
+            const response = await fetch(`/api/orders/${orderData.orderNumber}/confirmation`);
             if (response.ok) {
-              const blob = await response.blob();
-              const url = window.URL.createObjectURL(blob);
+              const confirmationData = await response.json();
+              // Convert JSON data to downloadable content
+              const dataStr = JSON.stringify(confirmationData, null, 2);
+              const dataBlob = new Blob([dataStr], { type: 'application/json' });
+              const url = window.URL.createObjectURL(dataBlob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `order-${orderData.orderNumber}-confirmation.pdf`;
+              a.download = `order-${orderData.orderNumber}-confirmation.json`;
               document.body.appendChild(a);
               a.click();
               window.URL.revokeObjectURL(url);
               document.body.removeChild(a);
+            } else {
+              console.error('Failed to fetch confirmation data');
             }
           } catch (error) {
             console.error('Failed to download confirmation:', error);
@@ -84,16 +101,17 @@ export const useOrderSuccess = (options: UseOrderSuccessOptions = {}) => {
           break;
           
         case 'SHARE_ORDER':
-          // Handle order sharing
+          // Handle order sharing using smart redirect
+          const shareUrl = window.location.origin + getSuccessPageUrl(orderData.orderNumber);
           if (navigator.share) {
             await navigator.share({
               title: `Order ${orderData.orderNumber} Confirmation`,
               text: `Order ${orderData.orderNumber} has been successfully created for ${orderData.clientName}`,
-              url: window.location.origin + `/vendor/order-success/${encodeURIComponent(orderData.orderNumber)}`
+              url: shareUrl
             });
           } else {
             // Fallback to clipboard
-            const shareText = `Order ${orderData.orderNumber} confirmed for ${orderData.clientName}. View details: ${window.location.origin}/vendor/order-success/${encodeURIComponent(orderData.orderNumber)}`;
+            const shareText = `Order ${orderData.orderNumber} confirmed for ${orderData.clientName}. View details: ${shareUrl}`;
             await navigator.clipboard.writeText(shareText);
           }
           break;
@@ -111,7 +129,7 @@ export const useOrderSuccess = (options: UseOrderSuccessOptions = {}) => {
     } finally {
       setIsProcessing(false);
     }
-  }, [orderData, router, redirectDelay, redirectToDashboard, redirectToOrderSuccess]);
+  }, [orderData, router, redirectDelay, redirectToDashboard, getSuccessPageUrl, userRole]);
 
   const reset = useCallback(() => {
     setIsModalOpen(false);

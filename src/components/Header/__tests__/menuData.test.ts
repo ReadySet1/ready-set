@@ -14,8 +14,8 @@ describe("Header menuData", () => {
 
   it("has 'Catering Request' submenu at the end of the menu", () => {
     const lastItem = menuData[menuData.length - 1];
-    expect(lastItem.title).toBe("Orders");
-    expect(lastItem.submenu?.some((sub) => sub.title === "Catering Request")).toBe(true);
+    expect(lastItem?.title).toBe("Orders");
+    expect(lastItem?.submenu?.some((sub) => sub.title === "Catering Request")).toBe(true);
   });
 
   it("'Catering Request' submenu has correct path", () => {

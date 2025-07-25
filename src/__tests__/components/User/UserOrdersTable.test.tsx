@@ -199,4 +199,71 @@ describe("ClientOrders Component", () => {
       ).toBeInTheDocument();
     });
   });
+
+  test("pagination bar is visible when there are more than 5 orders", async () => {
+    const manyOrders = Array.from({ length: 10 }, (_, i) => ({
+      ...mockOrders[0],
+      id: `${i + 1}`,
+      order_number: `ORD-00${i + 1}`,
+    }));
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(manyOrders),
+    });
+    render(<ClientOrders />);
+    await waitFor(() => {
+      expect(screen.getByText("ORD-001")).toBeInTheDocument();
+    });
+    // Pagination state and buttons should be visible
+    expect(screen.getByText(/1 of 2/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /next/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /previous/i })).toBeInTheDocument();
+  });
+
+  test("pagination state updates and buttons work", async () => {
+    const manyOrders = Array.from({ length: 10 }, (_, i) => ({
+      ...mockOrders[0],
+      id: `${i + 1}`,
+      order_number: `ORD-00${i + 1}`,
+    }));
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(manyOrders),
+    });
+    render(<ClientOrders />);
+    await waitFor(() => {
+      expect(screen.getByText("ORD-001")).toBeInTheDocument();
+    });
+    // Click next page
+    const nextButton = screen.getByRole("button", { name: /next/i });
+    await userEvent.click(nextButton);
+    // Should show page 2 of 2
+    await waitFor(() => {
+      expect(screen.getByText(/2 of 2/)).toBeInTheDocument();
+    });
+    // Previous button should be enabled
+    const prevButton = screen.getByRole("button", { name: /previous/i });
+    expect(prevButton).not.toBeDisabled();
+    // Next button should be disabled on last page
+    expect(nextButton).toBeDisabled();
+    // Click previous page
+    await userEvent.click(prevButton);
+    await waitFor(() => {
+      expect(screen.getByText(/1 of 2/)).toBeInTheDocument();
+    });
+  });
+
+  test("pagination bar is hidden when there are no orders", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve([]),
+    });
+    render(<ClientOrders />);
+    await waitFor(() => {
+      expect(screen.getByText("No orders found")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /previous/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/of/)).not.toBeInTheDocument();
+  });
 });

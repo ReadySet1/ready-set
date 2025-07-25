@@ -335,4 +335,38 @@ describe("CreateCateringOrderForm Address Auto-Selection", () => {
       });
     }
   });
+
+  it("shows OrderSuccess modal after successful catering order creation", async () => {
+    (fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ success: true, orderNumber: "SF-12345" }),
+    });
+
+    render(<CreateCateringOrderForm {...defaultProps} />);
+
+    // Select addresses
+    const pickupHandler = mockAddressManagerWrapper.mock.calls.find(
+      (call) => call[0].label && call[0].label.includes("Pickup"),
+    )?.[0]?.onAddressSelected;
+    const deliveryHandler = mockAddressManagerWrapper.mock.calls.find(
+      (call) => call[0].label && call[0].label.includes("Delivery"),
+    )?.[0]?.onAddressSelected;
+    if (pickupHandler) pickupHandler("pickup-1");
+    if (deliveryHandler) deliveryHandler("delivery-1");
+
+    // Find and submit form
+    const submitButton = screen.queryByRole("button", {
+      name: /create.*order/i,
+    });
+    if (submitButton) {
+      await userEvent.click(submitButton);
+      // Wait for modal to appear
+      await waitFor(() => {
+        // The modal should be visible and show the order number
+        const modal = screen.getByTestId("order-success-modal");
+        expect(modal).toBeInTheDocument();
+        expect(modal).toHaveTextContent("SF-12345");
+      });
+    }
+  });
 });

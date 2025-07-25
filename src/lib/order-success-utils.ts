@@ -4,107 +4,66 @@ export const generateDefaultNextSteps = (orderData: Partial<OrderSuccessData>): 
   const now = new Date();
   const steps: NextStepAction[] = [];
 
-  // Base steps for all catering orders
+  // Base steps for all catering orders - Client focused
   steps.push({
-    id: 'confirm-details',
-    title: 'Confirm Order Details',
-    description: 'Review all order details and contact client if any clarification is needed',
-    dueDate: new Date(now.getTime() + 2 * 60 * 60 * 1000), // 2 hours from now
-    priority: 'HIGH',
-    completed: false,
-    estimatedDuration: '15 minutes',
-    actionType: 'VENDOR_ACTION'
-  });
-
-  steps.push({
-    id: 'prepare-ingredients',
-    title: 'Prepare Ingredients & Menu',
-    description: 'Source ingredients and finalize menu preparation timeline',
-    dueDate: orderData.pickupDateTime 
-      ? new Date(orderData.pickupDateTime.getTime() - 24 * 60 * 60 * 1000) // 1 day before pickup
-      : new Date(now.getTime() + 24 * 60 * 60 * 1000),
-    priority: 'HIGH',
-    completed: false,
-    estimatedDuration: '2-4 hours',
-    actionType: 'VENDOR_ACTION'
-  });
-
-  steps.push({
-    id: 'coordinate-delivery',
-    title: 'Coordinate Delivery Logistics',
-    description: 'Confirm delivery address, parking availability, and contact delivery team',
-    dueDate: orderData.arrivalDateTime
-      ? new Date(orderData.arrivalDateTime.getTime() - 4 * 60 * 60 * 1000) // 4 hours before delivery
-      : new Date(now.getTime() + 12 * 60 * 60 * 1000),
-    priority: 'MEDIUM',
+    id: 'order-confirmation',
+    title: 'Order Confirmation',
+    description: 'You will receive an email confirmation with your order',
     completed: false,
     estimatedDuration: '30 minutes',
-    actionType: 'VENDOR_ACTION'
+    actionType: 'CLIENT_EXPECTATION'
   });
 
-  // Host-specific steps
+  steps.push({
+    id: 'venue-coordination',
+    title: 'Venue & Logistics Coordination',
+    description: 'Our team will contact you to confirm delivery details and venue access',
+    completed: false,
+    estimatedDuration: '24 hours',
+    actionType: 'CLIENT_EXPECTATION'
+  });
+
+  steps.push({
+    id: 'final-preparations',
+    title: 'Final Event Preparations',
+    description: 'We will complete all food preparation and coordinate delivery logistics for your event',
+    completed: false,
+    estimatedDuration: '4 hours before event',
+    actionType: 'CLIENT_EXPECTATION'
+  });
+
+  // Host-specific steps - Client focused
   if (orderData.needHost === 'YES') {
     steps.push({
-      id: 'assign-hosts',
-      title: 'Assign Event Hosts',
-      description: `Assign ${orderData.numberOfHosts || 1} qualified host(s) for ${orderData.hoursNeeded || 2} hours`,
-      dueDate: orderData.pickupDateTime
-        ? new Date(orderData.pickupDateTime.getTime() - 48 * 60 * 60 * 1000) // 2 days before
-        : new Date(now.getTime() + 48 * 60 * 60 * 1000),
-      priority: 'HIGH',
+      id: 'host-assignment',
+      title: 'Event Host Assignment',
+      description: `Professional event hosts (${orderData.numberOfHosts || 1} host${(orderData.numberOfHosts || 1) > 1 ? 's' : ''}) will be assigned and briefed for your ${orderData.hoursNeeded || 2}-hour event`,
       completed: false,
-      estimatedDuration: '1 hour',
-      actionType: 'VENDOR_ACTION'
+      estimatedDuration: '2 days before event',
+      actionType: 'CLIENT_EXPECTATION'
     });
 
     steps.push({
-      id: 'brief-hosts',
-      title: 'Brief Event Hosts',
-      description: 'Provide hosts with event details, client preferences, and service protocols',
-      dueDate: orderData.arrivalDateTime
-        ? new Date(orderData.arrivalDateTime.getTime() - 2 * 60 * 60 * 1000) // 2 hours before
-        : new Date(now.getTime() + 6 * 60 * 60 * 1000),
-      priority: 'MEDIUM',
+      id: 'host-arrival',
+      title: 'Event Host Arrival',
+      description: 'Your assigned hosts will arrive on-site and begin event setup and service',
       completed: false,
-      estimatedDuration: '45 minutes',
-      actionType: 'VENDOR_ACTION'
+      estimatedDuration: '15 minutes before event',
+      actionType: 'CLIENT_EXPECTATION'
     });
   }
 
-  // Brokerage-specific steps
-  if (orderData.brokerage && orderData.brokerage !== 'Direct Delivery') {
-    steps.push({
-      id: 'update-brokerage',
-      title: `Update ${orderData.brokerage} Platform`,
-      description: `Confirm order status and delivery timeline on ${orderData.brokerage} platform`,
-      dueDate: new Date(now.getTime() + 60 * 60 * 1000), // 1 hour from now
-      priority: 'MEDIUM',
-      completed: false,
-      estimatedDuration: '10 minutes',
-      actionType: 'VENDOR_ACTION'
-    });
-  }
-
-  // Client communication steps
+  // Service delivery step
   steps.push({
-    id: 'client-confirmation',
-    title: 'Send Client Confirmation',
-    description: 'Email client with order confirmation and delivery details',
-    dueDate: new Date(now.getTime() + 30 * 60 * 1000), // 30 minutes from now
-    priority: 'MEDIUM',
+    id: 'service-delivery',
+    title: 'Service Delivery',
+    description: 'Your catering order will be delivered and set up according to your specifications',
     completed: false,
-    estimatedDuration: '10 minutes',
-    actionType: 'SYSTEM_ACTION'
+    estimatedDuration: 'Event day',
+    actionType: 'CLIENT_EXPECTATION'
   });
 
-  return steps.sort((a, b) => {
-    // Sort by priority first, then by due date
-    const priorityOrder = { HIGH: 0, MEDIUM: 1, LOW: 2 };
-    const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-    if (priorityDiff !== 0) return priorityDiff;
-    
-    return a.dueDate!.getTime() - b.dueDate!.getTime();
-  });
+  return steps;
 };
 
 export const transformOrderToSuccessData = (

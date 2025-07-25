@@ -12,7 +12,7 @@ vi.mock("@/contexts/UserContext", () => ({
 vi.mock("./DashboardHome", async (importOriginal) => {
   const mod = await importOriginal();
   return {
-    ...mod,
+    ...(mod || {}),
     __esModule: true,
     default: (props: any) => <div>Dashboard Content</div>,
   };

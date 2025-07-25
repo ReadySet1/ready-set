@@ -49,7 +49,8 @@ const ClientOrders: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit] = useState(5);
+  const [totalOrders, setTotalOrders] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -62,10 +63,26 @@ const ClientOrders: React.FC = () => {
         if (!response.ok) {
           throw new Error("Failed to fetch orders");
         }
-        const data: Order[] = await response.json();
-
+        // Try to get total count from header or response (API update may be needed)
+        let data, total;
+        try {
+          const json = await response.json();
+          if (Array.isArray(json)) {
+            data = json;
+            // Fallback: if no total, estimate by page 1 length
+            if (page === 1 && json.length < limit) {
+              total = json.length;
+            }
+          } else {
+            data = json.orders || [];
+            total = json.totalCount || 0;
+          }
+        } catch (e) {
+          data = [];
+          total = 0;
+        }
         // Validate and sanitize order data
-        const sanitizedOrders = data.map((order) => ({
+        const sanitizedOrders = (data as Order[]).map((order: Order) => ({
           ...order,
           address: {
             street1: order.address?.street1 || "N/A",
@@ -85,8 +102,24 @@ const ClientOrders: React.FC = () => {
           status: order.status || "Unknown",
           date: order.date ? new Date(order.date).toLocaleDateString() : "N/A",
         }));
-
         setOrders(sanitizedOrders);
+        if (typeof total === "number" && total > 0) {
+          setTotalOrders(total);
+          // If the current page is out of range (e.g., user deleted orders or navigated too far), go back to last page with orders
+          const lastPage = Math.max(1, Math.ceil(total / limit));
+          if (page > lastPage) {
+            setPage(lastPage);
+            return;
+          }
+        } else if (page === 1 && sanitizedOrders.length < limit) {
+          setTotalOrders(sanitizedOrders.length);
+        }
+        // If there are no orders on this page but there are orders in total, go back to last page with orders
+        if (sanitizedOrders.length === 0 && totalOrders > 0 && page > 1) {
+          const lastPage = Math.max(1, Math.ceil(totalOrders / limit));
+          setPage(lastPage);
+          return;
+        }
       } catch (error) {
         console.error("Error fetching orders:", error);
         setError(
@@ -98,11 +131,13 @@ const ClientOrders: React.FC = () => {
         setIsLoading(false);
       }
     };
-
     fetchOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit]);
 
-  const handleNextPage = () => setPage((prev) => prev + 1);
+  const handleNextPage = () => {
+    if (!isLastPage) setPage((prev) => prev + 1);
+  };
   const handlePrevPage = () => setPage((prev) => Math.max(1, prev - 1));
 
   const getOrderTypeBadgeClass = (type: "catering" | "on_demand") => {
@@ -115,6 +150,19 @@ const ClientOrders: React.FC = () => {
         return "";
     }
   };
+
+  // Calculate total pages based on totalOrders and limit, but never show an empty last page
+  const totalPages =
+    totalOrders > 0
+      ? Math.ceil(totalOrders / limit)
+      : orders.length < limit && page === 1
+        ? 1
+        : page;
+  const isLastPage =
+    totalOrders > 0 ? page >= totalPages : orders.length < limit;
+
+  // Show pagination if there are any orders displayed or totalOrders > 0
+  const showPagination = orders.length > 0 || totalOrders > 0;
 
   // Render error state
   if (error) {
@@ -145,7 +193,7 @@ const ClientOrders: React.FC = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => router.push("/client")}
-                  className="text-muted-foreground hover:text-foreground absolute left-4 top-4 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-2"
+                  className="text-muted-foreground hover:text-foreground absolute left-4 top-4 flex items-center gap-2 dark:text-gray-400 dark:hover:text-gray-200"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   <span className="hidden sm:inline">Back to Dashboard</span>
@@ -162,7 +210,7 @@ const ClientOrders: React.FC = () => {
                   <div className="flex items-center justify-center py-10">
                     <Loader2 className="h-10 w-10 animate-spin text-gray-500" />
                   </div>
-                ) : orders.length === 0 ? (
+                ) : orders.length === 0 && totalOrders === 0 && page === 1 ? (
                   <div className="flex flex-col items-center justify-center py-10 text-center">
                     <Truck className="mb-4 h-16 w-16 text-gray-400" />
                     <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -252,17 +300,21 @@ const ClientOrders: React.FC = () => {
                         ))}
                       </TableBody>
                     </Table>
-                    <div className="mt-4 flex justify-between">
-                      <Button onClick={handlePrevPage} disabled={page === 1}>
-                        Previous
-                      </Button>
-                      <Button
-                        onClick={handleNextPage}
-                        disabled={orders.length < limit}
-                      >
-                        Next
-                      </Button>
-                    </div>
+                    {showPagination && (
+                      <div className="mt-4 flex w-full items-center justify-between">
+                        <Button onClick={handlePrevPage} disabled={page === 1}>
+                          Previous
+                        </Button>
+                        <div className="flex flex-1 justify-center">
+                          <span className="text-sm text-gray-500">
+                            {page} of {totalPages}
+                          </span>
+                        </div>
+                        <Button onClick={handleNextPage} disabled={isLastPage}>
+                          Next
+                        </Button>
+                      </div>
+                    )}
                   </>
                 )}
               </CardContent>

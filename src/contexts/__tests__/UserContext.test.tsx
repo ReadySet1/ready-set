@@ -6,7 +6,8 @@ import { UserProvider, UserContext } from "../UserContext";
 describe("UserContext", () => {
   it("provides user and role values", () => {
     const TestComponent = () => {
-      const { user, userRole, isLoading } = useContext(UserContext);
+      const context = useContext(UserContext);
+      const { user, userRole, isLoading } = context || {};
       return (
         <div>
           <span>{user?.id}</span>
@@ -18,9 +19,9 @@ describe("UserContext", () => {
     render(
       <UserProvider>
         <TestComponent />
-      </UserProvider>
+      </UserProvider>,
     );
     // Just check that the context renders without crashing
     expect(screen.getByText(/loaded|loading/)).toBeInTheDocument();
   });
-}); 
+});

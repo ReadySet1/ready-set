@@ -36,7 +36,7 @@ export interface NextStepAction {
   priority: 'HIGH' | 'MEDIUM' | 'LOW';
   completed: boolean;
   estimatedDuration?: string;
-  actionType: 'VENDOR_ACTION' | 'SYSTEM_ACTION' | 'CLIENT_ACTION';
+  actionType: 'VENDOR_ACTION' | 'SYSTEM_ACTION' | 'CLIENT_ACTION' | 'CLIENT_EXPECTATION';
 }
 
 export interface SuccessModalProps {

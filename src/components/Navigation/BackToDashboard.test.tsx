@@ -20,7 +20,8 @@ vi.mock("@/contexts/UserContext", () => ({
 // Mock getDashboardRouteByRole
 const mockGetDashboardRouteByRole = vi.fn();
 vi.mock("@/utils/navigation", () => ({
-  getDashboardRouteByRole: (...args) => mockGetDashboardRouteByRole(...args),
+  getDashboardRouteByRole: (...args: any[]) =>
+    mockGetDashboardRouteByRole(...args),
 }));
 
 describe("BackToDashboard", () => {
