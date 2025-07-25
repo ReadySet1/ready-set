@@ -85,6 +85,12 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     lastSuccessfulAuth: null,
   });
 
+  // NEW: Role caching mechanism to prevent race conditions
+  const [roleCache, setRoleCache] = useState<
+    Map<string, { role: UserType; timestamp: number }>
+  >(new Map());
+  const roleCacheTimeout = 5 * 60 * 1000; // 5 minutes
+
   // Refs for cleanup and tracking
   const mountedRef = useRef(true);
   const authListenerRef = useRef<any>(null);
@@ -109,6 +115,42 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  // NEW: Enhanced role caching utility
+  const getCachedRole = useCallback(
+    (userId: string): UserType | null => {
+      const cached = roleCache.get(userId);
+      if (cached && Date.now() - cached.timestamp < roleCacheTimeout) {
+        console.log(
+          `[UserContext] Using cached role for user ${userId}: ${cached.role}`,
+        );
+        return cached.role;
+      }
+      return null;
+    },
+    [roleCache, roleCacheTimeout],
+  );
+
+  const setCachedRole = useCallback((userId: string, role: UserType) => {
+    setRoleCache((prev) =>
+      new Map(prev).set(userId, { role, timestamp: Date.now() }),
+    );
+    console.log(`[UserContext] Cached role for user ${userId}: ${role}`);
+  }, []);
+
+  const clearRoleCache = useCallback((userId?: string) => {
+    if (userId) {
+      setRoleCache((prev) => {
+        const newCache = new Map(prev);
+        newCache.delete(userId);
+        return newCache;
+      });
+      console.log(`[UserContext] Cleared cached role for user ${userId}`);
+    } else {
+      setRoleCache(new Map());
+      console.log("[UserContext] Cleared all role cache");
+    }
+  }, []);
 
   // Enhanced retry logic with exponential backoff
   const retryWithBackoff = useCallback(
@@ -146,13 +188,24 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     [],
   );
 
-  // Enhanced user role fetching with retry logic
+  // Enhanced user role fetching with retry logic and caching
   const fetchUserRoleWithRetry = useCallback(
     async (supabase: any, user: User): Promise<UserType | null> => {
       const startTime = Date.now();
 
       try {
         console.log(`[UserContext] Fetching user role for user: ${user.id}`);
+
+        // NEW: Check cache first
+        const cachedRole = getCachedRole(user.id);
+        if (cachedRole) {
+          const duration = Date.now() - startTime;
+          setAuthMetrics((prev) => ({
+            ...prev,
+            profileFetchTime: duration,
+          }));
+          return cachedRole;
+        }
 
         const role = await retryWithBackoff(async () => {
           const { data: profile, error } = await supabase
@@ -162,6 +215,96 @@ function UserProviderClient({ children }: { children: ReactNode }) {
             .single();
 
           if (error) {
+            // If profile doesn't exist, create one
+            if (error.code === "PGRST116") {
+              // No rows returned
+              console.log(
+                `[UserContext] No profile found for user ${user.id}, creating one...`,
+              );
+
+              // Helper function to determine if user should be admin
+              const shouldBeAdmin = (email: string): boolean => {
+                const adminEmail =
+                  process.env.NEXT_PUBLIC_ADMIN_EMAIL?.toLowerCase();
+                const adminEmails =
+                  process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(",").map((e) =>
+                    e.trim().toLowerCase(),
+                  ) || [];
+                const adminDomains =
+                  process.env.NEXT_PUBLIC_ADMIN_DOMAINS?.split(",").map((d) =>
+                    d.trim().toLowerCase(),
+                  ) || [];
+
+                const emailLower = email.toLowerCase();
+
+                // Check exact email match (including existing ADMIN_EMAIL)
+                if (adminEmail && emailLower === adminEmail) {
+                  return true;
+                }
+
+                // Check exact email match
+                if (adminEmails.includes(emailLower)) {
+                  return true;
+                }
+
+                // Check domain match
+                const domain = emailLower.split("@")[1];
+                if (domain && adminDomains.includes(domain)) {
+                  return true;
+                }
+
+                return false;
+              };
+
+              // Create profile for new user
+              const email = user.email;
+              const name =
+                user.user_metadata?.full_name ||
+                user.user_metadata?.name ||
+                email?.split("@")[0] ||
+                "User";
+              const image =
+                user.user_metadata?.avatar_url || user.user_metadata?.picture;
+
+              // Determine user type
+              let type = "client";
+              if (email && shouldBeAdmin(email)) {
+                type = "admin";
+              }
+
+              console.log(
+                `[UserContext] Creating profile for user ${user.id} with type: ${type}`,
+              );
+
+              const { data: newProfile, error: createError } = await supabase
+                .from("profiles")
+                .insert({
+                  id: user.id,
+                  email: email,
+                  name: name,
+                  image: image,
+                  type: type,
+                  status: "active",
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+                .select("type")
+                .single();
+
+              if (createError) {
+                console.error(
+                  "[UserContext] Error creating profile:",
+                  createError,
+                );
+                throw createError;
+              }
+
+              console.log(
+                "[UserContext] Profile created successfully:",
+                newProfile,
+              );
+              return newProfile.type;
+            }
             throw error;
           }
 
@@ -189,6 +332,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           profileFetchTime: duration,
         }));
 
+        // NEW: Cache the role
+        setCachedRole(user.id, role);
+
         console.log(`[UserContext] User role fetched successfully: ${role}`);
         return role;
       } catch (err) {
@@ -210,7 +356,60 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    [retryWithBackoff, createAuthError],
+    [retryWithBackoff, createAuthError, getCachedRole, setCachedRole],
+  );
+
+  // NEW: Enhanced OAuth-specific role fetching with immediate retry
+  const fetchUserRoleForOAuth = useCallback(
+    async (supabase: any, user: User): Promise<UserType | null> => {
+      console.log(
+        `[UserContext] Fetching user role for OAuth user: ${user.id}`,
+      );
+
+      // Clear any cached role for this user to ensure fresh data
+      clearRoleCache(user.id);
+
+      // Add extra delay for OAuth users to ensure profile is created
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Try multiple times with increasing delays
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        try {
+          console.log(`[UserContext] OAuth role fetch attempt ${attempt}/5`);
+
+          const role = await fetchUserRoleWithRetry(supabase, user);
+          if (role) {
+            console.log(
+              `[UserContext] OAuth role fetch successful on attempt ${attempt}: ${role}`,
+            );
+            return role;
+          }
+
+          // Wait before next attempt
+          if (attempt < 5) {
+            const delay = 1000 * attempt; // 1s, 2s, 3s, 4s
+            console.log(
+              `[UserContext] Waiting ${delay}ms before OAuth role fetch retry...`,
+            );
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+        } catch (error) {
+          console.warn(
+            `[UserContext] OAuth role fetch attempt ${attempt} failed:`,
+            error,
+          );
+
+          if (attempt < 5) {
+            const delay = 1000 * attempt;
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+        }
+      }
+
+      console.error("[UserContext] All OAuth role fetch attempts failed");
+      return null;
+    },
+    [fetchUserRoleWithRetry, clearRoleCache],
   );
 
   // Enhanced session validation
@@ -245,7 +444,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     [],
   );
 
-  // NEW: Enhanced authentication state refresh with retry mechanisms
+  // NEW: Enhanced authentication state refresh with retry mechanisms and OAuth handling
   const forceAuthRefresh = useCallback(
     async (reason: string = "manual", maxRetries: number = 3) => {
       console.log(`[UserContext] Force auth refresh triggered: ${reason}`);
@@ -320,8 +519,24 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           setUser(freshUser);
 
           if (freshUser && freshSession) {
-            // Fetch user role with retry
-            const role = await fetchUserRoleWithRetry(supabase, freshUser);
+            // NEW: Check if this is an OAuth user and handle accordingly
+            const isOAuthUser =
+              freshUser.app_metadata?.provider === "google" ||
+              freshUser.app_metadata?.provider === "github" ||
+              freshUser.app_metadata?.provider === "facebook";
+
+            let role: UserType | null = null;
+
+            if (isOAuthUser) {
+              console.log(
+                `[UserContext] OAuth user detected (${freshUser.app_metadata?.provider}), using OAuth-specific role fetch`,
+              );
+              role = await fetchUserRoleForOAuth(supabase, freshUser);
+            } else {
+              // Fetch user role with retry
+              role = await fetchUserRoleWithRetry(supabase, freshUser);
+            }
+
             if (role) {
               setUserRole(role);
             }
@@ -418,10 +633,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         }
       }
     },
-    [fetchUserRoleWithRetry, createAuthError],
+    [fetchUserRoleWithRetry, fetchUserRoleForOAuth, createAuthError],
   );
 
-  // NEW: Enhanced authentication events handling with state validation
+  // NEW: Enhanced authentication events handling with OAuth-specific logic
   useEffect(() => {
     console.log("[UserContext] Setting up authentication event listener");
 
@@ -525,6 +740,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
             localStorage.removeItem("ready-set-auth-state");
             sessionStorage.removeItem("ready-set-auth-pending");
           }
+
+          // Clear role cache on session expiry
+          clearRoleCache();
           break;
 
         default:
@@ -540,7 +758,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         authEventListenerRef.current();
       }
     };
-  }, [forceAuthRefresh]);
+  }, [forceAuthRefresh, clearRoleCache]);
 
   // NEW: Check for pending authentication state on mount
   useEffect(() => {
@@ -689,9 +907,24 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           console.log("[UserContext] Setting authenticated user");
           setUser(currentUser);
 
+          // NEW: Check if this is an OAuth user
+          const isOAuthUser =
+            currentUser.app_metadata?.provider === "google" ||
+            currentUser.app_metadata?.provider === "github" ||
+            currentUser.app_metadata?.provider === "facebook";
+
           // Fetch user role with loading state
           setProfileState((prev) => ({ ...prev, isLoading: true }));
-          const role = await fetchUserRoleWithRetry(supabase, currentUser);
+
+          let role: UserType | null = null;
+          if (isOAuthUser) {
+            console.log(
+              `[UserContext] OAuth user detected (${currentUser.app_metadata?.provider}), using OAuth-specific role fetch`,
+            );
+            role = await fetchUserRoleForOAuth(supabase, currentUser);
+          } else {
+            role = await fetchUserRoleWithRetry(supabase, currentUser);
+          }
 
           if (role) {
             setUserRole(role);
@@ -775,6 +1008,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                 sessionStorage.removeItem("ready-set-auth-pending");
               }
 
+              // Clear role cache on logout
+              clearRoleCache();
+
               emitAuthEvent("logout", null, "listener");
               return;
             }
@@ -783,7 +1019,23 @@ function UserProviderClient({ children }: { children: ReactNode }) {
             if (newUser?.id !== currentUser?.id || !userRole) {
               console.log("[UserContext] Fetching role for new/changed user");
               setProfileState((prev) => ({ ...prev, isLoading: true }));
-              const role = await fetchUserRoleWithRetry(supabase, newUser);
+
+              // NEW: Check if this is an OAuth user
+              const isOAuthUser =
+                newUser.app_metadata?.provider === "google" ||
+                newUser.app_metadata?.provider === "github" ||
+                newUser.app_metadata?.provider === "facebook";
+
+              let role: UserType | null = null;
+              if (isOAuthUser) {
+                console.log(
+                  `[UserContext] OAuth user detected (${newUser.app_metadata?.provider}), using OAuth-specific role fetch`,
+                );
+                role = await fetchUserRoleForOAuth(supabase, newUser);
+              } else {
+                role = await fetchUserRoleWithRetry(supabase, newUser);
+              }
+
               if (role) {
                 setUserRole(role);
               }
@@ -872,10 +1124,12 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     };
   }, [
     fetchUserRoleWithRetry,
+    fetchUserRoleForOAuth,
     validateSession,
     createAuthError,
     authState.retryCount,
     forceAuthRefresh,
+    clearRoleCache,
   ]);
 
   // Enhanced refresh user data with retry logic
@@ -902,7 +1156,22 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       setUser(currentUser);
 
       if (currentUser) {
-        const role = await fetchUserRoleWithRetry(supabase, currentUser);
+        // NEW: Check if this is an OAuth user
+        const isOAuthUser =
+          currentUser.app_metadata?.provider === "google" ||
+          currentUser.app_metadata?.provider === "github" ||
+          currentUser.app_metadata?.provider === "facebook";
+
+        let role: UserType | null = null;
+        if (isOAuthUser) {
+          console.log(
+            `[UserContext] OAuth user detected (${currentUser.app_metadata?.provider}), using OAuth-specific role fetch`,
+          );
+          role = await fetchUserRoleForOAuth(supabase, currentUser);
+        } else {
+          role = await fetchUserRoleWithRetry(supabase, currentUser);
+        }
+
         if (role) {
           setUserRole(role);
         }
@@ -935,7 +1204,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         error: authError,
       }));
     }
-  }, [fetchUserRoleWithRetry, createAuthError]);
+  }, [fetchUserRoleWithRetry, fetchUserRoleForOAuth, createAuthError]);
 
   // Enhanced retry auth method
   const retryAuth = useCallback(async () => {

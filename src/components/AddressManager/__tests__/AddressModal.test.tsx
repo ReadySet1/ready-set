@@ -1,9 +1,9 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AddressModal from "../AddressModal";
 import { Address } from "@/types/address";
-import { render } from '@/__tests__/utils/test-utils';
+import { render } from "@/__tests__/utils/test-utils";
 
 // Mock Supabase client
 const mockSupabase = {
