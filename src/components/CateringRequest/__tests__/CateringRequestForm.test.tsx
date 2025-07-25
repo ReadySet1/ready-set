@@ -4,6 +4,9 @@ import userEvent from "@testing-library/user-event";
 import CateringRequestForm from "../CateringRequestForm";
 import { Address } from "@/types/address";
 import { vi } from "vitest";
+import type { SupabaseClient, Session } from "@supabase/supabase-js";
+const mockSupabase = {} as SupabaseClient;
+const mockSession = {} as Session;
 
 // Mock Next.js router
 const mockPush = vi.fn();
@@ -165,7 +168,7 @@ describe("CateringRequestForm", () => {
 
   it("renders the form correctly", async () => {
     await act(async () => {
-      render(<CateringRequestForm />);
+      render(<CateringRequestForm supabase={mockSupabase} session={mockSession} />);
     });
 
     // Check that key form elements are rendered
@@ -179,7 +182,7 @@ describe("CateringRequestForm", () => {
   it("redirects to vendor dashboard after successful form submission", async () => {
     const user = userEvent.setup();
     await act(async () => {
-      render(<CateringRequestForm />);
+      render(<CateringRequestForm supabase={mockSupabase} session={mockSession} />);
     });
 
     // Fill out the form with valid data
@@ -260,7 +263,7 @@ describe("CateringRequestForm", () => {
     );
 
     await act(async () => {
-      render(<CateringRequestForm />);
+      render(<CateringRequestForm supabase={mockSupabase} session={mockSession} />);
     });
 
     // Fill out the form with valid data
@@ -299,7 +302,7 @@ describe("CateringRequestForm", () => {
   it("submits the form with correct data structure", async () => {
     const user = userEvent.setup();
     await act(async () => {
-      render(<CateringRequestForm />);
+      render(<CateringRequestForm supabase={mockSupabase} session={mockSession} />);
     });
 
     // Fill out the form
@@ -341,7 +344,7 @@ describe("CateringRequestForm", () => {
   describe("Manage Addresses Button", () => {
     it("renders the Manage Addresses button in the delivery details section", async () => {
       await act(async () => {
-        render(<CateringRequestForm />);
+        render(<CateringRequestForm supabase={mockSupabase} session={mockSession} />);
       });
 
       // Check that the Delivery Details section is rendered
@@ -356,7 +359,7 @@ describe("CateringRequestForm", () => {
 
     it("has the correct href attribute pointing to /addresses", async () => {
       await act(async () => {
-        render(<CateringRequestForm />);
+        render(<CateringRequestForm supabase={mockSupabase} session={mockSession} />);
       });
 
       const manageAddressesButton = screen.getByRole("link", {
@@ -367,7 +370,7 @@ describe("CateringRequestForm", () => {
 
     it("has the correct styling classes", async () => {
       await act(async () => {
-        render(<CateringRequestForm />);
+        render(<CateringRequestForm supabase={mockSupabase} session={mockSession} />);
       });
 
       const manageAddressesButton = screen.getByRole("link", {
@@ -388,7 +391,7 @@ describe("CateringRequestForm", () => {
 
     it("is accessible and properly labeled", async () => {
       await act(async () => {
-        render(<CateringRequestForm />);
+        render(<CateringRequestForm supabase={mockSupabase} session={mockSession} />);
       });
 
       const manageAddressesButton = screen.getByRole("link", {
@@ -410,7 +413,7 @@ describe("CateringRequestForm", () => {
 
     it("is positioned correctly within the delivery details section", async () => {
       await act(async () => {
-        render(<CateringRequestForm />);
+        render(<CateringRequestForm supabase={mockSupabase} session={mockSession} />);
       });
 
       // Find the delivery details section
@@ -431,7 +434,7 @@ describe("CateringRequestForm", () => {
     it("does not interfere with form submission", async () => {
       const user = userEvent.setup();
       await act(async () => {
-        render(<CateringRequestForm />);
+        render(<CateringRequestForm supabase={mockSupabase} session={mockSession} />);
       });
 
       // First, verify the button is there

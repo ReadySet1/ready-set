@@ -3,6 +3,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CateringRequestForm from "@/components/CateringRequest/CateringRequestForm";
 import { createClient } from "@/utils/supabase/client";
+import type { SupabaseClient, Session } from "@supabase/supabase-js";
+const mockSupabase = {} as SupabaseClient;
+const mockSession = {} as Session;
 
 // Mock useRouter
 jest.mock("next/navigation", () => ({
@@ -172,13 +175,17 @@ describe("CateringRequestForm with AddressManager Integration", () => {
   });
 
   it("renders the form with address manager", () => {
-    render(<CateringRequestForm />);
+    render(
+      <CateringRequestForm supabase={mockSupabase} session={mockSession} />,
+    );
     expect(screen.getByTestId("select-trigger")).toBeInTheDocument();
     expect(screen.getByText("Select an address")).toBeInTheDocument();
   });
 
   it("allows adding a new address without form nesting issues", async () => {
-    render(<CateringRequestForm />);
+    render(
+      <CateringRequestForm supabase={mockSupabase} session={mockSession} />,
+    );
 
     // Open the address form
     const addButton = screen.getByText("Add New Address");
@@ -208,7 +215,9 @@ describe("CateringRequestForm with AddressManager Integration", () => {
   });
 
   it("maintains form state when adding a new address", async () => {
-    render(<CateringRequestForm />);
+    render(
+      <CateringRequestForm supabase={mockSupabase} session={mockSession} />,
+    );
 
     // Fill out some catering form fields
     const eventNameInput = screen.getByLabelText("Event Name");
@@ -229,7 +238,9 @@ describe("CateringRequestForm with AddressManager Integration", () => {
   });
 
   it("allows selecting an address from the dropdown", async () => {
-    render(<CateringRequestForm />);
+    render(
+      <CateringRequestForm supabase={mockSupabase} session={mockSession} />,
+    );
 
     // Click the select root to trigger value change
     const selectRoot = screen.getByTestId("select-root");

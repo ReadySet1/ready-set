@@ -5,7 +5,6 @@ import { Controller, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Session, SupabaseClient } from "@supabase/supabase-js";
 import { CateringFormData, Address } from "@/types/catering";
 import { CateringNeedHost } from "@/types/order";
 import { createClient } from "@/utils/supabase/client";
@@ -30,6 +29,13 @@ import {
 } from "@/components/Common/OrderSuccessWrapper";
 import { transformOrderToSuccessData } from "@/lib/order-success-utils";
 import { useSmartRedirect } from "@/hooks/useSmartRedirect";
+import type { SupabaseClient, Session } from "@supabase/supabase-js";
+interface CateringRequestFormProps {
+  client?: import("@/types/client").Client;
+  isAdminMode?: boolean;
+  supabase: SupabaseClient;
+  session: Session;
+}
 
 // Form field components
 const InputField: React.FC<{
@@ -219,19 +225,13 @@ const BROKERAGE_OPTIONS = [
  * @param client Optional client object (used in admin mode to submit on behalf of a client)
  * @param isAdminMode If true, uses the provided client instead of the logged-in user
  */
-interface CateringRequestFormProps {
-  client?: import("@/types/client").Client;
-  isAdminMode?: boolean;
-}
-
 const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   client,
   isAdminMode = false,
+  supabase,
+  session,
 }) => {
   const router = useRouter();
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [isInitializing, setIsInitializing] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -242,22 +242,6 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
 
   // Smart redirect hook
   const { redirectToDashboard } = useSmartRedirect();
-
-  // Initialize Supabase client
-  useEffect(() => {
-    const initSupabase = async () => {
-      try {
-        const client = await createClient();
-        setSupabase(client);
-      } catch (error) {
-        console.error("Error initializing Supabase client:", error);
-        toast.error("Error connecting to the service. Please try again.");
-        setIsInitializing(false);
-      }
-    };
-
-    initSupabase();
-  }, []);
 
   // Form initialization
   const { control, handleSubmit, watch, setValue, reset } =
@@ -305,36 +289,6 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         attachments: [],
       },
     });
-
-  // Fetch Supabase session when client is initialized
-  useEffect(() => {
-    if (!supabase) return;
-
-    const fetchSession = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        setSession(data.session);
-      } catch (error) {
-        console.error("Error fetching session:", error);
-      } finally {
-        setIsInitializing(false);
-      }
-    };
-
-    fetchSession();
-
-    // Set up listener for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [supabase]);
 
   const handleAddressesLoaded = useCallback((loadedAddresses: Address[]) => {
     setAddresses(loadedAddresses);

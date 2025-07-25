@@ -140,7 +140,7 @@ const CateringPageContent = () => {
 
         <div className="mt-20">
           <DeliveryChecklist />
-          <CateringRequestForm />
+          <CateringRequestForm supabase={supabase} session={session} />
         </div>
       </div>
     </div>
