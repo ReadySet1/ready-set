@@ -35,6 +35,9 @@ describe("useSmartRedirect", () => {
         clearError: () => {},
         getDashboardPath: () => "",
         getOrderDetailPath: () => "",
+        signOut: async () => {},
+        signIn: async () => {},
+        forceAuthRefresh: async () => {},
       });
       const { result } = renderHook(() => useSmartRedirect());
       expect(result.current.redirectToDashboard).toBeDefined();

@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { User } from "@supabase/supabase-js";
+import { useUser } from "@/contexts/UserContext";
 
 interface MenuItem {
   title: string;
@@ -28,9 +29,15 @@ const Navigation: React.FC<NavigationProps> = ({
   session,
 }) => {
   const [openIndex, setOpenIndex] = useState<number>(-1);
+  const { signOut } = useUser();
 
   const handleSubmenu = (index: number) => {
     setOpenIndex(openIndex === index ? -1 : index);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    // Add redirect or state update as needed
   };
 
   return (
@@ -90,12 +97,7 @@ const Navigation: React.FC<NavigationProps> = ({
         {session?.user && (
           <li className="group relative lg:hidden">
             <button
-              onClick={async () => {
-                const supabase = createClient();
-                await supabase.auth.signOut();
-                navbarToggleHandler();
-                window.location.href = "/";
-              }}
+              onClick={handleSignOut}
               className="ud-menu-scroll flex py-2 text-base text-dark group-hover:text-primary dark:text-white dark:group-hover:text-primary lg:inline-flex lg:px-0 lg:py-6"
             >
               Sign Out

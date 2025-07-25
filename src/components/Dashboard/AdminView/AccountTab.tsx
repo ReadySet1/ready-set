@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { createClient } from "@/utils/supabase/client";
+import { useUser } from "@/contexts/UserContext";
 
 interface AccountTabProps {
   userId: string;
@@ -43,10 +44,14 @@ export const AccountTab: React.FC<AccountTabProps> = ({ userId }) => {
     zip: "",
   });
 
-  const [originalData, setOriginalData] = useState<AccountFormData | null>(null);
+  const [originalData, setOriginalData] = useState<AccountFormData | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
+
+  const { signOut } = useUser();
 
   const fetchUserData = useCallback(async () => {
     try {
@@ -89,7 +94,9 @@ export const AccountTab: React.FC<AccountTabProps> = ({ userId }) => {
     // Check if the form data has changed from the original data
     if (originalData) {
       const changed = Object.keys(formData).some(
-        (key) => formData[key as keyof AccountFormData] !== originalData[key as keyof AccountFormData]
+        (key) =>
+          formData[key as keyof AccountFormData] !==
+          originalData[key as keyof AccountFormData],
       );
       setHasChanges(changed);
     }
@@ -107,7 +114,7 @@ export const AccountTab: React.FC<AccountTabProps> = ({ userId }) => {
     try {
       setIsSaving(true);
       const supabase = await createClient();
-      
+
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -136,10 +143,15 @@ export const AccountTab: React.FC<AccountTabProps> = ({ userId }) => {
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    // Add redirect or state update as needed
+  };
+
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="flex justify-center items-center py-10">
+        <CardContent className="flex items-center justify-center py-10">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </CardContent>
       </Card>
@@ -150,13 +162,11 @@ export const AccountTab: React.FC<AccountTabProps> = ({ userId }) => {
     <Card>
       <CardHeader>
         <CardTitle>Account Information</CardTitle>
-        <CardDescription>
-          Manage your personal account details
-        </CardDescription>
+        <CardDescription>Manage your personal account details</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
@@ -178,7 +188,7 @@ export const AccountTab: React.FC<AccountTabProps> = ({ userId }) => {
               disabled
               placeholder="Your email"
             />
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Email cannot be changed. Contact support for assistance.
             </p>
           </div>
@@ -217,7 +227,7 @@ export const AccountTab: React.FC<AccountTabProps> = ({ userId }) => {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="city">City</Label>
             <Input
@@ -261,10 +271,7 @@ export const AccountTab: React.FC<AccountTabProps> = ({ userId }) => {
         >
           Cancel
         </Button>
-        <Button
-          onClick={handleSave}
-          disabled={!hasChanges || isSaving}
-        >
+        <Button onClick={handleSave} disabled={!hasChanges || isSaving}>
           {isSaving ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -274,7 +281,14 @@ export const AccountTab: React.FC<AccountTabProps> = ({ userId }) => {
             "Save Changes"
           )}
         </Button>
+        <Button
+          variant="destructive"
+          onClick={handleSignOut}
+          disabled={isSaving}
+        >
+          Sign Out
+        </Button>
       </CardFooter>
     </Card>
   );
-}; 
+};

@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render } from '@/__tests__/utils/test-utils';
 import { vi } from "vitest";
 import DashboardHome from "./DashboardHome";
 

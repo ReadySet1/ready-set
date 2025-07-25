@@ -1,6 +1,6 @@
 // src/__tests__/integration/enhanced-auth-flow.test.tsx
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@/__tests__/utils/test-utils';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/contexts/UserContext';

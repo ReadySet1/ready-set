@@ -30,6 +30,10 @@ const USER_HOME_ROUTES: Record<string, string> = {
 export interface FormState {
   error?: string;
   redirectTo?: string;
+  // NEW: Add authentication state for client-side sync
+  authSuccess?: boolean;
+  userId?: string;
+  userEmail?: string;
 }
 
 export async function login(
@@ -96,6 +100,8 @@ export async function login(
     return { error: "Failed to get user data" };
   }
 
+  console.log("✅ Login successful for user:", user.id);
+
   // Get user type from profile
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
@@ -141,12 +147,24 @@ export async function login(
     console.log("No valid returnTo path provided, redirecting to default home:", redirectPath);
   }
 
+  // NEW: Set authentication state for client-side synchronization
+  console.log("🔄 Setting authentication state for client-side sync");
+  
+  // Note: We can't directly access client-side utilities from server actions,
+  // but we can return state that the client can use to trigger immediate sync
+  const authState: FormState = {
+    authSuccess: true,
+    userId: user.id,
+    userEmail: user.email || email,
+    redirectTo: redirectPath
+  };
+
   // Always redirect to the determined path
-  console.log("Final redirect destination:", redirectPath);
+  console.log("🚀 Final redirect destination:", redirectPath);
   redirect(redirectPath);
 
   // This is unreachable but satisfies TypeScript
-  return { redirectTo: redirectPath };
+  return authState;
 }
 
 export async function signup(formData: FormData) {
