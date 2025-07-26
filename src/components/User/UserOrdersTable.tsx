@@ -234,7 +234,7 @@ const ClientOrders: React.FC = () => {
                             Status
                           </TableHead>
                           <TableHead className="hidden md:table-cell">
-                            Date
+                            Delivery Date
                           </TableHead>
                           <TableHead className="hidden lg:table-cell">
                             Pickup
