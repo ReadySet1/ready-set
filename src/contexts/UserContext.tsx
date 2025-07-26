@@ -25,14 +25,6 @@ import {
   getDashboardRouteByRole,
   getOrderDetailPath as getOrderDetailPathUtil,
 } from "@/utils/navigation";
-import {
-  emitAuthEvent,
-  onAuthEvent,
-  getPendingAuthState,
-  clearPendingAuthState,
-  confirmAuthenticationState,
-  requestAuthSync,
-} from "@/utils/auth-events";
 
 // Create the context with enhanced types
 export const UserContext = createContext<AuthContextType | null>(null);
@@ -88,7 +80,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   // Refs for cleanup and tracking
   const mountedRef = useRef(true);
   const authListenerRef = useRef<any>(null);
-  const authEventListenerRef = useRef<any>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Enhanced error creation utility
@@ -245,327 +236,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     [],
   );
 
-  // NEW: Enhanced authentication state refresh with retry mechanisms
-  const forceAuthRefresh = useCallback(
-    async (reason: string = "manual", maxRetries: number = 3) => {
-      console.log(`[UserContext] Force auth refresh triggered: ${reason}`);
-
-      let attempt = 0;
-      while (attempt < maxRetries) {
-        try {
-          attempt++;
-          console.log(
-            `[UserContext] Auth refresh attempt ${attempt}/${maxRetries}`,
-          );
-
-          setAuthState((prev) => ({
-            ...prev,
-            isLoading: true,
-            error: null,
-          }));
-
-          const supabase = supabaseClient;
-
-          // Force fresh session fetch with retry logic
-          let freshSession = null;
-          let freshUser = null;
-
-          try {
-            const sessionResult = await supabase.auth.getSession();
-            freshSession = sessionResult.data.session;
-
-            const userResult = await supabase.auth.getUser();
-            freshUser = userResult.data.user;
-
-            // Validate that we have consistent data
-            if (freshSession && !freshUser) {
-              throw new Error(
-                "Session exists but user is null - inconsistent state",
-              );
-            }
-
-            if (!freshSession && freshUser) {
-              throw new Error(
-                "User exists but session is null - inconsistent state",
-              );
-            }
-          } catch (authError: any) {
-            if (
-              attempt < maxRetries &&
-              (authError.message?.includes("timeout") ||
-                authError.message?.includes("network") ||
-                authError.message?.includes("inconsistent"))
-            ) {
-              console.warn(
-                `[UserContext] Auth refresh attempt ${attempt} failed, retrying:`,
-                authError,
-              );
-              await new Promise((resolve) =>
-                setTimeout(resolve, Math.pow(2, attempt) * 1000),
-              ); // Exponential backoff
-              continue;
-            }
-            throw authError;
-          }
-
-          console.log("[UserContext] Fresh auth data retrieved:", {
-            hasSession: !!freshSession,
-            hasUser: !!freshUser,
-            userId: freshUser?.id,
-            attempt,
-          });
-
-          // Update session and user immediately
-          setSession(freshSession);
-          setUser(freshUser);
-
-          if (freshUser && freshSession) {
-            // Fetch user role with retry
-            const role = await fetchUserRoleWithRetry(supabase, freshUser);
-            if (role) {
-              setUserRole(role);
-            }
-
-            setAuthState((prev) => ({
-              ...prev,
-              isAuthenticated: true,
-              isLoading: false,
-              lastAuthCheck: new Date(),
-              retryCount: 0, // Reset retry count on success
-            }));
-
-            // Persist successful authentication state
-            if (typeof window !== "undefined") {
-              const authStateToStore = {
-                isAuthenticated: true,
-                userId: freshUser.id,
-                email: freshUser.email,
-                timestamp: Date.now(),
-              };
-              localStorage.setItem(
-                "ready-set-auth-state",
-                JSON.stringify(authStateToStore),
-              );
-            }
-
-            // Emit login event for immediate UI updates
-            emitAuthEvent(
-              "login",
-              { user: freshUser, session: freshSession },
-              "client",
-            );
-
-            console.log(
-              "[UserContext] Authentication state refreshed successfully",
-            );
-            break; // Success - exit retry loop
-          } else {
-            // No authentication found
-            setUserRole(null);
-            setAuthState((prev) => ({
-              ...prev,
-              isAuthenticated: false,
-              isLoading: false,
-              lastAuthCheck: new Date(),
-              retryCount: 0,
-            }));
-
-            // Clear any persisted state
-            if (typeof window !== "undefined") {
-              localStorage.removeItem("ready-set-auth-state");
-            }
-            break; // No auth found - exit retry loop
-          }
-
-          // Clear any pending auth state
-          clearPendingAuthState();
-        } catch (error) {
-          console.error(
-            `[UserContext] Auth refresh attempt ${attempt} failed:`,
-            error,
-          );
-
-          if (attempt >= maxRetries) {
-            console.error("[UserContext] All auth refresh attempts failed");
-            setError(
-              createAuthError(
-                AuthErrorType.UNKNOWN_ERROR,
-                `Failed to refresh authentication state after ${maxRetries} attempts`,
-                true,
-                error,
-              ),
-            );
-            setAuthState((prev) => ({
-              ...prev,
-              isLoading: false,
-              retryCount: prev.retryCount + 1,
-              error: createAuthError(
-                AuthErrorType.UNKNOWN_ERROR,
-                `Failed to refresh authentication state after ${maxRetries} attempts`,
-                true,
-                error,
-              ),
-            }));
-
-            // On final failure, emit a retry request after delay
-            setTimeout(() => {
-              console.log(
-                "[UserContext] Requesting fallback auth sync after failure",
-              );
-              requestAuthSync("fallback after refresh failure");
-            }, 5000);
-          }
-        }
-      }
-    },
-    [fetchUserRoleWithRetry, createAuthError],
-  );
-
-  // NEW: Enhanced authentication events handling with state validation
-  useEffect(() => {
-    console.log("[UserContext] Setting up authentication event listener");
-
-    const unsubscribe = onAuthEvent(async (event) => {
-      const { type, payload, source } = event.detail;
-      console.log(`[UserContext] Received auth event: ${type}`, {
-        payload,
-        source,
-      });
-
-      switch (type) {
-        case "auth-sync-requested":
-          await forceAuthRefresh(`event: ${type}`);
-          break;
-
-        case "auth-state-check":
-          if (payload?.confirmed && payload?.user) {
-            console.log(
-              "[UserContext] Auth state confirmed via event, validating...",
-            );
-
-            // Validate the confirmed state before updating
-            try {
-              const supabase = supabaseClient;
-              const {
-                data: { session: currentSession },
-                error,
-              } = await supabase.auth.getSession();
-
-              if (error) {
-                console.warn(
-                  "[UserContext] Session validation failed during state check:",
-                  error,
-                );
-                // Request fresh auth sync instead of using potentially stale data
-                await forceAuthRefresh("validation failed during state check");
-                return;
-              }
-
-              // Only update if we have a valid session that matches the payload
-              if (currentSession?.user?.id === payload.user.id) {
-                console.log(
-                  "[UserContext] State validation passed, updating context",
-                );
-                setUser(payload.user);
-                setSession(payload.session);
-                setAuthState((prev) => ({
-                  ...prev,
-                  isAuthenticated: true,
-                  isLoading: false,
-                  lastAuthCheck: new Date(),
-                }));
-
-                // Persist validated state
-                if (typeof window !== "undefined") {
-                  const authStateToStore = {
-                    isAuthenticated: true,
-                    userId: payload.user.id,
-                    email: payload.user.email,
-                    timestamp: Date.now(),
-                  };
-                  localStorage.setItem(
-                    "ready-set-auth-state",
-                    JSON.stringify(authStateToStore),
-                  );
-                }
-              } else {
-                console.warn(
-                  "[UserContext] State validation failed - session mismatch, requesting fresh sync",
-                );
-                await forceAuthRefresh("session mismatch during validation");
-              }
-            } catch (validationError) {
-              console.error(
-                "[UserContext] Error during state validation:",
-                validationError,
-              );
-              await forceAuthRefresh("error during state validation");
-            }
-          }
-          break;
-
-        case "session-refresh":
-          console.log("[UserContext] Session refresh requested");
-          await forceAuthRefresh("session refresh request");
-          break;
-
-        case "session-expired":
-          console.log("[UserContext] Session expired, clearing state");
-          setUser(null);
-          setSession(null);
-          setUserRole(null);
-          setAuthState((prev) => ({
-            ...prev,
-            isAuthenticated: false,
-            isLoading: false,
-            lastAuthCheck: new Date(),
-          }));
-
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("ready-set-auth-state");
-            sessionStorage.removeItem("ready-set-auth-pending");
-          }
-          break;
-
-        default:
-          // Handle other auth events as needed
-          break;
-      }
-    });
-
-    authEventListenerRef.current = unsubscribe;
-
-    return () => {
-      if (authEventListenerRef.current) {
-        authEventListenerRef.current();
-      }
-    };
-  }, [forceAuthRefresh]);
-
-  // NEW: Check for pending authentication state on mount
-  useEffect(() => {
-    const checkPendingAuth = async () => {
-      const pendingAuth = getPendingAuthState();
-      if (pendingAuth) {
-        console.log(
-          "[UserContext] Found pending auth state, confirming...",
-          pendingAuth,
-        );
-
-        // Small delay to ensure any redirects have completed
-        setTimeout(async () => {
-          const confirmed = await confirmAuthenticationState();
-          if (confirmed) {
-            await forceAuthRefresh("pending auth confirmation");
-          }
-          clearPendingAuthState();
-        }, 100);
-      }
-    };
-
-    checkPendingAuth();
-  }, [forceAuthRefresh]);
-
   // Enhanced auth state setup with improved error handling and session persistence
   useEffect(() => {
     const setupAuth = async () => {
@@ -581,42 +251,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           isLoading: true,
           error: null,
         }));
-
-        // NEW: Check for persisted authentication state
-        const persistedAuthState =
-          typeof window !== "undefined"
-            ? localStorage.getItem("ready-set-auth-state")
-            : null;
-
-        if (persistedAuthState) {
-          try {
-            const parsed = JSON.parse(persistedAuthState);
-            console.log("[UserContext] Found persisted auth state:", parsed);
-
-            // Use persisted state as initial optimistic state
-            if (
-              parsed.isAuthenticated &&
-              parsed.timestamp &&
-              Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000
-            ) {
-              // 24 hours
-              console.log(
-                "[UserContext] Using persisted auth state for faster initial load",
-              );
-              setAuthState((prev) => ({
-                ...prev,
-                isAuthenticated: true,
-                isLoading: true, // Keep loading to verify
-              }));
-            }
-          } catch (error) {
-            console.warn(
-              "[UserContext] Error parsing persisted auth state:",
-              error,
-            );
-            localStorage.removeItem("ready-set-auth-state");
-          }
-        }
 
         // Get initial session and user data with validation
         let initialSession = null;
@@ -662,11 +296,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               retryCount: authState.retryCount + 1,
               lastAuthCheck: new Date(),
             });
-
-            // Clear persisted state
-            if (typeof window !== "undefined") {
-              localStorage.removeItem("ready-set-auth-state");
-            }
             return;
           }
           throw getUserError;
@@ -698,21 +327,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           }
 
           setProfileState((prev) => ({ ...prev, isLoading: false }));
-
-          // NEW: Persist authentication state
-          if (typeof window !== "undefined") {
-            const authStateToStore = {
-              isAuthenticated: true,
-              userId: currentUser.id,
-              email: currentUser.email,
-              timestamp: Date.now(),
-            };
-            localStorage.setItem(
-              "ready-set-auth-state",
-              JSON.stringify(authStateToStore),
-            );
-            console.log("[UserContext] Persisted authentication state");
-          }
         } else {
           console.log(
             "[UserContext] No authenticated user found or session invalid",
@@ -720,11 +334,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           // Explicitly set user to null when no authentication
           setUser(null);
           setUserRole(null);
-
-          // Clear persisted state
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("ready-set-auth-state");
-          }
         }
 
         // Mark auth as initialized and set loading to false
@@ -768,14 +377,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                 isAuthenticated: false,
                 isLoading: false,
               }));
-
-              // Clear persisted state on logout
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("ready-set-auth-state");
-                sessionStorage.removeItem("ready-set-auth-pending");
-              }
-
-              emitAuthEvent("logout", null, "listener");
               return;
             }
 
@@ -796,25 +397,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               isLoading: false,
               lastAuthCheck: new Date(),
             }));
-
-            // NEW: Persist authentication state on successful login
-            if (typeof window !== "undefined") {
-              const authStateToStore = {
-                isAuthenticated: true,
-                userId: newUser.id,
-                email: newUser.email,
-                timestamp: Date.now(),
-              };
-              localStorage.setItem(
-                "ready-set-auth-state",
-                JSON.stringify(authStateToStore),
-              );
-              console.log(
-                "[UserContext] Persisted authentication state after login",
-              );
-            }
-
-            emitAuthEvent("login", { user: newUser }, "listener");
           },
         );
 
@@ -847,11 +429,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
             ...prev,
             errorCount: prev.errorCount + 1,
           }));
-
-          // Clear persisted state on initialization failure
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("ready-set-auth-state");
-          }
         }
       }
     };
@@ -863,9 +440,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       if (authListenerRef.current) {
         authListenerRef.current.subscription.unsubscribe();
       }
-      if (authEventListenerRef.current) {
-        authEventListenerRef.current();
-      }
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
       }
@@ -875,7 +449,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     validateSession,
     createAuthError,
     authState.retryCount,
-    forceAuthRefresh,
   ]);
 
   // Enhanced refresh user data with retry logic
@@ -970,223 +543,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     return getOrderDetailPathUtil(orderNumber, userRole);
   };
 
-  // --- Add signOut method ---
-  const signOut = useCallback(async () => {
-    try {
-      await supabaseClient.auth.signOut();
-      setUser(null);
-      setSession(null);
-      setUserRole(null);
-      setAuthState((prev) => ({
-        ...prev,
-        isAuthenticated: false,
-        isLoading: false,
-        lastAuthCheck: new Date(),
-      }));
-      await refreshUserData();
-      emitAuthEvent("logout", null, "client");
-    } catch (error) {
-      console.error("[UserContext] Error signing out:", error);
-      setError(
-        createAuthError(
-          AuthErrorType.UNKNOWN_ERROR,
-          "Failed to sign out",
-          true,
-          error,
-        ),
-      );
-    }
-  }, [refreshUserData, createAuthError]);
-
-  // --- Enhanced signIn method with comprehensive post-login validation ---
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      console.log("[UserContext] Enhanced sign in started for:", email);
-
-      try {
-        setAuthState((prev) => ({
-          ...prev,
-          isLoading: true,
-          error: null,
-        }));
-
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        console.log(
-          "[UserContext] Initial sign in successful, validating state...",
-        );
-
-        // Post-login validation: Ensure we have consistent authentication state
-        let validationRetries = 0;
-        const maxValidationRetries = 3;
-        let validationSuccessful = false;
-
-        while (
-          validationRetries < maxValidationRetries &&
-          !validationSuccessful
-        ) {
-          try {
-            validationRetries++;
-            console.log(
-              `[UserContext] Post-login validation attempt ${validationRetries}/${maxValidationRetries}`,
-            );
-
-            // Wait a moment for auth state to propagate
-            if (validationRetries > 1) {
-              await new Promise((resolve) =>
-                setTimeout(resolve, 1000 * validationRetries),
-              );
-            }
-
-            // Re-fetch to ensure we have the latest state
-            const {
-              data: { session: validationSession },
-              error: sessionError,
-            } = await supabaseClient.auth.getSession();
-            const {
-              data: { user: validationUser },
-              error: userError,
-            } = await supabaseClient.auth.getUser();
-
-            if (sessionError || userError) {
-              throw new Error(
-                `Validation failed: ${sessionError?.message || userError?.message}`,
-              );
-            }
-
-            // Validate that the authentication was successful and consistent
-            if (!validationSession || !validationUser) {
-              throw new Error(
-                "Post-login validation failed: Missing session or user",
-              );
-            }
-
-            if (validationSession.user.id !== validationUser.id) {
-              throw new Error(
-                "Post-login validation failed: Session and user ID mismatch",
-              );
-            }
-
-            if (validationUser.email !== email) {
-              throw new Error("Post-login validation failed: Email mismatch");
-            }
-
-            console.log("[UserContext] Post-login validation successful");
-
-            // Update state with validated data
-            setSession(validationSession);
-            setUser(validationUser);
-            setAuthState((prev) => ({
-              ...prev,
-              isAuthenticated: true,
-              isLoading: false,
-              lastAuthCheck: new Date(),
-              retryCount: 0,
-            }));
-
-            // Fetch user role
-            const role = await fetchUserRoleWithRetry(
-              supabaseClient,
-              validationUser,
-            );
-            if (role) {
-              setUserRole(role);
-            }
-
-            // Persist validated authentication state
-            if (typeof window !== "undefined") {
-              const authStateToStore = {
-                isAuthenticated: true,
-                userId: validationUser.id,
-                email: validationUser.email,
-                timestamp: Date.now(),
-              };
-              localStorage.setItem(
-                "ready-set-auth-state",
-                JSON.stringify(authStateToStore),
-              );
-            }
-
-            // Emit validated login event
-            emitAuthEvent(
-              "login",
-              { user: validationUser, session: validationSession },
-              "client",
-            );
-
-            validationSuccessful = true;
-            console.log(
-              "[UserContext] Enhanced sign in completed successfully",
-            );
-          } catch (validationError) {
-            console.warn(
-              `[UserContext] Post-login validation attempt ${validationRetries} failed:`,
-              validationError,
-            );
-
-            if (validationRetries >= maxValidationRetries) {
-              // Final validation attempt failed - still update state but with warnings
-              console.error(
-                "[UserContext] All post-login validation attempts failed, using initial auth data",
-              );
-
-              setSession(data.session);
-              setUser(data.user);
-              setAuthState((prev) => ({
-                ...prev,
-                isAuthenticated: !!data.user,
-                isLoading: false,
-                lastAuthCheck: new Date(),
-                retryCount: prev.retryCount + 1,
-              }));
-
-              // Still try to refresh data and emit events
-              await refreshUserData();
-              emitAuthEvent("login", { user: data.user }, "client");
-
-              // Request a background auth sync to fix any inconsistencies
-              setTimeout(() => {
-                requestAuthSync("post-login validation failed");
-              }, 2000);
-
-              validationSuccessful = true; // Exit retry loop
-            }
-          }
-        }
-      } catch (error) {
-        console.error("[UserContext] Enhanced sign in failed:", error);
-
-        setAuthState((prev) => ({
-          ...prev,
-          isLoading: false,
-          retryCount: prev.retryCount + 1,
-        }));
-
-        setError(
-          createAuthError(
-            AuthErrorType.UNKNOWN_ERROR,
-            "Failed to sign in",
-            true,
-            error,
-          ),
-        );
-
-        // Clear any potentially stale persisted state
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("ready-set-auth-state");
-        }
-      }
-    },
-    [refreshUserData, createAuthError, fetchUserRoleWithRetry],
-  );
-
   // Enhanced loading state - only show loading if auth is not initialized
   const effectiveLoading = authState.isLoading || !authState.isInitialized;
 
@@ -1203,10 +559,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     clearError,
     getDashboardPath,
     getOrderDetailPath,
-    signOut,
-    signIn,
-    // NEW: Add force refresh method to context
-    forceAuthRefresh,
   };
 
   return (

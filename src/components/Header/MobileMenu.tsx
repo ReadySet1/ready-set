@@ -176,14 +176,34 @@ const MobileMenuOverlay: React.FC<{
   pathUrl,
   sticky,
 }) => {
-  const { user, userRole, isLoading, signOut } = useUser();
-  const [isSigningOut, setIsSigningOut] = React.useState(false);
+  const { user, userRole } = useUser();
+  const [supabase, setSupabase] = useState<any>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const router = useRouter();
+
+  // Get role-specific menu item
   const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole as UserType] : null;
 
+  // Initialize Supabase client
+  useEffect(() => {
+    const initSupabase = async () => {
+      try {
+        const client = await createClient();
+        setSupabase(client);
+      } catch (error) {
+        console.error("Error initializing Supabase client:", error);
+      }
+    };
+
+    initSupabase();
+  }, []);
+
   const handleSignOut = async () => {
-    setIsSigningOut(true);
+    if (!supabase) return;
+
     try {
-      await signOut();
+      setIsSigningOut(true);
+      await supabase.auth.signOut();
       window.location.href = "/";
       navbarToggleHandler();
     } catch (error) {
@@ -358,7 +378,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
   isVirtualAssistantPage, // Destructure
   isLogisticsPage,
 }) => {
-  const { user, userRole, isLoading, signOut } = useUser();
+  const { user, userRole, isLoading } = useUser();
   const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole as UserType] : null;
 
   return (

@@ -11,14 +11,13 @@ import { login, FormState } from "@/app/actions/login";
 import GoogleAuthButton from "@/components/Auth/GoogleAuthButton";
 import { useUser } from "@/contexts/UserContext";
 import { useRouter } from "next/navigation";
-import { setPendingAuthState, requestAuthSync, confirmAuthenticationState } from "@/utils/auth-events";
 
 const Signin = ({
   searchParams,
 }: {
   searchParams?: { error?: string; message?: string; returnTo?: string };
 }) => {
-  const { isLoading: isUserLoading, session, forceAuthRefresh } = useUser();
+  const { isLoading: isUserLoading, session } = useUser();
   const router = useRouter();
 
   const [state, formAction] = useActionState<FormState, FormData>(login, {
@@ -55,34 +54,6 @@ const Signin = ({
     }
   }, []);
 
-  // NEW: Enhanced authentication success handling
-  useEffect(() => {
-    const handleAuthSuccess = async () => {
-      if (state?.authSuccess && state?.userId && state?.userEmail) {
-        console.log("🔄 [SignIn] Authentication success detected, triggering immediate sync");
-        
-        // Set pending auth state for UserContext to pick up
-        setPendingAuthState({
-          userId: state.userId,
-          email: state.userEmail,
-          source: 'server-login'
-        });
-
-        // Trigger immediate auth refresh
-        try {
-          await forceAuthRefresh('login action success');
-          console.log("✅ [SignIn] Authentication state synchronized successfully");
-        } catch (error) {
-          console.error("❌ [SignIn] Error during auth sync:", error);
-          // Fallback: request auth sync via events
-          requestAuthSync('login success fallback');
-        }
-      }
-    };
-
-    handleAuthSuccess();
-  }, [state?.authSuccess, state?.userId, state?.userEmail, forceAuthRefresh]);
-
   useEffect(() => {
     if (state?.error) {
       setErrors((prev) => ({ ...prev, general: state.error || "" }));
@@ -102,21 +73,6 @@ const Signin = ({
       setErrors((prev) => ({ ...prev, general: searchParams.error || "" }));
     }
   }, [searchParams]);
-
-  // NEW: Enhanced form submission with immediate feedback
-  const handlePasswordFormSubmit = async (formData: FormData) => {
-    console.log("🚀 [SignIn] Password form submitted");
-    setLoading(true);
-    setErrors((prev) => ({ ...prev, general: "" }));
-    
-    try {
-      // Call the original form action
-      await formAction(formData);
-    } catch (error) {
-      console.error("❌ [SignIn] Form submission error:", error);
-      setLoading(false);
-    }
-  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -165,13 +121,6 @@ const Signin = ({
       if (error) throw error;
 
       setMagicLinkSent(true);
-      
-      // Set pending auth state for magic link login
-      setPendingAuthState({
-        email: magicLinkEmail,
-        source: 'client-login'
-      });
-      
     } catch (error: any) {
       console.error("Magic link error:", error);
       let errorMessage =
@@ -284,7 +233,7 @@ const Signin = ({
 
               {/* Password login form */}
               {loginMethod === "password" && (
-                <form action={handlePasswordFormSubmit} className="mb-5">
+                <form action={formAction} className="mb-5">
                   <div className="mb-4">
                     <input
                       type="email"

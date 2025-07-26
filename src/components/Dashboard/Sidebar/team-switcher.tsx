@@ -13,7 +13,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
-import { useUser } from "@/contexts/UserContext";
 
 export function TeamSwitcher({
   teams,
@@ -25,14 +24,7 @@ export function TeamSwitcher({
   }[];
 }) {
   const { isMobile } = useSidebar();
-  const [activeTeam, setActiveTeam] = React.useState(
-    teams.length > 0 ? teams[0] : null,
-  );
-  const { signOut } = useUser();
-  const handleSignOut = async () => {
-    await signOut();
-    // Add redirect or state update as needed
-  };
+  const [activeTeam, setActiveTeam] = React.useState(teams.length > 0 ? teams[0] : null);
 
   if (!activeTeam) {
     return null; // Return nothing if no team is available
@@ -48,12 +40,9 @@ export function TeamSwitcher({
                 size="lg"
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
-                <div
-                  className="text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: "#FFFFFF" }}
-                >
-                  <activeTeam.logo className="size-4 text-black" />{" "}
-                </div>
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg text-sidebar-primary-foreground" style={{ backgroundColor: '#FFFFFF' }}>
+
+                <activeTeam.logo className="size-4 text-black" />                </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">
                     {activeTeam.name}

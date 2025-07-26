@@ -9,7 +9,6 @@ import { createClient } from "@/utils/supabase/client";
 import { UserType } from "@/types/user";
 import { AccountTab } from "@/components/Dashboard/AdminView/AccountTab";
 import { PasswordChange } from "./PasswordChange";
-import { useUser } from "@/contexts/UserContext";
 
 export function SettingsUser() {
   const [activeTab, setActiveTab] = useState<string>("account");
@@ -22,30 +21,28 @@ export function SettingsUser() {
     const fetchCurrentUser = async () => {
       try {
         setLoading(true);
-
+        
         // Get Supabase client
         const supabase = await createClient();
-
+        
         // Get current authenticated user
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
+        const { data: { user } } = await supabase.auth.getUser();
+        
         if (!user) {
           throw new Error("No authenticated user found");
         }
-
+        
         // Get user profile data from database
         const { data: profileData, error } = await supabase
           .from("profiles")
           .select("id, type")
           .eq("id", user.id)
           .single();
-
+          
         if (error) {
           throw error;
         }
-
+        
         setUserId(profileData.id);
         setUserType(profileData.type as UserType);
         setIsSuperAdmin(profileData.type === UserType.SUPER_ADMIN);
@@ -63,16 +60,10 @@ export function SettingsUser() {
     setActiveTab(value);
   };
 
-  const { signOut } = useUser();
-  const handleSignOut = async () => {
-    await signOut();
-    // Add redirect or state update as needed
-  };
-
   if (loading) {
     return (
-      <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -87,34 +78,35 @@ export function SettingsUser() {
             Manage your account settings and preferences
           </p>
         </div>
-
+        
         <div className="mx-auto w-full max-w-6xl">
           <Tabs
             value={activeTab}
             onValueChange={handleTabChange}
             className="w-full"
           >
-            <TabsList className="mb-8 grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-3 mb-8">
               <TabsTrigger value="account">Account</TabsTrigger>
               <TabsTrigger value="security">Security</TabsTrigger>
-              {(userType === UserType.ADMIN ||
-                userType === UserType.SUPER_ADMIN) && (
+              {(userType === UserType.ADMIN || userType === UserType.SUPER_ADMIN) && (
                 <TabsTrigger value="admin">Admin Settings</TabsTrigger>
               )}
             </TabsList>
-
+            
             <TabsContent value="account" className="space-y-6">
               <AccountTab userId={userId} />
             </TabsContent>
-
+            
             <TabsContent value="security" className="space-y-6">
               <PasswordChange userId={userId} />
             </TabsContent>
-
-            {(userType === UserType.ADMIN ||
-              userType === UserType.SUPER_ADMIN) && (
+            
+            {(userType === UserType.ADMIN || userType === UserType.SUPER_ADMIN) && (
               <TabsContent value="admin" className="space-y-6">
-                <UserSettingsTab userId={userId} isSuperAdmin={isSuperAdmin} />
+                <UserSettingsTab 
+                  userId={userId} 
+                  isSuperAdmin={isSuperAdmin}
+                />
               </TabsContent>
             )}
           </Tabs>

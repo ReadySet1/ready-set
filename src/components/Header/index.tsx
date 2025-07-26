@@ -285,7 +285,7 @@ const Header: React.FC = () => {
     <header
       className={`ud-header left-0 top-0 z-40 flex w-full items-center ${
         sticky
-          ? "sticky-menu shadow-nav fixed z-[999] border-b border-stroke bg-white/80 backdrop-blur-[5px] dark:border-dark-3/20 dark:bg-dark/10"
+          ? "shadow-nav fixed z-[999] border-b border-stroke bg-white/80 backdrop-blur-[5px] dark:border-dark-3/20 dark:bg-dark/10"
           : "absolute bg-transparent"
       }`}
     >
@@ -315,7 +315,7 @@ const Header: React.FC = () => {
                   isVirtualAssistantPage={isVirtualAssistantPage}
                   isLogisticsPage={isLogisticsPage}
                 />
-                {/* Auth Buttons (visible on all pages except homepage) */}
+                {/* Auth Buttons (only visible on desktop; mobile handled by MobileMenu) */}
                 <div className="items-center justify-end pr-16 sm:flex lg:pr-0">
                   <AuthButtons sticky={sticky} pathUrl={pathUrl} />
                 </div>

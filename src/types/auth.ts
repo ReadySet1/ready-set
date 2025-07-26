@@ -80,11 +80,6 @@ export interface AuthContextType {
   refreshUserData: () => Promise<void>;
   retryAuth: () => Promise<void>;
   clearError: () => void;
-
-  // New methods for master plan
-  signOut: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
-  forceAuthRefresh: (reason?: string) => Promise<void>;
   
   // Navigation helpers
   getDashboardPath: () => string;

@@ -161,15 +161,6 @@ div.rdp-day.rdp-day_disabled,
   opacity: 0.7 !important;
 }
 
-/* Base styles for auth buttons - always visible */
-.loginBtn {
-  @apply text-dark hover:text-primary hover:opacity-100 dark:text-white;
-}
-
-.signUpBtn {
-  @apply bg-primary hover:bg-dark text-white hover:text-white;
-}
-
 .sticky-menu .navbar-logo {
   @apply py-2;
 }

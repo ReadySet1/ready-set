@@ -1,7 +1,12 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useUser } from "@/contexts/UserContext";
-import { onAuthEvent, requestAuthSync } from "@/utils/auth-events";
+import { createClient } from "@/utils/supabase/client";
+import {
+  User,
+  SupabaseClient,
+  Session,
+  AuthChangeEvent,
+} from "@supabase/supabase-js";
 
 interface AuthButtonsProps {
   sticky: boolean;
@@ -9,126 +14,121 @@ interface AuthButtonsProps {
 }
 
 const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
-  const { user, isLoading, authState } = useUser();
+  const [user, setUser] = useState<User | null>(null);
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Enhanced state management for immediate UI updates
-  const [optimisticAuthState, setOptimisticAuthState] = useState({
-    isAuthenticated: false,
-    user: null as any,
-    isLoading: true,
-  });
-
-  // Initialize optimistic state from actual auth state
+  // Initialize Supabase client
   useEffect(() => {
-    setOptimisticAuthState({
-      isAuthenticated: authState.isAuthenticated,
-      user: user,
-      isLoading: isLoading || !authState.isInitialized,
-    });
-  }, [authState.isAuthenticated, user, isLoading, authState.isInitialized]);
-
-  // Enhanced auth event handling for immediate UI updates
-  useEffect(() => {
-    console.log("[AuthButtons] Setting up auth event listener");
-
-    const unsubscribe = onAuthEvent((event) => {
-      const { type, payload, source } = event.detail;
-      console.log(`[AuthButtons] Received auth event: ${type}`, {
-        payload,
-        source,
-      });
-
-      switch (type) {
-        case "login":
-          console.log("[AuthButtons] Login event - updating optimistic state");
-          setOptimisticAuthState((prev) => ({
-            ...prev,
-            isAuthenticated: true,
-            user: payload?.user || prev.user,
-            isLoading: false,
-          }));
-          break;
-
-        case "logout":
-          console.log("[AuthButtons] Logout event - updating optimistic state");
-          setOptimisticAuthState((prev) => ({
-            ...prev,
-            isAuthenticated: false,
-            user: null,
-            isLoading: false,
-          }));
-          break;
-
-        case "auth-state-check":
-          if (payload?.confirmed) {
-            console.log(
-              "[AuthButtons] Auth state confirmed - updating optimistic state",
-            );
-            setOptimisticAuthState((prev) => ({
-              ...prev,
-              isAuthenticated: true,
-              user: payload?.user || prev.user,
-              isLoading: false,
-            }));
-          }
-          break;
-
-        case "session-refresh":
-          console.log("[AuthButtons] Session refresh - requesting sync");
-          // Request fresh auth sync to ensure UI is up to date
-          requestAuthSync("session refresh from AuthButtons");
-          break;
-
-        default:
-          break;
+    const initSupabase = async () => {
+      try {
+        const client = await createClient();
+        setSupabase(client);
+      } catch (error) {
+        console.error("Error initializing Supabase client:", error);
+        setIsLoading(false);
       }
-    });
-
-    return () => {
-      unsubscribe();
     };
+
+    initSupabase();
   }, []);
 
-  // Use optimistic state for immediate UI responsiveness
-  const effectiveUser = optimisticAuthState.user;
-  const effectiveIsAuthenticated = optimisticAuthState.isAuthenticated;
-  const effectiveIsLoading = optimisticAuthState.isLoading;
+  useEffect(() => {
+    // Optimistic UI: Check for cached session in localStorage
+    if (typeof window !== "undefined") {
+      try {
+        const cachedSession = localStorage.getItem("sb-auth-token");
+        if (cachedSession) {
+          const sessionObj = JSON.parse(cachedSession);
+          if (sessionObj?.user) {
+            setUser(sessionObj.user);
+            setIsLoading(false);
+          }
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+  }, []);
 
-  // Show loading state only briefly during initialization
-  if (effectiveIsLoading && !authState.isInitialized) {
-    console.log("AuthButtons: Rendering loading state");
+  useEffect(() => {
+    if (!supabase) return;
+
+    // Get the current user when component mounts
+    const getUser = async () => {
+      try {
+        const {
+          data: { user, session },
+          error,
+        } = await supabase.auth.getUser();
+        if (error) throw error;
+        setUser(user);
+        // Store session in localStorage for optimistic UI
+        if (typeof window !== "undefined" && session) {
+          localStorage.setItem("sb-auth-token", JSON.stringify(session));
+        }
+      } catch (error) {
+        // If Supabase validation fails, clear cache
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("sb-auth-token");
+        }
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    getUser();
+
+    // Set up auth state listener
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event: AuthChangeEvent, session: Session | null) => {
+        if (event === "SIGNED_IN" && session) {
+          setUser(session.user);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("sb-auth-token", JSON.stringify(session));
+          }
+        } else if (event === "SIGNED_OUT") {
+          setUser(null);
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("sb-auth-token");
+          }
+        }
+      },
+    );
+
+    // Clean up subscription
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  if (isLoading) {
     return (
       <div className="flex items-center gap-4">
-        <div className="h-10 w-24 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"></div>
-        <div className="h-10 w-24 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"></div>
+        <div className="h-10 w-24 animate-pulse rounded-lg bg-gray-200"></div>
+        <div className="h-10 w-24 animate-pulse rounded-lg bg-gray-200"></div>
       </div>
     );
   }
 
-  if (effectiveIsAuthenticated && effectiveUser) {
+  if (user) {
     return (
-      <div className="flex items-center gap-4">
+      <>
         <Link href={"/client"}>
-          <div
-            className="flex items-center rounded-lg border border-gray-200 bg-white px-6 py-2 shadow"
-            style={{ minWidth: 120, justifyContent: "center" }}
+          <p
+            className={`loginBtn px-7 py-3 text-base font-medium ${
+              !sticky && pathUrl === "/" ? "text-white" : "text-black"
+            }`}
           >
-            <span
-              className={`loginBtn text-base font-medium transition-colors duration-200 ${
-                !sticky && pathUrl === "/"
-                  ? "text-black"
-                  : "text-black dark:text-white"
-              }`}
-            >
-              {effectiveUser.user_metadata?.name ||
-                effectiveUser.user_metadata?.full_name ||
-                effectiveUser.email?.split("@")?.[0] ||
-                "User"}
-            </span>
-          </div>
+            {user.user_metadata?.name ||
+              user.user_metadata?.full_name ||
+              user.email?.split("@")[0] ||
+              "User"}
+          </p>
         </Link>
         <SignOutButton sticky={sticky} pathUrl={pathUrl} />
-      </div>
+      </>
     );
   }
 
@@ -145,70 +145,47 @@ interface ButtonProps {
   pathUrl: string;
 }
 
-// Enhanced SignOut button with optimistic updates and better UX
 const SignOutButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => {
-  const { signOut } = useUser();
-  const [isLoading, setIsLoading] = useState(false);
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
 
-  const handleSignOut = useCallback(async () => {
-    setIsLoading(true);
-    console.log("[AuthButtons] Sign out initiated");
+  // Initialize Supabase client
+  useEffect(() => {
+    const initSupabase = async () => {
+      try {
+        const client = await createClient();
+        setSupabase(client);
+      } catch (error) {
+        console.error("Error initializing Supabase client:", error);
+      }
+    };
+
+    initSupabase();
+  }, []);
+
+  const handleSignOut = async () => {
+    if (!supabase) {
+      console.error("Supabase client not initialized");
+      return;
+    }
 
     try {
-      await signOut();
-      console.log("[AuthButtons] Sign out completed successfully");
-
-      // Small delay to allow auth state to propagate
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 100);
-    } catch (error) {
-      console.error("[AuthButtons] Sign out error:", error);
-      // Still redirect on error to prevent stuck state
+      await supabase.auth.signOut();
       window.location.href = "/";
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error("Error signing out:", error);
     }
-  }, [signOut]);
+  };
 
   return (
     <button
       onClick={handleSignOut}
-      disabled={isLoading}
-      className={`ml-0 rounded-lg bg-[#1743e3] px-7 py-3 text-base font-bold text-white shadow transition-all duration-300 ease-in-out ${
-        isLoading
-          ? "scale-95 cursor-not-allowed opacity-70"
-          : "cursor-pointer border border-[#1743e3] hover:scale-105 hover:border-black hover:bg-transparent hover:text-black"
+      className={`signUpBtn rounded-lg px-6 py-3 text-base font-medium duration-300 ease-in-out ${
+        pathUrl !== "/" || sticky
+          ? "bg-blue-800 bg-opacity-100 text-white hover:bg-opacity-20 hover:text-dark"
+          : "bg-blue-800 bg-opacity-20 text-white hover:bg-opacity-100 hover:text-white"
       }`}
-      style={{ minWidth: 120 }}
     >
-      {isLoading ? (
-        <span className="flex items-center">
-          <svg
-            className="-ml-1 mr-2 h-4 w-4 animate-spin text-white"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          Signing out...
-        </span>
-      ) : (
-        "Sign Out"
-      )}
+      Sign Out
     </button>
   );
 };
@@ -216,7 +193,7 @@ const SignOutButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => {
 const SignInButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => (
   <Link
     href="/sign-in"
-    className="rounded-lg bg-white px-7 py-3 text-base font-medium text-black shadow-md transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:shadow-lg"
+    className="rounded-lg bg-white px-7 py-3 text-base font-medium text-black shadow-md transition duration-200 hover:bg-gray-100"
     style={{ marginRight: "12px" }}
   >
     Sign In
@@ -226,7 +203,7 @@ const SignInButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => (
 const SignUpButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => (
   <Link
     href="/sign-up"
-    className="rounded-lg bg-amber-400 px-7 py-3 text-base font-medium text-black transition-all duration-200 hover:scale-105 hover:bg-amber-500 hover:shadow-lg"
+    className="rounded-lg bg-amber-400 px-7 py-3 text-base font-medium text-black transition duration-200 hover:bg-amber-500"
   >
     Sign Up
   </Link>

@@ -2,7 +2,6 @@ import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import DriverDashboardPage from "../DriverOrder";
-import { render } from '@/__tests__/utils/test-utils';
 
 // Mock Next.js modules
 vi.mock("next/navigation", () => ({

@@ -41,7 +41,6 @@ import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { useUser } from "@/contexts/UserContext";
 
 const NavBar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -49,7 +48,7 @@ const NavBar = () => {
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const closeSheet = () => setIsOpen(false);
   const router = useRouter();
-
+  
   // Initialize Supabase client
   useEffect(() => {
     const initSupabase = async () => {
@@ -65,10 +64,29 @@ const NavBar = () => {
     initSupabase();
   }, []);
 
-  const { signOut } = useUser();
   const handleSignOut = async () => {
-    await signOut();
-    // Add redirect or state update as needed
+    if (!supabase) {
+      toast.error("Unable to connect to authentication service");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast.success("Successfully signed out");
+      router.push("/");
+      router.refresh(); // Refresh to update auth state across the app
+    } catch (err: any) {
+      console.error("Sign out error:", err);
+      toast.error(err.message || "An unexpected error occurred while signing out");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

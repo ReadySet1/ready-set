@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AddressManager from "../index";
 import { Address } from "@/types/address";
-import { render } from "@/__tests__/utils/test-utils";
 
 // Mock Supabase client
 const mockSupabase = {
