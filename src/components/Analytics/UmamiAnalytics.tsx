@@ -19,16 +19,14 @@ interface TrackingPreferences {
 
 export default function UmamiAnalytics() {
   const [shouldLoadScript, setShouldLoadScript] = useState(true); // Default to true since Umami is privacy-focused
-  const [retryCount, setRetryCount] = useState(0);
-  const MAX_RETRIES = 3;
 
   const checkConsentStatus = () => {
     try {
       const consentStatus = localStorage.getItem("cookieConsentStatus");
       const preferences: TrackingPreferences = JSON.parse(
-        localStorage.getItem("cookiePreferences") || "{}",
+        localStorage.getItem("cookiePreferences") || "{}"
       );
-
+      
       // Only block Umami if user explicitly rejected analytics
       // Since Umami is privacy-focused and doesn't use cookies, we load it by default
       if (consentStatus === "rejected" || preferences.analytics === false) {
@@ -58,18 +56,12 @@ export default function UmamiAnalytics() {
       checkConsentStatus();
     };
 
-    window.addEventListener("storage", handleStorageChange);
-    window.addEventListener(
-      "cookiePreferencesUpdated",
-      handlePreferencesUpdate,
-    );
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('cookiePreferencesUpdated', handlePreferencesUpdate);
 
     return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener(
-        "cookiePreferencesUpdated",
-        handlePreferencesUpdate,
-      );
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('cookiePreferencesUpdated', handlePreferencesUpdate);
     };
   }, []);
 
@@ -83,28 +75,15 @@ export default function UmamiAnalytics() {
       data-do-not-track="true"
       data-cache="false"
       onLoad={() => {
-        console.log(
-          "✅ Umami analytics script loaded successfully from self-hosted instance",
-        );
+        console.log("✅ Umami analytics script loaded successfully from self-hosted instance");
         // Test if Umami is working
-        if (typeof window !== "undefined" && window.umami) {
+        if (typeof window !== 'undefined' && window.umami) {
           console.log("🎯 Umami is ready for tracking");
         }
       }}
       onError={(error) => {
-        if (retryCount < MAX_RETRIES) {
-          setTimeout(
-            () => {
-              setRetryCount((prev) => prev + 1);
-              setShouldLoadScript(false);
-              setTimeout(() => setShouldLoadScript(true), 100);
-            },
-            Math.pow(2, retryCount) * 1000,
-          );
-        } else {
-          console.error("❌ Failed to load Umami after retries:", error);
-        }
+        console.error("❌ Failed to load Umami analytics script:", error);
       }}
     />
   ) : null;
-}
+} 

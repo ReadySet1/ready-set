@@ -82,7 +82,6 @@ export async function GET(req: NextRequest) {
             ? value.toString()
             : value
         )),
-        order_number: order.orderNumber || order.order_number || 'N/A',
         order_type: 'brokerage' in order ? 'catering' : 'on_demand',
         address: {
           street1: pickupAddress.street1 || 'N/A',
@@ -98,8 +97,7 @@ export async function GET(req: NextRequest) {
         } : null,
         client_attention: order.client_attention || order.specialNotes || 'No special notes',
         status: order.status || 'Unknown',
-        date: order.arrivalDateTime || order.pickupDateTime || order.createdAt || new Date().toISOString(),
-        delivery_date: order.arrivalDateTime || order.pickupDateTime || null,
+        date: order.date || order.createdAt || new Date().toISOString(),
         pickup_time: order.pickupDateTime || order.pickup_time || 'N/A',
         arrival_time: order.arrivalDateTime || order.arrival_time || 'N/A',
         order_total: order.orderTotal || order.order_total || '0.00'
