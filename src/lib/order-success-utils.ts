@@ -11,8 +11,7 @@ export const generateDefaultNextSteps = (orderData: Partial<OrderSuccessData>): 
     description: 'You will receive an email confirmation with your order',
     completed: false,
     estimatedDuration: '30 minutes',
-    actionType: 'CLIENT_EXPECTATION',
-    priority: 'MEDIUM'
+    actionType: 'CLIENT_EXPECTATION'
   });
 
   steps.push({
@@ -21,8 +20,7 @@ export const generateDefaultNextSteps = (orderData: Partial<OrderSuccessData>): 
     description: 'Our team will contact you to confirm delivery details and venue access',
     completed: false,
     estimatedDuration: '24 hours',
-    actionType: 'CLIENT_EXPECTATION',
-    priority: 'MEDIUM'
+    actionType: 'CLIENT_EXPECTATION'
   });
 
   steps.push({
@@ -31,8 +29,7 @@ export const generateDefaultNextSteps = (orderData: Partial<OrderSuccessData>): 
     description: 'We will complete all food preparation and coordinate delivery logistics for your event',
     completed: false,
     estimatedDuration: '4 hours before event',
-    actionType: 'CLIENT_EXPECTATION',
-    priority: 'MEDIUM'
+    actionType: 'CLIENT_EXPECTATION'
   });
 
   // Host-specific steps - Client focused
@@ -43,8 +40,7 @@ export const generateDefaultNextSteps = (orderData: Partial<OrderSuccessData>): 
       description: `Professional event hosts (${orderData.numberOfHosts || 1} host${(orderData.numberOfHosts || 1) > 1 ? 's' : ''}) will be assigned and briefed for your ${orderData.hoursNeeded || 2}-hour event`,
       completed: false,
       estimatedDuration: '2 days before event',
-      actionType: 'CLIENT_EXPECTATION',
-      priority: 'MEDIUM'
+      actionType: 'CLIENT_EXPECTATION'
     });
 
     steps.push({
@@ -53,8 +49,7 @@ export const generateDefaultNextSteps = (orderData: Partial<OrderSuccessData>): 
       description: 'Your assigned hosts will arrive on-site and begin event setup and service',
       completed: false,
       estimatedDuration: '15 minutes before event',
-      actionType: 'CLIENT_EXPECTATION',
-      priority: 'MEDIUM'
+      actionType: 'CLIENT_EXPECTATION'
     });
   }
 
@@ -65,8 +60,7 @@ export const generateDefaultNextSteps = (orderData: Partial<OrderSuccessData>): 
     description: 'Your catering order will be delivered and set up according to your specifications',
     completed: false,
     estimatedDuration: 'Event day',
-    actionType: 'CLIENT_EXPECTATION',
-    priority: 'HIGH'
+    actionType: 'CLIENT_EXPECTATION'
   });
 
   return steps;
