@@ -64,6 +64,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/utils/supabase/client";
 import { CarrierOrdersBadge } from "@/components/Dashboard/CarrierManagement/CarrierOrdersBadge";
 import { CarrierSummaryWidget } from "@/components/Dashboard/CarrierManagement/CarrierSummaryWidget";
+import { useRouter } from "next/navigation";
 
 // API Response Interfaces
 interface JobApplicationsApiResponse {
@@ -418,6 +419,7 @@ const ActivityFeedCard: React.FC = () => (
 // Main Dashboard Component
 export function ModernDashboardHome() {
   const { user, isLoading: userLoading, error: userError } = useUser();
+  const router = useRouter();
 
   const [recentOrders, setRecentOrders] = useState<CateringRequest[]>([]);
   const [activeOrders, setActiveOrders] = useState<CateringRequest[]>([]);
@@ -460,30 +462,50 @@ export function ModernDashboardHome() {
   };
 
   useEffect(() => {
-    if (userLoading || !user) {
-      if (!userLoading && !user) {
-        setLoading(false);
-      }
+    if (!userLoading && !user) {
+      setLoading(false);
+      setError("No authenticated user found. Please log in.");
+      router.replace("/login");
       return;
     }
 
     const fetchData = async () => {
       setLoading(true);
       setError(null);
+
+      console.log("[Dashboard] Starting data fetch for user:", user.id);
+
       try {
         const supabase = createClient();
         const {
           data: { session },
         } = await supabase.auth.getSession();
 
+        console.log("[Dashboard] Session check:", {
+          hasSession: !!session,
+          hasAccessToken: !!session?.access_token,
+          tokenLength: session?.access_token?.length || 0,
+        });
+
         if (!session) {
           throw new Error("Authentication required: No active session");
+        }
+
+        if (!session.access_token) {
+          throw new Error(
+            "Authentication required: No access token in session",
+          );
         }
 
         const headers = {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         };
+
+        console.log("[Dashboard] Making API requests with token:", {
+          tokenPreview: session.access_token.substring(0, 20) + "...",
+          headers,
+        });
 
         const results = await Promise.allSettled([
           fetch("/api/orders/catering-orders?recentOnly=true", { headers }),
@@ -493,11 +515,28 @@ export function ModernDashboardHome() {
           fetch("/api/users/current-user", { headers }),
         ]);
 
+        console.log(
+          "[Dashboard] API results:",
+          results.map((result, index) => ({
+            endpoint: ["orders", "users", "applications", "profile"][index],
+            status: result.status,
+            fulfilled: result.status === "fulfilled",
+            ok: result.status === "fulfilled" ? result.value.ok : null,
+            statusCode:
+              result.status === "fulfilled" ? result.value.status : null,
+          })),
+        );
+
         // Handle orders
         const ordersResult = results[0];
         if (ordersResult.status === "fulfilled") {
           if (!ordersResult.value.ok) {
             const errorText = await ordersResult.value.text();
+            console.error("[Dashboard] Orders API failed:", {
+              status: ordersResult.value.status,
+              statusText: ordersResult.value.statusText,
+              error: errorText,
+            });
             throw new Error(
               `Orders API failed: ${ordersResult.value.status} - ${errorText}`,
             );
@@ -510,6 +549,10 @@ export function ModernDashboardHome() {
               [OrderStatus.ACTIVE, OrderStatus.ASSIGNED].includes(order.status),
           );
           setActiveOrders(activeOrdersList);
+          console.log("[Dashboard] Orders loaded:", {
+            total: ordersData.orders?.length || 0,
+            active: activeOrdersList.length,
+          });
         } else {
           console.error("Failed to fetch orders:", ordersResult.reason);
           throw new Error("Failed to fetch orders data.");
@@ -520,6 +563,11 @@ export function ModernDashboardHome() {
         if (usersResult.status === "fulfilled") {
           if (!usersResult.value.ok) {
             const errorText = await usersResult.value.text();
+            console.error("[Dashboard] Users API failed:", {
+              status: usersResult.value.status,
+              statusText: usersResult.value.statusText,
+              error: errorText,
+            });
             throw new Error(
               `Users API failed: ${usersResult.value.status} - ${errorText}`,
             );
@@ -527,6 +575,10 @@ export function ModernDashboardHome() {
           const usersData =
             (await usersResult.value.json()) as UsersApiResponse;
           setUsers(usersData.users || []);
+          console.log(
+            "[Dashboard] Users loaded:",
+            usersData.users?.length || 0,
+          );
         } else {
           console.error("Failed to fetch users:", usersResult.reason);
           throw new Error("Failed to fetch users data.");
@@ -537,6 +589,11 @@ export function ModernDashboardHome() {
         if (applicationsResult.status === "fulfilled") {
           if (!applicationsResult.value.ok) {
             const errorText = await applicationsResult.value.text();
+            console.error("[Dashboard] Applications API failed:", {
+              status: applicationsResult.value.status,
+              statusText: applicationsResult.value.statusText,
+              error: errorText,
+            });
             throw new Error(
               `Applications API failed: ${applicationsResult.value.status} - ${errorText}`,
             );
@@ -548,6 +605,10 @@ export function ModernDashboardHome() {
             (app) => app.status === ApplicationStatus.PENDING,
           );
           setPendingApplications(pendingAppsList);
+          console.log("[Dashboard] Applications loaded:", {
+            total: applicationsData.applications?.length || 0,
+            pending: pendingAppsList.length,
+          });
         } else {
           console.error(
             "Failed to fetch applications:",
@@ -561,7 +622,18 @@ export function ModernDashboardHome() {
         if (profileResult.status === "fulfilled" && profileResult.value.ok) {
           const profileData = await profileResult.value.json();
           setUserProfile(profileData);
+          console.log("[Dashboard] User profile loaded:", profileData);
+        } else if (
+          profileResult.status === "fulfilled" &&
+          !profileResult.value.ok
+        ) {
+          console.warn("[Dashboard] Failed to load user profile:", {
+            status: profileResult.value.status,
+            statusText: profileResult.value.statusText,
+          });
         }
+
+        console.log("[Dashboard] All data loaded successfully");
       } catch (err) {
         console.error("Dashboard data fetch error:", err);
         setError(
@@ -575,7 +647,7 @@ export function ModernDashboardHome() {
     };
 
     fetchData();
-  }, [userLoading, user]);
+  }, [userLoading, user, router]);
 
   const combinedLoading = userLoading || loading || metricsLoading;
   const combinedError = userError || error || metricsError;
