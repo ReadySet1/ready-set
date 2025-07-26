@@ -8,39 +8,13 @@ interface AuthButtonsProps {
   pathUrl: string;
 }
 
-// NEW: Helper function to determine display name based on role
-const getDisplayName = (user: any, userRole: string | null): string => {
-  if (!user) return "User";
-  
-  // Check if user has admin privileges
-  const isAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'helpdesk';
-  
-  if (isAdmin) {
-    // Show role-based display name for admin users
-    if (userRole === 'super_admin') {
-      return "Super Admin";
-    } else if (userRole === 'admin') {
-      return "Admin";
-    } else if (userRole === 'helpdesk') {
-      return "Help Desk";
-    }
-  }
-  
-  // For non-admin users, show their name or email
-  return user.user_metadata?.name ||
-         user.user_metadata?.full_name ||
-         user.email?.split("@")?.[0] ||
-         "User";
-};
-
 const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
-  const { user, userRole, isLoading, authState } = useUser();
+  const { user, isLoading, authState } = useUser();
 
   // Enhanced state management for immediate UI updates
   const [optimisticAuthState, setOptimisticAuthState] = useState({
     isAuthenticated: false,
     user: null as any,
-    userRole: null as string | null,
     isLoading: true,
   });
 
@@ -49,10 +23,9 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
     setOptimisticAuthState({
       isAuthenticated: authState.isAuthenticated,
       user: user,
-      userRole: userRole,
       isLoading: isLoading || !authState.isInitialized,
     });
-  }, [authState.isAuthenticated, user, userRole, isLoading, authState.isInitialized]);
+  }, [authState.isAuthenticated, user, isLoading, authState.isInitialized]);
 
   // Enhanced auth event handling for immediate UI updates
   useEffect(() => {
@@ -72,7 +45,6 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
             ...prev,
             isAuthenticated: true,
             user: payload?.user || prev.user,
-            userRole: payload?.userRole || prev.userRole,
             isLoading: false,
           }));
           break;
@@ -83,7 +55,6 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
             ...prev,
             isAuthenticated: false,
             user: null,
-            userRole: null,
             isLoading: false,
           }));
           break;
@@ -97,7 +68,6 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
               ...prev,
               isAuthenticated: true,
               user: payload?.user || prev.user,
-              userRole: payload?.userRole || prev.userRole,
               isLoading: false,
             }));
           }
@@ -121,7 +91,6 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
 
   // Use optimistic state for immediate UI responsiveness
   const effectiveUser = optimisticAuthState.user;
-  const effectiveUserRole = optimisticAuthState.userRole;
   const effectiveIsAuthenticated = optimisticAuthState.isAuthenticated;
   const effectiveIsLoading = optimisticAuthState.isLoading;
 
@@ -137,9 +106,6 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
   }
 
   if (effectiveIsAuthenticated && effectiveUser) {
-    // NEW: Get display name based on role
-    const displayName = getDisplayName(effectiveUser, effectiveUserRole);
-    
     return (
       <div className="flex items-center gap-4">
         <Link href={"/client"}>
@@ -154,7 +120,10 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
                   : "text-black dark:text-white"
               }`}
             >
-              {displayName}
+              {effectiveUser.user_metadata?.name ||
+                effectiveUser.user_metadata?.full_name ||
+                effectiveUser.email?.split("@")?.[0] ||
+                "User"}
             </span>
           </div>
         </Link>

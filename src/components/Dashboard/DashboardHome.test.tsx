@@ -1,16 +1,11 @@
 import React from "react";
-import { render } from "@/__tests__/utils/test-utils";
-import { screen } from "@testing-library/react";
+import { render } from '@/__tests__/utils/test-utils';
 import { vi } from "vitest";
 import DashboardHome from "./DashboardHome";
 
 // Mock useUser context (if used)
 vi.mock("@/contexts/UserContext", () => ({
-  useUser: () => ({
-    user: { id: "test" },
-    userRole: "ADMIN",
-    isLoading: false,
-  }),
+  useUser: () => ({ user: { id: "test" }, userRole: "ADMIN", isLoading: false }),
 }));
 
 // Mock fetchData or any data-fetching logic to immediately resolve with mock data

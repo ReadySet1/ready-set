@@ -21,23 +21,15 @@ export default function AdminLayout({
   const pathname = usePathname(); 
 
   useEffect(() => {
-    // Simplified loading logic - just set loaded after a short delay
-    const timer = setTimeout(() => {
-      setIsLoaded(true);
-    }, 100);
-    
-    return () => clearTimeout(timer);
+    const savedState = localStorage.getItem("sidebar_state");
+    if (savedState === "true" || savedState === "false") {
+      setDefaultOpen(savedState === "true");
+    }
+    setIsLoaded(true);
   }, []);
 
   const handleSidebarChange = (isOpen: boolean) => {
-    // Only save to localStorage if it's available
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        localStorage.setItem("sidebar_state", String(isOpen));
-      } catch (error) {
-        console.warn('Failed to save sidebar state to localStorage:', error);
-      }
-    }
+    localStorage.setItem("sidebar_state", String(isOpen));
   };
 
   if (!isLoaded) {

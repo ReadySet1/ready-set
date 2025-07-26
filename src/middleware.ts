@@ -38,58 +38,6 @@ const ADMIN_ROUTES = [
   '/admin/job-applications',
 ];
 
-// NEW: Enhanced role fetching with retry logic
-const fetchUserRoleWithRetry = async (supabase: any, userId: string, maxRetries: number = 3) => {
-  const baseDelay = 500; // 500ms base delay
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`[Middleware] Fetching user role for user ${userId} (attempt ${attempt}/${maxRetries})`);
-      
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('type')
-        .eq('id', userId)
-        .single();
-        
-      if (error) {
-        console.error(`[Middleware] Error fetching profile (attempt ${attempt}):`, error);
-        
-        if (error.code === 'PGRST116') {
-          // No rows returned - profile doesn't exist yet
-          console.log(`[Middleware] No profile found for user ${userId}, waiting before retry...`);
-          
-          if (attempt === maxRetries) {
-            return null; // Profile doesn't exist after all retries
-          }
-          
-          // Wait before retry with exponential backoff
-          const delay = baseDelay * Math.pow(2, attempt - 1);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue;
-        }
-        
-        throw error;
-      }
-      
-      console.log('[Middleware] Profile fetched successfully:', profile);
-      return profile?.type || null;
-    } catch (error) {
-      console.error(`[Middleware] Failed to fetch profile (attempt ${attempt}):`, error);
-      
-      if (attempt === maxRetries) {
-        throw error;
-      }
-      
-      // Wait before retry with exponential backoff
-      const delay = baseDelay * Math.pow(2, attempt - 1);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  
-  return null;
-};
-
 // Enhanced authentication validation
 const validateUserAuthentication = async (supabase: any, requestId: string) => {
   const startTime = Date.now();
@@ -135,7 +83,7 @@ const validateUserAuthentication = async (supabase: any, requestId: string) => {
   }
 };
 
-// NEW: Enhanced role validation for admin routes with retry logic
+// Enhanced role validation for admin routes
 const validateUserRole = async (supabase: any, user: any, pathname: string, requestId: string) => {
   const startTime = Date.now();
   
@@ -152,31 +100,46 @@ const validateUserRole = async (supabase: any, user: any, pathname: string, requ
       return { isValid: true, role: 'user' };
     }
     
-    // NEW: Use enhanced role fetching with retry logic
-    const userRole = await fetchUserRoleWithRetry(supabase, user.id);
+    // Get user profile to check role
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('type')
+      .eq('id', user.id)
+      .single();
     
     const duration = Date.now() - startTime;
     console.log(`[Middleware] [${requestId}] Role validation completed in ${duration}ms:`, {
-      userRole,
+      profileType: profile?.type,
+      error: profileError?.message,
       duration,
     });
     
-    if (!userRole) {
-      console.log(`[Middleware] [${requestId}] No role found for user`);
+    if (profileError) {
+      console.error(`[Middleware] [${requestId}] Error fetching user profile:`, profileError);
+      throw createAuthError(
+        AuthErrorType.ROLE_FETCH_FAILED,
+        "Failed to fetch user role",
+        true,
+        profileError
+      );
+    }
+    
+    if (!profile || !profile.type) {
+      console.log(`[Middleware] [${requestId}] No profile found for user`);
       throw createAuthError(
         AuthErrorType.USER_NOT_FOUND,
-        "User role not found",
+        "User profile not found",
         false
       );
     }
     
     // Check if user has admin privileges
     const hasAdminPrivileges = ['admin', 'super_admin', 'helpdesk'].includes(
-      userRole.toLowerCase()
+      (profile.type ?? '').toLowerCase()
     );
     
     if (!hasAdminPrivileges) {
-      console.log(`[Middleware] [${requestId}] User ${user.id} (type: ${userRole}) attempted to access admin route`);
+      console.log(`[Middleware] [${requestId}] User ${user.id} (type: ${profile.type}) attempted to access admin route`);
       throw createAuthError(
         AuthErrorType.USER_NOT_FOUND,
         "Insufficient privileges",
@@ -184,8 +147,8 @@ const validateUserRole = async (supabase: any, user: any, pathname: string, requ
       );
     }
     
-    console.log(`[Middleware] [${requestId}] User role validated successfully: ${userRole}`);
-    return { isValid: true, role: userRole };
+    console.log(`[Middleware] [${requestId}] User role validated successfully: ${profile.type}`);
+    return { isValid: true, role: profile.type };
   } catch (error) {
     const duration = Date.now() - startTime;
     console.error(`[Middleware] [${requestId}] Role validation failed after ${duration}ms:`, error);
@@ -193,13 +156,12 @@ const validateUserRole = async (supabase: any, user: any, pathname: string, requ
   }
 };
 
-// NEW: Enhanced response creation with role caching headers
+// Enhanced response creation with tracking headers
 const createRedirectResponse = (
   url: string, 
   reason: string, 
   requestId: string,
-  originalPath?: string,
-  userRole?: string
+  originalPath?: string
 ) => {
   const response = NextResponse.redirect(url);
   
@@ -210,27 +172,6 @@ const createRedirectResponse = (
   if (originalPath) {
     response.headers.set('x-redirect-from', originalPath);
   }
-  
-  // NEW: Add role caching headers
-  if (userRole) {
-    response.headers.set('x-user-role', userRole);
-    response.headers.set('x-role-cache-timestamp', Date.now().toString());
-  }
-  
-  return response;
-};
-
-// NEW: Enhanced response creation with role validation headers
-const createValidatedResponse = (
-  response: NextResponse,
-  userRole: string,
-  requestId: string
-) => {
-  // Add role validation headers
-  response.headers.set('x-user-role', userRole);
-  response.headers.set('x-role-validated', 'true');
-  response.headers.set('x-role-validation-timestamp', Date.now().toString());
-  response.headers.set('x-request-id', requestId);
   
   return response;
 };
@@ -283,48 +224,25 @@ export async function middleware(request: NextRequest) {
         // Validate user authentication
         const { user } = await validateUserAuthentication(supabase, requestId);
         
-        // NEW: Check for cached role in cookies first
-        const cachedRole = request.cookies.get('user-role')?.value;
-        let userRole = cachedRole;
+        // Validate user role for admin routes
+        const { isValid, role } = await validateUserRole(supabase, user, pathname, requestId);
         
-        if (cachedRole) {
-          console.log(`[Middleware] [${requestId}] Using cached role: ${cachedRole}`);
-        } else {
-          // Validate user role for admin routes
-          const { isValid, role } = await validateUserRole(supabase, user, pathname, requestId);
-          
-          if (!isValid) {
-            console.log(`[Middleware] [${requestId}] User validation failed, redirecting to home`);
-            return createRedirectResponse(
-              new URL('/', request.url).toString(),
-              'unauthorized',
-              requestId,
-              pathname
-            );
-          }
-          
-          userRole = role;
-          
-          // NEW: Cache the role in a cookie for faster access
-          if (userRole) {
-            response.cookies.set('user-role', userRole, {
-              httpOnly: false,
-              secure: process.env.NODE_ENV === 'production',
-              sameSite: 'lax',
-              maxAge: 60 * 60 * 24 * 7, // 7 days
-            });
-          }
+        if (!isValid) {
+          console.log(`[Middleware] [${requestId}] User validation failed, redirecting to home`);
+          return createRedirectResponse(
+            new URL('/', request.url).toString(),
+            'unauthorized',
+            requestId,
+            pathname
+          );
         }
         
         const totalDuration = Date.now() - startTime;
         console.log(`[Middleware] [${requestId}] Authentication successful in ${totalDuration}ms:`, {
           userId: user.id,
-          role: userRole,
+          role,
           pathname,
         });
-        
-        // NEW: Return response with role validation headers
-        return createValidatedResponse(response, userRole || 'client', requestId);
         
       } catch (error) {
         const totalDuration = Date.now() - startTime;
