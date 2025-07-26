@@ -42,6 +42,45 @@ export const useProfile = () => {
     }
   }, [profile, forceShowContent]);
 
+  const fetchProfileData = useCallback(async () => {
+    if (!user?.id) {
+      console.log("[ProfilePage] No user ID, skipping profile fetch");
+      return;
+    }
+
+    console.log("[ProfilePage] Fetching profile data for user:", user.id);
+    setLoading(true);
+    setError(null);
+
+    try {
+      console.log("[ProfilePage] Making API call to /api/profile");
+      const response = await fetch(`/api/profile`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      console.log("[ProfilePage] Response status:", response.status);
+      console.log("[ProfilePage] Response headers:", Object.fromEntries(response.headers.entries()));
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[ProfilePage] Response error text:", errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log("[ProfilePage] Profile data fetched successfully:", data);
+      setProfile(data);
+      setLastFetchTime(new Date());
+    } catch (err) {
+      console.error("[ProfilePage] Profile fetch error:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch profile");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
   // Auth state change handler - trigger profile fetch when user becomes authenticated
   useEffect(() => {
     console.log("[ProfilePage] Auth state changed:", {
@@ -81,45 +120,6 @@ export const useProfile = () => {
       unsubscribe();
     };
   }, [fetchProfileData, profile]);
-
-  const fetchProfileData = useCallback(async () => {
-    if (!user?.id) {
-      console.log("[ProfilePage] No user ID, skipping profile fetch");
-      return;
-    }
-
-    console.log("[ProfilePage] Fetching profile data for user:", user.id);
-    setLoading(true);
-    setError(null);
-
-    try {
-      console.log("[ProfilePage] Making API call to /api/profile");
-      const response = await fetch(`/api/profile`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      console.log("[ProfilePage] Response status:", response.status);
-      console.log("[ProfilePage] Response headers:", Object.fromEntries(response.headers.entries()));
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("[ProfilePage] Response error text:", errorText);
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
-      }
-      
-      const data = await response.json();
-      console.log("[ProfilePage] Profile data fetched successfully:", data);
-      setProfile(data);
-      setLastFetchTime(new Date());
-    } catch (err) {
-      console.error("[ProfilePage] Profile fetch error:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch profile");
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
 
   // Simplified authentication check
   useEffect(() => {
