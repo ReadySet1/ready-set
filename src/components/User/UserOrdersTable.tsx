@@ -63,26 +63,26 @@ const ClientOrders: React.FC = () => {
         if (!response.ok) {
           throw new Error("Failed to fetch orders");
         }
-        // Try to get total count from header or response (API update may be needed)
-        let data, total;
-        try {
-          const json = await response.json();
-          if (Array.isArray(json)) {
-            data = json;
-            // Fallback: if no total, estimate by page 1 length
-            if (page === 1 && json.length < limit) {
-              total = json.length;
-            }
-          } else {
-            data = json.orders || [];
-            total = json.totalCount || 0;
-          }
-        } catch (e) {
-          data = [];
+
+        const data = await response.json();
+
+        // Handle new API response structure with totalCount
+        let ordersData, total;
+        if (data.orders && typeof data.totalCount === "number") {
+          // New API response structure
+          ordersData = data.orders;
+          total = data.totalCount;
+        } else if (Array.isArray(data)) {
+          // Fallback for old API response structure
+          ordersData = data;
           total = 0;
+        } else {
+          ordersData = data.orders || [];
+          total = data.totalCount || 0;
         }
+
         // Validate and sanitize order data
-        const sanitizedOrders = (data as Order[]).map((order: Order) => ({
+        const sanitizedOrders = (ordersData as Order[]).map((order: Order) => ({
           ...order,
           address: {
             street1: order.address?.street1 || "N/A",
@@ -102,18 +102,22 @@ const ClientOrders: React.FC = () => {
           status: order.status || "Unknown",
           date: order.date ? new Date(order.date).toLocaleDateString() : "N/A",
         }));
+
         setOrders(sanitizedOrders);
-        if (typeof total === "number" && total > 0) {
+
+        // Set total orders count
+        if (typeof total === "number" && total >= 0) {
           setTotalOrders(total);
-          // If the current page is out of range (e.g., user deleted orders or navigated too far), go back to last page with orders
+          // If the current page is out of range, go back to last page with orders
           const lastPage = Math.max(1, Math.ceil(total / limit));
-          if (page > lastPage) {
+          if (page > lastPage && lastPage > 0) {
             setPage(lastPage);
             return;
           }
         } else if (page === 1 && sanitizedOrders.length < limit) {
           setTotalOrders(sanitizedOrders.length);
         }
+
         // If there are no orders on this page but there are orders in total, go back to last page with orders
         if (sanitizedOrders.length === 0 && totalOrders > 0 && page > 1) {
           const lastPage = Math.max(1, Math.ceil(totalOrders / limit));
@@ -151,15 +155,9 @@ const ClientOrders: React.FC = () => {
     }
   };
 
-  // Calculate total pages based on totalOrders and limit, but never show an empty last page
-  const totalPages =
-    totalOrders > 0
-      ? Math.ceil(totalOrders / limit)
-      : orders.length < limit && page === 1
-        ? 1
-        : page;
-  const isLastPage =
-    totalOrders > 0 ? page >= totalPages : orders.length < limit;
+  // Calculate total pages based on totalOrders and limit
+  const totalPages = totalOrders > 0 ? Math.ceil(totalOrders / limit) : 1;
+  const isLastPage = page >= totalPages;
 
   // Show pagination if there are any orders displayed or totalOrders > 0
   const showPagination = orders.length > 0 || totalOrders > 0;

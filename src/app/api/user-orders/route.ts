@@ -31,8 +31,11 @@ export async function GET(req: NextRequest) {
 
     let cateringOrders: CateringOrder[] = [];
     let onDemandOrders: OnDemandOrder[] = [];
+    let totalCateringCount = 0;
+    let totalOnDemandCount = 0;
 
     if (type === 'all' || type === 'catering' || !type) {
+      // Fetch catering orders with pagination
       cateringOrders = await prisma.cateringRequest.findMany({
         where: { userId: user.id },
         skip,
@@ -44,9 +47,15 @@ export async function GET(req: NextRequest) {
           deliveryAddress: true
         },
       });
+
+      // Get total count of catering orders for this user
+      totalCateringCount = await prisma.cateringRequest.count({
+        where: { userId: user.id },
+      });
     }
 
     if (type === 'all' || type === 'on_demand' || !type) {
+      // Fetch on-demand orders with pagination
       onDemandOrders = await prisma.onDemand.findMany({
         where: { userId: user.id },
         skip,
@@ -57,6 +66,11 @@ export async function GET(req: NextRequest) {
           pickupAddress: true,
           deliveryAddress: true
         },
+      });
+
+      // Get total count of on-demand orders for this user
+      totalOnDemandCount = await prisma.onDemand.count({
+        where: { userId: user.id },
       });
     }
 
@@ -69,6 +83,9 @@ export async function GET(req: NextRequest) {
     ]
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit);
+
+    // Calculate total count of all orders
+    const totalOrders = totalCateringCount + totalOnDemandCount;
 
     // Modify the serializedOrders mapping to ensure robust address handling
     const serializedOrders = allOrders.map(order => {
@@ -105,7 +122,13 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json(serializedOrders, { status: 200 });
+    // Return orders with total count for proper pagination
+    return NextResponse.json({
+      orders: serializedOrders,
+      totalCount: totalOrders,
+      currentPage: page,
+      totalPages: Math.ceil(totalOrders / limit)
+    }, { status: 200 });
   } catch (error) {
     console.error("Error fetching user orders:", error);
     return NextResponse.json({ message: "Error fetching user orders" }, { status: 500 });
