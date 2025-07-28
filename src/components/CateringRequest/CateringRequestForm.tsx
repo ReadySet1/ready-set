@@ -549,9 +549,31 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
       toast.success("Catering request submitted successfully!");
       setErrorMessage("");
 
-      // --- Redirect to Vendor Dashboard ---
-      console.log("Redirecting user to vendor dashboard");
-      router.push("/vendor");
+      // --- Redirect to appropriate dashboard based on user type ---
+      try {
+        if (session?.user?.email) {
+          // Get user profile to determine their type
+          const response = await fetch(`/api/users/profile?email=${encodeURIComponent(session.user.email)}`);
+          if (response.ok) {
+            const profile = await response.json();
+            const dashboardPath = profile.type === 'VENDOR' ? '/vendor' : '/client';
+            console.log(`Redirecting ${profile.type} user to ${dashboardPath}`);
+            router.push(dashboardPath);
+          } else {
+            // Fallback to client dashboard if profile fetch fails
+            console.log("Profile fetch failed, redirecting to client dashboard");
+            router.push("/client");
+          }
+        } else {
+          // Fallback to client dashboard if no session
+          console.log("No session, redirecting to client dashboard");
+          router.push("/client");
+        }
+      } catch (error) {
+        console.error("Error determining user type for redirect:", error);
+        // Fallback to client dashboard
+        router.push("/client");
+      }
       // --- End Redirect Logic ---
     } catch (error) {
       console.error("Error submitting order:", error);

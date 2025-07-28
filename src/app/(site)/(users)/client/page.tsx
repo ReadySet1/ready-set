@@ -209,6 +209,23 @@ const ClientPage = async () => {
     redirect("/sign-in");
   }
 
+  // Check if user is a client
+  const profile = await prisma.profile.findUnique({
+    where: { id: user.id },
+    select: { type: true }
+  });
+
+  if (!profile || profile.type !== 'CLIENT') {
+    // Redirect to appropriate dashboard based on user type
+    if (profile?.type === 'VENDOR') {
+      redirect('/vendor');
+    } else if (profile?.type === 'ADMIN' || profile?.type === 'HELPDESK' || profile?.type === 'SUPER_ADMIN') {
+      redirect('/admin');
+    } else {
+      redirect('/sign-in');
+    }
+  }
+
   // Fetch dashboard data
   const dashboardData = await getClientDashboardData(user.id);
 

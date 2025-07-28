@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 import Breadcrumb from "@/components/Common/Breadcrumb";
 import {
   Card,
@@ -34,6 +36,7 @@ import { OrderData, VendorMetrics } from "@/lib/services/vendor";
 import { AllOrdersModal } from "@/components/Orders/AllOrdersModal";
 
 const VendorPage = () => {
+  const router = useRouter();
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [metrics, setMetrics] = useState<VendorMetrics>({
     activeOrders: 0,
@@ -52,6 +55,44 @@ const VendorPage = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPrevPage, setHasPrevPage] = useState(false);
+
+  // Check user type and redirect if not a vendor
+  useEffect(() => {
+    const checkUserType = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user?.email) {
+          router.push('/signin');
+          return;
+        }
+
+        // Get user profile to check type
+        const response = await fetch(`/api/users/profile?email=${encodeURIComponent(user.email)}`);
+        if (response.ok) {
+          const profile = await response.json();
+          if (profile.type !== 'VENDOR') {
+            // Redirect to appropriate dashboard based on user type
+            const dashboardPath = profile.type === 'CLIENT' ? '/client' : '/admin';
+            console.log(`User is ${profile.type}, redirecting to ${dashboardPath}`);
+            router.push(dashboardPath);
+            return;
+          }
+        } else {
+          console.error('Failed to fetch user profile');
+          router.push('/signin');
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking user type:', error);
+        router.push('/signin');
+        return;
+      }
+    };
+
+    checkUserType();
+  }, [router]);
 
   useEffect(() => {
     const fetchVendorData = async () => {

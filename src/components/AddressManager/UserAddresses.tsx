@@ -253,8 +253,8 @@ const UserAddresses: React.FC = () => {
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
+    <Card className="w-full max-w-none">
+      <CardHeader className="p-4 sm:p-6">
         <CardTitle>Your Addresses</CardTitle>
         <CardDescription>
           Manage your saved addresses for deliveries and pickups
@@ -279,7 +279,7 @@ const UserAddresses: React.FC = () => {
           <Button onClick={handleAddNewAddress}>+ Add New Address</Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 sm:p-6">
         {error && (
           <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-500">
             {error}

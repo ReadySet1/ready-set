@@ -350,9 +350,31 @@ const OnDemandOrderForm: React.FC = () => {
         reset();
         toast.success("On-demand request submitted successfully!");
 
-        // Redirect to vendor dashboard
-        console.log("Redirecting user to vendor dashboard");
-        router.push("/vendor");
+        // Redirect to appropriate dashboard based on user type
+        try {
+          if (session?.user?.email) {
+            // Get user profile to determine their type
+            const profileResponse = await fetch(`/api/users/profile?email=${encodeURIComponent(session.user.email)}`);
+            if (profileResponse.ok) {
+              const profile = await profileResponse.json();
+              const dashboardPath = profile.type === 'VENDOR' ? '/vendor' : '/client';
+              console.log(`Redirecting ${profile.type} user to ${dashboardPath}`);
+              router.push(dashboardPath);
+            } else {
+              // Fallback to client dashboard if profile fetch fails
+              console.log("Profile fetch failed, redirecting to client dashboard");
+              router.push("/client");
+            }
+          } else {
+            // Fallback to client dashboard if no session
+            console.log("No session, redirecting to client dashboard");
+            router.push("/client");
+          }
+        } catch (error) {
+          console.error("Error determining user type for redirect:", error);
+          // Fallback to client dashboard
+          router.push("/client");
+        }
       } else {
         const errorData = await response.json();
         console.error("Failed to create on-demand request", errorData);

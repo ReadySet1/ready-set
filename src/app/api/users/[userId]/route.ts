@@ -385,6 +385,133 @@ export async function PUT(
   }
 }
 
+// PATCH: Update a user's own profile (for regular users)
+export async function PATCH(
+  request: NextRequest
+) {
+  try {
+    // Get userId from URL path
+    const url = new URL(request.url);
+    const userId = url.pathname.split('/').pop();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.error("[PATCH /api/users/[userId]] Authentication error:", authError);
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required' },
+        { status: 401 }
+      );
+    }
+    
+    console.log(`[PATCH /api/users/[userId]] Authenticated user ID: ${user.id}, updating profile: ${userId}`);
+
+    // Users can only update their own profile
+    if (user.id !== userId) {
+      console.log(`[PATCH /api/users/[userId]] Forbidden: User ${user.id} attempted to update profile ${userId}`);
+      return NextResponse.json(
+        { error: 'Forbidden: You can only update your own profile' },
+        { status: 403 }
+      );
+    }
+    
+    // Parse request body
+    const requestBody = await request.json();
+    console.log('[PATCH /api/users/[userId]] Request body:', requestBody);
+    
+    // Validate required fields
+    if (!requestBody) {
+      return NextResponse.json(
+        { error: 'Request body is required' },
+        { status: 400 }
+      );
+    }
+    
+    // Prepare data for update - only allow updating safe fields
+    const updateData: any = {
+      // Basic information - only update email if provided and not null
+      ...(requestBody.email && { email: requestBody.email }),
+      ...(requestBody.contact_number !== undefined && { contactNumber: requestBody.contact_number }),
+      
+      // Name handling
+      ...(requestBody.name !== undefined && { name: requestBody.name }),
+      
+      // Company information
+      ...(requestBody.company_name !== undefined && { companyName: requestBody.company_name }),
+      ...(requestBody.website !== undefined && { website: requestBody.website }),
+      
+      // Address information
+      ...(requestBody.street1 !== undefined && { street1: requestBody.street1 }),
+      ...(requestBody.street2 !== undefined && { street2: requestBody.street2 }),
+      ...(requestBody.city !== undefined && { city: requestBody.city }),
+      ...(requestBody.state !== undefined && { state: requestBody.state }),
+      ...(requestBody.zip !== undefined && { zip: requestBody.zip }),
+    };
+    
+    // Remove undefined values from updateData
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key as keyof typeof updateData] === undefined) {
+        delete updateData[key as keyof typeof updateData];
+      }
+    });
+    
+    console.log('[PATCH /api/users/[userId]] Update data:', updateData);
+
+    // Update user profile
+    const updatedProfile = await prisma.profile.update({
+      where: { id: userId },
+      data: updateData,
+    });
+    
+    console.log('[PATCH /api/users/[userId]] Profile updated successfully');
+
+    // Transform the response to match the frontend UserProfile interface
+    const transformedProfile = {
+      id: updatedProfile.id,
+      name: updatedProfile.name,
+      email: updatedProfile.email,
+      contact_number: updatedProfile.contactNumber,
+      company_name: updatedProfile.companyName,
+      website: updatedProfile.website,
+      street1: updatedProfile.street1,
+      street2: updatedProfile.street2,
+      city: updatedProfile.city,
+      state: updatedProfile.state,
+      zip: updatedProfile.zip,
+      type: updatedProfile.type,
+      status: updatedProfile.status,
+      created_at: updatedProfile.createdAt.toISOString(),
+      updated_at: updatedProfile.updatedAt.toISOString(),
+    };
+
+    return NextResponse.json(transformedProfile);
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    
+    // Check for Prisma-specific errors
+    if ((error as any)?.code && (error as any)?.message) {
+      if ((error as any).code === 'P2025') {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        );
+      }
+    }
+    
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
+
 // DELETE: Delete a user by ID
 export async function DELETE(
   request: NextRequest

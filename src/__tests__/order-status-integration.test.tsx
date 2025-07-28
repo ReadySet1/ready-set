@@ -1,120 +1,111 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import ClientOrders from '@/components/User/UserOrdersTable';
 import UserOrderDetail from '@/components/User/UserOrder';
-import ClientDashboardContent from '@/components/Dashboard/ClientDashboardContent';
+import { ClientDashboardContent } from '@/components/Dashboard/ClientDashboardContent';
+import { CombinedOrder } from '@/types/models';
 
 // Mock data
 const mockOrders = [
   {
     id: '1',
-    order_number: 'SF-12360',
-    order_type: 'catering',
+    orderNumber: 'SF-12360',
+    orderType: 'catering' as const,
     status: 'active',
-    date: '2025-07-30T12:00:00Z',
-    order_total: '234.00',
-    pickup_time: '2025-07-30T12:00:00Z',
-    arrival_time: '2025-07-30T12:45:00Z',
-    address: {
-      street1: '25 Winter St',
-      city: 'South San Francisco',
-      state: 'CA',
-      zip: '94080'
-    },
-    delivery_address: {
-      street1: '89 Spencer st',
-      city: 'Burlingame',
-      state: 'CA',
-      zip: '94010'
-    },
-    special_notes: 'Handle with care',
-    headcount: 40
+    pickupDateTime: new Date('2025-07-30T12:00:00Z'),
+    arrivalDateTime: new Date('2025-07-30T12:45:00Z'),
+    orderTotal: 234.00,
+    pickupNotes: null,
+    specialNotes: 'Handle with care',
+    clientAttention: null,
+    userId: 'user123',
+    pickupAddressId: 'addr1',
+    deliveryAddressId: 'addr2',
+    brokerage: 'Test Brokerage',
+    headcount: 40,
+    needHost: 'yes',
+    hoursNeeded: 4,
+    numberOfHosts: 2,
+    createdAt: new Date(),
+    updatedAt: new Date()
   },
   {
     id: '2',
-    order_number: 'SF-12361',
-    order_type: 'on_demand',
+    orderNumber: 'SF-12361',
+    orderType: 'on_demand' as const,
     status: 'active',
-    date: '2025-08-02T10:25:00Z',
-    order_total: '230.00',
-    pickup_time: '2025-08-02T10:25:00Z',
-    arrival_time: '2025-08-02T11:00:00Z',
-    address: {
-      street1: '89 Spencer st',
-      city: 'Burlingame',
-      state: 'CA',
-      zip: '94010'
-    },
-    delivery_address: {
-      street1: '876 Laurel Street',
-      city: 'San Carlos',
-      state: 'CA',
-      zip: '94070'
-    },
-    special_notes: null
+    pickupDateTime: new Date('2025-08-02T10:25:00Z'),
+    arrivalDateTime: new Date('2025-08-02T11:00:00Z'),
+    orderTotal: 230.00,
+    pickupNotes: null,
+    specialNotes: null,
+    clientAttention: null,
+    userId: 'user123',
+    pickupAddressId: 'addr3',
+    deliveryAddressId: 'addr4',
+    itemDelivered: 'Package',
+    vehicleType: 'Van',
+    length: 10,
+    width: 5,
+    height: 3,
+    weight: 50,
+    createdAt: new Date(),
+    updatedAt: new Date()
   }
 ];
 
 const mockOrderDetail = {
   id: '1',
-  order_number: 'SF-12360',
-  order_type: 'catering',
+  orderNumber: 'SF-12360',
+  orderType: 'catering' as const,
   status: 'active',
-  date: '2025-07-30T12:00:00Z',
-  order_total: '234.00',
-  pickup_time: '2025-07-30T12:00:00Z',
-  arrival_time: '2025-07-30T12:45:00Z',
-  address: {
-    street1: '25 Winter St',
-    city: 'South San Francisco',
-    state: 'CA',
-    zip: '94080'
-  },
-  delivery_address: {
-    street1: '89 Spencer st',
-    city: 'Burlingame',
-    state: 'CA',
-    zip: '94010'
-  },
-  special_notes: 'Handle with care',
+  pickupDateTime: new Date('2025-07-30T12:00:00Z'),
+  arrivalDateTime: new Date('2025-07-30T12:45:00Z'),
+  orderTotal: 234.00,
+  pickupNotes: null,
+  specialNotes: 'Handle with care',
+  clientAttention: null,
+  userId: 'user123',
+  pickupAddressId: 'addr1',
+  deliveryAddressId: 'addr2',
+  brokerage: 'Test Brokerage',
   headcount: 40,
-  user_id: 'user123',
-  driver_status: null,
-  dispatch: [],
-  complete_time: null,
-  updated_at: '2025-07-30T12:00:00Z'
+  needHost: 'yes',
+  hoursNeeded: 4,
+  numberOfHosts: 2,
+  createdAt: new Date(),
+  updatedAt: new Date()
 };
 
 // Setup MSW server
 const server = setupServer(
   // Mock the user orders list API
-  rest.get('/api/user-orders', (req, res, ctx) => {
-    const page = req.url.searchParams.get('page') || '1';
-    const limit = req.url.searchParams.get('limit') || '5';
+  http.get('/api/user-orders', ({ request }) => {
+    const url = new URL(request.url);
+    const page = url.searchParams.get('page') || '1';
+    const limit = url.searchParams.get('limit') || '5';
     
-    return res(
-      ctx.json({
-        orders: mockOrders.slice(0, parseInt(limit)),
-        totalCount: mockOrders.length,
-        totalPages: Math.ceil(mockOrders.length / parseInt(limit)),
-        currentPage: parseInt(page),
-        limit: parseInt(limit)
-      })
-    );
+    return HttpResponse.json({
+      orders: mockOrders.slice(0, parseInt(limit)),
+      totalCount: mockOrders.length,
+      totalPages: Math.ceil(mockOrders.length / parseInt(limit)),
+      currentPage: parseInt(page),
+      limit: parseInt(limit)
+    });
   }),
 
   // Mock the individual order detail API
-  rest.get('/api/user-orders/:orderNumber', (req, res, ctx) => {
-    const { orderNumber } = req.params;
+  http.get('/api/user-orders/:orderNumber', ({ params }) => {
+    const { orderNumber } = params;
     
     if (orderNumber === 'SF-12360') {
-      return res(ctx.json(mockOrderDetail));
+      return HttpResponse.json(mockOrderDetail);
     }
     
-    return res(
-      ctx.status(404),
-      ctx.json({ message: 'Order not found' })
+    return HttpResponse.json(
+      { message: 'Order not found' },
+      { status: 404 }
     );
   })
 );
@@ -189,20 +180,18 @@ describe('Order Status Integration Tests', () => {
       const manyOrders = Array.from({ length: 7 }, (_, i) => ({
         ...mockOrders[0],
         id: `${i + 1}`,
-        order_number: `SF-${12360 + i}`
+        orderNumber: `SF-${12360 + i}`
       }));
 
       server.use(
-        rest.get('/api/user-orders', (req, res, ctx) => {
-          return res(
-            ctx.json({
-              orders: manyOrders.slice(0, 5),
-              totalCount: manyOrders.length,
-              totalPages: 2,
-              currentPage: 1,
-              limit: 5
-            })
-          );
+        http.get('/api/user-orders', () => {
+          return HttpResponse.json({
+            orders: manyOrders.slice(0, 5),
+            totalCount: manyOrders.length,
+            totalPages: 2,
+            currentPage: 1,
+            limit: 5
+          });
         })
       );
 
@@ -271,10 +260,10 @@ describe('Order Status Integration Tests', () => {
 
     test('handles order not found', async () => {
       server.use(
-        rest.get('/api/user-orders/:orderNumber', (req, res, ctx) => {
-          return res(
-            ctx.status(404),
-            ctx.json({ message: 'Order not found' })
+        http.get('/api/user-orders/:orderNumber', () => {
+          return HttpResponse.json(
+            { message: 'Order not found' },
+            { status: 404 }
           );
         })
       );
@@ -288,8 +277,8 @@ describe('Order Status Integration Tests', () => {
 
     test('handles API errors gracefully', async () => {
       server.use(
-        rest.get('/api/user-orders/:orderNumber', (req, res, ctx) => {
-          return res(ctx.status(500));
+        http.get('/api/user-orders/:orderNumber', () => {
+          return HttpResponse.json({}, { status: 500 });
         })
       );
 
@@ -303,7 +292,7 @@ describe('Order Status Integration Tests', () => {
 
   describe('ClientDashboardContent Component', () => {
     const mockDashboardData = {
-      recentOrders: mockOrders,
+      recentOrders: mockOrders as CombinedOrder[],
       stats: {
         activeOrders: 11,
         completedOrders: 0,
