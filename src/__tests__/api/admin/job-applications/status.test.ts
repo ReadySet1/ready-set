@@ -36,7 +36,7 @@ afterAll(() => {
 
 describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
   const mockContext = {
-    params: { id: 'test-app-id' },
+    params: Promise.resolve({ id: 'test-app-id' }),
   };
 
   beforeEach(() => {
@@ -68,7 +68,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
+    const request = new NextRequest('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -111,7 +111,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
+    const request = new NextRequest('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -161,7 +161,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
+    const request = new NextRequest('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -185,7 +185,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
+    const request = new NextRequest('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -219,7 +219,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
+    const request = new NextRequest('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -252,7 +252,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
+    const request = new NextRequest('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -285,7 +285,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
+    const request = new NextRequest('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -324,7 +324,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: { message: 'Database connection failed' },
     });
 
-    const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
+    const request = new NextRequest('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -352,7 +352,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
+    const request = new NextRequest('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -392,7 +392,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
+    const request = new NextRequest('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -427,7 +427,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: { message: 'User not found' },
     });
 
-    const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
+    const request = new NextRequest('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -469,7 +469,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
         error: null,
       });
 
-      const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
+      const request = new NextRequest('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
