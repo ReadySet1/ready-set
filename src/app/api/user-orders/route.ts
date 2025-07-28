@@ -31,33 +31,49 @@ export async function GET(req: NextRequest) {
 
     let cateringOrders: CateringOrder[] = [];
     let onDemandOrders: OnDemandOrder[] = [];
+    let totalCateringCount = 0;
+    let totalOnDemandCount = 0;
 
     if (type === 'all' || type === 'catering' || !type) {
-      cateringOrders = await prisma.cateringRequest.findMany({
-        where: { userId: user.id },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: { 
-          user: { select: { name: true, email: true } },
-          pickupAddress: true,
-          deliveryAddress: true
-        },
-      });
+      const [cateringData, cateringCount] = await Promise.all([
+        prisma.cateringRequest.findMany({
+          where: { userId: user.id },
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: { 
+            user: { select: { name: true, email: true } },
+            pickupAddress: true,
+            deliveryAddress: true
+          },
+        }),
+        prisma.cateringRequest.count({
+          where: { userId: user.id }
+        })
+      ]);
+      cateringOrders = cateringData;
+      totalCateringCount = cateringCount;
     }
 
     if (type === 'all' || type === 'on_demand' || !type) {
-      onDemandOrders = await prisma.onDemand.findMany({
-        where: { userId: user.id },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: { 
-          user: { select: { name: true, email: true } },
-          pickupAddress: true,
-          deliveryAddress: true
-        },
-      });
+      const [onDemandData, onDemandCount] = await Promise.all([
+        prisma.onDemand.findMany({
+          where: { userId: user.id },
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: { 
+            user: { select: { name: true, email: true } },
+            pickupAddress: true,
+            deliveryAddress: true
+          },
+        }),
+        prisma.onDemand.count({
+          where: { userId: user.id }
+        })
+      ]);
+      onDemandOrders = onDemandData;
+      totalOnDemandCount = onDemandCount;
     }
 
     const allOrders: Order[] = [
@@ -69,6 +85,9 @@ export async function GET(req: NextRequest) {
     ]
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit);
+
+    const totalCount = totalCateringCount + totalOnDemandCount;
+    const totalPages = Math.ceil(totalCount / limit);
 
 
 
@@ -123,7 +142,13 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json(serializedOrders, { status: 200 });
+    return NextResponse.json({
+      orders: serializedOrders,
+      totalCount,
+      totalPages,
+      currentPage: page,
+      limit
+    }, { status: 200 });
   } catch (error) {
     console.error("Error fetching user orders:", error);
     

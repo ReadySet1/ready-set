@@ -94,7 +94,42 @@ export async function GET(req: NextRequest, props: { params: Promise<{ order_num
 
     if (order) {
       const serializedOrder = serializeBigInt(order);
-      return NextResponse.json(serializedOrder);
+      
+      // Map database fields to frontend expected fields
+      const mappedOrder = {
+        id: serializedOrder.id,
+        order_number: serializedOrder.orderNumber || `ORDER-${serializedOrder.id.slice(0, 8)}`,
+        order_type: serializedOrder.order_type,
+        status: serializedOrder.status?.toLowerCase() || 'active',
+        date: serializedOrder.pickupDateTime || serializedOrder.createdAt,
+        order_total: serializedOrder.orderTotal ? serializedOrder.orderTotal.toString() : '0.00',
+        special_notes: serializedOrder.specialNotes || serializedOrder.clientAttention,
+        address: serializedOrder.pickupAddress ? {
+          street1: serializedOrder.pickupAddress.street1,
+          city: serializedOrder.pickupAddress.city,
+          state: serializedOrder.pickupAddress.state,
+          zip: serializedOrder.pickupAddress.zip,
+        } : null,
+        delivery_address: serializedOrder.deliveryAddress ? {
+          street1: serializedOrder.deliveryAddress.street1,
+          city: serializedOrder.deliveryAddress.city,
+          state: serializedOrder.deliveryAddress.state,
+          zip: serializedOrder.deliveryAddress.zip,
+        } : null,
+        dispatch: serializedOrder.dispatches || [],
+        user_id: serializedOrder.userId,
+        pickup_time: serializedOrder.pickupDateTime,
+        arrival_time: serializedOrder.arrivalDateTime,
+        complete_time: serializedOrder.completeDateTime,
+        updated_at: serializedOrder.updatedAt,
+        driver_status: serializedOrder.driverStatus,
+        // Add catering-specific fields
+        ...(serializedOrder.order_type === 'catering' && {
+          headcount: serializedOrder.headcount,
+        }),
+      };
+      
+      return NextResponse.json(mappedOrder);
     }
 
     return NextResponse.json({ message: "Order not found" }, { status: 404 });

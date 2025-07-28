@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Card,
   CardHeader,
@@ -8,12 +9,14 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import {
   CalendarIcon,
   MapPinIcon,
   FileTextIcon,
   UsersIcon,
   ClockIcon,
+  ArrowLeft,
 } from "lucide-react";
 import OrderStatusCard from "./OrderStatus";
 import { usePathname } from "next/navigation";
@@ -85,7 +88,13 @@ type DriverStatusCardOrder = {
   updated_at: string | null;
 };
 
-const UserOrderDetail: React.FC = () => {
+interface UserOrderDetailProps {
+  orderNumber?: string;
+}
+
+const UserOrderDetail: React.FC<UserOrderDetailProps> = ({
+  orderNumber: propOrderNumber,
+}) => {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,20 +103,33 @@ const UserOrderDetail: React.FC = () => {
 
   useEffect(() => {
     const fetchOrder = async () => {
-      const orderNumber = decodeURIComponent(
-        (pathname ?? "").split("/").pop() || "",
-      );
+      const orderNumber =
+        propOrderNumber ||
+        decodeURIComponent((pathname ?? "").split("/").pop() || "");
 
       try {
+        console.log("Fetching order:", orderNumber);
         const response = await fetch(
-          `/api/user-orders/${encodeURIComponent(orderNumber)}?include=dispatch.driver`,
+          `/api/user-orders/${encodeURIComponent(orderNumber)}`,
         );
+
         if (!response.ok) {
-          throw new Error("Failed to fetch order");
+          if (response.status === 404) {
+            throw new Error("Order not found");
+          }
+          throw new Error(`Failed to fetch order: ${response.status}`);
         }
+
         const data = await response.json();
+        console.log("Order data received:", data);
+
+        if (!data || (typeof data === "object" && data.message)) {
+          throw new Error(data.message || "Order not found");
+        }
+
         setOrder(Array.isArray(data) ? data[0] : data);
       } catch (err) {
+        console.error("Error fetching order:", err);
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
         setLoading(false);
@@ -197,6 +219,16 @@ const UserOrderDetail: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4">
+      {/* Back to Orders Link */}
+      <div className="mb-4">
+        <Link href="/order-status">
+          <Button variant="outline" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Orders
+          </Button>
+        </Link>
+      </div>
+
       <h1 className="mb-6 text-center text-3xl font-bold">Order Details</h1>
       <Card className="mx-auto w-full max-w-3xl">
         <CardHeader>

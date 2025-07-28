@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Truck } from "lucide-react";
+import { Loader2, Truck, ArrowLeft } from "lucide-react";
 
 interface Order {
   id: string;
@@ -48,7 +48,9 @@ const ClientOrders: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit] = useState(5);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -56,9 +58,9 @@ const ClientOrders: React.FC = () => {
       const apiUrl = `/api/user-orders?page=${page}&limit=${limit}`;
       try {
         const response = await fetch(apiUrl, {
-          credentials: 'include',
+          credentials: "include",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
         });
         if (!response.ok) {
@@ -67,8 +69,20 @@ const ClientOrders: React.FC = () => {
           }
           throw new Error("Failed to fetch orders");
         }
-        const data: Order[] = await response.json();
-        setOrders(data);
+        const data = await response.json();
+
+        // Handle both old and new API response formats
+        if (Array.isArray(data)) {
+          // Old format - just an array of orders
+          setOrders(data);
+          setTotalCount(data.length);
+          setTotalPages(Math.ceil(data.length / limit));
+        } else {
+          // New format - object with orders, totalCount, totalPages, etc.
+          setOrders(data.orders || []);
+          setTotalCount(data.totalCount || 0);
+          setTotalPages(data.totalPages || 1);
+        }
       } catch (error) {
         setError(error instanceof Error ? error.message : "An error occurred");
       } finally {
@@ -111,8 +125,18 @@ const ClientOrders: React.FC = () => {
                 <CardContent>
                   <div className="flex flex-col items-center justify-center py-10 text-center">
                     <div className="mb-4 rounded-full bg-red-100 p-3">
-                      <svg className="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      <svg
+                        className="h-8 w-8 text-red-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                        />
                       </svg>
                     </div>
                     <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -121,8 +145,8 @@ const ClientOrders: React.FC = () => {
                     <p className="mb-4 max-w-md text-gray-500 dark:text-gray-400">
                       {error}
                     </p>
-                    <Button 
-                      onClick={() => window.location.reload()} 
+                    <Button
+                      onClick={() => window.location.reload()}
                       className="bg-blue-600 hover:bg-blue-700"
                     >
                       Try Again
@@ -145,11 +169,26 @@ const ClientOrders: React.FC = () => {
         <div className="-mx-4 flex flex-wrap items-center">
           <div className="w-full px-4">
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle>Your Orders</CardTitle>
-                <CardDescription className="max-w-lg text-balance leading-relaxed">
-                  View and manage your orders.
-                </CardDescription>
+              <CardHeader className="relative pb-3">
+                {/* Back to Dashboard Link - Positioned in top-left corner */}
+                <div className="absolute left-0 top-0 pl-6 pt-6">
+                  <Link
+                    href="/client"
+                    className="flex items-center gap-2 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Dashboard
+                  </Link>
+                </div>
+
+                <div className="text-center">
+                  <CardTitle className="mb-4 text-center">
+                    Your Orders
+                  </CardTitle>
+                  <CardDescription className="mx-auto max-w-lg text-balance text-center leading-relaxed">
+                    View and manage your orders.
+                  </CardDescription>
+                </div>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
@@ -266,13 +305,19 @@ const ClientOrders: React.FC = () => {
                         ))}
                       </TableBody>
                     </Table>
-                    <div className="mt-4 flex justify-between">
+                    <div className="mt-4 flex items-center justify-between">
                       <Button onClick={handlePrevPage} disabled={page === 1}>
                         Previous
                       </Button>
+
+                      {/* Pagination Information - Center */}
+                      <div className="text-center text-sm text-gray-600">
+                        Page {page} of {totalPages} • {totalCount} total orders
+                      </div>
+
                       <Button
                         onClick={handleNextPage}
-                        disabled={orders.length < limit}
+                        disabled={page >= totalPages}
                       >
                         Next
                       </Button>

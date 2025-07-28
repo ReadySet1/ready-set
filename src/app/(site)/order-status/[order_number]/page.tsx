@@ -28,7 +28,7 @@ const OrderPage = () => {
       <div className="container">
         <div className="-mx-4 flex flex-wrap items-center">
           <div className="w-full px-4">
-            <UserOrderDetail />
+            <UserOrderDetail orderNumber={orderNumber} />
           </div>
         </div>
       </div>

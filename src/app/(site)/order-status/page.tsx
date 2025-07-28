@@ -6,7 +6,7 @@ const OrderStatusPage = () => {
   return (
     <main>
       <Breadcrumb pageName="Order Status Page" />
-      <ClientOrders/>
+      <ClientOrders />
     </main>
   );
 };
