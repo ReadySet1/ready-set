@@ -24,6 +24,7 @@ import {
 import { useUploadFile, UploadedFile } from "@/hooks/use-upload-file";
 import { FileWithPath } from "react-dropzone";
 import { HostSection } from "./HostSection";
+import { CateringOrderSuccessModal } from "../Orders/CateringOrders/CateringOrderSuccessModal";
 
 // Form field components
 const InputField: React.FC<{
@@ -230,6 +231,8 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadedFileKeys, setUploadedFileKeys] = useState<string[]>([]);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successOrderData, setSuccessOrderData] = useState<any>(null);
 
   // Initialize Supabase client
   useEffect(() => {
@@ -468,9 +471,83 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
     }
   };
 
+  const handleViewOrderDetails = (orderId: string) => {
+    console.log("🚀 handleViewOrderDetails called with orderId:", orderId);
+    console.log("Current router:", router);
+    const targetUrl = `/client/catering-order-details/${orderId}`;
+    console.log("Navigating to:", targetUrl);
+
+    router.push(targetUrl);
+  };
+
+  const handleShowSuccessModal = (
+    formData: ExtendedCateringFormData,
+    orderNumber: string,
+    orderId?: string,
+  ) => {
+    console.log("🎯 handleShowSuccessModal called");
+    console.log("Form data:", formData);
+    console.log("Order number:", orderNumber);
+    console.log("Order ID:", orderId);
+
+    // Create order data for the modal
+    const orderData = {
+      orderId,
+      orderNumber,
+      clientName: client?.title || session?.user?.email || "Unknown Client",
+      pickupDateTime: new Date(`${formData.date}T${formData.pickupTime}`),
+      deliveryDateTime: new Date(`${formData.date}T${formData.arrivalTime}`),
+      pickupAddress: formData.pickupAddress || {
+        street1: "",
+        city: "",
+        state: "",
+        zip: "",
+      },
+      deliveryAddress: formData.deliveryAddress || {
+        street1: "",
+        city: "",
+        state: "",
+        zip: "",
+      },
+      headcount: parseInt(formData.headcount) || 0,
+      needHost: formData.needHost,
+      hoursNeeded: formData.hoursNeeded
+        ? parseInt(formData.hoursNeeded)
+        : undefined,
+      numberOfHosts: formData.numberOfHosts
+        ? parseInt(formData.numberOfHosts)
+        : undefined,
+    };
+
+    console.log("Order data for modal:", orderData);
+    console.log("Setting successOrderData and showSuccessModal");
+    setSuccessOrderData(orderData);
+    setShowSuccessModal(true);
+    console.log("Modal state set to true");
+
+    // Force a re-render by updating state
+    setTimeout(() => {
+      console.log("Current modal state - showSuccessModal:", showSuccessModal);
+      console.log("Current modal state - successOrderData:", successOrderData);
+    }, 100);
+  };
+
   const onSubmit = async (data: ExtendedCateringFormData) => {
-    console.log("Starting catering form submission:", {
-      formData: { ...data, attachments: data.attachments?.length },
+    console.log("Starting catering form submission");
+    console.log("Form data:", JSON.stringify(data, null, 2));
+    console.log("Form data summary:", {
+      orderNumber: data.orderNumber,
+      brokerage: data.brokerage,
+      date: data.date,
+      pickupTime: data.pickupTime,
+      arrivalTime: data.arrivalTime,
+      headcount: data.headcount,
+      needHost: data.needHost,
+      clientAttention: data.clientAttention,
+      orderTotal: data.orderTotal,
+      pickupAddress: data.pickupAddress,
+      deliveryAddress: data.deliveryAddress,
+      attachments: data.attachments?.length,
     });
 
     // In admin mode, require a client prop
@@ -487,23 +564,33 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
     setErrorMessage("");
     const userId = session?.user?.id;
     try {
+      const requestBody = {
+        ...data,
+        attachments: data.attachments,
+        userId,
+        clientId: isAdminMode && client ? client.id : undefined,
+      };
+
+      console.log(
+        "Submitting request body:",
+        JSON.stringify(requestBody, null, 2),
+      );
+
       const response = await fetch("/api/catering-requests", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          ...data,
-          attachments: data.attachments,
-          userId,
-          clientId: isAdminMode && client ? client.id : undefined,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       let responseData: any = null;
       try {
         responseData = await response.json();
+        console.log("API Response status:", response.status);
+        console.log("API Response data:", responseData);
       } catch (jsonErr) {
+        console.error("Error parsing JSON response:", jsonErr);
         responseData = {};
       }
 
@@ -527,6 +614,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
       }
 
       console.log("Order submitted successfully:", responseData);
+      console.log("About to show success modal...");
 
       // IMPORTANT FIX: Update the file entity IDs to link them to the catering request
       if (responseData.orderId && uploadedFiles.length > 0) {
@@ -549,32 +637,28 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
       toast.success("Catering request submitted successfully!");
       setErrorMessage("");
 
-      // --- Redirect to appropriate dashboard based on user type ---
-      try {
-        if (session?.user?.email) {
-          // Get user profile to determine their type
-          const response = await fetch(`/api/users/profile?email=${encodeURIComponent(session.user.email)}`);
-          if (response.ok) {
-            const profile = await response.json();
-            const dashboardPath = profile.type === 'VENDOR' ? '/vendor' : '/client';
-            console.log(`Redirecting ${profile.type} user to ${dashboardPath}`);
-            router.push(dashboardPath);
-          } else {
-            // Fallback to client dashboard if profile fetch fails
-            console.log("Profile fetch failed, redirecting to client dashboard");
-            router.push("/client");
-          }
-        } else {
-          // Fallback to client dashboard if no session
-          console.log("No session, redirecting to client dashboard");
-          router.push("/client");
-        }
-      } catch (error) {
-        console.error("Error determining user type for redirect:", error);
-        // Fallback to client dashboard
-        router.push("/client");
+      // Show success modal with order details
+      // Use the order number from the API response if available, otherwise use form data
+      console.log("API Response:", responseData);
+      console.log("Form data order number:", data.orderNumber);
+
+      const orderNumber = responseData.orderNumber || data.orderNumber;
+
+      console.log("Final check - orderNumber:", orderNumber);
+      console.log("API Response orderId:", responseData.orderId);
+      if (orderNumber) {
+        console.log(
+          "Calling handleShowSuccessModal with orderNumber:",
+          orderNumber,
+          "and orderId:",
+          responseData.orderId,
+        );
+        handleShowSuccessModal(data, orderNumber, responseData.orderId);
+      } else {
+        // Fallback if no order number available
+        console.log("No order number available, showing basic success");
+        setShowSuccessModal(true);
       }
-      // --- End Redirect Logic ---
     } catch (error) {
       console.error("Error submitting order:", error);
       setErrorMessage(
@@ -877,6 +961,51 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           )}
         </button>
       </div>
+      <CateringOrderSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          console.log("Modal close triggered");
+          setShowSuccessModal(false);
+          setSuccessOrderData(null);
+          // Redirect to appropriate dashboard after modal is closed
+          try {
+            if (session?.user?.email) {
+              // Get user profile to determine their type
+              fetch(
+                `/api/users/profile?email=${encodeURIComponent(session.user.email)}`,
+              )
+                .then((response) => {
+                  if (response.ok) {
+                    return response.json();
+                  }
+                  return { type: "CLIENT" }; // Fallback
+                })
+                .then((profile) => {
+                  const dashboardPath =
+                    profile.type === "VENDOR" ? "/vendor" : "/client";
+                  console.log(
+                    `Redirecting ${profile.type} user to ${dashboardPath}`,
+                  );
+                  router.push(dashboardPath);
+                })
+                .catch((error) => {
+                  console.error(
+                    "Error determining user type for redirect:",
+                    error,
+                  );
+                  router.push("/client");
+                });
+            } else {
+              router.push("/client");
+            }
+          } catch (error) {
+            console.error("Error in redirect logic:", error);
+            router.push("/client");
+          }
+        }}
+        orderData={successOrderData}
+        onViewOrderDetails={handleViewOrderDetails}
+      />
     </form>
   );
 };

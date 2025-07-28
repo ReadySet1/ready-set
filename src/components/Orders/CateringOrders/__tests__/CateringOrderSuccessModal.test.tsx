@@ -9,6 +9,9 @@ jest.mock("@/components/ui/dialog", () => ({
   DialogContent: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="dialog-content">{children}</div>
   ),
+  DialogTitle: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div data-testid="dialog-title" className={className}>{children}</div>
+  ),
 }));
 
 // Mock the Button component
@@ -40,6 +43,7 @@ jest.mock("@/components/ui/badge", () => ({
 }));
 
 const mockOrderData = {
+  orderId: "test-order-id-123",
   orderNumber: "SF-03020",
   clientName: "Lorne Malvo",
   pickupDateTime: new Date("2025-08-08T11:00:00"),
@@ -175,7 +179,47 @@ describe("CateringOrderSuccessModal", () => {
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onClose when view order details button is clicked", () => {
+  it("calls onViewOrderDetails when view order details button is clicked with orderId", () => {
+    const mockOnViewOrderDetails = jest.fn();
+    
+    render(
+      <CateringOrderSuccessModal
+        isOpen={true}
+        onClose={mockOnClose}
+        orderData={mockOrderData}
+        onViewOrderDetails={mockOnViewOrderDetails}
+      />,
+    );
+
+    const viewDetailsButton = screen.getByTestId("button-default");
+    fireEvent.click(viewDetailsButton);
+
+    expect(mockOnViewOrderDetails).toHaveBeenCalledWith("test-order-id-123");
+    expect(mockOnClose).not.toHaveBeenCalled();
+  });
+
+  it("calls onViewOrderDetails with orderNumber when orderId is not available", () => {
+    const mockOnViewOrderDetails = jest.fn();
+    const orderDataWithoutId = { ...mockOrderData };
+    delete orderDataWithoutId.orderId;
+    
+    render(
+      <CateringOrderSuccessModal
+        isOpen={true}
+        onClose={mockOnClose}
+        orderData={orderDataWithoutId}
+        onViewOrderDetails={mockOnViewOrderDetails}
+      />,
+    );
+
+    const viewDetailsButton = screen.getByTestId("button-default");
+    fireEvent.click(viewDetailsButton);
+
+    expect(mockOnViewOrderDetails).toHaveBeenCalledWith("SF-03020");
+    expect(mockOnClose).not.toHaveBeenCalled();
+  });
+
+  it("calls onClose when view order details button is clicked but no onViewOrderDetails provided", () => {
     render(
       <CateringOrderSuccessModal
         isOpen={true}
@@ -220,5 +264,75 @@ describe("CateringOrderSuccessModal", () => {
 
     expect(screen.getByText("Headcount: 45")).toBeInTheDocument();
     expect(screen.queryByText(/Hosts needed:/)).not.toBeInTheDocument();
+  });
+
+  it("renders fallback modal when no order data is provided", () => {
+    render(
+      <CateringOrderSuccessModal
+        isOpen={true}
+        onClose={mockOnClose}
+        orderData={null}
+      />,
+    );
+
+    expect(screen.getByText("Order Created Successfully!")).toBeInTheDocument();
+    expect(screen.getByText("Your catering request has been submitted")).toBeInTheDocument();
+    expect(screen.getByText("View Orders")).toBeInTheDocument();
+  });
+
+  it("includes DialogTitle for accessibility", () => {
+    render(
+      <CateringOrderSuccessModal
+        isOpen={true}
+        onClose={mockOnClose}
+        orderData={mockOrderData}
+      />,
+    );
+
+    expect(screen.getByTestId("dialog-title")).toBeInTheDocument();
+    expect(screen.getByText("Order Created Successfully - Order #SF-03020")).toBeInTheDocument();
+  });
+
+  it("includes DialogTitle in fallback modal for accessibility", () => {
+    render(
+      <CateringOrderSuccessModal
+        isOpen={true}
+        onClose={mockOnClose}
+        orderData={null}
+      />,
+    );
+
+    expect(screen.getByTestId("dialog-title")).toBeInTheDocument();
+    expect(screen.getByText("Order Created Successfully")).toBeInTheDocument();
+  });
+
+  it("calls onClose when fallback modal close button is clicked", () => {
+    render(
+      <CateringOrderSuccessModal
+        isOpen={true}
+        onClose={mockOnClose}
+        orderData={null}
+      />,
+    );
+
+    const closeButton = screen.getByTestId("button-outline");
+    fireEvent.click(closeButton);
+
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onClose when fallback modal view orders button is clicked", () => {
+    render(
+      <CateringOrderSuccessModal
+        isOpen={true}
+        onClose={mockOnClose}
+        orderData={null}
+      />,
+    );
+
+    const viewOrdersButton = screen.getByTestId("button-default");
+    fireEvent.click(viewOrdersButton);
+
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 });

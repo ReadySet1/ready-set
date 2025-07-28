@@ -13,7 +13,7 @@ jest.mock('@/components/Hero', () => ({
 }));
 jest.mock('@/components/Features', () => ({ default: () => <div data-testid="mock-features">Features</div> }));
 jest.mock('@/components/About', () => ({ default: () => <div data-testid="mock-about">About</div> }));
-jest.mock('@/components/FeaturesTab', () => ({ default: () => <div data-testid="mock-features-tab">FeaturesTab</div> }));
+
 jest.mock('@/components/FunFact', () => ({ default: () => <div data-testid="mock-fun-fact">FunFact</div> }));
 jest.mock('@/components/Integration', () => ({ default: () => <div data-testid="mock-integration">Integration</div> }));
 jest.mock('@/components/CTA', () => ({ default: () => <div data-testid="mock-cta">CTA</div> }));

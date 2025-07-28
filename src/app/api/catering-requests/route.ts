@@ -180,7 +180,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       message: "Catering request created successfully", 
-      orderId: cateringRequest.id 
+      orderId: cateringRequest.id,
+      orderNumber: cateringRequest.orderNumber // Include the order number in response
     }, { status: 201 });
     
   } catch (error) {

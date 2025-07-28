@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { TextEncoder, TextDecoder } from 'util';
+import { createRoot } from 'react-dom/client';
 
 // Set up environment variables for tests
 process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test_db";
@@ -171,3 +172,23 @@ jest.mock('next/server', () => ({
   NextRequest: jest.fn(),
   NextResponse: mockNextResponse,
 }));
+
+// Override @testing-library/react render to use React 18 createRoot
+const originalRender = require('@testing-library/react').render;
+
+require('@testing-library/react').render = (ui: any, options: any) => {
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  
+  const root = createRoot(container);
+  root.render(ui);
+  
+  return {
+    container,
+    unmount: () => {
+      root.unmount();
+      document.body.removeChild(container);
+    },
+    ...originalRender(ui, { container, ...options }),
+  };
+};

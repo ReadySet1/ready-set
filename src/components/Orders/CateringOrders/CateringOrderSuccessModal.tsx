@@ -14,6 +14,7 @@ interface CateringOrderSuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
   orderData: {
+    orderId?: string;
     orderNumber: string;
     clientName: string;
     pickupDateTime: Date;
@@ -35,22 +36,56 @@ interface CateringOrderSuccessModalProps {
     hoursNeeded?: number;
     numberOfHosts?: number;
   } | null;
+  onViewOrderDetails?: (orderId: string) => void;
 }
 
-export const CateringOrderSuccessModal: React.FC<CateringOrderSuccessModalProps> = ({
-  isOpen,
-  onClose,
-  orderData,
-}) => {
+export const CateringOrderSuccessModal: React.FC<
+  CateringOrderSuccessModalProps
+> = ({ isOpen, onClose, orderData, onViewOrderDetails }) => {
   console.log("🎨 CateringOrderSuccessModal render");
   console.log("isOpen:", isOpen);
   console.log("orderData:", orderData);
-  
-  // Don't render if no order data
-  if (!orderData) {
+
+  // Don't render if not open
+  if (!isOpen) {
     return null;
   }
-  
+
+  // Don't render if no order data
+  if (!orderData) {
+    console.log("No order data provided, showing fallback modal");
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl p-0">
+          <DialogTitle className="sr-only">
+            Order Created Successfully
+          </DialogTitle>
+          <div className="p-6">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+                <Check className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-green-600">
+                  Order Created Successfully!
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Your catering request has been submitted
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={onClose}>
+                Close
+              </Button>
+              <Button onClick={onClose}>View Orders</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const formatAddress = (address: {
     street1: string;
     city: string;
@@ -67,6 +102,9 @@ export const CateringOrderSuccessModal: React.FC<CateringOrderSuccessModalProps>
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl p-0">
+        <DialogTitle className="sr-only">
+          Order Created Successfully - Order #{orderData.orderNumber}
+        </DialogTitle>
         <div className="p-6">
           {/* Success Header */}
           <div className="mb-6 flex items-center gap-3">
@@ -93,7 +131,9 @@ export const CateringOrderSuccessModal: React.FC<CateringOrderSuccessModalProps>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <p className="text-sm text-gray-500">Client</p>
-                <p className="font-medium text-gray-900">{orderData.clientName}</p>
+                <p className="font-medium text-gray-900">
+                  {orderData.clientName}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Order Type</p>
@@ -143,13 +183,16 @@ export const CateringOrderSuccessModal: React.FC<CateringOrderSuccessModalProps>
                   Headcount: {orderData.headcount}
                 </span>
               </div>
-              {orderData.needHost === "YES" && orderData.hoursNeeded && orderData.numberOfHosts && (
-                <div className="ml-6">
-                  <p className="text-sm text-gray-600">
-                    Hosts needed: {orderData.numberOfHosts} for {orderData.hoursNeeded} hours
-                  </p>
-                </div>
-              )}
+              {orderData.needHost === "YES" &&
+                orderData.hoursNeeded &&
+                orderData.numberOfHosts && (
+                  <div className="ml-6">
+                    <p className="text-sm text-gray-600">
+                      Hosts needed: {orderData.numberOfHosts} for{" "}
+                      {orderData.hoursNeeded} hours
+                    </p>
+                  </div>
+                )}
             </div>
           </div>
 
@@ -165,7 +208,9 @@ export const CateringOrderSuccessModal: React.FC<CateringOrderSuccessModalProps>
                 <div className="flex items-start gap-3">
                   <div className="mt-1 h-2 w-2 rounded-full bg-blue-600"></div>
                   <div>
-                    <h4 className="font-medium text-gray-900">Order Confirmation</h4>
+                    <h4 className="font-medium text-gray-900">
+                      Order Confirmation
+                    </h4>
                     <p className="text-sm text-gray-600">
                       You will receive an email confirmation with your order
                     </p>
@@ -181,7 +226,8 @@ export const CateringOrderSuccessModal: React.FC<CateringOrderSuccessModalProps>
                       Venue & Logistics Coordination
                     </h4>
                     <p className="text-sm text-gray-600">
-                      Our team will contact you to confirm delivery details and venue access
+                      Our team will contact you to confirm delivery details and
+                      venue access
                     </p>
                   </div>
                 </div>
@@ -191,9 +237,12 @@ export const CateringOrderSuccessModal: React.FC<CateringOrderSuccessModalProps>
                 <div className="flex items-start gap-3">
                   <div className="mt-1 h-2 w-2 rounded-full bg-blue-600"></div>
                   <div>
-                    <h4 className="font-medium text-gray-900">Event Host Arrival</h4>
+                    <h4 className="font-medium text-gray-900">
+                      Event Host Arrival
+                    </h4>
                     <p className="text-sm text-gray-600">
-                      Your assigned hosts will arrive on-site and begin event setup and service
+                      Your assigned hosts will arrive on-site and begin event
+                      setup and service
                     </p>
                   </div>
                 </div>
@@ -206,7 +255,44 @@ export const CateringOrderSuccessModal: React.FC<CateringOrderSuccessModalProps>
             <Button variant="outline" onClick={onClose}>
               Close
             </Button>
-            <Button onClick={onClose}>
+            <Button
+              onClick={() => {
+                console.log("🎯 View Order Details button clicked");
+                console.log("orderData:", orderData);
+                console.log("orderData?.orderId:", orderData?.orderId);
+                console.log("onViewOrderDetails function:", onViewOrderDetails);
+
+                if (orderData?.orderId && onViewOrderDetails) {
+                  console.log(
+                    "✅ Calling onViewOrderDetails with orderId:",
+                    orderData.orderId,
+                  );
+                  onViewOrderDetails(orderData.orderId);
+                } else if (onViewOrderDetails) {
+                  // Fallback: try to use orderNumber as orderId if orderId is not available
+                  console.log(
+                    "⚠️ No orderId found, trying to use orderNumber as fallback",
+                  );
+                  if (orderData?.orderNumber) {
+                    console.log(
+                      "✅ Using orderNumber as fallback:",
+                      orderData.orderNumber,
+                    );
+                    onViewOrderDetails(orderData.orderNumber);
+                  } else {
+                    console.log(
+                      "❌ No orderId or orderNumber available, falling back to onClose",
+                    );
+                    onClose();
+                  }
+                } else {
+                  console.log(
+                    "❌ onViewOrderDetails function not provided, falling back to onClose",
+                  );
+                  onClose();
+                }
+              }}
+            >
               View Order Details
             </Button>
           </div>
@@ -214,4 +300,4 @@ export const CateringOrderSuccessModal: React.FC<CateringOrderSuccessModalProps>
       </DialogContent>
     </Dialog>
   );
-}; 
+};

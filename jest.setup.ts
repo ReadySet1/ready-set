@@ -2,6 +2,7 @@
 // Polyfills for Jest environment
 
 import '@testing-library/jest-dom';
+import React from 'react';
 
 // Fix TextEncoder/Decoder for Node 18+
 import { TextEncoder, TextDecoder } from 'util';
@@ -23,30 +24,7 @@ beforeEach(() => {
   }
 });
 
-// Mock React 18's createRoot to fall back to React 17 render
-jest.mock('react-dom/client', () => ({
-  createRoot: jest.fn().mockImplementation((container) => {
-    const ReactDOM = require('react-dom');
-    
-    // If no container is provided or it's not a valid DOM element, create one
-    let targetContainer = container;
-    if (!container || !container.nodeType) {
-      targetContainer = document.createElement('div');
-      if (document.body) {
-        document.body.appendChild(targetContainer);
-      }
-    }
-    
-    return {
-      // eslint-disable-next-line react/no-deprecated
-      render: (element: any) => {
-        ReactDOM.render(element, targetContainer);
-      },
-      // eslint-disable-next-line react/no-deprecated
-      unmount: () => ReactDOM.unmountComponentAtNode(targetContainer),
-    };
-  }),
-}));
+// Don't mock react-dom/client - let it work normally for tests
 
 // Mock next/navigation properly
 jest.mock('next/navigation', () => ({
@@ -75,57 +53,106 @@ jest.mock('next/navigation', () => ({
   },
 }));
 
-// PointerEvent polyfill for JSDOM (needed for Radix UI components tested with user-event)
-if (typeof window !== 'undefined' && !window.PointerEvent) {
-  class PointerEvent extends MouseEvent {
-    pointerId: number;
-    constructor(type: string, params: PointerEventInit = {}) {
-      super(type, params);
-      this.pointerId = params.pointerId ?? 0;
+// Mock UI components to avoid displayName issues
+jest.mock('@/components/ui/select', () => ({
+  Select: ({ children, ...props }: any) => React.createElement('div', { 'data-testid': 'select', ...props }, children),
+  SelectContent: ({ children, ...props }: any) => React.createElement('div', { 'data-testid': 'select-content', ...props }, children),
+  SelectItem: ({ children, ...props }: any) => React.createElement('div', { 'data-testid': 'select-item', ...props }, children),
+  SelectTrigger: ({ children, ...props }: any) => React.createElement('button', { 'data-testid': 'select-trigger', ...props }, children),
+  SelectValue: ({ children, ...props }: any) => React.createElement('span', { 'data-testid': 'select-value', ...props }, children),
+  SelectLabel: ({ children, ...props }: any) => React.createElement('label', { 'data-testid': 'select-label', ...props }, children),
+  SelectGroup: ({ children, ...props }: any) => React.createElement('div', { 'data-testid': 'select-group', ...props }, children),
+  SelectSeparator: ({ ...props }: any) => React.createElement('hr', { 'data-testid': 'select-separator', ...props }),
+  SelectScrollUpButton: ({ ...props }: any) => React.createElement('button', { 'data-testid': 'select-scroll-up', ...props }),
+  SelectScrollDownButton: ({ ...props }: any) => React.createElement('button', { 'data-testid': 'select-scroll-down', ...props }),
+}));
+
+// Mock other UI components
+jest.mock('@/components/ui/button', () => ({
+  Button: ({ children, ...props }: any) => React.createElement('button', { 'data-testid': 'button', ...props }, children),
+}));
+
+jest.mock('@/components/ui/input', () => ({
+  Input: ({ ...props }: any) => React.createElement('input', { 'data-testid': 'input', ...props }),
+}));
+
+jest.mock('@/components/ui/label', () => ({
+  Label: ({ children, ...props }: any) => React.createElement('label', { 'data-testid': 'label', ...props }, children),
+}));
+
+jest.mock('@/components/ui/dialog', () => ({
+  Dialog: ({ children, ...props }: any) => React.createElement('div', { 'data-testid': 'dialog', ...props }, children),
+  DialogContent: ({ children, ...props }: any) => React.createElement('div', { 'data-testid': 'dialog-content', ...props }, children),
+  DialogHeader: ({ children, ...props }: any) => React.createElement('div', { 'data-testid': 'dialog-header', ...props }, children),
+  DialogTitle: ({ children, ...props }: any) => React.createElement('h2', { 'data-testid': 'dialog-title', ...props }, children),
+  DialogDescription: ({ children, ...props }: any) => React.createElement('p', { 'data-testid': 'dialog-description', ...props }, children),
+  DialogTrigger: ({ children, ...props }: any) => React.createElement('button', { 'data-testid': 'dialog-trigger', ...props }, children),
+}));
+
+// Only set up window-related mocks if window exists (jsdom environment)
+if (typeof window !== 'undefined') {
+  // PointerEvent polyfill for JSDOM (needed for Radix UI components tested with user-event)
+  if (!window.PointerEvent) {
+    class PointerEvent extends MouseEvent {
+      pointerId: number;
+      constructor(type: string, params: PointerEventInit = {}) {
+        super(type, params);
+        this.pointerId = params.pointerId ?? 0;
+      }
     }
+    window.PointerEvent = PointerEvent as any;
   }
-  window.PointerEvent = PointerEvent as any;
+
+  if (typeof Element !== 'undefined' && !Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = function(pointerId: number) { 
+      // No-op: JSDOM doesn't support pointer capture
+    };
+  }
+
+  if (typeof Element !== 'undefined' && !Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = function(pointerId: number) {
+      // No-op: JSDOM doesn't support pointer capture
+    };
+  }
+
+  if (typeof Element !== 'undefined' && !Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = function(pointerId: number): boolean {
+      // No-op: JSDOM doesn't support pointer capture
+      return false;
+    };
+  }
+
+  // Mock window methods
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn().mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: jest.fn(), // Deprecated
+      removeListener: jest.fn(), // Deprecated
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })),
+  });
+
+  // Mock scrollTo
+  Object.defineProperty(window, 'scrollTo', {
+    writable: true,
+    value: jest.fn(),
+  });
+
+  // Mock BroadcastChannel for MSW
+  if (!window.BroadcastChannel) {
+    window.BroadcastChannel = jest.fn().mockImplementation(() => ({
+      postMessage: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      close: jest.fn(),
+    }));
+  }
 }
-
-if (typeof Element !== 'undefined' && !Element.prototype.setPointerCapture) {
-  Element.prototype.setPointerCapture = function(pointerId: number) { 
-    // No-op: JSDOM doesn't support pointer capture
-  };
-}
-
-if (typeof Element !== 'undefined' && !Element.prototype.releasePointerCapture) {
-  Element.prototype.releasePointerCapture = function(pointerId: number) {
-    // No-op: JSDOM doesn't support pointer capture
-  };
-}
-
-if (typeof Element !== 'undefined' && !Element.prototype.hasPointerCapture) {
-  Element.prototype.hasPointerCapture = function(pointerId: number): boolean {
-    // No-op: JSDOM doesn't support pointer capture
-    return false;
-  };
-}
-
-// Mock window methods
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: jest.fn().mockImplementation(query => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: jest.fn(), // Deprecated
-    removeListener: jest.fn(), // Deprecated
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
-  })),
-});
-
-// Mock scrollTo
-Object.defineProperty(window, 'scrollTo', {
-  writable: true,
-  value: jest.fn(),
-});
 
 // Mock IntersectionObserver
 global.IntersectionObserver = jest.fn().mockImplementation(() => ({
