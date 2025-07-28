@@ -70,6 +70,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useUploadFile, UploadedFile } from "@/hooks/use-upload-file"; // Import the upload hook
 import { FileWithPath } from "react-dropzone"; // Import FileWithPath type
 import { useToast } from "@/components/ui/use-toast";
+import { CateringOrderSuccessModal } from "./CateringOrderSuccessModal";
 
 interface CreateCateringOrderFormProps {
   clients: ClientListItem[];
@@ -234,6 +235,10 @@ export const CreateCateringOrderForm: React.FC<
 
   // File upload state
   const [uploadedFileKeys, setUploadedFileKeys] = useState<string[]>([]);
+
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successOrderData, setSuccessOrderData] = useState<any>(null);
 
   // Initialize Supabase client
   const supabase = createClient();
@@ -484,7 +489,44 @@ export const CreateCateringOrderForm: React.FC<
   // Add the scrollToTop utility function
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
+  // Helper function to show success modal
+  const handleShowSuccessModal = (
+    formData: CreateCateringOrderInput,
+    orderNumber: string,
+  ) => {
+    console.log("🎯 handleShowSuccessModal called");
+    console.log("Form data:", formData);
+    console.log("Order number:", orderNumber);
+
+    const selectedClient = clients.find(
+      (client) => client.id === formData.userId,
+    );
+    console.log("Selected client:", selectedClient);
+
+    const orderData = {
+      orderNumber,
+      clientName: selectedClient?.name || "Unknown Client",
+      pickupDateTime: formData.pickupDateTime,
+      deliveryDateTime: formData.arrivalDateTime,
+      pickupAddress: formData.pickupAddress,
+      deliveryAddress: formData.deliveryAddress,
+      headcount: formData.headcount || 0,
+      needHost: formData.needHost,
+      hoursNeeded: formData.hoursNeeded,
+      numberOfHosts: formData.numberOfHosts,
+    };
+
+    console.log("Order data for modal:", orderData);
+    setSuccessOrderData(orderData);
+    setShowSuccessModal(true);
+    console.log("Modal state set to true");
+  };
+
   const handleFormSubmit = async (data: CreateCateringOrderInput) => {
+    console.log("🚀 handleFormSubmit called");
+    console.log("Form data:", data);
+    console.log("Form errors:", form.formState.errors);
+    
     setIsSubmitting(true);
     setGeneralError(null);
 
@@ -505,7 +547,27 @@ export const CreateCateringOrderForm: React.FC<
         return;
       }
 
-      router.push("/admin/catering-orders");
+      if (result.success && result.orderNumber) {
+        console.log("✅ Order created successfully, showing modal...");
+        console.log("Result:", result);
+        console.log("Form data:", data);
+
+        // If we have uploaded files, update their entity ID
+        if (uploadedFiles.length > 0 && result.orderId) {
+          console.log(
+            `Updating file entities from temp ID to actual order ID: ${result.orderId}`,
+          );
+          await updateEntityId(result.orderId);
+        }
+
+        handleShowSuccessModal(data, result.orderNumber);
+      } else {
+        console.log("❌ Order creation failed or missing order number");
+        console.log("Result:", result);
+        // Fallback: show alert if modal doesn't work
+        alert(`Order created successfully! Order #${result.orderNumber}`);
+        router.push("/admin/catering-orders");
+      }
     } catch (err) {
       console.error("Form submission error:", err);
       setGeneralError("An unexpected error occurred. Please try again.");
@@ -908,9 +970,8 @@ export const CreateCateringOrderForm: React.FC<
           await updateEntityId(result.orderId);
         }
 
-        alert("Order created successfully!");
         if (result.orderNumber) {
-          router.push(`/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`);
+          handleShowSuccessModal(formData, result.orderNumber);
         }
       } else {
         alert("Failed to create order: " + (result.error || "Unknown error"));
@@ -963,9 +1024,8 @@ export const CreateCateringOrderForm: React.FC<
           .then((result) => {
             console.log("Server action result:", result);
             if (result.success) {
-              alert("Order created successfully!");
               if (result.orderNumber) {
-                router.push(`/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`);
+                handleShowSuccessModal(formData, result.orderNumber);
               }
             } else {
               alert(
@@ -1938,6 +1998,18 @@ export const CreateCateringOrderForm: React.FC<
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Success Modal */}
+      <CateringOrderSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          setSuccessOrderData(null);
+          // Optionally redirect to the orders list or reset the form
+          router.push("/admin/catering-orders");
+        }}
+        orderData={successOrderData}
+      />
     </>
   );
 };
