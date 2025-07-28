@@ -234,13 +234,26 @@ export default function ProfilePage() {
 
     try {
       setIsLoading(true);
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      let { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (sessionError || !session) {
-        console.error("Authentication error:", sessionError?.message);
+      if (sessionError) {
+        console.error("Session error:", sessionError?.message);
         toast.error("Authentication error. Please try logging in again.");
         router.push('/sign-in');
         return;
+      }
+      
+      if (!session) {
+        // Try to refresh the session before giving up
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshedSession) {
+          console.error("Failed to refresh session:", refreshError?.message);
+          toast.error("Session expired. Please log in again.");
+          router.push('/sign-in');
+          return;
+        }
+        // Use the refreshed session
+        session = refreshedSession;
       }
 
       const response = await fetch(`/api/users/${user.id}`, {
@@ -310,13 +323,13 @@ export default function ProfilePage() {
   }, [user?.id, supabase.auth]);
 
   useEffect(() => {
-    if (!isUserLoading && !session) {
+    if (!isUserLoading && !user) {
       router.push('/sign-in');
-    } else if (!isUserLoading && session && user) {
+    } else if (!isUserLoading && user) {
       fetchProfile();
       fetchUserFiles();
     }
-  }, [session, isUserLoading, router, user, refreshTrigger, fetchProfile, fetchUserFiles]);
+  }, [isUserLoading, router, user, refreshTrigger, fetchProfile, fetchUserFiles]);
 
   const handleSave = async () => {
     if (!editedProfile || !user?.id) return;

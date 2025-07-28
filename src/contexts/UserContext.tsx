@@ -109,6 +109,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       try {
         console.log("UserContext: Getting initial user data...");
         const { data: { user: currentUser }, error: getUserError } = await supabase.auth.getUser();
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
         
         if (!mounted) return;
         
@@ -117,6 +118,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           setIsLoading(false);
           return;
         }
+        
+        // Set the initial session
+        setSession(currentSession);
         
         if (currentUser) {
           setUser(currentUser);
