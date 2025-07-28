@@ -2,11 +2,11 @@ name: "Deploy to Staging"
 
 on:
   push:
-    branches: [ "preview-development" ]
+    branches: ["preview-development"]
   workflow_dispatch:
     inputs:
       force_deploy:
-        description: 'Force deploy even if tests fail'
+        description: "Force deploy even if tests fail"
         required: false
         default: false
         type: boolean
@@ -20,81 +20,81 @@ jobs:
     name: Pre-deployment Health Checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Validate required secrets
-      run: |
-        if [ -z "${{ secrets.STAGING_DATABASE_URL }}" ]; then
-          echo "❌ STAGING_DATABASE_URL secret is not set"
-          exit 1
-        fi
-        if [ -z "${{ secrets.STAGING_DIRECT_URL }}" ]; then
-          echo "❌ STAGING_DIRECT_URL secret is not set"
-          exit 1
-        fi
-        if [ -z "${{ secrets.STAGING_SUPABASE_URL }}" ]; then
-          echo "❌ STAGING_SUPABASE_URL secret is not set"
-          exit 1
-        fi
-        if [ -z "${{ secrets.STAGING_SUPABASE_ANON_KEY }}" ]; then
-          echo "❌ STAGING_SUPABASE_ANON_KEY secret is not set"
-          exit 1
-        fi
-        if [ -z "${{ secrets.STAGING_NEXTAUTH_SECRET }}" ]; then
-          echo "❌ STAGING_NEXTAUTH_SECRET secret is not set"
-          exit 1
-        fi
-        echo "✅ All required secrets are configured"
+      - name: Validate required secrets
+        run: |
+          if [ -z "${{ secrets.STAGING_DATABASE_URL }}" ]; then
+            echo "❌ STAGING_DATABASE_URL secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.STAGING_DIRECT_URL }}" ]; then
+            echo "❌ STAGING_DIRECT_URL secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.STAGING_SUPABASE_URL }}" ]; then
+            echo "❌ STAGING_SUPABASE_URL secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.STAGING_SUPABASE_ANON_KEY }}" ]; then
+            echo "❌ STAGING_SUPABASE_ANON_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.STAGING_NEXTAUTH_SECRET }}" ]; then
+            echo "❌ STAGING_NEXTAUTH_SECRET secret is not set"
+            exit 1
+          fi
+          echo "✅ All required secrets are configured"
 
-    - name: Install pnpm
-      uses: pnpm/action-setup@v2
-      with:
-        version: latest
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.8.0
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'pnpm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "pnpm"
 
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-    - name: Generate Prisma Client
-      run: pnpm prisma generate
-      env:
-        DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      - name: Generate Prisma Client
+        run: pnpm prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
-    - name: Database Health Check
-      run: |
-        echo "Checking database connectivity..."
-        npx prisma db pull --preview-feature
-      env:
-        DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      - name: Database Health Check
+        run: |
+          echo "Checking database connectivity..."
+          npx prisma db pull --preview-feature
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
-    - name: Run tests
-      run: pnpm test
-      if: ${{ !inputs.force_deploy }}
-      env:
-        CI: true
-        DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
-        DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
-        NEXTAUTH_SECRET: ${{ secrets.STAGING_NEXTAUTH_SECRET }}
+      - name: Run tests
+        run: pnpm test
+        if: ${{ !inputs.force_deploy }}
+        env:
+          CI: true
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          NEXTAUTH_SECRET: ${{ secrets.STAGING_NEXTAUTH_SECRET }}
 
-    - name: Build verification
-      run: pnpm build:no-typecheck
-      env:
-        NEXT_TELEMETRY_DISABLED: 1
-        DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
-        DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
-        NEXTAUTH_SECRET: ${{ secrets.STAGING_NEXTAUTH_SECRET }}
+      - name: Build verification
+        run: pnpm build:no-typecheck
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          NEXTAUTH_SECRET: ${{ secrets.STAGING_NEXTAUTH_SECRET }}
 
   build-and-push:
     name: Build and Push Docker Image
@@ -103,167 +103,167 @@ jobs:
     permissions:
       contents: read
       packages: write
-    
+
     outputs:
       image: ${{ steps.image.outputs.image }}
       digest: ${{ steps.build.outputs.digest }}
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=sha,prefix={{branch}}-
-          type=raw,value=staging-latest
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=staging-latest
 
-    - name: Build and push Docker image
-      id: build
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        platforms: linux/amd64
-        build-args: |
-          DATABASE_URL=${{ secrets.STAGING_DATABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.STAGING_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+          build-args: |
+            DATABASE_URL=${{ secrets.STAGING_DATABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.STAGING_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.STAGING_SUPABASE_ANON_KEY }}
 
-    - name: Output image
-      id: image
-      run: |
-        echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-latest" >> $GITHUB_OUTPUT
+      - name: Output image
+        id: image
+        run: |
+          echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-latest" >> $GITHUB_OUTPUT
 
   database-migration:
     name: Database Migration
     runs-on: ubuntu-latest
     needs: [pre-deployment-checks, build-and-push]
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install pnpm
-      uses: pnpm/action-setup@v2
-      with:
-        version: latest
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.8.0
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'pnpm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "pnpm"
 
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-    - name: Generate Prisma Client
-      run: pnpm prisma generate
-      env:
-        DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      - name: Generate Prisma Client
+        run: pnpm prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
-    - name: Create database backup
-      run: |
-        echo "Creating database backup before migration..."
-        # Create backup using timestamp
-        BACKUP_NAME="staging_backup_$(date +%Y%m%d_%H%M%S)"
-        echo "Backup name: $BACKUP_NAME"
-        echo "backup_name=$BACKUP_NAME" >> $GITHUB_ENV
-      env:
-        DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      - name: Create database backup
+        run: |
+          echo "Creating database backup before migration..."
+          # Create backup using timestamp
+          BACKUP_NAME="staging_backup_$(date +%Y%m%d_%H%M%S)"
+          echo "Backup name: $BACKUP_NAME"
+          echo "backup_name=$BACKUP_NAME" >> $GITHUB_ENV
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
-    - name: Run database migrations
-      run: |
-        echo "Running database migrations..."
-        npx prisma migrate deploy
-        echo "Migrations completed successfully"
-      env:
-        DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      - name: Run database migrations
+        run: |
+          echo "Running database migrations..."
+          npx prisma migrate deploy
+          echo "Migrations completed successfully"
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
-    - name: Seed database (if needed)
-      run: |
-        echo "Running database seeding..."
-        # Add seeding logic if needed
-        echo "Database seeding completed"
-      env:
-        DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      - name: Seed database (if needed)
+        run: |
+          echo "Running database seeding..."
+          # Add seeding logic if needed
+          echo "Database seeding completed"
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
   deploy-staging:
     name: Deploy to Staging Environment
     runs-on: ubuntu-latest
     needs: [build-and-push, database-migration]
-    
+
     steps:
-    - name: Deploy to staging
-      run: |
-        echo "Deploying image: ${{ needs.build-and-push.outputs.image }}"
-        echo "Deployment digest: ${{ needs.build-and-push.outputs.digest }}"
-        
-        # Add your staging deployment logic here
-        # This could be:
-        # - Updating Kubernetes deployments
-        # - Calling deployment webhooks
-        # - Using cloud provider CLIs
-        # - Updating docker-compose services
-        
-        echo "✅ Staging deployment completed successfully"
-      env:
-        DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      - name: Deploy to staging
+        run: |
+          echo "Deploying image: ${{ needs.build-and-push.outputs.image }}"
+          echo "Deployment digest: ${{ needs.build-and-push.outputs.digest }}"
 
-    - name: Health check staging deployment
-      run: |
-        echo "Performing post-deployment health checks..."
-        
-        # Wait for deployment to stabilize
-        sleep 30
-        
-        # Add health check logic
-        echo "🏥 Health checks passed"
+          # Add your staging deployment logic here
+          # This could be:
+          # - Updating Kubernetes deployments
+          # - Calling deployment webhooks
+          # - Using cloud provider CLIs
+          # - Updating docker-compose services
 
-    - name: Run smoke tests
-      run: |
-        echo "Running smoke tests against staging environment..."
-        
-        # Add smoke test logic here
-        echo "🧪 Smoke tests passed"
+          echo "✅ Staging deployment completed successfully"
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+
+      - name: Health check staging deployment
+        run: |
+          echo "Performing post-deployment health checks..."
+
+          # Wait for deployment to stabilize
+          sleep 30
+
+          # Add health check logic
+          echo "🏥 Health checks passed"
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests against staging environment..."
+
+          # Add smoke test logic here
+          echo "🧪 Smoke tests passed"
 
   notify:
     name: Deployment Notification
     runs-on: ubuntu-latest
     needs: [deploy-staging]
     if: always()
-    
+
     steps:
-    - name: Deployment notification
-      run: |
-        if [ "${{ needs.deploy-staging.result }}" == "success" ]; then
-          echo "✅ Staging deployment successful!"
-          echo "Environment: https://development.readysetllc.com"
-          echo "Deployment time: $(date)"
-          echo "Image deployed: ${{ needs.build-and-push.outputs.image }}"
-        else
-          echo "❌ Staging deployment failed!"
-          echo "Check the logs for details."
-          exit 1
-        fi 
+      - name: Deployment notification
+        run: |
+          if [ "${{ needs.deploy-staging.result }}" == "success" ]; then
+            echo "✅ Staging deployment successful!"
+            echo "Environment: https://development.readysetllc.com"
+            echo "Deployment time: $(date)"
+            echo "Image deployed: ${{ needs.build-and-push.outputs.image }}"
+          else
+            echo "❌ Staging deployment failed!"
+            echo "Check the logs for details."
+            exit 1
+          fi
