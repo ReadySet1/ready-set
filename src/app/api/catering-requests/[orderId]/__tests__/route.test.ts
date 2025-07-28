@@ -73,7 +73,7 @@ describe("/api/catering-requests/[orderId]", () => {
       mockPrisma.cateringRequest.findUnique.mockResolvedValue(mockOrder);
 
       const request = new NextRequest("http://localhost:3000/api/catering-requests/test-order-id-123");
-      const response = await GET(request, { params: { orderId: "test-order-id-123" } });
+      const response = await GET(request, { params: Promise.resolve({ orderId: "test-order-id-123" }) });
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -102,7 +102,7 @@ describe("/api/catering-requests/[orderId]", () => {
       mockPrisma.cateringRequest.findUnique.mockResolvedValue(null);
 
       const request = new NextRequest("http://localhost:3000/api/catering-requests/non-existent-id");
-      const response = await GET(request, { params: { orderId: "non-existent-id" } });
+      const response = await GET(request, { params: Promise.resolve({ orderId: "non-existent-id" }) });
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -114,7 +114,7 @@ describe("/api/catering-requests/[orderId]", () => {
       mockPrisma.cateringRequest.findUnique.mockRejectedValue(new Error("Database error"));
 
       const request = new NextRequest("http://localhost:3000/api/catering-requests/test-order-id-123");
-      const response = await GET(request, { params: { orderId: "test-order-id-123" } });
+      const response = await GET(request, { params: Promise.resolve({ orderId: "test-order-id-123" }) });
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -166,7 +166,7 @@ describe("/api/catering-requests/[orderId]", () => {
       mockPrisma.cateringRequest.findUnique.mockResolvedValue(mockOrderWithoutHost);
 
       const request = new NextRequest("http://localhost:3000/api/catering-requests/test-order-id-123");
-      const response = await GET(request, { params: { orderId: "test-order-id-123" } });
+      const response = await GET(request, { params: Promise.resolve({ orderId: "test-order-id-123" }) });
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -221,7 +221,7 @@ describe("/api/catering-requests/[orderId]", () => {
       mockPrisma.cateringRequest.findUnique.mockResolvedValue(mockOrderWithoutNotes);
 
       const request = new NextRequest("http://localhost:3000/api/catering-requests/test-order-id-123");
-      const response = await GET(request, { params: { orderId: "test-order-id-123" } });
+      const response = await GET(request, { params: Promise.resolve({ orderId: "test-order-id-123" }) });
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -258,7 +258,7 @@ describe("/api/catering-requests/[orderId]", () => {
       mockPrisma.cateringRequest.findUnique.mockResolvedValue(mockOrderWithMissingAddress);
 
       const request = new NextRequest("http://localhost:3000/api/catering-requests/test-order-id-123");
-      const response = await GET(request, { params: { orderId: "test-order-id-123" } });
+      const response = await GET(request, { params: Promise.resolve({ orderId: "test-order-id-123" }) });
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -269,7 +269,7 @@ describe("/api/catering-requests/[orderId]", () => {
 
     it("validates orderId parameter", async () => {
       const request = new NextRequest("http://localhost:3000/api/catering-requests/");
-      const response = await GET(request, { params: {} });
+      const response = await GET(request, { params: Promise.resolve({ orderId: "" }) });
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -279,7 +279,7 @@ describe("/api/catering-requests/[orderId]", () => {
 
     it("handles invalid orderId format", async () => {
       const request = new NextRequest("http://localhost:3000/api/catering-requests/invalid-id");
-      const response = await GET(request, { params: { orderId: "invalid-id" } });
+      const response = await GET(request, { params: Promise.resolve({ orderId: "invalid-id" }) });
       const data = await response.json();
 
       // The endpoint should still try to find the order even with invalid format

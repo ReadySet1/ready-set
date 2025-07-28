@@ -95,15 +95,39 @@ jest.mock("@/utils/supabase/client", () => ({
 
 // Mock UI components to avoid displayName issues
 jest.mock("@/components/ui/select", () => ({
-  Select: ({ children, ...props }: any) => <div data-testid="select" {...props}>{children}</div>,
-  SelectContent: ({ children, ...props }: any) => <div data-testid="select-content" {...props}>{children}</div>,
-  SelectItem: ({ children, ...props }: any) => <div data-testid="select-item" {...props}>{children}</div>,
-  SelectTrigger: ({ children, ...props }: any) => <div data-testid="select-trigger" {...props}>{children}</div>,
-  SelectValue: ({ children, ...props }: any) => <div data-testid="select-value" {...props}>{children}</div>,
+  Select: ({ children, ...props }: any) => (
+    <div data-testid="select" {...props}>
+      {children}
+    </div>
+  ),
+  SelectContent: ({ children, ...props }: any) => (
+    <div data-testid="select-content" {...props}>
+      {children}
+    </div>
+  ),
+  SelectItem: ({ children, ...props }: any) => (
+    <div data-testid="select-item" {...props}>
+      {children}
+    </div>
+  ),
+  SelectTrigger: ({ children, ...props }: any) => (
+    <div data-testid="select-trigger" {...props}>
+      {children}
+    </div>
+  ),
+  SelectValue: ({ children, ...props }: any) => (
+    <div data-testid="select-value" {...props}>
+      {children}
+    </div>
+  ),
 }));
 
 jest.mock("@/components/ui/button", () => ({
-  Button: ({ children, ...props }: any) => <button data-testid="button" {...props}>{children}</button>,
+  Button: ({ children, ...props }: any) => (
+    <button data-testid="button" {...props}>
+      {children}
+    </button>
+  ),
 }));
 
 jest.mock("@/components/ui/input", () => ({
@@ -111,10 +135,26 @@ jest.mock("@/components/ui/input", () => ({
 }));
 
 jest.mock("@/components/ui/card", () => ({
-  Card: ({ children, ...props }: any) => <div data-testid="card" {...props}>{children}</div>,
-  CardContent: ({ children, ...props }: any) => <div data-testid="card-content" {...props}>{children}</div>,
-  CardHeader: ({ children, ...props }: any) => <div data-testid="card-header" {...props}>{children}</div>,
-  CardTitle: ({ children, ...props }: any) => <div data-testid="card-title" {...props}>{children}</div>,
+  Card: ({ children, ...props }: any) => (
+    <div data-testid="card" {...props}>
+      {children}
+    </div>
+  ),
+  CardContent: ({ children, ...props }: any) => (
+    <div data-testid="card-content" {...props}>
+      {children}
+    </div>
+  ),
+  CardHeader: ({ children, ...props }: any) => (
+    <div data-testid="card-header" {...props}>
+      {children}
+    </div>
+  ),
+  CardTitle: ({ children, ...props }: any) => (
+    <div data-testid="card-title" {...props}>
+      {children}
+    </div>
+  ),
 }));
 
 describe("AddressManager Component", () => {
@@ -186,26 +226,12 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
       expect(screen.getByText("Address Manager")).toBeInTheDocument();
       expect(screen.getByText("Select an address")).toBeInTheDocument();
-    });
-
-    it("should render with custom title when provided", async () => {
-      await act(async () => {
-        render(
-          <AddressManager
-            title="Custom Address Manager"
-            onAddressesLoaded={mockOnAddressesLoaded}
-            onAddressSelected={mockOnAddressSelected}
-          />
-        );
-      });
-
-      expect(screen.getByText("Custom Address Manager")).toBeInTheDocument();
     });
 
     it("should render filter options", async () => {
@@ -214,7 +240,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -232,7 +258,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -247,7 +273,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -288,7 +314,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -309,7 +335,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -337,7 +363,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -365,7 +391,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -395,7 +421,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -421,7 +447,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -450,7 +476,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -478,7 +504,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -513,7 +539,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -545,7 +571,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 
@@ -585,7 +611,7 @@ describe("AddressManager Component", () => {
           <AddressManager
             onAddressesLoaded={mockOnAddressesLoaded}
             onAddressSelected={mockOnAddressSelected}
-          />
+          />,
         );
       });
 

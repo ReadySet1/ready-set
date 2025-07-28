@@ -117,7 +117,6 @@ describe("Catering Requests API", () => {
       mockPrismaClient.cateringRequest.findUnique.mockResolvedValue(null); // No existing order
       mockPrismaClient.cateringRequest.create.mockResolvedValue({
         id: "order-123",
-        orderNumber: "TEST-12345",
         status: "ACTIVE",
         ...requestBody,
       });
@@ -332,7 +331,6 @@ describe("Catering Requests API", () => {
       mockPrismaClient.cateringRequest.findUnique.mockResolvedValue(null); // No existing order
       mockPrismaClient.cateringRequest.create.mockResolvedValue({
         id: "order-host-123",
-        orderNumber: "TEST-HOST-123",
         status: "ACTIVE",
         ...requestBody,
       });

@@ -104,6 +104,9 @@ export async function GET(request: NextRequest) {
           headCount: true,
           status: true,
           contactName: true,
+          sideNotes: true,
+          createdAt: true,
+          updatedAt: true,
         }
       });
       console.log(`[GET /api/users/[userId]] Target profile fetched (ID: ${userId}):`, profile ? 'Found' : 'Not Found');
@@ -121,6 +124,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`[GET /api/users/[userId]] Successfully fetched profile for user ID: ${userId}`);
+    console.log(`[GET /api/users/[userId]] Profile contact number:`, profile.contactNumber);
     
     // Helper to parse comma-separated strings, potentially with extra quotes
     const parseCommaSeparatedString = (value: unknown): string[] => {
@@ -132,13 +136,42 @@ export async function GET(request: NextRequest) {
       return cleanedStr.split(',').map(s => s.trim()).filter(s => s !== ''); // Filter out empty strings
     };
 
-    return NextResponse.json({
-      ...profile,
+    // Transform the response to match the frontend UserProfile interface
+    const transformedProfile = {
+      id: profile.id,
+      name: profile.name,
+      email: profile.email,
+      contact_number: profile.contactNumber,
+      company_name: profile.companyName,
+      website: profile.website,
+      street1: profile.street1,
+      street2: profile.street2,
+      city: profile.city,
+      state: profile.state,
+      zip: profile.zip,
+      type: profile.type,
+      status: profile.status,
+      location_number: profile.locationNumber,
+      parking_loading: profile.parkingLoading,
+      contact_name: profile.contactName,
+      side_notes: profile.sideNotes,
+      created_at: profile.createdAt?.toISOString(),
+      updated_at: profile.updatedAt?.toISOString(),
+      frequency: profile.frequency,
+      head_count: profile.headCount,
       // Use the helper function to parse counties
       countiesServed: parseCommaSeparatedString(profile.counties),
       timeNeeded: parseCommaSeparatedString(profile.timeNeeded),
       cateringBrokerage: parseCommaSeparatedString(profile.cateringBrokerage),
       provisions: parseCommaSeparatedString(profile.provide)
+    };
+
+    return NextResponse.json(transformedProfile, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     });
   } catch (error) {
     console.error('[GET /api/users/[userId]] Unexpected error:', error);
@@ -379,6 +412,7 @@ export async function PATCH(
     // Parse request body
     const requestBody = await request.json();
     console.log('[PATCH /api/users/[userId]] Request body:', requestBody);
+    console.log('[PATCH /api/users/[userId]] Contact number in request:', requestBody.contact_number);
     
     // Validate required fields
     if (!requestBody) {
@@ -425,27 +459,67 @@ export async function PATCH(
     });
     
     console.log('[PATCH /api/users/[userId]] Profile updated successfully');
+    console.log('[PATCH /api/users/[userId]] Updated profile contact number:', updatedProfile.contactNumber);
+
+    // Verify the update by fetching the profile again
+    const verifiedProfile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        contactNumber: true,
+        companyName: true,
+        website: true,
+        street1: true,
+        street2: true,
+        city: true,
+        state: true,
+        zip: true,
+        type: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    });
+    
+    console.log('[PATCH /api/users/[userId]] Verified profile contact number:', verifiedProfile?.contactNumber);
+
+    // Check if verification failed
+    if (!verifiedProfile) {
+      console.error('[PATCH /api/users/[userId]] Failed to verify profile update');
+      return NextResponse.json(
+        { error: 'Failed to verify profile update' },
+        { status: 500 }
+      );
+    }
 
     // Transform the response to match the frontend UserProfile interface
     const transformedProfile = {
-      id: updatedProfile.id,
-      name: updatedProfile.name,
-      email: updatedProfile.email,
-      contact_number: updatedProfile.contactNumber,
-      company_name: updatedProfile.companyName,
-      website: updatedProfile.website,
-      street1: updatedProfile.street1,
-      street2: updatedProfile.street2,
-      city: updatedProfile.city,
-      state: updatedProfile.state,
-      zip: updatedProfile.zip,
-      type: updatedProfile.type,
-      status: updatedProfile.status,
-      created_at: updatedProfile.createdAt.toISOString(),
-      updated_at: updatedProfile.updatedAt.toISOString(),
+      id: verifiedProfile!.id,
+      name: verifiedProfile!.name,
+      email: verifiedProfile!.email,
+      contact_number: verifiedProfile!.contactNumber,
+      company_name: verifiedProfile!.companyName,
+      website: verifiedProfile!.website,
+      street1: verifiedProfile!.street1,
+      street2: verifiedProfile!.street2,
+      city: verifiedProfile!.city,
+      state: verifiedProfile!.state,
+      zip: verifiedProfile!.zip,
+      type: verifiedProfile!.type,
+      status: verifiedProfile!.status,
+      created_at: verifiedProfile!.createdAt.toISOString(),
+      updated_at: verifiedProfile!.updatedAt.toISOString(),
     };
 
-    return NextResponse.json(transformedProfile);
+    return NextResponse.json(transformedProfile, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
     console.error('Unexpected error:', error);
     

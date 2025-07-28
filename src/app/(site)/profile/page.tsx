@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/UserContext";
 import { motion } from "framer-motion";
@@ -187,6 +187,7 @@ export default function ProfilePage() {
   const [files, setFiles] = useState<UserFile[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const supabase = createClient();
+  const lastRefreshTimeRef = useRef(0);
 
   // File upload hooks for different categories based on user type
   const driverPhotoUpload = useUploadFile({
@@ -259,66 +260,90 @@ export default function ProfilePage() {
     entityId: user?.id || "",
   });
 
-  const fetchProfile = useCallback(async () => {
-    if (!user?.id) return;
+  const fetchProfile = useCallback(
+    async (retryCount = 0) => {
+      if (!user?.id) return;
 
-    try {
-      setIsLoading(true);
-      let {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+      try {
+        setIsLoading(true);
+        let {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-      if (sessionError) {
-        console.error("Session error:", sessionError?.message);
-        toast.error("Authentication error. Please try logging in again.");
-        router.push("/sign-in");
-        return;
-      }
-
-      if (!session) {
-        // Try to refresh the session before giving up
-        const {
-          data: { session: refreshedSession },
-          error: refreshError,
-        } = await supabase.auth.refreshSession();
-        if (refreshError || !refreshedSession) {
-          console.error("Failed to refresh session:", refreshError?.message);
-          toast.error("Session expired. Please log in again.");
+        if (sessionError) {
+          console.error("Session error:", sessionError?.message);
+          toast.error("Authentication error. Please try logging in again.");
           router.push("/sign-in");
           return;
         }
-        // Use the refreshed session
-        session = refreshedSession;
-      }
 
-      const response = await fetch(`/api/users/${user.id}`, {
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-      });
+        if (!session) {
+          // Try to refresh the session before giving up
+          const {
+            data: { session: refreshedSession },
+            error: refreshError,
+          } = await supabase.auth.refreshSession();
+          if (refreshError || !refreshedSession) {
+            console.error("Failed to refresh session:", refreshError?.message);
+            toast.error("Session expired. Please log in again.");
+            router.push("/sign-in");
+            return;
+          }
+          // Use the refreshed session
+          session = refreshedSession;
+        }
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          toast.error("Session expired. Please log in again.");
-          router.push("/sign-in");
+        const response = await fetch(
+          `/api/users/${user.id}?t=${Date.now()}&r=${Math.random()}`,
+          {
+            credentials: "include",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              "Content-Type": "application/json",
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              Pragma: "no-cache",
+            },
+          },
+        );
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            toast.error("Session expired. Please log in again.");
+            router.push("/sign-in");
+            return;
+          }
+          throw new Error("Failed to fetch profile");
+        }
+
+        const profileData = await response.json();
+        console.log("Profile data fetched:", profileData);
+        setProfile(profileData);
+        setEditedProfile(profileData);
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+
+        // Retry up to 3 times with exponential backoff
+        if (retryCount < 3) {
+          console.log(
+            `Retrying profile fetch (attempt ${retryCount + 1}/3)...`,
+          );
+          setTimeout(
+            () => {
+              fetchProfile(retryCount + 1);
+            },
+            Math.pow(2, retryCount) * 1000,
+          ); // 1s, 2s, 4s
           return;
         }
-        throw new Error("Failed to fetch profile");
-      }
 
-      const profileData = await response.json();
-      setProfile(profileData);
-      setEditedProfile(profileData);
-    } catch (error) {
-      console.error("Error fetching profile:", error);
-      toast.error("Failed to load profile");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.id, supabase.auth, router]);
+        toast.error("Failed to load profile");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [user?.id, supabase.auth, router],
+  );
 
   const fetchUserFiles = useCallback(async () => {
     if (!user?.id) return;
@@ -377,6 +402,20 @@ export default function ProfilePage() {
     fetchUserFiles,
   ]);
 
+  // Simple focus event listener to refresh data when user returns to the page
+  useEffect(() => {
+    const handleFocus = () => {
+      const now = Date.now();
+      if (user?.id && !isLoading && now - lastRefreshTimeRef.current > 10000) {
+        lastRefreshTimeRef.current = now;
+        setRefreshTrigger((prev) => prev + 1);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [user?.id, isLoading]);
+
   const handleSave = async () => {
     if (!editedProfile || !user?.id) return;
 
@@ -394,12 +433,16 @@ export default function ProfilePage() {
         return;
       }
 
+
+
       const response = await fetch(`/api/users/${user.id}`, {
         method: "PATCH",
         credentials: "include",
         headers: {
           Authorization: `Bearer ${session.access_token}`,
           "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
         },
         body: JSON.stringify(editedProfile),
       });
@@ -414,10 +457,15 @@ export default function ProfilePage() {
       }
 
       const updatedProfile = await response.json();
+      console.log("Profile updated successfully:", updatedProfile);
       setProfile(updatedProfile);
       setEditedProfile(updatedProfile);
       setIsEditing(false);
       toast.success("Profile updated successfully!");
+
+      // Trigger a fresh fetch to ensure we have the latest data from the server
+      lastRefreshTimeRef.current = Date.now();
+      setRefreshTrigger((prev) => prev + 1);
     } catch (error) {
       console.error("Error updating profile:", error);
       toast.error("Failed to update profile");

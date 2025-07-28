@@ -9,8 +9,16 @@ jest.mock("@/components/ui/dialog", () => ({
   DialogContent: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="dialog-content">{children}</div>
   ),
-  DialogTitle: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="dialog-title" className={className}>{children}</div>
+  DialogTitle: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <div data-testid="dialog-title" className={className}>
+      {children}
+    </div>
   ),
 }));
 
@@ -181,7 +189,7 @@ describe("CateringOrderSuccessModal", () => {
 
   it("calls onViewOrderDetails when view order details button is clicked with orderId", () => {
     const mockOnViewOrderDetails = jest.fn();
-    
+
     render(
       <CateringOrderSuccessModal
         isOpen={true}
@@ -200,9 +208,8 @@ describe("CateringOrderSuccessModal", () => {
 
   it("calls onViewOrderDetails with orderNumber when orderId is not available", () => {
     const mockOnViewOrderDetails = jest.fn();
-    const orderDataWithoutId = { ...mockOrderData };
-    delete orderDataWithoutId.orderId;
-    
+    const orderDataWithoutId = { ...mockOrderData, orderId: undefined };
+
     render(
       <CateringOrderSuccessModal
         isOpen={true}
@@ -276,7 +283,9 @@ describe("CateringOrderSuccessModal", () => {
     );
 
     expect(screen.getByText("Order Created Successfully!")).toBeInTheDocument();
-    expect(screen.getByText("Your catering request has been submitted")).toBeInTheDocument();
+    expect(
+      screen.getByText("Your catering request has been submitted"),
+    ).toBeInTheDocument();
     expect(screen.getByText("View Orders")).toBeInTheDocument();
   });
 
@@ -290,7 +299,9 @@ describe("CateringOrderSuccessModal", () => {
     );
 
     expect(screen.getByTestId("dialog-title")).toBeInTheDocument();
-    expect(screen.getByText("Order Created Successfully - Order #SF-03020")).toBeInTheDocument();
+    expect(
+      screen.getByText("Order Created Successfully - Order #SF-03020"),
+    ).toBeInTheDocument();
   });
 
   it("includes DialogTitle in fallback modal for accessibility", () => {

@@ -1,7 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { useRouter } from "next/navigation";
-import { CateringRequestForm } from "@/components/CateringRequest/CateringRequestForm";
+import CateringRequestForm from "@/components/CateringRequest/CateringRequestForm";
 
 // Mock Next.js router
 jest.mock("next/navigation", () => ({
