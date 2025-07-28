@@ -171,8 +171,8 @@ async function testTimezoneFunctions() {
       console.log('  • Halil\'s specific issue is resolved');
       
       console.log('\n📋 Next Steps:');
-      console.log('  1. Start your development server: npm run dev');
-      console.log('  2. Test the API endpoint with: npm run test:api');
+      console.log('  1. Start your development server: pnpm run dev');
+      console.log('  2. Test the API endpoint with: pnpm run test:api');
       console.log('  3. Contact Halil to re-test with Postman');
       
       return true;
@@ -199,7 +199,7 @@ async function testTimezoneFunctions() {
     console.error('  • Missing dependencies (date-fns-tz)');
     console.error('  • Environment setup issues');
     console.error('  • Import path problems');
-    console.error('\nTry running: npm install date-fns-tz@latest');
+    console.error('\nTry running: pnpm install date-fns-tz@latest');
     return false;
   }
 }
@@ -272,7 +272,7 @@ async function testAPIEndpoints() {
     if (error.code === 'ECONNREFUSED') {
       console.log('⚠️  API endpoint test skipped - server not running');
       console.log('💡 To test the API:');
-      console.log('  1. Start the server: npm run dev');
+      console.log('  1. Start the server: pnpm run dev');
       console.log('  2. Run this script again with: node scripts/test-timezone-fix.js --api');
     } else {
       console.log('⚠️  API endpoint test failed:', error.message);

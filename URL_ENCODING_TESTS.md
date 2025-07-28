@@ -157,7 +157,7 @@ pnpm test
 pnpm test:e2e
 
 # Or use the comprehensive test script
-npm run test:all
+pnpm run test:all
 ```
 
 ## 🎯 Test Scenarios Covered

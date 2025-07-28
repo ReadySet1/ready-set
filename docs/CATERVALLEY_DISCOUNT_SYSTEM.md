@@ -16,13 +16,13 @@ The CaterValley Discount System is a comprehensive pricing engine that automatic
 
 ## Pricing Tiers
 
-| Tier | Head Count | Food Cost Range | Price w/Tip | Price w/o Tip | Notes |
-|------|------------|----------------|-------------|---------------|-------|
-| 1    | 1-24       | $0-299.99      | $35.00      | $42.50        | Fixed pricing |
-| 2    | 25-49      | $300-599.99    | $45.00      | $52.50        | Fixed pricing |
-| 3    | 50-74      | $600-899.99    | $55.00      | $62.50        | Fixed pricing |
-| 4    | 75-99      | $900-1199.99   | $65.00      | $72.50        | Fixed pricing |
-| 5    | 100+       | $1200+         | 9%          | 10%           | Percentage-based |
+| Tier | Head Count | Food Cost Range | Price w/Tip | Price w/o Tip | Notes            |
+| ---- | ---------- | --------------- | ----------- | ------------- | ---------------- |
+| 1    | 1-24       | $0-299.99       | $35.00      | $42.50        | Fixed pricing    |
+| 2    | 25-49      | $300-599.99     | $45.00      | $52.50        | Fixed pricing    |
+| 3    | 50-74      | $600-899.99     | $55.00      | $62.50        | Fixed pricing    |
+| 4    | 75-99      | $900-1199.99    | $65.00      | $72.50        | Fixed pricing    |
+| 5    | 100+       | $1200+          | 9%          | 10%           | Percentage-based |
 
 ## Architecture
 
@@ -47,7 +47,7 @@ CREATE TABLE "pricing_tiers" (
 );
 
 -- Enhanced catering requests
-ALTER TABLE "catering_requests" 
+ALTER TABLE "catering_requests"
 ADD COLUMN "applied_discount" DECIMAL(10,2),
 ADD COLUMN "pricing_tier_id" TEXT;
 ```
@@ -77,33 +77,35 @@ src/
 **Endpoint**: `POST /api/pricing/calculate`
 
 **Request Body**:
+
 ```json
 {
   "headCount": 30,
-  "foodCost": 450.00,
+  "foodCost": 450.0,
   "hasTip": true
 }
 ```
 
 **Response**:
+
 ```json
 {
-  "basePrice": 450.00,
-  "discount": 405.00,
-  "finalPrice": 45.00,
+  "basePrice": 450.0,
+  "discount": 405.0,
+  "finalPrice": 45.0,
   "appliedTier": {
     "id": "tier2_...",
     "minHeadCount": 25,
     "maxHeadCount": 49,
-    "minFoodCost": 300.00,
+    "minFoodCost": 300.0,
     "maxFoodCost": 599.99,
-    "priceWithTip": 45.00,
-    "priceWithoutTip": 52.50
+    "priceWithTip": 45.0,
+    "priceWithoutTip": 52.5
   },
   "hasTip": true,
   "calculationDetails": {
     "isPercentageBased": false,
-    "appliedRate": 45.00,
+    "appliedRate": 45.0,
     "tierName": "Tier 25-49 heads"
   }
 }
@@ -130,8 +132,8 @@ function OrderForm() {
   const [hasTip, setHasTip] = useState(true);
 
   const { data: pricing, isLoading } = usePricingCalculation(
-    headCount, 
-    foodCost, 
+    headCount,
+    foodCost,
     hasTip
   );
 
@@ -175,7 +177,7 @@ function CheckoutPage() {
 ### Service Layer Usage
 
 ```typescript
-import { pricingService } from '@/services/pricing/pricing.service';
+import { pricingService } from "@/services/pricing/pricing.service";
 
 // Calculate pricing
 const calculation = await pricingService.calculatePrice(50, 750, true);
@@ -211,7 +213,7 @@ npx dotenv -e .env.local -- npx prisma generate
 npx dotenv -e .env.local -- tsx scripts/seed-pricing-tiers.ts
 
 # Open Prisma Studio
-npm run studio
+pnpm run studio
 ```
 
 ### Testing
@@ -234,15 +236,15 @@ The system includes optimized indexes for fast pricing tier lookups:
 
 ```sql
 -- Optimized for head count queries
-CREATE INDEX "pricing_tiers_min_head_count_max_head_count_idx" 
+CREATE INDEX "pricing_tiers_min_head_count_max_head_count_idx"
 ON "pricing_tiers"("min_head_count", "max_head_count");
 
--- Optimized for food cost queries  
-CREATE INDEX "pricing_tiers_min_food_cost_max_food_cost_idx" 
+-- Optimized for food cost queries
+CREATE INDEX "pricing_tiers_min_food_cost_max_food_cost_idx"
 ON "pricing_tiers"("min_food_cost", "max_food_cost");
 
 -- Filter active tiers
-CREATE INDEX "pricing_tiers_is_active_idx" 
+CREATE INDEX "pricing_tiers_is_active_idx"
 ON "pricing_tiers"("is_active");
 ```
 
@@ -261,16 +263,19 @@ ON "pricing_tiers"("is_active");
 ## Error Handling
 
 ### Service Layer
+
 - Comprehensive try-catch blocks with detailed error logging
 - Graceful fallbacks for invalid inputs or missing tiers
 - Type-safe error responses
 
 ### API Layer
+
 - Input validation with detailed error messages
 - Proper HTTP status codes (400, 500, etc.)
 - Consistent error response format
 
 ### Frontend
+
 - Loading states for async operations
 - Error boundaries for component failures
 - User-friendly error messages
@@ -278,11 +283,13 @@ ON "pricing_tiers"("is_active");
 ## Security Considerations
 
 ### Input Validation
+
 - Server-side validation of all pricing parameters
 - SQL injection prevention through Prisma ORM
 - Type checking for all inputs
 
 ### Access Control
+
 - API endpoints protected by authentication middleware
 - Admin-only access for tier management operations
 - Rate limiting on pricing calculation endpoints
@@ -290,11 +297,13 @@ ON "pricing_tiers"("is_active");
 ## Monitoring & Analytics
 
 ### Logging
+
 - Detailed logs for all pricing calculations
 - Error tracking for failed operations
 - Performance metrics for database queries
 
 ### Audit Trail
+
 - All tier modifications are logged with timestamps
 - Pricing calculation history for order auditing
 - User attribution for admin operations
@@ -302,16 +311,19 @@ ON "pricing_tiers"("is_active");
 ## Migration Notes
 
 ### Database Changes
+
 - **Added**: `pricing_tiers` table with full tier configuration
 - **Modified**: `catering_requests` table with pricing fields and foreign key
 - **Indexed**: Critical fields for performance optimization
 
 ### Breaking Changes
+
 - None - this is a new feature addition
 - Existing orders are unaffected
 - Legacy pricing calculations remain functional
 
 ### Rollback Plan
+
 - Pricing tiers can be deactivated without data loss
 - Foreign key constraint allows for clean removal
 - Migration can be rolled back if needed
@@ -319,6 +331,7 @@ ON "pricing_tiers"("is_active");
 ## Future Enhancements
 
 ### Planned Features
+
 - **Dynamic Tier Management**: Admin UI for tier configuration
 - **A/B Testing**: Support for multiple pricing strategies
 - **Regional Pricing**: Location-based tier variations
@@ -327,6 +340,7 @@ ON "pricing_tiers"("is_active");
 - **Custom Pricing**: Client-specific pricing overrides
 
 ### Technical Improvements
+
 - **Caching Layer**: Redis caching for frequently accessed tiers
 - **Real-time Updates**: WebSocket updates for pricing changes
 - **Analytics Dashboard**: Pricing effectiveness metrics
@@ -337,18 +351,21 @@ ON "pricing_tiers"("is_active");
 ### Common Issues
 
 **Migration Fails with DIRECT_URL Error**
+
 ```bash
 # Solution: Use dotenv to load environment variables
 npx dotenv -e .env.local -- npx prisma migrate dev
 ```
 
 **Type Errors with PricingTier Model**
+
 ```bash
 # Solution: Regenerate Prisma client
 npx dotenv -e .env.local -- npx prisma generate
 ```
 
 **Pricing Calculation Returns No Tier**
+
 - Check head count and food cost ranges
 - Verify tier is active (`is_active = true`)
 - Ensure tier constraints are properly configured
@@ -380,4 +397,4 @@ For issues or questions regarding the CaterValley Discount System:
 **Implementation Date**: July 3, 2025  
 **Last Updated**: July 3, 2025  
 **Version**: 1.0.0  
-**Status**: ✅ Production Ready 
+**Status**: ✅ Production Ready

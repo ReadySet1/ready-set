@@ -2,13 +2,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
 
-// Protected admin routes that require authentication
+// Protected routes that require authentication
 const PROTECTED_ROUTES = [
   '/admin',
   '/admin/catering-orders',
   '/admin/users',
   '/admin/job-applications',
-  '/dashboard'
+  '/dashboard',
+  '/order-status',
+  '/profile',
+  '/client'
 ];
 
 export async function middleware(request: NextRequest) {

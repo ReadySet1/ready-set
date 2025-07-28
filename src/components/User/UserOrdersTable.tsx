@@ -26,17 +26,17 @@ interface Order {
   order_number: string;
   order_type: "catering" | "on_demand";
   status: string;
-  date: string;
-  pickup_time: string;
-  arrival_time: string;
-  order_total: string;
-  client_attention: string;
-  address: {
+  date?: string;
+  pickup_time?: string;
+  arrival_time?: string;
+  order_total?: string;
+  client_attention?: string;
+  address?: {
     street1: string | null;
     city: string | null;
     state: string | null;
-  };
-  delivery_address: {
+  } | null;
+  delivery_address?: {
     street1: string | null;
     city: string | null;
     state: string | null;
@@ -55,8 +55,16 @@ const ClientOrders: React.FC = () => {
       setIsLoading(true);
       const apiUrl = `/api/user-orders?page=${page}&limit=${limit}`;
       try {
-        const response = await fetch(apiUrl);
+        const response = await fetch(apiUrl, {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
         if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error("Authentication required. Please log in again.");
+          }
           throw new Error("Failed to fetch orders");
         }
         const data: Order[] = await response.json();
@@ -86,7 +94,47 @@ const ClientOrders: React.FC = () => {
   };
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return (
+      <section id="orders" className="relative py-20 md:py-[120px]">
+        <div className="absolute left-0 top-0 -z-[1] h-full w-full dark:bg-dark"></div>
+        <div className="absolute left-0 top-0 -z-[1] h-1/2 w-full bg-[#E9F9FF] dark:bg-dark-700 lg:h-[45%] xl:h-1/2"></div>
+        <div className="container px-4">
+          <div className="-mx-4 flex flex-wrap items-center">
+            <div className="w-full px-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle>Your Orders</CardTitle>
+                  <CardDescription className="max-w-lg text-balance leading-relaxed">
+                    View and manage your orders.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <div className="mb-4 rounded-full bg-red-100 p-3">
+                      <svg className="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                      Unable to load orders
+                    </h3>
+                    <p className="mb-4 max-w-md text-gray-500 dark:text-gray-400">
+                      {error}
+                    </p>
+                    <Button 
+                      onClick={() => window.location.reload()} 
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -95,12 +143,12 @@ const ClientOrders: React.FC = () => {
       <div className="absolute left-0 top-0 -z-[1] h-1/2 w-full bg-[#E9F9FF] dark:bg-dark-700 lg:h-[45%] xl:h-1/2"></div>
       <div className="container px-4">
         <div className="-mx-4 flex flex-wrap items-center">
-          <div className="w-full px-4 ">
+          <div className="w-full px-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle>Your Orders</CardTitle>
                 <CardDescription className="max-w-lg text-balance leading-relaxed">
-                  View and manage your orders. 
+                  View and manage your orders.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -115,8 +163,8 @@ const ClientOrders: React.FC = () => {
                       No orders found
                     </h3>
                     <p className="max-w-md text-gray-500 dark:text-gray-400">
-                      You don&apos;t have any orders at the moment.
-                      Check back soon or contact us if you need support. 
+                      You don&apos;t have any orders at the moment. Check back
+                      soon or contact us if you need support.
                     </p>
                   </div>
                 ) : (
@@ -145,7 +193,9 @@ const ClientOrders: React.FC = () => {
                       </TableHeader>
                       <TableBody>
                         {orders.map((order, index) => (
-                          <TableRow key={`${order.id}-${order.order_number}-${index}`}>
+                          <TableRow
+                            key={`${order.id}-${order.order_number}-${index}`}
+                          >
                             <TableCell>
                               <Link
                                 href={`/order-status/${order.order_number}`}
@@ -153,10 +203,14 @@ const ClientOrders: React.FC = () => {
                               >
                                 {order.order_number}
                               </Link>
-                              <br />
-                              <div className="text-muted-foreground hidden text-sm md:inline">
-                                {order.client_attention}
-                              </div>
+                              {order.client_attention && (
+                                <>
+                                  <br />
+                                  <div className="text-muted-foreground hidden text-sm md:inline">
+                                    {order.client_attention}
+                                  </div>
+                                </>
+                              )}
                             </TableCell>
                             <TableCell className="hidden sm:table-cell">
                               <Badge
@@ -178,19 +232,35 @@ const ClientOrders: React.FC = () => {
                               </Badge>
                             </TableCell>
                             <TableCell className="hidden md:table-cell">
-                              {new Date(order.date).toLocaleDateString()}
+                              {order.date
+                                ? (() => {
+                                    const date = new Date(order.date);
+                                    return isNaN(date.getTime())
+                                      ? "N/A"
+                                      : date.toLocaleDateString();
+                                  })()
+                                : "N/A"}
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
-                              {order.address.street1}, {order.address.city},{" "}
-                              {order.address.state}
+                              {order.address
+                                ? `${order.address.street1 || "N/A"}, ${order.address.city || "N/A"}, ${order.address.state || "N/A"}`
+                                : "N/A"}
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
                               {order.delivery_address
-                                ? `${order.delivery_address.street1}, ${order.delivery_address.city}, ${order.delivery_address.state}`
+                                ? `${order.delivery_address.street1 || "N/A"}, ${order.delivery_address.city || "N/A"}, ${order.delivery_address.state || "N/A"}`
                                 : "N/A"}
                             </TableCell>
                             <TableCell className="text-right">
-                              ${parseFloat(order.order_total).toFixed(2)}
+                              $
+                              {order.order_total
+                                ? (() => {
+                                    const total = parseFloat(order.order_total);
+                                    return isNaN(total)
+                                      ? "0.00"
+                                      : total.toFixed(2);
+                                  })()
+                                : "0.00"}
                             </TableCell>
                           </TableRow>
                         ))}

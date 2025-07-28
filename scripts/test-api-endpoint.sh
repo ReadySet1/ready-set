@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Test script for CaterValley timezone fix API endpoint
-# Run this script after starting your development server with: npm run dev
+# Run this script after starting your development server with: pnpm run dev
 
 echo "🧪 Testing CaterValley API Endpoint..."
 echo ""
@@ -95,7 +95,7 @@ else
     
     if [ "$status_code" = "000" ]; then
         echo ""
-        echo "💡 Server is not running. Start it with: npm run dev"
+        echo "💡 Server is not running. Start it with: pnpm run dev"
     fi
 fi
 

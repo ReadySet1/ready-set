@@ -41,7 +41,7 @@ fi
 # Check if node_modules exists
 if [ ! -d "node_modules" ]; then
     print_warning "node_modules not found. Installing dependencies..."
-    npm install
+    pnpm install
 fi
 
 print_status "Running Profile Page Authentication Tests..."

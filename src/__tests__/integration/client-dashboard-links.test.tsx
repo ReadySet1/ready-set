@@ -82,7 +82,7 @@ describe('Client Dashboard Links', () => {
 
   describe('Quick Actions Links', () => {
     it('should render New Order link with correct href', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       render(<ClientDashboardContent data={mockDashboardData} />);
 
@@ -91,7 +91,7 @@ describe('Client Dashboard Links', () => {
     });
 
     it('should render Manage Addresses link with correct href', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       render(<ClientDashboardContent data={mockDashboardData} />);
 
@@ -100,7 +100,7 @@ describe('Client Dashboard Links', () => {
     });
 
     it('should render Update Profile link with correct href', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       render(<ClientDashboardContent data={mockDashboardData} />);
 
@@ -109,7 +109,7 @@ describe('Client Dashboard Links', () => {
     });
 
     it('should render Contact Us link with correct href', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       render(<ClientDashboardContent data={mockDashboardData} />);
 
@@ -120,7 +120,7 @@ describe('Client Dashboard Links', () => {
 
   describe('Empty State Links', () => {
     it('should render Place Your First Order link with correct href when no orders', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       const emptyData = {
         ...mockDashboardData,
@@ -134,7 +134,7 @@ describe('Client Dashboard Links', () => {
     });
 
     it('should show empty state message when no recent orders', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       const emptyData = {
         ...mockDashboardData,
@@ -149,7 +149,7 @@ describe('Client Dashboard Links', () => {
 
   describe('Dashboard Stats', () => {
     it('should display correct active orders count', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       render(<ClientDashboardContent data={mockDashboardData} />);
 
@@ -158,7 +158,7 @@ describe('Client Dashboard Links', () => {
     });
 
     it('should display correct completed orders count', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       render(<ClientDashboardContent data={mockDashboardData} />);
 
@@ -167,7 +167,7 @@ describe('Client Dashboard Links', () => {
     });
 
     it('should display correct saved locations count', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       render(<ClientDashboardContent data={mockDashboardData} />);
 
@@ -178,7 +178,7 @@ describe('Client Dashboard Links', () => {
 
   describe('Recent Orders Section', () => {
     it('should display recent orders when available', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       render(<ClientDashboardContent data={mockDashboardData} />);
 
@@ -187,7 +187,7 @@ describe('Client Dashboard Links', () => {
     });
 
     it('should render View All link with correct href', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       render(<ClientDashboardContent data={mockDashboardData} />);
 
@@ -198,7 +198,7 @@ describe('Client Dashboard Links', () => {
 
   describe('Link Accessibility', () => {
     it('should have proper ARIA labels and descriptions', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       render(<ClientDashboardContent data={mockDashboardData} />);
 
@@ -210,7 +210,7 @@ describe('Client Dashboard Links', () => {
     });
 
     it('should have proper hover states and transitions', async () => {
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       render(<ClientDashboardContent data={mockDashboardData} />);
 
@@ -235,7 +235,7 @@ describe('Client Dashboard Links', () => {
       (getCurrentUser as jest.Mock).mockResolvedValue(mockUser);
       
       // Mock the component to test rendering
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       render(<ClientDashboardContent data={mockDashboardData} />);
       
@@ -248,7 +248,7 @@ describe('Client Dashboard Links', () => {
       (prisma.cateringRequest.findMany as jest.Mock).mockRejectedValue(new Error('Database error'));
       
       // The component should handle this gracefully
-      const ClientDashboardContent = (await import('@/app/(site)/(users)/client/page')).ClientDashboardContent;
+      const { ClientDashboardContent } = await import('@/components/Dashboard/ClientDashboardContent');
       
       // Should still render with empty data
       const emptyData = {

@@ -176,11 +176,13 @@ const OrderStatusTable: React.FC<OrderStatusTableProps> = ({
                     {userType === "driver" && (
                       <>
                         <TableCell className="hidden lg:table-cell">
-                          {order.address ? `${order.address.street1}, ${order.address.city}, ${order.address.state}` : "N/A"}
+                          {order.address
+                            ? `${order.address.street1 || "N/A"}, ${order.address.city || "N/A"}, ${order.address.state || "N/A"}`
+                            : "N/A"}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           {order.delivery_address
-                            ? `${order.delivery_address.street1}, ${order.delivery_address.city}, ${order.delivery_address.state}`
+                            ? `${order.delivery_address.street1 || "N/A"}, ${order.delivery_address.city || "N/A"}, ${order.delivery_address.state || "N/A"}`
                             : "N/A"}
                         </TableCell>
                       </>
