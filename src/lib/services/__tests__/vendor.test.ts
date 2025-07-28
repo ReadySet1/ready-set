@@ -1,33 +1,32 @@
 import { getVendorOrders } from "../vendor";
-import { vi, describe, it, expect, beforeEach } from "vitest";
 
 // Mock Prisma
 const mockPrisma = {
   cateringRequest: {
-    findMany: vi.fn(),
+    findMany: jest.fn(),
   },
   onDemand: {
-    findMany: vi.fn(),
+    findMany: jest.fn(),
   },
 };
 
-vi.mock("@/lib/db/prisma", () => ({
+jest.mock("@/lib/db/prisma", () => ({
   prisma: mockPrisma,
 }));
 
 // Mock auth function
-const mockGetCurrentUserId = vi.fn();
-vi.mock("@/lib/auth", () => ({
-  getCurrentUser: vi.fn(),
+const mockGetCurrentUserId = jest.fn();
+jest.mock("@/lib/auth", () => ({
+  getCurrentUser: jest.fn(),
 }));
 
-vi.mock("@/utils/supabase/server", () => ({
-  createClient: vi.fn(),
+jest.mock("@/utils/supabase/server", () => ({
+  createClient: jest.fn(),
 }));
 
 // Override the getCurrentUserId import
-vi.mock("../vendor", async (importOriginal) => {
-  const mod = await importOriginal() as any;
+jest.mock("../vendor", async () => {
+  const mod = await jest.requireActual("../vendor") as any;
   return {
     ...mod,
     getCurrentUserId: mockGetCurrentUserId,
@@ -40,7 +39,7 @@ const getVendorOrdersActual = vendorModule.getVendorOrders;
 
 describe("getVendorOrders Service", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     mockGetCurrentUserId.mockResolvedValue("test-user-id");
   });
 

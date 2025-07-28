@@ -1,6 +1,13 @@
 import '@testing-library/jest-dom';
 import { TextEncoder, TextDecoder } from 'util';
 
+// Set up environment variables for tests
+process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test_db";
+process.env.NEXTAUTH_SECRET = "test-secret";
+process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
+process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -127,3 +134,40 @@ global.TextDecoder = TextDecoder as any;
 
 // Mock fetch
 global.fetch = jest.fn();
+
+// Mock Next.js server APIs globally
+global.Request = jest.fn().mockImplementation((url, options) => ({
+  url,
+  method: options?.method || 'GET',
+  headers: new Headers(options?.headers),
+  json: () => Promise.resolve({}),
+  text: () => Promise.resolve(''),
+}));
+
+// @ts-ignore - Mock Response constructor for tests
+global.Response = jest.fn().mockImplementation((body, options) => ({
+  ok: true,
+  status: options?.status || 200,
+  headers: new Headers(options?.headers),
+  json: () => Promise.resolve(body),
+  text: () => Promise.resolve(body),
+}));
+
+// Mock NextResponse
+const mockNextResponse = {
+  json: jest.fn((data, options) => ({
+    json: () => Promise.resolve(data),
+    status: options?.status || 200,
+    headers: new Headers(),
+  })),
+  next: jest.fn(() => ({
+    json: () => Promise.resolve({}),
+    status: 200,
+    headers: new Headers(),
+  })),
+};
+
+jest.mock('next/server', () => ({
+  NextRequest: jest.fn(),
+  NextResponse: mockNextResponse,
+}));

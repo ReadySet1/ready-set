@@ -1,21 +1,21 @@
 import { renderHook, waitFor, act } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+// Test imports handled by Jest globals
 import { useUserForm } from '../useUserForm';
 import { UserFormValues } from '../../types';
 import toast from 'react-hot-toast';
 
 // Mock dependencies
-vi.mock('react-hot-toast', () => ({
+jest.mock('react-hot-toast', () => ({
   default: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: jest.fn(),
+    error: jest.fn(),
   },
 }));
 
-vi.mock('@/utils/supabase/client', () => ({
-  createClient: vi.fn(() => ({
+jest.mock('@/utils/supabase/client', () => ({
+  createClient: jest.fn(() => ({
     auth: {
-      getSession: vi.fn().mockResolvedValue({
+      getSession: jest.fn().mockResolvedValue({
         data: { session: { access_token: 'mock-token' } },
         error: null,
       }),
@@ -23,36 +23,36 @@ vi.mock('@/utils/supabase/client', () => ({
   })),
 }));
 
-vi.mock('@/contexts/UserContext', () => ({
+jest.mock('@/contexts/UserContext', () => ({
   useUser: () => ({
     session: { access_token: 'mock-token' },
   }),
 }));
 
 // Mock fetch globally
-const mockFetch = vi.fn();
+const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 describe('useUserForm', () => {
   const mockUserId = 'test-user-id';
-  const mockFetchUser = vi.fn();
-  const mockOnSaveSuccess = vi.fn();
+  const mockFetchUser = jest.fn();
+  const mockOnSaveSuccess = jest.fn();
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     // Mock localStorage
     Object.defineProperty(window, 'localStorage', {
       value: {
-        getItem: vi.fn().mockReturnValue('true'),
-        setItem: vi.fn(),
-        removeItem: vi.fn(),
+        getItem: jest.fn().mockReturnValue('true'),
+        setItem: jest.fn(),
+        removeItem: jest.fn(),
       },
       writable: true,
     });
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   const mockUserData: UserFormValues = {

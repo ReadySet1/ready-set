@@ -47,10 +47,11 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { UserStatus } from "@/types/user";
+import { encodeOrderNumber } from "@/utils/order";
 
 interface Delivery {
   id: string;
-  order_number: string;
+  orderNumber: string;
   delivery_type: "catering" | "on_demand";
   status: string;
   driverStatus?: string;
@@ -147,9 +148,12 @@ const DriverDeliveries: React.FC = () => {
           throw new Error("Failed to fetch deliveries");
         }
         const data: Delivery[] = await response.json();
-        setDeliveries(data);
+        // Ensure data is always an array
+        setDeliveries(Array.isArray(data) ? data : []);
       } catch (error) {
         setError(error instanceof Error ? error.message : "An error occurred");
+        // Ensure deliveries is reset to empty array on error
+        setDeliveries([]);
       } finally {
         setIsLoading(false);
       }
@@ -160,6 +164,12 @@ const DriverDeliveries: React.FC = () => {
 
   // Filter deliveries based on activeTab and statusFilter
   useEffect(() => {
+    // Ensure deliveries is always an array before filtering
+    if (!Array.isArray(deliveries)) {
+      setFilteredDeliveries([]);
+      return;
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -347,21 +357,21 @@ const DriverDeliveries: React.FC = () => {
     );
   }
 
-  // Count deliveries by status
-  const todayCount = deliveries.filter(d => {
+  // Count deliveries by status - ensure deliveries is always an array
+  const todayCount = Array.isArray(deliveries) ? deliveries.filter(d => {
     const pickupDate = new Date(d.pickupDateTime);
     const today = new Date();
     return pickupDate.toDateString() === today.toDateString();
-  }).length;
+  }).length : 0;
 
-  const upcomingCount = deliveries.filter(d => {
+  const upcomingCount = Array.isArray(deliveries) ? deliveries.filter(d => {
     const pickupDate = new Date(d.pickupDateTime);
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return pickupDate >= tomorrow;
-  }).length;
+  }).length : 0;
 
-  const completedCount = deliveries.filter(d => !!d.completeDateTime).length;
+  const completedCount = Array.isArray(deliveries) ? deliveries.filter(d => !!d.completeDateTime).length : 0;
 
   return (
     <div className="container px-4 mx-auto">
@@ -540,7 +550,7 @@ const DriverDeliveries: React.FC = () => {
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-10 w-10 animate-spin text-gray-500" />
                   </div>
-                ) : filteredDeliveries.length === 0 ? (
+                ) : !Array.isArray(filteredDeliveries) || filteredDeliveries.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <Truck className="mb-4 h-16 w-16 text-gray-400" />
                     <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -579,10 +589,10 @@ const DriverDeliveries: React.FC = () => {
                                 <TableCell>
                                   <div className="flex flex-col space-y-1">
                                     <Link
-                                      href={`/driver/deliveries/${delivery.order_number}`}
+                                      href={`/driver/deliveries/${encodeOrderNumber(delivery.orderNumber)}`}
                                       className="font-medium hover:underline text-primary"
                                     >
-                                      #{delivery.order_number}
+                                      #{delivery.orderNumber}
                                     </Link>
                                     <div className="flex items-center text-xs text-muted-foreground">
                                       {getDeliveryTypeBadge(delivery.delivery_type)}
@@ -590,9 +600,9 @@ const DriverDeliveries: React.FC = () => {
                                     <HoverCard>
                                       <HoverCardTrigger asChild>
                                         <div className="text-sm text-muted-foreground cursor-help mt-1">
-                                          {delivery.client_attention.length > 30 
+                                          {delivery.client_attention && delivery.client_attention.length > 30 
                                             ? delivery.client_attention.substring(0, 30) + '...' 
-                                            : delivery.client_attention}
+                                            : delivery.client_attention || ''}
                                         </div>
                                       </HoverCardTrigger>
                                       <HoverCardContent className="w-80">
@@ -611,7 +621,7 @@ const DriverDeliveries: React.FC = () => {
                                               <p className="text-sm">{delivery.pickupNotes}</p>
                                             </>
                                           )}
-                                          {getAdditionalDeliveryInfo(delivery).length > 0 && (
+                                          {Array.isArray(getAdditionalDeliveryInfo(delivery)) && getAdditionalDeliveryInfo(delivery).length > 0 && (
                                             <>
                                               <h4 className="text-sm font-semibold">Additional Details</h4>
                                               <ul className="text-sm list-disc pl-4">
@@ -708,7 +718,7 @@ const DriverDeliveries: React.FC = () => {
                         </TableBody>
                       </Table>
                     </div>
-                    {deliveries.length > limit && (
+                    {Array.isArray(deliveries) && deliveries.length > limit && (
                       <div className="mt-6 flex justify-between">
                         <Button 
                           variant="outline"
@@ -719,7 +729,7 @@ const DriverDeliveries: React.FC = () => {
                         </Button>
                         <Button
                           onClick={handleNextPage}
-                          disabled={filteredDeliveries.length < limit}
+                          disabled={!Array.isArray(filteredDeliveries) || filteredDeliveries.length < limit}
                         >
                           Next
                         </Button>

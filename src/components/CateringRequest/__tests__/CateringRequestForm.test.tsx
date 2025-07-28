@@ -3,25 +3,24 @@ import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CateringRequestForm from "../CateringRequestForm";
 import { Address } from "@/types/address";
-import { vi } from "vitest";
 
 // Mock Next.js router
-const mockPush = vi.fn();
+const mockPush = jest.fn();
 const mockRouter = {
   push: mockPush,
-  replace: vi.fn(),
-  back: vi.fn(),
-  forward: vi.fn(),
-  refresh: vi.fn(),
-  prefetch: vi.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  forward: jest.fn(),
+  refresh: jest.fn(),
+  prefetch: jest.fn(),
 };
 
-vi.mock("next/navigation", () => ({
+jest.mock("next/navigation", () => ({
   useRouter: () => mockRouter,
 }));
 
 // Mock Next.js Link component
-vi.mock("next/link", () => ({
+jest.mock("next/link", () => ({
   __esModule: true,
   default: ({ children, href, ...props }: any) => (
     <a href={href} {...props}>
@@ -31,16 +30,16 @@ vi.mock("next/link", () => ({
 }));
 
 // Mock react-hot-toast
-vi.mock("react-hot-toast", () => ({
+jest.mock("react-hot-toast", () => ({
   default: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: jest.fn(),
+    error: jest.fn(),
   },
 }));
 
 // Mock AddressManager component
-const mockHandleAddressSelect = vi.fn();
-vi.mock("@/components/AddressManager", () => ({
+const mockHandleAddressSelect = jest.fn();
+jest.mock("@/components/AddressManager", () => ({
   __esModule: true,
   default: (props: { onAddressSelected: (address: any) => void }) => {
     mockHandleAddressSelect.mockImplementation(props.onAddressSelected);
@@ -49,21 +48,21 @@ vi.mock("@/components/AddressManager", () => ({
 }));
 
 // Mock file upload hook
-vi.mock("@/hooks/use-job-application-upload", () => ({
+jest.mock("@/hooks/use-job-application-upload", () => ({
   useJobApplicationUpload: () => ({
     uploadedFiles: [],
-    deleteFile: vi.fn(),
-    uploadFile: vi.fn(),
+    deleteFile: jest.fn(),
+    uploadFile: jest.fn(),
     isUploading: false,
-    updateEntityId: vi.fn(),
+    updateEntityId: jest.fn(),
   }),
 }));
 
 // Mock Supabase client
-vi.mock("@/utils/supabase/client", () => ({
-  createClient: vi.fn(() => ({
+jest.mock("@/utils/supabase/client", () => ({
+  createClient: jest.fn(() => ({
     auth: {
-      getSession: vi.fn().mockResolvedValue({
+      getSession: jest.fn().mockResolvedValue({
         data: {
           session: {
             user: {
@@ -74,25 +73,25 @@ vi.mock("@/utils/supabase/client", () => ({
           },
         },
       }),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
+      onAuthStateChange: jest.fn(() => ({
+        data: { subscription: { unsubscribe: jest.fn() } },
       })),
     },
   })),
 }));
 
 // Mock fetch function
-const mockFetch = vi.fn();
+const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 // Mock scrollIntoView for JSDOM
-window.HTMLElement.prototype.scrollIntoView = vi.fn();
+window.HTMLElement.prototype.scrollIntoView = jest.fn();
 
 // Mock ResizeObserver for JSDOM
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
+global.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
 }));
 
 // Mock addresses data
@@ -127,7 +126,7 @@ const mockAddress = {
 
 describe("CateringRequestForm", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     mockPush.mockClear();
     mockHandleAddressSelect.mockClear();
 

@@ -6,7 +6,7 @@ import { storage } from '@/utils/supabase/storage';
 import { UserType } from "@/types/prisma";
 
 
-// Updated helper function to fix authorization issues
+// SECURITY FIX: Proper authorization function with no bypasses
 async function checkAuthorization(requestedUserId: string) {
   try {
     const supabase = await createClient();
@@ -18,13 +18,8 @@ async function checkAuthorization(requestedUserId: string) {
     console.log("Auth check - Requested user ID:", requestedUserId);
     console.log("Auth check - Session exists:", sessionData?.session ? "Yes" : "No");
     
-    // If accessing from admin panel, allow access without authentication
-    const isAdminRoute = requestedUserId.length > 30; // UUID pattern indicates admin route
-    if (isAdminRoute) {
-      console.log("Auth check - Admin route detected, allowing access");
-      return null; // Authorized for admin routes
-    }
-    
+    // SECURITY FIX: Remove dangerous UUID length bypass
+    // All requests must be properly authenticated
     if (error || !data.user) {
       console.error("Auth error:", error?.message || "No authenticated user found");
       return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });

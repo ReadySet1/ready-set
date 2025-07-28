@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock Next.js
-vi.mock('next/server', () => ({
+jest.mock('next/server', () => ({
   NextRequest: class MockNextRequest {
     url: string;
     constructor(url: string) {
@@ -20,23 +19,23 @@ vi.mock('next/server', () => ({
 // Mock database/Prisma
 const mockPrisma = {
   order: {
-    findFirst: vi.fn(),
-    findMany: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
   },
   file: {
-    findMany: vi.fn(),
+    findMany: jest.fn(),
   },
 };
 
-vi.mock('@/lib/db/prisma', () => ({
+jest.mock('@/lib/db/prisma', () => ({
   default: mockPrisma,
 }));
 
 describe('Order API Encoding Tests', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   describe('Order Detail API', () => {

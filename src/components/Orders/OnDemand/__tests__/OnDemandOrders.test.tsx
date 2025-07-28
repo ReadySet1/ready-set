@@ -1,10 +1,9 @@
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach } from "vitest";
 import OnDemandOrdersPage from "../OnDemandOrders";
 
 // Mock Next.js Link component
-vi.mock("next/link", () => ({
+jest.mock("next/link", () => ({
   __esModule: true,
   default: ({
     href,
@@ -22,7 +21,7 @@ vi.mock("next/link", () => ({
 }));
 
 // Mock Framer Motion components
-vi.mock("framer-motion", () => ({
+jest.mock("framer-motion", () => ({
   motion: {
     tr: ({ children, ...props }: any) => <tr {...props}>{children}</tr>,
   },
@@ -30,12 +29,12 @@ vi.mock("framer-motion", () => ({
 }));
 
 // Mock fetch globally
-const mockFetch = vi.fn();
+const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 describe("OnDemandOrders - URL Encoding", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
 
     // Mock successful fetch response with orders containing special characters
     mockFetch.mockResolvedValue({

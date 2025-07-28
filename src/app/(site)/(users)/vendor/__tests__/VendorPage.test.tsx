@@ -28,7 +28,7 @@ jest.mock("@/components/Common/Breadcrumb", () => ({
   ),
 }));
 
-vi.mock("@/components/Orders/AllOrdersModal", () => ({
+jest.mock("@/components/Orders/AllOrdersModal", () => ({
   AllOrdersModal: ({
     isOpen,
     onClose,
@@ -44,7 +44,7 @@ vi.mock("@/components/Orders/AllOrdersModal", () => ({
 }));
 
 // Mock fetch globally
-const mockFetch = vi.fn();
+const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 // Mock order data
@@ -161,7 +161,7 @@ const mockMetrics = {
 
 describe("VendorPage Pagination", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     mockPush.mockClear();
 
     // Default mock for metrics (always successful)

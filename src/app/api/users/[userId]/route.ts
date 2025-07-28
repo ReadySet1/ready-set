@@ -28,75 +28,52 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    // Check request source or headers to determine if this is an admin panel request
-    const requestSource = request.headers.get('x-request-source');
-    const isAdminPanelRequest = requestSource === 'ModernUserProfile' || requestSource === 'AdminPanel';
-    console.log(`[GET /api/users/[userId]] Request source: ${requestSource}, isAdminPanelRequest: ${isAdminPanelRequest}`);
-    
+    // SECURITY FIX: Remove dangerous admin panel bypass
+    // All requests must go through proper authentication
     const supabase = await createClient();
-    // Get current session user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError) {
-      console.error("[GET /api/users/[userId]] Supabase auth error:", authError);
-      
-      // For admin panel requests, bypass authentication
-      if (isAdminPanelRequest) {
-        console.log("[GET /api/users/[userId]] Authentication bypassed for admin panel request");
-      } else {
-        return NextResponse.json({ error: 'Authentication error' }, { status: 500 });
-      }
-    }
-
-    // Skip authentication check for admin panel requests
-    if (!user && !isAdminPanelRequest) {
-      console.log("[GET /api/users/[userId]] No authenticated user found and not an admin panel request.");
+    if (authError || !user) {
+      console.error("[GET /api/users/[userId]] Authentication required:", authError);
       return NextResponse.json(
         { error: 'Unauthorized: Authentication required' },
         { status: 401 }
       );
     }
     
-    if (user) {
-      console.log(`[GET /api/users/[userId]] Authenticated user ID: ${user.id}`);
-    }
+    console.log(`[GET /api/users/[userId]] Authenticated user ID: ${user.id}`);
 
-    // For admin panel requests, skip permission check
+    // Check permissions for all requests
     let requesterProfile;
     let isAdminOrHelpdesk = false;
     
-    if (user && !isAdminPanelRequest) {
-      // Only check permissions if not an admin panel request and user is authenticated
-      try {
-        requesterProfile = await prisma.profile.findUnique({
-          where: { id: user.id },
-          select: { type: true }
-        });
-        console.log(`[GET /api/users/[userId]] Requester profile fetched:`, requesterProfile);
+    try {
+      requesterProfile = await prisma.profile.findUnique({
+        where: { id: user.id },
+        select: { type: true }
+      });
+      console.log(`[GET /api/users/[userId]] Requester profile fetched:`, requesterProfile);
+      
+      isAdminOrHelpdesk =
+        requesterProfile?.type === UserType.ADMIN ||
+        requesterProfile?.type === UserType.SUPER_ADMIN ||
+        requesterProfile?.type === UserType.HELPDESK;
         
-        isAdminOrHelpdesk =
-          requesterProfile?.type === UserType.ADMIN ||
-          requesterProfile?.type === UserType.SUPER_ADMIN ||
-          requesterProfile?.type === UserType.HELPDESK;
-          
-        // Only allow if requesting own profile or admin/super_admin
-        const isSelf = user.id === userId;
+      // Only allow if requesting own profile or admin/super_admin
+      const isSelf = user.id === userId;
 
-        console.log(`[GET /api/users/[userId]] Authorization check: isSelf=${isSelf}, isAdminOrHelpdesk=${isAdminOrHelpdesk}, requesterType=${requesterProfile?.type}`);
+      console.log(`[GET /api/users/[userId]] Authorization check: isSelf=${isSelf}, isAdminOrHelpdesk=${isAdminOrHelpdesk}, requesterType=${requesterProfile?.type}`);
 
-        if (!isSelf && !isAdminOrHelpdesk) {
-          console.log(`[GET /api/users/[userId]] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to access profile ${userId}.`);
-          return NextResponse.json(
-            { error: 'Forbidden: Insufficient permissions' },
-            { status: 403 }
-          );
-        }
-      } catch (profileError) {
-        console.error(`[GET /api/users/[userId]] Error fetching requester profile (ID: ${user.id}):`, profileError);
-        return NextResponse.json({ error: 'Failed to fetch requester profile' }, { status: 500 });
+      if (!isSelf && !isAdminOrHelpdesk) {
+        console.log(`[GET /api/users/[userId]] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to access profile ${userId}.`);
+        return NextResponse.json(
+          { error: 'Forbidden: Insufficient permissions' },
+          { status: 403 }
+        );
       }
-    } else if (isAdminPanelRequest) {
-      console.log("[GET /api/users/[userId]] Skipping permission check for admin panel request");
+    } catch (profileError) {
+      console.error(`[GET /api/users/[userId]] Error fetching requester profile (ID: ${user.id}):`, profileError);
+      return NextResponse.json({ error: 'Failed to fetch requester profile' }, { status: 500 });
     }
 
     // Fetch the target user profile
@@ -188,74 +165,51 @@ export async function PUT(
       );
     }
     
-    // Check if this is an admin panel request
-    const requestSource = request.headers.get('x-request-source');
-    const isAdminMode = request.headers.get('x-admin-mode') === 'true';
-    const isAdminPanelRequest = requestSource === 'ModernUserProfile' || 
-                               requestSource === 'AdminPanel' || 
-                               requestSource === 'ModernUserProfile-Submit' ||
-                               isAdminMode;
-    console.log(`[PUT /api/users/[userId]] Request source: ${requestSource}, isAdminMode: ${isAdminMode}, isAdminPanelRequest: ${isAdminPanelRequest}`);
-    
+    // SECURITY FIX: Remove dangerous admin panel bypass
+    // All requests must go through proper authentication
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError) {
-      console.error("[PUT /api/users/[userId]] Supabase auth error:", authError);
-      
-      // For admin panel requests, bypass authentication
-      if (isAdminPanelRequest) {
-        console.log("[PUT /api/users/[userId]] Authentication bypassed for admin panel request");
-      } else {
-        return NextResponse.json({ error: 'Authentication error' }, { status: 500 });
-      }
-    }
-
-    // Skip authentication check for admin panel requests
-    if (!user && !isAdminPanelRequest) {
-      console.log("[PUT /api/users/[userId]] No authenticated user found and not an admin panel request.");
+    if (authError || !user) {
+      console.error("[PUT /api/users/[userId]] Authentication required:", authError);
       return NextResponse.json(
         { error: 'Unauthorized: Authentication required' },
         { status: 401 }
       );
     }
     
-    if (user) {
-      console.log(`[PUT /api/users/[userId]] Authenticated user ID: ${user.id}`);
-    }
+    console.log(`[PUT /api/users/[userId]] Authenticated user ID: ${user.id}`);
 
-    // For admin panel requests, skip permission check
+    // Check permissions for all requests
     let requesterProfile;
-    let isAdminOrHelpdesk = false;
     
-    if (user && !isAdminPanelRequest) {
-      // Only check permissions if not an admin panel request and user is authenticated
-      try {
-        requesterProfile = await prisma.profile.findUnique({
-          where: { id: user.id },
-          select: { type: true }
-        });
-        console.log(`[PUT /api/users/[userId]] Requester profile fetched:`, requesterProfile);
+    try {
+      requesterProfile = await prisma.profile.findUnique({
+        where: { id: user.id },
+        select: { type: true }
+      });
+      console.log(`[PUT /api/users/[userId]] Requester profile fetched:`, requesterProfile);
+      
+      const isAdminOrHelpdesk =
+        requesterProfile?.type === UserType.ADMIN ||
+        requesterProfile?.type === UserType.SUPER_ADMIN ||
+        requesterProfile?.type === UserType.HELPDESK;
         
-        isAdminOrHelpdesk =
-          requesterProfile?.type === UserType.ADMIN ||
-          requesterProfile?.type === UserType.SUPER_ADMIN ||
-          requesterProfile?.type === UserType.HELPDESK;
-          
-        // Only allow if admin/super_admin/helpdesk
-        if (!isAdminOrHelpdesk) {
-          console.log(`[PUT /api/users/[userId]] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to update profile ${userId}.`);
-          return NextResponse.json(
-            { error: 'Forbidden: Insufficient permissions' },
-            { status: 403 }
-          );
-        }
-      } catch (profileError) {
-        console.error(`[PUT /api/users/[userId]] Error fetching requester profile (ID: ${user.id}):`, profileError);
-        return NextResponse.json({ error: 'Failed to fetch requester profile' }, { status: 500 });
+      // Only allow if requesting own profile or admin/super_admin
+      const isSelf = user.id === userId;
+
+      console.log(`[PUT /api/users/[userId]] Authorization check: isSelf=${isSelf}, isAdminOrHelpdesk=${isAdminOrHelpdesk}, requesterType=${requesterProfile?.type}`);
+
+      if (!isSelf && !isAdminOrHelpdesk) {
+        console.log(`[PUT /api/users/[userId]] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to update profile ${userId}.`);
+        return NextResponse.json(
+          { error: 'Forbidden: Insufficient permissions' },
+          { status: 403 }
+        );
       }
-    } else if (isAdminPanelRequest) {
-      console.log("[PUT /api/users/[userId]] Skipping permission check for admin panel request");
+    } catch (profileError) {
+      console.error(`[PUT /api/users/[userId]] Error fetching requester profile (ID: ${user.id}):`, profileError);
+      return NextResponse.json({ error: 'Failed to fetch requester profile' }, { status: 500 });
     }
     
     // Parse request body

@@ -1,13 +1,12 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach } from "vitest";
 import userEvent from "@testing-library/user-event";
 
 // Mock Next.js navigation
-const mockPush = vi.fn();
-const mockPathname = vi.fn();
+const mockPush = jest.fn();
+const mockPathname = jest.fn();
 
-vi.mock("next/navigation", () => ({
+jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
   }),
@@ -15,7 +14,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 // Mock Next.js Link component
-vi.mock("next/link", () => ({
+jest.mock("next/link", () => ({
   __esModule: true,
   default: ({
     href,
@@ -44,7 +43,7 @@ vi.mock("next/link", () => ({
 }));
 
 // Mock components to avoid complexity in integration test
-vi.mock("@/components/Orders/SingleOrder", () => ({
+jest.mock("@/components/Orders/SingleOrder", () => ({
   __esModule: true,
   default: ({ onDeleteSuccess }: { onDeleteSuccess: () => void }) => (
     <div data-testid="single-order-component">
@@ -56,7 +55,7 @@ vi.mock("@/components/Orders/SingleOrder", () => ({
   ),
 }));
 
-vi.mock("@/components/Orders/OnDemand/SingleOnDemandOrder", () => ({
+jest.mock("@/components/Orders/OnDemand/SingleOnDemandOrder", () => ({
   __esModule: true,
   default: ({ onDeleteSuccess }: { onDeleteSuccess: () => void }) => (
     <div data-testid="single-ondemand-order-component">
@@ -69,7 +68,7 @@ vi.mock("@/components/Orders/OnDemand/SingleOnDemandOrder", () => ({
 }));
 
 // Mock Framer Motion
-vi.mock("framer-motion", () => ({
+jest.mock("framer-motion", () => ({
   motion: {
     tr: ({ children, ...props }: any) => <tr {...props}>{children}</tr>,
   },
@@ -77,12 +76,12 @@ vi.mock("framer-motion", () => ({
 }));
 
 // Mock fetch globally
-const mockFetch = vi.fn();
+const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 describe("Order Navigation Integration Tests", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
 
     // Setup default mock responses
     mockFetch.mockImplementation((url: string) => {

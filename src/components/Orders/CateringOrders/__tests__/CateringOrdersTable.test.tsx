@@ -1,11 +1,10 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach } from "vitest";
 import { CateringOrdersTable } from "../CateringOrdersTable";
 import { Order, StatusFilter, UserRole } from "../types";
 
 // Mock Next.js Link component
-vi.mock("next/link", () => ({
+jest.mock("next/link", () => ({
   __esModule: true,
   default: ({
     href,
@@ -23,7 +22,7 @@ vi.mock("next/link", () => ({
 }));
 
 // Mock CarrierOrdersBadge component
-vi.mock("@/components/Dashboard/CarrierManagement/CarrierOrdersBadge", () => ({
+jest.mock("@/components/Dashboard/CarrierManagement/CarrierOrdersBadge", () => ({
   CarrierOrdersBadge: () => (
     <div data-testid="carrier-badge">Carrier Badge</div>
   ),
@@ -36,11 +35,11 @@ describe("CateringOrdersTable - URL Encoding", () => {
     helpdesk: false,
   };
 
-  const mockOnStatusFilterChange = vi.fn();
-  const mockOnOrderDeleted = vi.fn();
+  const mockOnStatusFilterChange = jest.fn();
+  const mockOnOrderDeleted = jest.fn();
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   it("should encode order numbers with forward slashes in URLs", () => {

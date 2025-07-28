@@ -1,26 +1,38 @@
 // app/api/drivers/route.ts
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/utils/prismaDB';
-import { createClient } from '@/utils/supabase/server';
+import { withAuth } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    // Initialize Supabase client for auth check
-    const supabase = await createClient();
-    
-    // Get user session from Supabase
-    const { data: { user } } = await supabase.auth.getUser();
+    // Use standardized authentication with role-based access
+    const authResult = await withAuth(request, {
+      allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
+      requireAuth: true
+    });
 
-    // Check if user is authenticated
-    if (!user || !user.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!authResult.success) {
+      return authResult.response;
     }
-    
+
+    const { context } = authResult;
+
+    // Fetch all drivers - only authorized personnel can see this sensitive data
     const drivers = await prisma.profile.findMany({
       where: {
         type: 'DRIVER'
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        contactNumber: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true
       }
     });
+
     return NextResponse.json(drivers);
   } catch (error) {
     console.error("Error fetching drivers:", error);

@@ -5,7 +5,7 @@ import Script from "next/script";
 import ClientLayout from "@/components/Clients/ClientLayout";
 import "../styles/index.css";
 import "../styles/prism-vsc-dark-plus.css";
-import ErrorBoundary from "@/components/ErrorBoundary/ErrorBoundary";
+import GlobalErrorBoundary from "@/components/ErrorBoundary/GlobalErrorBoundary";
 import CookieConsentBanner from "../components/Cookies/Banner";
 import { UserProvider } from "@/contexts/UserContext";
 import { Toaster } from "@/components/ui/toaster";
@@ -80,11 +80,11 @@ export default function RootLayout({
     >
       <head></head>
       <body className="overflow-x-hidden">
-        <ErrorBoundary fallback={<div>Something went wrong</div>}>
+        <GlobalErrorBoundary>
           <UserProvider>
             <ClientLayout>{children}</ClientLayout>
           </UserProvider>
-        </ErrorBoundary>
+        </GlobalErrorBoundary>
         <Toaster />
         {/* {process.env.NODE_ENV === "development" && <VercelToolbar />} */}
         <Analytics />
