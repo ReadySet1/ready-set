@@ -352,22 +352,29 @@ const OnDemandOrderForm: React.FC = () => {
 
         // Redirect to appropriate dashboard based on user type
         try {
-          if (session?.user?.email) {
+          if (user?.email) {
             // Get user profile to determine their type
-            const profileResponse = await fetch(`/api/users/profile?email=${encodeURIComponent(session.user.email)}`);
+            const profileResponse = await fetch(
+              `/api/users/profile?email=${encodeURIComponent(user.email)}`,
+            );
             if (profileResponse.ok) {
               const profile = await profileResponse.json();
-              const dashboardPath = profile.type === 'VENDOR' ? '/vendor' : '/client';
-              console.log(`Redirecting ${profile.type} user to ${dashboardPath}`);
+              const dashboardPath =
+                profile.type === "VENDOR" ? "/vendor" : "/client";
+              console.log(
+                `Redirecting ${profile.type} user to ${dashboardPath}`,
+              );
               router.push(dashboardPath);
             } else {
               // Fallback to client dashboard if profile fetch fails
-              console.log("Profile fetch failed, redirecting to client dashboard");
+              console.log(
+                "Profile fetch failed, redirecting to client dashboard",
+              );
               router.push("/client");
             }
           } else {
-            // Fallback to client dashboard if no session
-            console.log("No session, redirecting to client dashboard");
+            // Fallback to client dashboard if no user
+            console.log("No user, redirecting to client dashboard");
             router.push("/client");
           }
         } catch (error) {
