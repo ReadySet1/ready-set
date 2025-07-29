@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGuides } from '@/sanity/lib/queries';
-import { initializeEdgeMonitoring } from '@/lib/monitoring';
+import { initializeNodeMonitoring } from '@/lib/monitoring';
 
-// Set edge runtime for better performance
-export const runtime = 'edge';
+// Remove edge runtime to avoid compatibility issues
+// export const runtime = 'edge';
 
-// Initialize edge-compatible monitoring
-initializeEdgeMonitoring();
+// Initialize Node.js monitoring instead
+initializeNodeMonitoring();
 
 /**
- * Edge API route to fetch all guides
+ * API route to fetch all guides
  */
 export async function GET(request: NextRequest) {
   try {
@@ -33,4 +33,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

@@ -1,0 +1,13 @@
+diff --git a/src/components/Orders/CateringOrders/CreateCateringOrderForm.tsx b/src/components/Orders/CateringOrders/CreateCateringOrderForm.tsx
+index d524a1c..b39e8f1 100644
+--- a/src/components/Orders/CateringOrders/CreateCateringOrderForm.tsx
++++ b/src/components/Orders/CateringOrders/CreateCateringOrderForm.tsx
+@@ -911,7 +911,7 @@ export const CreateCateringOrderForm: React.FC<
+     if (generalError === null) {
+       form.clearErrors();
+     }
+-  }, []); // Empty dependency array - only run on mount
++  }, [generalError, form]); // Add missing dependencies
+ 
+   // Keep the cleanup function separate
+   useEffect(() => {

@@ -72,6 +72,9 @@ jobs:
         NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
         NEXTAUTH_SECRET: "test-secret"
+        # SendGrid Configuration (using test/placeholder values for CI)
+        SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY || 'SG.test-placeholder-key' }}
+        SENDGRID_LIST_ID: ${{ secrets.SENDGRID_LIST_ID || 'test-list-id' }}
 
   security:
     name: Security Audit
@@ -109,4 +112,4 @@ jobs:
         DIRECT_URL: "postgresql://test:test@localhost:5432/test"
         NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
-        NEXTAUTH_SECRET: "test-secret" 
+        NEXTAUTH_SECRET: "test-secret"
