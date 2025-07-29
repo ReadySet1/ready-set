@@ -6,15 +6,21 @@ import { ClientRequest } from "@sendgrid/client/src/request";
 import { sendDownloadEmail } from "@/app/actions/send-download-email";
 
 import { prisma } from "@/utils/prismaDB";
-const client = new Client();
 
-// We're still using SendGrid for list management
-if (!process.env.SENDGRID_API_KEY || !process.env.SENDGRID_LIST_ID) {
-  throw new Error('SendGrid configuration is missing');
+// Check for SendGrid configuration
+const SENDGRID_CONFIGURED = !!(process.env.SENDGRID_API_KEY && process.env.SENDGRID_LIST_ID);
+
+let client: Client | null = null;
+let WEBSITE_LEADS_LIST_ID: string | undefined;
+
+if (SENDGRID_CONFIGURED) {
+  client = new Client();
+  client.setApiKey(process.env.SENDGRID_API_KEY!);
+  WEBSITE_LEADS_LIST_ID = process.env.SENDGRID_LIST_ID;
+  console.log('SendGrid client initialized');
+} else {
+  console.warn('SendGrid configuration is missing. Newsletter subscriptions will not be processed.');
 }
-
-client.setApiKey(process.env.SENDGRID_API_KEY);
-const WEBSITE_LEADS_LIST_ID = process.env.SENDGRID_LIST_ID;
 
 // Updated schema to include sendEmail flag
 const FormSchema = z.object({
@@ -54,7 +60,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Handle SendGrid subscription for newsletter
-    if (validatedData.newsletterConsent) {
+    if (validatedData.newsletterConsent && SENDGRID_CONFIGURED && client && WEBSITE_LEADS_LIST_ID) {
       try {
         const sendgridData = {
           list_ids: [WEBSITE_LEADS_LIST_ID],
@@ -93,6 +99,8 @@ export async function POST(req: NextRequest) {
           email: validatedData.email,
         });
       }
+    } else if (validatedData.newsletterConsent && !SENDGRID_CONFIGURED) {
+      console.warn('Newsletter consent given but SendGrid is not configured');
     }
 
     // Handle resource download email using Resend - only send if sendEmail flag is true
