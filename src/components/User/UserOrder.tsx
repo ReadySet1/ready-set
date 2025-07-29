@@ -137,7 +137,7 @@ const UserOrderDetail: React.FC<UserOrderDetailProps> = ({
     };
 
     fetchOrder();
-  }, [pathname]);
+  }, [pathname, propOrderNumber]); // Fixed: Added propOrderNumber to dependencies
 
   const formatAddress = (address: Address | null) => {
     if (!address) return "N/A";
