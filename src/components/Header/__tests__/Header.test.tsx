@@ -26,7 +26,7 @@ jest.mock('@/utils/supabase/client', () => ({
 
 jest.mock('next/image', () => {
   return function MockImage(props: any) {
-    return <img {...props} />;
+    return <img alt="" {...props} />;
   };
 });
 
