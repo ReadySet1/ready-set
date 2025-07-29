@@ -1,0 +1,13 @@
+diff --git a/src/components/User/UserOrder.tsx b/src/components/User/UserOrder.tsx
+index a87e8aa..2f8d9e1 100644
+--- a/src/components/User/UserOrder.tsx
++++ b/src/components/User/UserOrder.tsx
+@@ -137,7 +137,7 @@ const UserOrderDetail: React.FC<UserOrderDetailProps> = ({
+     };
+ 
+     fetchOrder();
+-  }, [pathname]);
++  }, [pathname, propOrderNumber]); // Add propOrderNumber to dependencies
+ 
+   const formatAddress = (address: Address | null) => {
+     if (!address) return "N/A";
