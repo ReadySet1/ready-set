@@ -101,7 +101,6 @@
     "debug": "^4.4.0",
     "decimal.js": "^10.5.0",
     "dotenv": "^16.5.0",
-    "dotenv-cli": "^8.0.0",
     "embla-carousel-autoplay": "^8.5.1",
     "embla-carousel-react": "^8.5.1",
     "encoding": "^0.1.13",

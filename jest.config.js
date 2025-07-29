@@ -34,7 +34,7 @@ const customJestConfig = {
     '<rootDir>/.next/',
     '<rootDir>/node_modules/',
     '<rootDir>/e2e/',
-    '<rootDir>/src/**/*.integration.{test,spec}.{js,jsx,ts,tsx}',
+    '<rootDir>/src/.*\\.integration\\.(test|spec)\\.(js|jsx|ts|tsx)$',
   ],
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
