@@ -182,27 +182,27 @@ export async function GET(request: NextRequest) {
       connectionHealth: connectionInfo,
       queryPerformance: {
         averageResponseTime: queryStats.length > 0 
-          ? queryStats.reduce((acc, q) => acc + q.mean_time, 0) / queryStats.length 
+          ? queryStats.reduce((acc: number, q: any) => acc + q.mean_time, 0) / queryStats.length 
           : 0,
-        slowQueries: queryStats.filter(q => q.mean_time > 1000).length,
-        totalQueries: queryStats.reduce((acc, q) => acc + Number(q.calls), 0)
+        slowQueries: queryStats.filter((q: any) => q.mean_time > 1000).length,
+        totalQueries: queryStats.reduce((acc: number, q: any) => acc + Number(q.calls), 0)
       },
       indexUsage: {
-        mostUsedIndexes: indexStats.slice(0, 10).map(idx => ({
+        mostUsedIndexes: indexStats.slice(0, 10).map((idx: any) => ({
           table: idx.tablename,
           index: idx.indexname,
           scans: Number(idx.idx_scan),
           tuples: Number(idx.idx_tup_read)
         })),
-        unusedIndexes: unusedIndexes.map(idx => ({
+        unusedIndexes: unusedIndexes.map((idx: any) => ({
           table: idx.tablename,
           index: idx.indexname
         }))
       },
       tableStats: {
         totalTables: tableStats.length,
-        totalRecords: tableStats.reduce((acc, table) => acc + Number(table.row_count), 0),
-        largestTables: tableStats.map(table => ({
+        totalRecords: tableStats.reduce((acc: number, table: any) => acc + Number(table.row_count), 0),
+        largestTables: tableStats.map((table: any) => ({
           table: table.table_name,
           records: Number(table.row_count),
           size: table.table_size

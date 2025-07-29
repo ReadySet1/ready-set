@@ -274,7 +274,13 @@ process.env.NEXTAUTH_SECRET = "test-secret";
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
-process.env.NODE_ENV = "test";
+
+// Set NODE_ENV for tests using Object.defineProperty to avoid read-only error
+Object.defineProperty(process.env, 'NODE_ENV', {
+  value: 'test',
+  writable: true,
+  configurable: true
+});
 
 // Set timeout based on environment - CI gets longer timeout
 const testTimeout = process.env.CI ? 90000 : 30000;

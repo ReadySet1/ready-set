@@ -35,7 +35,7 @@ const POOL_CONFIG = {
 }
 
 // Enhanced logging configuration
-const LOG_CONFIG: Prisma.LogLevel[] = isDevelopment 
+const LOG_CONFIG: string[] = isDevelopment 
   ? ['query', 'error', 'warn', 'info']
   : ['error', 'warn']
 
@@ -91,18 +91,36 @@ const createOptimizedPrismaClient = (): PrismaClient => {
   return client
 }
 
-// Singleton pattern with connection pooling
-const prismaPooled = globalThis.prismaPooled ?? createOptimizedPrismaClient()
+// Singleton pattern with lazy loading
+let prismaPooledInstance: PrismaClient | null = null;
 
-// Store in global for development hot reload
-if (isDevelopment) {
-  globalThis.prismaPooled = prismaPooled
-}
+const getPrismaPooled = (): PrismaClient => {
+  if (!prismaPooledInstance) {
+    prismaPooledInstance = globalThis.prismaPooled ?? createOptimizedPrismaClient();
+    
+    // Store in global for development hot reload
+    if (isDevelopment) {
+      globalThis.prismaPooled = prismaPooledInstance;
+    }
+  }
+  return prismaPooledInstance;
+};
+
+// Export a proxy that lazily initializes the client
+export const prismaPooled = new Proxy({} as PrismaClient, {
+  get(target, prop) {
+    const client = getPrismaPooled();
+    return (client as any)[prop];
+  }
+});
 
 // Graceful shutdown handling
 const handleShutdown = async () => {
   console.log('🔄 Gracefully disconnecting Prisma client...')
-  await prismaPooled.$disconnect()
+  if (prismaPooledInstance) {
+    await prismaPooledInstance.$disconnect()
+    prismaPooledInstance = null;
+  }
   console.log('✅ Prisma client disconnected')
 }
 
@@ -146,7 +164,7 @@ export const queryMetrics = {
 export const healthCheck = {
   async checkConnection(): Promise<boolean> {
     try {
-      await prismaPooled.$queryRaw`SELECT 1`
+      await getPrismaPooled().$queryRaw`SELECT 1`
       return true
     } catch (error) {
       console.error('❌ Database connection check failed:', error)
@@ -156,7 +174,7 @@ export const healthCheck = {
 
   async getConnectionInfo() {
     try {
-      const result = await prismaPooled.$queryRaw<Array<{ count: number }>>`
+      const result = await getPrismaPooled().$queryRaw<Array<{ count: number }>>`
         SELECT count(*) as count FROM pg_stat_activity WHERE datname = current_database()
       `
       return {
@@ -173,8 +191,4 @@ export const healthCheck = {
       }
     }
   }
-}
-
-// Export the optimized client
-export { prismaPooled }
-export default prismaPooled 
+} 

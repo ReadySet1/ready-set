@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 
 /**
- * Simplified PrismaClient instantiation
+ * Simplified PrismaClient instantiation with lazy loading
  */
 
 // Define the global type that will hold our PrismaClient instance
@@ -14,15 +14,7 @@ declare global {
 const isDevelopment = process.env.NODE_ENV === 'development'
 const databaseUrl = process.env.DATABASE_URL
 
-// Debug environment
-console.log('Prisma Environment Check:', {
-  NODE_ENV: process.env.NODE_ENV,
-  NEXT_RUNTIME: process.env.NEXT_RUNTIME,
-  hasDataBaseUrl: !!databaseUrl,
-  databaseUrlPreview: databaseUrl ? databaseUrl.substring(0, 20) + '...' : 'NOT SET'
-})
-
-// Create Prisma client
+// Create Prisma client function
 const createPrismaClient = (): PrismaClient => {
   console.log('🟢 Creating Prisma client')
   
@@ -41,24 +33,32 @@ const createPrismaClient = (): PrismaClient => {
   });
 };
 
-// Create the Prisma instance
-const prisma = globalThis.prismaGlobal ?? createPrismaClient()
+// Lazy initialization function
+const getPrismaClient = (): PrismaClient => {
+  if (!globalThis.prismaGlobal) {
+    globalThis.prismaGlobal = createPrismaClient();
+  }
+  return globalThis.prismaGlobal;
+};
 
-// Store in global for development hot reload
-if (isDevelopment) {
-  globalThis.prismaGlobal = prisma;
-}
-
-// Export the client
-export { prisma };
+// Export a proxy that lazily initializes the client
+export const prisma = new Proxy({} as PrismaClient, {
+  get(target, prop) {
+    const client = getPrismaClient();
+    return (client as any)[prop];
+  }
+});
 
 // Export default for compatibility
 export default prisma;
 
 // Simple manager for compatibility
 export const PrismaClientManager = {
-  getInstance: () => prisma,
+  getInstance: () => getPrismaClient(),
   resetInstance: () => {
-    globalThis.prismaGlobal = undefined;
+    if (globalThis.prismaGlobal) {
+      globalThis.prismaGlobal.$disconnect();
+      globalThis.prismaGlobal = undefined;
+    }
   }
 };
