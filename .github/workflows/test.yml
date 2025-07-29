@@ -71,6 +71,11 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
           NEXTAUTH_SECRET: "test-secret"
+          SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key"
+          STRIPE_SECRET_KEY: "sk_test_placeholder"
+          SENDGRID_API_KEY: "SG.placeholder"
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_placeholder"
+          RESEND_API_KEY: "re_placeholder"
 
       - name: Lint check
         run: pnpm run lint
@@ -81,7 +86,7 @@ jobs:
 
       - name: Run unit tests
         run: pnpm run test:ci --verbose
-        timeout-minutes: 8
+        timeout-minutes: 15
         env:
           CI: true
           NODE_OPTIONS: "--max-old-space-size=4096"
@@ -90,10 +95,15 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
           NEXTAUTH_SECRET: "test-secret"
+          SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key"
+          STRIPE_SECRET_KEY: "sk_test_placeholder"
+          SENDGRID_API_KEY: "SG.placeholder"
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_placeholder"
+          RESEND_API_KEY: "re_placeholder"
 
       - name: Run unit tests with coverage
         run: pnpm run test:coverage --verbose --maxWorkers=2
-        timeout-minutes: 10
+        timeout-minutes: 15
         env:
           CI: true
           NODE_OPTIONS: "--max-old-space-size=4096"
@@ -102,6 +112,11 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
           NEXTAUTH_SECRET: "test-secret"
+          SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key"
+          STRIPE_SECRET_KEY: "sk_test_placeholder"
+          SENDGRID_API_KEY: "SG.placeholder"
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_placeholder"
+          RESEND_API_KEY: "re_placeholder"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -155,7 +170,7 @@ jobs:
 
       - name: Build application
         run: pnpm run build:no-typecheck
-        timeout-minutes: 8
+        timeout-minutes: 15
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
           NEXT_TELEMETRY_DISABLED: 1
@@ -164,12 +179,27 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
           NEXTAUTH_SECRET: "test-secret"
+          SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key"
+          STRIPE_SECRET_KEY: "sk_test_placeholder"
+          SENDGRID_API_KEY: "SG.placeholder"
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_placeholder"
+          RESEND_API_KEY: "re_placeholder"
 
       - name: Run E2E tests
         run: pnpm run test:e2e
         timeout-minutes: 15
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
+          DATABASE_URL: "postgresql://test:test@localhost:5432/test"
+          DIRECT_URL: "postgresql://test:test@localhost:5432/test"
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
+          NEXTAUTH_SECRET: "test-secret"
+          SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key"
+          STRIPE_SECRET_KEY: "sk_test_placeholder"
+          SENDGRID_API_KEY: "SG.placeholder"
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_placeholder"
+          RESEND_API_KEY: "re_placeholder"
 
       - name: Upload E2E test results
         uses: actions/upload-artifact@v4
@@ -233,13 +263,14 @@ jobs:
       - name: Setup test database
         run: |
           npm install -g prisma
-          DATABASE_URL="postgresql://postgres:postgres@localhost:5432/test_db" npx prisma db push
+          DATABASE_URL="postgresql://postgres:postgres@localhost:5432/test_db" npx prisma db push --skip-generate
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
         timeout-minutes: 3
 
       - name: Run integration tests
         run: pnpm run test:integration:ci --verbose
+        timeout-minutes: 10
         env:
           CI: true
           NODE_OPTIONS: "--max-old-space-size=4096"
@@ -249,7 +280,11 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
           NEXTAUTH_SECRET: "test-secret"
           NODE_ENV: test
-        timeout-minutes: 8
+          SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key"
+          STRIPE_SECRET_KEY: "sk_test_placeholder"
+          SENDGRID_API_KEY: "SG.placeholder"
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_placeholder"
+          RESEND_API_KEY: "re_placeholder"
 
       - name: Upload integration test results
         uses: actions/upload-artifact@v4

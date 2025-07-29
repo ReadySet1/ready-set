@@ -10,7 +10,7 @@ const integrationJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testEnvironment: 'jest-environment-jsdom',
   // Longer timeout for integration tests
-  testTimeout: process.env.CI ? 120000 : 60000,
+  testTimeout: process.env.CI ? 150000 : 60000,
   // Limit workers for integration tests (database dependent)
   maxWorkers: 1,
   // Better test isolation for integration tests

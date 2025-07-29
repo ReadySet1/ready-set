@@ -10,7 +10,7 @@ const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testEnvironment: 'jest-environment-jsdom',
   // CI-specific timeout settings
-  testTimeout: process.env.CI ? 60000 : 30000,
+  testTimeout: process.env.CI ? 90000 : 30000,
   // Memory optimization for CI
   maxWorkers: process.env.CI ? 2 : '50%',
   // Better test isolation

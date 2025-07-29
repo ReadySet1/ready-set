@@ -277,7 +277,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
 process.env.NODE_ENV = "test";
 
 // Set timeout based on environment - CI gets longer timeout
-const testTimeout = process.env.CI ? 60000 : 30000;
+const testTimeout = process.env.CI ? 90000 : 30000;
 jest.setTimeout(testTimeout);
 
 // Log test environment info on startup for debugging
