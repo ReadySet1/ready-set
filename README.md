@@ -9,31 +9,38 @@ This platform allows users to register as drivers, vendors, and clients, facilit
 ## Features
 
 ### User Registration and Management
+
 - Multiple user types: Drivers, Vendors, and Clients
 - Secure authentication and authorization
 
 ### Fast and Reliable Delivery Solutions
+
 - Same-day delivery
 - On-demand services
 - Emergency last-minute deliveries
 
 ### On-the-Go Courier Assistance
+
 - Quick pickup and delivery
 - Experienced and trained couriers
 
 ### Catering Delivery & Setup
+
 - Event planning assistance
 - Food transport and presentation services
 - **CaterValley Discount System**: Automated tiered pricing based on head count and food cost
 
 ### Versatile Delivery Options
+
 - Handling various items beyond food (documents, medical supplies, etc.)
 - Ensuring safe and timely deliveries
 
 ### Priority Handling for Urgent Requests
+
 - Rapid response to time-sensitive deliveries
 
 ### Professional Standards
+
 - Comprehensive driver training programs
 - HIPAA compliance
 - Food Handlers Certification (California standards)
@@ -83,7 +90,61 @@ Stay updated with our latest news and valuable information about our services th
 
 [Provide contact information or links for support and inquiries]
 
+## Testing
 
+This project has a comprehensive testing suite with separate configurations for different test types:
+
+### Test Types
+
+- **Unit Tests**: Fast, isolated tests for individual components and functions
+- **Integration Tests**: Tests that verify database interactions and API endpoints
+- **E2E Tests**: End-to-end tests using Playwright for complete user workflows
+
+### Running Tests Locally
+
+```bash
+# Run unit tests
+pnpm test:unit
+
+# Run unit tests with coverage
+pnpm test:coverage
+
+# Run integration tests (requires database)
+pnpm test:integration
+
+# Run E2E tests
+pnpm test:e2e
+
+# Run all tests
+pnpm test:all
+```
+
+### CI/CD Testing
+
+The project uses optimized CI configurations for reliable test execution:
+
+- **Timeout Management**: All test jobs and steps have explicit timeouts to prevent hanging
+- **Memory Optimization**: NODE_OPTIONS set to 4GB for large Next.js builds
+- **Node Version Matrix**: Tests run on both Node 18 and 20 with fail-fast disabled
+- **Environment Variables**: Complete set of required env vars for all test types
+- **Test Isolation**: Separate Jest configurations for unit and integration tests
+- **Artifact Upload**: Test results and coverage reports saved for debugging
+
+### Test Configuration Files
+
+- `jest.config.js` - Unit test configuration with coverage reporting
+- `jest.config.integration.js` - Integration test configuration with database setup
+- `jest.setup.ts` - Common test environment setup and mocks
+- `playwright.config.ts` - E2E test configuration
+
+### Debugging Failed Tests
+
+Test artifacts are automatically uploaded on failure:
+
+- Unit test results and coverage reports
+- Integration test results
+- E2E test reports and videos
+- Environment information for debugging
 
 ## Build and Deployment Process
 
@@ -130,7 +191,7 @@ A GitHub Actions workflow runs on every push and pull request to ensure the buil
    ```typescript
    // ❌ Avoid this:
    if (error instanceof Prisma.PrismaClientKnownRequestError) { ... }
-   
+
    // ✅ Use this instead:
    import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
    if (error instanceof PrismaClientKnownRequestError) { ... }

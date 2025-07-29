@@ -24,6 +24,24 @@ beforeEach(() => {
   }
 });
 
+// Clean up after each test for better isolation
+afterEach(() => {
+  // Clear any timers
+  jest.clearAllTimers();
+  // Clear all mocks
+  jest.clearAllMocks();
+  // Restore any mocked implementations
+  jest.restoreAllMocks();
+  
+  // Additional cleanup for CI environment
+  if (process.env.CI) {
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+    }
+  }
+});
+
 // Don't mock react-dom/client - let it work normally for tests
 
 // Mock next/navigation properly
@@ -251,10 +269,22 @@ jest.mock('next/server', () => ({
 
 // Set up environment variables for tests
 process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test_db";
+process.env.DIRECT_URL = "postgresql://test:test@localhost:5432/test_db";
 process.env.NEXTAUTH_SECRET = "test-secret";
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+process.env.NODE_ENV = "test";
 
-// Increase timeout for async operations
-jest.setTimeout(30000); 
+// Set timeout based on environment - CI gets longer timeout
+const testTimeout = process.env.CI ? 60000 : 30000;
+jest.setTimeout(testTimeout);
+
+// Log test environment info on startup for debugging
+if (process.env.CI) {
+  console.log('🧪 Test Environment Info:');
+  console.log(`- Node Version: ${process.version}`);
+  console.log(`- Test Timeout: ${testTimeout}ms`);
+  console.log(`- Max Workers: ${process.env.CI ? '2' : 'default'}`);
+  console.log(`- NODE_OPTIONS: ${process.env.NODE_OPTIONS || 'not set'}`);
+} 
