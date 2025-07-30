@@ -1,14 +1,30 @@
+// Load environment variables first
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
 // Try to import PrismaClient, fallback to mock if not available
 let PrismaClient: any;
 let PrismaClientType: any;
+
+// Import PrismaClient with proper error handling - use direct import
 try {
-  const prismaModule = require('@prisma/client');
-  PrismaClient = prismaModule.PrismaClient;
-  PrismaClientType = PrismaClient;
+  const { PrismaClient: PrismaClientClass } = require('../../node_modules/.prisma/client');
+  PrismaClient = PrismaClientClass;
+  PrismaClientType = PrismaClientClass;
+  console.log('✅ PrismaClient imported successfully via direct path');
 } catch (error) {
-  console.warn('⚠️ Could not import PrismaClient from @prisma/client, will use mock client');
-  PrismaClient = undefined;
-  PrismaClientType = class MockPrismaClient {};
+  console.warn('⚠️ Could not import PrismaClient via direct path, trying standard import...');
+  try {
+    const { PrismaClient: PrismaClientClass } = require('@prisma/client');
+    PrismaClient = PrismaClientClass;
+    PrismaClientType = PrismaClientClass;
+    console.log('✅ PrismaClient imported successfully via standard import');
+  } catch (standardError) {
+    console.warn('⚠️ Could not import PrismaClient from @prisma/client, will use mock client');
+    console.warn('Error details:', standardError);
+    PrismaClient = undefined;
+    PrismaClientType = class MockPrismaClient {};
+  }
 }
 
 /**
@@ -21,7 +37,7 @@ declare global {
   var prismaGlobal: typeof PrismaClientType | undefined;
 }
 
-// Environment checks
+// Environment checks - now after dotenv is loaded
 const isDevelopment = process.env.NODE_ENV === 'development'
 const isProduction = process.env.NODE_ENV === 'production'
 const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build'
@@ -33,7 +49,8 @@ console.log('Prisma Environment Check:', {
   NEXT_RUNTIME: process.env.NEXT_RUNTIME,
   NEXT_PHASE: process.env.NEXT_PHASE,
   hasDataBaseUrl: !!databaseUrl,
-  databaseUrlPreview: databaseUrl ? databaseUrl.substring(0, 20) + '...' : 'NOT SET'
+  databaseUrlPreview: databaseUrl ? databaseUrl.substring(0, 20) + '...' : 'NOT SET',
+  prismaClientAvailable: !!PrismaClient
 })
 
 // Create a mock Prisma client for build-time
@@ -179,6 +196,12 @@ const createMockPrismaClient = (): typeof PrismaClientType => {
 // Create Prisma client with better error handling
 const createPrismaClient = (): typeof PrismaClientType => {
   console.log('🟢 Creating Prisma client')
+  console.log('🔍 Debug info:', {
+    prismaClientType: typeof PrismaClient,
+    prismaClientAvailable: !!PrismaClient,
+    databaseUrlExists: !!databaseUrl,
+    databaseUrlPreview: databaseUrl ? databaseUrl.substring(0, 30) + '...' : 'NOT SET'
+  })
   
   // Check if PrismaClient is available
   if (typeof PrismaClient === 'undefined') {
@@ -195,6 +218,7 @@ const createPrismaClient = (): typeof PrismaClientType => {
   }
 
   try {
+    console.log('🔄 Attempting to create Prisma client with configuration...')
     // Try to create the client with configuration first
     const client = new PrismaClient({
       log: isDevelopment ? ['error', 'warn'] : ['error'],
@@ -208,12 +232,15 @@ const createPrismaClient = (): typeof PrismaClientType => {
     console.log('✅ Prisma client created successfully with configuration')
     return client
   } catch (configError) {
+    console.error('❌ Error creating Prisma client with configuration:', configError)
     // Silently try basic client without logging
     try {
+      console.log('🔄 Attempting to create fallback Prisma client...')
       const fallbackClient = new PrismaClient()
       console.log('✅ Fallback Prisma client created successfully')
       return fallbackClient
     } catch (fallbackError) {
+      console.error('❌ Error creating fallback Prisma client:', fallbackError)
       // Only log in development, and make it less alarming
       if (isDevelopment) {
         console.log('ℹ️ Using mock Prisma client for development')

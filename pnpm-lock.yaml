@@ -260,9 +260,6 @@ importers:
       nookies:
         specifier: ^2.5.2
         version: 2.5.2
-      pg:
-        specifier: ^8.16.2
-        version: 8.16.3
       prettier:
         specifier: ^3.4.2
         version: 3.6.2
@@ -456,6 +453,9 @@ importers:
       null-loader:
         specifier: ^4.0.1
         version: 4.0.1(webpack@5.100.1(@swc/core@1.13.0)(esbuild@0.25.6))
+      pg:
+        specifier: ^8.16.3
+        version: 8.16.3
       postcss:
         specifier: ^8.4.49
         version: 8.5.6
