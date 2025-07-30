@@ -40,6 +40,7 @@ declare global {
 // Environment checks - now after dotenv is loaded
 const isDevelopment = process.env.NODE_ENV === 'development'
 const isProduction = process.env.NODE_ENV === 'production'
+const isTest = process.env.NODE_ENV === 'test'
 const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build'
 const databaseUrl = process.env.DATABASE_URL
 
@@ -50,7 +51,8 @@ console.log('Prisma Environment Check:', {
   NEXT_PHASE: process.env.NEXT_PHASE,
   hasDataBaseUrl: !!databaseUrl,
   databaseUrlPreview: databaseUrl ? databaseUrl.substring(0, 20) + '...' : 'NOT SET',
-  prismaClientAvailable: !!PrismaClient
+  prismaClientAvailable: !!PrismaClient,
+  isTest: isTest
 })
 
 // Create a mock Prisma client for build-time
@@ -200,8 +202,15 @@ const createPrismaClient = (): typeof PrismaClientType => {
     prismaClientType: typeof PrismaClient,
     prismaClientAvailable: !!PrismaClient,
     databaseUrlExists: !!databaseUrl,
-    databaseUrlPreview: databaseUrl ? databaseUrl.substring(0, 30) + '...' : 'NOT SET'
+    databaseUrlPreview: databaseUrl ? databaseUrl.substring(0, 30) + '...' : 'NOT SET',
+    isTest: isTest
   })
+  
+  // In test environment, always use mock client
+  if (isTest) {
+    console.log('🧪 Test environment detected - using mock Prisma client');
+    return createMockPrismaClient()
+  }
   
   // Check if PrismaClient is available
   if (typeof PrismaClient === 'undefined') {
