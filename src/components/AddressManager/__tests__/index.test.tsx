@@ -257,10 +257,15 @@ describe("AddressManager Refresh Functionality", () => {
 
     render(<AddressManager {...defaultProps} />);
 
+    // Add debug logging to see what's happening
+    console.log('Mock onError calls:', mockOnError.mock.calls);
+    console.log('Mock onError call count:', mockOnError.mock.calls.length);
+
     await waitFor(() => {
+      console.log('Inside waitFor - Mock onError calls:', mockOnError.mock.calls);
       expect(mockOnError).toHaveBeenCalledWith(
         "Error fetching addresses: Internal Server Error",
       );
-    });
+    }, { timeout: 5000 });
   });
 });

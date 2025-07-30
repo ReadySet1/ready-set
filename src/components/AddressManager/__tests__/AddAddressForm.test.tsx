@@ -119,7 +119,7 @@ describe("AddAddressForm County Dropdown", () => {
 
     // Fill required fields except county
     await userEvent.type(
-      screen.getByLabelText(/street address/i),
+      screen.getByLabelText(/street address \*/i),
       "123 Main St",
     );
     await userEvent.type(screen.getByLabelText(/city/i), "San Francisco");
@@ -143,7 +143,7 @@ describe("AddAddressForm County Dropdown", () => {
     await userEvent.click(screen.getByText("San Francisco"));
 
     await userEvent.type(
-      screen.getByLabelText(/street address/i),
+      screen.getByLabelText(/street address \*/i),
       "123 Main St",
     );
     await userEvent.type(screen.getByLabelText(/city/i), "San Francisco");
