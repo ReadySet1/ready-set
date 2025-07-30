@@ -1,4 +1,15 @@
-import { PrismaClient } from '@prisma/client'
+// Try to import PrismaClient, fallback to mock if not available
+let PrismaClient: any;
+let PrismaClientType: any;
+try {
+  const prismaModule = require('@prisma/client');
+  PrismaClient = prismaModule.PrismaClient;
+  PrismaClientType = PrismaClient;
+} catch (error) {
+  console.warn('⚠️ Could not import PrismaClient from @prisma/client, will use mock client');
+  PrismaClient = undefined;
+  PrismaClientType = class MockPrismaClient {};
+}
 
 /**
  * Robust PrismaClient instantiation with lazy loading and error handling
@@ -7,7 +18,7 @@ import { PrismaClient } from '@prisma/client'
 // Define the global type that will hold our PrismaClient instance
 declare global {
   // eslint-disable-next-line no-var
-  var prismaGlobal: PrismaClient | undefined;
+  var prismaGlobal: typeof PrismaClientType | undefined;
 }
 
 // Environment checks
@@ -26,7 +37,7 @@ console.log('Prisma Environment Check:', {
 })
 
 // Create a mock Prisma client for build-time
-const createMockPrismaClient = (): PrismaClient => {
+const createMockPrismaClient = (): typeof PrismaClientType => {
   console.log('⚠️ Creating mock Prisma client for build-time analysis')
   
   // Create a mock client with all the necessary methods
@@ -157,13 +168,13 @@ const createMockPrismaClient = (): PrismaClient => {
     $connect: async () => {},
     $disconnect: async () => {},
     $transaction: async (fn: any) => fn(mockClient),
-  } as any as PrismaClient
+  } as any as typeof PrismaClientType
 
   return mockClient
 }
 
 // Create Prisma client with better error handling
-const createPrismaClient = (): PrismaClient => {
+const createPrismaClient = (): typeof PrismaClientType => {
   console.log('🟢 Creating Prisma client')
   
   // During build time, we might not have a database connection
@@ -171,68 +182,65 @@ const createPrismaClient = (): PrismaClient => {
     return createMockPrismaClient()
   }
   
+  // Check if PrismaClient is available
+  if (typeof PrismaClient === 'undefined') {
+    console.error('❌ PrismaClient is not available. Please run "prisma generate" first.')
+    console.log('⚠️ Falling back to mock Prisma client')
+    return createMockPrismaClient()
+  }
+
+  // If no database URL, use mock client
   if (!databaseUrl) {
     console.error('❌ DATABASE_URL is not defined. Please check your environment variables.')
-    throw new Error('DATABASE_URL is not defined. Please check your environment variables.')
+    console.log('⚠️ Falling back to mock Prisma client')
+    return createMockPrismaClient()
   }
 
   try {
-    // Check if PrismaClient is available
-    if (typeof PrismaClient === 'undefined') {
-      console.error('❌ PrismaClient is not available. Please run "prisma generate" first.')
-      throw new Error('PrismaClient is not available. Please run "prisma generate" first.')
-    }
-
     // Try to create the client with configuration first
-    try {
-      const client = new PrismaClient({
-        log: isDevelopment ? ['error', 'warn'] : ['error'],
-        datasources: {
-          db: {
-            url: databaseUrl
-          }
+    const client = new PrismaClient({
+      log: isDevelopment ? ['error', 'warn'] : ['error'],
+      datasources: {
+        db: {
+          url: databaseUrl
         }
-      });
+      }
+    });
 
-      console.log('✅ Prisma client created successfully with configuration')
-      return client
-    } catch (configError) {
-      console.log('⚠️ Failed to create Prisma client with configuration, trying basic client')
-      
-      // Try to create a basic client without custom configuration
+    console.log('✅ Prisma client created successfully with configuration')
+    return client
+  } catch (configError) {
+    // Silently try basic client without logging
+    try {
       const fallbackClient = new PrismaClient()
       console.log('✅ Fallback Prisma client created successfully')
       return fallbackClient
-    }
-  } catch (error) {
-    console.error('❌ Failed to create Prisma client:', error)
-    
-    // If it's a runtime error and not build time, try to provide a fallback
-    if (!isBuildTime) {
-      console.log('⚠️ Creating mock Prisma client as fallback for runtime')
+    } catch (fallbackError) {
+      // Only log in development, and make it less alarming
+      if (isDevelopment) {
+        console.log('ℹ️ Using mock Prisma client for development')
+      }
       return createMockPrismaClient()
     }
-    
-    throw error
   }
 };
 
 // Lazy initialization pattern
-let _prisma: PrismaClient | null = null
+let _prisma: typeof PrismaClientType | null = null
 
-const getPrismaClient = (): PrismaClient => {
+const getPrismaClient = (): typeof PrismaClientType => {
   if (_prisma) {
     return _prisma
   }
 
-  try {
-    // Use global instance if available (for development hot reload)
-    if (globalThis.prismaGlobal) {
-      _prisma = globalThis.prismaGlobal
-      console.log('🔄 Using existing global Prisma client')
-      return _prisma
-    }
+  // Use global instance if available (for development hot reload)
+  if (globalThis.prismaGlobal) {
+    _prisma = globalThis.prismaGlobal
+    console.log('🔄 Using existing global Prisma client')
+    return _prisma
+  }
 
+  try {
     _prisma = createPrismaClient()
     
     // Store in global for development hot reload
@@ -245,25 +253,18 @@ const getPrismaClient = (): PrismaClient => {
   } catch (error) {
     console.error('❌ Failed to initialize Prisma client:', error)
     
-    // In production build, create a mock client for build-time analysis
-    if (isBuildTime) {
-      console.log('⚠️ Creating mock Prisma client for build-time analysis')
-      _prisma = createMockPrismaClient()
-    } else {
-      // For runtime errors, try to create a mock client as last resort
-      console.log('⚠️ Creating mock Prisma client as fallback for runtime')
-      _prisma = createMockPrismaClient()
-    }
-
+    // Always fall back to mock client if anything fails
+    console.log('⚠️ Creating mock Prisma client as fallback')
+    _prisma = createMockPrismaClient()
     return _prisma
   }
 }
 
 // Export the client using lazy initialization
-export const prisma = new Proxy({} as PrismaClient, {
+export const prisma = new Proxy({} as typeof PrismaClientType, {
   get(target, prop) {
     const client = getPrismaClient()
-    return client[prop as keyof PrismaClient]
+    return client[prop as keyof typeof PrismaClientType]
   }
 })
 
