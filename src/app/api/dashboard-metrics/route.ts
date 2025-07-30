@@ -106,11 +106,10 @@ export async function GET(request: NextRequest) {
           prisma.cateringRequest.count({
             where: { ...baseWhere, status: CateringStatus.COMPLETED }
           }),
-          userType === 'ADMIN' 
-            ? prisma.profile.count({
-                where: { deletedAt: null, type: "VENDOR" }
-              })
-            : Promise.resolve(1)
+          // Always query the actual vendor count from database for all user types
+          prisma.profile.count({
+            where: { deletedAt: null, type: "VENDOR" }
+          })
         ]);
 
       totalRevenue = Number(totalRevenueResult._sum.orderTotal || 0);
@@ -125,7 +124,7 @@ export async function GET(request: NextRequest) {
       totalRevenue = 12500;
       deliveriesRequests = 45;
       salesTotal = 38;
-      totalVendors = userType === 'ADMIN' ? 12 : 1;
+      totalVendors = 11; // Use consistent vendor count for all environments
     }
 
     // Build response
