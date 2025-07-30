@@ -3,6 +3,13 @@ import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { UserType } from "@/types/prisma";
 
+// Helper function to check if user has admin privileges
+function hasAdminPrivileges(userType: string): boolean {
+  // Handle both lowercase and uppercase user types
+  const normalizedType = userType?.toUpperCase();
+  return normalizedType === 'ADMIN' || normalizedType === 'SUPER_ADMIN' || normalizedType === 'HELPDESK';
+}
+
 export async function GET(req: NextRequest) {
   try {
     // Get the authorization header
@@ -56,10 +63,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Determine user roles using Prisma UserType enum
-    const isAdmin = profile.type === UserType.ADMIN;
-    const isSuperAdmin = profile.type === UserType.SUPER_ADMIN;
-    const isHelpdesk = profile.type === UserType.HELPDESK;
+    // Determine user roles using normalized type comparison
+    const normalizedType = profile.type?.toUpperCase();
+    const isAdmin = normalizedType === 'ADMIN';
+    const isSuperAdmin = normalizedType === 'SUPER_ADMIN';
+    const isHelpdesk = normalizedType === 'HELPDESK';
 
     // Return role information
     return NextResponse.json({

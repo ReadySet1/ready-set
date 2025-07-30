@@ -11,13 +11,20 @@ import { addSecurityHeaders } from '@/lib/auth-middleware';
 // Rate limiting for admin operations
 const adminRateLimit = withRateLimit(RateLimitConfigs.admin);
 
+// Helper function to check if user has admin privileges
+function hasAdminPrivileges(userType: string): boolean {
+  // Handle both lowercase and uppercase user types
+  const normalizedType = userType?.toUpperCase();
+  return normalizedType === 'ADMIN' || normalizedType === 'SUPER_ADMIN' || normalizedType === 'HELPDESK';
+}
+
 // GET: Fetch users with pagination, search, sort, filter
 export async function GET(request: NextRequest) {
   try {
     // Apply rate limiting for admin operations
     const rateLimitResponse = adminRateLimit(request);
     if (rateLimitResponse) {
-      return addSecurityHeaders(rateLimitResponse);
+      return rateLimitResponse;
     }
 
     // Get the authorization header
@@ -42,15 +49,40 @@ export async function GET(request: NextRequest) {
       return addSecurityHeaders(response);
     }
 
-    const dbUser = await prisma.profile.findUnique({
-      where: { id: authUser.id },
-      select: { type: true },
+    console.log('🔍 [Users API] Authenticated user ID:', authUser.id);
+
+    // Get user profile from Supabase (same approach as current-user route)
+    const { data: dbUser, error: profileError } = await supabase
+      .from('profiles')
+      .select('type')
+      .eq('id', authUser.id)
+      .single();
+
+    if (profileError || !dbUser) {
+      console.error('Profile error:', profileError);
+      const response = NextResponse.json({ error: "User profile not found" }, { status: 404 });
+      return addSecurityHeaders(response);
+    }
+
+    console.log('🔍 [Users API] Database user type:', dbUser.type);
+    console.log('🔍 [Users API] Expected types:', UserType.ADMIN, UserType.SUPER_ADMIN, UserType.HELPDESK);
+    console.log('🔍 [Users API] Type comparison:', {
+      isAdmin: dbUser.type === UserType.ADMIN,
+      isSuperAdmin: dbUser.type === UserType.SUPER_ADMIN,
+      isHelpdesk: dbUser.type === UserType.HELPDESK,
+      hasType: !!dbUser.type,
+      normalizedType: dbUser.type?.toUpperCase(),
+      hasAdminPrivileges: hasAdminPrivileges(dbUser.type || '')
     });
 
-    if (!dbUser?.type || (dbUser.type !== UserType.ADMIN && dbUser.type !== UserType.SUPER_ADMIN && dbUser.type !== UserType.HELPDESK)) {
+    // Check if user has admin privileges using the helper function
+    if (!dbUser.type || !hasAdminPrivileges(dbUser.type)) {
+      console.log('❌ [Users API] Authorization failed - User type not allowed:', dbUser.type);
       const response = NextResponse.json({ error: "Forbidden" }, { status: 403 });
       return addSecurityHeaders(response);
     }
+
+    console.log('✅ [Users API] Authorization successful for user type:', dbUser.type);
 
     // --- Parse Query Parameters ---
     const { searchParams } = new URL(request.url);
@@ -111,36 +143,28 @@ export async function GET(request: NextRequest) {
       prisma.profile.count({ where }),
     ]);
 
-    // --- Response ---
+    // --- Calculate Pagination ---
     const totalPages = Math.ceil(totalCount / limit);
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
 
+    // --- Return Response ---
     const response = NextResponse.json({
       users,
-      pagination: {
-        currentPage: page,
-        totalPages,
-        totalCount,
-        pageSize: limit,
-        hasNextPage,
-        hasPrevPage,
-      },
-      filters: {
-        search,
-        status: statusFilter,
-        type: typeFilter,
-        sort: sortField,
-        sortOrder,
-      },
+      totalPages,
+      totalCount,
+      currentPage: page,
+      hasNextPage,
+      hasPrevPage,
+      limit,
     });
 
     return addSecurityHeaders(response);
   } catch (error) {
-    console.error("Error fetching users:", error);
+    console.error("Error in GET /api/users:", error);
     const response = NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 },
+      { status: 500 }
     );
     return addSecurityHeaders(response);
   }
@@ -152,7 +176,7 @@ export async function POST(request: Request) {
     // Apply rate limiting for admin operations
     const rateLimitResponse = adminRateLimit(request as NextRequest);
     if (rateLimitResponse) {
-      return addSecurityHeaders(rateLimitResponse);
+      return rateLimitResponse;
     }
 
     // Get the authorization header
@@ -177,13 +201,21 @@ export async function POST(request: Request) {
       return addSecurityHeaders(response);
     }
 
-    const dbUser = await prisma.profile.findUnique({
-      where: { id: authUser.id },
-      select: { type: true },
-    });
+    // Get user profile from Supabase (same approach as current-user route)
+    const { data: dbUser, error: profileError } = await supabase
+      .from('profiles')
+      .select('type')
+      .eq('id', authUser.id)
+      .single();
+
+    if (profileError || !dbUser) {
+      console.error('Profile error:', profileError);
+      const response = NextResponse.json({ error: "User profile not found" }, { status: 404 });
+      return addSecurityHeaders(response);
+    }
 
     // Allow admin and super_admin to create users
-    if (dbUser?.type !== UserType.ADMIN && dbUser?.type !== UserType.SUPER_ADMIN) {
+    if (!hasAdminPrivileges(dbUser.type || '')) {
         const response = NextResponse.json({ error: "Forbidden: Only admins can create users" }, { status: 403 });
         return addSecurityHeaders(response);
     }

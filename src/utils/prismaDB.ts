@@ -59,6 +59,7 @@ const createMockPrismaClient = (): typeof PrismaClientType => {
       create: async () => ({}),
       update: async () => ({}),
       delete: async () => ({}),
+      aggregate: async () => ({ _sum: {} }),
     },
     order: {
       count: async () => 0,
@@ -67,6 +68,7 @@ const createMockPrismaClient = (): typeof PrismaClientType => {
       create: async () => ({}),
       update: async () => ({}),
       delete: async () => ({}),
+      aggregate: async () => ({ _sum: {} }),
     },
     cateringRequest: {
       count: async () => 0,
@@ -75,6 +77,7 @@ const createMockPrismaClient = (): typeof PrismaClientType => {
       create: async () => ({}),
       update: async () => ({}),
       delete: async () => ({}),
+      aggregate: async () => ({ _sum: { orderTotal: 0 } }),
     },
     fileUpload: {
       count: async () => 0,
@@ -176,11 +179,6 @@ const createMockPrismaClient = (): typeof PrismaClientType => {
 // Create Prisma client with better error handling
 const createPrismaClient = (): typeof PrismaClientType => {
   console.log('🟢 Creating Prisma client')
-  
-  // During build time, we might not have a database connection
-  if (isBuildTime) {
-    return createMockPrismaClient()
-  }
   
   // Check if PrismaClient is available
   if (typeof PrismaClient === 'undefined') {
