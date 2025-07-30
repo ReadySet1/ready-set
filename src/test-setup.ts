@@ -2,6 +2,90 @@
 import React from 'react';
 import '@testing-library/jest-dom';
 
+// Mock DialogFormContainer to avoid rendering the real dialog in tests
+jest.mock('@/components/Logistics/DialogFormContainer', () => ({
+  __esModule: true,
+  default: () => React.createElement('div', { 'data-testid': 'mock-dialog-form-container' }),
+}));
+
+// Mock global Request object for API route tests
+global.Request = class Request {
+  url: string;
+  method: string;
+  headers: Headers;
+  body: any;
+
+  constructor(input: string | Request, init?: RequestInit) {
+    this.url = typeof input === 'string' ? input : input.url;
+    this.method = init?.method || 'GET';
+    this.headers = new Headers(init?.headers);
+    this.body = init?.body;
+  }
+} as any;
+
+// Mock global Headers object
+global.Headers = class Headers {
+  private headers: Map<string, string>;
+
+  constructor(init?: HeadersInit) {
+    this.headers = new Map();
+    if (init) {
+      if (Array.isArray(init)) {
+        init.forEach(([key, value]) => this.headers.set(key, value));
+      } else if (typeof init === 'object') {
+        Object.entries(init).forEach(([key, value]) => this.headers.set(key, value));
+      }
+    }
+  }
+
+  get(name: string): string | null {
+    return this.headers.get(name) || null;
+  }
+
+  set(name: string, value: string): void {
+    this.headers.set(name, value);
+  }
+
+  has(name: string): boolean {
+    return this.headers.has(name);
+  }
+
+  append(name: string, value: string): void {
+    this.headers.set(name, value);
+  }
+
+  delete(name: string): void {
+    this.headers.delete(name);
+  }
+
+  forEach(callback: (value: string, key: string) => void): void {
+    this.headers.forEach(callback);
+  }
+} as any;
+
+// Mock global Response object
+global.Response = class Response {
+  status: number;
+  statusText: string;
+  headers: Headers;
+  body: any;
+
+  constructor(body?: BodyInit, init?: ResponseInit) {
+    this.status = init?.status || 200;
+    this.statusText = init?.statusText || '';
+    this.headers = new Headers(init?.headers);
+    this.body = body;
+  }
+
+  json() {
+    return Promise.resolve(this.body);
+  }
+
+  text() {
+    return Promise.resolve(String(this.body));
+  }
+} as any;
+
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -69,6 +153,36 @@ jest.mock('@/utils/supabase/client', () => ({
         getPublicUrl: jest.fn(() => ({ data: { publicUrl: 'https://example.com/file' } })),
       })),
     },
+  })),
+}));
+
+// Mock Supabase server utilities
+jest.mock('@/utils/supabase/server', () => ({
+  createClient: jest.fn(() => ({
+    auth: {
+      getSession: jest.fn().mockResolvedValue({
+        data: { session: { access_token: 'mock-token' } },
+        error: null
+      }),
+      getUser: jest.fn().mockResolvedValue({
+        data: { user: { id: 'mock-user-id', email: 'test@example.com' } },
+        error: null
+      }),
+    },
+    from: jest.fn(() => ({
+      select: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+      eq: jest.fn(() => ({
+        single: jest.fn().mockResolvedValue({
+          data: { type: 'admin' },
+          error: null
+        }),
+        data: [{ type: 'admin' }],
+        error: null
+      })),
+    })),
   })),
 }));
 

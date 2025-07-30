@@ -130,8 +130,10 @@ describe("AddAddressForm County Dropdown", () => {
     const submitButton = screen.getByRole("button", { name: /save address/i });
     await userEvent.click(submitButton);
 
-    // Should show validation error
-    expect(screen.getByText("County is required")).toBeInTheDocument();
+    // Should show validation error - use waitFor to ensure validation has time to run
+    await waitFor(() => {
+      expect(screen.getByText(/County is required/i)).toBeInTheDocument();
+    });
   });
 
   it("submits form successfully when all required fields including county are filled", async () => {
