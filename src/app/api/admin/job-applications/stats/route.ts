@@ -7,6 +7,15 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
+    // Check if Prisma client is properly initialized
+    if (!prisma || typeof prisma.jobApplication === 'undefined') {
+      console.error('❌ Prisma client not properly initialized');
+      return NextResponse.json(
+        { error: 'Database connection not available' },
+        { status: 503 }
+      );
+    }
+
     // Count total job applications (not deleted)
     const total = await prisma.jobApplication.count({
       where: { deletedAt: null },

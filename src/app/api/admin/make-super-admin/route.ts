@@ -5,6 +5,15 @@ const SUPER_ADMIN_SECRET = process.env.SUPER_ADMIN_SECRET;
 
 export async function POST(request: Request) {
   try {
+    // Check if Prisma client is properly initialized
+    if (!prisma || typeof prisma.profile === 'undefined') {
+      console.error('❌ Prisma client not properly initialized');
+      return NextResponse.json(
+        { error: 'Database connection not available' },
+        { status: 503 }
+      );
+    }
+
     const { email, secret } = await request.json();
 
     // Validate secret key

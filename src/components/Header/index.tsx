@@ -279,6 +279,7 @@ const Header: React.FC = () => {
 
   return (
     <header
+      key={user?.id || 'no-user'}
       className={`ud-header left-0 top-0 z-40 flex w-full items-center ${
         sticky
           ? "shadow-nav fixed z-[999] border-b border-stroke bg-white/80 backdrop-blur-[5px] dark:border-dark-3/20 dark:bg-dark/10"

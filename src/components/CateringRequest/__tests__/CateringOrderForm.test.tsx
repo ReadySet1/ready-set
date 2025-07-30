@@ -3,26 +3,25 @@ import { render, screen, waitFor, act, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CateringOrderForm from "../CateringOrderForm";
 import { Address } from "@/types/address";
-import { vi } from "vitest";
 
 // Mock Next.js router
-const mockPush = vi.fn();
+const mockPush = jest.fn();
 const mockRouter = {
   push: mockPush,
-  replace: vi.fn(),
-  back: vi.fn(),
-  forward: vi.fn(),
-  refresh: vi.fn(),
-  prefetch: vi.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  forward: jest.fn(),
+  refresh: jest.fn(),
+  prefetch: jest.fn(),
 };
 
-vi.mock("next/navigation", () => ({
+jest.mock("next/navigation", () => ({
   useRouter: () => mockRouter,
 }));
 
 // Mock the internal AddressManager component
-const mockHandleAddressSelect = vi.fn(); // Mock function to simulate selection
-vi.mock("@/components/AddressManager", () => ({
+const mockHandleAddressSelect = jest.fn(); // Mock function to simulate selection
+jest.mock("@/components/AddressManager", () => ({
   __esModule: true,
   default: (props: { onAddressSelect: (id: string) => void }) => {
     // Render a simple placeholder or nothing
@@ -33,28 +32,28 @@ vi.mock("@/components/AddressManager", () => ({
 }));
 
 // Mock scrollIntoView for Radix components in JSDOM
-window.HTMLElement.prototype.scrollIntoView = vi.fn();
+window.HTMLElement.prototype.scrollIntoView = jest.fn();
 
 // Mock the Supabase client more accurately
-vi.mock("@/utils/supabase/client", () => ({
-  createClient: vi.fn(() => {
+jest.mock("@/utils/supabase/client", () => ({
+  createClient: jest.fn(() => {
     // Store the callback for onAuthStateChange
     let authCallback: (event: string, session: any) => void = () => {};
     const mockSupabase = {
       auth: {
         // Ensure getUser returns the correct nested structure
-        getUser: vi.fn().mockResolvedValue({
+        getUser: jest.fn().mockResolvedValue({
           data: { user: { id: "test-user-id", email: "test@example.com" } },
           error: null,
         }),
         // Provide a way to simulate auth state changes if needed
-        onAuthStateChange: vi.fn((callback) => {
+        onAuthStateChange: jest.fn((callback) => {
           authCallback = callback; // Store the callback
           // Simulate initial check or specific event if needed upon registration
           // Example: Simulate initial state check might return the current user
           // Promise.resolve().then(() => callback('INITIAL_SESSION', { user: { id: 'test-user-id' } }));
           return {
-            data: { subscription: { unsubscribe: vi.fn() } },
+            data: { subscription: { unsubscribe: jest.fn() } },
           };
         }),
         // Add other auth methods if used by the components (e.g., signIn, signOut)
@@ -70,7 +69,7 @@ vi.mock("@/utils/supabase/client", () => ({
 }));
 
 // Mock the fetch function more robustly
-const mockFetch = vi.fn();
+const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 // Mock addresses data
@@ -97,7 +96,7 @@ const mockAddresses: Address[] = [
 describe("CateringOrderForm", () => {
   beforeEach(() => {
     // Reset all mocks before each test
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     mockHandleAddressSelect.mockClear(); // Clear address select mock specifically
     mockPush.mockClear(); // Clear router mock
 

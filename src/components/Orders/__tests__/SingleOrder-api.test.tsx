@@ -1,13 +1,12 @@
 import React from "react";
 import { renderHook, waitFor } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { act } from "@testing-library/react";
 
 // Mock Next.js navigation hooks
-const mockPush = vi.fn();
-const mockPathname = vi.fn();
+const mockPush = jest.fn();
+const mockPathname = jest.fn();
 
-vi.mock("next/navigation", () => ({
+jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
   }),
@@ -15,32 +14,32 @@ vi.mock("next/navigation", () => ({
 }));
 
 // Mock react-hot-toast
-vi.mock("react-hot-toast", () => ({
+jest.mock("react-hot-toast", () => ({
   default: {
-    success: vi.fn(),
-    error: vi.fn(),
+    success: jest.fn(),
+    error: jest.fn(),
   },
 }));
 
 // Mock Supabase client
 const mockSupabase = {
   auth: {
-    getSession: vi.fn().mockResolvedValue({
+    getSession: jest.fn().mockResolvedValue({
       data: { session: { access_token: "mock-token" } },
       error: null,
     }),
-    getUser: vi.fn().mockResolvedValue({
+    getUser: jest.fn().mockResolvedValue({
       data: { user: { id: "test-user-id" } },
       error: null,
     }),
-    onAuthStateChange: vi.fn(() => ({
-      data: { subscription: { unsubscribe: vi.fn() } },
+    onAuthStateChange: jest.fn(() => ({
+      data: { subscription: { unsubscribe: jest.fn() } },
     })),
   },
-  from: vi.fn(() => ({
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        single: vi.fn().mockResolvedValue({
+  from: jest.fn(() => ({
+    select: jest.fn(() => ({
+      eq: jest.fn(() => ({
+        single: jest.fn().mockResolvedValue({
           data: { type: "admin" },
           error: null,
         }),
@@ -48,29 +47,29 @@ const mockSupabase = {
     })),
   })),
   storage: {
-    listBuckets: vi.fn().mockResolvedValue({
+    listBuckets: jest.fn().mockResolvedValue({
       data: [{ name: "user-assets" }],
       error: null,
     }),
   },
 };
 
-vi.mock("@/utils/supabase/client", () => ({
-  createClient: vi.fn(() => mockSupabase),
+jest.mock("@/utils/supabase/client", () => ({
+  createClient: jest.fn(() => mockSupabase),
 }));
 
 // Mock broker sync service
-vi.mock("@/lib/services/brokerSyncService", () => ({
-  syncOrderStatusWithBroker: vi.fn().mockResolvedValue(undefined),
+jest.mock("@/lib/services/brokerSyncService", () => ({
+  syncOrderStatusWithBroker: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock fetch globally
-const mockFetch = vi.fn();
+const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 describe("SingleOrder - API Encoding Tests", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
 
     // Setup default successful responses
     mockFetch.mockImplementation((url: string) => {
@@ -116,7 +115,7 @@ describe("SingleOrder - API Encoding Tests", () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   it("should encode order numbers with slashes in API calls for order details", async () => {
@@ -194,7 +193,7 @@ describe("SingleOrder - API Encoding Tests", () => {
     );
 
     for (const testCase of testCases) {
-      vi.clearAllMocks();
+      jest.clearAllMocks();
       mockPathname.mockReturnValue(testCase.pathname);
 
       await act(async () => {

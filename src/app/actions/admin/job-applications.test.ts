@@ -1,12 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { prisma } from '@/lib/db/prisma'; // Adjust path if your prisma client is elsewhere
 import { approveJobApplication } from './job-applications';
 import { UserType } from "@/types/user";
 import { ApplicationStatus } from "@/types/prisma";
 
 // --- Mock next/cache --- 
-vi.mock('next/cache', () => ({
-    revalidatePath: vi.fn(), // Mock revalidatePath as a simple function
+jest.mock('next/cache', () => ({
+    revalidatePath: jest.fn(), // Mock revalidatePath as a simple function
 }));
 
 // ... existing code ...

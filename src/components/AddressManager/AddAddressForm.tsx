@@ -143,7 +143,19 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
     setIsSubmitting(true);
     setSubmitError(null); // Clear previous errors
     try {
-      await onSubmit(data as AddressFormData);
+      // Normalize state input to CA format
+      const normalizedData = {
+        ...data,
+        state: (() => {
+          const state = data.state.trim().toUpperCase();
+          if (state === "CALIFORNIA" || state === "CALIF") {
+            return "CA";
+          }
+          return state;
+        })(),
+      };
+      
+      await onSubmit(normalizedData as AddressFormData);
       reset();
       // onSubmit is responsible for closing the dialog on success
     } catch (error) {
@@ -292,10 +304,13 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
               </Label>
               <Input
                 id="state"
-                placeholder="CA"
+                placeholder="CA or California"
                 {...register("state")}
                 className={errors.state ? "border-red-500" : ""}
               />
+              <p className="mt-1 text-xs text-gray-500">
+                Enter "CA" or "California" (will be normalized to CA)
+              </p>
               {errors.state && (
                 <p className="mt-1 text-xs text-red-500">
                   {errors.state.message}

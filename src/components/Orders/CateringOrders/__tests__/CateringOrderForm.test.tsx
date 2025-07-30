@@ -4,14 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { CreateCateringOrderForm } from "../CreateCateringOrderForm";
 import { Address } from "@/types/address";
 
-// Mock the AddressManager component
-const mockAddressManagerWrapper = jest.fn();
-jest.mock("../../AddressManagerWrapper", () => {
-  return function MockAddressManagerWrapper(props: any) {
-    mockAddressManagerWrapper(props);
-    return <div data-testid="address-manager-wrapper">{props.children}</div>;
-  };
-});
+// Note: AddressManagerWrapper is an internal component within CateringOrderForm
 
 // Mock Supabase client
 const mockSupabase = {
@@ -27,6 +20,9 @@ jest.mock("@/utils/supabase/client", () => ({
 
 // Mock fetch
 global.fetch = jest.fn();
+
+// Mock AddressManagerWrapper component
+const mockAddressManagerWrapper = jest.fn();
 
 const mockCateringRequest = {
   id: "catering-123",

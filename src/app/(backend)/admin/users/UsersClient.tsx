@@ -79,6 +79,7 @@ interface User {
   type: UserType;
   contact_name?: string | null;
   contact_number?: string | null;
+  companyName?: string | null;
   status: UserStatus;
   createdAt: string; 
 }
@@ -192,17 +193,16 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
           });
         }
         
-        // Attempt to get the session. Proceed even if it fails initially, 
-        // relying on cookie-based auth in the API route.
+        // Get the session and ensure authentication
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-            console.warn("No active session found");
+        if (!session?.access_token) {
+          throw new Error("No active session - please log in again");
         }
         
         const response = await fetch(apiUrl, {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': session ? `Bearer ${session.access_token}` : '',
+            'Authorization': `Bearer ${session.access_token}`,
           },
           credentials: 'include'
         });
@@ -593,6 +593,11 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                               >
                                 <div>{user.name || user.contact_name || 'Unnamed User'}</div>
                                 <div className="text-sm text-slate-500">{user.email}</div>
+                                {user.type === 'vendor' && user.companyName && (
+                                  <div className="text-xs text-amber-600 font-medium mt-1">
+                                    🏢 {user.companyName}
+                                  </div>
+                                )}
                               </Link>
                             </TableCell>
                             <TableCell>

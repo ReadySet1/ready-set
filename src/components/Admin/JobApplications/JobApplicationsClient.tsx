@@ -524,6 +524,104 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
     });
   };
 
+  // CSV export function
+  const exportToCSV = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error("No active session - please log in");
+      }
+
+      // Fetch all applications for export (remove pagination)
+      const params = new URLSearchParams({
+        limit: "1000", // Large number to get all applications
+        search: searchTerm,
+        status: statusFilter === "all" ? "" : statusFilter,
+        position: positionFilter,
+      });
+      
+      const response = await fetch(`/api/admin/job-applications?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch applications for export");
+      }
+      
+      const data = await response.json();
+      const exportApplications = data.applications as JobApplication[];
+
+      // Convert to CSV
+      const headers = [
+        "Name",
+        "Email", 
+        "Phone",
+        "Position",
+        "Status",
+        "City",
+        "State",
+        "Address",
+        "Education",
+        "Experience",
+        "Skills",
+        "Applied Date",
+        "Cover Letter"
+      ];
+
+      const csvRows = [
+        headers.join(","),
+        ...exportApplications.map(app => [
+          `"${app.firstName} ${app.lastName}"`,
+          `"${app.email}"`,
+          `"${app.phone || 'N/A'}"`,
+          `"${app.position}"`,
+          `"${app.status}"`,
+          `"${app.addressCity}"`,
+          `"${app.addressState}"`,
+          `"${app.addressStreet}, ${app.addressCity}, ${app.addressState} ${app.addressZip}"`,
+          `"${app.education || 'N/A'}"`,
+          `"${app.workExperience || 'N/A'}"`,
+          `"${app.skills || 'N/A'}"`,
+          `"${formatDate(app.createdAt)}"`,
+          `"${app.coverLetter ? 'Yes' : 'No'}"`
+        ].join(","))
+      ];
+
+      // Create and download CSV file
+      const csvContent = csvRows.join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `job-applications-${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      toast({
+        title: "Success",
+        description: `Exported ${exportApplications.length} applications to CSV`,
+        variant: "default",
+      });
+
+    } catch (error) {
+      console.error("Error exporting CSV:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to export CSV",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Fetch stats
   const fetchStats = useCallback(async () => {
     setIsStatsLoading(true);
@@ -824,6 +922,7 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
             <div className="flex gap-3">
               <Button
                 variant="outline"
+                onClick={exportToCSV}
                 className="bg-white hover:bg-slate-50 text-slate-700 px-6 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2"
               >
                 <Download className="h-4 w-4" />

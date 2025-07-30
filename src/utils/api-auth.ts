@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/db/prisma-client";
+import { prisma } from "@/utils/prismaDB";
 import { UserType } from "@/types/prisma";
+
+// Helper function to check if user has admin privileges
+function hasAdminPrivileges(userType: string): boolean {
+  // Handle both lowercase and uppercase user types
+  const normalizedType = userType?.toUpperCase();
+  return normalizedType === 'ADMIN' || normalizedType === 'SUPER_ADMIN' || normalizedType === 'HELPDESK';
+}
 
 /**
  * Gets the authenticated user from an API request using the Authorization header
@@ -67,7 +74,7 @@ export async function checkAdminPrivileges(userId: string) {
       select: { type: true },
     });
 
-    if (!dbUser?.type || (dbUser.type !== UserType.ADMIN && dbUser.type !== UserType.SUPER_ADMIN && dbUser.type !== UserType.HELPDESK)) {
+    if (!dbUser?.type || !hasAdminPrivileges(dbUser.type)) {
       return {
         error: NextResponse.json(
           { error: "Forbidden - Insufficient permissions" },

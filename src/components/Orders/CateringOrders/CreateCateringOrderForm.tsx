@@ -765,11 +765,27 @@ export const CreateCateringOrderForm: React.FC<
         </div>
         <div className="space-y-1">
           <Label htmlFor={`${fieldName}.county`}>County (Optional)</Label>
-          <Input
-            id={`${fieldName}.county`}
-            {...register(`${fieldName}.county`)}
-            placeholder="Los Angeles"
+          <Controller
+            name={`${fieldName}.county`}
+            control={control}
+            render={({ field }) => (
+              <Select value={field.value || ""} onValueChange={field.onChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Bay Area county" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bayAreaCountyValues.map((county) => (
+                    <SelectItem key={county} value={county}>
+                      {county}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           />
+          <p className="text-xs text-gray-500">
+            Bay Area counties only
+          </p>
         </div>
       </div>
     </div>

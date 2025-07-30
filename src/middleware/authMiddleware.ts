@@ -7,6 +7,13 @@ import { UserType } from "@/types/prisma";
 
 import { prisma } from "@/utils/prismaDB";
 
+// Helper function to check if user has admin privileges
+function hasAdminPrivileges(userType: string): boolean {
+  // Handle both lowercase and uppercase user types
+  const normalizedType = userType?.toUpperCase();
+  return normalizedType === 'ADMIN' || normalizedType === 'SUPER_ADMIN' || normalizedType === 'HELPDESK';
+}
+
 export async function validateAdminRole(request: Request) {
   try {
     // Dynamically import and create Supabase client
@@ -26,7 +33,7 @@ export async function validateAdminRole(request: Request) {
       select: { type: true },
     });
 
-    if (!dbUser || (dbUser.type !== UserType.ADMIN && dbUser.type !== UserType.SUPER_ADMIN && dbUser.type !== UserType.HELPDESK)) {
+    if (!dbUser || !hasAdminPrivileges(dbUser.type)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

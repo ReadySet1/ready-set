@@ -20,7 +20,22 @@ export async function PATCH(
     // Check if user is authorized (admin or helpdesk)
     const supabase = await createClient();
     
-    const { data: { user } } = await supabase.auth.getUser();
+    // Try to get auth token from header first
+    const authHeader = request.headers.get('authorization');
+    let user;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const { data: { user: tokenUser }, error } = await supabase.auth.getUser(token);
+      if (error) {
+        console.error('Token auth error:', error);
+      }
+      user = tokenUser;
+    } else {
+      // Fallback to session-based auth
+      const { data: { user: sessionUser } } = await supabase.auth.getUser();
+      user = sessionUser;
+    }
     
     if (!user || !user.email) {
       return NextResponse.json(
