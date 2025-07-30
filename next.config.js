@@ -18,11 +18,20 @@ const nextConfig = {
     return [];
   },
 
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev, isEdgeRuntime }) => {
     // Configure externals for server-side rendering
     if (isServer) {
       config.externals = config.externals || [];
       config.externals.push('pg');
+    }
+    
+    // Handle Prisma client during build
+    if (isServer && !dev) {
+      // Ensure Prisma client is properly bundled
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@prisma/client': path.resolve(__dirname, 'node_modules/.prisma/client'),
+      };
     }
     
     return config;

@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
     // --- Build WHERE Clause ---
-    const where: Prisma.ProfileWhereInput = {};
+    const where: any = {};
 
     if (search) {
       where.OR = [
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     }
 
     // --- Build ORDER BY Clause ---
-    const orderBy: Prisma.ProfileOrderByWithRelationInput = {};
+    const orderBy: any = {};
     if (sortField && (sortOrder === "asc" || sortOrder === "desc")) {
       (orderBy as any)[sortField] = sortOrder;
     }

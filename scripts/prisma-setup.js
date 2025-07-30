@@ -59,6 +59,14 @@ try {
   
   log('Prisma client generated successfully!');
   
+  // Verify the client index file exists
+  const clientIndexPath = path.join(prismaClientPath, 'index.js');
+  if (!fs.existsSync(clientIndexPath)) {
+    throw new Error('Prisma client index file not found at: ' + clientIndexPath);
+  }
+  
+  log('Prisma client index file verified!');
+  
   // Create a verification file to ensure Prisma client is initialized
   const verificationPath = path.join(process.cwd(), '.prisma-initialized');
   fs.writeFileSync(verificationPath, JSON.stringify({
@@ -90,6 +98,18 @@ try {
     }
   } catch (validationError) {
     log('Warning: Could not validate unified Prisma client:', validationError.message);
+  }
+  
+  // Test Prisma client import (only in development)
+  if (process.env.NODE_ENV === 'development') {
+    try {
+      log('Testing Prisma client import...');
+      const { PrismaClient } = require('@prisma/client');
+      const testClient = new PrismaClient();
+      log('Prisma client import test successful!');
+    } catch (importError) {
+      log('Warning: Prisma client import test failed:', importError.message);
+    }
   }
   
   log('Prisma setup complete!');

@@ -36,7 +36,7 @@ afterAll(() => {
 
 describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
   const mockContext = {
-    params: { id: 'test-app-id' },
+    params: Promise.resolve({ id: 'test-app-id' }),
   };
 
   beforeEach(() => {
@@ -74,7 +74,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status: 'APPROVED' }),
-    });
+    }) as NextRequest;
 
     const response = await PATCH(request, mockContext);
     const data = await response.json();
@@ -118,7 +118,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
         'Authorization': 'Bearer valid-token-123',
       },
       body: JSON.stringify({ status: 'REJECTED' }),
-    });
+    }) as NextRequest;
 
     const response = await PATCH(request, mockContext);
     const data = await response.json();
@@ -168,7 +168,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
         'Authorization': 'Bearer invalid-token',
       },
       body: JSON.stringify({ status: 'PENDING' }),
-    });
+    }) as NextRequest;
 
     const response = await PATCH(request, mockContext);
     const data = await response.json();
@@ -191,7 +191,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status: 'APPROVED' }),
-    });
+    }) as NextRequest;
 
     const response = await PATCH(request, mockContext);
     const data = await response.json();
@@ -225,7 +225,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status: 'APPROVED' }),
-    });
+    }) as NextRequest;
 
     const response = await PATCH(request, mockContext);
     const data = await response.json();
@@ -258,7 +258,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({}), // Missing status
-    });
+    }) as NextRequest;
 
     const response = await PATCH(request, mockContext);
     const data = await response.json();
@@ -291,7 +291,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status: 'INVALID_STATUS' }),
-    });
+    }) as NextRequest;
 
     const response = await PATCH(request, mockContext);
     const data = await response.json();
@@ -330,7 +330,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status: 'APPROVED' }),
-    });
+    }) as NextRequest;
 
     const response = await PATCH(request, mockContext);
     const data = await response.json();
@@ -358,7 +358,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
         'Content-Type': 'application/json',
       },
       body: 'invalid json',
-    });
+    }) as NextRequest;
 
     const response = await PATCH(request, mockContext);
     const data = await response.json();
@@ -398,7 +398,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status: 'UNDER_REVIEW' }),
-    });
+    }) as NextRequest;
 
     const response = await PATCH(request, mockContext);
     const data = await response.json();
@@ -433,7 +433,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status: 'APPROVED' }),
-    });
+    }) as NextRequest;
 
     const response = await PATCH(request, mockContext);
     const data = await response.json();
@@ -475,7 +475,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ status }),
-      });
+      }) as NextRequest;
 
       const response = await PATCH(request, mockContext);
       const data = await response.json();

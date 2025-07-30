@@ -240,7 +240,7 @@ async function fetchOptimizedOrders(
   ]);
 
   // Transform and combine results
-  const transformedCatering: OptimizedOrderData[] = cateringOrders.map(order => ({
+  const transformedCatering: OptimizedOrderData[] = (cateringOrders as any[]).map((order: any) => ({
     id: order.id,
     orderNumber: order.orderNumber,
     pickupDateTime: order.pickupDateTime,
@@ -257,7 +257,7 @@ async function fetchOptimizedOrders(
     updatedAt: order.updatedAt
   }));
 
-  const transformedOnDemand: OptimizedOrderData[] = onDemandOrders.map(order => ({
+  const transformedOnDemand: OptimizedOrderData[] = (onDemandOrders as any[]).map((order: any) => ({
     id: order.id,
     orderNumber: order.orderNumber,
     pickupDateTime: order.pickupDateTime,
@@ -276,7 +276,7 @@ async function fetchOptimizedOrders(
 
   // Combine and sort results
   const allOrders = [...transformedCatering, ...transformedOnDemand];
-  const totalCount = cateringCount + onDemandCount;
+  const totalCount = (cateringCount as number) + (onDemandCount as number);
 
   // Sort combined results in memory (more efficient for small datasets)
   allOrders.sort((a, b) => {

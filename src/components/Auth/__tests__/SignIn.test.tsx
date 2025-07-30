@@ -136,6 +136,9 @@ describe('SignIn Component', () => {
         isLoading: false,
         session: null,
         user: null,
+        userRole: null,
+        error: null,
+        refreshUserData: jest.fn(),
       });
     });
 
@@ -196,6 +199,9 @@ describe('SignIn Component', () => {
         isLoading: false,
         session: null,
         user: null,
+        userRole: null,
+        error: null,
+        refreshUserData: jest.fn(),
       });
     });
 
@@ -301,6 +307,9 @@ describe('SignIn Component', () => {
         isLoading: false,
         session: null,
         user: null,
+        userRole: null,
+        error: null,
+        refreshUserData: jest.fn(),
       });
     });
 
@@ -395,6 +404,9 @@ describe('SignIn Component', () => {
         isLoading: false,
         session: null,
         user: null,
+        userRole: null,
+        error: null,
+        refreshUserData: jest.fn(),
       });
     });
 
@@ -422,6 +434,9 @@ describe('SignIn Component', () => {
         isLoading: false,
         session: null,
         user: null,
+        userRole: null,
+        error: null,
+        refreshUserData: jest.fn(),
       });
     });
 

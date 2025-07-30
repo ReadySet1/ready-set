@@ -15,6 +15,7 @@ declare global {
 // Environment configuration
 const isDevelopment = process.env.NODE_ENV === 'development'
 const isProduction = process.env.NODE_ENV === 'production'
+const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build'
 const databaseUrl = process.env.DATABASE_URL
 const directUrl = process.env.DIRECT_URL
 
@@ -35,13 +36,76 @@ const POOL_CONFIG = {
 }
 
 // Enhanced logging configuration
-const LOG_CONFIG: Prisma.LogLevel[] = isDevelopment 
+const LOG_CONFIG: any[] = isDevelopment 
   ? ['query', 'error', 'warn', 'info']
   : ['error', 'warn']
+
+// Create a mock Prisma client for build-time
+const createMockPrismaClient = (): PrismaClient => {
+  console.log('⚠️ Creating mock Prisma client for build-time analysis (pooled)')
+  
+  // Create a mock client with all the necessary methods
+  const mockClient = {
+    // Add all the models as empty objects with basic methods
+    jobApplication: {
+      count: async () => 0,
+      findMany: async () => [],
+      findUnique: async () => null,
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+      groupBy: async () => [],
+    },
+    profile: {
+      count: async () => 0,
+      findMany: async () => [],
+      findUnique: async () => null,
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+    },
+    order: {
+      count: async () => 0,
+      findMany: async () => [],
+      findUnique: async () => null,
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+    },
+    cateringRequest: {
+      count: async () => 0,
+      findMany: async () => [],
+      findUnique: async () => null,
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+    },
+    fileUpload: {
+      count: async () => 0,
+      findMany: async () => [],
+      findUnique: async () => null,
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+    },
+    // Add other models as needed
+    $connect: async () => {},
+    $disconnect: async () => {},
+    $transaction: async (fn: any) => fn(mockClient),
+    $queryRaw: async () => [],
+  } as any as PrismaClient
+
+  return mockClient
+}
 
 // Create optimized Prisma client with connection pooling
 const createOptimizedPrismaClient = (): PrismaClient => {
   console.log('🔄 Creating optimized Prisma client with connection pooling...')
+  
+  // During build time, we might not have a database connection
+  if (isBuildTime) {
+    return createMockPrismaClient()
+  }
   
   if (!databaseUrl) {
     console.error('❌ DATABASE_URL is not defined. Please check your environment variables.')
@@ -92,11 +156,32 @@ const createOptimizedPrismaClient = (): PrismaClient => {
 }
 
 // Singleton pattern with connection pooling
-const prismaPooled = globalThis.prismaPooled ?? createOptimizedPrismaClient()
+let prismaPooled: PrismaClient
 
-// Store in global for development hot reload
-if (isDevelopment) {
-  globalThis.prismaPooled = prismaPooled
+try {
+  // Use global instance if available (for development hot reload)
+  if (globalThis.prismaPooled) {
+    prismaPooled = globalThis.prismaPooled
+    console.log('🔄 Using existing global Prisma pooled client')
+  } else {
+    prismaPooled = createOptimizedPrismaClient()
+    
+    // Store in global for development hot reload
+    if (isDevelopment && !isBuildTime) {
+      globalThis.prismaPooled = prismaPooled
+      console.log('💾 Stored Prisma pooled client in global for development')
+    }
+  }
+} catch (error) {
+  console.error('❌ Failed to initialize Prisma pooled client:', error)
+  
+  // In production build, create a mock client for build-time analysis
+  if (isBuildTime) {
+    console.log('⚠️ Creating mock Prisma pooled client for build-time analysis')
+    prismaPooled = createMockPrismaClient()
+  } else {
+    throw error
+  }
 }
 
 // Graceful shutdown handling
