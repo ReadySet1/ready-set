@@ -23,12 +23,12 @@ async function fixAdminUser() {
       return;
     }
 
-    allUsers.forEach((user, index) => {
+    allUsers.forEach((user: any, index: number) => {
       console.log(`${index + 1}. ${user.email} (${user.name || 'No name'}) - Type: ${user.type} - Status: ${user.status}`);
     });
 
     // Check for users with lowercase types that need to be fixed
-    const usersToFix = allUsers.filter(user => {
+    const usersToFix = allUsers.filter((user: any) => {
       const type = user.type as string;
       return type === 'admin' || type === 'super_admin' || type === 'helpdesk' || 
              type === 'vendor' || type === 'client' || type === 'driver';
@@ -80,13 +80,13 @@ async function fixAdminUser() {
     }
 
     // Check for admin users specifically
-    const adminUsers = allUsers.filter(user => {
+    const adminUsers = allUsers.filter((user: any) => {
       const normalizedType = user.type?.toUpperCase();
       return normalizedType === 'ADMIN' || normalizedType === 'SUPER_ADMIN' || normalizedType === 'HELPDESK';
     });
 
     console.log(`\n👑 Admin users found: ${adminUsers.length}`);
-    adminUsers.forEach((user, index) => {
+    adminUsers.forEach((user: any, index: number) => {
       console.log(`${index + 1}. ${user.email} (${user.name || 'No name'}) - Type: ${user.type}`);
     });
 
@@ -129,7 +129,7 @@ async function fixAdminUser() {
       orderBy: { createdAt: 'desc' }
     });
 
-    finalUsers.forEach((user, index) => {
+    finalUsers.forEach((user: any, index: number) => {
       const normalizedType = user.type?.toUpperCase();
       const hasAdminPrivileges = normalizedType === 'ADMIN' || normalizedType === 'SUPER_ADMIN' || normalizedType === 'HELPDESK';
       console.log(`${index + 1}. ${user.email} (${user.name || 'No name'}) - Type: ${user.type} - Admin: ${hasAdminPrivileges ? '✅' : '❌'}`);

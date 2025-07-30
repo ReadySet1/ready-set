@@ -15,12 +15,12 @@ async function fixUserTypes() {
     });
 
     console.log('\n📋 Current users in database:');
-    users.forEach((user, index) => {
+    users.forEach((user: any, index: number) => {
       console.log(`${index + 1}. ${user.email} (${user.name || 'No name'}) - Type: ${user.type}`);
     });
 
     // Check for users with lowercase types that need to be fixed
-    const usersToFix = users.filter(user => {
+    const usersToFix = users.filter((user: any) => {
       const type = user.type as string;
       return type === 'admin' || type === 'super_admin' || type === 'helpdesk' || 
              type === 'vendor' || type === 'client' || type === 'driver';
@@ -32,7 +32,7 @@ async function fixUserTypes() {
     }
 
     console.log(`\n🔧 Found ${usersToFix.length} users with lowercase types that need to be fixed:`);
-    usersToFix.forEach((user, index) => {
+    usersToFix.forEach((user: any, index: number) => {
       console.log(`${index + 1}. ${user.email} - Current type: ${user.type}`);
     });
 
@@ -89,7 +89,7 @@ async function fixUserTypes() {
     });
 
     console.log('\n📋 Final user types:');
-    finalUsers.forEach((user, index) => {
+    finalUsers.forEach((user: any, index: number) => {
       console.log(`${index + 1}. ${user.email} (${user.name || 'No name'}) - Type: ${user.type}`);
     });
 

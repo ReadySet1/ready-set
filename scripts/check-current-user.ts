@@ -42,11 +42,11 @@ async function checkCurrentUser() {
       });
       
       console.log('\n📋 All users in database:');
-      allUsers.forEach((user, index) => {
+      allUsers.forEach((user: any, index: number) => {
         console.log(`${index + 1}. ${user.email} (${user.name || 'No name'}) - Type: ${user.type} - Status: ${user.status}`);
       });
     } else {
-      users.forEach((user, index) => {
+      users.forEach((user: any, index: number) => {
         console.log(`${index + 1}. ${user.email} (${user.name || 'No name'}) - Type: ${user.type} - Status: ${user.status}`);
         
         // Check if this user has admin privileges

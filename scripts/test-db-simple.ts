@@ -2,8 +2,8 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
-// Set NODE_ENV
-process.env.NODE_ENV = 'development';
+// Set NODE_ENV - use a different approach to avoid read-only property error
+const nodeEnv = process.env.NODE_ENV || 'development';
 
 // Now import Prisma
 import { PrismaClient } from '@prisma/client';
@@ -20,7 +20,7 @@ async function testDatabaseConnection() {
   try {
     console.log('🔍 Testing database connection...');
     console.log('📊 Environment check:', {
-      NODE_ENV: process.env.NODE_ENV,
+      NODE_ENV: nodeEnv,
       hasDatabaseUrl: !!process.env.DATABASE_URL,
       databaseUrlPreview: process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 30) + '...' : 'NOT SET'
     });
@@ -58,7 +58,7 @@ async function testDatabaseConnection() {
     });
     
     console.log('\n📋 Sample users:');
-    sampleUsers.forEach((user, index) => {
+    sampleUsers.forEach((user: any, index: number) => {
       console.log(`${index + 1}. ${user.name || 'N/A'} (${user.email}) - ${user.type} - ${user.status}`);
     });
     
@@ -84,7 +84,7 @@ async function testDatabaseConnection() {
     });
     
     console.log('\n📋 Sample catering orders:');
-    sampleCateringOrders.forEach((order, index) => {
+    sampleCateringOrders.forEach((order: any, index: number) => {
       console.log(`${index + 1}. ${order.orderNumber} - ${order.user?.name || 'N/A'} - $${order.orderTotal} - ${order.status}`);
     });
     

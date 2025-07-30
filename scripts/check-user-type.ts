@@ -19,7 +19,7 @@ async function checkUserType() {
     });
 
     console.log('\n📋 Recent users in database:');
-    users.forEach((user, index) => {
+    users.forEach((user: any, index: number) => {
       console.log(`${index + 1}. ${user.email} (${user.name || 'No name'}) - Type: ${user.type}`);
     });
 
@@ -42,7 +42,7 @@ async function checkUserType() {
     if (adminUsers.length === 0) {
       console.log('❌ No admin users found in database');
     } else {
-      adminUsers.forEach((user, index) => {
+      adminUsers.forEach((user: any, index: number) => {
         console.log(`${index + 1}. ${user.email} (${user.name || 'No name'}) - Type: ${user.type}`);
       });
     }
