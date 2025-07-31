@@ -1,5 +1,5 @@
 /**
- * @jest-environment node
+ * @jest-environment jsdom
  */
 import { Metadata } from 'next';
 

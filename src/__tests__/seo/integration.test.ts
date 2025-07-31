@@ -1,5 +1,5 @@
 /**
- * @jest-environment node
+ * @jest-environment jsdom
  */
 import { NextRequest, NextResponse } from 'next/server';
 
