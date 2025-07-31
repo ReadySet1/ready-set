@@ -249,6 +249,7 @@ describe("AddressManager Refresh Functionality", () => {
   });
 
   it("handles API fetch errors properly", async () => {
+    // Mock fetch to return an error response
     (fetch as jest.Mock).mockResolvedValue({
       ok: false,
       status: 500,
@@ -257,12 +258,8 @@ describe("AddressManager Refresh Functionality", () => {
 
     render(<AddressManager {...defaultProps} />);
 
-    // Add debug logging to see what's happening
-    console.log('Mock onError calls:', mockOnError.mock.calls);
-    console.log('Mock onError call count:', mockOnError.mock.calls.length);
-
+    // Wait for the error to be handled
     await waitFor(() => {
-      console.log('Inside waitFor - Mock onError calls:', mockOnError.mock.calls);
       expect(mockOnError).toHaveBeenCalledWith(
         "Error fetching addresses: Internal Server Error",
       );
