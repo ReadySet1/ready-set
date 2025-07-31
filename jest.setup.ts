@@ -37,6 +37,22 @@ process.env.SANITY_API_TOKEN = 'test-token';
 import { TextEncoder, TextDecoder } from 'util';
 Object.assign(global, { TextEncoder, TextDecoder });
 
+// Mock Next.js Image component
+jest.mock('next/image', () => ({
+  __esModule: true,
+  default: ({ src, alt, width, height, ...props }: any) => {
+    // eslint-disable-next-line @next/next/no-img-element
+    return React.createElement('img', { src, alt, width, height, ...props });
+  },
+}));
+
+// Mock Next.js Link component
+jest.mock('next/link', () => {
+  return function MockLink({ children, href, ...props }: any) {
+    return React.createElement('a', { href, ...props }, children);
+  };
+});
+
 // React 18 test environment setup
 import { configure } from '@testing-library/react';
 
