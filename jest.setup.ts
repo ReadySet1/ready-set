@@ -2,9 +2,16 @@
 // Polyfills for Jest environment
 
 import '@testing-library/jest-dom';
+import React from 'react';
 
 // Set up test environment variables
-process.env.NODE_ENV = 'test';
+// Use Object.defineProperty to avoid read-only property error
+Object.defineProperty(process.env, 'NODE_ENV', {
+  value: 'test',
+  writable: true,
+  configurable: true,
+});
+
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test_db';
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
@@ -249,7 +256,8 @@ jest.mock('next/server', () => ({
 }));
 
 // Also mock NextResponse directly for API routes
-global.NextResponse = mockNextResponse as any;
+// Use proper typing for global assignment
+(global as any).NextResponse = mockNextResponse;
 
 // Mock Radix UI Select primitive
 jest.mock('@radix-ui/react-select', () => {
@@ -293,13 +301,6 @@ jest.mock('framer-motion', () => ({
   },
   AnimatePresence: ({ children }: any) => children,
 }));
-
-// Set up environment variables for tests
-process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test_db";
-process.env.NEXTAUTH_SECRET = "test-secret";
-process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
-process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
-process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
 
 // Increase timeout for async operations
 jest.setTimeout(30000); 
