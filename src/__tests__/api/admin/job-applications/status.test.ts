@@ -25,7 +25,15 @@ const mockSupabaseClient = {
 const mockSingleQuery = jest.fn();
 const mockEqQuery = jest.fn(() => ({ single: mockSingleQuery }));
 const mockSelectQuery = jest.fn(() => ({ eq: mockEqQuery }));
-const mockFromQuery = jest.fn(() => ({ select: mockSelectQuery }));
+const mockUpdateQuery = jest.fn(() => ({
+  eq: jest.fn(() => ({
+    select: jest.fn(),
+  })),
+}));
+const mockFromQuery = jest.fn(() => ({ 
+  select: mockSelectQuery,
+  update: mockUpdateQuery 
+}));
 
 // Override the from method to return our chained mock
 mockSupabaseClient.from = mockFromQuery;
@@ -46,7 +54,7 @@ jest.mock('@/utils/prismaDB', () => ({
 // Mock console.error to avoid cluttering test output
 const originalConsoleError = console.error;
 beforeAll(() => {
-  console.error = jest.fn();
+  console.error = jest.fn() as jest.MockedFunction<typeof console.error>;
 });
 
 afterAll(() => {
@@ -64,8 +72,8 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
 
   afterEach(() => {
     // Log any console errors to help debug
-    if (console.error.mock.calls.length > 0) {
-      console.log('Console errors:', console.error.mock.calls);
+    if ((console.error as jest.MockedFunction<typeof console.error>).mock.calls.length > 0) {
+      console.log('Console errors:', (console.error as jest.MockedFunction<typeof console.error>).mock.calls);
     }
   });
 
