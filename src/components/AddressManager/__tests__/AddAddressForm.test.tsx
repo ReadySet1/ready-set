@@ -7,10 +7,10 @@ import { COUNTIES } from "@/components/Auth/SignUp/ui/FormData";
 // Mock the FormData import
 jest.mock("@/components/Auth/SignUp/ui/FormData", () => ({
   COUNTIES: [
-    { value: "san-francisco", label: "San Francisco" },
-    { value: "san-mateo", label: "San Mateo" },
-    { value: "santa-clara", label: "Santa Clara" },
-    { value: "alameda", label: "Alameda" },
+    { value: "San Francisco", label: "San Francisco" },
+    { value: "San Mateo", label: "San Mateo" },
+    { value: "Santa Clara", label: "Santa Clara" },
+    { value: "Alameda", label: "Alameda" },
   ],
 }));
 
@@ -53,19 +53,32 @@ describe("AddAddressForm County Dropdown", () => {
   it("allows county selection and preserves the value", async () => {
     render(<AddAddressForm {...defaultProps} />);
 
+    // Wait for counties to be loaded and San Francisco to be available
+    await waitFor(() => {
+      const countyTrigger = screen.getByRole("combobox", { name: /county/i });
+      expect(countyTrigger).toBeInTheDocument();
+    });
+
     const countyTrigger = screen.getByRole("combobox", { name: /county/i });
     await userEvent.click(countyTrigger);
+
+    // Wait for the dropdown to open and San Francisco to be available
+    await waitFor(() => {
+      expect(screen.getByText("San Francisco")).toBeInTheDocument();
+    });
 
     // Select San Francisco
     const sanFranciscoOption = screen.getByText("San Francisco");
     await userEvent.click(sanFranciscoOption);
 
     // Verify the selection persists
-    expect(countyTrigger).toHaveTextContent("San Francisco");
+    await waitFor(() => {
+      expect(countyTrigger).toHaveTextContent("San Francisco");
+    });
   });
 
   it("initializes with provided counties when allowedCounties prop is passed", async () => {
-    const allowedCounties = ["san-francisco", "san-mateo"];
+    const allowedCounties = ["San Francisco", "San Mateo"];
 
     render(
       <AddAddressForm {...defaultProps} allowedCounties={allowedCounties} />,
@@ -139,9 +152,21 @@ describe("AddAddressForm County Dropdown", () => {
   it("submits form successfully when all required fields including county are filled", async () => {
     render(<AddAddressForm {...defaultProps} />);
 
+    // Wait for counties to be loaded
+    await waitFor(() => {
+      const countyTrigger = screen.getByRole("combobox", { name: /county/i });
+      expect(countyTrigger).toBeInTheDocument();
+    });
+
     // Fill all required fields
     const countyTrigger = screen.getByRole("combobox", { name: /county/i });
     await userEvent.click(countyTrigger);
+
+    // Wait for the dropdown to open and San Francisco to be available
+    await waitFor(() => {
+      expect(screen.getByText("San Francisco")).toBeInTheDocument();
+    });
+
     await userEvent.click(screen.getByText("San Francisco"));
 
     await userEvent.type(
@@ -159,7 +184,7 @@ describe("AddAddressForm County Dropdown", () => {
     // Should call onSubmit with correct data
     expect(mockOnSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
-        county: "san-francisco",
+        county: "San Francisco",
         street1: "123 Main St",
         city: "San Francisco",
         state: "CA",

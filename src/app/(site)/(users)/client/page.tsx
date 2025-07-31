@@ -413,7 +413,7 @@ const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
             </Link>
 
             <Link
-              href="/addresses"
+              href="/client/addresses"
               className="flex items-center rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
             >
               <div className="mr-3 rounded-md bg-blue-50 p-2">
@@ -428,7 +428,7 @@ const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
             </Link>
 
             <Link
-              href="/profile"
+              href="/client/profile"
               className="flex items-center rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
             >
               <div className="mr-3 rounded-md bg-purple-50 p-2">
