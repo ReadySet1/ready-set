@@ -3,6 +3,7 @@ import { render, screen, waitFor, act, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CateringOrderForm from "../CateringOrderForm";
 import { Address } from "@/types/address";
+import { createFutureDate } from "@/__tests__/utils/test-utils";
 
 // Mock Next.js router
 const mockPush = jest.fn();
@@ -211,9 +212,7 @@ describe("CateringOrderForm", () => {
     });
 
     // Use a future date to avoid validation errors
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + 30);
-    const futureDateString = futureDate.toISOString().split("T")[0];
+    const futureDateString = createFutureDate();
 
     await act(async () => {
       await user.type(eventNameInput, "Test Event");
@@ -319,9 +318,7 @@ describe("CateringOrderForm", () => {
     });
 
     // Use a future date
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + 30);
-    const futureDateString = futureDate.toISOString().split("T")[0];
+    const futureDateString = createFutureDate();
 
     await act(async () => {
       await user.type(eventNameInput, "Test Event Error");
@@ -383,9 +380,7 @@ describe("CateringOrderForm", () => {
       await user.type(eventNameInput, "Test Event Error");
 
       // Use a future date
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + 30);
-      const futureDateString = futureDate.toISOString().split("T")[0];
+      const futureDateString = createFutureDate();
 
       await user.type(screen.getByLabelText(/event date/i), futureDateString);
       await user.type(screen.getByLabelText(/event time/i), "11:00");
@@ -423,9 +418,7 @@ describe("CateringOrderForm", () => {
     });
 
     // Use a future date
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + 30);
-    const futureDateString = futureDate.toISOString().split("T")[0];
+    const futureDateString = createFutureDate();
 
     await act(async () => {
       await user.type(eventNameInput, "Test Event");
@@ -488,9 +481,7 @@ describe("CateringOrderForm", () => {
       await user.type(eventNameInput, "Test Event Error");
 
       // Use a future date
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + 30);
-      const futureDateString = futureDate.toISOString().split("T")[0];
+      const futureDateString = createFutureDate();
 
       await user.type(screen.getByLabelText(/event date/i), futureDateString);
       await user.type(screen.getByLabelText(/event time/i), "11:00");

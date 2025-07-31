@@ -109,7 +109,9 @@ export const mockAddresses = [mockAddress];
 export const createFutureDate = (daysFromNow: number = 30): string => {
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + daysFromNow);
-  return futureDate.toISOString().split('T')[0];
+  const dateString = futureDate.toISOString().split('T')[0];
+  // Ensure we always return a string, even if split fails
+  return dateString || futureDate.toISOString().substring(0, 10);
 };
 
 // Helper function to wait for async operations
