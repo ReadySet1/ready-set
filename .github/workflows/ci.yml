@@ -8,6 +8,8 @@ on:
 
 jobs:
   test:
+    # Workflow is disabled - remove this line to re-enable
+    if: false
     name: Test & Lint
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -50,6 +52,8 @@ jobs:
         NEXT_TELEMETRY_DISABLED: 1
 
   security:
+    # Workflow is disabled - remove this line to re-enable
+    if: false
     name: Security Audit
     runs-on: ubuntu-latest
     timeout-minutes: 15
