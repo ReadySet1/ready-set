@@ -5,7 +5,7 @@ import "@testing-library/jest-dom";
 import FlowerHero from "../FlowerHero";
 
 // Mock framer-motion
-jest.mock('framer-motion', () => ({
+jest.mock("framer-motion", () => ({
   motion: (component: string) => component,
   AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -18,18 +18,25 @@ jest.mock("@/components/Logistics/QuoteRequest/Quotes/FormManager", () => ({
   FormManager: () => ({
     openForm: mockOpenForm,
     closeForm: mockCloseForm,
-    DialogForm: React.createElement('div', { 'data-testid': 'mock-dialog-form' }, 'Dialog Form'),
+    DialogForm: () =>
+      React.createElement(
+        "div",
+        { "data-testid": "mock-dialog-form" },
+        "Dialog Form",
+      ),
   }),
 }));
 
 // Mock ScheduleDialog
 jest.mock("../../Logistics/Schedule", () => {
-  const ScheduleDialog = ({ buttonText, customButton, calendarUrl }: any) => (
-    <div data-testid="mock-schedule-dialog">
-      {customButton || <button>{buttonText}</button>}
-    </div>
-  );
-  return { ScheduleDialog };
+  const ScheduleDialog = ({ buttonText, customButton, calendarUrl }: any) => {
+    return React.createElement(
+      "div",
+      { "data-testid": "mock-schedule-dialog" },
+      customButton || React.createElement("button", {}, buttonText),
+    );
+  };
+  return { default: ScheduleDialog };
 });
 
 describe("FlowerHero", () => {

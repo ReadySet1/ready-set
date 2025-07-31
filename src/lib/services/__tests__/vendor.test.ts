@@ -33,11 +33,15 @@ jest.mock("../vendor", async () => {
   };
 });
 
-// Re-import after mocking to get the mocked getCurrentUserId
-const vendorModule = await import("../vendor");
-const getVendorOrdersActual = vendorModule.getVendorOrders;
-
 describe("getVendorOrders Service", () => {
+  let getVendorOrdersActual: typeof getVendorOrders;
+
+  beforeAll(async () => {
+    // Re-import after mocking to get the mocked getCurrentUserId
+    const vendorModule = await import("../vendor");
+    getVendorOrdersActual = vendorModule.getVendorOrders;
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetCurrentUserId.mockResolvedValue("test-user-id");

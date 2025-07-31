@@ -3,6 +3,29 @@
 
 import '@testing-library/jest-dom';
 
+// Set up test environment variables
+process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test_db';
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
+process.env.NEXTAUTH_SECRET = 'test-secret-key';
+process.env.NEXTAUTH_URL = 'http://localhost:3000';
+process.env.GOOGLE_CLIENT_ID = 'test-google-client-id';
+process.env.GOOGLE_CLIENT_SECRET = 'test-google-client-secret';
+process.env.STRIPE_SECRET_KEY = 'sk_test_test';
+process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_test';
+process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
+process.env.SENDGRID_API_KEY = 'test-sendgrid-key';
+process.env.RESEND_API_KEY = 'test-resend-key';
+process.env.OPENAI_API_KEY = 'test-openai-key';
+process.env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
+process.env.CLOUDINARY_API_KEY = 'test-api-key';
+process.env.CLOUDINARY_API_SECRET = 'test-api-secret';
+process.env.SANITY_PROJECT_ID = 'test-project';
+process.env.SANITY_DATASET = 'test-dataset';
+process.env.SANITY_API_TOKEN = 'test-token';
+
 // Fix TextEncoder/Decoder for Node 18+
 import { TextEncoder, TextDecoder } from 'util';
 Object.assign(global, { TextEncoder, TextDecoder });
@@ -87,23 +110,26 @@ if (typeof window !== 'undefined' && !window.PointerEvent) {
   window.PointerEvent = PointerEvent as any;
 }
 
-if (typeof Element !== 'undefined' && !Element.prototype.setPointerCapture) {
-  Element.prototype.setPointerCapture = function(pointerId: number) { 
-    // No-op: JSDOM doesn't support pointer capture
-  };
-}
+// Fix hasPointerCapture and related pointer capture methods for JSDOM
+if (typeof Element !== 'undefined') {
+  if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = function(pointerId: number) { 
+      // No-op: JSDOM doesn't support pointer capture
+    };
+  }
 
-if (typeof Element !== 'undefined' && !Element.prototype.releasePointerCapture) {
-  Element.prototype.releasePointerCapture = function(pointerId: number) {
-    // No-op: JSDOM doesn't support pointer capture
-  };
-}
+  if (!Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = function(pointerId: number) {
+      // No-op: JSDOM doesn't support pointer capture
+    };
+  }
 
-if (typeof Element !== 'undefined' && !Element.prototype.hasPointerCapture) {
-  Element.prototype.hasPointerCapture = function(pointerId: number): boolean {
-    // No-op: JSDOM doesn't support pointer capture
-    return false;
-  };
+  if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = function(pointerId: number): boolean {
+      // No-op: JSDOM doesn't support pointer capture
+      return false;
+    };
+  }
 }
 
 // Mock window methods
@@ -220,6 +246,52 @@ const mockNextResponse = {
 jest.mock('next/server', () => ({
   NextRequest: jest.fn(),
   NextResponse: mockNextResponse,
+}));
+
+// Also mock NextResponse directly for API routes
+global.NextResponse = mockNextResponse as any;
+
+// Mock Radix UI Select primitive
+jest.mock('@radix-ui/react-select', () => {
+  const React = require('react');
+  return {
+    Root: ({ children, ...props }: any) => React.createElement('div', props, children),
+    Group: ({ children, ...props }: any) => React.createElement('div', props, children),
+    Value: ({ children, ...props }: any) => React.createElement('span', props, children),
+    Trigger: ({ children, ...props }: any) => React.createElement('button', { ...props, role: 'combobox' }, children),
+    Content: ({ children, ...props }: any) => React.createElement('div', props, children),
+    Label: ({ children, ...props }: any) => React.createElement('div', props, children),
+    Item: ({ children, ...props }: any) => React.createElement('div', props, children),
+    Separator: ({ children, ...props }: any) => React.createElement('div', props, children),
+    ScrollUpButton: ({ children, ...props }: any) => React.createElement('button', props, children),
+    ScrollDownButton: ({ children, ...props }: any) => React.createElement('button', props, children),
+    Viewport: ({ children, ...props }: any) => React.createElement('div', props, children),
+    Portal: ({ children, ...props }: any) => children,
+    ItemIndicator: ({ children, ...props }: any) => React.createElement('span', props, children),
+    ItemText: ({ children, ...props }: any) => React.createElement('span', props, children),
+    Icon: ({ children, ...props }: any) => React.createElement('span', props, children),
+  };
+});
+
+// Mock other Radix UI components that might be used
+jest.mock('@radix-ui/react-tabs', () => {
+  const React = require('react');
+  return {
+    Root: ({ children, ...props }: any) => React.createElement('div', props, children),
+    List: ({ children, ...props }: any) => React.createElement('div', { ...props, role: 'tablist' }, children),
+    Trigger: ({ children, ...props }: any) => React.createElement('button', { ...props, role: 'tab' }, children),
+    Content: ({ children, ...props }: any) => React.createElement('div', { ...props, role: 'tabpanel' }, children),
+  };
+});
+
+// Mock framer-motion
+jest.mock('framer-motion', () => ({
+  motion: {
+    div: ({ children, ...props }: any) => React.createElement('div', props, children),
+    span: ({ children, ...props }: any) => React.createElement('span', props, children),
+    button: ({ children, ...props }: any) => React.createElement('button', props, children),
+  },
+  AnimatePresence: ({ children }: any) => children,
 }));
 
 // Set up environment variables for tests

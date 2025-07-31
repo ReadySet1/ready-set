@@ -4,7 +4,10 @@ import userEvent from "@testing-library/user-event";
 import AdminProfileView from "../AdminProfileView";
 import { UserFormValues } from "../types";
 
-// Mock the router
+// Mock the useUserForm hook
+const mockUseUserForm = jest.fn();
+
+// Mock next/navigation
 const mockPush = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -15,16 +18,22 @@ jest.mock("next/navigation", () => ({
   }),
 }));
 
-// Mock the UserContext
-jest.mock("@/contexts/UserContext", () => ({
-  useUser: () => ({
-    session: { access_token: "mock-token" },
-    user: { id: "current-user-id" },
-  }),
+// Mock Supabase server
+jest.mock("@/utils/supabase/server", () => ({
+  createClient: jest.fn(() => ({
+    auth: {
+      getUser: jest.fn().mockResolvedValue({
+        data: { user: { id: "current-user-id" } },
+        error: null,
+      }),
+      getSession: jest.fn().mockResolvedValue({
+        data: { session: { access_token: "mock-token" } },
+        error: null,
+      }),
+    },
+  })),
 }));
 
-// Mock the useUserForm hook
-const mockUseUserForm = jest.fn();
 jest.mock("../hooks/useUserForm", () => ({
   useUserForm: mockUseUserForm,
 }));
@@ -96,7 +105,7 @@ describe("AdminProfileView - No Redirect Behavior", () => {
     // No third parameter (onSaveSuccess callback) should be passed
     expect(mockUseUserForm).toHaveBeenCalledWith(
       TEST_USER_ID,
-      expect.any(Function)
+      expect.any(Function),
       // Note: no third parameter means no redirect callback
     );
 
