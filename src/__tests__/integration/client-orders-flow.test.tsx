@@ -264,12 +264,12 @@ describe("Client Orders Flow Integration", () => {
       };
 
       // Verify data consistency
-      expect(dashboardOrders[0].orderNumber).toBe(
-        ordersPageData.orders[0].orderNumber,
+      expect(dashboardOrders[0]?.orderNumber).toBe(
+        ordersPageData.orders[0]?.orderNumber,
       );
-      expect(dashboardOrders[0].status).toBe(ordersPageData.orders[0].status);
-      expect(dashboardOrders[0].orderTotal).toBe(
-        ordersPageData.orders[0].orderTotal,
+      expect(dashboardOrders[0]?.status).toBe(ordersPageData.orders[0]?.status);
+      expect(dashboardOrders[0]?.orderTotal).toBe(
+        ordersPageData.orders[0]?.orderTotal,
       );
     });
 

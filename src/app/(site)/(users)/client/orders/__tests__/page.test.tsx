@@ -32,7 +32,7 @@ describe("ClientOrdersPage", () => {
       status: "ACTIVE",
       pickupDateTime: "2025-01-15T10:00:00Z",
       arrivalDateTime: "2025-01-15T11:00:00Z",
-      orderTotal: 150.00,
+      orderTotal: 150.0,
       createdAt: "2025-01-15T09:00:00Z",
       pickupAddress: {
         address: "123 Pickup St",
@@ -52,7 +52,7 @@ describe("ClientOrdersPage", () => {
       status: "PENDING",
       pickupDateTime: "2025-01-16T10:00:00Z",
       arrivalDateTime: "2025-01-16T11:00:00Z",
-      orderTotal: 75.50,
+      orderTotal: 75.5,
       createdAt: "2025-01-16T09:00:00Z",
       pickupAddress: {
         address: "789 Pickup Blvd",
@@ -82,12 +82,12 @@ describe("ClientOrdersPage", () => {
 
   describe("Loading State", () => {
     it("should show loading spinner initially", () => {
-      mockFetch.mockImplementation(() =>
-        new Promise(() => {}) // Never resolves to keep loading state
+      mockFetch.mockImplementation(
+        () => new Promise(() => {}), // Never resolves to keep loading state
       );
 
       render(<ClientOrdersPage />);
-      
+
       expect(screen.getByRole("status")).toBeInTheDocument();
       expect(screen.getByText(/loading/i)).toBeInTheDocument();
     });
@@ -109,7 +109,9 @@ describe("ClientOrdersPage", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Your Orders")).toBeInTheDocument();
-        expect(screen.getByText("View and manage your orders.")).toBeInTheDocument();
+        expect(
+          screen.getByText("View and manage your orders."),
+        ).toBeInTheDocument();
       });
     });
 
@@ -158,8 +160,12 @@ describe("ClientOrdersPage", () => {
         expect(screen.getByText("1/16/2025")).toBeInTheDocument();
 
         // Check addresses
-        expect(screen.getByText("123 Pickup St, San Francisco, CA")).toBeInTheDocument();
-        expect(screen.getByText("456 Delivery Ave, San Francisco, CA")).toBeInTheDocument();
+        expect(
+          screen.getByText("123 Pickup St, San Francisco, CA"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("456 Delivery Ave, San Francisco, CA"),
+        ).toBeInTheDocument();
 
         // Check totals
         expect(screen.getByText("$150.00")).toBeInTheDocument();
@@ -215,7 +221,7 @@ describe("ClientOrdersPage", () => {
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledWith(
-          "/api/user-orders?page=2&limit=5"
+          "/api/user-orders?page=2&limit=5",
         );
       });
     });
@@ -244,7 +250,7 @@ describe("ClientOrdersPage", () => {
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledWith(
-          "/api/user-orders?page=1&limit=5"
+          "/api/user-orders?page=1&limit=5",
         );
       });
     });
@@ -293,7 +299,9 @@ describe("ClientOrdersPage", () => {
 
       await waitFor(() => {
         expect(screen.getByText("No Orders Found")).toBeInTheDocument();
-        expect(screen.getByText(/You haven't placed any orders yet/)).toBeInTheDocument();
+        expect(
+          screen.getByText(/You haven't placed any orders yet/),
+        ).toBeInTheDocument();
         expect(screen.getByText("Create New Order")).toBeInTheDocument();
       });
     });
@@ -310,7 +318,9 @@ describe("ClientOrdersPage", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Error")).toBeInTheDocument();
-        expect(screen.getByText(/We encountered a problem loading your dashboard/)).toBeInTheDocument();
+        expect(
+          screen.getByText(/We encountered a problem loading your dashboard/),
+        ).toBeInTheDocument();
         expect(screen.getByText("Try Again")).toBeInTheDocument();
       });
     });
@@ -322,7 +332,9 @@ describe("ClientOrdersPage", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Error")).toBeInTheDocument();
-        expect(screen.getByText(/Failed to load dashboard data/)).toBeInTheDocument();
+        expect(
+          screen.getByText(/Failed to load dashboard data/),
+        ).toBeInTheDocument();
       });
     });
 
@@ -360,7 +372,10 @@ describe("ClientOrdersPage", () => {
 
       await waitFor(() => {
         const orderLink = screen.getByText("CAT001");
-        expect(orderLink.closest("a")).toHaveAttribute("href", "/client/deliveries/CAT001");
+        expect(orderLink.closest("a")).toHaveAttribute(
+          "href",
+          "/client/deliveries/CAT001",
+        );
       });
     });
 
@@ -391,7 +406,7 @@ describe("ClientOrdersPage", () => {
       await waitFor(() => {
         const activeBadge = screen.getByText("ACTIVE");
         const pendingBadge = screen.getByText("PENDING");
-        
+
         expect(activeBadge).toBeInTheDocument();
         expect(pendingBadge).toBeInTheDocument();
       });
@@ -415,7 +430,7 @@ describe("ClientOrdersPage", () => {
       await waitFor(() => {
         const cateringBadge = screen.getByText("catering");
         const onDemandBadge = screen.getByText("on_demand");
-        
+
         expect(cateringBadge).toBeInTheDocument();
         expect(onDemandBadge).toBeInTheDocument();
       });
@@ -480,8 +495,12 @@ describe("ClientOrdersPage", () => {
       render(<ClientOrdersPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("123 Pickup St, San Francisco, CA")).toBeInTheDocument();
-        expect(screen.getByText("456 Delivery Ave, San Francisco, CA")).toBeInTheDocument();
+        expect(
+          screen.getByText("123 Pickup St, San Francisco, CA"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("456 Delivery Ave, San Francisco, CA"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -505,9 +524,9 @@ describe("ClientOrdersPage", () => {
       render(<ClientOrdersPage />);
 
       await waitFor(() => {
-        const n/aElements = screen.getAllByText("N/A");
-        expect(n/aElements).toHaveLength(2); // One for pickup, one for delivery
+        const naElements = screen.getAllByText("N/A");
+        expect(naElements).toHaveLength(2); // One for pickup, one for delivery
       });
     });
   });
-}); 
+});
