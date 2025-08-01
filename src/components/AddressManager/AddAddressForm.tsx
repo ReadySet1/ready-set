@@ -154,14 +154,14 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
           return state;
         })(),
       };
-      
+
       await onSubmit(normalizedData as AddressFormData);
       reset();
       // onSubmit is responsible for closing the dialog on success
     } catch (error) {
       console.error("Error submitting form:", error);
       setSubmitError(
-        error instanceof Error ? error.message : "Failed to save address",
+        error instanceof Error ? error.message : "Submission failed",
       );
     } finally {
       setIsSubmitting(false);
@@ -180,7 +180,7 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
           </div>
         )}
       </CardHeader>
-      <div>
+      <form onSubmit={handleSubmit(submitHandler)}>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* County Field */}
@@ -201,12 +201,19 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
                       onValueChange={(value) => {
                         field.onChange(value);
                       }}
+                      key={field.value || "empty"}
                     >
                       <SelectTrigger
                         id="county"
                         className={errors.county ? "border-red-500" : ""}
                       >
-                        <SelectValue placeholder="Select County" />
+                        <SelectValue placeholder="Select County">
+                          {field.value
+                            ? availableCounties.find(
+                                (c) => c.value === field.value,
+                              )?.label
+                            : "Select County"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="z-[9999] max-h-[200px] overflow-y-auto">
                         {availableCounties && availableCounties.length > 0 ? (
@@ -406,15 +413,11 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
           >
             Cancel
           </Button>
-          <Button
-            type="button"
-            onClick={() => handleSubmit(submitHandler)()}
-            disabled={isSubmitting}
-          >
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : "Save Address"}
           </Button>
         </CardFooter>
-      </div>
+      </form>
     </Card>
   );
 };

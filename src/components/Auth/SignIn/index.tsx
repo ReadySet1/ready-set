@@ -5,7 +5,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useActionState } from "react";
 import Loader from "@/components/Common/Loader";
 import { login, FormState } from "@/app/actions/login";
 import GoogleAuthButton from "@/components/Auth/GoogleAuthButton";
@@ -20,9 +19,8 @@ const Signin = ({
   const { isLoading: isUserLoading, session } = useUser();
   const router = useRouter();
 
-  const [state, formAction] = useActionState<FormState, FormData>(login, {
-    error: "",
-  });
+  // Replace useActionState with useState
+  const [formState, setFormState] = useState<FormState>({ error: "" });
   const [loginData, setLoginData] = useState({
     email: "",
     password: "",
@@ -55,28 +53,65 @@ const Signin = ({
   }, []);
 
   useEffect(() => {
-    if (state?.error) {
-      setErrors((prev) => ({ ...prev, general: state.error || "" }));
+    if (formState?.error) {
+      setErrors((prev) => ({ ...prev, general: formState.error || "" }));
       setLoading(false);
-      
-
     }
     
     // If redirectTo is set in the state, we're being redirected by the server
-    if (state?.redirectTo) {
-      console.log("Login action is handling redirect to:", state.redirectTo);
-      
-
-      
+    if (formState?.redirectTo) {
+      console.log("Login action is handling redirect to:", formState.redirectTo);
       // Let the server handle the redirect
     }
-  }, [state, loginData.email, returnTo]);
+  }, [formState, loginData.email, returnTo]);
 
   useEffect(() => {
     if (searchParams?.error) {
       setErrors((prev) => ({ ...prev, general: searchParams.error || "" }));
     }
   }, [searchParams]);
+
+  // Manual form submission handler to replace formAction
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrors((prev) => ({ ...prev, general: "" }));
+
+    // Validate form data
+    if (!loginData.email) {
+      setErrors((prev) => ({ ...prev, email: "Email is required" }));
+      setLoading(false);
+      return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(loginData.email)) {
+      setErrors((prev) => ({ ...prev, email: "Please enter a valid email" }));
+      setLoading(false);
+      return;
+    }
+
+    if (!loginData.password) {
+      setErrors((prev) => ({ ...prev, password: "Password is required" }));
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Create FormData object
+      const formData = new FormData();
+      formData.append("email", loginData.email);
+      formData.append("password", loginData.password);
+      formData.append("returnTo", returnTo);
+
+      // Call the login action
+      const result = await login(null, formData);
+      setFormState(result);
+    } catch (error) {
+      console.error("Login error:", error);
+      setFormState({ error: "An unexpected error occurred. Please try again." });
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -259,7 +294,7 @@ const Signin = ({
 
               {/* Password login form */}
               {loginMethod === "password" && (
-                <form action={formAction} className="mb-5">
+                <form onSubmit={handleLogin} className="mb-5">
                   <div className="mb-4">
                     <input
                       type="email"
@@ -294,12 +329,6 @@ const Signin = ({
                       </p>
                     )}
                   </div>
-                  {/* Hidden input for returnTo */}
-                  <input
-                    type="hidden"
-                    name="returnTo"
-                    value={returnTo}
-                  />
                   <div className="mb-6">
                     <button
                       type="submit"
