@@ -155,12 +155,12 @@ describe("Client Dashboard Navigation Link Tests", () => {
       .getByText("Manage Addresses")
       .closest("a");
     expect(manageAddressesLink).toBeInTheDocument();
-    expect(manageAddressesLink).toHaveAttribute("href", "/client/addresses");
+    expect(manageAddressesLink).toHaveAttribute("href", "/addresses");
 
     // Test Update Profile link
     const updateProfileLink = screen.getByText("Update Profile").closest("a");
     expect(updateProfileLink).toBeInTheDocument();
-    expect(updateProfileLink).toHaveAttribute("href", "/client/profile");
+    expect(updateProfileLink).toHaveAttribute("href", "/profile");
 
     // Test Contact Us link
     const contactUsLink = screen.getByText("Contact Us").closest("a");
@@ -262,11 +262,11 @@ describe("Client Dashboard Link Functionality - Core Navigation Tests", () => {
     const manageAddressesLink = screen
       .getByText("Manage Addresses")
       .closest("a");
-    expect(manageAddressesLink).toHaveAttribute("href", "/client/addresses");
+    expect(manageAddressesLink).toHaveAttribute("href", "/addresses");
 
     // Test Update Profile link
     const updateProfileLink = screen.getByText("Update Profile").closest("a");
-    expect(updateProfileLink).toHaveAttribute("href", "/client/profile");
+    expect(updateProfileLink).toHaveAttribute("href", "/profile");
 
     // Test Contact Us link
     const contactUsLink = screen.getByText("Contact Us").closest("a");
