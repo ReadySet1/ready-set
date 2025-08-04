@@ -13,8 +13,9 @@ export async function GET(
   // Add debug logging to see what parameters we're receiving
   console.log("Order files API endpoint called with params:", params);
   
-  // Await params before accessing its properties
-  const { order_number } = await params;
+  // Await params before accessing its properties and decode the order number
+  const { order_number: encodedOrderNumber } = await params;
+  const order_number = decodeURIComponent(encodedOrderNumber);
   
   // Check if order_number exists
   if (!order_number) {

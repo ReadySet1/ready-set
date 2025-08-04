@@ -5,12 +5,14 @@ import userEvent from "@testing-library/user-event";
 // Mock Next.js navigation
 const mockPush = jest.fn();
 const mockPathname = jest.fn();
+const mockUseParams = jest.fn();
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
   }),
   usePathname: () => mockPathname(),
+  useParams: () => mockUseParams(),
 }));
 
 // Mock Next.js Link component
@@ -197,7 +199,7 @@ describe("Order Navigation Integration Tests", () => {
       const orderLink = screen.getByText("CV-0GF59K/1").closest("a");
       expect(orderLink).toHaveAttribute(
         "href",
-        "/admin/catering-orders/CV-0GF59K%2F1",
+        "/admin/catering-orders/CV-0GF59K%252F1",
       );
 
       // Click the link
@@ -205,13 +207,18 @@ describe("Order Navigation Integration Tests", () => {
 
       // Verify navigation was called with encoded URL
       expect(mockPush).toHaveBeenCalledWith(
-        "/admin/catering-orders/CV-0GF59K%2F1",
+        "/admin/catering-orders/CV-0GF59K%252F1",
       );
     });
 
     it("should handle the complete flow from table to detail page", async () => {
       // Step 1: Simulate being on the catering orders detail page
-      mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%2F1");
+      mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%252F1");
+
+      // Mock useParams to return the order_number parameter
+      mockUseParams.mockReturnValue({
+        order_number: "CV-0GF59K%252F1",
+      });
 
       // Import and render the order detail page
       const OrderPage = await import(
@@ -220,15 +227,22 @@ describe("Order Navigation Integration Tests", () => {
 
       render(<OrderPage.default />);
 
-      // Verify the page displays decoded order number in breadcrumb
-      expect(screen.getByText("Order CV-0GF59K/1")).toBeInTheDocument();
+      // Wait for the component to update with the decoded order number
+      await waitFor(() => {
+        expect(screen.getByText("Order CV-0GF59K/1")).toBeInTheDocument();
+      });
 
       // Verify SingleOrder component is rendered
       expect(screen.getByTestId("single-order-component")).toBeInTheDocument();
     });
 
     it("should handle navigation back to orders list after delete", async () => {
-      mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%2F1");
+      mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%252F1");
+
+      // Mock useParams to return the order_number parameter
+      mockUseParams.mockReturnValue({
+        order_number: "CV-0GF59K%252F1",
+      });
 
       const OrderPage = await import(
         "@/app/(backend)/admin/catering-orders/[order_number]/page"
@@ -304,7 +318,7 @@ describe("Order Navigation Integration Tests", () => {
   describe("Cross-Component Consistency", () => {
     it("should maintain consistent encoding/decoding across different components", async () => {
       const testOrderNumber = "CV-0GF59K/1&test+more#end";
-      const encodedOrderNumber = "CV-0GF59K%2F1%26test%2Bmore%23end";
+      const encodedOrderNumber = "CV-0GF59K%252F1%2526test%252Bmore%2523end";
 
       // Test table component encoding
       const { CateringOrdersTable } = await import(
@@ -345,21 +359,30 @@ describe("Order Navigation Integration Tests", () => {
         `/admin/catering-orders/${encodedOrderNumber}`,
       );
 
+      // Mock useParams to return the order_number parameter
+      mockUseParams.mockReturnValue({
+        order_number: encodedOrderNumber,
+      });
+
       const OrderPage = await import(
         "@/app/(backend)/admin/catering-orders/[order_number]/page"
       );
 
       rerender(<OrderPage.default />);
 
-      // Verify page decodes correctly
-      expect(screen.getByText(`Order ${testOrderNumber}`)).toBeInTheDocument();
+      // Wait for the component to update with the decoded order number
+      await waitFor(() => {
+        expect(
+          screen.getByText(`Order ${testOrderNumber}`),
+        ).toBeInTheDocument();
+      });
     });
 
     it("should handle empty and edge case order numbers", async () => {
       const edgeCases = [
         { orderNumber: "", encoded: "" },
-        { orderNumber: "/", encoded: "%2F" },
-        { orderNumber: "///", encoded: "%2F%2F%2F" },
+        { orderNumber: "/", encoded: "%252F" },
+        { orderNumber: "///", encoded: "%252F%252F%252F" },
         { orderNumber: "normal-order", encoded: "normal-order" },
       ];
 
@@ -420,14 +443,23 @@ describe("Order Navigation Integration Tests", () => {
 
       render(<OnDemandOrdersPage.default />);
 
-      // Component should still render even with API error
-      // (Specific error handling depends on implementation)
-      expect(mockFetch).toHaveBeenCalled();
+      // Wait for the debounced fetch call (300ms + buffer)
+      await waitFor(
+        () => {
+          expect(mockFetch).toHaveBeenCalled();
+        },
+        { timeout: 1000 },
+      );
     });
 
     it("should handle malformed URLs gracefully", async () => {
       // Test with malformed encoded URL
       mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%");
+
+      // Mock useParams to return the malformed order_number parameter
+      mockUseParams.mockReturnValue({
+        order_number: "CV-0GF59K%",
+      });
 
       const OrderPage = await import(
         "@/app/(backend)/admin/catering-orders/[order_number]/page"

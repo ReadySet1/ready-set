@@ -33,7 +33,8 @@ export async function GET(req: NextRequest, props: { params: Promise<{ order_num
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const { order_number } = params;
+    const { order_number: encodedOrderNumber } = params;
+    const order_number = decodeURIComponent(encodedOrderNumber);
 
     let order: Order | null = null;
 

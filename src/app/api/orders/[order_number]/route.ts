@@ -120,8 +120,9 @@ export async function GET(
 
     console.log(`Authenticated user: ${user.id}`);
     
-    // Extract order_number from params
-    const { order_number } = resolvedParams;
+    // Extract order_number from params and decode it properly
+    const { order_number: encodedOrderNumber } = resolvedParams;
+    const order_number = decodeURIComponent(encodedOrderNumber);
 
     let order: Order | null = null;
 
@@ -231,8 +232,9 @@ export async function PATCH(
 
     console.log(`Authenticated user: ${user.id}`);
     
-    // Extract order_number from params
-    const { order_number } = resolvedParams;
+    // Extract order_number from params and decode it properly
+    const { order_number: encodedOrderNumber } = resolvedParams;
+    const order_number = decodeURIComponent(encodedOrderNumber);
     
     const body = await request.json();
     const { status, driverStatus } = body;

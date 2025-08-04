@@ -67,8 +67,6 @@ const montserrat = Montserrat({
   weight: ["300", "400", "500", "600", "700", "800", "900"],
 });
 
-
-
 export default function RootLayout({
   children,
 }: {
@@ -80,8 +78,7 @@ export default function RootLayout({
       className={`!scroll-smooth ${montserrat.variable} ${montserrat.className}`}
       lang="en"
     >
-      <head>
-      </head>
+      <head></head>
       <body className="overflow-x-hidden">
         <GlobalErrorBoundary>
           <UserProvider>
@@ -92,6 +89,21 @@ export default function RootLayout({
         {/* {process.env.NODE_ENV === "development" && <VercelToolbar />} */}
         <Analytics />
         <UmamiAnalytics />
+
+        {/* Perception Company Analytics Script */}
+        <Script
+          id="perception-company-analytics"
+          strategy="afterInteractive"
+          src="https://www.perception-company.com/js/803213.js"
+        />
+        <noscript>
+          <img
+            src="https://www.perception-company.com/803213.png"
+            alt="Perception Company Analytics"
+            style={{ display: "none" }}
+          />
+        </noscript>
+
         <CookieConsentBanner
           metricoolHash="5e4d77df771777117a249111f4fc9683"
           gaMeasurementId="G-PHGL28W4NP"

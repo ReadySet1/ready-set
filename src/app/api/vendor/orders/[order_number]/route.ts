@@ -16,7 +16,7 @@ export async function GET(
     }
 
     const params = await props.params;
-    const orderNumber = params.order_number;
+    const orderNumber = decodeURIComponent(params.order_number);
     if (!orderNumber) {
       return NextResponse.json(
         { error: "Order number is required" },

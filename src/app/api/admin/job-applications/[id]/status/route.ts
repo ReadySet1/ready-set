@@ -15,8 +15,39 @@ export async function PATCH(
   try {
     const params = await props.params;
     const id = params.id;
-    const { status, feedbackNote } = await request.json();
-
+    
+    console.log('Request headers:', Object.fromEntries(request.headers.entries()));
+    
+        let requestBody;
+    try {
+      requestBody = await request.json();
+      console.log('Parsed request body:', requestBody);
+    } catch (error) {
+      console.log('Error parsing request body:', error);
+      return NextResponse.json(
+        { error: "Invalid JSON in request body" },
+        { status: 400 }
+      );
+    }
+    
+    // Check if request body is empty
+    if (!requestBody || Object.keys(requestBody).length === 0) {
+      return NextResponse.json(
+        { error: "Request body is empty" },
+        { status: 400 }
+      );
+    }
+    
+    const { status, feedbackNote } = requestBody;
+    
+    // Check if status is provided
+    if (!status) {
+      return NextResponse.json(
+        { error: "Status is required" },
+        { status: 400 }
+      );
+    }
+    
     // Check if user is authorized (admin or helpdesk)
     const supabase = await createClient();
     
@@ -61,6 +92,10 @@ export async function PATCH(
     }
 
     // Validate the input
+    console.log('Status received:', status);
+    console.log('ApplicationStatus values:', Object.values(ApplicationStatus));
+    console.log('Is status valid:', Object.values(ApplicationStatus).includes(status as ApplicationStatus));
+    
     if (!Object.values(ApplicationStatus).includes(status as ApplicationStatus)) {
       return NextResponse.json(
         { error: "Invalid status value" },
@@ -96,7 +131,7 @@ export async function PATCH(
   } catch (error) {
     console.error("Error updating application status:", error);
     return NextResponse.json(
-      { error: "Failed to update application status" },
+      { error: "Failed to update job application status" },
       { status: 500 }
     );
   }

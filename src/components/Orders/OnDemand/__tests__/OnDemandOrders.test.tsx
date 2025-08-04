@@ -217,7 +217,13 @@ describe("OnDemandOrders - URL Encoding", () => {
       expect(screen.getByText("OD-0GF59K1")).toBeInTheDocument();
     });
 
-    const orderLink = screen.getByTestId("order-link");
+    // Get all order links and find the one that contains the order number
+    const orderLinks = screen.getAllByTestId("order-link");
+    const orderLink = orderLinks.find(
+      (link) => link.textContent === "OD-0GF59K1",
+    );
+
+    expect(orderLink).toBeDefined();
 
     // Normal order numbers should work fine
     expect(orderLink).toHaveAttribute(
@@ -247,15 +253,25 @@ describe("OnDemandOrders - URL Encoding", () => {
     expect(url).toContain("direction=desc");
   });
 
-  it("should handle loading state", () => {
+  it("should handle loading state", async () => {
     // Mock a pending promise to simulate loading
     mockFetch.mockImplementation(() => new Promise(() => {}));
 
     render(<OnDemandOrdersPage />);
 
-    // Check if loading skeleton is displayed (assuming it shows some loading indicator)
-    // This will depend on your actual loading UI implementation
-    expect(mockFetch).toHaveBeenCalled();
+    // Wait for the debounced fetch to be called (component uses 300ms debounce)
+    await waitFor(
+      () => {
+        expect(mockFetch).toHaveBeenCalled();
+      },
+      { timeout: 1000 },
+    );
+
+    // The component should show some loading state
+    // Since the fetch is pending, the component should be in a loading state
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/orders/on-demand-orders?"),
+    );
   });
 
   it("should handle empty orders list", async () => {

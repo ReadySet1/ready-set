@@ -5,8 +5,8 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "dev": "next dev",
-    "build": "node scripts/prisma-setup.js && node scripts/type-check.js && PRISMA_MOCK_BUILD=true next build",
-    "build:no-typecheck": "node scripts/prisma-setup.js && SKIP_TYPECHECK=true PRISMA_MOCK_BUILD=true next build",
+    "build": "prisma generate && next build",
+    "build:no-typecheck": "SKIP_TYPECHECK=true prisma generate && next build",
     "build:custom": "node scripts/build-without-prisma-collect.js",
     "build:sourcemaps": "pnpm run build",
     "start": "next start",
@@ -29,8 +29,8 @@
     "studio": "dotenv -e .env.local -- npx prisma studio",
     "db:generate": "dotenv -e .env.local -- npx prisma generate",
     "prisma": "prisma generate",
-    "postinstall": "node scripts/prisma-setup.js",
-    "vercel-build": "node scripts/prisma-setup.js && prisma db push && PRISMA_MOCK_BUILD=true NODE_ENV=production next build",
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma generate && prisma db push && next build",
     "vercel-sim": "node scripts/vercel-build-simulation.js",
     "type-check": "tsc --noEmit",
     "pre-push": "node scripts/type-check.js",
@@ -74,7 +74,7 @@
     "@sanity/client": "^6.27.1",
     "@sanity/image-url": "^1.1.0",
     "@sanity/types": "^3.71.2",
-    "@sanity/vision": "^3.71.2",
+    "@sanity/vision": "^3.99.0",
     "@sendgrid/client": "^8.1.0",
     "@stripe/react-stripe-js": "^3.1.1",
     "@stripe/stripe-js": "^5.4.0",
@@ -88,7 +88,7 @@
     "@vercel/postgres": "^0.10.0",
     "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
-    "better-auth": "^1.2.5",
+    "better-auth": "^1.2.12",
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -109,9 +109,9 @@
     "gray-matter": "^4.0.3",
     "json-edit-react": "^1.19.1",
     "lucide-react": "^0.468.0",
-    "next": "^15.3.0",
+    "next": "^15.3.5",
     "next-auth": "^4.24.11",
-    "next-sanity": "^9.8.42",
+    "next-sanity": "^9.12.2",
     "next-seo": "^6.6.0",
     "next-themes": "^0.4.4",
     "node-cron": "^3.0.3",
@@ -133,7 +133,7 @@
     "remark-html": "^16.0.1",
     "resend": "^4.2.0",
     "rimraf": "6.0.1",
-    "sanity": "^3.71.2",
+    "sanity": "^3.99.0",
     "sanity-plugin-seo": "1.2.6-alpha",
     "stripe": "^17.5.0",
     "styled-components": "^6.1.13",
@@ -141,7 +141,7 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "11.0.3",
-    "vercel": "^39.2.2",
+    "vercel": "^44.4.1",
     "yup": "^1.6.1",
     "zod": "^3.24.1",
     "zustand": "^5.0.2"
@@ -227,12 +227,7 @@
       "next@>=15.3.0 <15.3.3": ">=15.3.3",
       "better-auth@<=1.2.9": ">=1.2.10",
       "better-call@<1.0.12": ">=1.0.12"
-    },
-    "ignoredBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "prisma"
-    ]
+    }
   },
   "packageManager": "pnpm@10.8.0"
 }

@@ -2,21 +2,17 @@
 
 /**
  * Encodes an order number for safe URL usage
- * Handles special characters like slashes by double encoding
+ * Handles special characters like slashes, ampersands, plus signs, etc.
  * 
  * @param orderNumber - The order number to encode (e.g., "CV-P4ZAG6/2")
- * @returns Double-encoded order number safe for URLs
+ * @returns Encoded order number safe for URLs
  */
 export function encodeOrderNumber(orderNumber: string): string {
   if (!orderNumber) return "";
   
   try {
-    // Double encode to handle slashes and other special characters
-    // First encoding handles special characters
-    const firstEncode = encodeURIComponent(orderNumber);
-    // Second encoding ensures it survives Next.js routing
-    const finalEncode = encodeURIComponent(firstEncode);
-    return finalEncode;
+    // Single encoding to handle special characters
+    return encodeURIComponent(orderNumber);
   } catch (error) {
     console.error("Error encoding order number:", error);
     // Fallback to basic encoding
@@ -26,7 +22,7 @@ export function encodeOrderNumber(orderNumber: string): string {
 
 /**
  * Decodes an order number from URL parameters
- * Handles double-encoded order numbers with slashes
+ * Handles encoded order numbers with slashes and other special characters
  * 
  * @param encodedOrderNumber - The encoded order number from URL
  * @returns Decoded order number
@@ -35,19 +31,12 @@ export function decodeOrderNumber(encodedOrderNumber: string): string {
   if (!encodedOrderNumber) return "";
   
   try {
-    // Double decode to handle order numbers with slashes
-    const firstDecode = decodeURIComponent(encodedOrderNumber);
-    const finalDecode = decodeURIComponent(firstDecode);
-    return finalDecode;
+    // Single decode to handle order numbers with slashes and other special characters
+    return decodeURIComponent(encodedOrderNumber);
   } catch (error) {
     console.error("Error decoding order number:", error);
-    // Fallback to basic decode
-    try {
-      return decodeURIComponent(encodedOrderNumber);
-    } catch (fallbackError) {
-      console.error("Fallback decode also failed:", fallbackError);
-      return encodedOrderNumber;
-    }
+    // Fallback to return the original string if decode fails
+    return encodedOrderNumber;
   }
 }
 

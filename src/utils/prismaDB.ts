@@ -1,315 +1,137 @@
-// Load environment variables first
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import { PrismaClient } from '@prisma/client';
 
-// Try to import PrismaClient, fallback to mock if not available
-let PrismaClient: any;
-let PrismaClientType: any;
-
-// Import PrismaClient with proper error handling - use direct import
-try {
-  const { PrismaClient: PrismaClientClass } = require('../../node_modules/.prisma/client');
-  PrismaClient = PrismaClientClass;
-  PrismaClientType = PrismaClientClass;
-  console.log('✅ PrismaClient imported successfully via direct path');
-} catch (error) {
-  console.warn('⚠️ Could not import PrismaClient via direct path, trying standard import...');
-  try {
-    const { PrismaClient: PrismaClientClass } = require('@prisma/client');
-    PrismaClient = PrismaClientClass;
-    PrismaClientType = PrismaClientClass;
-    console.log('✅ PrismaClient imported successfully via standard import');
-  } catch (standardError) {
-    console.warn('⚠️ Could not import PrismaClient from @prisma/client, will use mock client');
-    console.warn('Error details:', standardError);
-    PrismaClient = undefined;
-    PrismaClientType = class MockPrismaClient {};
-  }
-}
-
-/**
- * Robust PrismaClient instantiation with lazy loading and error handling
- */
-
-// Define the global type that will hold our PrismaClient instance
 declare global {
   // eslint-disable-next-line no-var
-  var prismaGlobal: typeof PrismaClientType | undefined;
+  var __prisma: PrismaClient | undefined;
 }
 
-// Environment checks - now after dotenv is loaded
-const isDevelopment = process.env.NODE_ENV === 'development'
-const isProduction = process.env.NODE_ENV === 'production'
-const isTest = process.env.NODE_ENV === 'test'
-const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build'
-const databaseUrl = process.env.DATABASE_URL
+// Environment checks
+const isProduction = process.env.NODE_ENV === 'production';
+const isDevelopment = process.env.NODE_ENV === 'development';
+const isTest = process.env.NODE_ENV === 'test';
 
-// Debug environment
-console.log('Prisma Environment Check:', {
+console.log('🔧 Prisma Environment:', {
   NODE_ENV: process.env.NODE_ENV,
   NEXT_RUNTIME: process.env.NEXT_RUNTIME,
-  NEXT_PHASE: process.env.NEXT_PHASE,
-  hasDataBaseUrl: !!databaseUrl,
-  databaseUrlPreview: databaseUrl ? databaseUrl.substring(0, 20) + '...' : 'NOT SET',
-  prismaClientAvailable: !!PrismaClient,
-  isTest: isTest
-})
+  hasDatabase: !!process.env.DATABASE_URL,
+  databasePreview: process.env.DATABASE_URL ? 
+    `${process.env.DATABASE_URL.substring(0, 20)}...` : 'NOT SET'
+});
 
-// Create a mock Prisma client for build-time
-const createMockPrismaClient = (): typeof PrismaClientType => {
-  console.log('⚠️ Creating mock Prisma client for build-time analysis')
+// Create Prisma client with optimized configuration
+function createPrismaClient(): PrismaClient {
+  console.log('🟢 Creating new Prisma client...');
   
-  // Create a mock client with all the necessary methods
-  const mockClient = {
-    // Add all the models as empty objects with basic methods
-    jobApplication: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-      groupBy: async () => [],
-    },
-    profile: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-      aggregate: async () => ({ _sum: {} }),
-    },
-    order: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-      aggregate: async () => ({ _sum: {} }),
-    },
-    cateringRequest: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-      aggregate: async () => ({ _sum: { orderTotal: 0 } }),
-    },
-    fileUpload: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-    },
-    onDemand: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-    },
-    address: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-    },
-    dispatch: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-    },
-    userAddress: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-    },
-    verificationToken: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-    },
-    formSubmission: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-    },
-    leadCapture: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-    },
-    pricingTier: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-    },
-    account: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-    },
-    session: {
-      count: async () => 0,
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-    },
-    // Add other models as needed
-    $connect: async () => {},
-    $disconnect: async () => {},
-    $transaction: async (fn: any) => fn(mockClient),
-  } as any as typeof PrismaClientType
-
-  return mockClient
-}
-
-// Create Prisma client with better error handling
-const createPrismaClient = (): typeof PrismaClientType => {
-  console.log('🟢 Creating Prisma client')
-  console.log('🔍 Debug info:', {
-    prismaClientType: typeof PrismaClient,
-    prismaClientAvailable: !!PrismaClient,
-    databaseUrlExists: !!databaseUrl,
-    databaseUrlPreview: databaseUrl ? databaseUrl.substring(0, 30) + '...' : 'NOT SET',
-    isTest: isTest
-  })
-  
-  // In test environment, always use mock client
+  // Test environment - minimal configuration
   if (isTest) {
-    console.log('🧪 Test environment detected - using mock Prisma client');
-    return createMockPrismaClient()
-  }
-  
-  // Check if PrismaClient is available
-  if (typeof PrismaClient === 'undefined') {
-    console.error('❌ PrismaClient is not available. Please run "prisma generate" first.')
-    console.log('⚠️ Falling back to mock Prisma client')
-    return createMockPrismaClient()
-  }
-
-  // If no database URL, use mock client
-  if (!databaseUrl) {
-    console.error('❌ DATABASE_URL is not defined. Please check your environment variables.')
-    console.log('⚠️ Falling back to mock Prisma client')
-    return createMockPrismaClient()
-  }
-
-  try {
-    console.log('🔄 Attempting to create Prisma client with configuration...')
-    // Try to create the client with configuration first
-    const client = new PrismaClient({
-      log: isDevelopment ? ['error', 'warn'] : ['error'],
+    console.log('🧪 Test environment - using basic client');
+    return new PrismaClient({
+      log: ['error'],
       datasources: {
         db: {
-          url: databaseUrl
+          url: process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test'
         }
       }
     });
-
-    console.log('✅ Prisma client created successfully with configuration')
-    return client
-  } catch (configError) {
-    console.error('❌ Error creating Prisma client with configuration:', configError)
-    // Silently try basic client without logging
-    try {
-      console.log('🔄 Attempting to create fallback Prisma client...')
-      const fallbackClient = new PrismaClient()
-      console.log('✅ Fallback Prisma client created successfully')
-      return fallbackClient
-    } catch (fallbackError) {
-      console.error('❌ Error creating fallback Prisma client:', fallbackError)
-      // Only log in development, and make it less alarming
-      if (isDevelopment) {
-        console.log('ℹ️ Using mock Prisma client for development')
-      }
-      return createMockPrismaClient()
-    }
   }
+
+  // Production environment - optimized for serverless
+  if (isProduction) {
+    console.log('🚀 Production environment - optimized client');
+    return new PrismaClient({
+      log: ['error'],
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL
+        }
+      },
+      // Optimize for serverless environments
+      // @ts-ignore - This is a valid Prisma option for serverless
+      __internal: {
+        engine: {
+          closePromise: () => Promise.resolve(),
+        },
+      },
+    });
+  }
+
+  // Development environment - full logging
+  console.log('🔧 Development environment - debug client');
+  return new PrismaClient({
+    log: ['query', 'info', 'warn', 'error'],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL
+      }
+    }
+  });
+}
+
+// Singleton pattern with global caching for development
+const getPrismaClient = (): PrismaClient => {
+  // In development, use global to prevent re-initialization during hot reloads
+  if (isDevelopment) {
+    if (!global.__prisma) {
+      console.log('🔄 Creating new global Prisma client for development');
+      global.__prisma = createPrismaClient();
+    } else {
+      console.log('♻️ Reusing existing global Prisma client');
+    }
+    return global.__prisma;
+  }
+
+  // In production/test, create new instance each time
+  return createPrismaClient();
 };
 
-// Lazy initialization pattern
-let _prisma: typeof PrismaClientType | null = null
+// Export the singleton instance
+export const prisma = getPrismaClient();
 
-const getPrismaClient = (): typeof PrismaClientType => {
-  if (_prisma) {
-    return _prisma
-  }
-
-  // Use global instance if available (for development hot reload)
-  if (globalThis.prismaGlobal) {
-    _prisma = globalThis.prismaGlobal
-    console.log('🔄 Using existing global Prisma client')
-    return _prisma
-  }
-
+// Enhanced connection management
+export async function connectPrisma(): Promise<void> {
   try {
-    _prisma = createPrismaClient()
-    
-    // Store in global for development hot reload
-    if (isDevelopment && !isBuildTime) {
-      globalThis.prismaGlobal = _prisma
-      console.log('💾 Stored Prisma client in global for development')
-    }
-
-    return _prisma
+    console.log('🔌 Attempting to connect to database...');
+    await prisma.$connect();
+    console.log('✅ Database connected successfully');
   } catch (error) {
-    console.error('❌ Failed to initialize Prisma client:', error)
-    
-    // Always fall back to mock client if anything fails
-    console.log('⚠️ Creating mock Prisma client as fallback')
-    _prisma = createMockPrismaClient()
-    return _prisma
+    console.error('❌ Database connection failed:', error);
+    throw new Error(`Failed to connect to database: ${error}`);
   }
 }
 
-// Export the client using lazy initialization
-export const prisma = new Proxy({} as typeof PrismaClientType, {
-  get(target, prop) {
-    const client = getPrismaClient()
-    return client[prop as keyof typeof PrismaClientType]
+export async function disconnectPrisma(): Promise<void> {
+  try {
+    console.log('🔌 Disconnecting from database...');
+    await prisma.$disconnect();
+    console.log('✅ Database disconnected successfully');
+  } catch (error) {
+    console.error('❌ Database disconnection failed:', error);
   }
-})
+}
+
+// Health check function
+export async function checkDatabaseHealth(): Promise<boolean> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('💚 Database health check passed');
+    return true;
+  } catch (error) {
+    console.error('💔 Database health check failed:', error);
+    return false;
+  }
+}
+
+// Graceful shutdown for serverless
+if (isProduction) {
+  process.on('beforeExit', async () => {
+    console.log('🔄 Gracefully shutting down Prisma client...');
+    await disconnectPrisma();
+  });
+}
 
 // Export default for compatibility
 export default prisma;
 
-// Simple manager for compatibility
-export const PrismaClientManager = {
-  getInstance: () => getPrismaClient(),
-  resetInstance: () => {
-    globalThis.prismaGlobal = undefined;
-    _prisma = null;
-  }
-};
+// Types for better TypeScript support
+export type PrismaClientInstance = typeof prisma;
+export type PrismaTransaction = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
