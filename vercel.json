@@ -1,25 +1,40 @@
 {
+  "version": 2,
   "buildCommand": "pnpm run vercel-build",
-  "installCommand": "pnpm install",
+  "outputDirectory": ".next",
+  "installCommand": "pnpm install --frozen-lockfile",
   "framework": "nextjs",
-  "regions": ["iad1"],
+  "functions": {
+    "app/**/*.{ts,tsx}": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 30
+    },
+    "src/app/**/*.{ts,tsx}": {
+      "runtime": "nodejs20.x", 
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "PRISMA_GENERATE_DATAPROXY": "true",
+    "PRISMA_CLI_BINARY_TARGETS": "native,rhel-openssl-3.0.x"
+  },
   "build": {
     "env": {
-      "PRISMA_GENERATE_DATAPROXY": "true"
+      "PRISMA_GENERATE_DATAPROXY": "true",
+      "PRISMA_CLI_BINARY_TARGETS": "native,rhel-openssl-3.0.x",
+      "NEXT_TELEMETRY_DISABLED": "1",
+      "NODE_ENV": "production"
     }
   },
-  "functions": {
-    "src/app/api/**/*": {
-      "memory": 1024,
-      "maxDuration": 10
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "s-maxage=0, max-age=0"
+        }
+      ]
     }
-  },
-  "crons": [],
-  "git": {
-    "deploymentEnabled": {
-      "main": true,
-      "development": true,
-      "production": true
-    }
-  }
-} 
+  ]
+}
