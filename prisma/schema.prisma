@@ -3,7 +3,6 @@ generator client {
   // Remove custom output path to use default location
   // output   = "../node_modules/.prisma/client"
   previewFeatures = ["relationJoins"]
-  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
