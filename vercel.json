@@ -4,24 +4,14 @@
   "outputDirectory": ".next",
   "installCommand": "pnpm install --frozen-lockfile",
   "framework": "nextjs",
-  "functions": {
-    "app/**/*.{ts,tsx}": {
-      "runtime": "nodejs20.x",
-      "maxDuration": 30
-    },
-    "src/app/**/*.{ts,tsx}": {
-      "runtime": "nodejs20.x", 
-      "maxDuration": 30
-    }
-  },
   "env": {
     "PRISMA_GENERATE_DATAPROXY": "true",
-    "PRISMA_CLI_BINARY_TARGETS": "native,rhel-openssl-3.0.x"
+    "PRISMA_SKIP_POSTINSTALL_GENERATE": "true"
   },
   "build": {
     "env": {
       "PRISMA_GENERATE_DATAPROXY": "true",
-      "PRISMA_CLI_BINARY_TARGETS": "native,rhel-openssl-3.0.x",
+      "PRISMA_SKIP_POSTINSTALL_GENERATE": "true",
       "NEXT_TELEMETRY_DISABLED": "1",
       "NODE_ENV": "production"
     }

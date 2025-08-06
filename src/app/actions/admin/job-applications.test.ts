@@ -17,9 +17,7 @@ jest.mock('@/lib/db/prisma', () => ({
             update: jest.fn(),
             findUnique: jest.fn(),
         },
-        user: {
-            create: jest.fn(),
-        },
+
         profile: {
             findUnique: jest.fn(),
             create: jest.fn(),
@@ -133,7 +131,7 @@ describe('Job Applications', () => {
                 ...mockApplication,
                 status: ApplicationStatus.APPROVED,
             });
-            (prisma.user.create as jest.Mock).mockResolvedValue(mockUser);
+            (prisma.profile.create as jest.Mock).mockResolvedValue(mockUser);
             (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null); // No existing profile
             (prisma.profile.create as jest.Mock).mockResolvedValue({ id: 'profile-id' });
             
@@ -222,7 +220,7 @@ describe('Job Applications', () => {
                 ...mockApplication,
                 status: ApplicationStatus.APPROVED,
             });
-            (prisma.user.create as jest.Mock).mockResolvedValue(mockUser);
+            (prisma.profile.create as jest.Mock).mockResolvedValue(mockUser);
             (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null); // No existing profile
             (prisma.profile.create as jest.Mock).mockResolvedValue({ id: 'profile-id' });
             

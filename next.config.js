@@ -11,8 +11,8 @@ const nextConfig = {
   experimental: {
     // Enable 'use cache' directive for static site generation
     useCache: true,
-    serverComponentsExternalPackages: ['@prisma/client', 'prisma'],
   },
+  serverExternalPackages: ['@prisma/client', 'prisma'],
   skipTrailingSlashRedirect: true,
   // Ensure all API routes are treated as dynamic
   async rewrites() {
