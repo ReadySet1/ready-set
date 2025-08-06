@@ -151,7 +151,7 @@
     "@next/bundle-analyzer": "^15.1.6",
     "@octokit/request": "8.4.1",
     "@playwright/test": "^1.54.1",
-    "@prisma/client": "6.8.2",
+    "@prisma/client": "6.13.0",
     "@swc/jest": "^0.2.39",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
@@ -186,7 +186,7 @@
     "null-loader": "^4.0.1",
     "pg": "^8.16.3",
     "postcss": "^8.4.49",
-    "prisma": "6.8.2",
+    "prisma": "6.13.0",
     "tailwindcss": "^3.4.17",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.2",
@@ -229,5 +229,5 @@
       "better-call@<1.0.12": ">=1.0.12"
     }
   },
-  "packageManager": "pnpm@10.8.0"
+  "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748"
 }
