@@ -23,54 +23,58 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const url = new URL(req.url);
-    const limit = parseInt(url.searchParams.get('limit') || '10', 10);
+    // Handle cases where req.url might be undefined (e.g., in tests)
+    const url = req.url ? new URL(req.url) : new URL("http://localhost:3000/api/user-orders");
+    const limit = parseInt(url.searchParams.get('limit') || '5', 10); // Changed default to 5
     const type = url.searchParams.get('type');
     const page = parseInt(url.searchParams.get('page') || '1', 10);
     const skip = (page - 1) * limit;
 
-    let cateringOrders: CateringOrder[] = [];
-    let onDemandOrders: OnDemandOrder[] = [];
-
-    if (type === 'all' || type === 'catering' || !type) {
-      cateringOrders = await prisma.cateringRequest.findMany({
-        where: { userId: user.id },
-        skip,
-        take: limit,
+    // Fetch all orders first (both catering and on-demand)
+    const [cateringOrders, onDemandOrders] = await Promise.all([
+      prisma.cateringRequest.findMany({
+        where: { 
+          userId: user.id,
+          deletedAt: null 
+        },
         orderBy: { createdAt: 'desc' },
         include: { 
           user: { select: { name: true, email: true } },
           pickupAddress: true,
           deliveryAddress: true
         },
-      });
-    }
-
-    if (type === 'all' || type === 'on_demand' || !type) {
-      onDemandOrders = await prisma.onDemand.findMany({
-        where: { userId: user.id },
-        skip,
-        take: limit,
+      }),
+      prisma.onDemand.findMany({
+        where: { 
+          userId: user.id,
+          deletedAt: null 
+        },
         orderBy: { createdAt: 'desc' },
         include: { 
           user: { select: { name: true, email: true } },
           pickupAddress: true,
           deliveryAddress: true
         },
-      });
-    }
+      }),
+    ]);
 
+    // Combine and sort all orders
     const allOrders: Order[] = [
       ...cateringOrders,
-      ...onDemandOrders.map(order => {
+      ...onDemandOrders.map((order: OnDemandOrder) => {
         const { deliveryAddress, ...rest } = order;
         return rest;
       })
-    ]
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(0, limit);
+    ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-    const serializedOrders = allOrders.map(order => ({
+    // Calculate pagination
+    const totalOrders = allOrders.length;
+    const totalPages = Math.ceil(totalOrders / limit);
+    
+    // Apply pagination to the combined result
+    const paginatedOrders = allOrders.slice(skip, skip + limit);
+
+    const serializedOrders = paginatedOrders.map(order => ({
       ...JSON.parse(JSON.stringify(order, (key, value) =>
         typeof value === 'bigint'
           ? value.toString()
@@ -79,7 +83,17 @@ export async function GET(req: NextRequest) {
       order_type: 'brokerage' in order ? 'catering' : 'on_demand',
     }));
 
-    return NextResponse.json(serializedOrders, { status: 200 });
+    return NextResponse.json({
+      orders: serializedOrders,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalOrders,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        ordersPerPage: limit
+      }
+    }, { status: 200 });
   } catch (error) {
     console.error("Error fetching user orders:", error);
     return NextResponse.json({ message: "Error fetching user orders" }, { status: 500 });

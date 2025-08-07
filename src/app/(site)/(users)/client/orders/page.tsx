@@ -29,6 +29,7 @@ import {
   CalendarDays,
   Truck,
   PlusCircle,
+  ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { getStatusColorClasses } from "@/types/order-status";
@@ -42,6 +43,25 @@ interface OrderData {
   arrivalDateTime: string;
   orderTotal: number;
   createdAt: string;
+  pickupAddress?: {
+    address: string;
+    city: string;
+    state: string;
+  };
+  deliveryAddress?: {
+    address: string;
+    city: string;
+    state: string;
+  };
+}
+
+interface PaginationData {
+  currentPage: number;
+  totalPages: number;
+  totalOrders: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  ordersPerPage: number;
 }
 
 interface ClientMetrics {
@@ -54,6 +74,14 @@ interface ClientMetrics {
 
 const ClientOrdersPage = () => {
   const [orders, setOrders] = useState<OrderData[]>([]);
+  const [pagination, setPagination] = useState<PaginationData>({
+    currentPage: 1,
+    totalPages: 1,
+    totalOrders: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+    ordersPerPage: 5,
+  });
   const [metrics, setMetrics] = useState<ClientMetrics>({
     activeOrders: 0,
     completedOrders: 0,
@@ -63,39 +91,30 @@ const ClientOrdersPage = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [ordersPerPage] = useState(10);
-  const [totalOrders, setTotalOrders] = useState(0);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [hasPrevPage, setHasPrevPage] = useState(false);
 
   useEffect(() => {
     const fetchClientData = async () => {
       try {
         setIsLoading(true);
-        
-        // Fetch orders
+
+        // Fetch orders with pagination
         const ordersResponse = await fetch(
-          `/api/user-orders?page=${currentPage}&limit=${ordersPerPage}`
+          `/api/user-orders?page=${pagination.currentPage}&limit=${pagination.ordersPerPage}`,
         );
 
         if (!ordersResponse.ok) {
           throw new Error(
-            `Failed to fetch orders: ${ordersResponse.statusText}`
+            `Failed to fetch orders: ${ordersResponse.statusText}`,
           );
         }
 
-        const ordersData = await ordersResponse.json();
-        setOrders(ordersData);
-        setTotalOrders(ordersData.length);
+        const responseData = await ordersResponse.json();
+        setOrders(responseData.orders);
+        setPagination(responseData.pagination);
 
         // Calculate metrics from the orders data
-        const metrics = calculateMetrics(ordersData);
+        const metrics = calculateMetrics(responseData.orders);
         setMetrics(metrics);
-
-        // Update pagination state
-        setHasPrevPage(currentPage > 1);
-        setHasNextPage(ordersData.length === ordersPerPage);
       } catch (error) {
         console.error("Error fetching client data:", error);
         setError("Failed to load dashboard data. Please try again later.");
@@ -105,7 +124,7 @@ const ClientOrdersPage = () => {
     };
 
     fetchClientData();
-  }, [currentPage, ordersPerPage]);
+  }, [pagination.currentPage, pagination.ordersPerPage]);
 
   const calculateMetrics = (orders: OrderData[]): ClientMetrics => {
     const metrics = {
@@ -134,7 +153,7 @@ const ClientOrdersPage = () => {
 
   const formatCurrency = (amount: number | string | null) => {
     if (!amount) return "$0.00";
-    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -142,10 +161,24 @@ const ClientOrdersPage = () => {
     }).format(numAmount);
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "numeric",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const formatAddress = (address: any) => {
+    if (!address) return "N/A";
+    return `${address.address}, ${address.city}, ${address.state}`;
+  };
+
   // Get badge style based on order status
   const getStatusBadge = (status: string) => {
     const statusColor = getStatusColorClasses(status as any);
-    
+
     const statusMap: Record<
       string,
       {
@@ -153,11 +186,11 @@ const ClientOrdersPage = () => {
         label: string;
       }
     > = {
-      ACTIVE: { variant: "default", label: "Active" },
-      PENDING: { variant: "secondary", label: "Pending" },
-      COMPLETED: { variant: "outline", label: "Completed" },
-      ASSIGNED: { variant: "secondary", label: "Assigned" },
-      CANCELLED: { variant: "destructive", label: "Cancelled" },
+      ACTIVE: { variant: "default", label: "ACTIVE" },
+      PENDING: { variant: "secondary", label: "PENDING" },
+      COMPLETED: { variant: "outline", label: "COMPLETED" },
+      ASSIGNED: { variant: "secondary", label: "ASSIGNED" },
+      CANCELLED: { variant: "destructive", label: "CANCELLED" },
     };
 
     const statusConfig = statusMap[status.toUpperCase()] || {
@@ -179,21 +212,21 @@ const ClientOrdersPage = () => {
             : "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
         }
       >
-        {type === "catering" ? "Catering" : "On Demand"}
+        {type === "catering" ? "catering" : "on_demand"}
       </Badge>
     );
   };
 
   // Pagination handlers
   const handlePrevPage = () => {
-    if (hasPrevPage) {
-      setCurrentPage(currentPage - 1);
+    if (pagination.hasPrevPage) {
+      setPagination((prev) => ({ ...prev, currentPage: prev.currentPage - 1 }));
     }
   };
 
   const handleNextPage = () => {
-    if (hasNextPage) {
-      setCurrentPage(currentPage + 1);
+    if (pagination.hasNextPage) {
+      setPagination((prev) => ({ ...prev, currentPage: prev.currentPage + 1 }));
     }
   };
 
@@ -229,87 +262,28 @@ const ClientOrdersPage = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Metrics Overview Cards */}
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-                {/* Active Orders */}
-                <Card className="overflow-hidden">
-                  <div className="h-1 bg-blue-500"></div>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="rounded-full bg-blue-50 p-3 text-blue-600">
-                        <Clock className="h-5 w-5" />
-                      </div>
-                      <span className="flex items-center gap-1 text-xs text-green-600">
-                        <TrendingUp className="h-3 w-3" /> Active now
-                      </span>
-                    </div>
-                    <h3 className="mt-3 text-3xl font-bold">
-                      {metrics.activeOrders}
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500">Active Orders</p>
-                  </CardContent>
-                </Card>
+              {/* Back to Dashboard Link */}
+              <div className="flex items-center">
+                <Link
+                  href="/client"
+                  className="flex items-center text-sm text-gray-600 transition-colors hover:text-primary"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Dashboard
+                </Link>
+              </div>
 
-                {/* Completed Orders */}
-                <Card className="overflow-hidden">
-                  <div className="h-1 bg-green-500"></div>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="rounded-full bg-green-50 p-3 text-green-600">
-                        <CheckCircle className="h-5 w-5" />
-                      </div>
-                      <span className="text-xs text-gray-500">
-                        Last 30 days
-                      </span>
-                    </div>
-                    <h3 className="mt-3 text-3xl font-bold">
-                      {metrics.completedOrders}
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Completed Orders
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Pending Orders */}
-                <Card className="overflow-hidden">
-                  <div className="h-1 bg-yellow-500"></div>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="rounded-full bg-yellow-50 p-3 text-yellow-600">
-                        <CalendarDays className="h-5 w-5" />
-                      </div>
-                      <span className="flex items-center gap-1 text-xs text-yellow-600">
-                        Needs attention
-                      </span>
-                    </div>
-                    <h3 className="mt-3 text-3xl font-bold">
-                      {metrics.pendingOrders}
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500">Pending Orders</p>
-                  </CardContent>
-                </Card>
+              {/* Page Title - Centered */}
+              <div className="text-center">
+                <h1 className="mb-2 text-3xl font-bold text-gray-900">
+                  Your Orders
+                </h1>
+                <p className="text-gray-600">View and manage your orders.</p>
               </div>
 
               {/* Orders Table */}
               <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Recent Orders</CardTitle>
-                      <CardDescription>
-                        Manage your recent and upcoming orders across the
-                        platform
-                      </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Button asChild>
-                        <Link href="/catering-request">Create New Order</Link>
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="p-6">
                   {orders.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-10 text-center">
                       <Package className="mb-4 h-16 w-16 text-gray-400" />
@@ -317,7 +291,8 @@ const ClientOrdersPage = () => {
                         No Orders Found
                       </h3>
                       <p className="max-w-md text-gray-500 dark:text-gray-400">
-                        You haven't placed any orders yet. Start by creating your first order.
+                        You haven't placed any orders yet. Start by creating
+                        your first order.
                       </p>
                       <Button className="mt-4" asChild>
                         <Link href="/catering-request">
@@ -332,18 +307,11 @@ const ClientOrdersPage = () => {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Order Number</TableHead>
-                            <TableHead className="hidden sm:table-cell">
-                              Type
-                            </TableHead>
-                            <TableHead className="hidden sm:table-cell">
-                              Status
-                            </TableHead>
-                            <TableHead className="hidden md:table-cell">
-                              Pickup
-                            </TableHead>
-                            <TableHead className="hidden md:table-cell">
-                              Delivery
-                            </TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Pickup</TableHead>
+                            <TableHead>Delivery</TableHead>
                             <TableHead className="text-right">Total</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -358,33 +326,20 @@ const ClientOrdersPage = () => {
                                   {order.orderNumber}
                                 </Link>
                               </TableCell>
-                              <TableCell className="hidden sm:table-cell">
+                              <TableCell>
                                 {getOrderTypeBadge(order.order_type)}
                               </TableCell>
-                              <TableCell className="hidden sm:table-cell">
+                              <TableCell>
                                 {getStatusBadge(order.status)}
                               </TableCell>
-                              <TableCell className="hidden md:table-cell">
-                                {new Date(order.pickupDateTime).toLocaleString(
-                                  undefined,
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  },
-                                )}
+                              <TableCell>
+                                {formatDate(order.createdAt)}
                               </TableCell>
-                              <TableCell className="hidden md:table-cell">
-                                {new Date(order.arrivalDateTime).toLocaleString(
-                                  undefined,
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  },
-                                )}
+                              <TableCell>
+                                {formatAddress(order.pickupAddress)}
+                              </TableCell>
+                              <TableCell>
+                                {formatAddress(order.deliveryAddress)}
                               </TableCell>
                               <TableCell className="text-right font-medium">
                                 {formatCurrency(order.orderTotal)}
@@ -394,53 +349,28 @@ const ClientOrdersPage = () => {
                         </TableBody>
                       </Table>
 
-                      <div className="mt-4 flex items-center justify-between">
+                      {/* Pagination */}
+                      <div className="mt-6 flex items-center justify-between">
                         <Button
                           variant="outline"
                           onClick={handlePrevPage}
-                          disabled={!hasPrevPage}
+                          disabled={!pagination.hasPrevPage}
                         >
                           Previous
                         </Button>
                         <span className="text-sm text-gray-500">
-                          Page {currentPage}
+                          Page {pagination.currentPage} of{" "}
+                          {pagination.totalPages}
                         </span>
                         <Button
                           onClick={handleNextPage}
-                          disabled={!hasNextPage}
+                          disabled={!pagination.hasNextPage}
                         >
                           Next
                         </Button>
                       </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-
-              {/* Upcoming Deliveries */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upcoming Deliveries</CardTitle>
-                  <CardDescription>
-                    Track your scheduled deliveries for today and tomorrow
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-start rounded-md bg-blue-50 p-4">
-                    <div className="mr-4 rounded-full bg-blue-100 p-2">
-                      <Truck className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-blue-800">
-                        Delivery Insights
-                      </h4>
-                      <p className="mt-1 text-sm text-blue-600">
-                        You have {metrics.activeOrders + metrics.pendingOrders}{" "}
-                        upcoming deliveries in the next 48 hours. Make sure your
-                        items are prepared and ready for pickup.
-                      </p>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -451,4 +381,4 @@ const ClientOrdersPage = () => {
   );
 };
 
-export default ClientOrdersPage; 
+export default ClientOrdersPage;

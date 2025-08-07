@@ -26,6 +26,40 @@ export interface AuthResult {
   context: AuthContext;
 }
 
+/**
+ * CSRF Token validation for state-changing operations
+ */
+export function validateCSRFToken(request: NextRequest): boolean {
+  // Only validate CSRF for state-changing methods
+  const method = request.method.toUpperCase();
+  if (!['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+    return true; // No CSRF validation needed for read operations
+  }
+
+  const csrfHeader = request.headers.get('X-CSRF-Token');
+  
+  // For now, implement a simple header-based CSRF protection
+  // In production, you should implement proper CSRF tokens
+  const expectedOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const origin = request.headers.get('origin');
+  const referer = request.headers.get('referer');
+
+  // Validate origin or referer matches expected domain
+  if (origin && origin !== expectedOrigin) {
+    return false;
+  }
+  
+  if (!origin && referer && !referer.startsWith(expectedOrigin)) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Standardized authentication middleware for API routes
+ * This ensures consistent security patterns across all endpoints
+ */
 export async function withAuth(
   request: NextRequest,
   options: AuthMiddlewareOptions = {}

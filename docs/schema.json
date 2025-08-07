@@ -1,189 +1,237 @@
 {
   "tables": [
     {
-      "name": "nextauth_users",
+      "name": "profiles",
+      "description": "User profiles linked to Supabase auth.users",
       "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "description": "Primary key, references auth.users.id"
+        },
         {
           "name": "email",
-          "type": "email"
-        },
-        {
-          "name": "emailVerified",
-          "type": "datetime"
-        },
-        {
-          "name": "name",
-          "type": "string"
-        },
-        {
-          "name": "image",
-          "type": "string"
-        },
-        {
-          "name": "password",
-          "type": "string"
-        }
-      ]
-    },
-    {
-      "name": "nextauth_accounts",
-      "columns": [
-        {
-          "name": "user",
-          "type": "link",
-          "link": {
-            "table": "nextauth_users"
-          }
+          "type": "string",
+          "description": "User email address"
         },
         {
           "name": "type",
-          "type": "string"
+          "type": "enum",
+          "description": "User type: CLIENT, ADMIN, SUPER_ADMIN, DRIVER, VENDOR, HELPDESK"
         },
         {
-          "name": "provider",
-          "type": "string"
+          "name": "status",
+          "type": "enum",
+          "description": "User status: ACTIVE, INACTIVE, SUSPENDED"
         },
         {
-          "name": "providerAccountId",
-          "type": "string"
+          "name": "created_at",
+          "type": "timestamp",
+          "description": "Profile creation timestamp"
         },
         {
-          "name": "refresh_token",
-          "type": "string"
-        },
-        {
-          "name": "access_token",
-          "type": "string"
-        },
-        {
-          "name": "expires_at",
-          "type": "int"
-        },
-        {
-          "name": "token_type",
-          "type": "string"
-        },
-        {
-          "name": "scope",
-          "type": "string"
-        },
-        {
-          "name": "id_token",
-          "type": "text"
-        },
-        {
-          "name": "session_state",
-          "type": "string"
+          "name": "updated_at",
+          "type": "timestamp",
+          "description": "Profile last update timestamp"
         }
       ]
     },
     {
-      "name": "nextauth_verificationTokens",
-      "columns": [
-        {
-          "name": "identifier",
-          "type": "string"
-        },
-        {
-          "name": "token",
-          "type": "string"
-        },
-        {
-          "name": "expires",
-          "type": "datetime"
-        }
-      ]
-    },
-    {
-      "name": "nextauth_users_accounts",
+      "name": "auth.users",
+      "description": "Supabase Auth users table (managed by Supabase)",
       "columns": [
         {
           "name": "id",
-          "type": "string"
+          "type": "uuid",
+          "description": "Primary key"
         },
         {
-          "name": "userId",
-          "type": "string"
+          "name": "email",
+          "type": "string",
+          "description": "User email"
         },
         {
-          "name": "type",
-          "type": "string"
+          "name": "created_at",
+          "type": "timestamp",
+          "description": "Account creation timestamp"
         },
         {
-          "name": "provider",
-          "type": "string"
-        },
-        {
-          "name": "providerAccountId",
-          "type": "string"
-        },
-        {
-          "name": "refresh_token",
-          "type": "string"
-        },
-        {
-          "name": "access_token",
-          "type": "string"
-        },
-        {
-          "name": "expires_at",
-          "type": "int"
-        },
-        {
-          "name": "token_type",
-          "type": "string"
-        },
-        {
-          "name": "scope",
-          "type": "string"
-        },
-        {
-          "name": "id_token",
-          "type": "text"
-        },
-        {
-          "name": "session_state",
-          "type": "string"
+          "name": "updated_at",
+          "type": "timestamp",
+          "description": "Account last update timestamp"
         }
       ]
     },
     {
-      "name": "nextauth_users_sessions",
+      "name": "auth.sessions",
+      "description": "Supabase Auth sessions table (managed by Supabase)",
       "columns": [
         {
           "name": "id",
-          "type": "string"
+          "type": "uuid",
+          "description": "Primary key"
         },
         {
-          "name": "sessionToken",
-          "type": "string"
+          "name": "user_id",
+          "type": "uuid",
+          "description": "References auth.users.id"
         },
         {
-          "name": "userId",
-          "type": "string"
+          "name": "created_at",
+          "type": "timestamp",
+          "description": "Session creation timestamp"
         },
         {
-          "name": "expires",
-          "type": "datetime"
+          "name": "expires_at",
+          "type": "timestamp",
+          "description": "Session expiration timestamp"
         }
       ]
     },
     {
-      "name": "nextauth_verification_tokens",
+      "name": "catering_requests",
+      "description": "Catering service requests",
       "columns": [
         {
-          "name": "identifier",
-          "type": "string"
+          "name": "id",
+          "type": "uuid",
+          "description": "Primary key"
         },
         {
-          "name": "token",
-          "type": "string"
+          "name": "user_id",
+          "type": "uuid",
+          "description": "References profiles.id"
         },
         {
-          "name": "expires",
-          "type": "datetime"
+          "name": "status",
+          "type": "enum",
+          "description": "Request status"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "description": "Request creation timestamp"
+        }
+      ]
+    },
+    {
+      "name": "on_demand_requests",
+      "description": "On-demand service requests",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "description": "Primary key"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "References profiles.id"
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "description": "Request status"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "description": "Request creation timestamp"
+        }
+      ]
+    },
+    {
+      "name": "addresses",
+      "description": "User addresses",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "description": "Primary key"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "description": "References profiles.id"
+        },
+        {
+          "name": "address_line_1",
+          "type": "string",
+          "description": "Primary address line"
+        },
+        {
+          "name": "address_line_2",
+          "type": "string",
+          "description": "Secondary address line"
+        },
+        {
+          "name": "city",
+          "type": "string",
+          "description": "City"
+        },
+        {
+          "name": "state",
+          "type": "string",
+          "description": "State"
+        },
+        {
+          "name": "zip_code",
+          "type": "string",
+          "description": "ZIP code"
+        },
+        {
+          "name": "country",
+          "type": "string",
+          "description": "Country"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "description": "Address creation timestamp"
         }
       ]
     }
+  ],
+  "authentication": {
+    "provider": "Supabase Auth",
+    "features": [
+      "Email/Password authentication",
+      "Google OAuth integration",
+      "Session management",
+      "Password reset",
+      "Email verification"
+    ],
+    "tables": [
+      "auth.users",
+      "auth.sessions",
+      "profiles"
+    ]
+  },
+  "relationships": [
+    {
+      "from": "profiles.id",
+      "to": "auth.users.id",
+      "type": "one-to-one",
+      "description": "Profile links to Supabase auth user"
+    },
+    {
+      "from": "catering_requests.user_id",
+      "to": "profiles.id",
+      "type": "many-to-one",
+      "description": "Catering requests belong to a user"
+    },
+    {
+      "from": "on_demand_requests.user_id",
+      "to": "profiles.id",
+      "type": "many-to-one",
+      "description": "On-demand requests belong to a user"
+    },
+    {
+      "from": "addresses.user_id",
+      "to": "profiles.id",
+      "type": "many-to-one",
+      "description": "Addresses belong to a user"
+    }
   ]
+} 
 } 
