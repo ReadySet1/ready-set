@@ -43,9 +43,9 @@ export async function GET(
     const params_array = [id];
 
     // If user is DRIVER, verify they own this shift
-    if (authResult.context.userType === 'DRIVER') {
+    if (authResult.context.user.type === 'DRIVER') {
       query += ` AND ds.driver_id = (SELECT id FROM drivers WHERE user_id = $2)`;
-      params_array.push(authResult.context.userId);
+      params_array.push(authResult.context.user.id);
     }
 
     const result = await prisma.$queryRawUnsafe<any[]>(query, ...params_array);
@@ -100,7 +100,7 @@ export async function GET(
       createdAt: shift.created_at,
       updatedAt: shift.updated_at,
       // Additional driver info for admin views
-      driverInfo: authResult.context.userType !== 'DRIVER' ? {
+      driverInfo: authResult.context.user.type !== 'DRIVER' ? {
         employeeId: shift.employee_id,
         vehicleNumber: shift.vehicle_number
       } : undefined
@@ -168,7 +168,7 @@ export async function PUT(
     const shift = verifyResult[0];
 
     // If user is DRIVER, verify they own this shift
-    if (authResult.context.userType === 'DRIVER' && shift.user_id !== authResult.context.userId) {
+    if (authResult.context.user.type === 'DRIVER' && shift?.user_id !== authResult.context.user.id) {
       return NextResponse.json(
         { success: false, error: 'Access denied' },
         { status: 403 }
@@ -177,7 +177,7 @@ export async function PUT(
 
     switch (action) {
       case 'end':
-        if (shift.status !== 'active' && shift.status !== 'paused') {
+        if (shift?.status !== 'active' && shift?.status !== 'paused') {
           return NextResponse.json(
             { success: false, error: 'Shift is not active' },
             { status: 400 }

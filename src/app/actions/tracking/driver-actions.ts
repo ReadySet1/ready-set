@@ -116,7 +116,7 @@ export async function endDriverShift(
 
     // Calculate distance if not provided
     let totalDistance = finalMileage || 0;
-    if (!finalMileage && shift.start_location) {
+    if (!finalMileage && shift?.start_location) {
       const distanceResult = await prisma.$queryRawUnsafe<{ distance_km: number }[]>(`
         SELECT ST_Distance(
           ST_GeogFromText($1),
@@ -159,7 +159,7 @@ export async function endDriverShift(
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
-      shift.driver_id,
+      shift?.driver_id,
       `POINT(${endLocation.coordinates.lng} ${endLocation.coordinates.lat})`
     );
 
@@ -269,6 +269,9 @@ export async function endShiftBreak(
     }
 
     const break_record = breakInfo[0];
+    if (!break_record) {
+      return { success: false, error: 'Break record not found' };
+    }
 
     // End the break
     await prisma.$executeRawUnsafe(`

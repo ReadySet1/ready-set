@@ -56,8 +56,12 @@ export interface DeliveryTracking {
   onDemandId?: string;         // Link to OnDemand orders
   driverId: string;
   status: DriverStatus;        // Use existing enum
-  pickupLocation: Coordinates;
-  deliveryLocation: Coordinates;
+  pickupLocation: {
+    coordinates: [number, number]; // [lng, lat]
+  };
+  deliveryLocation: {
+    coordinates: [number, number]; // [lng, lat]
+  };
   estimatedArrival?: Date;
   actualArrival?: Date;
   route: LocationUpdate[];
@@ -94,7 +98,9 @@ export interface TrackedDriver {
   phoneNumber: string;
   isActive: boolean;
   isOnDuty: boolean;
-  lastKnownLocation?: Coordinates;
+  lastKnownLocation?: {
+    coordinates: [number, number]; // [lng, lat]
+  };
   lastLocationUpdate?: Date;
   traccarDeviceId?: number;
   currentShift?: DriverShift;
@@ -104,6 +110,10 @@ export interface TrackedDriver {
     number: string;
     type: string;
   };
+  // Additional computed fields from queries
+  deliveryCount?: number;
+  totalDistanceKm?: number;
+  activeDeliveries?: number;
   metadata: Record<string, any>;
   createdAt: Date;
   updatedAt: Date;

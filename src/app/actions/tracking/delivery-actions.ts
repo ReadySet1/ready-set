@@ -3,7 +3,7 @@
 import { prisma } from '@/utils/prismaDB';
 import { revalidatePath } from 'next/cache';
 import type { LocationUpdate, DeliveryTracking } from '@/types/tracking';
-import type { DriverStatus } from '@/types/user';
+import { DriverStatus } from '@/types/user';
 
 /**
  * Update delivery status with location and optional proof of delivery
@@ -61,13 +61,13 @@ export async function updateDeliveryStatus(
 
     // Set timestamp fields based on status
     switch (status) {
-      case 'STARTED':
+      case DriverStatus.EN_ROUTE_TO_CLIENT:
         updateFields.push('started_at = NOW()');
         break;
-      case 'ARRIVED':
+      case DriverStatus.ARRIVED_TO_CLIENT:
         updateFields.push('arrived_at = NOW()');
         break;
-      case 'DELIVERED':
+      case DriverStatus.COMPLETED:
         updateFields.push('completed_at = NOW()');
         break;
     }
@@ -80,7 +80,7 @@ export async function updateDeliveryStatus(
     `, ...params);
 
     // Update driver location if provided
-    if (location && deliveryRecord.driver_id) {
+    if (location && deliveryRecord?.driver_id) {
       await prisma.$executeRawUnsafe(`
         UPDATE drivers 
         SET 
@@ -95,7 +95,7 @@ export async function updateDeliveryStatus(
     }
 
     // Update delivery count in current shift if delivery is completed
-    if (status === 'DELIVERED' && deliveryRecord.driver_id) {
+    if (status === DriverStatus.COMPLETED && deliveryRecord?.driver_id) {
       await prisma.$executeRawUnsafe(`
         UPDATE driver_shifts 
         SET 
@@ -107,7 +107,7 @@ export async function updateDeliveryStatus(
     }
 
     // Update linked order status if applicable
-    if (deliveryRecord.catering_request_id) {
+    if (deliveryRecord?.catering_request_id) {
       await prisma.$executeRawUnsafe(`
         UPDATE catering_requests 
         SET 
@@ -117,7 +117,7 @@ export async function updateDeliveryStatus(
       `, deliveryRecord.catering_request_id, status);
     }
 
-    if (deliveryRecord.on_demand_id) {
+    if (deliveryRecord?.on_demand_id) {
       await prisma.$executeRawUnsafe(`
         UPDATE on_demand 
         SET 
@@ -157,7 +157,7 @@ export async function assignDeliveryToDriver(
       WHERE id = $1::uuid
     `, driverId);
 
-    if (driver.length === 0 || !driver[0].is_active) {
+    if (driver.length === 0 || !driver[0]?.is_active) {
       return { success: false, error: 'Driver not found or inactive' };
     }
 
@@ -167,7 +167,7 @@ export async function assignDeliveryToDriver(
 
     if (estimatedArrival) {
       updateFields.push('estimated_arrival = $3');
-      params.push(estimatedArrival);
+      params.push(estimatedArrival.toISOString());
     }
 
     await prisma.$executeRawUnsafe(`

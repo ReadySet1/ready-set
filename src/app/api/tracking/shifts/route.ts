@@ -46,10 +46,10 @@ export async function GET(request: NextRequest) {
     let paramCounter = 1;
 
     // If user is DRIVER, only show their own shifts
-    if (authResult.context.userType === 'DRIVER') {
+    if (authResult.context.user.type === 'DRIVER') {
       // Assume driver has a profile linking to the drivers table
       query += ` AND ds.driver_id = (SELECT id FROM drivers WHERE user_id = $${paramCounter})`;
-      params.push(authResult.context.userId);
+      params.push(authResult.context.user.id);
       paramCounter++;
     } else if (driverId) {
       query += ` AND ds.driver_id = $${paramCounter}`;
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
           createdAt: shift.created_at,
           updatedAt: shift.updated_at,
           // Additional driver info for admin views
-          driverInfo: authResult.context.userType !== 'DRIVER' ? {
+          driverInfo: authResult.context.user.type !== 'DRIVER' ? {
             employeeId: shift.employee_id,
             vehicleNumber: shift.vehicle_number
           } : undefined
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
       SELECT id, current_shift_id 
       FROM drivers 
       WHERE user_id = $1 AND is_active = true
-    `, authResult.context.userId);
+    `, authResult.context.user.id);
 
     if (driverResult.length === 0) {
       return NextResponse.json(
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
     const driver = driverResult[0];
 
     // Check if driver already has an active shift
-    if (driver.current_shift_id) {
+    if (driver?.current_shift_id) {
       return NextResponse.json(
         { success: false, error: 'Driver already has an active shift' },
         { status: 409 }
@@ -204,12 +204,18 @@ export async function POST(request: NextRequest) {
         $3::jsonb
       ) RETURNING id
     `,
-      driver.id,
+      driver?.id,
       `POINT(${location.coordinates.lng} ${location.coordinates.lat})`,
       JSON.stringify({ vehicleCheck, ...metadata })
     );
 
-    const shiftId = shiftResult[0].id;
+    const shiftId = shiftResult[0]?.id;
+    if (!shiftId) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to create shift' },
+        { status: 500 }
+      );
+    }
 
     // Update driver status
     await prisma.$executeRawUnsafe(`
@@ -223,7 +229,7 @@ export async function POST(request: NextRequest) {
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
-      driver.id,
+      driver?.id,
       shiftId,
       `POINT(${location.coordinates.lng} ${location.coordinates.lat})`
     );

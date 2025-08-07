@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
-import type { DriverStatus } from '@/types/user';
+import { DriverStatus } from '@/types/user';
 
 // GET - Get specific delivery details
 export async function GET(
@@ -52,9 +52,9 @@ export async function GET(
     const params_array = [id];
 
     // If user is DRIVER, verify they own this delivery
-    if (authResult.context.userType === 'DRIVER') {
+    if (authResult.context.user.type === 'DRIVER') {
       query += ` AND dr.user_id = $2`;
-      params_array.push(authResult.context.userId);
+      params_array.push(authResult.context.user.id);
     }
 
     const result = await prisma.$queryRawUnsafe<any[]>(query, ...params_array);
@@ -92,7 +92,7 @@ export async function GET(
       createdAt: delivery.created_at,
       updatedAt: delivery.updated_at,
       // Additional driver info for admin views
-      driverInfo: authResult.context.userType !== 'DRIVER' ? {
+      driverInfo: authResult.context.user.type !== 'DRIVER' ? {
         employeeId: delivery.employee_id,
         vehicleNumber: delivery.vehicle_number
       } : undefined
@@ -160,7 +160,7 @@ export async function PUT(
     const delivery = verifyResult[0];
 
     // If user is DRIVER, verify they own this delivery
-    if (authResult.context.userType === 'DRIVER' && delivery.user_id !== authResult.context.userId) {
+    if (authResult.context.user.type === 'DRIVER' && delivery?.user_id !== authResult.context.user.id) {
       return NextResponse.json(
         { success: false, error: 'Access denied' },
         { status: 403 }
@@ -168,7 +168,7 @@ export async function PUT(
     }
 
     // Validate status transition
-    const validStatuses: DriverStatus[] = ['ASSIGNED', 'STARTED', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
+    const validStatuses: DriverStatus[] = [DriverStatus.ASSIGNED, DriverStatus.EN_ROUTE_TO_CLIENT, DriverStatus.ARRIVED_TO_CLIENT, DriverStatus.COMPLETED];
     if (status && !validStatuses.includes(status)) {
       return NextResponse.json(
         { success: false, error: 'Invalid status' },
@@ -217,7 +217,7 @@ export async function PUT(
       params_array.push(JSON.stringify({ 
         notes, 
         statusUpdatedAt: new Date().toISOString(),
-        updatedBy: authResult.context.userId
+        updatedBy: authResult.context.user.id
       }));
       paramCounter++;
     }
@@ -230,7 +230,7 @@ export async function PUT(
     `, ...params_array);
 
     // Update driver location if provided
-    if (location && location.coordinates && delivery.driver_id) {
+    if (location && location.coordinates && delivery?.driver_id) {
       await prisma.$executeRawUnsafe(`
         UPDATE drivers 
         SET 
@@ -245,7 +245,7 @@ export async function PUT(
     }
 
     // Update delivery count in current shift if delivery is completed
-    if (status === 'DELIVERED' && delivery.driver_id) {
+    if (status === DriverStatus.COMPLETED && delivery?.driver_id) {
       await prisma.$executeRawUnsafe(`
         UPDATE driver_shifts 
         SET 
@@ -305,7 +305,7 @@ export async function DELETE(
 
     const delivery = deliveryResult[0];
 
-    if (delivery.status === 'DELIVERED') {
+    if (delivery?.status === 'DELIVERED') {
       return NextResponse.json(
         { success: false, error: 'Cannot cancel completed delivery' },
         { status: 400 }
@@ -324,7 +324,7 @@ export async function DELETE(
       id,
       JSON.stringify({
         cancelledAt: new Date().toISOString(),
-        cancelledBy: authResult.context.userId
+        cancelledBy: authResult.context.user.id
       })
     );
 

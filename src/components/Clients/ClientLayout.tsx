@@ -19,6 +19,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const isStudioRoute = pathname?.startsWith("/studio");
   const isHomePage = pathname === "/";
   const isProfilePage = pathname === "/profile";
+  const isDriverRoute = pathname?.startsWith("/driver");
 
   useEffect(() => {
     setTimeout(() => setLoading(false), 1000);
@@ -27,9 +28,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
       <ThemeProvider attribute="class" enableSystem={true} defaultTheme="light">
         <ToasterContext />
-        {!isBackendAdminRoute && !isStudioRoute && !isHomePage && !isProfilePage && <Header />}
+        {!isBackendAdminRoute && !isStudioRoute && !isHomePage && !isProfilePage && !isDriverRoute && <Header />}
         <main className="flex-grow">{children}</main>
-        {!isBackendAdminRoute && !isStudioRoute && <Footer />}
+        {!isBackendAdminRoute && !isStudioRoute && !isDriverRoute && <Footer />}
         <ScrollToTop />
       </ThemeProvider>
   );

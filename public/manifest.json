@@ -1,0 +1,42 @@
+{
+  "name": "ReadySet Driver Portal",
+  "short_name": "ReadySet Driver",
+  "description": "Real-time location tracking and delivery management for ReadySet drivers",
+  "start_url": "/driver/tracking",
+  "display": "standalone",
+  "background_color": "#1f2937",
+  "theme_color": "#1f2937",
+  "orientation": "portrait",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/images/logo/logo-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/images/logo/logo-icon.png", 
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/driver-portal-screenshot.png",
+      "sizes": "375x812",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "permissions": [
+    "geolocation"
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "geo",
+      "url": "/driver/tracking?coords=%s"
+    }
+  ]
+}

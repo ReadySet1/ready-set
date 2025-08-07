@@ -53,9 +53,9 @@ export async function GET(request: NextRequest) {
     let paramCounter = 1;
 
     // If user is DRIVER, only show their own deliveries
-    if (authResult.context.userType === 'DRIVER') {
+    if (authResult.context.user.type === 'DRIVER') {
       query += ` AND d.driver_id = (SELECT id FROM drivers WHERE user_id = $${paramCounter})`;
-      params.push(authResult.context.userId);
+      params.push(authResult.context.user.id);
       paramCounter++;
     } else if (driverId) {
       query += ` AND d.driver_id = $${paramCounter}`;
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
       createdAt: delivery.created_at,
       updatedAt: delivery.updated_at,
       // Additional driver info for admin views
-      driverInfo: authResult.context.userType !== 'DRIVER' ? {
+      driverInfo: authResult.context.user.type !== 'DRIVER' ? {
         employeeId: delivery.employee_id,
         vehicleNumber: delivery.vehicle_number
       } : undefined
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       WHERE id = $1
     `, driverId);
 
-    if (driverResult.length === 0 || !driverResult[0].is_active) {
+    if (driverResult.length === 0 || !driverResult[0]?.is_active) {
       return NextResponse.json(
         { success: false, error: 'Driver not found or inactive' },
         { status: 404 }
@@ -215,8 +215,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        deliveryId: result[0].id,
-        assignedAt: result[0].assigned_at,
+        deliveryId: result[0]?.id,
+        assignedAt: result[0]?.assigned_at,
         status: 'ASSIGNED'
       }
     }, { status: 201 });
