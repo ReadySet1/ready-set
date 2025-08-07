@@ -29,7 +29,7 @@
     "studio": "dotenv -e .env.local -- npx prisma studio",
     "db:generate": "dotenv -e .env.local -- npx prisma generate",
     "prisma": "prisma generate",
-    "postinstall": "node -e \"if (process.env.PRISMA_SKIP_POSTINSTALL_GENERATE !== 'true') { require('child_process').execSync('prisma generate', { stdio: 'inherit' }); }\"",
+    "postinstall": "node -e \"if (process.env.PRISMA_SKIP_POSTINSTALL_GENERATE !== 'true' && process.env.CI !== 'true') { try { require('child_process').execSync('prisma generate', { stdio: 'inherit' }); } catch (e) { console.log('Skipping prisma generate in postinstall:', e.message); } }\"",
     "vercel-build": "prisma generate && next build",
     "vercel-sim": "node scripts/vercel-build-simulation.js",
     "type-check": "tsc --noEmit",
