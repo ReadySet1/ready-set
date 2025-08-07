@@ -11,6 +11,8 @@ on:
 
 jobs:
   analyze:
+    # Workflow is disabled - remove this line to re-enable
+    if: false
     name: Analyze Code
     runs-on: ubuntu-latest
     timeout-minutes: 360

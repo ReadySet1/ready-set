@@ -97,3 +97,6 @@ pids
 tmp/
 temp/.prisma-initialized
 test-results/
+
+# Documentation markdown files
+docs/markdown/

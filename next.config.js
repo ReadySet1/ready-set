@@ -12,6 +12,7 @@ const nextConfig = {
     // Enable 'use cache' directive for static site generation
     useCache: true,
   },
+  serverExternalPackages: ['@prisma/client', 'prisma'],
   skipTrailingSlashRedirect: true,
   // Ensure all API routes are treated as dynamic
   async rewrites() {
@@ -23,15 +24,54 @@ const nextConfig = {
     if (isServer) {
       config.externals = config.externals || [];
       config.externals.push('pg');
+      
+      // Don't externalize @prisma/client - bundle it
+      if (config.externals.includes('@prisma/client')) {
+        config.externals = config.externals.filter(external => external !== '@prisma/client');
+      }
     }
     
-    // Handle Prisma client during build
-    if (isServer && !dev) {
-      // Ensure Prisma client is properly bundled
+    // Handle Prisma client during build - improved configuration
+    if (isServer) {
+      // Force Prisma to use standard import path
       config.resolve.alias = {
         ...config.resolve.alias,
-        '@prisma/client': path.resolve(__dirname, 'node_modules/.prisma/client'),
+        '@prisma/client': require.resolve('@prisma/client'),
       };
+      
+      // Ensure binary targets are properly included
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        crypto: false,
+      };
+      
+      // Copy Prisma binaries for production builds
+      if (!dev) {
+        config.plugins = config.plugins || [];
+        
+        // Add custom plugin to copy Prisma binaries
+        const { CopyPlugin } = require('webpack').webpack || {};
+        if (CopyPlugin) {
+          config.plugins.push(
+            new CopyPlugin({
+              patterns: [
+                {
+                  from: path.join(__dirname, 'node_modules/.prisma/client/*.node'),
+                  to: path.join(__dirname, '.next/server/[name][ext]'),
+                  noErrorOnMissing: true,
+                },
+                {
+                  from: path.join(__dirname, 'node_modules/prisma/libquery_engine-*.so.node'),  
+                  to: path.join(__dirname, '.next/server/[name][ext]'),
+                  noErrorOnMissing: true,
+                },
+              ],
+            })
+          );
+        }
+      }
     }
     
     return config;
