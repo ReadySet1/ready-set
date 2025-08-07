@@ -22,7 +22,20 @@ jest.mock("@/utils/supabase/server", () => ({
   createClient: jest.fn(),
 }));
 
-const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+// Narrow the prisma import to the mocked shape so Jest helpers are available
+type PrismaMock = {
+  cateringRequest: {
+    findMany: jest.Mock;
+    count: jest.Mock;
+  };
+  onDemand: {
+    findMany: jest.Mock;
+    count: jest.Mock;
+  };
+  $disconnect: jest.Mock;
+};
+
+const mockPrisma = prisma as unknown as PrismaMock;
 const mockCreateClient = createClient as jest.MockedFunction<typeof createClient>;
 
 describe("/api/user-orders", () => {

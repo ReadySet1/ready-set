@@ -36,7 +36,24 @@ global.fetch = jest.fn();
 const mockCreateClient = createClient as jest.MockedFunction<
   typeof createClient
 >;
-const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+
+// Narrow the prisma import to the mocked shape so Jest helpers are available
+type PrismaMock = {
+  cateringRequest: {
+    findMany: jest.Mock;
+    count: jest.Mock;
+  };
+  onDemand: {
+    findMany: jest.Mock;
+    count: jest.Mock;
+  };
+  userAddress: {
+    count: jest.Mock;
+  };
+  $disconnect: jest.Mock;
+};
+
+const mockPrisma = prisma as unknown as PrismaMock;
 const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
 
 describe("Client Orders Flow Integration", () => {
