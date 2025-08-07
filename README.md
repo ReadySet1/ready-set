@@ -31,16 +31,29 @@ For comprehensive documentation, setup instructions, and development guides, see
 ## 🎯 Key Features
 
 - **Multi-user platform** for drivers, vendors, and clients
+- **Supabase authentication** with Google OAuth integration
 - **CaterValley integration** with automated pricing system
 - **Real-time delivery tracking**
 - **Professional standards** with HIPAA compliance
 - **Modern tech stack** with Next.js, TypeScript, and PostgreSQL
+
+## 🔐 Authentication
+
+This project uses **Supabase Auth** for secure user authentication:
+
+- **Email/Password authentication** with secure password hashing
+- **Google OAuth integration** for social login
+- **Magic link authentication** for passwordless login
+- **Session management** with secure JWT tokens
+- **Role-based access control** (CLIENT, ADMIN, SUPER_ADMIN, DRIVER, VENDOR, HELPDESK)
+- **Protected routes** with middleware-based authorization
 
 ## 🔧 Development
 
 This project follows Next.js and TypeScript best practices with:
 
 - **Strict TypeScript** configuration
+- **Supabase authentication** with secure session management
 - **Automated testing** with Vitest and Playwright
 - **Code quality** with ESLint and Prettier
 - **Git hooks** for pre-push validation

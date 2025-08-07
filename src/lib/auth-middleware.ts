@@ -83,7 +83,6 @@ export function validateCSRFToken(request: NextRequest): boolean {
   }
 
   const csrfHeader = request.headers.get('X-CSRF-Token');
-  const sessionCookie = request.cookies.get('next-auth.csrf-token')?.value;
   
   // For now, implement a simple header-based CSRF protection
   // In production, you should implement proper CSRF tokens

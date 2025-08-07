@@ -2,15 +2,13 @@
   "version": 2,
   "buildCommand": "pnpm run vercel-build",
   "outputDirectory": ".next",
-  "installCommand": "pnpm install --frozen-lockfile",
+  "installCommand": "PRISMA_SKIP_POSTINSTALL_GENERATE=true pnpm install --frozen-lockfile",
   "framework": "nextjs",
   "env": {
-    "PRISMA_GENERATE_DATAPROXY": "true",
     "PRISMA_SKIP_POSTINSTALL_GENERATE": "true"
   },
   "build": {
     "env": {
-      "PRISMA_GENERATE_DATAPROXY": "true",
       "PRISMA_SKIP_POSTINSTALL_GENERATE": "true",
       "NEXT_TELEMETRY_DISABLED": "1",
       "NODE_ENV": "production"
