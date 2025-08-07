@@ -103,6 +103,10 @@ async function fixAdminUser() {
 
       // Use the first user and make them an admin
       const firstUser = allUsers[0];
+      if (!firstUser) {
+        console.log('❌ No users available to promote to admin');
+        return;
+      }
       console.log(`🔧 Making user ${firstUser.email} an admin...`);
       
       try {

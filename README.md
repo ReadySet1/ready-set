@@ -1,139 +1,60 @@
-# Multi-User Delivery Service Platform
+# Ready Set - Multi-User Delivery Service Platform
 
 A comprehensive web application for managing delivery services, built with Next.js, PostgreSQL, and Shadcn components.
 
-## Overview
-
-This platform allows users to register as drivers, vendors, and clients, facilitating a seamless delivery service experience. It's designed to handle user management using PostgreSQL, with a modern and responsive frontend powered by Next.js and Shadcn components.
-
-## Features
-
-### User Registration and Management
-- Multiple user types: Drivers, Vendors, and Clients
-- Secure authentication and authorization
-
-### Fast and Reliable Delivery Solutions
-- Same-day delivery
-- On-demand services
-- Emergency last-minute deliveries
-
-### On-the-Go Courier Assistance
-- Quick pickup and delivery
-- Experienced and trained couriers
-
-### Catering Delivery & Setup
-- Event planning assistance
-- Food transport and presentation services
-- **CaterValley Discount System**: Automated tiered pricing based on head count and food cost
-
-### Versatile Delivery Options
-- Handling various items beyond food (documents, medical supplies, etc.)
-- Ensuring safe and timely deliveries
-
-### Priority Handling for Urgent Requests
-- Rapid response to time-sensitive deliveries
-
-### Professional Standards
-- Comprehensive driver training programs
-- HIPAA compliance
-- Food Handlers Certification (California standards)
-- Strict dress code and safety protocols
-
-## Technical Stack
-
-- **Frontend**: Next.js
-- **Backend**: Next.js API routes
-- **Database**: PostgreSQL with Prisma ORM
-- **UI Components**: Shadcn
-- **Pricing Engine**: CaterValley Discount System with tiered pricing
-
-## CaterValley Discount System
-
-The platform includes an advanced discount system for catering orders with automated pricing calculation based on:
-
-- **5-tier pricing structure** covering different head count and food cost ranges
-- **Fixed pricing** for smaller orders (1-99 heads)
-- **Percentage-based pricing** for large orders (100+ heads)
-- **Tip-aware pricing** with different rates for orders with and without tips
-- **Real-time calculation** with debounced API calls for optimal performance
-
-See [`docs/CATERVALLEY_DISCOUNT_SYSTEM.md`](docs/CATERVALLEY_DISCOUNT_SYSTEM.md) for complete documentation.
-
-## Getting Started
-
-[Include installation and setup instructions here]
-
-## Documentation
-
-[Link to or include basic documentation about how to use the platform]
-
-## Blog
-
-Stay updated with our latest news and valuable information about our services through our blog section.
-
-## Contributing
-
-[Include information about how others can contribute to the project, if applicable]
-
-## License
-
-[Specify the license under which your project is released]
-
-## Contact
-
-[Provide contact information or links for support and inquiries]
-
-
-
-## Build and Deployment Process
-
-This project includes several safeguards to prevent build errors during deployment:
-
-### Local Development Checks
-
-Before pushing your changes to GitHub, you can run these commands to catch potential issues early:
+## 🚀 Quick Start
 
 ```bash
-# Run a full build check - simulates Vercel environment
-pnpm check-build
+# Install dependencies
+pnpm install
 
-# Run just the type checker
-pnpm typecheck
+# Start development server
+pnpm dev
 
-# Run linting
-pnpm lint
+# Run tests
+pnpm test
+pnpm test:e2e
+
+# Build for production
+pnpm build
 ```
 
-### Git Hooks
+## 📚 Documentation
 
-The project uses Husky to enforce pre-push checks:
+For comprehensive documentation, setup instructions, and development guides, see:
 
-- **Pre-push hook**: Automatically runs type checking, Prisma generation, and linting before allowing you to push to GitHub
+- **[📖 Full Documentation](docs/README.md)** - Complete project documentation
+- **[📋 Documentation Index](docs/DOCUMENTATION_INDEX.md)** - Organized documentation structure
+- **[🛠️ Scripts Guide](scripts/README.md)** - Available utility scripts
+- **[📊 Project Cleanup Summary](docs/PROJECT_CLEANUP_SUMMARY.md)** - Project organization details
 
-### GitHub Actions
+## 🎯 Key Features
 
-A GitHub Actions workflow runs on every push and pull request to ensure the build will succeed:
+- **Multi-user platform** for drivers, vendors, and clients
+- **CaterValley integration** with automated pricing system
+- **Real-time delivery tracking**
+- **Professional standards** with HIPAA compliance
+- **Modern tech stack** with Next.js, TypeScript, and PostgreSQL
 
-- Runs on Ubuntu with Node.js 20
-- Uses PNPM with caching for faster builds
-- Performs TypeScript type checking
-- Runs a full build with the same environment variables as Vercel
+## 🔧 Development
 
-### Best Practices to Avoid Build Errors
+This project follows Next.js and TypeScript best practices with:
 
-1. **Strict TypeScript checking**: The project is configured with strict TypeScript settings to catch type errors early
+- **Strict TypeScript** configuration
+- **Automated testing** with Vitest and Playwright
+- **Code quality** with ESLint and Prettier
+- **Git hooks** for pre-push validation
+- **CI/CD** with GitHub Actions
 
-2. **Version pinning**: All dependencies, especially Prisma, have their versions pinned to avoid inconsistencies
+## 📞 Support
 
-3. **Import statements**: Always use explicit imports for types rather than namespace access:
+For questions or issues:
 
-   ```typescript
-   // ❌ Avoid this:
-   if (error instanceof Prisma.PrismaClientKnownRequestError) { ... }
-   
-   // ✅ Use this instead:
-   import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-   if (error instanceof PrismaClientKnownRequestError) { ... }
-   ```
+1. Check the [documentation](docs/README.md)
+2. Review [troubleshooting guides](docs/)
+3. Check GitHub issues
+4. Contact the development team
 
-4. **Run checks locally**: Always run `pnpm check-build` before pushing to GitHub to verify your changes will build successfully on Vercel
+---
+
+**Built with ❤️ using Next.js, TypeScript, and modern web technologies**
