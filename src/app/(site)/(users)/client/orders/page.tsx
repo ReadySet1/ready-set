@@ -172,7 +172,13 @@ const ClientOrdersPage = () => {
 
   const formatAddress = (address: any) => {
     if (!address) return "N/A";
-    return `${address.address}, ${address.city}, ${address.state}`;
+
+    const addressParts = [address.address, address.city, address.state].filter(
+      (part) => part && part !== "undefined",
+    );
+
+    if (addressParts.length === 0) return "N/A";
+    return addressParts.join(", ");
   };
 
   // Get badge style based on order status

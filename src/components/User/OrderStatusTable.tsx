@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -120,7 +119,8 @@ const OrderStatusTable: React.FC<OrderStatusTableProps> = ({
               No Orders Found
             </h3>
             <p className="max-w-md text-gray-500 dark:text-gray-400">
-              There are no orders to display at the moment. Check back later or contact support if you think this is an error.
+              There are no orders to display at the moment. Check back later or
+              contact support if you think this is an error.
             </p>
           </div>
         ) : (
@@ -134,8 +134,12 @@ const OrderStatusTable: React.FC<OrderStatusTableProps> = ({
                   <TableHead className="hidden md:table-cell">Date</TableHead>
                   {userType === "driver" && (
                     <>
-                      <TableHead className="hidden lg:table-cell">Pickup</TableHead>
-                      <TableHead className="hidden lg:table-cell">Delivery</TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        Pickup
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        Delivery
+                      </TableHead>
                     </>
                   )}
                   <TableHead className="text-right">Total</TableHead>
@@ -158,14 +162,20 @@ const OrderStatusTable: React.FC<OrderStatusTableProps> = ({
                       )}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      <Badge className={getOrderTypeBadgeClass(order.order_type)}>
+                      <Badge
+                        className={getOrderTypeBadgeClass(order.order_type)}
+                      >
                         {order.order_type}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       <Badge
                         className="text-xs"
-                        variant={order.status.toLowerCase() === "active" ? "secondary" : "outline"}
+                        variant={
+                          order.status.toLowerCase() === "active"
+                            ? "secondary"
+                            : "outline"
+                        }
                       >
                         {order.status}
                       </Badge>
@@ -176,17 +186,42 @@ const OrderStatusTable: React.FC<OrderStatusTableProps> = ({
                     {userType === "driver" && (
                       <>
                         <TableCell className="hidden lg:table-cell">
-                          {order.address ? `${order.address.street1}, ${order.address.city}, ${order.address.state}` : "N/A"}
+                          {order.address
+                            ? (() => {
+                                const addressParts = [
+                                  order.address.street1,
+                                  order.address.city,
+                                  order.address.state,
+                                ].filter(
+                                  (part) => part && part !== "undefined",
+                                );
+                                return addressParts.length > 0
+                                  ? addressParts.join(", ")
+                                  : "N/A";
+                              })()
+                            : "N/A"}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           {order.delivery_address
-                            ? `${order.delivery_address.street1}, ${order.delivery_address.city}, ${order.delivery_address.state}`
+                            ? (() => {
+                                const addressParts = [
+                                  order.delivery_address.street1,
+                                  order.delivery_address.city,
+                                  order.delivery_address.state,
+                                ].filter(
+                                  (part) => part && part !== "undefined",
+                                );
+                                return addressParts.length > 0
+                                  ? addressParts.join(", ")
+                                  : "N/A";
+                              })()
                             : "N/A"}
                         </TableCell>
                       </>
                     )}
                     <TableCell className="text-right">
-                      ${typeof order.order_total === "string"
+                      $
+                      {typeof order.order_total === "string"
                         ? parseFloat(order.order_total).toFixed(2)
                         : order.order_total.toFixed(2)}
                     </TableCell>

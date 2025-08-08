@@ -86,10 +86,12 @@ describe("ClientOrdersPage", () => {
         () => new Promise(() => {}), // Never resolves to keep loading state
       );
 
-      render(<ClientOrdersPage />);
+      const { container } = render(<ClientOrdersPage />);
 
-      expect(screen.getByRole("status")).toBeInTheDocument();
-      expect(screen.getByText(/loading/i)).toBeInTheDocument();
+      // The loader is a Lucide SVG spinner, not an ARIA status region.
+      // Assert that a spinning icon is rendered.
+      const spinner = container.querySelector(".animate-spin");
+      expect(spinner).toBeInTheDocument();
     });
   });
 
@@ -344,6 +346,14 @@ describe("ClientOrdersPage", () => {
         statusText: "Internal Server Error",
       } as Response);
 
+      // Mock reload via defineProperty since Location.reload is read-only
+      const originalReload = window.location.reload;
+      const reloadSpy = jest.fn();
+      Object.defineProperty(window, "location", {
+        value: { ...window.location, reload: reloadSpy },
+        writable: true,
+      });
+
       render(<ClientOrdersPage />);
 
       await waitFor(() => {
@@ -351,8 +361,13 @@ describe("ClientOrdersPage", () => {
         fireEvent.click(retryButton);
       });
 
-      // Should call fetch again
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(reloadSpy).toHaveBeenCalledTimes(1);
+
+      // Restore original
+      Object.defineProperty(window, "location", {
+        value: { ...window.location, reload: originalReload },
+        writable: true,
+      });
     });
   });
 
@@ -526,6 +541,99 @@ describe("ClientOrdersPage", () => {
       await waitFor(() => {
         const naElements = screen.getAllByText("N/A");
         expect(naElements).toHaveLength(2); // One for pickup, one for delivery
+      });
+    });
+  });
+
+  describe("Undefined/invalid address values", () => {
+    it("should not display the literal 'undefined' when some address fields are missing", async () => {
+      const ordersWithMissingParts = [
+        {
+          id: "1",
+          orderNumber: "CAT002",
+          order_type: "catering" as const,
+          status: "ACTIVE",
+          pickupDateTime: "2025-02-01T10:00:00Z",
+          arrivalDateTime: "2025-02-01T11:00:00Z",
+          orderTotal: 200,
+          createdAt: "2025-02-01T09:00:00Z",
+          // city missing
+          pickupAddress: {
+            address: "10 Market St",
+            city: undefined as any,
+            state: "CA",
+          },
+          // street missing
+          deliveryAddress: {
+            address: undefined as any,
+            city: "San Jose",
+            state: "CA",
+          },
+        },
+      ];
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          orders: ordersWithMissingParts,
+          pagination: mockPagination,
+        }),
+      } as Response);
+
+      render(<ClientOrdersPage />);
+
+      await waitFor(() => {
+        // Ensure no literal 'undefined' appears anywhere
+        expect(screen.queryByText(/undefined/i)).not.toBeInTheDocument();
+
+        // Addresses should collapse missing parts and render valid pieces only
+        expect(screen.getByText("10 Market St, CA")).toBeInTheDocument();
+        expect(screen.getByText("San Jose, CA")).toBeInTheDocument();
+      });
+    });
+
+    it("should show 'N/A' when all address parts are missing or equal to the string 'undefined'", async () => {
+      const ordersAllUndefined = [
+        {
+          id: "1",
+          orderNumber: "CAT003",
+          order_type: "catering" as const,
+          status: "ACTIVE",
+          pickupDateTime: "2025-02-01T10:00:00Z",
+          arrivalDateTime: "2025-02-01T11:00:00Z",
+          orderTotal: 200,
+          createdAt: "2025-02-01T09:00:00Z",
+          // all parts missing
+          pickupAddress: {
+            address: undefined as any,
+            city: undefined as any,
+            state: undefined as any,
+          },
+          // parts set to the string 'undefined'
+          deliveryAddress: {
+            address: "undefined" as any,
+            city: "undefined" as any,
+            state: "undefined" as any,
+          },
+        },
+      ];
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          orders: ordersAllUndefined,
+          pagination: mockPagination,
+        }),
+      } as Response);
+
+      render(<ClientOrdersPage />);
+
+      await waitFor(() => {
+        const naCells = screen.getAllByText("N/A");
+        // One N/A for pickup and one for delivery
+        expect(naCells.length).toBeGreaterThanOrEqual(2);
+        // And certainly no literal 'undefined'
+        expect(screen.queryByText(/undefined/i)).not.toBeInTheDocument();
       });
     });
   });

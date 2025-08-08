@@ -5,7 +5,10 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { ChevronDown, ArrowLeft, ArrowRight } from "lucide-react";
-import { useJobApplicationUpload, UploadedFile as HookUploadedFile } from "@/hooks/use-job-application-upload";
+import {
+  useJobApplicationUpload,
+  UploadedFile as HookUploadedFile,
+} from "@/hooks/use-job-application-upload";
 import { toast } from "@/components/ui/use-toast";
 import { FileUpload } from "./FileUpload";
 import { v4 as uuidv4 } from "uuid";
@@ -36,7 +39,7 @@ const FORM_STEPS: FormStep[] = [
     fields: ["role", "firstName", "lastName", "email", "phone", "address"],
   },
   {
-    id: 2, 
+    id: 2,
     name: "Experience & Skills",
     shortName: "Skills",
     fields: ["education", "workExperience", "skills", "coverLetter"],
@@ -45,8 +48,17 @@ const FORM_STEPS: FormStep[] = [
     id: 3,
     name: "Documents",
     shortName: "Docs",
-    fields: ["resume", "driversLicense", "insurance", "vehicleRegistration", 
-             "foodHandler", "hipaa", "driverPhoto", "carPhoto", "equipmentPhoto"],
+    fields: [
+      "resume",
+      "driversLicense",
+      "insurance",
+      "vehicleRegistration",
+      "foodHandler",
+      "hipaa",
+      "driverPhoto",
+      "carPhoto",
+      "equipmentPhoto",
+    ],
   },
   {
     id: 4,
@@ -150,18 +162,18 @@ interface JobApplicationResponse {
 }
 
 // Component to handle search params extraction
-const SearchParamsHandler = ({ 
-  onRoleChange 
-}: { 
-  onRoleChange: (role: string | null) => void 
+const SearchParamsHandler = ({
+  onRoleChange,
+}: {
+  onRoleChange: (role: string | null) => void;
 }) => {
   const searchParams = useSearchParams();
-  const roleFromUrl = searchParams?.get('role');
-  
+  const roleFromUrl = searchParams?.get("role");
+
   useEffect(() => {
     onRoleChange(roleFromUrl);
   }, [roleFromUrl, onRoleChange]);
-  
+
   return null;
 };
 
@@ -171,12 +183,12 @@ const JobApplicationForm = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   // Use simple timestamp-based ID instead of UUID format to avoid Prisma's UUID validation
   const tempEntityId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-  
+
   // Add a state to track if user came from signup
   const [fromSignup, setFromSignup] = useState<boolean>(false);
   // State to store the role from URL
   const [roleFromUrl, setRoleFromUrl] = useState<string | null>(null);
-  
+
   const {
     register,
     handleSubmit,
@@ -186,7 +198,7 @@ const JobApplicationForm = () => {
     formState: { errors, isSubmitting: formIsSubmitting, isDirty, isValid },
     trigger,
   } = useForm<FormData>({
-    mode: "onChange",  // Enable real-time validation
+    mode: "onChange", // Enable real-time validation
     defaultValues: {
       role: "",
       firstName: "",
@@ -217,23 +229,26 @@ const JobApplicationForm = () => {
   });
 
   // Handle role changes from URL parameter
-  const handleRoleChange = React.useCallback((role: string | null) => {
-    if (role) {
-      setValue('role', role, { shouldValidate: true });
-      setFromSignup(true);
-      setRoleFromUrl(role);
-      
-      // Only validate the role but start at step 1
-      const isValidRole = positions.some(p => p.title === role);
-      if (isValidRole) {
-        // Short delay to ensure field is set before validating
-        setTimeout(() => {
-          trigger('role');
-          // Keep user at step 1, don't advance to step 2
-        }, 100);
+  const handleRoleChange = React.useCallback(
+    (role: string | null) => {
+      if (role) {
+        setValue("role", role, { shouldValidate: true });
+        setFromSignup(true);
+        setRoleFromUrl(role);
+
+        // Only validate the role but start at step 1
+        const isValidRole = positions.some((p) => p.title === role);
+        if (isValidRole) {
+          // Short delay to ensure field is set before validating
+          setTimeout(() => {
+            trigger("role");
+            // Keep user at step 1, don't advance to step 2
+          }, 100);
+        }
       }
-    }
-  }, [setValue, trigger]);
+    },
+    [setValue, trigger],
+  );
 
   const selectedRole = watch("role");
   const isDriverRole = selectedRole === "Driver for Catering Deliveries";
@@ -322,7 +337,7 @@ const JobApplicationForm = () => {
   // Watch for role changes to trigger validation
   React.useEffect(() => {
     if (isDirty) {
-      trigger();  // Re-validate form when role changes
+      trigger(); // Re-validate form when role changes
     }
   }, [selectedRole, isDirty, trigger]);
 
@@ -332,14 +347,14 @@ const JobApplicationForm = () => {
     if (event) {
       event.preventDefault();
     }
-    
+
     // *** Keep file validation specifically before moving from Step 3 ***
     if (currentStep === 3) {
       const role = watch("role"); // Get the selected role
       const fileValidationErrors = validateFiles(role);
       if (fileValidationErrors.length > 0) {
         // If file validation fails, show errors and stop navigation
-        fileValidationErrors.forEach(error => {
+        fileValidationErrors.forEach((error) => {
           toast({
             title: "Missing Documents",
             description: error,
@@ -349,9 +364,9 @@ const JobApplicationForm = () => {
         return; // Stop navigation
       }
     }
-    
+
     // If step-specific validation passes (only file check for step 3), proceed
-    setCurrentStep(prev => Math.min(prev + 1, FORM_STEPS.length));
+    setCurrentStep((prev) => Math.min(prev + 1, FORM_STEPS.length));
     // Remove scroll to top behavior
   };
 
@@ -360,8 +375,8 @@ const JobApplicationForm = () => {
     if (event) {
       event.preventDefault();
     }
-    
-    setCurrentStep(prev => Math.max(prev - 1, 1));
+
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
     // Remove scroll to top behavior
   };
 
@@ -376,11 +391,11 @@ const JobApplicationForm = () => {
 
   const onSubmit = async (formData: FormData) => {
     console.log("Form submission started", { formData });
-    
+
     // Validate required files based on role
     const fileValidationErrors = validateFiles(formData.role);
     if (fileValidationErrors.length > 0) {
-      fileValidationErrors.forEach(error => {
+      fileValidationErrors.forEach((error) => {
         toast({
           title: "Error",
           description: error,
@@ -395,7 +410,9 @@ const JobApplicationForm = () => {
       const { address, role, ...otherData } = formData;
 
       // Filter out empty skills
-      const filteredSkills = otherData.skills.filter(skill => skill.trim() !== "");
+      const filteredSkills = otherData.skills.filter(
+        (skill) => skill.trim() !== "",
+      );
 
       const submissionData: SubmissionData = {
         ...otherData,
@@ -405,29 +422,65 @@ const JobApplicationForm = () => {
           street: address?.street || "",
           city: address?.city || "",
           state: address?.state || "",
-          zip: address?.zip || ""
+          zip: address?.zip || "",
         },
         // Log the first file of each category to help debug
-        resumeFilePath: resumeUpload.uploadedFiles[0] ? resumeUpload.uploadedFiles[0].path : null,
-        driversLicenseFilePath: licenseUpload.uploadedFiles[0] ? licenseUpload.uploadedFiles[0].path : null,
-        insuranceFilePath: insuranceUpload.uploadedFiles[0] ? insuranceUpload.uploadedFiles[0].path : null,
-        vehicleRegFilePath: registrationUpload.uploadedFiles[0] ? registrationUpload.uploadedFiles[0].path : null,
-        foodHandlerFilePath: foodHandlerUpload.uploadedFiles[0] ? foodHandlerUpload.uploadedFiles[0].path : null,
-        hipaaFilePath: hipaaUpload.uploadedFiles[0] ? hipaaUpload.uploadedFiles[0].path : null,
-        driverPhotoFilePath: driverPhotoUpload.uploadedFiles[0] ? driverPhotoUpload.uploadedFiles[0].path : null,
-        carPhotoFilePath: carPhotoUpload.uploadedFiles[0] ? carPhotoUpload.uploadedFiles[0].path : null,
-        equipmentPhotoFilePath: equipmentPhotoUpload.uploadedFiles[0] ? equipmentPhotoUpload.uploadedFiles[0].path : null,
-        resumeFileId: resumeUpload.uploadedFiles[0] ? resumeUpload.uploadedFiles[0].key : null,
-        driversLicenseFileId: licenseUpload.uploadedFiles[0] ? licenseUpload.uploadedFiles[0].key : null,
-        insuranceFileId: insuranceUpload.uploadedFiles[0] ? insuranceUpload.uploadedFiles[0].key : null,
-        vehicleRegFileId: registrationUpload.uploadedFiles[0] ? registrationUpload.uploadedFiles[0].key : null,
-        foodHandlerFileId: foodHandlerUpload.uploadedFiles[0] ? foodHandlerUpload.uploadedFiles[0].key : null,
-        hipaaFileId: hipaaUpload.uploadedFiles[0] ? hipaaUpload.uploadedFiles[0].key : null,
-        driverPhotoFileId: driverPhotoUpload.uploadedFiles[0] ? driverPhotoUpload.uploadedFiles[0].key : null,
-        carPhotoFileId: carPhotoUpload.uploadedFiles[0] ? carPhotoUpload.uploadedFiles[0].key : null,
-        equipmentPhotoFileId: equipmentPhotoUpload.uploadedFiles[0] ? equipmentPhotoUpload.uploadedFiles[0].key : null,
+        resumeFilePath: resumeUpload.uploadedFiles[0]
+          ? resumeUpload.uploadedFiles[0].path
+          : null,
+        driversLicenseFilePath: licenseUpload.uploadedFiles[0]
+          ? licenseUpload.uploadedFiles[0].path
+          : null,
+        insuranceFilePath: insuranceUpload.uploadedFiles[0]
+          ? insuranceUpload.uploadedFiles[0].path
+          : null,
+        vehicleRegFilePath: registrationUpload.uploadedFiles[0]
+          ? registrationUpload.uploadedFiles[0].path
+          : null,
+        foodHandlerFilePath: foodHandlerUpload.uploadedFiles[0]
+          ? foodHandlerUpload.uploadedFiles[0].path
+          : null,
+        hipaaFilePath: hipaaUpload.uploadedFiles[0]
+          ? hipaaUpload.uploadedFiles[0].path
+          : null,
+        driverPhotoFilePath: driverPhotoUpload.uploadedFiles[0]
+          ? driverPhotoUpload.uploadedFiles[0].path
+          : null,
+        carPhotoFilePath: carPhotoUpload.uploadedFiles[0]
+          ? carPhotoUpload.uploadedFiles[0].path
+          : null,
+        equipmentPhotoFilePath: equipmentPhotoUpload.uploadedFiles[0]
+          ? equipmentPhotoUpload.uploadedFiles[0].path
+          : null,
+        resumeFileId: resumeUpload.uploadedFiles[0]
+          ? resumeUpload.uploadedFiles[0].key
+          : null,
+        driversLicenseFileId: licenseUpload.uploadedFiles[0]
+          ? licenseUpload.uploadedFiles[0].key
+          : null,
+        insuranceFileId: insuranceUpload.uploadedFiles[0]
+          ? insuranceUpload.uploadedFiles[0].key
+          : null,
+        vehicleRegFileId: registrationUpload.uploadedFiles[0]
+          ? registrationUpload.uploadedFiles[0].key
+          : null,
+        foodHandlerFileId: foodHandlerUpload.uploadedFiles[0]
+          ? foodHandlerUpload.uploadedFiles[0].key
+          : null,
+        hipaaFileId: hipaaUpload.uploadedFiles[0]
+          ? hipaaUpload.uploadedFiles[0].key
+          : null,
+        driverPhotoFileId: driverPhotoUpload.uploadedFiles[0]
+          ? driverPhotoUpload.uploadedFiles[0].key
+          : null,
+        carPhotoFileId: carPhotoUpload.uploadedFiles[0]
+          ? carPhotoUpload.uploadedFiles[0].key
+          : null,
+        equipmentPhotoFileId: equipmentPhotoUpload.uploadedFiles[0]
+          ? equipmentPhotoUpload.uploadedFiles[0].key
+          : null,
       };
-      
+
       // Print out the uploaded files from each hook for debugging
       console.log("Resume Files:", resumeUpload.uploadedFiles);
       console.log("License Files:", licenseUpload.uploadedFiles);
@@ -448,7 +501,10 @@ const JobApplicationForm = () => {
 
       if (!response.ok) {
         const responseData = await response.json();
-        throw new Error(responseData.error || `Failed to submit application: ${response.statusText}`);
+        throw new Error(
+          responseData.error ||
+            `Failed to submit application: ${response.statusText}`,
+        );
       }
 
       const responseData = await response.json();
@@ -456,18 +512,21 @@ const JobApplicationForm = () => {
 
       toast({
         title: "Application Received",
-        description: "Your application has been submitted successfully! We will contact you soon.",
+        description:
+          "Your application has been submitted successfully! We will contact you soon.",
         variant: "default",
       });
 
       // Set application as submitted instead of just resetting
       setIsSubmitted(true);
-
     } catch (error) {
       console.error("Submission error:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to submit application. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to submit application. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -480,7 +539,10 @@ const JobApplicationForm = () => {
     const errors: string[] = [];
 
     // Only require resume if NOT a driver role
-    if (role !== "Driver for Catering Deliveries" && resumeUpload.uploadedFiles.length === 0) {
+    if (
+      role !== "Driver for Catering Deliveries" &&
+      resumeUpload.uploadedFiles.length === 0
+    ) {
       errors.push("Please upload your resume");
     }
 
@@ -515,18 +577,31 @@ const JobApplicationForm = () => {
 
       {/* Add notification for users coming from signup */}
       {fromSignup && !isSubmitted && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded">
+        <div className="mb-6 rounded border-l-4 border-yellow-400 bg-yellow-50 p-4">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.19-1.458-1.516-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+              <svg
+                className="h-5 w-5 text-yellow-400"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.19-1.458-1.516-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+                  clipRule="evenodd"
+                />
               </svg>
             </div>
             <div className="ml-3">
               <p className="text-sm text-yellow-700">
-                <span className="font-medium">Application Process: </span> 
-                You've selected to apply as a {roleFromUrl === "Driver for Catering Deliveries" ? "Driver" : "Helpdesk Agent"}. 
-                Please complete this application form to be considered for the position.
+                <span className="font-medium">Application Process: </span>
+                You've selected to apply as a{" "}
+                {roleFromUrl === "Driver for Catering Deliveries"
+                  ? "Driver"
+                  : "Helpdesk Agent"}
+                . Please complete this application form to be considered for the
+                position.
               </p>
             </div>
           </div>
@@ -535,14 +610,13 @@ const JobApplicationForm = () => {
 
       {/* Form steps UI */}
       <div className="relative mb-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <button
             onClick={goToPrevStep}
-            className={`flex items-center text-gray-500 hover:text-gray-700 transition-colors
-              ${currentStep === 1 ? "invisible" : ""}`}
+            className={`flex items-center text-gray-500 transition-colors hover:text-gray-700 ${currentStep === 1 ? "invisible" : ""}`}
             disabled={currentStep === 1}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             <span className="text-sm font-medium">Back</span>
           </button>
 
@@ -550,12 +624,12 @@ const JobApplicationForm = () => {
             {FORM_STEPS.map((step) => (
               <button
                 key={step.id}
-                className={`rounded-full h-3 w-3 transition-colors duration-200 ${
+                className={`h-3 w-3 rounded-full transition-colors duration-200 ${
                   step.id === currentStep
                     ? "bg-yellow-500"
                     : step.id < currentStep
-                    ? "bg-yellow-300"
-                    : "bg-gray-300"
+                      ? "bg-yellow-300"
+                      : "bg-gray-300"
                 }`}
                 aria-label={`Go to step ${step.id}`}
                 onClick={() => {
@@ -570,32 +644,30 @@ const JobApplicationForm = () => {
 
           <button
             onClick={goToNextStep}
-            className={`flex items-center text-gray-500 hover:text-gray-700 transition-colors ${
+            className={`flex items-center text-gray-500 transition-colors hover:text-gray-700 ${
               currentStep === 4 ? "invisible" : ""
             }`}
           >
             <span className="text-sm font-medium">Next</span>
-            <ArrowRight className="h-4 w-4 ml-2" />
+            <ArrowRight className="ml-2 h-4 w-4" />
           </button>
         </div>
 
-        <div className="w-full bg-gray-100 h-1 rounded-full">
-          <div 
-            className="bg-yellow-400 h-full rounded-full transition-all duration-300 shadow-sm"
-            style={{ width: `${((currentStep - 1) / (FORM_STEPS.length - 1)) * 100}%` }}
+        <div className="h-1 w-full rounded-full bg-gray-100">
+          <div
+            className="h-full rounded-full bg-yellow-400 shadow-sm transition-all duration-300"
+            style={{
+              width: `${((currentStep - 1) / (FORM_STEPS.length - 1)) * 100}%`,
+            }}
           />
         </div>
       </div>
 
-      <h2 className="text-xl font-medium text-gray-800 mb-6">
-        {FORM_STEPS.find(step => step.id === currentStep)?.name}
+      <h2 className="mb-6 text-xl font-medium text-gray-800">
+        {FORM_STEPS.find((step) => step.id === currentStep)?.name}
       </h2>
 
-      <form 
-        onSubmit={handleSubmit(onSubmit)}
-        className="space-y-6"
-        noValidate
-      >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
         {/* Step 1: Position & Personal Info */}
         {currentStep === 1 && (
           <motion.div
@@ -612,7 +684,7 @@ const JobApplicationForm = () => {
                 <select
                   className={`block w-full rounded-md border ${
                     errors.role ? "border-red-500" : "border-gray-300"
-                  } appearance-none bg-white px-3 py-2.5 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 text-gray-700`}
+                  } appearance-none bg-white px-3 py-2.5 text-gray-700 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400`}
                   {...register("role", {
                     required: "Please select a position",
                   })}
@@ -629,16 +701,16 @@ const JobApplicationForm = () => {
               {renderError(errors.role)}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
                   First Name *
                 </label>
                 <input
                   type="text"
                   className={`block w-full rounded-md border ${
                     errors.firstName ? "border-red-500" : "border-gray-200"
-                  } px-4 py-2.5 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 text-gray-700`}
+                  } px-4 py-2.5 text-gray-700 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400`}
                   {...register("firstName", {
                     required: "First name is required",
                     minLength: {
@@ -650,14 +722,14 @@ const JobApplicationForm = () => {
                 {renderError(errors.firstName)}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
                   Last Name *
                 </label>
                 <input
                   type="text"
                   className={`block w-full rounded-md border ${
                     errors.lastName ? "border-red-500" : "border-gray-200"
-                  } px-4 py-2.5 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 text-gray-700`}
+                  } px-4 py-2.5 text-gray-700 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400`}
                   {...register("lastName", {
                     required: "Last name is required",
                     minLength: {
@@ -670,16 +742,16 @@ const JobApplicationForm = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
                   Email *
                 </label>
                 <input
                   type="email"
                   className={`block w-full rounded-md border ${
                     errors.email ? "border-red-500" : "border-gray-200"
-                  } px-4 py-2.5 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 text-gray-700`}
+                  } px-4 py-2.5 text-gray-700 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400`}
                   {...register("email", {
                     required: "Email is required",
                     pattern: {
@@ -692,15 +764,15 @@ const JobApplicationForm = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
                   Phone
-                  <span className="text-red-500 ml-1">*</span>
+                  <span className="ml-1 text-red-500">*</span>
                 </label>
                 <input
                   type="tel"
                   className={`block w-full rounded-md border ${
                     errors.phone ? "border-red-500" : "border-gray-200"
-                  } px-4 py-2.5 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 text-gray-700`}
+                  } px-4 py-2.5 text-gray-700 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400`}
                   {...register("phone", {
                     required: "Phone number is required",
                     pattern: {
@@ -714,17 +786,15 @@ const JobApplicationForm = () => {
             </div>
 
             <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Address *
               </label>
               <input
                 type="text"
                 placeholder="Street Address"
                 className={`block w-full rounded-md border ${
-                  errors.address?.street
-                    ? "border-red-500"
-                    : "border-gray-200"
-                } px-4 py-2.5 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 text-gray-700`}
+                  errors.address?.street ? "border-red-500" : "border-gray-200"
+                } px-4 py-2.5 text-gray-700 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400`}
                 {...register("address.street", {
                   required: "Street address is required",
                 })}
@@ -740,7 +810,7 @@ const JobApplicationForm = () => {
                       errors.address?.city
                         ? "border-red-500"
                         : "border-gray-200"
-                    } px-4 py-2.5 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 text-gray-700`}
+                    } px-4 py-2.5 text-gray-700 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400`}
                     {...register("address.city", {
                       required: "City is required",
                     })}
@@ -755,7 +825,7 @@ const JobApplicationForm = () => {
                       errors.address?.state
                         ? "border-red-500"
                         : "border-gray-200"
-                    } px-4 py-2.5 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 text-gray-700`}
+                    } px-4 py-2.5 text-gray-700 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400`}
                     {...register("address.state", {
                       required: "State is required",
                     })}
@@ -769,7 +839,7 @@ const JobApplicationForm = () => {
                 placeholder="ZIP Code"
                 className={`block w-full rounded-md border ${
                   errors.address?.zip ? "border-red-500" : "border-gray-200"
-                } px-4 py-2.5 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400 text-gray-700`}
+                } px-4 py-2.5 text-gray-700 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400`}
                 {...register("address.zip", {
                   required: "ZIP code is required",
                   pattern: {
@@ -821,7 +891,9 @@ const JobApplicationForm = () => {
                   </label>
                   <textarea
                     className={`mt-1 block w-full rounded-md border ${
-                      errors.workExperience ? "border-red-500" : "border-gray-300"
+                      errors.workExperience
+                        ? "border-red-500"
+                        : "border-gray-300"
                     } px-3 py-2 focus:border-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-400`}
                     rows={4}
                     placeholder="Describe your relevant work experience..."
@@ -892,12 +964,12 @@ const JobApplicationForm = () => {
             ) : (
               <div className="flex flex-col items-center justify-center py-8">
                 <div className="text-center">
-                  <h3 className="text-lg font-medium text-gray-700 mb-2">
+                  <h3 className="mb-2 text-lg font-medium text-gray-700">
                     Driver Application
                   </h3>
                   <p className="text-gray-500">
-                    For driver positions, please continue to the next section
-                    to upload your required documents.
+                    For driver positions, please continue to the next section to
+                    upload your required documents.
                   </p>
                 </div>
               </div>
@@ -914,18 +986,21 @@ const JobApplicationForm = () => {
             className="space-y-6"
           >
             {isDriverRole ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-2">
                 {/* Driver's License Upload */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Driver's License
-                    <span className="text-red-500 ml-1">*</span>
+                    <span className="ml-1 text-red-500">*</span>
                   </label>
                   <FileUpload
                     name="driversLicense"
                     label="Upload Driver's License"
                     startUpload={licenseUpload.onUpload as any}
-                    file={licenseUpload.uploadedFiles[0] as HookUploadedFile || null}
+                    file={
+                      (licenseUpload.uploadedFiles[0] as HookUploadedFile) ||
+                      null
+                    }
                     deleteFile={licenseUpload.deleteFile}
                     accept={generateAcceptString(IMAGE_PDF_TYPES)}
                     isUploading={licenseUpload.isUploading}
@@ -937,13 +1012,16 @@ const JobApplicationForm = () => {
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Proof of Insurance
-                    <span className="text-red-500 ml-1">*</span>
+                    <span className="ml-1 text-red-500">*</span>
                   </label>
                   <FileUpload
                     name="insurance"
                     label="Upload Insurance"
                     startUpload={insuranceUpload.onUpload as any}
-                    file={insuranceUpload.uploadedFiles[0] as HookUploadedFile || null}
+                    file={
+                      (insuranceUpload.uploadedFiles[0] as HookUploadedFile) ||
+                      null
+                    }
                     deleteFile={insuranceUpload.deleteFile}
                     accept={generateAcceptString(IMAGE_PDF_TYPES)}
                     isUploading={insuranceUpload.isUploading}
@@ -955,13 +1033,16 @@ const JobApplicationForm = () => {
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Vehicle Registration
-                    <span className="text-red-500 ml-1">*</span>
+                    <span className="ml-1 text-red-500">*</span>
                   </label>
                   <FileUpload
                     name="vehicleRegistration"
                     label="Upload Registration"
                     startUpload={registrationUpload.onUpload as any}
-                    file={registrationUpload.uploadedFiles[0] as HookUploadedFile || null}
+                    file={
+                      (registrationUpload
+                        .uploadedFiles[0] as HookUploadedFile) || null
+                    }
                     deleteFile={registrationUpload.deleteFile}
                     accept={generateAcceptString(IMAGE_PDF_TYPES)}
                     isUploading={registrationUpload.isUploading}
@@ -978,25 +1059,31 @@ const JobApplicationForm = () => {
                     name="foodHandler"
                     label="Upload Card (Optional)"
                     startUpload={foodHandlerUpload.onUpload as any}
-                    file={foodHandlerUpload.uploadedFiles[0] as HookUploadedFile || null}
+                    file={
+                      (foodHandlerUpload
+                        .uploadedFiles[0] as HookUploadedFile) || null
+                    }
                     deleteFile={foodHandlerUpload.deleteFile}
                     accept={generateAcceptString(IMAGE_PDF_TYPES)}
                     isUploading={foodHandlerUpload.isUploading}
                     progresses={foodHandlerUpload.progresses}
                   />
                 </div>
-                
+
                 {/* Driver Photo Upload */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Driver Photo
-                    <span className="text-red-500 ml-1">*</span>
+                    <span className="ml-1 text-red-500">*</span>
                   </label>
                   <FileUpload
                     name="driverPhoto"
                     label="Upload Photo"
                     startUpload={driverPhotoUpload.onUpload as any}
-                    file={driverPhotoUpload.uploadedFiles[0] as HookUploadedFile || null}
+                    file={
+                      (driverPhotoUpload
+                        .uploadedFiles[0] as HookUploadedFile) || null
+                    }
                     deleteFile={driverPhotoUpload.deleteFile}
                     accept={generateAcceptString([".jpg", ".jpeg", ".png"])}
                     isUploading={driverPhotoUpload.isUploading}
@@ -1008,13 +1095,16 @@ const JobApplicationForm = () => {
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Car Photo
-                    <span className="text-red-500 ml-1">*</span>
+                    <span className="ml-1 text-red-500">*</span>
                   </label>
                   <FileUpload
                     name="carPhoto"
                     label="Upload Photo"
                     startUpload={carPhotoUpload.onUpload as any}
-                    file={carPhotoUpload.uploadedFiles[0] as HookUploadedFile || null}
+                    file={
+                      (carPhotoUpload.uploadedFiles[0] as HookUploadedFile) ||
+                      null
+                    }
                     deleteFile={carPhotoUpload.deleteFile}
                     accept={generateAcceptString([".jpg", ".jpeg", ".png"])}
                     isUploading={carPhotoUpload.isUploading}
@@ -1031,7 +1121,10 @@ const JobApplicationForm = () => {
                     name="equipmentPhoto"
                     label="Upload Photo (Optional)"
                     startUpload={equipmentPhotoUpload.onUpload as any}
-                    file={equipmentPhotoUpload.uploadedFiles[0] as HookUploadedFile || null}
+                    file={
+                      (equipmentPhotoUpload
+                        .uploadedFiles[0] as HookUploadedFile) || null
+                    }
                     deleteFile={equipmentPhotoUpload.deleteFile}
                     accept={generateAcceptString([".jpg", ".jpeg", ".png"])}
                     isUploading={equipmentPhotoUpload.isUploading}
@@ -1048,7 +1141,9 @@ const JobApplicationForm = () => {
                     name="hipaa"
                     label="Upload Certificate (Optional)"
                     startUpload={hipaaUpload.onUpload as any}
-                    file={hipaaUpload.uploadedFiles[0] as HookUploadedFile || null}
+                    file={
+                      (hipaaUpload.uploadedFiles[0] as HookUploadedFile) || null
+                    }
                     deleteFile={hipaaUpload.deleteFile}
                     accept={generateAcceptString(IMAGE_PDF_TYPES)}
                     isUploading={hipaaUpload.isUploading}
@@ -1062,13 +1157,16 @@ const JobApplicationForm = () => {
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Resume
-                    <span className="text-red-500 ml-1">*</span>
+                    <span className="ml-1 text-red-500">*</span>
                   </label>
                   <FileUpload
                     name="resume"
                     label="Upload Resume (.pdf, .doc, .docx)"
                     startUpload={resumeUpload.onUpload as any}
-                    file={resumeUpload.uploadedFiles[0] as HookUploadedFile || null}
+                    file={
+                      (resumeUpload.uploadedFiles[0] as HookUploadedFile) ||
+                      null
+                    }
                     deleteFile={resumeUpload.deleteFile}
                     accept={generateAcceptString(RESUME_TYPES)}
                     isUploading={resumeUpload.isUploading}
@@ -1088,10 +1186,14 @@ const JobApplicationForm = () => {
             exit={{ opacity: 0, x: -20 }}
             className="space-y-6"
           >
-            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 mb-6">
-              <h3 className="text-lg font-medium text-yellow-800 mb-2">Application Review</h3>
+            <div className="mb-6 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+              <h3 className="mb-2 text-lg font-medium text-yellow-800">
+                Application Review
+              </h3>
               <p className="text-yellow-700">
-                Please review your application details below before submitting. Once submitted, your application will be reviewed by our team and we will contact you soon regarding next steps.
+                Please review your application details below before submitting.
+                Once submitted, your application will be reviewed by our team
+                and we will contact you soon regarding next steps.
               </p>
             </div>
 
@@ -1102,50 +1204,112 @@ const JobApplicationForm = () => {
               </div>
 
               <div className="pt-2">
-                <h4 className="font-medium text-gray-700">Personal Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
-                  <p>Name: {watch("firstName")} {watch("lastName")}</p>
+                <h4 className="font-medium text-gray-700">
+                  Personal Information
+                </h4>
+                <div className="mt-1 grid grid-cols-1 gap-2 md:grid-cols-2">
+                  <p>
+                    Name: {watch("firstName")} {watch("lastName")}
+                  </p>
                   <p>Email: {watch("email")}</p>
                   <p>Phone: {watch("phone") || "Not provided"}</p>
-                  <p>Address: {watch("address.street")}, {watch("address.city")}, {watch("address.state")} {watch("address.zip")}</p>
+                  <p>
+                    Address:{" "}
+                    {(() => {
+                      const addressParts = [
+                        watch("address.street"),
+                        watch("address.city"),
+                        watch("address.state"),
+                        watch("address.zip"),
+                      ].filter((part) => part && part !== "undefined");
+                      return addressParts.length > 0
+                        ? addressParts.join(", ")
+                        : "Not provided";
+                    })()}
+                  </p>
                 </div>
               </div>
 
               {!isDriverRole && (
                 <>
                   <div className="pt-2">
-                    <h4 className="font-medium text-gray-700">Education & Experience</h4>
+                    <h4 className="font-medium text-gray-700">
+                      Education & Experience
+                    </h4>
                     <p className="mt-1 text-sm">{watch("education")}</p>
-                    <h4 className="font-medium text-gray-700 mt-2">Work Experience</h4>
+                    <h4 className="mt-2 font-medium text-gray-700">
+                      Work Experience
+                    </h4>
                     <p className="mt-1 text-sm">{watch("workExperience")}</p>
                   </div>
 
                   <div className="pt-2">
                     <h4 className="font-medium text-gray-700">Skills</h4>
-                    <ul className="mt-1 list-disc list-inside">
-                      {watch("skills").filter(Boolean).map((skill, index) => (
-                        <li key={index} className="text-sm">{skill}</li>
-                      ))}
+                    <ul className="mt-1 list-inside list-disc">
+                      {watch("skills")
+                        .filter(Boolean)
+                        .map((skill, index) => (
+                          <li key={index} className="text-sm">
+                            {skill}
+                          </li>
+                        ))}
                     </ul>
                   </div>
 
                   <div className="pt-2">
                     <h4 className="font-medium text-gray-700">Documents</h4>
-                    <p className="mt-1">Resume: {resumeUpload.uploadedFiles.length > 0 ? "Uploaded" : "Not uploaded"}</p>
+                    <p className="mt-1">
+                      Resume:{" "}
+                      {resumeUpload.uploadedFiles.length > 0
+                        ? "Uploaded"
+                        : "Not uploaded"}
+                    </p>
                   </div>
                 </>
               )}
 
               {isDriverRole && (
                 <div className="pt-2">
-                  <h4 className="font-medium text-gray-700">Required Documents</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
-                    <p>Driver's License: {licenseUpload.uploadedFiles.length > 0 ? "Uploaded" : "Not uploaded"}</p>
-                    <p>Insurance: {insuranceUpload.uploadedFiles.length > 0 ? "Uploaded" : "Not uploaded"}</p>
-                    <p>Vehicle Registration: {registrationUpload.uploadedFiles.length > 0 ? "Uploaded" : "Not uploaded"}</p>
-                    <p>Food Handler's Card: {foodHandlerUpload.uploadedFiles.length > 0 ? "Uploaded" : "Not provided"}</p>
-                    <p>Driver Photo: {driverPhotoUpload.uploadedFiles.length > 0 ? "Uploaded" : "Not uploaded"}</p>
-                    <p>Car Photo: {carPhotoUpload.uploadedFiles.length > 0 ? "Uploaded" : "Not uploaded"}</p>
+                  <h4 className="font-medium text-gray-700">
+                    Required Documents
+                  </h4>
+                  <div className="mt-1 grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <p>
+                      Driver's License:{" "}
+                      {licenseUpload.uploadedFiles.length > 0
+                        ? "Uploaded"
+                        : "Not uploaded"}
+                    </p>
+                    <p>
+                      Insurance:{" "}
+                      {insuranceUpload.uploadedFiles.length > 0
+                        ? "Uploaded"
+                        : "Not uploaded"}
+                    </p>
+                    <p>
+                      Vehicle Registration:{" "}
+                      {registrationUpload.uploadedFiles.length > 0
+                        ? "Uploaded"
+                        : "Not uploaded"}
+                    </p>
+                    <p>
+                      Food Handler's Card:{" "}
+                      {foodHandlerUpload.uploadedFiles.length > 0
+                        ? "Uploaded"
+                        : "Not provided"}
+                    </p>
+                    <p>
+                      Driver Photo:{" "}
+                      {driverPhotoUpload.uploadedFiles.length > 0
+                        ? "Uploaded"
+                        : "Not uploaded"}
+                    </p>
+                    <p>
+                      Car Photo:{" "}
+                      {carPhotoUpload.uploadedFiles.length > 0
+                        ? "Uploaded"
+                        : "Not uploaded"}
+                    </p>
                   </div>
                 </div>
               )}
@@ -1154,14 +1318,14 @@ const JobApplicationForm = () => {
         )}
 
         {/* Navigation Buttons */}
-        <div className="flex justify-between pt-6 border-t border-gray-200">
+        <div className="flex justify-between border-t border-gray-200 pt-6">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={(e) => goToPrevStep(e)}
-              className="flex items-center px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-yellow-400"
+              className="flex items-center rounded-md border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-yellow-400"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
               Previous
             </button>
           ) : (
@@ -1172,17 +1336,17 @@ const JobApplicationForm = () => {
             <button
               type="button"
               onClick={(e) => goToNextStep(e)}
-              className="flex items-center px-5 py-2.5 text-sm font-medium text-white bg-yellow-400 border border-transparent rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-400"
+              className="flex items-center rounded-md border border-transparent bg-yellow-400 px-5 py-2.5 text-sm font-medium text-white hover:bg-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-400"
             >
               Next
-              <ArrowRight className="w-4 h-4 ml-2" />
+              <ArrowRight className="ml-2 h-4 w-4" />
             </button>
           ) : (
             <button
-              type="button" 
+              type="button"
               onClick={handleSubmit(onSubmit)}
               disabled={isSubmitting}
-              className="px-5 py-2.5 text-sm font-medium text-white bg-yellow-400 border border-transparent rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-400 disabled:opacity-50"
+              className="rounded-md border border-transparent bg-yellow-400 px-5 py-2.5 text-sm font-medium text-white hover:bg-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-400 disabled:opacity-50"
             >
               {isSubmitting ? "Submitting..." : "Submit Application"}
             </button>

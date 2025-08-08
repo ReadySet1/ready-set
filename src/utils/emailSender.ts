@@ -84,7 +84,16 @@ export async function sendOrderEmail(order: CateringOrder | OnDemandOrder) {
   };
 
   const formatAddress = (address: PrismaAddress) => {
-    return `${address.street1}${address.street2 ? ", " + address.street2 : ""}, ${address.city}, ${address.state} ${address.zip}`;
+    const addressParts = [
+      address.street1,
+      address.street2,
+      address.city,
+      address.state,
+      address.zip
+    ].filter(part => part && part !== "undefined");
+    
+    if (addressParts.length === 0) return "N/A";
+    return addressParts.join(", ");
   };
 
   const formatOrderTotal = (total: number | string | null) => {
