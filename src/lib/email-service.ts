@@ -28,7 +28,15 @@ export class EmailService {
     } = formData;
 
     const formattedAddress = pickupAddress
-      ? `${pickupAddress.street}, ${pickupAddress.city}, ${pickupAddress.state} ${pickupAddress.zip}`
+      ? (() => {
+          const addressParts = [
+            pickupAddress.street,
+            pickupAddress.city,
+            pickupAddress.state,
+            pickupAddress.zip
+          ].filter(part => part && part !== "undefined");
+          return addressParts.length > 0 ? addressParts.join(", ") : "N/A";
+        })()
       : "N/A";
 
     // Improved specifications handling

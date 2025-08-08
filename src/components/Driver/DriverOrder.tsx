@@ -441,10 +441,17 @@ const OrderPage: React.FC = () => {
                   </div>
                   <p className="mb-2 text-sm text-gray-900">
                     {order.pickupAddress
-                      ? `${order.pickupAddress.street1 || ""}, ${order.pickupAddress.city || ""}, ${order.pickupAddress.state || ""} ${order.pickupAddress.zip || ""}`
-                          .replace(/,\s*,/g, ",")
-                          .replace(/^,\s*/, "")
-                          .replace(/,\s*$/, "") || "N/A"
+                      ? (() => {
+                          const addressParts = [
+                            order.pickupAddress.street1,
+                            order.pickupAddress.city,
+                            order.pickupAddress.state,
+                            order.pickupAddress.zip,
+                          ].filter((part) => part && part !== "undefined");
+                          return addressParts.length > 0
+                            ? addressParts.join(", ")
+                            : "N/A";
+                        })()
                       : "N/A"}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -463,10 +470,17 @@ const OrderPage: React.FC = () => {
                   </div>
                   <p className="mb-2 text-sm text-gray-900">
                     {order.deliveryAddress
-                      ? `${order.deliveryAddress.street1 || ""}, ${order.deliveryAddress.city || ""}, ${order.deliveryAddress.state || ""} ${order.deliveryAddress.zip || ""}`
-                          .replace(/,\s*,/g, ",")
-                          .replace(/^,\s*/, "")
-                          .replace(/,\s*$/, "") || "N/A"
+                      ? (() => {
+                          const addressParts = [
+                            order.deliveryAddress.street1,
+                            order.deliveryAddress.city,
+                            order.deliveryAddress.state,
+                            order.deliveryAddress.zip,
+                          ].filter((part) => part && part !== "undefined");
+                          return addressParts.length > 0
+                            ? addressParts.join(", ")
+                            : "N/A";
+                        })()
                       : "N/A"}
                   </p>
                   <p className="text-xs text-gray-500">

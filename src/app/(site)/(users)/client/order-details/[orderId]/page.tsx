@@ -75,26 +75,32 @@ const OrderDetailsPage = () => {
     const fetchOrderDetails = async () => {
       try {
         setIsLoading(true);
-        
+
         // First, get the order number from the user orders API
-        const userOrdersResponse = await fetch('/api/user-orders?limit=100');
-        
+        const userOrdersResponse = await fetch("/api/user-orders?limit=100");
+
         if (!userOrdersResponse.ok) {
-          throw new Error(`Failed to fetch user orders: ${userOrdersResponse.statusText}`);
+          throw new Error(
+            `Failed to fetch user orders: ${userOrdersResponse.statusText}`,
+          );
         }
 
         const userOrders = await userOrdersResponse.json();
         const order = userOrders.find((o: any) => o.id === orderId);
-        
+
         if (!order) {
-          throw new Error('Order not found');
+          throw new Error("Order not found");
         }
 
         // Now fetch the detailed order information using the order number
-        const response = await fetch(`/api/orders/${encodeURIComponent(order.orderNumber)}`);
-        
+        const response = await fetch(
+          `/api/orders/${encodeURIComponent(order.orderNumber)}`,
+        );
+
         if (!response.ok) {
-          throw new Error(`Failed to fetch order details: ${response.statusText}`);
+          throw new Error(
+            `Failed to fetch order details: ${response.statusText}`,
+          );
         }
 
         const data = await response.json();
@@ -114,7 +120,7 @@ const OrderDetailsPage = () => {
 
   const formatCurrency = (amount: number | string | null) => {
     if (!amount) return "$0.00";
-    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -124,7 +130,7 @@ const OrderDetailsPage = () => {
 
   const formatDateTime = (dateString: string) => {
     if (!dateString) return "N/A";
-    
+
     const date = new Date(dateString);
     return date.toLocaleString("en-US", {
       year: "numeric",
@@ -138,7 +144,7 @@ const OrderDetailsPage = () => {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A";
-    
+
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
       year: "numeric",
@@ -150,12 +156,21 @@ const OrderDetailsPage = () => {
 
   const formatAddress = (address: any) => {
     if (!address) return "N/A";
-    return `${address.street || ""}, ${address.city || ""}, ${address.state || ""} ${address.zipCode || ""}`.trim();
+
+    const addressParts = [
+      address.street,
+      address.city,
+      address.state,
+      address.zipCode,
+    ].filter((part) => part && part !== "undefined");
+
+    if (addressParts.length === 0) return "N/A";
+    return addressParts.join(", ");
   };
 
   const getStatusBadge = (status: string) => {
     const statusColor = getStatusColorClasses(status as any);
-    
+
     const statusMap: Record<
       string,
       {
@@ -191,7 +206,9 @@ const OrderDetailsPage = () => {
           <CardContent>
             <p className="mb-4 text-sm text-red-600">{error}</p>
             <div className="flex gap-2">
-              <Button onClick={() => window.location.reload()}>Try Again</Button>
+              <Button onClick={() => window.location.reload()}>
+                Try Again
+              </Button>
               <Button variant="outline" asChild>
                 <Link href="/client">Back to Dashboard</Link>
               </Button>
@@ -205,7 +222,7 @@ const OrderDetailsPage = () => {
   return (
     <>
       <Breadcrumb pageName="Order Details" />
-      
+
       <div className="shadow-default dark:border-strokedark dark:bg-boxdark sm:p-7.5 rounded-sm border border-stroke bg-white p-5">
         <div className="max-w-full">
           {/* Back to Dashboard Link */}
@@ -226,9 +243,13 @@ const OrderDetailsPage = () => {
             <div className="space-y-6">
               {/* Page Header */}
               <div className="border-b border-gray-200 pb-4">
-                <h1 className="text-2xl font-bold text-gray-900">Order Details</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Order Details
+                </h1>
                 <div className="mt-2 flex items-center gap-4">
-                  <h2 className="text-lg text-gray-600">Order #{orderDetails.orderNumber}</h2>
+                  <h2 className="text-lg text-gray-600">
+                    Order #{orderDetails.orderNumber}
+                  </h2>
                   {getStatusBadge(orderDetails.status)}
                 </div>
               </div>
@@ -245,43 +266,68 @@ const OrderDetailsPage = () => {
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm font-medium text-gray-500">Order Number</p>
-                        <p className="text-sm text-gray-900">{orderDetails.orderNumber}</p>
+                        <p className="text-sm font-medium text-gray-500">
+                          Order Number
+                        </p>
+                        <p className="text-sm text-gray-900">
+                          {orderDetails.orderNumber}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-500">Client Attention</p>
-                        <p className="text-sm text-gray-900">{orderDetails.clientAttention || "N/A"}</p>
+                        <p className="text-sm font-medium text-gray-500">
+                          Client Attention
+                        </p>
+                        <p className="text-sm text-gray-900">
+                          {orderDetails.clientAttention || "N/A"}
+                        </p>
                       </div>
                       {orderDetails.hostServices && (
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Host Services</p>
+                          <p className="text-sm font-medium text-gray-500">
+                            Host Services
+                          </p>
                           <p className="text-sm text-gray-900">
-                            {orderDetails.hostServices.numberOfHosts} hosts for {orderDetails.hostServices.hoursNeeded} hours
+                            {orderDetails.hostServices.numberOfHosts} hosts for{" "}
+                            {orderDetails.hostServices.hoursNeeded} hours
                           </p>
                         </div>
                       )}
                       <div>
-                        <p className="text-sm font-medium text-gray-500">Order Total</p>
+                        <p className="text-sm font-medium text-gray-500">
+                          Order Total
+                        </p>
                         <p className="text-sm font-semibold text-gray-900">
                           {formatCurrency(orderDetails.orderTotal)}
                         </p>
                       </div>
                       {orderDetails.brokerage && (
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Brokerage</p>
-                          <p className="text-sm text-gray-900">{orderDetails.brokerage}</p>
+                          <p className="text-sm font-medium text-gray-500">
+                            Brokerage
+                          </p>
+                          <p className="text-sm text-gray-900">
+                            {orderDetails.brokerage}
+                          </p>
                         </div>
                       )}
                       {orderDetails.headcount && (
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Headcount</p>
-                          <p className="text-sm text-gray-900">{orderDetails.headcount}</p>
+                          <p className="text-sm font-medium text-gray-500">
+                            Headcount
+                          </p>
+                          <p className="text-sm text-gray-900">
+                            {orderDetails.headcount}
+                          </p>
                         </div>
                       )}
                       {orderDetails.trip && (
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Trip</p>
-                          <p className="text-sm text-gray-900">{formatCurrency(orderDetails.trip)}</p>
+                          <p className="text-sm font-medium text-gray-500">
+                            Trip
+                          </p>
+                          <p className="text-sm text-gray-900">
+                            {formatCurrency(orderDetails.trip)}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -299,22 +345,38 @@ const OrderDetailsPage = () => {
                   <CardContent className="space-y-4">
                     <div className="space-y-3">
                       <div>
-                        <p className="text-sm font-medium text-gray-500">Pickup Time</p>
-                        <p className="text-sm text-gray-900">{formatDateTime(orderDetails.pickupDateTime)}</p>
+                        <p className="text-sm font-medium text-gray-500">
+                          Pickup Time
+                        </p>
+                        <p className="text-sm text-gray-900">
+                          {formatDateTime(orderDetails.pickupDateTime)}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-500">Delivery Time</p>
-                        <p className="text-sm text-gray-900">{formatDateTime(orderDetails.arrivalDateTime)}</p>
+                        <p className="text-sm font-medium text-gray-500">
+                          Delivery Time
+                        </p>
+                        <p className="text-sm text-gray-900">
+                          {formatDateTime(orderDetails.arrivalDateTime)}
+                        </p>
                       </div>
                       {orderDetails.completeDateTime && (
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Completion Time</p>
-                          <p className="text-sm text-gray-900">{formatDateTime(orderDetails.completeDateTime)}</p>
+                          <p className="text-sm font-medium text-gray-500">
+                            Completion Time
+                          </p>
+                          <p className="text-sm text-gray-900">
+                            {formatDateTime(orderDetails.completeDateTime)}
+                          </p>
                         </div>
                       )}
                       <div>
-                        <p className="text-sm font-medium text-gray-500">Last Updated</p>
-                        <p className="text-sm text-gray-900">{formatDateTime(orderDetails.updatedAt)}</p>
+                        <p className="text-sm font-medium text-gray-500">
+                          Last Updated
+                        </p>
+                        <p className="text-sm text-gray-900">
+                          {formatDateTime(orderDetails.updatedAt)}
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -330,7 +392,7 @@ const OrderDetailsPage = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-start gap-3">
-                      <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
+                      <MapPin className="mt-0.5 h-5 w-5 text-gray-400" />
                       <p className="text-sm text-gray-900">
                         {formatAddress(orderDetails.pickupAddress)}
                       </p>
@@ -348,7 +410,7 @@ const OrderDetailsPage = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-start gap-3">
-                      <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
+                      <MapPin className="mt-0.5 h-5 w-5 text-gray-400" />
                       <p className="text-sm text-gray-900">
                         {formatAddress(orderDetails.deliveryAddress)}
                       </p>
@@ -367,15 +429,21 @@ const OrderDetailsPage = () => {
                   <CardContent>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div>
-                        <p className="text-sm font-medium text-gray-500 mb-2">Pickup Notes</p>
-                        <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
-                          {orderDetails.pickupNotes || "No pickup notes provided"}
+                        <p className="mb-2 text-sm font-medium text-gray-500">
+                          Pickup Notes
+                        </p>
+                        <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-900">
+                          {orderDetails.pickupNotes ||
+                            "No pickup notes provided"}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-500 mb-2">Special Notes</p>
-                        <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
-                          {orderDetails.specialNotes || "No special notes provided"}
+                        <p className="mb-2 text-sm font-medium text-gray-500">
+                          Special Notes
+                        </p>
+                        <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-900">
+                          {orderDetails.specialNotes ||
+                            "No special notes provided"}
                         </p>
                       </div>
                     </div>
@@ -387,9 +455,12 @@ const OrderDetailsPage = () => {
             <div className="flex min-h-[400px] items-center justify-center">
               <div className="text-center">
                 <Package className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-semibold text-gray-900">Order not found</h3>
+                <h3 className="mt-2 text-sm font-semibold text-gray-900">
+                  Order not found
+                </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  The order you're looking for doesn't exist or has been removed.
+                  The order you're looking for doesn't exist or has been
+                  removed.
                 </p>
                 <div className="mt-6">
                   <Button asChild>
@@ -405,4 +476,4 @@ const OrderDetailsPage = () => {
   );
 };
 
-export default OrderDetailsPage; 
+export default OrderDetailsPage;
