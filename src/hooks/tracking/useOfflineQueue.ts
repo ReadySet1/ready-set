@@ -11,8 +11,9 @@ interface UseOfflineQueueReturn {
 }
 
 export function useOfflineQueue(): UseOfflineQueueReturn {
+  // Initialize with deterministic values for SSR hydration
   const [offlineStatus, setOfflineStatus] = useState<OfflineCapability>({
-    isOnline: navigator.onLine,
+    isOnline: false,
     pendingUpdates: 0,
     lastSync: undefined,
     syncInProgress: false
@@ -103,6 +104,14 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
 
   // Monitor online/offline status
   useEffect(() => {
+    // Set actual status on mount to avoid SSR/client mismatch
+    try {
+      const initialOnline = typeof navigator !== 'undefined' ? navigator.onLine : false;
+      setOfflineStatus(prev => ({ ...prev, isOnline: initialOnline }));
+    } catch {
+      // no-op
+    }
+
     const updateOnlineStatus = () => {
       const isOnline = navigator.onLine;
       setOfflineStatus(prev => ({ ...prev, isOnline }));

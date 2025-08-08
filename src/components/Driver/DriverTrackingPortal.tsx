@@ -34,6 +34,7 @@ interface DriverTrackingPortalProps {
 
 export default function DriverTrackingPortal({ className }: DriverTrackingPortalProps) {
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
   
   // Offline support
   const { offlineStatus, queuedItems } = useOfflineQueue();
@@ -70,6 +71,7 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
 
   // Monitor battery level
   useEffect(() => {
+    setIsMounted(true);
     const getBatteryInfo = async () => {
       if ('getBattery' in navigator) {
         try {
@@ -153,12 +155,13 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <div className={cn('w-3 h-3 rounded-full', {
-                'bg-green-500': isOnline,
-                'bg-red-500': !isOnline
+              <div suppressHydrationWarning className={cn('w-3 h-3 rounded-full', {
+                'bg-green-500': isMounted && isOnline,
+                'bg-red-500': isMounted && !isOnline,
+                'bg-gray-400': !isMounted
               })} />
-              <span className="text-sm font-medium">
-                {isOnline ? 'Online' : 'Offline'}
+              <span suppressHydrationWarning className="text-sm font-medium">
+                {isMounted ? (isOnline ? 'Online' : 'Offline') : '...'}
               </span>
             </div>
             
@@ -417,12 +420,12 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <div className={cn('w-2 h-2 rounded-full', {
-                'bg-green-500 animate-pulse': isTracking,
-                'bg-gray-400': !isTracking
+              <div suppressHydrationWarning className={cn('w-2 h-2 rounded-full', {
+                'bg-green-500 animate-pulse': isMounted && isTracking,
+                'bg-gray-400': !isMounted || !isTracking
               })} />
-              <span className="text-sm">
-                {isTracking ? 'Location tracking active' : 'Location tracking stopped'}
+              <span suppressHydrationWarning className="text-sm">
+                {isMounted ? (isTracking ? 'Location tracking active' : 'Location tracking stopped') : '...'}
               </span>
             </div>
             

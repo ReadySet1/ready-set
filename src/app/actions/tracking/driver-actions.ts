@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/utils/prismaDB';
+import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { withAuth } from '@/lib/auth-middleware';
 import type { LocationUpdate, DriverShift, ShiftBreak } from '@/types/tracking';
@@ -305,6 +306,12 @@ export async function endShiftBreak(
  */
 export async function getActiveShift(driverId: string): Promise<DriverShift | null> {
   try {
+    // Validate UUID to avoid 22P02 errors
+    const uuid = z.string().uuid().safeParse(driverId);
+    if (!uuid.success) {
+      console.error('getActiveShift called with invalid driverId', { driverId });
+      return null;
+    }
     const result = await prisma.$queryRawUnsafe<any[]>(`
       SELECT 
         ds.id,
@@ -386,6 +393,11 @@ export async function updateDriverLocation(
   location: LocationUpdate
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    // Validate UUID
+    const uuid = z.string().uuid().safeParse(driverId);
+    if (!uuid.success) {
+      return { success: false, error: 'Invalid driverId' };
+    }
     // Insert location record
     await prisma.$executeRawUnsafe(`
       INSERT INTO driver_locations (
@@ -455,6 +467,10 @@ export async function getDriverShiftHistory(
   limit: number = 10
 ): Promise<DriverShift[]> {
   try {
+    const uuid = z.string().uuid().safeParse(driverId);
+    if (!uuid.success) {
+      return [];
+    }
     const result = await prisma.$queryRawUnsafe<any[]>(`
       SELECT 
         ds.id,

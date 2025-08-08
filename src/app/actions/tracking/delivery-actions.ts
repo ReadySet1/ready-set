@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/utils/prismaDB';
+import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import type { LocationUpdate, DeliveryTracking } from '@/types/tracking';
 import { DriverStatus } from '@/types/user';
@@ -150,6 +151,13 @@ export async function assignDeliveryToDriver(
   estimatedArrival?: Date
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    // Validate UUIDs
+    if (!z.string().uuid().safeParse(deliveryId).success) {
+      return { success: false, error: 'Invalid deliveryId' };
+    }
+    if (!z.string().uuid().safeParse(driverId).success) {
+      return { success: false, error: 'Invalid driverId' };
+    }
     // Verify driver exists and is active
     const driver = await prisma.$queryRawUnsafe<{ id: string; is_active: boolean }[]>(`
       SELECT id, is_active 
@@ -201,6 +209,9 @@ export async function createDelivery(
   metadata: Record<string, any> = {}
 ): Promise<{ success: boolean; deliveryId?: string; error?: string }> {
   try {
+    if (!z.string().uuid().safeParse(driverId).success) {
+      return { success: false, error: 'Invalid driverId' };
+    }
     // Insert delivery record
     const result = await prisma.$queryRawUnsafe<{ id: string }[]>(`
       INSERT INTO deliveries (
@@ -253,6 +264,9 @@ export async function createDelivery(
  */
 export async function getDriverActiveDeliveries(driverId: string): Promise<DeliveryTracking[]> {
   try {
+    if (!z.string().uuid().safeParse(driverId).success) {
+      return [];
+    }
     const result = await prisma.$queryRawUnsafe<any[]>(`
       SELECT 
         d.id,

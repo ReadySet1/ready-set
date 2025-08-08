@@ -27,11 +27,13 @@ interface ShiftStatus {
 
 const DriverPage = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isMounted, setIsMounted] = useState(false);
   const [shiftStatus, setShiftStatus] = useState<ShiftStatus>({ isActive: false });
   const [driverName, setDriverName] = useState("Driver");
 
-  // Update current time every minute
+  // Ensure time-based UI only renders on the client to avoid SSR hydration mismatches
   useEffect(() => {
+    setIsMounted(true);
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 60000);
@@ -80,11 +82,15 @@ const DriverPage = () => {
               </div>
               <div>
                 <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Driver Dashboard</h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(currentTime)}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400" suppressHydrationWarning>
+                  {isMounted ? formatDate(currentTime) : ''}
+                </p>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-lg font-bold text-gray-900 dark:text-white">{formatTime(currentTime)}</div>
+              <div className="text-lg font-bold text-gray-900 dark:text-white" suppressHydrationWarning>
+                {isMounted ? formatTime(currentTime) : ''}
+              </div>
               <div className="flex items-center space-x-1">
                 <div className={`w-2 h-2 rounded-full ${shiftStatus.isActive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -104,8 +110,8 @@ const DriverPage = () => {
               <UserIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                Good {greeting}, {driverName}!
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white" suppressHydrationWarning>
+                {isMounted ? `Good ${greeting}, ${driverName}!` : `Hello, ${driverName}!`}
               </h2>
               <p className="text-gray-600 dark:text-gray-400">Ready to make some deliveries today?</p>
             </div>

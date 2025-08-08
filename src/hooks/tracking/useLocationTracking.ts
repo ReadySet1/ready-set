@@ -147,26 +147,38 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   }, [formatLocationUpdate, isTracking, syncLocationToServer]);
 
   // Handle geolocation errors
-  const handleGeolocationError = useCallback((error: GeolocationPositionError) => {
-    let errorMessage = 'Location error: ';
-    
-    switch (error.code) {
-      case error.PERMISSION_DENIED:
-        errorMessage += 'Location access denied. Please enable location services.';
-        break;
-      case error.POSITION_UNAVAILABLE:
-        errorMessage += 'Location information unavailable.';
-        break;
-      case error.TIMEOUT:
-        errorMessage += 'Location request timed out.';
-        break;
-      default:
-        errorMessage += 'An unknown error occurred.';
-        break;
+  const handleGeolocationError = useCallback((err: unknown) => {
+    // Normalize different error shapes to a readable message
+    let code: number | undefined;
+    let name: string | undefined;
+    let detailMessage: string | undefined;
+    let message = 'Location error: ';
+
+    if (typeof err === 'object' && err !== null) {
+      const maybeError = err as Partial<GeolocationPositionError> & { name?: string; message?: string; toString?: () => string };
+      code = typeof (maybeError as any).code === 'number' ? (maybeError as any).code : undefined;
+      name = typeof maybeError.name === 'string' ? maybeError.name : undefined;
+      if (typeof maybeError.message === 'string' && maybeError.message.length > 0) {
+        detailMessage = maybeError.message;
+      }
     }
-    
-    setError(errorMessage);
-    console.error('Geolocation error:', error);
+
+    if (code === 1) {
+      message = 'Location access denied. Please enable location permissions for this site.';
+    } else if (code === 2) {
+      message = 'Location information unavailable. Check GPS settings or signal.';
+    } else if (code === 3) {
+      message = 'Location request timed out. Try again.';
+    } else if (detailMessage) {
+      message = `Location error: ${detailMessage}`;
+    } else {
+      message = 'Location error: An unknown error occurred.';
+    }
+
+    setError(message);
+    // Log structured details and multiple render-friendly forms to avoid empty {}
+    const toStringValue = (err as any)?.toString ? (err as any).toString() : undefined;
+    console.error('Geolocation error:', message, { code, name, detailMessage }, toStringValue);
   }, []);
 
   // Start continuous location tracking
@@ -222,9 +234,34 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       const position = await getCurrentPosition();
       await handlePositionUpdate(position);
     } catch (error) {
-      handleGeolocationError(error as GeolocationPositionError);
+      handleGeolocationError(error);
     }
   }, [getCurrentPosition, handlePositionUpdate, handleGeolocationError]);
+
+  // Check support and permissions on mount for better UX
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!('geolocation' in navigator)) {
+      setError('Geolocation is not supported in this browser.');
+      return;
+    }
+    try {
+      if ('permissions' in navigator && (navigator as any).permissions?.query) {
+        (navigator as any).permissions
+          .query({ name: 'geolocation' as PermissionName })
+          .then((status: PermissionStatus) => {
+            if (status.state === 'denied') {
+              setError('Location permission is denied. Enable it in your browser settings.');
+            }
+          })
+          .catch(() => {
+            // Ignore permission query errors; not all browsers support it reliably
+          });
+      }
+    } catch {
+      // no-op
+    }
+  }, []);
 
   // Get initial location on mount
   useEffect(() => {
