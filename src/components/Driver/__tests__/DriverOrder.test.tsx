@@ -441,6 +441,26 @@ describe("DriverDashboardPage", () => {
         expect(mockPush).toHaveBeenCalledWith("/driver");
       });
     });
+
+    it("should navigate to client dashboard when backHref is provided", async () => {
+      const mockPush = jest.fn();
+      useRouter.mockReturnValue({
+        push: mockPush,
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockCateringOrder,
+      });
+
+      render(<DriverDashboardPage backHref="/client" />);
+
+      await waitFor(() => {
+        const backButton = screen.getByText("Back to Dashboard");
+        fireEvent.click(backButton);
+        expect(mockPush).toHaveBeenCalledWith("/client");
+      });
+    });
   });
 
   describe("Error Handling", () => {
