@@ -515,7 +515,7 @@ export default function ProfilePage() {
           </p>
           <Button
             variant="default"
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/client")}
             className="rounded-xl bg-blue-600 px-6 py-2 text-white shadow-lg transition-all duration-200 hover:bg-blue-700 hover:shadow-xl"
           >
             Go to Dashboard
@@ -1199,7 +1199,7 @@ export default function ProfilePage() {
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-2 rounded-xl hover:bg-slate-50"
-                  onClick={() => router.push("/dashboard")}
+                  onClick={() => router.push("/client")}
                 >
                   <FileText className="h-4 w-4" />
                   View Dashboard
@@ -1207,7 +1207,7 @@ export default function ProfilePage() {
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-2 rounded-xl hover:bg-slate-50"
-                  onClick={() => router.push("/orders")}
+                  onClick={() => router.push("/client/orders")}
                 >
                   <FileText className="h-4 w-4" />
                   My Orders
