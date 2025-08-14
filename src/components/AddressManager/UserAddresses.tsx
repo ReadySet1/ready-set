@@ -247,11 +247,11 @@ const UserAddresses: React.FC = () => {
 
   return (
     <div className="w-full">
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold leading-none tracking-tight">
+      <div className="mb-6 rounded-lg bg-gray-50 p-6 dark:bg-gray-800">
+        <h2 className="text-center text-2xl font-semibold leading-none tracking-tight">
           Your Addresses
         </h2>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
           Manage your saved addresses for deliveries and pickups
         </p>
         <div className="mt-4 flex items-center justify-between">
