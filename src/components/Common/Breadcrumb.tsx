@@ -16,7 +16,7 @@ const Breadcrumb = ({
         }}
       >
         <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-stroke/0 via-stroke to-stroke/0 dark:via-dark-3"></div>
-        <div className="container relative">
+        <div className="relative px-4 sm:px-6 lg:px-8">
           <div className="-mx-4 flex flex-wrap items-center">
             <div className="w-full px-4">
               <div className="text-center">

@@ -6,13 +6,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Address } from "@/types/address";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Table,
   TableBody,
   TableCaption,
@@ -253,12 +246,14 @@ const UserAddresses: React.FC = () => {
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Your Addresses</CardTitle>
-        <CardDescription>
+    <div className="w-full">
+      <div className="mb-6">
+        <h2 className="text-2xl font-semibold leading-none tracking-tight">
+          Your Addresses
+        </h2>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
           Manage your saved addresses for deliveries and pickups
-        </CardDescription>
+        </p>
         <div className="mt-4 flex items-center justify-between">
           <Tabs
             defaultValue={filterType}
@@ -278,8 +273,9 @@ const UserAddresses: React.FC = () => {
           </Tabs>
           <Button onClick={handleAddNewAddress}>+ Add New Address</Button>
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+
+      <div>
         {error && (
           <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-500">
             {error}
@@ -399,7 +395,7 @@ const UserAddresses: React.FC = () => {
             </TableBody>
           </Table>
         )}
-      </CardContent>
+      </div>
 
       {isModalOpen && (
         <AddressModal
@@ -409,7 +405,7 @@ const UserAddresses: React.FC = () => {
           onClose={() => setIsModalOpen(false)}
         />
       )}
-    </Card>
+    </div>
   );
 };
 
