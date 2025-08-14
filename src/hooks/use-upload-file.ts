@@ -464,15 +464,8 @@ export function useUploadFile({
         console.log(`Deleting file with key: ${fileKey}`);
 
         // We'll use our API route to delete the file
-        const response = await fetch("/api/file-uploads", {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            fileId: fileKey,
-            userId: userId || "",
-          }),
+        const response = await fetch(`/api/file-uploads?fileId=${encodeURIComponent(fileKey)}`, {
+          method: "DELETE"
         });
 
         if (!response.ok) {

@@ -442,18 +442,16 @@ export default function ProfilePage() {
         return;
       }
 
-      const response = await fetch("/api/file-uploads", {
-        method: "DELETE",
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/file-uploads?fileId=${encodeURIComponent(fileId)}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
         },
-        body: JSON.stringify({
-          fileId,
-          userId: user?.id,
-        }),
-      });
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
