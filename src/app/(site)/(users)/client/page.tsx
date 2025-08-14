@@ -249,8 +249,8 @@ const UpcomingOrderCard = ({ order }: { order: CombinedOrder }) => {
     return `$${Number(amount).toFixed(2)}`;
   };
 
-  // Determine the correct route based on order type
-  const orderDetailsLink = `/client/order-details/${order.id}`;
+  // Determine the correct route based on order number to the unified Order Dashboard
+  const orderDetailsLink = `/order-status/${encodeURIComponent(order.orderNumber)}`;
 
   return (
     <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">

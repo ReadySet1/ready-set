@@ -85,14 +85,22 @@ const OrderDetailsPage = () => {
           );
         }
 
-        const userOrders = await userOrdersResponse.json();
-        const order = userOrders.find((o: any) => o.id === orderId);
+        // API returns an object with { orders, pagination }
+        const { orders: userOrders = [] } = await userOrdersResponse.json();
+        const order = Array.isArray(userOrders)
+          ? userOrders.find((o: any) => o.id === orderId)
+          : undefined;
 
         if (!order) {
           throw new Error("Order not found");
         }
 
-        // Now fetch the detailed order information using the order number
+        // Redirect users to the unified Order Dashboard route
+        router.replace(
+          `/order-status/${encodeURIComponent(order.orderNumber)}`,
+        );
+
+        // Also fetch the detailed order information in case this page is rendered before redirect
         const response = await fetch(
           `/api/orders/${encodeURIComponent(order.orderNumber)}`,
         );
