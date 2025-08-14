@@ -17,6 +17,9 @@ import {
 } from "lucide-react";
 import OrderStatusCard from "./OrderStatus";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 
 type OrderStatus = "active" | "assigned" | "cancelled" | "completed";
 type DriverStatus =
@@ -197,6 +200,14 @@ const UserOrderDetail: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4">
+      <div className="mx-auto mb-2 w-full max-w-3xl">
+        <Button variant="ghost" asChild>
+          <Link href="/client" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Link>
+        </Button>
+      </div>
       <h1 className="mb-6 text-center text-3xl font-bold">Order Details</h1>
       <Card className="mx-auto w-full max-w-3xl">
         <CardHeader>
