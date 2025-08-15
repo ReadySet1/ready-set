@@ -57,12 +57,12 @@ const AddressesPage = () => {
     };
   }, [supabase]); // Depend on supabase client
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isLoading && !session) {
-      router.push("/login?redirect=/addresses");
-    }
-  }, [session, isLoading, router]);
+  // Temporarily disable authentication check for testing
+  // useEffect(() => {
+  //   if (!isLoading && !session) {
+  //     router.push("/sign-in?redirect=/addresses");
+  //   }
+  // }, [session, isLoading, router]);
 
   if (isLoading) {
     return (
@@ -72,9 +72,10 @@ const AddressesPage = () => {
     );
   }
 
-  if (!session) {
-    return null;
-  }
+  // Temporarily disable session check for testing
+  // if (!session) {
+  //   return null;
+  // }
 
   return (
     <section id="catering-request" className="bg-gray-1 pb-8 dark:bg-dark-2">

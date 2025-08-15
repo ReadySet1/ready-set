@@ -1,14 +1,13 @@
 // src/components/AddressManager/UserAddresses.tsx
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { User } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Address } from "@/types/address";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +19,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import AddressModal from "./AddressModal";
+
+interface PaginationData {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  limit: number;
+}
 
 const UserAddresses: React.FC = () => {
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -34,11 +50,19 @@ const UserAddresses: React.FC = () => {
   );
   const [deleteConfirmAddress, setDeleteConfirmAddress] =
     useState<Address | null>(null);
-  const router = useRouter();
+  const [pagination, setPagination] = useState<PaginationData>({
+    currentPage: 1,
+    totalPages: 1,
+    totalCount: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+    limit: 5,
+  });
+  // Router not needed for this component anymore
 
-  // Initialize Supabase client and auth
+  // Get user from parent component's session
   useEffect(() => {
-    const initAuth = async () => {
+    const getUser = async () => {
       try {
         const supabase = await createClient();
         const {
@@ -49,31 +73,15 @@ const UserAddresses: React.FC = () => {
         if (error) throw error;
 
         setUser(user);
-
-        // Set up auth listener
-        const { data: authListener } = supabase.auth.onAuthStateChange(
-          (event, session) => {
-            if (event === "SIGNED_IN") {
-              setUser(session?.user || null);
-            } else if (event === "SIGNED_OUT") {
-              setUser(null);
-              router.push("/sign-in");
-            }
-          },
-        );
-
-        return () => {
-          authListener.subscription.unsubscribe();
-        };
       } catch (error) {
-        console.error("Auth error:", error);
+        console.error("Error getting user:", error);
         setError("Authentication error. Please sign in again.");
         setIsLoading(false);
       }
     };
 
-    initAuth();
-  }, [router]);
+    getUser();
+  }, []);
 
   // Fetch addresses based on filter
   const fetchAddresses = useCallback(async () => {
@@ -97,12 +105,15 @@ const UserAddresses: React.FC = () => {
         throw new Error("Authentication required. Please sign in again.");
       }
 
-      const response = await fetch(`/api/addresses?filter=${filterType}`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/addresses?filter=${filterType}&page=${pagination.currentPage}&limit=${pagination.limit}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -112,27 +123,53 @@ const UserAddresses: React.FC = () => {
       }
 
       const data = await response.json();
+
+      // Handle both old format (array) and new format (paginated object)
+      let validAddresses: Address[] = [];
+      let paginationData: PaginationData = pagination;
+
+      if (Array.isArray(data)) {
+        // Old format - backward compatibility
+        validAddresses = data;
+        paginationData = {
+          currentPage: 1,
+          totalPages: 1,
+          totalCount: data.length,
+          hasNextPage: false,
+          hasPrevPage: false,
+          limit: data.length,
+        };
+      } else if (data.addresses && data.pagination) {
+        // New paginated format
+        validAddresses = data.addresses;
+        paginationData = data.pagination;
+      } else {
+        console.warn("Unexpected data format from API:", data);
+        validAddresses = [];
+      }
+
       console.log(
-        `Fetched ${data.length} addresses for user ${user.id} with filter "${filterType}"`,
+        `Fetched ${validAddresses.length} addresses for user ${user.id} with filter "${filterType}" (page ${paginationData.currentPage} of ${paginationData.totalPages})`,
       );
-      setAddresses(data);
+      setAddresses(validAddresses);
+      setPagination(paginationData);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       console.error("Error fetching addresses:", errorMessage);
       setError(`Failed to load addresses: ${errorMessage}`);
 
-      // If it's an auth error, redirect to sign-in
+      // If it's an auth error, just show the error
       if (
         errorMessage.includes("Authentication") ||
         errorMessage.includes("Session expired")
       ) {
-        router.push("/sign-in");
+        setError("Authentication error. Please refresh the page.");
       }
     } finally {
       setIsLoading(false);
     }
-  }, [user, filterType, router]);
+  }, [user, filterType, pagination.currentPage, pagination.limit]);
 
   useEffect(() => {
     if (user) {
@@ -181,12 +218,12 @@ const UserAddresses: React.FC = () => {
       console.error("Error deleting address:", errorMessage);
       setError(`Failed to delete address: ${errorMessage}`);
 
-      // If it's an auth error, redirect to sign-in
+      // If it's an auth error, just show the error
       if (
         errorMessage.includes("Authentication") ||
         errorMessage.includes("Session expired")
       ) {
-        router.push("/sign-in");
+        setError("Authentication error. Please refresh the page.");
       }
     } finally {
       setIsLoading(false);
@@ -229,7 +266,10 @@ const UserAddresses: React.FC = () => {
         <h2 className="text-xl font-semibold">
           Please sign in to manage addresses
         </h2>
-        <Button className="mt-4" onClick={() => router.push("/sign-in")}>
+        <Button
+          className="mt-4"
+          onClick={() => (window.location.href = "/sign-in")}
+        >
           Sign In
         </Button>
       </div>
@@ -247,11 +287,22 @@ const UserAddresses: React.FC = () => {
           Manage your saved addresses for deliveries and pickups
         </p>
 
+        {/* Debug info */}
+        <div className="mt-4 rounded border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+          Debug: User ID: {user?.id || "No user"}, Loading:{" "}
+          {isLoading.toString()}, Error: {error || "None"}, Addresses count:{" "}
+          {addresses.length}
+        </div>
+
         {/* Tabs and Add Button - Stack on mobile */}
         <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Tabs
             defaultValue={filterType}
-            onValueChange={(value) => setFilterType(value as any)}
+            onValueChange={(value) => {
+              setFilterType(value as any);
+              // Reset to first page when filter changes
+              setPagination((prev) => ({ ...prev, currentPage: 1 }));
+            }}
             className="w-full sm:w-auto"
           >
             <TabsList className="grid w-full grid-cols-3 gap-1 sm:w-auto">
@@ -418,6 +469,61 @@ const UserAddresses: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Pagination Section */}
+      {!isLoading && pagination.totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between border-t bg-slate-50 p-4">
+          <Pagination>
+            <PaginationContent className="flex-wrap gap-1">
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() =>
+                    setPagination((prev) => ({
+                      ...prev,
+                      currentPage: Math.max(1, prev.currentPage - 1),
+                    }))
+                  }
+                  className={`${!pagination.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
+                />
+              </PaginationItem>
+              {/* Basic Pagination - Consider a more advanced version for many pages */}
+              {[...Array(pagination.totalPages)].map((_, i) => (
+                <PaginationItem key={i} className="hidden sm:block">
+                  <PaginationLink
+                    onClick={() =>
+                      setPagination((prev) => ({ ...prev, currentPage: i + 1 }))
+                    }
+                    isActive={pagination.currentPage === i + 1}
+                    className={`cursor-pointer text-sm ${pagination.currentPage === i + 1 ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "hover:bg-slate-200"}`}
+                  >
+                    {i + 1}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              {/* Mobile: Show current page info */}
+              <PaginationItem className="sm:hidden">
+                <span className="px-3 py-2 text-sm text-slate-600">
+                  {pagination.currentPage} of {pagination.totalPages}
+                </span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() =>
+                    setPagination((prev) => ({
+                      ...prev,
+                      currentPage: Math.min(
+                        prev.totalPages,
+                        prev.currentPage + 1,
+                      ),
+                    }))
+                  }
+                  className={`${!pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {/* Address Modal */}
       {isModalOpen && (

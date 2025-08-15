@@ -20,6 +20,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import AddAddressForm from "./AddAddressForm";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -31,6 +39,15 @@ interface AddressManagerProps {
   showFilters?: boolean;
   showManagementButtons?: boolean;
   onRefresh?: (refreshFn: () => void) => void;
+}
+
+interface PaginationData {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  limit: number;
 }
 
 const AddressManager: React.FC<AddressManagerProps> = ({
@@ -53,6 +70,14 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+  const [pagination, setPagination] = useState<PaginationData>({
+    currentPage: 1,
+    totalPages: 1,
+    totalCount: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+    limit: 5,
+  });
   const isRequestPending = useRef(false);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fetchAttempts = useRef(0);
@@ -191,13 +216,18 @@ const AddressManager: React.FC<AddressManagerProps> = ({
     setError(null);
 
     try {
-      console.log(`Fetching addresses with filter=${filterType}`);
-      const response = await fetch(`/api/addresses?filter=${filterType}`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
+      console.log(
+        `Fetching addresses with filter=${filterType}, page=${pagination.currentPage}`,
+      );
+      const response = await fetch(
+        `/api/addresses?filter=${filterType}&page=${pagination.currentPage}&limit=${pagination.limit}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -215,8 +245,33 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       }
 
       const data = await response.json();
-      const validAddresses = Array.isArray(data) ? data : [];
+
+      // Handle both old format (array) and new format (paginated object)
+      let validAddresses: Address[] = [];
+      let paginationData: PaginationData = pagination;
+
+      if (Array.isArray(data)) {
+        // Old format - backward compatibility
+        validAddresses = data;
+        paginationData = {
+          currentPage: 1,
+          totalPages: 1,
+          totalCount: data.length,
+          hasNextPage: false,
+          hasPrevPage: false,
+          limit: data.length,
+        };
+      } else if (data.addresses && data.pagination) {
+        // New paginated format
+        validAddresses = data.addresses;
+        paginationData = data.pagination;
+      } else {
+        console.warn("Unexpected data format from API:", data);
+        validAddresses = [];
+      }
+
       setAddresses(validAddresses);
+      setPagination(paginationData);
 
       fetchAttempts.current = 0;
 
@@ -233,6 +288,8 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   }, [
     user,
     filterType,
+    pagination.currentPage,
+    pagination.limit,
     onAddressesLoaded,
     onError,
     MAX_FETCH_ATTEMPTS,
@@ -337,6 +394,24 @@ const AddressManager: React.FC<AddressManagerProps> = ({
 
   const handleFilterChange = (value: string) => {
     setFilterType(value as "all" | "shared" | "private");
+    // Reset to first page when filter changes
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPagination((prev) => ({ ...prev, currentPage: newPage }));
+  };
+
+  const handlePrevPage = () => {
+    if (pagination.hasPrevPage) {
+      setPagination((prev) => ({ ...prev, currentPage: prev.currentPage - 1 }));
+    }
+  };
+
+  const handleNextPage = () => {
+    if (pagination.hasNextPage) {
+      setPagination((prev) => ({ ...prev, currentPage: prev.currentPage + 1 }));
+    }
   };
 
   const getAddressBadge = (address: Address) => {
@@ -494,6 +569,46 @@ const AddressManager: React.FC<AddressManagerProps> = ({
               isRestaurant: false,
             }}
           />
+        </div>
+      )}
+
+      {/* Pagination Section */}
+      {!isLoading && pagination.totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between border-t bg-slate-50 p-4">
+          <Pagination>
+            <PaginationContent className="flex-wrap gap-1">
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={handlePrevPage}
+                  className={`${!pagination.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
+                />
+              </PaginationItem>
+              {/* Basic Pagination - Consider a more advanced version for many pages */}
+              {[...Array(pagination.totalPages)].map((_, i) => (
+                <PaginationItem key={i} className="hidden sm:block">
+                  <PaginationLink
+                    onClick={() => handlePageChange(i + 1)}
+                    isActive={pagination.currentPage === i + 1}
+                    className={`cursor-pointer text-sm ${pagination.currentPage === i + 1 ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "hover:bg-slate-200"}`}
+                  >
+                    {i + 1}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              {/* Mobile: Show current page info */}
+              <PaginationItem className="sm:hidden">
+                <span className="px-3 py-2 text-sm text-slate-600">
+                  {pagination.currentPage} of {pagination.totalPages}
+                </span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  onClick={handleNextPage}
+                  className={`${!pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
     </div>

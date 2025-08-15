@@ -41,6 +41,9 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
     const filterParam = searchParams.get("filter") || "all"; // Options: all, shared, private
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "5", 10);
+    const skip = (page - 1) * limit;
 
     // If requesting a specific address by ID
     if (id) {
@@ -71,6 +74,8 @@ export async function GET(request: NextRequest) {
     const addressesQuery = {
       where: {},
       orderBy: { createdAt: "desc" as const },
+      skip,
+      take: limit,
     };
 
     // Build the query based on the filter
@@ -97,13 +102,33 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // Execute the query
-    const addresses = await prisma.address.findMany(addressesQuery);
+    // Execute the query with pagination
+    const [addresses, totalCount] = await Promise.all([
+      prisma.address.findMany(addressesQuery),
+      prisma.address.count({ where: addressesQuery.where }),
+    ]);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
 
     console.log(
-      `Found ${addresses.length} addresses for user ${currentUser.id}`,
+      `Found ${addresses.length} addresses for user ${currentUser.id} (page ${page} of ${totalPages})`,
     );
-    return NextResponse.json(addresses);
+
+    // Return paginated response
+    return NextResponse.json({
+      addresses,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage,
+        hasPrevPage,
+        limit,
+      },
+    });
   } catch (error) {
     console.error("Error fetching addresses:", error);
     return NextResponse.json(
