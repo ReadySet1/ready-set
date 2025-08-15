@@ -5,15 +5,6 @@ import { User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Address } from "@/types/address";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
@@ -247,49 +238,58 @@ const UserAddresses: React.FC = () => {
 
   return (
     <div className="w-full">
-      <div className="mb-6 rounded-lg bg-gray-50 p-6 dark:bg-gray-800">
-        <h2 className="text-center text-2xl font-semibold leading-none tracking-tight">
+      {/* Header Section */}
+      <div className="mb-6 rounded-lg bg-gray-50 p-4 dark:bg-gray-800 sm:p-6">
+        <h2 className="text-center text-xl font-semibold leading-none tracking-tight sm:text-2xl">
           Your Addresses
         </h2>
         <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
           Manage your saved addresses for deliveries and pickups
         </p>
-        <div className="mt-4 flex items-center justify-between">
+
+        {/* Tabs and Add Button - Stack on mobile */}
+        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Tabs
             defaultValue={filterType}
             onValueChange={(value) => setFilterType(value as any)}
+            className="w-full sm:w-auto"
           >
-            <TabsList className="gap-1">
+            <TabsList className="grid w-full grid-cols-3 gap-1 sm:w-auto">
               <TabsTrigger value="all" className="text-xs sm:text-sm">
-                All Addresses
+                All
               </TabsTrigger>
               <TabsTrigger value="private" className="text-xs sm:text-sm">
-                Your Private Addresses
+                Private
               </TabsTrigger>
               <TabsTrigger value="shared" className="text-xs sm:text-sm">
-                Shared Addresses
+                Shared
               </TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button onClick={handleAddNewAddress}>+ Add New Address</Button>
+
+          <Button onClick={handleAddNewAddress} className="w-full sm:w-auto">
+            + Add New Address
+          </Button>
         </div>
       </div>
 
-      <div>
-        {error && (
-          <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-500">
-            {error}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setError(null)}
-              className="ml-2 h-auto p-1 text-red-700"
-            >
-              Dismiss
-            </Button>
-          </div>
-        )}
+      {/* Error Display */}
+      {error && (
+        <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-500">
+          {error}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setError(null)}
+            className="ml-2 h-auto p-1 text-red-700"
+          >
+            Dismiss
+          </Button>
+        </div>
+      )}
 
+      {/* Content Area */}
+      <div>
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Spinner />
@@ -302,101 +302,124 @@ const UserAddresses: React.FC = () => {
             </Button>
           </div>
         ) : (
-          <Table>
-            <TableCaption>Your saved addresses</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead>County</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {addresses.map((address) => (
-                <TableRow key={address.id}>
-                  <TableCell className="font-medium">
-                    {address.name || "Unnamed Location"}
-                    {address.isShared && (
-                      <Badge className="ml-2 bg-blue-500">Shared</Badge>
-                    )}
-                    {isAddressOwner(address) && (
-                      <Badge className="ml-2 bg-green-500">Owner</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {address.street1}
-                    {address.street2 && `, ${address.street2}`}
-                    <br />
-                    {address.city}, {address.state} {address.zip}
-                    {address.locationNumber && (
-                      <div className="mt-1 text-xs text-gray-500">
-                        Phone: {address.locationNumber}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>{address.county || "N/A"}</TableCell>
-                  <TableCell>
-                    {address.isRestaurant ? "Restaurant" : "Standard Address"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditAddress(address)}
-                        disabled={!isAddressOwner(address)}
-                      >
-                        Edit
-                      </Button>
+          /* Mobile-friendly card layout instead of table */
+          <div className="space-y-4">
+            {addresses.map((address) => (
+              <div
+                key={address.id}
+                className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+              >
+                {/* Address Header */}
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                      {address.name || "Unnamed Location"}
+                    </h3>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {address.isShared && (
+                        <Badge className="bg-blue-500 text-xs">Shared</Badge>
+                      )}
+                      {isAddressOwner(address) && (
+                        <Badge className="bg-green-500 text-xs">Owner</Badge>
+                      )}
+                    </div>
+                  </div>
 
-                      <AlertDialog
-                        open={deleteConfirmAddress?.id === address.id}
-                        onOpenChange={(open) => {
-                          if (!open) setDeleteConfirmAddress(null);
-                        }}
-                      >
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => setDeleteConfirmAddress(address)}
-                            disabled={
-                              !isAddressOwner(address) || address.isShared
-                            }
+                  {/* Action Buttons - Stack on mobile */}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditAddress(address)}
+                      disabled={!isAddressOwner(address)}
+                      className="w-full sm:w-auto"
+                    >
+                      Edit
+                    </Button>
+
+                    <AlertDialog
+                      open={deleteConfirmAddress?.id === address.id}
+                      onOpenChange={(open) => {
+                        if (!open) setDeleteConfirmAddress(null);
+                      }}
+                    >
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setDeleteConfirmAddress(address)}
+                          disabled={
+                            !isAddressOwner(address) || address.isShared
+                          }
+                          className="w-full sm:w-auto"
+                        >
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete this address? This
+                            action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-red-500 hover:bg-red-600"
+                            onClick={() => handleDeleteAddress(address.id)}
                           >
                             Delete
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete this address? This
-                              action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-red-500 hover:bg-red-600"
-                              onClick={() => handleDeleteAddress(address.id)}
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+
+                {/* Address Details */}
+                <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                  <div>
+                    <span className="font-medium">Address:</span>
+                    <div className="mt-1">
+                      {address.street1}
+                      {address.street2 && <div>{address.street2}</div>}
+                      <div>
+                        {address.city}, {address.state} {address.zip}
+                      </div>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </div>
+
+                  <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+                    <div>
+                      <span className="font-medium">County:</span>
+                      <span className="ml-2">{address.county || "N/A"}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Type:</span>
+                      <span className="ml-2">
+                        {address.isRestaurant
+                          ? "Restaurant"
+                          : "Standard Address"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {address.locationNumber && (
+                    <div>
+                      <span className="font-medium">Phone:</span>
+                      <span className="ml-2">{address.locationNumber}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
+      {/* Address Modal */}
       {isModalOpen && (
         <AddressModal
           onAddressUpdated={handleAddressUpdated}

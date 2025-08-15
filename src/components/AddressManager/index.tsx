@@ -454,10 +454,10 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       )}
 
       {showManagementButtons && (
-        <div className="flex space-x-4 pb-6">
+        <div className="flex flex-col gap-3 pb-6 sm:flex-row sm:space-x-4">
           <Link
             href="/addresses"
-            className="rounded-md bg-blue-500 px-4 py-2 text-white transition hover:bg-blue-600"
+            className="rounded-md bg-blue-500 px-4 py-2 text-center text-white transition hover:bg-blue-600 sm:text-left"
           >
             Manage Addresses
           </Link>

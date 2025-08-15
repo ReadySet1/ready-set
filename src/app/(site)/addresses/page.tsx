@@ -78,7 +78,7 @@ const AddressesPage = () => {
 
   return (
     <section id="catering-request" className="bg-gray-1 pb-8 dark:bg-dark-2">
-      <div className="mb-[60px] px-4 sm:px-6 lg:px-8">
+      <div className="mb-[60px] px-3 sm:px-4 md:px-6 lg:px-8">
         <Breadcrumb pageName="Addresses manager" />
         <UserAddresses />
       </div>

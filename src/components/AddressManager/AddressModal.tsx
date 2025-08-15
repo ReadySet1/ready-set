@@ -106,7 +106,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="border bg-white shadow-lg dark:bg-gray-950 sm:max-w-[425px]">
+      <DialogContent className="max-h-[90vh] w-[95vw] max-w-[500px] overflow-y-auto border bg-white shadow-lg dark:bg-gray-950">
         <DialogHeader>
           <DialogTitle>
             {addressToEdit ? "Edit Address" : "Add Address"}
@@ -114,8 +114,8 @@ const AddressModal: React.FC<AddressModalProps> = ({
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="county" className="text-right">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
+              <Label htmlFor="county" className="sm:text-right">
                 County
               </Label>
               <Controller
@@ -127,7 +127,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
                     onValueChange={field.onChange}
                     value={field.value || ""}
                   >
-                    <SelectTrigger className="col-span-3">
+                    <SelectTrigger className="sm:col-span-3">
                       <SelectValue placeholder="Please Select" />
                     </SelectTrigger>
                     <SelectContent className="z-[1002]">
@@ -141,71 +141,83 @@ const AddressModal: React.FC<AddressModalProps> = ({
                 )}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
+              <Label htmlFor="name" className="sm:text-right">
                 Name
               </Label>
-              <Input id="name" className="col-span-3" {...register("name")} />
+              <Input
+                id="name"
+                className="sm:col-span-3"
+                {...register("name")}
+              />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="street1" className="text-right">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
+              <Label htmlFor="street1" className="sm:text-right">
                 Street Address 1
               </Label>
               <Input
                 id="street1"
-                className="col-span-3"
+                className="sm:col-span-3"
                 {...register("street1")}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="street2" className="text-right">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
+              <Label htmlFor="street2" className="sm:text-right">
                 Street Address 2
               </Label>
               <Input
                 id="street2"
-                className="col-span-3"
+                className="sm:col-span-3"
                 {...register("street2")}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="city" className="text-right">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
+              <Label htmlFor="city" className="sm:text-right">
                 City
               </Label>
-              <Input id="city" className="col-span-3" {...register("city")} />
+              <Input
+                id="city"
+                className="sm:col-span-3"
+                {...register("city")}
+              />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="state" className="text-right">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
+              <Label htmlFor="state" className="sm:text-right">
                 State
               </Label>
-              <Input id="state" className="col-span-3" {...register("state")} />
+              <Input
+                id="state"
+                className="sm:col-span-3"
+                {...register("state")}
+              />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="zip" className="text-right">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
+              <Label htmlFor="zip" className="sm:text-right">
                 Zip
               </Label>
-              <Input id="zip" className="col-span-3" {...register("zip")} />
+              <Input id="zip" className="sm:col-span-3" {...register("zip")} />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="locationNumber" className="text-right">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
+              <Label htmlFor="locationNumber" className="sm:text-right">
                 Location Phone Number
               </Label>
               <Input
                 id="locationNumber"
-                className="col-span-3"
+                className="sm:col-span-3"
                 {...register("locationNumber")}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="parkingLoading" className="text-right">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
+              <Label htmlFor="parkingLoading" className="sm:text-right">
                 Parking / Loading
               </Label>
               <Input
                 id="parkingLoading"
-                className="col-span-3"
+                className="sm:col-span-3"
                 {...register("parkingLoading")}
               />
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 sm:col-span-4">
               <Controller
                 name="isRestaurant"
                 control={control}
@@ -220,7 +232,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
               />
               <Label htmlFor="isRestaurant">Is this a restaurant?</Label>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 sm:col-span-4">
               <Controller
                 name="isShared"
                 control={control}
