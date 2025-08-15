@@ -498,8 +498,30 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const fileUrl = searchParams.get('fileUrl');
-    const fileIdParam = searchParams.get('fileId');
+    let fileUrl = searchParams.get('fileUrl');
+    let fileIdParam = searchParams.get('fileId');
+
+    // Fallback: some clients send JSON body instead of query params
+    if (!fileUrl && !fileIdParam) {
+      try {
+        const contentType = request.headers.get('content-type') || '';
+        // Be tolerant of different body encodings and environments
+        const bodyText = await request.text();
+        if (bodyText) {
+          try {
+            const parsed = contentType.includes('application/json')
+              ? JSON.parse(bodyText)
+              : Object.fromEntries(new URLSearchParams(bodyText));
+            fileUrl = (parsed as any)?.fileUrl || fileUrl;
+            fileIdParam = (parsed as any)?.fileId || fileIdParam;
+          } catch {
+            // ignore parse errors; handled by validation below
+          }
+        }
+      } catch (e) {
+        // ignore parse errors; handled by validation below
+      }
+    }
 
     console.log('DELETE /api/file-uploads called with params:', {
       fileUrl,

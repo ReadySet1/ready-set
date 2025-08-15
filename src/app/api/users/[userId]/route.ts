@@ -132,14 +132,36 @@ export async function GET(request: NextRequest) {
       return cleanedStr.split(',').map(s => s.trim()).filter(s => s !== ''); // Filter out empty strings
     };
 
-    return NextResponse.json({
-      ...profile,
-      // Use the helper function to parse counties
+    // Transform the response to match frontend expectations (snake_case)
+    const transformedProfile = {
+      id: profile.id,
+      name: profile.name,
+      email: profile.email,
+      contact_number: profile.contactNumber,
+      company_name: profile.companyName,
+      website: profile.website,
+      street1: profile.street1,
+      street2: profile.street2,
+      city: profile.city,
+      state: profile.state,
+      zip: profile.zip,
+      type: profile.type,
+      status: profile.status,
+      location_number: profile.locationNumber,
+      parking_loading: profile.parkingLoading,
+      contact_name: profile.contactName,
+      counties: profile.counties,
+      timeNeeded: profile.timeNeeded,
+      cateringBrokerage: profile.cateringBrokerage,
+      provide: profile.provide,
+      frequency: profile.frequency,
+      headCount: profile.headCount,
+      // Use the helper function to parse counties and provisions
       countiesServed: parseCommaSeparatedString(profile.counties),
-      timeNeeded: parseCommaSeparatedString(profile.timeNeeded),
-      cateringBrokerage: parseCommaSeparatedString(profile.cateringBrokerage),
       provisions: parseCommaSeparatedString(profile.provide)
-    });
+    };
+
+    return NextResponse.json(transformedProfile);
   } catch (error) {
     console.error('[GET /api/users/[userId]] Unexpected error:', error);
     return NextResponse.json(
@@ -315,9 +337,256 @@ export async function PUT(
     
     console.log('[PUT /api/users/[userId]] Profile updated successfully');
 
+    // Transform the response to match frontend expectations (snake_case)
+    const transformedProfile = {
+      id: updatedProfile.id,
+      name: updatedProfile.name,
+      email: updatedProfile.email,
+      contact_number: updatedProfile.contactNumber,
+      company_name: updatedProfile.companyName,
+      website: updatedProfile.website,
+      street1: updatedProfile.street1,
+      street2: updatedProfile.street2,
+      city: updatedProfile.city,
+      state: updatedProfile.state,
+      zip: updatedProfile.zip,
+      type: updatedProfile.type,
+      status: updatedProfile.status,
+      location_number: updatedProfile.locationNumber,
+      parking_loading: updatedProfile.parkingLoading,
+      counties: updatedProfile.counties,
+      timeNeeded: updatedProfile.timeNeeded,
+      cateringBrokerage: updatedProfile.cateringBrokerage,
+      provide: updatedProfile.provide,
+      frequency: updatedProfile.frequency,
+      headCount: updatedProfile.headCount,
+      sideNotes: updatedProfile.sideNotes,
+      contact_name: updatedProfile.contactName,
+    };
+
     return NextResponse.json({
       message: 'User profile updated successfully',
-      user: updatedProfile
+      user: transformedProfile,
+      // Also return the profile data directly for easier frontend consumption
+      ...transformedProfile
+    });
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    
+    // Check for Prisma-specific errors
+    if ((error as any)?.code && (error as any)?.message) {
+      if ((error as any).code === 'P2025') {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        );
+      }
+    }
+    
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH: Partially update a user by ID (same as PUT for partial updates)
+export async function PATCH(
+  request: NextRequest
+) {
+  try {
+    // Get userId from URL path
+    const url = new URL(request.url);
+    const userId = url.pathname.split('/').pop();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    // SECURITY FIX: Remove dangerous admin panel bypass
+    // All requests must go through proper authentication
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.error("[PATCH /api/users/[userId]] Authentication required:", authError);
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required' },
+        { status: 401 }
+      );
+    }
+    
+    console.log(`[PATCH /api/users/[userId]] Authenticated user ID: ${user.id}`);
+
+    // Check permissions for all requests
+    let requesterProfile;
+    
+    try {
+      requesterProfile = await prisma.profile.findUnique({
+        where: { id: user.id },
+        select: { type: true }
+      });
+      console.log(`[PATCH /api/users/[userId]] Requester profile fetched:`, requesterProfile);
+      
+      const isAdminOrHelpdesk =
+        requesterProfile?.type === UserType.ADMIN ||
+        requesterProfile?.type === UserType.SUPER_ADMIN ||
+        requesterProfile?.type === UserType.HELPDESK;
+        
+      // Only allow if requesting own profile or admin/super_admin
+      const isSelf = user.id === userId;
+
+      console.log(`[PATCH /api/users/[userId]] Authorization check: isSelf=${isSelf}, isAdminOrHelpdesk=${isAdminOrHelpdesk}, requesterType=${requesterProfile?.type}`);
+
+      if (!isSelf && !isAdminOrHelpdesk) {
+        console.log(`[PATCH /api/users/[userId]] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to update profile ${userId}.`);
+        return NextResponse.json(
+          { error: 'Forbidden: Insufficient permissions' },
+          { status: 403 }
+        );
+      }
+    } catch (profileError) {
+      console.error(`[PATCH /api/users/[userId]] Error fetching requester profile (ID: ${user.id}):`, profileError);
+      return NextResponse.json({ error: 'Failed to fetch requester profile' }, { status: 500 });
+    }
+    
+    // Parse request body
+    const requestBody = await request.json();
+    console.log('[PATCH /api/users/[userId]] Request body:', requestBody);
+    
+    // Validate required fields
+    if (!requestBody) {
+      return NextResponse.json(
+        { error: 'Request body is required' },
+        { status: 400 }
+      );
+    }
+    
+    // Prepare data for update
+    let userTypeEnum: UserType | undefined = undefined;
+    
+    // Convert string type to UserType enum with validation
+    if (requestBody.type) {
+      try {
+        const typeKey = requestBody.type.toUpperCase();
+        console.log(`[PATCH /api/users/[userId]] Converting user type: '${requestBody.type}' to enum. Available UserType keys:`, Object.keys(UserType));
+        
+        if (Object.keys(UserType).includes(typeKey)) {
+          userTypeEnum = UserType[typeKey as keyof typeof UserType];
+          console.log(`[PATCH /api/users/[userId]] Successfully converted '${requestBody.type}' to UserType enum: ${userTypeEnum}`);
+        } else {
+          console.log(`[PATCH /api/users/[userId]] Invalid user type: '${requestBody.type}'. Valid types are:`, Object.keys(UserType));
+          return NextResponse.json(
+            { error: `Invalid user type: ${requestBody.type}. Valid types are: ${Object.keys(UserType).map(k => k.toLowerCase()).join(', ')}` },
+            { status: 400 }
+          );
+        }
+      } catch (error) {
+        console.error('[PATCH /api/users/[userId]] Error converting user type:', error);
+        return NextResponse.json(
+          { error: `Invalid user type: ${requestBody.type}` },
+          { status: 400 }
+        );
+      }
+    }
+    
+    const updateData: any = {
+      // Basic information
+      email: requestBody.email,
+      contactNumber: requestBody.contact_number,
+      // Use the validated enum value
+      type: userTypeEnum,
+      
+      // Name handling based on user type - Fix field mapping
+      name: requestBody.name,
+      contactName: requestBody.contact_name, // Fix: use contactName (camelCase) for Prisma
+      
+      // Company information
+      companyName: requestBody.company_name,
+      website: requestBody.website,
+      
+      // Address information
+      street1: requestBody.street1,
+      street2: requestBody.street2,
+      city: requestBody.city,
+      state: requestBody.state,
+      zip: requestBody.zip,
+      
+      // Location details
+      locationNumber: requestBody.location_number,
+      parkingLoading: requestBody.parking_loading,
+      
+      // Service details
+      counties: requestBody.counties,
+      timeNeeded: Array.isArray(requestBody.timeNeeded) 
+        ? requestBody.timeNeeded.join(',') 
+        : requestBody.timeNeeded,
+      cateringBrokerage: Array.isArray(requestBody.cateringBrokerage) 
+        ? requestBody.cateringBrokerage.join(',') 
+        : requestBody.cateringBrokerage,
+      provide: Array.isArray(requestBody.provisions) 
+        ? requestBody.provisions.join(',') 
+        : requestBody.provisions,
+      
+      // Operational details
+      frequency: requestBody.frequency,
+      headCount: requestBody.headCount,
+      
+      // Side notes
+      sideNotes: requestBody.sideNotes,
+    };
+    
+    // Remove undefined values from updateData
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key as keyof typeof updateData] === undefined) {
+        delete updateData[key as keyof typeof updateData];
+      }
+    });
+    
+    console.log('[PATCH /api/users/[userId]] Update data:', updateData);
+
+    // Update user profile
+    const updatedProfile = await prisma.profile.update({
+      where: { id: userId },
+      data: updateData,
+    });
+    
+    console.log('[PATCH /api/users/[userId]] Profile updated successfully');
+
+    // Transform the response to match frontend expectations (snake_case)
+    const transformedProfile = {
+      id: updatedProfile.id,
+      name: updatedProfile.name,
+      email: updatedProfile.email,
+      contact_number: updatedProfile.contactNumber,
+      company_name: updatedProfile.companyName,
+      website: updatedProfile.website,
+      street1: updatedProfile.street1,
+      street2: updatedProfile.street2,
+      city: updatedProfile.city,
+      state: updatedProfile.state,
+      zip: updatedProfile.zip,
+      type: updatedProfile.type,
+      status: updatedProfile.status,
+      location_number: updatedProfile.locationNumber,
+      parking_loading: updatedProfile.parkingLoading,
+      counties: updatedProfile.counties,
+      timeNeeded: updatedProfile.timeNeeded,
+      cateringBrokerage: updatedProfile.cateringBrokerage,
+      provide: updatedProfile.provide,
+      frequency: updatedProfile.frequency,
+      headCount: updatedProfile.headCount,
+      sideNotes: updatedProfile.sideNotes,
+      contact_name: updatedProfile.contactName,
+    };
+
+    return NextResponse.json({
+      message: 'User profile updated successfully',
+      user: transformedProfile,
+      // Also return the profile data directly for easier frontend consumption
+      ...transformedProfile
     });
   } catch (error) {
     console.error('Unexpected error:', error);
