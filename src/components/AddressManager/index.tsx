@@ -288,8 +288,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   }, [
     user,
     filterType,
-    pagination.currentPage,
-    pagination.limit,
+    pagination,
     onAddressesLoaded,
     onError,
     MAX_FETCH_ATTEMPTS,

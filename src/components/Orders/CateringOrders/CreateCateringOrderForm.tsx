@@ -783,9 +783,7 @@ export const CreateCateringOrderForm: React.FC<
               </Select>
             )}
           />
-          <p className="text-xs text-gray-500">
-            Bay Area counties only
-          </p>
+          <p className="text-xs text-gray-500">Bay Area counties only</p>
         </div>
       </div>
     </div>
@@ -850,7 +848,7 @@ export const CreateCateringOrderForm: React.FC<
     if (generalError === null) {
       form.clearErrors();
     }
-  }, []); // Empty dependency array - only run on mount
+  }, [form, generalError]);
 
   // Keep the cleanup function separate
   useEffect(() => {
@@ -926,7 +924,9 @@ export const CreateCateringOrderForm: React.FC<
 
         alert("Order created successfully!");
         if (result.orderNumber) {
-          router.push(`/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`);
+          router.push(
+            `/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`,
+          );
         }
       } else {
         alert("Failed to create order: " + (result.error || "Unknown error"));
@@ -981,7 +981,9 @@ export const CreateCateringOrderForm: React.FC<
             if (result.success) {
               alert("Order created successfully!");
               if (result.orderNumber) {
-                router.push(`/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`);
+                router.push(
+                  `/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`,
+                );
               }
             } else {
               alert(

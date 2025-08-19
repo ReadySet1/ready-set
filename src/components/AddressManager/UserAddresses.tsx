@@ -169,7 +169,7 @@ const UserAddresses: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, filterType, pagination.currentPage, pagination.limit]);
+  }, [user, filterType, pagination]);
 
   useEffect(() => {
     if (user) {
