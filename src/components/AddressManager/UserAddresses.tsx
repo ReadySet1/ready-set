@@ -287,13 +287,6 @@ const UserAddresses: React.FC = () => {
           Manage your saved addresses for deliveries and pickups
         </p>
 
-        {/* Debug info */}
-        <div className="mt-4 rounded border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
-          Debug: User ID: {user?.id || "No user"}, Loading:{" "}
-          {isLoading.toString()}, Error: {error || "None"}, Addresses count:{" "}
-          {addresses.length}
-        </div>
-
         {/* Tabs and Add Button - Stack on mobile */}
         <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Tabs
