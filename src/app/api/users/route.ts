@@ -4,7 +4,8 @@ import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { createClient } from "@/utils/supabase/server";
 import { Prisma } from '@prisma/client';
-import { UserStatus, UserType } from '@/types/prisma';
+import { UserStatus, UserType, PrismaClientKnownRequestError, PrismaClientValidationError } from '@/types/prisma';
+import { ApiTypeUtils, ApiValidationError, ApiError } from '@/types/api-shared';
 import { withRateLimit, RateLimitConfigs } from '@/lib/rate-limiting';
 import { addSecurityHeaders } from '@/lib/auth-middleware';
 
@@ -18,25 +19,94 @@ function hasAdminPrivileges(userType: string): boolean {
   return normalizedType === 'ADMIN' || normalizedType === 'SUPER_ADMIN' || normalizedType === 'HELPDESK';
 }
 
-// Helper function to normalize user type filter from frontend to Prisma enum
-function normalizeUserType(userType: string | 'all'): UserType | 'all' {
-  if (userType === 'all') {
-    return 'all';
+// Use shared utility functions for type normalization to ensure consistency
+
+// Enhanced error handling utility for Prisma and validation errors
+function handlePrismaError(error: unknown): { error: ApiError; status: number } {
+  console.error('Prisma error occurred:', error);
+  
+  // Handle Prisma validation errors
+  if (error instanceof PrismaClientValidationError) {
+    const validationError: ApiValidationError = {
+      error: "Invalid data provided",
+      code: "VALIDATION_ERROR",
+      details: "The data provided does not match the expected format.",
+    };
+    return { error: validationError, status: 400 };
   }
   
-  // Convert lowercase frontend values to uppercase Prisma enum values
-  const normalizedType = userType?.toUpperCase();
-  
-  // Validate that it's a valid UserType enum value
-  const validTypes = ['VENDOR', 'CLIENT', 'DRIVER', 'ADMIN', 'HELPDESK', 'SUPER_ADMIN'];
-  
-  if (validTypes.includes(normalizedType)) {
-    return normalizedType as UserType;
+  // Handle Prisma known request errors
+  if (error instanceof PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case 'P2002': // Unique constraint violation
+        const constraintError: ApiValidationError = {
+          error: "A user with this email already exists",
+          code: "DUPLICATE_EMAIL",
+          field: "email",
+          details: error.meta,
+        };
+        return { error: constraintError, status: 409 };
+        
+      case 'P2025': // Record not found
+        const notFoundError: ApiError = {
+          error: "User not found",
+          code: "USER_NOT_FOUND",
+          details: error.meta,
+        };
+        return { error: notFoundError, status: 404 };
+        
+      case 'P2003': // Foreign key constraint violation
+        const foreignKeyError: ApiError = {
+          error: "Invalid reference to related data",
+          code: "FOREIGN_KEY_VIOLATION", 
+          details: error.meta,
+        };
+        return { error: foreignKeyError, status: 400 };
+        
+      case 'P2004': // Constraint violation
+        const constraintViolationError: ApiError = {
+          error: "Data constraint violation",
+          code: "CONSTRAINT_VIOLATION",
+          details: error.meta,
+        };
+        return { error: constraintViolationError, status: 400 };
+        
+      default:
+        const unknownPrismaError: ApiError = {
+          error: "Database operation failed",
+          code: error.code,
+          details: error.meta,
+        };
+        return { error: unknownPrismaError, status: 500 };
+    }
   }
   
-  // If invalid type, log warning and return 'all' to prevent errors
-  console.warn(`[Users API] Invalid user type filter received: "${userType}". Using 'all' instead.`);
-  return 'all';
+  // Handle generic Prisma errors
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const prismaError: ApiError = {
+      error: "Database operation failed",
+      code: error.code,
+      details: error.meta,
+    };
+    return { error: prismaError, status: 500 };
+  }
+  
+  // Handle standard errors
+  if (error instanceof Error) {
+    const standardError: ApiError = {
+      error: error.message || "An unexpected error occurred",
+      code: "INTERNAL_ERROR",
+    };
+    return { error: standardError, status: 500 };
+  }
+  
+  // Fallback for unknown error types
+  const fallbackError: ApiError = {
+    error: "An unexpected error occurred",
+    code: "UNKNOWN_ERROR",
+    details: String(error),
+  };
+  return { error: fallbackError, status: 500 };
 }
 
 // GET: Fetch users with pagination, search, sort, filter
@@ -110,13 +180,14 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "10", 10);
     const search = searchParams.get("search") || "";
-    const statusFilter = (searchParams.get("status") ?? "all") as UserStatus | 'all';
+    const rawStatusFilter = searchParams.get("status") ?? "all";
+    const statusFilter = ApiTypeUtils.normalizeUserStatus(rawStatusFilter);
     const rawTypeFilter = searchParams.get("type") ?? "all";
-    const typeFilter = normalizeUserType(rawTypeFilter); // Transform lowercase to uppercase
+    const typeFilter = ApiTypeUtils.normalizeUserType(rawTypeFilter); // Use shared utility
     const sortField = searchParams.get("sort") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
-    console.log(`🔍 [Users API] Type filter transformation: "${rawTypeFilter}" -> "${typeFilter}"`);
+    console.log(`🔍 [Users API] Filter transformations: type "${rawTypeFilter}" -> "${typeFilter}", status "${rawStatusFilter}" -> "${statusFilter}"`);
 
     // --- Build WHERE Clause ---
     const where: any = {};
@@ -186,10 +257,21 @@ export async function GET(request: NextRequest) {
     return addSecurityHeaders(response);
   } catch (error) {
     console.error("Error in GET /api/users:", error);
-    const response = NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+    
+    // Use comprehensive error handling
+    const { error: apiError, status } = handlePrismaError(error);
+    
+    // Add additional context for debugging
+    const contextualError: ApiError = {
+      ...apiError,
+      details: {
+        ...apiError.details,
+        operation: 'fetch_users',
+        filters: { statusFilter, typeFilter, search, page, limit, sortField, sortOrder },
+      },
+    };
+    
+    const response = NextResponse.json(contextualError, { status });
     return addSecurityHeaders(response);
   }
 }
@@ -252,19 +334,31 @@ export async function POST(request: Request) {
          return addSecurityHeaders(response);
     }
 
-    // Normalize user type from frontend to Prisma enum
-    const normalizedType = normalizeUserType(data.type);
+    // Normalize user type using shared utility
+    const normalizedType = ApiTypeUtils.normalizeUserType(data.type);
     if (normalizedType === 'all') {
-        const response = NextResponse.json({ error: "Invalid user type provided" }, { status: 400 });
+        const validationError: ApiValidationError = {
+            error: "Invalid user type provided",
+            field: "type",
+            received: data.type,
+            expected: ['VENDOR', 'CLIENT', 'DRIVER', 'ADMIN', 'HELPDESK', 'SUPER_ADMIN']
+        };
+        const response = NextResponse.json(validationError, { status: 400 });
         return addSecurityHeaders(response);
     }
 
     console.log(`🔍 [Users API] POST type normalization: "${data.type}" -> "${normalizedType}"`);
 
-    // Check if email already exists
+    // Check if email already exists (with better error handling)
     const existingUser = await prisma.profile.findUnique({ where: { email: data.email } });
     if (existingUser) {
-        const response = NextResponse.json({ error: "Email already in use" }, { status: 409 });
+        const duplicateError: ApiValidationError = {
+            error: "Email already in use",
+            code: "DUPLICATE_EMAIL",
+            field: "email",
+            received: data.email,
+        };
+        const response = NextResponse.json(duplicateError, { status: 409 });
         return addSecurityHeaders(response);
     }
 
@@ -285,10 +379,21 @@ export async function POST(request: Request) {
     return addSecurityHeaders(response);
   } catch (error) {
     console.error("Error creating user:", error);
-    const response = NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 },
-    );
+    
+    // Use comprehensive error handling
+    const { error: apiError, status } = handlePrismaError(error);
+    
+    // Add additional context for debugging
+    const contextualError: ApiError = {
+      ...apiError,
+      details: {
+        ...apiError.details,
+        operation: 'create_user',
+        input: { email: data?.email, type: data?.type, status: data?.status },
+      },
+    };
+    
+    const response = NextResponse.json(contextualError, { status });
     return addSecurityHeaders(response);
   }
 }
