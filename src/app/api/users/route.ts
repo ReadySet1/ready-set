@@ -18,6 +18,27 @@ function hasAdminPrivileges(userType: string): boolean {
   return normalizedType === 'ADMIN' || normalizedType === 'SUPER_ADMIN' || normalizedType === 'HELPDESK';
 }
 
+// Helper function to normalize user type filter from frontend to Prisma enum
+function normalizeUserType(userType: string | 'all'): UserType | 'all' {
+  if (userType === 'all') {
+    return 'all';
+  }
+  
+  // Convert lowercase frontend values to uppercase Prisma enum values
+  const normalizedType = userType?.toUpperCase();
+  
+  // Validate that it's a valid UserType enum value
+  const validTypes = ['VENDOR', 'CLIENT', 'DRIVER', 'ADMIN', 'HELPDESK', 'SUPER_ADMIN'];
+  
+  if (validTypes.includes(normalizedType)) {
+    return normalizedType as UserType;
+  }
+  
+  // If invalid type, log warning and return 'all' to prevent errors
+  console.warn(`[Users API] Invalid user type filter received: "${userType}". Using 'all' instead.`);
+  return 'all';
+}
+
 // GET: Fetch users with pagination, search, sort, filter
 export async function GET(request: NextRequest) {
   try {
@@ -90,9 +111,12 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10", 10);
     const search = searchParams.get("search") || "";
     const statusFilter = (searchParams.get("status") ?? "all") as UserStatus | 'all';
-    const typeFilter = (searchParams.get("type") ?? "all") as UserType | 'all';
+    const rawTypeFilter = searchParams.get("type") ?? "all";
+    const typeFilter = normalizeUserType(rawTypeFilter); // Transform lowercase to uppercase
     const sortField = searchParams.get("sort") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
+
+    console.log(`🔍 [Users API] Type filter transformation: "${rawTypeFilter}" -> "${typeFilter}"`);
 
     // --- Build WHERE Clause ---
     const where: any = {};
@@ -228,6 +252,15 @@ export async function POST(request: Request) {
          return addSecurityHeaders(response);
     }
 
+    // Normalize user type from frontend to Prisma enum
+    const normalizedType = normalizeUserType(data.type);
+    if (normalizedType === 'all') {
+        const response = NextResponse.json({ error: "Invalid user type provided" }, { status: 400 });
+        return addSecurityHeaders(response);
+    }
+
+    console.log(`🔍 [Users API] POST type normalization: "${data.type}" -> "${normalizedType}"`);
+
     // Check if email already exists
     const existingUser = await prisma.profile.findUnique({ where: { email: data.email } });
     if (existingUser) {
@@ -239,7 +272,7 @@ export async function POST(request: Request) {
     const newUser = await prisma.profile.create({
       data: {
         email: data.email,
-        type: data.type,
+        type: normalizedType, // Use normalized type instead of raw data.type
         status: data.status,
         name: data.name || null,
         contactName: data.contactName || null,
