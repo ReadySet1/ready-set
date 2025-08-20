@@ -340,8 +340,8 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
         let validatedUsers: User[] = [];
         if (Array.isArray(data.users)) {
           validatedUsers = data.users
-            .filter((user) => user && user.id && user.email) // Filter out invalid users
-            .map((user) => ({
+            .filter((user: any) => user && user.id && user.email) // Filter out invalid users
+            .map((user: any) => ({
               ...user,
               // Apply fallbacks and normalize data
               type:

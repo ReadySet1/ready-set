@@ -111,6 +111,15 @@ function handlePrismaError(error: unknown): { error: ApiError; status: number } 
 
 // GET: Fetch users with pagination, search, sort, filter
 export async function GET(request: NextRequest) {
+  // Declare variables in broader scope for error handling
+  let page = 1;
+  let limit = 10;
+  let search = "";
+  let statusFilter = "all";
+  let typeFilter = "all";
+  let sortField = "createdAt";
+  let sortOrder = "desc";
+
   try {
     // Apply rate limiting for admin operations
     const rateLimitResponse = adminRateLimit(request);
@@ -177,15 +186,15 @@ export async function GET(request: NextRequest) {
 
     // --- Parse Query Parameters ---
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "10", 10);
-    const search = searchParams.get("search") || "";
+    page = parseInt(searchParams.get("page") || "1", 10);
+    limit = parseInt(searchParams.get("limit") || "10", 10);
+    search = searchParams.get("search") || "";
     const rawStatusFilter = searchParams.get("status") ?? "all";
-    const statusFilter = ApiTypeUtils.normalizeUserStatus(rawStatusFilter);
+    statusFilter = ApiTypeUtils.normalizeUserStatus(rawStatusFilter);
     const rawTypeFilter = searchParams.get("type") ?? "all";
-    const typeFilter = ApiTypeUtils.normalizeUserType(rawTypeFilter); // Use shared utility
-    const sortField = searchParams.get("sort") || "createdAt";
-    const sortOrder = searchParams.get("sortOrder") || "desc";
+    typeFilter = ApiTypeUtils.normalizeUserType(rawTypeFilter); // Use shared utility
+    sortField = searchParams.get("sort") || "createdAt";
+    sortOrder = searchParams.get("sortOrder") || "desc";
 
     console.log(`🔍 [Users API] Filter transformations: type "${rawTypeFilter}" -> "${typeFilter}", status "${rawStatusFilter}" -> "${statusFilter}"`);
 
@@ -278,6 +287,9 @@ export async function GET(request: NextRequest) {
 
 // POST: Create a new user
 export async function POST(request: Request) {
+  // Declare data variable in broader scope for error handling
+  let data: any = {};
+
   try {
     // Apply rate limiting for admin operations
     const rateLimitResponse = adminRateLimit(request as NextRequest);
@@ -326,7 +338,7 @@ export async function POST(request: Request) {
         return addSecurityHeaders(response);
     }
 
-    const data = await request.json();
+    data = await request.json();
 
     // Basic validation
     if (!data.email || !data.type || !data.status) {
