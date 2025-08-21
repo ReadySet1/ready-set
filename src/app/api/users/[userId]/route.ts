@@ -14,6 +14,7 @@ import { createClient } from "@/utils/supabase/server";
 import { prisma } from '@/utils/prismaDB';
 import { Prisma } from '@prisma/client';
 import { UserType } from '@/types/prisma';
+import { PrismaTransaction } from '@/types/prisma-types';
 
 export async function GET(request: NextRequest) {
   console.log(`[GET /api/users/[userId]] Request received for URL: ${request.url}`);
@@ -643,27 +644,315 @@ export async function DELETE(
       );
     }
     
-    // Prevent deletion of SUPER_ADMIN users
+    // Prevent deletion of SUPER_ADMIN users and get user details
     const userToDelete = await prisma.profile.findUnique({
       where: { id: userId },
-      select: { type: true }
+      select: { type: true, email: true }
     });
     
-    if (userToDelete?.type === UserType.SUPER_ADMIN) {
+    if (!userToDelete) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+    
+    if (userToDelete.type === UserType.SUPER_ADMIN) {
       return NextResponse.json(
         { error: 'Forbidden: Super Admin users cannot be deleted' },
         { status: 403 }
       );
     }
     
-    // ...delete logic here
+    // Prevent self-deletion
+    if (user.id === userId) {
+      return NextResponse.json(
+        { error: 'Forbidden: Cannot delete your own account' },
+        { status: 403 }
+      );
+    }
+    
+    const startTime = Date.now();
+    console.log(`[DELETE /api/users/[userId]] Starting user deletion process for user: ${userId}`);
+    console.log(`[DELETE] Requester: ${user.id} (Type: ${requesterProfile?.type})`);
+    
+    // Step 1: Pre-deletion validation - Check for active orders
+    console.log(`[DELETE] Step 1: Validating active orders...`);
+    const activeOrders = await Promise.all([
+      prisma.cateringRequest.count({
+        where: { 
+          userId, 
+          status: { in: ['ACTIVE', 'ASSIGNED', 'PENDING', 'CONFIRMED', 'IN_PROGRESS'] }
+        }
+      }),
+      prisma.onDemand.count({
+        where: { 
+          userId, 
+          status: { in: ['ACTIVE', 'ASSIGNED', 'PENDING', 'CONFIRMED', 'IN_PROGRESS'] }
+        }
+      })
+    ]);
+    
+    const totalActiveOrders = activeOrders[0] + activeOrders[1];
+    console.log(`[DELETE] Found ${totalActiveOrders} active orders (${activeOrders[0]} catering, ${activeOrders[1]} on-demand)`);
+    
+    if (totalActiveOrders > 0) {
+      return NextResponse.json(
+        { 
+          error: 'Cannot delete user with active orders. Complete or cancel orders first.',
+          details: { 
+            activeCateringOrders: activeOrders[0],
+            activeOnDemandOrders: activeOrders[1],
+            totalActiveOrders 
+          }
+        },
+        { status: 409 }
+      );
+    }
+    
+    // Step 2: Execute deletion transaction
+    console.log(`[DELETE] Step 2: Beginning deletion transaction...`);
+    const transactionResult = await prisma.$transaction(async (tx: PrismaTransaction) => {
+      // Step 2a: Delete Dispatch records (no CASCADE defined)
+      console.log(`[DELETE] Step 2a: Deleting dispatch records...`);
+      const deletedDispatches = await tx.dispatch.deleteMany({
+        where: {
+          OR: [{ driverId: userId }, { userId }],
+        },
+      });
+      console.log(`[DELETE] Deleted ${deletedDispatches.count} dispatch records`);
+      
+      // Step 2b: Update FileUpload records to null out userId (preserve files)
+      console.log(`[DELETE] Step 2b: Updating file upload records...`);
+      const updatedFileUploads = await tx.fileUpload.updateMany({
+        where: { userId },
+        data: { userId: null },
+      });
+      console.log(`[DELETE] Updated ${updatedFileUploads.count} file upload records`);
+      
+      // Step 2c: Handle Address ownership logic
+      console.log(`[DELETE] Step 2c: Processing address relationships...`);
+      const createdAddresses = await tx.address.findMany({
+        where: { createdBy: userId },
+        include: {
+          userAddresses: true,
+          cateringPickupRequests: true,
+          cateringDeliveryRequests: true,
+          onDemandPickupRequests: true,
+          onDemandDeliveryRequests: true,
+        }
+      });
+      
+      let deletedAddresses = 0;
+      let updatedAddresses = 0;
+      
+      for (const address of createdAddresses) {
+        const isUsedByOthers = 
+          address.userAddresses.some((ua: { userId: string }) => ua.userId !== userId) ||
+          address.cateringPickupRequests.length > 0 ||
+          address.cateringDeliveryRequests.length > 0 ||
+          address.onDemandPickupRequests.length > 0 ||
+          address.onDemandDeliveryRequests.length > 0;
+        
+        if (!isUsedByOthers) {
+          // Delete unused addresses
+          await tx.address.delete({
+            where: { id: address.id }
+          });
+          deletedAddresses++;
+        } else {
+          // Null out the createdBy field for addresses used by others
+          await tx.address.update({
+            where: { id: address.id },
+            data: { createdBy: null }
+          });
+          updatedAddresses++;
+        }
+      }
+      
+      console.log(`[DELETE] Processed ${createdAddresses.length} addresses: ${deletedAddresses} deleted, ${updatedAddresses} updated`);
+      
+      // Step 2d: Delete the Profile (triggers CASCADE deletes)
+      console.log(`[DELETE] Step 2d: Deleting user profile...`);
+      const deletedProfile = await tx.profile.delete({
+        where: { id: userId },
+      });
+      console.log(`[DELETE] Profile deleted successfully: ${deletedProfile.id}`);
+      
+      return {
+        deletedProfile,
+        deletedDispatches: deletedDispatches.count,
+        updatedFileUploads: updatedFileUploads.count,
+        deletedAddresses,
+        updatedAddresses,
+        totalAddressesProcessed: createdAddresses.length
+      };
+    }, {
+      timeout: 10000, // 10 second timeout for complex deletions
+    });
+    
+    const duration = Date.now() - startTime;
+    console.log(`[DELETE] Transaction completed successfully in ${duration}ms`);
+    
+    // Step 3: Create audit log entry
+    const auditEntry = {
+      action: 'USER_DELETION',
+      performedBy: user.id,
+      performedByType: requesterProfile?.type,
+      targetUserId: userId,
+      targetUserEmail: userToDelete.email,
+      targetUserType: userToDelete.type,
+      timestamp: new Date(),
+      affectedRecords: {
+        dispatchesDeleted: transactionResult.deletedDispatches,
+        fileUploadsUpdated: transactionResult.updatedFileUploads,
+        addressesDeleted: transactionResult.deletedAddresses,
+        addressesUpdated: transactionResult.updatedAddresses
+      },
+      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      success: true,
+      duration: `${duration}ms`
+    };
+    
+    console.log(`[AUDIT] User deletion completed:`, JSON.stringify(auditEntry));
+    
     return NextResponse.json({
-      message: 'User and associated files deleted'
+      message: 'User and associated data deleted successfully',
+      summary: {
+        deletedUser: {
+          id: userId,
+          email: userToDelete.email,
+          type: userToDelete.type
+        },
+        deletedDispatches: transactionResult.deletedDispatches,
+        updatedFileUploads: transactionResult.updatedFileUploads,
+        processedAddresses: transactionResult.totalAddressesProcessed,
+        deletedAddresses: transactionResult.deletedAddresses,
+        updatedAddresses: transactionResult.updatedAddresses,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      }
     });
   } catch (error) {
-    console.error('Error deleting user:', error);
+    const duration = Date.now() - startTime;
+    console.error(`[DELETE] Transaction failed after ${duration}ms:`, error);
+    
+    // Create failure audit log entry
+    const failureAuditEntry = {
+      action: 'USER_DELETION_FAILED',
+      performedBy: user.id,
+      performedByType: requesterProfile?.type,
+      targetUserId: userId,
+      targetUserEmail: userToDelete?.email,
+      targetUserType: userToDelete?.type,
+      timestamp: new Date(),
+      error: error instanceof Error ? error.message : 'Unknown error',
+      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      success: false,
+      duration: `${duration}ms`
+    };
+    
+    console.log(`[AUDIT] User deletion failed:`, JSON.stringify(failureAuditEntry));
+    
+    // Handle Prisma-specific errors
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      switch (error.code) {
+        case 'P2025': // Record not found
+          return NextResponse.json(
+            { 
+              error: 'User not found or already deleted',
+              code: 'USER_NOT_FOUND',
+              details: error.meta
+            },
+            { status: 404 }
+          );
+        
+        case 'P2003': // Foreign key constraint violation  
+          return NextResponse.json(
+            { 
+              error: 'Cannot delete user: referenced by other records',
+              code: 'FOREIGN_KEY_VIOLATION',
+              details: error.meta
+            },
+            { status: 409 }
+          );
+        
+        case 'P2002': // Unique constraint violation
+          return NextResponse.json(
+            { 
+              error: 'Data integrity constraint violation',
+              code: 'CONSTRAINT_VIOLATION',
+              details: error.meta
+            },
+            { status: 409 }
+          );
+          
+        case 'P1001': // Database connection failed
+          return NextResponse.json(
+            { 
+              error: 'Database connection failed. Please try again.',
+              code: 'CONNECTION_FAILED'
+            },
+            { status: 503 }
+          );
+          
+        case 'P2024': // Connection timeout
+          return NextResponse.json(
+            { 
+              error: 'Operation timed out. Please try again.',
+              code: 'OPERATION_TIMEOUT'
+            },
+            { status: 408 }
+          );
+          
+        default:
+          console.error('Unknown Prisma error:', error.code, error.message);
+          return NextResponse.json(
+            { 
+              error: 'Database operation failed',
+              code: 'DATABASE_ERROR',
+              details: { 
+                prismaCode: error.code,
+                message: error.message 
+              }
+            },
+            { status: 500 }
+          );
+      }
+    }
+    
+    // Handle transaction timeout
+    if (error instanceof Error && error.message.includes('timeout')) {
+      return NextResponse.json(
+        { 
+          error: 'Deletion operation timed out. The operation may have been too complex.',
+          code: 'TRANSACTION_TIMEOUT',
+          details: { duration: `${duration}ms` }
+        },
+        { status: 408 }
+      );
+    }
+    
+    // Handle business logic errors (thrown by our validation)
+    if (error instanceof Error && error.message.includes('Cannot delete user with active orders')) {
+      return NextResponse.json(
+        { 
+          error: error.message,
+          code: 'ACTIVE_ORDERS_EXIST'
+        },
+        { status: 409 }
+      );
+    }
+    
+    // Handle general errors
     return NextResponse.json(
-      { error: 'Failed to delete user' },
+      { 
+        error: 'Failed to delete user',
+        code: 'DELETION_FAILED',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
