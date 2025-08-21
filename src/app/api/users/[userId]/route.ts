@@ -613,10 +613,16 @@ export async function PATCH(
 export async function DELETE(
   request: NextRequest
 ) {
+  const startTime = Date.now();
+  let userId: string | undefined;
+  let user: any;
+  let requesterProfile: any;
+  let userToDelete: any;
+
   try {
     // Get userId from URL path
     const url = new URL(request.url);
-    const userId = url.pathname.split('/').pop();
+    userId = url.pathname.split('/').pop();
     if (!userId) {
       return NextResponse.json(
         { error: 'User ID is required' },
@@ -624,14 +630,15 @@ export async function DELETE(
       );
     }
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) {
       return NextResponse.json(
         { error: 'Unauthorized: Authentication required' },
         { status: 401 }
       );
     }
-    const requesterProfile = await prisma.profile.findUnique({
+    user = authUser;
+    requesterProfile = await prisma.profile.findUnique({
       where: { id: user.id },
       select: { type: true }
     });
@@ -645,7 +652,7 @@ export async function DELETE(
     }
     
     // Prevent deletion of SUPER_ADMIN users and get user details
-    const userToDelete = await prisma.profile.findUnique({
+    userToDelete = await prisma.profile.findUnique({
       where: { id: userId },
       select: { type: true, email: true }
     });
@@ -672,7 +679,6 @@ export async function DELETE(
       );
     }
     
-    const startTime = Date.now();
     console.log(`[DELETE /api/users/[userId]] Starting user deletion process for user: ${userId}`);
     console.log(`[DELETE] Requester: ${user.id} (Type: ${requesterProfile?.type})`);
     
@@ -841,11 +847,11 @@ export async function DELETE(
     // Create failure audit log entry
     const failureAuditEntry = {
       action: 'USER_DELETION_FAILED',
-      performedBy: user.id,
-      performedByType: requesterProfile?.type,
-      targetUserId: userId,
-      targetUserEmail: userToDelete?.email,
-      targetUserType: userToDelete?.type,
+      performedBy: user?.id || 'unknown',
+      performedByType: requesterProfile?.type || 'unknown',
+      targetUserId: userId || 'unknown',
+      targetUserEmail: userToDelete?.email || 'unknown',
+      targetUserType: userToDelete?.type || 'unknown',
       timestamp: new Date(),
       error: error instanceof Error ? error.message : 'Unknown error',
       ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
