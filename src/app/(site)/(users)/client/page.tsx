@@ -22,6 +22,11 @@ import {
 import { CombinedOrder } from "@/types/models";
 import { Prisma } from "@prisma/client";
 import { CateringRequest, OnDemand, Decimal } from "@/types/prisma";
+import {
+  DashboardCardSkeleton,
+  OrderCardSkeleton,
+  QuickActionsSkeleton,
+} from "@/components/Skeleton/AuthSkeleton";
 
 interface DashboardStats {
   activeOrders: number;
@@ -293,6 +298,47 @@ const UpcomingOrderCard = ({ order }: { order: CombinedOrder }) => {
   );
 };
 
+// Skeleton loading component for the full dashboard
+const ClientDashboardSkeleton: React.FC = () => (
+  <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+    {/* Stats Section Skeleton */}
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-3 lg:grid-cols-3">
+      <DashboardCardSkeleton />
+      <DashboardCardSkeleton />
+      <DashboardCardSkeleton />
+    </div>
+
+    {/* Recent Orders Section Skeleton */}
+    <div className="overflow-hidden rounded-lg border border-gray-100 bg-white shadow-sm md:col-span-2">
+      <div className="border-b border-gray-100 p-5">
+        <div className="flex items-center justify-between">
+          <div className="h-6 w-32 animate-pulse rounded bg-gray-200" />
+          <div className="h-4 w-16 animate-pulse rounded bg-gray-200" />
+        </div>
+      </div>
+
+      <div className="p-5">
+        <div className="space-y-4">
+          <OrderCardSkeleton />
+          <OrderCardSkeleton />
+          <OrderCardSkeleton />
+        </div>
+      </div>
+    </div>
+
+    {/* Quick Actions Section Skeleton */}
+    <div className="overflow-hidden rounded-lg border border-gray-100 bg-white shadow-sm">
+      <div className="border-b border-gray-100 p-5">
+        <div className="h-6 w-28 animate-pulse rounded bg-gray-200" />
+      </div>
+
+      <div className="p-5">
+        <QuickActionsSkeleton />
+      </div>
+    </div>
+  </div>
+);
+
 const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
   const hasRecentOrders = data.recentOrders.length > 0;
 
@@ -467,6 +513,33 @@ const ClientPage = async () => {
     redirect("/sign-in");
   }
 
+  // Server-side session validation: Ensure user has proper role before rendering
+  const { getUserRole } = await import("@/lib/auth");
+  const userRole = await getUserRole(user.id);
+
+  if (!userRole) {
+    console.error("No user role found for authenticated user:", user.id);
+    redirect("/sign-in?error=Profile+not+found");
+  }
+
+  // Validate user has client access
+  if (userRole.toLowerCase() !== "client") {
+    console.log(
+      "User does not have client role, redirecting to appropriate dashboard",
+    );
+    // Redirect to their appropriate dashboard based on role
+    const roleRoutes: Record<string, string> = {
+      admin: "/admin",
+      super_admin: "/admin",
+      driver: "/driver",
+      helpdesk: "/helpdesk",
+      vendor: "/vendor",
+    };
+
+    const redirectPath = roleRoutes[userRole.toLowerCase()] || "/";
+    redirect(redirectPath);
+  }
+
   // Fetch dashboard data
   const dashboardData = await getClientDashboardData(user.id);
 
@@ -486,11 +559,7 @@ const ClientPage = async () => {
             information.
           </p>
 
-          <Suspense
-            fallback={
-              <div className="py-10 text-center">Loading dashboard...</div>
-            }
-          >
+          <Suspense fallback={<ClientDashboardSkeleton />}>
             <ClientDashboardContent data={dashboardData} />
           </Suspense>
         </div>

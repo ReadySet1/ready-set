@@ -119,6 +119,54 @@ export async function login(
   const userTypeKey = profile.type.toLowerCase();
   console.log("Normalized user type for redirection:", userTypeKey);
 
+  // Set immediate session data in cookies for client-side access
+  const cookieStore = await cookies();
+  
+  // Set user session data that can be read immediately by client
+  const sessionData = {
+    userId: user.id,
+    email: user.email || '',
+    userRole: profile.type,
+    timestamp: Date.now()
+  };
+  
+  // Set session cookie with immediate user data
+  cookieStore.set('user-session-data', JSON.stringify(sessionData), {
+    path: '/',
+    httpOnly: false, // Allow client-side access
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7 // 7 days
+  });
+
+  console.log("Set immediate session data for client:", sessionData);
+
+  // Prefetch and cache user profile data for faster client-side loading
+  try {
+    const { prefetchUserProfile } = await import("@/utils/supabase/client");
+    // Note: This will run on server, so we manually cache the profile data
+    const profileData = {
+      type: profile.type,
+      email: user.email || '',
+      name: user.user_metadata?.name || user.email?.split('@')[0] || '',
+      timestamp: Date.now()
+    };
+    
+    // Set a server-side cache cookie that client can read immediately
+    cookieStore.set(`user-profile-${user.id}`, JSON.stringify(profileData), {
+      path: '/',
+      httpOnly: false, // Allow client-side access
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 10 // 10 minutes
+    });
+    
+    console.log("Prefetched user profile data for client:", profileData);
+  } catch (error) {
+    console.error("Error prefetching user profile data:", error);
+    // Don't fail login if prefetch fails
+  }
+
   // Determine where to redirect the user
   let redirectPath: string;
 

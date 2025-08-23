@@ -12,6 +12,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { MenuItem } from "@/types/menu";
 import { UserType } from "@/types/user";
 import MobileMenu from "./MobileMenu";
+import { AuthButtonsSkeleton } from "@/components/Skeleton/AuthSkeleton";
 
 // Define base menu items (visible to all users)
 const baseMenuItems: MenuItem[] = [
@@ -279,7 +280,7 @@ const Header: React.FC = () => {
 
   return (
     <header
-      key={user?.id || 'no-user'}
+      key={user?.id || "no-user"}
       className={`ud-header left-0 top-0 z-40 flex w-full items-center ${
         sticky
           ? "shadow-nav fixed z-[999] border-b border-stroke bg-white/80 backdrop-blur-[5px] dark:border-dark-3/20 dark:bg-dark/10"
@@ -313,7 +314,14 @@ const Header: React.FC = () => {
 
             {/* Auth Buttons (only visible on desktop; mobile handled by MobileMenu) */}
             <div className="hidden items-center justify-end pr-16 sm:flex lg:pr-0">
-              {!user && !isLoading ? (
+              {isLoading ? (
+                <AuthButtonsSkeleton
+                  sticky={sticky}
+                  isVirtualAssistantPage={isVirtualAssistantPage}
+                  isHomePage={isHomePage}
+                  isLogisticsPage={isLogisticsPage}
+                />
+              ) : !user ? (
                 <>
                   {pathUrl !== "/" || isVirtualAssistantPage ? (
                     <div className="flex items-center gap-3">
@@ -363,7 +371,7 @@ const Header: React.FC = () => {
                 </>
               ) : user ? (
                 <>
-                  {roleMenuItem && roleMenuItem.path && (
+                  {roleMenuItem && roleMenuItem.path ? (
                     <Link href={roleMenuItem.path}>
                       <p
                         className={`loginBtn hidden px-7 py-3 font-medium lg:block ${
@@ -379,7 +387,21 @@ const Header: React.FC = () => {
                         {roleMenuItem.title}
                       </p>
                     </Link>
-                  )}
+                  ) : userRole === null ? (
+                    <div
+                      className={`px-7 py-3 font-medium ${
+                        sticky
+                          ? "text-dark dark:text-white"
+                          : isVirtualAssistantPage ||
+                              isHomePage ||
+                              isLogisticsPage
+                            ? "text-white"
+                            : "text-dark dark:text-white"
+                      }`}
+                    >
+                      Loading Dashboard...
+                    </div>
+                  ) : null}
                   {isVirtualAssistantPage || isHomePage ? (
                     <button
                       onClick={handleSignOut}
