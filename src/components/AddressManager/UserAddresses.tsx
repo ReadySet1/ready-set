@@ -169,13 +169,13 @@ const UserAddresses: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, filterType, pagination]);
+  }, [user, filterType, pagination.currentPage, pagination.limit]);
 
   useEffect(() => {
     if (user) {
       fetchAddresses();
     }
-  }, [user, filterType, fetchAddresses]);
+  }, [user, filterType, pagination.currentPage, fetchAddresses]);
 
   const handleDeleteAddress = async (addressId: string) => {
     setIsLoading(true);

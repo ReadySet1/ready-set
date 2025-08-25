@@ -288,7 +288,8 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   }, [
     user,
     filterType,
-    pagination,
+    pagination.currentPage,
+    pagination.limit,
     onAddressesLoaded,
     onError,
     MAX_FETCH_ATTEMPTS,
@@ -299,7 +300,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
     if (user) {
       debouncedFetch(fetchAddresses);
     }
-  }, [user, filterType, fetchAddresses, debouncedFetch]);
+  }, [user, filterType, pagination.currentPage, debouncedFetch]);
 
   // Expose refresh function to parent component
   useEffect(() => {
@@ -309,7 +310,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
         fetchAddresses();
       });
     }
-  }, [onRefresh, fetchAddresses]);
+  }, [onRefresh]);
 
   const handleAddAddress = useCallback(
     async (newAddress: Partial<Address>) => {
