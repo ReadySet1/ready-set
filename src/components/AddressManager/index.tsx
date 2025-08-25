@@ -162,7 +162,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
     fetchTimeoutRef.current = setTimeout(() => {
       fn();
       fetchTimeoutRef.current = null;
-    }, 500);
+    }, 100); // Reduced delay for better testing
   }, []);
 
   const fetchAddresses = useCallback(async () => {
@@ -281,6 +281,11 @@ const AddressManager: React.FC<AddressManagerProps> = ({
     } catch (err) {
       console.error("Fetch Addresses Catch Block:", err);
       setAddresses([]);
+      if (onError) {
+        onError(
+          `Error fetching addresses: ${err instanceof Error ? err.message : "Unknown error"}`,
+        );
+      }
     } finally {
       setIsLoading(false);
       isRequestPending.current = false;
