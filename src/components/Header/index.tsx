@@ -249,7 +249,7 @@ const Header: React.FC = () => {
       const cookies = document.cookie;
       const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
 
-      if (sessionMatch) {
+      if (sessionMatch && sessionMatch[1]) {
         try {
           const decoded = decodeURIComponent(sessionMatch[1]);
           const sessionData = JSON.parse(decoded);
@@ -338,9 +338,10 @@ const Header: React.FC = () => {
   // Get role-specific menu item - use fallback if main context fails
   const effectiveUser = user || fallbackUser;
   const effectiveUserRole = userRole || fallbackRole;
-  const roleMenuItem = effectiveUserRole
-    ? ROLE_MENU_ITEMS[effectiveUserRole]
-    : null;
+  const roleMenuItem =
+    effectiveUserRole && typeof effectiveUserRole === "string"
+      ? ROLE_MENU_ITEMS[effectiveUserRole as UserType]
+      : null;
 
   console.log("🔧 Header effective auth state:", {
     hasEffectiveUser: !!effectiveUser,
@@ -359,7 +360,7 @@ const Header: React.FC = () => {
       console.log("🍪 All cookies:", cookies);
 
       const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
-      if (sessionMatch) {
+      if (sessionMatch && sessionMatch[1]) {
         try {
           const decoded = decodeURIComponent(sessionMatch[1]);
           const sessionData = JSON.parse(decoded);
@@ -378,7 +379,7 @@ const Header: React.FC = () => {
       console.log("🔄 FORCING AUTH UPDATE...");
       const cookies = document.cookie;
       const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
-      if (sessionMatch) {
+      if (sessionMatch && sessionMatch[1]) {
         try {
           const decoded = decodeURIComponent(sessionMatch[1]);
           const sessionData = JSON.parse(decoded);

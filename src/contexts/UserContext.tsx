@@ -186,7 +186,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     const cookies = document.cookie;
     const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
 
-    if (sessionMatch) {
+    if (sessionMatch && sessionMatch[1]) {
       try {
         const decoded = decodeURIComponent(sessionMatch[1]);
         const sessionData = JSON.parse(decoded);
@@ -236,7 +236,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
       // Manual cookie parsing as backup
       const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
-      if (sessionMatch) {
+      if (sessionMatch && sessionMatch[1]) {
         console.log("🔍 FORCED Found session cookie manually!");
         try {
           const decoded = decodeURIComponent(sessionMatch[1]);

@@ -124,9 +124,9 @@ export async function login(
   
   // Set user session data that can be read immediately by client
   // Normalize userRole to match TypeScript enum (lowercase)
-  const normalizedUserRole = Object.values(UserType).find(
-    enumValue => enumValue.toUpperCase() === profile.type.toUpperCase()
-  ) || profile.type.toLowerCase();
+  const normalizedUserRole = profile.type ? Object.values(UserType).find(
+    enumValue => enumValue.toUpperCase() === profile.type!.toUpperCase()
+  ) || profile.type.toLowerCase() : 'customer';
   
   const sessionData = {
     userId: user.id,

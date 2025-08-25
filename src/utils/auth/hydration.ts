@@ -45,6 +45,11 @@ export const getServerAuthState = (): ServerAuthState | null => {
     }
     
     const encodedValue = sessionMatch[1];
+    if (!encodedValue) {
+      console.log('❌ No encoded value found in session match');
+      return null;
+    }
+    
     console.log('📄 Encoded cookie value:', encodedValue.substring(0, 100) + '...');
     
     const decodedValue = decodeURIComponent(encodedValue);
@@ -122,6 +127,11 @@ export const getCachedProfileData = (userId: string): CachedProfileData | null =
     }
     
     const encodedValue = profileMatch[1];
+    if (!encodedValue) {
+      console.log('❌ No encoded value found in profile match');
+      return null;
+    }
+    
     console.log('📄 Encoded profile value:', encodedValue.substring(0, 100) + '...');
     
     const decodedValue = decodeURIComponent(encodedValue);
