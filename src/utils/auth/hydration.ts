@@ -36,6 +36,7 @@ export const getServerAuthState = (): ServerAuthState | null => {
     if (!cookie) return null;
     
     const sessionDataStr = cookie.split('=')[1];
+    if (!sessionDataStr) return null;
     const sessionData = JSON.parse(decodeURIComponent(sessionDataStr));
     
     // Validate session data structure
@@ -78,6 +79,7 @@ export const getCachedProfileData = (userId: string): CachedProfileData | null =
     if (!cookie) return null;
     
     const profileDataStr = cookie.split('=')[1];
+    if (!profileDataStr) return null;
     const profileData = JSON.parse(decodeURIComponent(profileDataStr));
     
     // Check if profile data is recent (within 10 minutes)

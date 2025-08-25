@@ -51,7 +51,7 @@ class AuthErrorBoundary extends Component<
 
     this.setState({
       error,
-      errorInfo: errorInfo.componentStack,
+      errorInfo: errorInfo.componentStack ?? null,
     });
 
     // Call the onError callback if provided

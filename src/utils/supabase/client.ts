@@ -167,6 +167,7 @@ export const getImmediateSessionData = () => {
     if (!cookie) return null;
     
     const sessionDataStr = cookie.split('=')[1];
+    if (!sessionDataStr) return null;
     const sessionData = JSON.parse(decodeURIComponent(sessionDataStr));
     
     // Check if session data is recent (within 5 minutes)

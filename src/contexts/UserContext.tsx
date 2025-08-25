@@ -186,7 +186,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               name: recoveredState.profileData.name,
             }
           : undefined,
-      } as User;
+      } as unknown as User;
 
       setUser(mockUser);
       setUserRole(recoveredState.userRole);
@@ -236,7 +236,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         const {
           data: { user: currentUser },
           error: getUserError,
-        } = await retryAuthOperation(() => supabase.auth.getUser(), {
+        } = await retryAuthOperation<{
+          data: { user: User | null };
+          error: any;
+        }>(() => supabase.auth.getUser(), {
           maxAttempts: 2,
           baseDelay: 500,
           retryCondition: (error) => {
@@ -364,19 +367,22 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       const {
         data: { user: currentUser },
         error: getUserError,
-      } = await retryAuthOperation(() => supabase.auth.getUser(), {
-        maxAttempts: 3,
-        baseDelay: 1000,
-        retryCondition: (error) => {
-          // Retry on network/temporary errors
-          return (
-            error?.message?.includes("network") ||
-            error?.message?.includes("timeout") ||
-            error?.message?.includes("connection") ||
-            error?.message?.includes("temporary")
-          );
+      } = await retryAuthOperation<{ data: { user: User | null }; error: any }>(
+        () => supabase.auth.getUser(),
+        {
+          maxAttempts: 3,
+          baseDelay: 1000,
+          retryCondition: (error) => {
+            // Retry on network/temporary errors
+            return (
+              error?.message?.includes("network") ||
+              error?.message?.includes("timeout") ||
+              error?.message?.includes("connection") ||
+              error?.message?.includes("temporary")
+            );
+          },
         },
-      });
+      );
 
       if (getUserError) {
         throw getUserError;
