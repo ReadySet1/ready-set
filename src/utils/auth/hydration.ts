@@ -23,44 +23,83 @@ export interface CachedProfileData {
  */
 
 /**
- * Gets server-side auth state from cookies set during login
+ * Simple, bulletproof cookie extraction
  */
 export const getServerAuthState = (): ServerAuthState | null => {
-  if (typeof window === 'undefined') return null;
+  console.log('🔍 NEW getServerAuthState() called');
+  
+  if (typeof window === 'undefined') {
+    console.log('❌ Server-side rendering detected');
+    return null;
+  }
   
   try {
-    const cookie = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('user-session-data='));
+    // Find the session cookie directly
+    const cookieString = document.cookie;
+    console.log('🍪 Full cookie string length:', cookieString.length);
     
-    if (!cookie) return null;
-    
-    const sessionDataStr = cookie.split('=')[1];
-    if (!sessionDataStr) return null;
-    const sessionData = JSON.parse(decodeURIComponent(sessionDataStr));
-    
-    // Validate session data structure
-    if (!sessionData.userId || !sessionData.email || !sessionData.userRole) {
+    const sessionMatch = cookieString.match(/user-session-data=([^;]+)/);
+    if (!sessionMatch) {
+      console.log('❌ No user-session-data cookie found in:', cookieString.substring(0, 200) + '...');
       return null;
     }
     
-    // Check if session data is recent (within 5 minutes for hydration)
-    const isRecent = Date.now() - sessionData.timestamp < 5 * 60 * 1000;
-    if (!isRecent) {
+    const encodedValue = sessionMatch[1];
+    console.log('📄 Encoded cookie value:', encodedValue.substring(0, 100) + '...');
+    
+    const decodedValue = decodeURIComponent(encodedValue);
+    console.log('🔓 Decoded value:', decodedValue);
+    
+    const sessionData = JSON.parse(decodedValue);
+    console.log('📊 Parsed session data:', sessionData);
+    
+    // Validate required fields
+    if (!sessionData.userId || !sessionData.email || !sessionData.userRole) {
+      console.log('❌ Missing required fields:', {
+        userId: !!sessionData.userId,
+        email: !!sessionData.email,
+        userRole: !!sessionData.userRole
+      });
+      return null;
+    }
+    
+    // Check age (10 minutes max)
+    const ageMinutes = (Date.now() - sessionData.timestamp) / (1000 * 60);
+    console.log(`⏰ Session age: ${ageMinutes.toFixed(2)} minutes`);
+    
+    if (ageMinutes > 10) {
+      console.log('❌ Session too old, clearing...');
       clearServerAuthState();
       return null;
     }
     
-    // Validate userRole is a valid UserType
+    // Normalize userRole to lowercase to match TypeScript enum
+    const normalizedRole = sessionData.userRole.toLowerCase();
+    console.log('🔄 Normalizing userRole from', sessionData.userRole, 'to', normalizedRole);
+    
+    // Find matching enum value
     const enumValues = Object.values(UserType);
-    if (!enumValues.includes(sessionData.userRole)) {
-      console.warn('Invalid userRole in session data:', sessionData.userRole);
+    const matchingEnum = enumValues.find(enumValue => 
+      enumValue.toLowerCase() === normalizedRole
+    );
+    
+    if (!matchingEnum) {
+      console.warn('❌ No matching enum for role:', normalizedRole, 'Available:', enumValues);
       return null;
     }
     
-    return sessionData;
+    const result = {
+      userId: sessionData.userId,
+      email: sessionData.email,
+      userRole: matchingEnum,
+      timestamp: sessionData.timestamp
+    };
+    
+    console.log('✅ Successfully parsed session data:', result);
+    return result;
+    
   } catch (error) {
-    console.error('Error parsing server auth state:', error);
+    console.error('❌ Error in getServerAuthState:', error);
     return null;
   }
 };
@@ -72,31 +111,48 @@ export const getCachedProfileData = (userId: string): CachedProfileData | null =
   if (typeof window === 'undefined') return null;
   
   try {
-    const cookie = document.cookie
-      .split('; ')
-      .find(row => row.startsWith(`user-profile-${userId}=`));
+    console.log(`🔍 NEW getCachedProfileData for user: ${userId}`);
     
-    if (!cookie) return null;
+    const cookieString = document.cookie;
+    const profileMatch = cookieString.match(new RegExp(`user-profile-${userId}=([^;]+)`));
     
-    const profileDataStr = cookie.split('=')[1];
-    if (!profileDataStr) return null;
-    const profileData = JSON.parse(decodeURIComponent(profileDataStr));
+    if (!profileMatch) {
+      console.log(`❌ No user-profile-${userId} cookie found`);
+      return null;
+    }
     
-    // Check if profile data is recent (within 10 minutes)
-    const isRecent = Date.now() - profileData.timestamp < 10 * 60 * 1000;
-    if (!isRecent) {
+    const encodedValue = profileMatch[1];
+    console.log('📄 Encoded profile value:', encodedValue.substring(0, 100) + '...');
+    
+    const decodedValue = decodeURIComponent(encodedValue);
+    console.log('🔓 Decoded profile value:', decodedValue);
+    
+    const profileData = JSON.parse(decodedValue);
+    console.log('📊 Parsed profile data:', profileData);
+    
+    // Check age (10 minutes max)
+    const ageMinutes = (Date.now() - profileData.timestamp) / (1000 * 60);
+    console.log(`⏰ Profile age: ${ageMinutes.toFixed(2)} minutes`);
+    
+    if (ageMinutes > 10) {
+      console.log('❌ Profile data too old, clearing...');
       clearCachedProfileData(userId);
       return null;
     }
     
-    // Validate profile data structure
+    // Validate structure
     if (!profileData.type || !profileData.email) {
+      console.log('❌ Invalid profile structure:', {
+        type: !!profileData.type,
+        email: !!profileData.email
+      });
       return null;
     }
     
+    console.log('✅ Successfully recovered profile data:', profileData);
     return profileData;
   } catch (error) {
-    console.error('Error parsing cached profile data:', error);
+    console.error('❌ Error in getCachedProfileData:', error);
     return null;
   }
 };
@@ -189,38 +245,54 @@ export const validateHydrationData = (serverState: ServerAuthState | null, profi
   return { isValid: true, reason: 'Hydration data is consistent' };
 };
 
+
+
 /**
  * Auth state recovery mechanism
  */
 export const recoverAuthState = () => {
-  console.log('Starting auth state recovery...');
+  console.log('🔍 NEW recoverAuthState starting...');
   
-  const serverState = getServerAuthState();
-  const profileData = serverState ? getCachedProfileData(serverState.userId) : null;
-  
-  const validation = validateHydrationData(serverState, profileData);
-  if (!validation.isValid) {
-    console.warn('Invalid hydration data detected:', validation.reason);
-    clearAllHydrationData();
+  // Check if we're on the client side
+  if (typeof window === 'undefined') {
+    console.log('❌ Server-side rendering, skipping recovery');
     return null;
   }
   
-  if (serverState) {
-    console.log('Auth state recovered from server data:', {
-      userId: serverState.userId,
-      email: serverState.email,
-      userRole: serverState.userRole,
-      hasProfileData: !!profileData
-    });
+  try {
+    const serverState = getServerAuthState();
+    console.log('📦 Server state result:', serverState);
     
-    return {
-      userId: serverState.userId,
-      email: serverState.email,
-      userRole: serverState.userRole,
-      profileData
-    };
+    const profileData = serverState ? getCachedProfileData(serverState.userId) : null;
+    console.log('👤 Profile data result:', profileData);
+    
+    const validation = validateHydrationData(serverState, profileData);
+    if (!validation.isValid) {
+      console.warn('❌ Invalid hydration data detected:', validation.reason);
+      clearAllHydrationData();
+      return null;
+    }
+    
+    if (serverState) {
+      console.log('✅ Auth state recovered successfully:', {
+        userId: serverState.userId,
+        email: serverState.email,
+        userRole: serverState.userRole,
+        hasProfileData: !!profileData
+      });
+      
+      return {
+        userId: serverState.userId,
+        email: serverState.email,
+        userRole: serverState.userRole,
+        profileData
+      };
+    }
+    
+    console.log('❌ No auth state to recover');
+    return null;
+  } catch (error) {
+    console.error('❌ Critical error in recoverAuthState:', error);
+    return null;
   }
-  
-  console.log('No auth state to recover');
-  return null;
 };

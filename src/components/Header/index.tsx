@@ -212,6 +212,69 @@ const Header: React.FC = () => {
   // Use the UserContext for authentication state
   const { user, userRole, isLoading } = useUser();
 
+  // Manual fallback state for authentication
+  const [fallbackUser, setFallbackUser] = useState<any>(null);
+  const [fallbackRole, setFallbackRole] = useState<string | null>(null);
+
+  // Debug authentication state in header
+  useEffect(() => {
+    console.log("🔧 Header component state update:", {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      userRole,
+      isLoading,
+      pathUrl,
+      hasFallbackUser: !!fallbackUser,
+      fallbackRole,
+    });
+  }, [user, userRole, isLoading, pathUrl, fallbackUser, fallbackRole]);
+
+  // Manual cookie check as fallback when UserContext fails
+  useEffect(() => {
+    console.log(
+      "🆘 HEADER FALLBACK useEffect TRIGGERED - checking conditions:",
+      {
+        hasUser: !!user,
+        isLoading,
+        hasWindow: typeof window !== "undefined",
+      },
+    );
+
+    if (!user && !isLoading && typeof window !== "undefined") {
+      console.log(
+        "🆘🆘🆘 HEADER FALLBACK: No user from context, checking cookies manually...",
+      );
+
+      const cookies = document.cookie;
+      const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
+
+      if (sessionMatch) {
+        try {
+          const decoded = decodeURIComponent(sessionMatch[1]);
+          const sessionData = JSON.parse(decoded);
+          console.log("🆘 HEADER FALLBACK: Found session data:", sessionData);
+
+          if (sessionData.userId && sessionData.email && sessionData.userRole) {
+            const mockUser = {
+              id: sessionData.userId,
+              email: sessionData.email,
+              user_metadata: {
+                name: sessionData.email?.split("@")[0] || "User",
+              },
+            };
+
+            setFallbackUser(mockUser);
+            setFallbackRole(sessionData.userRole.toLowerCase());
+            console.log("✅ HEADER FALLBACK: Set fallback user successfully!");
+          }
+        } catch (error) {
+          console.error("❌ HEADER FALLBACK: Failed to parse cookies:", error);
+        }
+      }
+    }
+  }, [user, isLoading]);
+
   const isVirtualAssistantPage = pathUrl === "/va";
   const isHomePage = pathUrl === "/";
   const isLogisticsPage = pathUrl === "/logistics";
@@ -272,8 +335,78 @@ const Header: React.FC = () => {
     }
   };
 
-  // Get role-specific menu item
-  const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole] : null;
+  // Get role-specific menu item - use fallback if main context fails
+  const effectiveUser = user || fallbackUser;
+  const effectiveUserRole = userRole || fallbackRole;
+  const roleMenuItem = effectiveUserRole
+    ? ROLE_MENU_ITEMS[effectiveUserRole]
+    : null;
+
+  console.log("🔧 Header effective auth state:", {
+    hasEffectiveUser: !!effectiveUser,
+    effectiveUserRole,
+    hasRoleMenuItem: !!roleMenuItem,
+    roleMenuPath: roleMenuItem?.path,
+  });
+
+  // 🔥 ADD GLOBAL TEST FUNCTIONS IMMEDIATELY (not in useEffect)
+  if (typeof window !== "undefined" && !(window as any).testCookieAuth) {
+    console.log("🧪 Adding global test functions to window IMMEDIATELY...");
+
+    (window as any).testCookieAuth = () => {
+      console.log("🧪 MANUAL COOKIE TEST:");
+      const cookies = document.cookie;
+      console.log("🍪 All cookies:", cookies);
+
+      const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
+      if (sessionMatch) {
+        try {
+          const decoded = decodeURIComponent(sessionMatch[1]);
+          const sessionData = JSON.parse(decoded);
+          console.log("✅ Successfully parsed session data:", sessionData);
+          return sessionData;
+        } catch (error) {
+          console.error("❌ Failed to parse session data:", error);
+        }
+      } else {
+        console.log("❌ No session cookie found");
+      }
+      return null;
+    };
+
+    (window as any).forceAuthUpdate = () => {
+      console.log("🔄 FORCING AUTH UPDATE...");
+      const cookies = document.cookie;
+      const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
+      if (sessionMatch) {
+        try {
+          const decoded = decodeURIComponent(sessionMatch[1]);
+          const sessionData = JSON.parse(decoded);
+          console.log("📊 Found session data:", sessionData);
+
+          const mockUser = {
+            id: sessionData.userId,
+            email: sessionData.email,
+            user_metadata: {
+              name: sessionData.email?.split("@")[0] || "User",
+            },
+          };
+
+          setFallbackUser(mockUser);
+          setFallbackRole(sessionData.userRole.toLowerCase());
+          console.log("✅ Manually set fallback user and role!");
+          return true;
+        } catch (error) {
+          console.error("❌ Failed to force auth update:", error);
+        }
+      }
+      return false;
+    };
+
+    console.log(
+      "✅ Global functions added: testCookieAuth() and forceAuthUpdate()",
+    );
+  }
 
   // Use base menu items without adding role-specific item (it will be shown separately)
   const menuItems = baseMenuItems;
@@ -321,7 +454,7 @@ const Header: React.FC = () => {
                   isHomePage={isHomePage}
                   isLogisticsPage={isLogisticsPage}
                 />
-              ) : !user ? (
+              ) : !effectiveUser ? (
                 <>
                   {pathUrl !== "/" || isVirtualAssistantPage ? (
                     <div className="flex items-center gap-3">
@@ -369,7 +502,7 @@ const Header: React.FC = () => {
                     </>
                   )}
                 </>
-              ) : user ? (
+              ) : effectiveUser ? (
                 <>
                   {roleMenuItem && roleMenuItem.path ? (
                     <Link href={roleMenuItem.path}>
@@ -387,7 +520,7 @@ const Header: React.FC = () => {
                         {roleMenuItem.title}
                       </p>
                     </Link>
-                  ) : userRole === null ? (
+                  ) : effectiveUserRole === null ? (
                     <div
                       className={`px-7 py-3 font-medium ${
                         sticky

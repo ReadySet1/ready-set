@@ -123,12 +123,19 @@ export async function login(
   const cookieStore = await cookies();
   
   // Set user session data that can be read immediately by client
+  // Normalize userRole to match TypeScript enum (lowercase)
+  const normalizedUserRole = Object.values(UserType).find(
+    enumValue => enumValue.toUpperCase() === profile.type.toUpperCase()
+  ) || profile.type.toLowerCase();
+  
   const sessionData = {
     userId: user.id,
     email: user.email || '',
-    userRole: profile.type,
+    userRole: normalizedUserRole,
     timestamp: Date.now()
   };
+  
+  console.log("Normalized userRole for session:", normalizedUserRole);
   
   // Set session cookie with immediate user data
   cookieStore.set('user-session-data', JSON.stringify(sessionData), {
@@ -146,7 +153,7 @@ export async function login(
     const { prefetchUserProfile } = await import("@/utils/supabase/client");
     // Note: This will run on server, so we manually cache the profile data
     const profileData = {
-      type: profile.type,
+      type: normalizedUserRole,
       email: user.email || '',
       name: user.user_metadata?.name || user.email?.split('@')[0] || '',
       timestamp: Date.now()

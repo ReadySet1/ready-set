@@ -163,6 +163,8 @@ const fetchUserRole = async (
 
 // Create a client component wrapper
 function UserProviderClient({ children }: { children: ReactNode }) {
+  console.log("🟢 UserProviderClient MOUNTING - this should appear first!");
+
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<UserType | null>(null);
@@ -171,11 +173,112 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   const [supabase, setSupabase] = useState<any>(null);
   const [hasImmediateData, setHasImmediateData] = useState(false);
 
+  console.log(
+    "🟢 UserProviderClient state initialized - user:",
+    !!user,
+    "isLoading:",
+    isLoading,
+  );
+
+  // 🔥 IMMEDIATE COOKIE CHECK (NOT in useEffect) - executes during render
+  if (typeof window !== "undefined" && !user && !hasImmediateData) {
+    console.log("🔥 IMMEDIATE cookie check during render...");
+    const cookies = document.cookie;
+    const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
+
+    if (sessionMatch) {
+      try {
+        const decoded = decodeURIComponent(sessionMatch[1]);
+        const sessionData = JSON.parse(decoded);
+        console.log("🔥 IMMEDIATE: Found session data:", sessionData);
+
+        if (sessionData.userId && sessionData.email && sessionData.userRole) {
+          console.log("🔥 IMMEDIATE: Setting user state immediately!");
+
+          const mockUser = {
+            id: sessionData.userId,
+            email: sessionData.email,
+            user_metadata: {
+              name: sessionData.email?.split("@")[0] || "User",
+            },
+          } as unknown as User;
+
+          const normalizedRole = sessionData.userRole.toLowerCase() as UserType;
+
+          // Set state immediately during render
+          if (!user) {
+            setUser(mockUser);
+            setUserRole(normalizedRole);
+            setHasImmediateData(true);
+            setIsLoading(false);
+            console.log("🔥 IMMEDIATE: Auth state set successfully!");
+          }
+        }
+      } catch (error) {
+        console.error("🔥 IMMEDIATE: Failed to parse cookie:", error);
+      }
+    } else {
+      console.log("🔥 IMMEDIATE: No session cookie found");
+    }
+  }
+
   // Hydrate auth state synchronously on mount using server-side data
   useEffect(() => {
+    console.log("🚀🚀🚀 FORCED UserContext useEffect TRIGGERED!");
+    console.log("🚀 FORCED UserContext: Starting hydration check...");
+    console.log("🚀 Window available?", typeof window !== "undefined");
+
+    // Force check cookies directly as backup
+    if (typeof window !== "undefined") {
+      const cookies = document.cookie;
+      console.log("🍪 FORCED Cookie check - length:", cookies.length);
+      console.log("🍪 FORCED Cookie preview:", cookies.substring(0, 200));
+
+      // Manual cookie parsing as backup
+      const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
+      if (sessionMatch) {
+        console.log("🔍 FORCED Found session cookie manually!");
+        try {
+          const decoded = decodeURIComponent(sessionMatch[1]);
+          const sessionData = JSON.parse(decoded);
+          console.log("📊 FORCED Manual session data:", sessionData);
+
+          if (sessionData.userId && sessionData.email && sessionData.userRole) {
+            console.log("✅ FORCED Creating user from manual parsing...");
+
+            // Create user object directly from cookie data
+            const mockUser = {
+              id: sessionData.userId,
+              email: sessionData.email,
+              user_metadata: {
+                name: sessionData.email?.split("@")[0] || "User",
+              },
+            } as unknown as User;
+
+            // Normalize userRole to lowercase
+            const normalizedRole =
+              sessionData.userRole.toLowerCase() as UserType;
+
+            setUser(mockUser);
+            setUserRole(normalizedRole);
+            setHasImmediateData(true);
+            setIsLoading(false);
+
+            console.log(
+              "✅ FORCED Hydrated auth state successfully with manual parsing!",
+            );
+            return; // Exit early since we found the data
+          }
+        } catch (error) {
+          console.error("❌ FORCED Manual parsing failed:", error);
+        }
+      }
+    }
+
+    // Fallback to original method
     const recoveredState = recoverAuthState();
     if (recoveredState) {
-      console.log("Recovered auth state from hydration:", recoveredState);
+      console.log("✅ Recovered auth state from hydration:", recoveredState);
 
       // Create a mock user object from recovered state
       const mockUser = {
@@ -193,7 +296,11 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       setHasImmediateData(true);
       setIsLoading(false); // We have hydrated data, not loading anymore
 
-      console.log("Hydrated auth state successfully");
+      console.log(
+        "✅ Hydrated auth state successfully - user should be visible in header",
+      );
+    } else {
+      console.log("❌ No auth state found during hydration check");
     }
   }, []);
 
@@ -232,6 +339,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       try {
         console.log("UserContext: Getting initial user data...");
 
+        // Add a small delay to allow middleware session refresh to complete
+        // especially important after login redirects
+        await new Promise((resolve) => setTimeout(resolve, 150));
+
         // Use retry mechanism for getting user data
         const {
           data: { user: currentUser },
@@ -240,14 +351,15 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           data: { user: User | null };
           error: any;
         }>(() => supabase.auth.getUser(), {
-          maxAttempts: 2,
+          maxAttempts: 3,
           baseDelay: 500,
           retryCondition: (error) => {
-            // Retry on network errors but not on auth errors
+            // Retry on network errors AND session missing errors (which can happen during login transitions)
             return (
               error?.message?.includes("network") ||
               error?.message?.includes("timeout") ||
-              error?.message?.includes("connection")
+              error?.message?.includes("connection") ||
+              error?.message?.includes("Auth session missing")
             );
           },
         });
@@ -255,7 +367,21 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         if (!mounted) return;
 
         if (getUserError) {
-          console.error("Error getting user:", getUserError);
+          console.error("❌ Error getting user:", getUserError);
+
+          // If we have immediate hydration data but Supabase session is missing,
+          // try to recover gracefully without showing error immediately
+          if (
+            hasImmediateData &&
+            getUserError.message?.includes("Auth session missing")
+          ) {
+            console.log(
+              "⚠️  Session missing but we have hydration data, continuing with hydrated state",
+            );
+            // Don't set error or stop loading immediately, let hydration data work
+            return;
+          }
+
           if (!hasImmediateData) {
             setIsLoading(false);
           }
@@ -440,11 +566,12 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
 // Export the provider component
 export function UserProvider({ children }: { children: ReactNode }) {
+  console.log("🔵 UserProvider wrapper called!");
   return (
     <AuthErrorBoundary
       onError={(error, errorInfo) => {
         // Log auth errors for monitoring
-        console.error("Auth Error Boundary triggered:", {
+        console.error("🚨 Auth Error Boundary triggered:", {
           error: error.message,
           stack: error.stack,
           componentStack: errorInfo.componentStack,
