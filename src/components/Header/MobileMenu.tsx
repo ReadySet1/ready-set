@@ -27,7 +27,7 @@ const ROLE_MENU_ITEMS: Record<UserType, MenuItem> = {
   },
   [UserType.DRIVER]: {
     id: 3,
-    title: "Driver Dashboard",
+    title: "Dashboard",
     path: "/driver",
   },
   [UserType.ADMIN]: {

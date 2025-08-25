@@ -1,28 +1,33 @@
-// src/app/api/auth/session/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { prisma } from '@/utils/prismaDB';
 
+// Simplified session endpoint - replace with your actual auth implementation
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    
-    // Get the authenticated user
-    const { data: { user }, error } = await supabase.auth.getUser();
-    
-    if (error || !user) {
-      return NextResponse.json(
-        { user: null },
-        { status: 200 } // Return 200 even for no user
-      );
-    }
-    
-    // Return the user data
-    return NextResponse.json({ user });
+    // Temporary dev session: fetch a real driver UUID to avoid invalid-UUID errors
+    const driver = await prisma.$queryRawUnsafe<{ id: string; employee_id: string }[]>(
+      `SELECT id, employee_id FROM drivers ORDER BY created_at DESC LIMIT 1`
+    );
+
+    const driverId = driver[0]?.id ?? null;
+
+    const session = {
+      user: {
+        id: 'user-123',
+        email: 'driver@readyset.com',
+        type: 'DRIVER',
+        driverId,
+        name: 'John Driver'
+      },
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    };
+
+    return NextResponse.json(session);
   } catch (error) {
-    console.error('Error checking authentication:', error);
+    console.error('Session error:', error);
     return NextResponse.json(
-      { user: null, error: 'Authentication error' },
-      { status: 200 } // Still return 200 for client-side handling
+      { error: 'Failed to get session' },
+      { status: 500 }
     );
   }
 }

@@ -61,6 +61,11 @@ export async function GET(req: NextRequest) {
       .filter((d: any) => d.onDemandId !== null)
       .map((d: any) => d.onDemandId!);
 
+    // If no dispatches, short-circuit to avoid extra queries
+    if (cateringIds.length === 0 && onDemandIds.length === 0) {
+      return NextResponse.json([], { status: 200 });
+    }
+
     // Fetch catering deliveries
     const cateringDeliveries = await prisma.cateringRequest.findMany({
       where: {
@@ -132,7 +137,5 @@ export async function GET(req: NextRequest) {
       { message: "Error fetching driver deliveries" },
       { status: 500 },
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

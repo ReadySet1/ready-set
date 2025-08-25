@@ -199,15 +199,7 @@ const DriverDeliveries: React.FC = () => {
     setFilteredDeliveries(filtered);
   }, [deliveries, activeTab, statusFilter]);
 
-  // Get time of day greeting
-  const getGreeting = (): string => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
-
-  // Format the user's first name
+  // Format the user's first name (for future use if needed)
   const getFirstName = (): string => {
     const fullName = userProfile?.name;
     if (!fullName) return "";
@@ -376,37 +368,7 @@ const DriverDeliveries: React.FC = () => {
   return (
     <div className="container px-4 mx-auto">
       {/* User Welcome */}
-      <div className="mb-6">
-        <Card className="shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center mr-4">
-                {userProfile?.image ? (
-                  <img 
-                    src={userProfile.image} 
-                    alt={userProfile.name || "Driver"} 
-                    className="h-10 w-10 rounded-full"
-                  />
-                ) : (
-                  <User className="h-5 w-5 text-blue-600 dark:text-blue-300" />
-                )}
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold">
-                  {getGreeting()}, {isProfileLoading ? (
-                    <span className="animate-pulse">Driver</span>
-                  ) : (
-                    getFirstName() || "Driver"
-                  )}
-                </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                  Here's your delivery overview for {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+
 
       {/* Account Status Alert */}
       {!isProfileLoading && userProfile?.status && userProfile.status.toString().toLowerCase() !== UserStatus.ACTIVE && (
@@ -462,44 +424,7 @@ const DriverDeliveries: React.FC = () => {
         </Card>
       ) : (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-3 gap-6 mb-6">
-            <Card className="shadow-sm">
-              <CardHeader className="py-4 px-6">
-                <CardTitle className="text-lg font-medium">Today's Deliveries</CardTitle>
-              </CardHeader>
-              <CardContent className="pb-5 pt-0 px-6">
-                <div className="flex items-center">
-                  <Calendar className="h-7 w-7 text-blue-500 mr-3" />
-                  <div className="text-3xl font-bold">{todayCount}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="shadow-sm">
-              <CardHeader className="py-4 px-6">
-                <CardTitle className="text-lg font-medium">Upcoming</CardTitle>
-              </CardHeader>
-              <CardContent className="pb-5 pt-0 px-6">
-                <div className="flex items-center">
-                  <Clock className="h-7 w-7 text-purple-500 mr-3" />
-                  <div className="text-3xl font-bold">{upcomingCount}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="shadow-sm">
-              <CardHeader className="py-4 px-6">
-                <CardTitle className="text-lg font-medium">Completed</CardTitle>
-              </CardHeader>
-              <CardContent className="pb-5 pt-0 px-6">
-                <div className="flex items-center">
-                  <CheckCircle2 className="h-7 w-7 text-green-500 mr-3" />
-                  <div className="text-3xl font-bold">{completedCount}</div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+
 
           {/* Main Dashboard Card */}
           <Card className="shadow-sm">
