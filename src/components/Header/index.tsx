@@ -13,6 +13,7 @@ import { MenuItem } from "@/types/menu";
 import { UserType } from "@/types/user";
 import MobileMenu from "./MobileMenu";
 import { AuthButtonsSkeleton } from "@/components/Skeleton/AuthSkeleton";
+import { clearAuthCookies, hasAuthCookies } from "@/utils/auth/cookies";
 
 // Define base menu items (visible to all users)
 const baseMenuItems: MenuItem[] = [
@@ -237,9 +238,16 @@ const Header: React.FC = () => {
       {
         hasUser: !!user,
         isLoading,
+        isSigningOut,
         hasWindow: typeof window !== "undefined",
       },
     );
+
+    // Don't run fallback logic if we're in the process of signing out
+    if (isSigningOut) {
+      console.log("🆘 HEADER FALLBACK: Skipping due to sign-out in progress");
+      return;
+    }
 
     if (!user && !isLoading && typeof window !== "undefined") {
       console.log(
@@ -255,25 +263,48 @@ const Header: React.FC = () => {
           const sessionData = JSON.parse(decoded);
           console.log("🆘 HEADER FALLBACK: Found session data:", sessionData);
 
+          // Additional validation: check if the session data is still valid
+          // Don't set fallback user if the session appears to be expired or invalid
           if (sessionData.userId && sessionData.email && sessionData.userRole) {
-            const mockUser = {
-              id: sessionData.userId,
-              email: sessionData.email,
-              user_metadata: {
-                name: sessionData.email?.split("@")[0] || "User",
-              },
-            };
+            // Use the utility function to check if we have any valid auth cookies
+            if (hasAuthCookies()) {
+              const mockUser = {
+                id: sessionData.userId,
+                email: sessionData.email,
+                user_metadata: {
+                  name: sessionData.email?.split("@")[0] || "User",
+                },
+              };
 
-            setFallbackUser(mockUser);
-            setFallbackRole(sessionData.userRole.toLowerCase());
-            console.log("✅ HEADER FALLBACK: Set fallback user successfully!");
+              setFallbackUser(mockUser);
+              setFallbackRole(sessionData.userRole.toLowerCase());
+              console.log(
+                "✅ HEADER FALLBACK: Set fallback user successfully!",
+              );
+            } else {
+              console.log(
+                "🆘 HEADER FALLBACK: Session data found but no valid auth cookies, clearing fallback state",
+              );
+              setFallbackUser(null);
+              setFallbackRole(null);
+            }
           }
         } catch (error) {
           console.error("❌ HEADER FALLBACK: Failed to parse cookies:", error);
+          // Clear fallback state on parsing errors
+          setFallbackUser(null);
+          setFallbackRole(null);
         }
+      } else {
+        // No session cookie found, ensure fallback state is cleared
+        console.log(
+          "🆘 HEADER FALLBACK: No session cookie found, clearing fallback state",
+        );
+        setFallbackUser(null);
+        setFallbackRole(null);
       }
     }
-  }, [user, isLoading]);
+  }, [user, isLoading, isSigningOut]);
 
   const isVirtualAssistantPage = pathUrl === "/va";
   const isHomePage = pathUrl === "/";
@@ -325,10 +356,22 @@ const Header: React.FC = () => {
 
     setIsSigningOut(true);
     try {
+      // Clear fallback state immediately to prevent showing old auth state
+      setFallbackUser(null);
+      setFallbackRole(null);
+
+      // Clear all authentication cookies before signing out
+      clearAuthCookies();
+
       await supabaseClient.auth.signOut();
+
+      // Force a page refresh to ensure all components update their auth state
       window.location.href = "/";
     } catch (error) {
       console.error("Error signing out:", error);
+      // Even if there's an error, clear the fallback state
+      setFallbackUser(null);
+      setFallbackRole(null);
     } finally {
       setIsSigningOut(false);
       setNavbarOpen(false);

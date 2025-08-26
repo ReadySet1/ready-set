@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
-import { User, SupabaseClient, Session, AuthChangeEvent } from "@supabase/supabase-js";
+import {
+  User,
+  SupabaseClient,
+  Session,
+  AuthChangeEvent,
+} from "@supabase/supabase-js";
+import { clearAuthCookies } from "@/utils/auth/cookies";
 
 interface AuthButtonsProps {
   sticky: boolean;
@@ -30,11 +36,14 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
 
   useEffect(() => {
     if (!supabase) return;
-    
+
     // Get the current user when component mounts
     const getUser = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
         if (error) throw error;
         setUser(user);
       } catch (error) {
@@ -43,9 +52,9 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
         setIsLoading(false);
       }
     };
-    
+
     getUser();
-    
+
     // Set up auth state listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, session: Session | null) => {
@@ -54,9 +63,9 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
         } else if (event === "SIGNED_OUT") {
           setUser(null);
         }
-      }
+      },
     );
-  
+
     // Clean up subscription
     return () => {
       authListener.subscription.unsubscribe();
@@ -83,7 +92,7 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
       </>
     );
   }
-  
+
   return (
     <>
       <SignInButton sticky={sticky} pathUrl={pathUrl} />
@@ -99,7 +108,7 @@ interface ButtonProps {
 
 const SignOutButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => {
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
-  
+
   // Initialize Supabase client
   useEffect(() => {
     const initSupabase = async () => {
@@ -119,15 +128,18 @@ const SignOutButton: React.FC<ButtonProps> = ({ sticky, pathUrl }) => {
       console.error("Supabase client not initialized");
       return;
     }
-    
+
     try {
+      // Clear all authentication cookies before signing out
+      clearAuthCookies();
+
       await supabase.auth.signOut();
       window.location.href = "/";
     } catch (error) {
       console.error("Error signing out:", error);
     }
   };
-  
+
   return (
     <button
       onClick={handleSignOut}
