@@ -29,6 +29,7 @@ function checkForNestedForms(filePath: string): FormCheckResult[] {
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      if (!line) continue; // Skip undefined lines
       const trimmedLine = line.trim();
       
       // Check for form opening tags

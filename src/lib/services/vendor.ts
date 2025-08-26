@@ -91,6 +91,28 @@ export async function checkOrderAccess() {
   return (cateringCount + onDemandCount) > 0;
 }
 
+// Check if current user has vendor access
+export async function checkVendorAccess(): Promise<boolean> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return false;
+    }
+    
+    // Check if user has any orders (basic vendor access check)
+    const result = await getUserOrders(1, 1);
+    return result.orders.length > 0;
+  } catch (error) {
+    console.error('Error checking vendor access:', error);
+    return false;
+  }
+}
+
+// Get vendor orders (alias for getUserOrders for backward compatibility)
+export async function getVendorOrders(limit = 10, page = 1) {
+  return getUserOrders(limit, page);
+}
+
 // Get user's orders
 export async function getUserOrders(limit = 10, page = 1) {
   const userId = await getCurrentUserId();
