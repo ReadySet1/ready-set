@@ -173,3 +173,148 @@ General-purpose scripts for common development and maintenance tasks.
 ---
 
 _Last updated: January 2025_
+
+## Test Scripts
+
+### Address Creation Test Script
+
+#### `test-address-creation.ts`
+
+This script tests the address creation API endpoint to ensure it's working correctly after implementing fixes.
+
+#### Prerequisites
+
+1. Set up environment variables in your `.env.local` file:
+
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   TEST_USER_EMAIL=test@example.com
+   TEST_USER_PASSWORD=testpassword
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   ```
+
+2. Ensure you have a test user account in your Supabase database
+
+#### Usage
+
+Run the test script:
+
+```bash
+# Using pnpm (recommended)
+pnpm tsx scripts/test-address-creation.ts
+
+# Using npm
+npm run tsx scripts/test-address-creation.ts
+
+# Using yarn
+yarn tsx scripts/test-address-creation.ts
+```
+
+#### What the Test Does
+
+1. **Authentication Test**: Signs in with test credentials
+2. **Address Creation Test**: Creates a test address via the API
+3. **Address Retrieval Test**: Verifies the created address can be fetched
+4. **Cleanup Test**: Attempts to delete the test address
+
+#### Expected Output
+
+```
+🧪 Starting address creation test...
+
+1️⃣ Testing authentication...
+✅ Authentication successful
+   User ID: [user-id]
+   Access Token: [token]...
+
+2️⃣ Testing address creation...
+   Sending address data: [address-data]
+   Response status: 201
+   Response OK: true
+✅ Address created successfully!
+   Address ID: [address-id]
+   Created at: [timestamp]
+   Created by: [user-id]
+
+3️⃣ Testing address retrieval...
+✅ Address retrieved successfully!
+   Street: 123 Test Street
+   City: San Francisco
+   State: CA
+   ZIP: 94102
+
+4️⃣ Testing address deletion...
+✅ Test address cleaned up successfully
+
+🎉 All tests completed successfully!
+
+👋 Signed out from test session
+```
+
+#### Troubleshooting
+
+- **Authentication Failed**: Check your test user credentials and Supabase configuration
+- **Address Creation Failed**: Verify the API endpoint is running and accessible
+- **Missing Environment Variables**: Ensure all required environment variables are set
+
+#### Notes
+
+- This script creates a real address in your database
+- The cleanup step attempts to delete the test address
+- If cleanup fails, you may need to manually remove test addresses from your database
+- This script is intended for development and testing purposes only
+
+### Form Structure Test Script
+
+#### `test-nested-forms.ts`
+
+This script scans the components directory to identify potential nested form issues that could cause HTML validation errors and hydration problems.
+
+#### What the Test Does
+
+1. **Form Depth Analysis**: Checks for nested `<form>` elements
+2. **Form Balance Validation**: Ensures all forms are properly closed
+3. **Component Scanning**: Recursively scans all TypeScript/TSX files
+4. **Issue Reporting**: Provides detailed information about any problems found
+
+#### Usage
+
+```bash
+# Run the form structure test
+pnpm test:forms
+
+# Or manually
+pnpm tsx scripts/test-nested-forms.ts
+```
+
+#### Expected Output
+
+```
+🔍 Scanning for nested form issues...
+
+✅ No nested form issues found!
+   All forms are properly structured.
+
+🎯 Form structure validation complete!
+```
+
+#### What It Checks
+
+- **Nested Forms**: Detects `<form>` elements inside other `<form>` elements
+- **Unclosed Forms**: Identifies forms that are opened but never closed
+- **Form Balance**: Ensures proper opening/closing tag matching
+- **Component Structure**: Validates form hierarchy across all components
+
+#### Troubleshooting
+
+- **Nested Forms Found**: Review the reported files and remove inner form wrappers
+- **Unclosed Forms**: Check for missing `</form>` tags
+- **Form Balance Issues**: Ensure each opening tag has a corresponding closing tag
+
+#### Notes
+
+- This script is a static analysis tool that scans your codebase
+- It helps prevent runtime HTML validation errors
+- Run this script after making changes to form components
+- Particularly useful when refactoring form structures

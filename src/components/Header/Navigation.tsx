@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { User } from "@supabase/supabase-js";
+import { clearAuthCookies } from "@/utils/auth/cookies";
 
 interface MenuItem {
   title: string;
@@ -92,6 +93,10 @@ const Navigation: React.FC<NavigationProps> = ({
             <button
               onClick={async () => {
                 const supabase = createClient();
+
+                // Clear all authentication cookies before signing out
+                clearAuthCookies();
+
                 await supabase.auth.signOut();
                 navbarToggleHandler();
                 window.location.href = "/";

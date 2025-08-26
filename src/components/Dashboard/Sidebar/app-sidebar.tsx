@@ -53,6 +53,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useUser } from "@/contexts/UserContext";
+import { clearAuthCookies } from "@/utils/auth/cookies";
 
 type SidebarNavItem = {
   title: string;
@@ -91,18 +92,24 @@ export function AppSidebar() {
 
     setIsLoading(true);
     try {
+      // Clear all authentication cookies before signing out
+      clearAuthCookies();
+
       const { error } = await supabase.auth.signOut();
-      
+
       if (error) {
         throw error;
       }
-      
+
       toast.success("Successfully signed out");
-      router.push("/sign-in");
-      router.refresh(); // Refresh to update auth state across the app
+
+      // Force a page refresh to ensure all components update their auth state
+      window.location.href = "/sign-in";
     } catch (err: any) {
       console.error("Sign out error:", err);
-      toast.error(err.message || "An unexpected error occurred while signing out");
+      toast.error(
+        err.message || "An unexpected error occurred while signing out",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -179,14 +186,17 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <SidebarMenu className="mb-0">
           <SidebarMenuItem>
-            <SidebarMenuButton asChild className="p-0 h-auto">
-              <Link href="/admin" className="flex justify-center items-center w-full py-2">
+            <SidebarMenuButton asChild className="h-auto p-0">
+              <Link
+                href="/admin"
+                className="flex w-full items-center justify-center py-2"
+              >
                 <Image
                   src="/images/logo/logo-white.png"
                   alt="Ready Set Logo"
                   width={240}
                   height={80}
-                  className="w-[240px] h-auto max-w-full"
+                  className="h-auto w-[240px] max-w-full"
                   priority
                 />
               </Link>
@@ -199,7 +209,9 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="px-3 py-1">Core Operations</SidebarGroupLabel>
+          <SidebarGroupLabel className="px-3 py-1">
+            Core Operations
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {coreNavItems.map((item) => (
@@ -258,7 +270,9 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel className="px-3 py-1">Management</SidebarGroupLabel>
+          <SidebarGroupLabel className="px-3 py-1">
+            Management
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {managementItems.map((item) => (
@@ -330,10 +344,7 @@ export function AppSidebar() {
                 <DropdownMenuItem asChild>
                   <Link href="/profile">Profile</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleSignOut}
-                  disabled={isLoading}
-                >
+                <DropdownMenuItem onClick={handleSignOut} disabled={isLoading}>
                   {isLoading ? "Signing out..." : "Sign out"}
                 </DropdownMenuItem>
               </DropdownMenuContent>

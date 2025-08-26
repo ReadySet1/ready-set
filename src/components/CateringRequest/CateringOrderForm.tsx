@@ -25,6 +25,8 @@ import {
   OrderType,
 } from "@/types/order";
 import { CateringFormData } from "@/types/catering";
+import { useUser } from "@/contexts/UserContext";
+import { getOrderCreationRedirectRoute } from "@/utils/routing";
 
 interface FormData {
   eventName: string;
@@ -38,6 +40,7 @@ interface FormData {
 
 const CateringOrderForm: React.FC = () => {
   const router = useRouter();
+  const { userRole } = useUser();
   // 1. Set up state with proper types
   const [user, setUser] = useState<User | null>(null);
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
@@ -176,9 +179,12 @@ const CateringOrderForm: React.FC = () => {
         setValue("addressId", "");
         toast.success("Catering request submitted successfully!");
 
-        // Redirect to vendor dashboard
-        console.log("Redirecting user to vendor dashboard");
-        router.push("/vendor");
+        // Redirect based on user role instead of hardcoded vendor dashboard
+        const redirectRoute = getOrderCreationRedirectRoute(userRole);
+        console.log(
+          `Redirecting user to ${redirectRoute} based on role: ${userRole}`,
+        );
+        router.push(redirectRoute);
       } else {
         const errorData = await response.json();
         console.error("Failed to create catering request", errorData);

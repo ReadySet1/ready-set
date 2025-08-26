@@ -57,7 +57,59 @@ This project follows Next.js and TypeScript best practices with:
 - **Automated testing** with Vitest and Playwright
 - **Code quality** with ESLint and Prettier
 - **Git hooks** for pre-push validation
-- **CI/CD** with GitHub Actions
+
+## 🚫 CI/CD Status - Workflows Disabled
+
+**As of August 18, 2025, all GitHub Actions workflows have been archived as part of our CI/CD optimization initiative.**
+
+### 📁 Current State
+- **GitHub Actions:** All workflows moved to archive
+- **CI/CD Process:** Manual deployment process
+- **Testing:** Local testing with `pnpm test` and `pnpm test:e2e`
+- **Build Process:** Manual build with `pnpm build`
+
+### 🔄 How to Re-enable Workflows
+If you need to restore CI/CD functionality:
+
+1. **Quick Re-enable (Individual Workflow):**
+   ```bash
+   # Copy workflow from archive to active directory
+   cp .github/workflows-archive/ci.yml .github/workflows/
+   
+   # Remove any "if: false" conditions from the workflow file
+   # Commit and push changes
+   ```
+
+2. **Full Restore (All Workflows):**
+   ```bash
+   # Restore all workflows at once
+   cp -r .github/workflows-archive/*.yml .github/workflows/
+   
+   # Commit and push changes
+   ```
+
+3. **Selective Restore:**
+   - Copy specific workflows as needed
+   - Configure required secrets and environment variables
+   - Each workflow can be re-enabled independently
+
+### 📚 Archive Documentation
+- **Archive Location:** `.github/workflows-archive/`
+- **Master Plan:** `GITHUB_WORKFLOWS_ARCHIVE_PLAN.md`
+- **Detailed Specifications:** `.github/workflows-archive/MANIFEST.md`
+- **Re-enabling Guide:** `.github/workflows-archive/README.md`
+
+### 🎯 Why Workflows Were Disabled
+- **Resource Optimization:** Reduce GitHub Actions minutes consumption
+- **Development Focus:** Prioritize feature development over automated workflows
+- **Maintenance Simplification:** Streamline deployment processes
+- **Project Transition:** Moving to new CI/CD strategy
+
+### 🚨 Important Notes
+- **All workflows are safely preserved** with complete functionality
+- **No data or configuration has been lost**
+- **Recovery is always possible** using the archive system
+- **Secrets and environment variables** are documented for easy reconfiguration
 
 ## 📞 Support
 

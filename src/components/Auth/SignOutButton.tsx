@@ -7,6 +7,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Button, ButtonProps } from "@/components/ui/button";
 import toast from "react-hot-toast";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { clearAuthCookies } from "@/utils/auth/cookies";
 
 interface SignOutButtonProps extends ButtonProps {
   redirectTo?: string;
@@ -47,13 +48,18 @@ export default function SignOutButton({
 
     setIsLoading(true);
     try {
+      // Clear all authentication cookies before signing out
+      clearAuthCookies();
+
       const { error } = await supabase.auth.signOut();
       if (error) {
         throw error;
       }
+
       toast.success("Signed out successfully");
-      router.push(redirectTo);
-      router.refresh(); // Refresh to update auth state across the app
+
+      // Force a page refresh to ensure all components update their auth state
+      window.location.href = redirectTo;
     } catch (error: any) {
       console.error("Error signing out:", error);
       toast.error(error.message || "Failed to sign out");

@@ -484,7 +484,7 @@ export function useUploadFile({
         throw error;
       }
     },
-    [userId],
+    [],
   );
 
   // You can also add a direct Supabase deletion method if needed, but let's keep it simpler:

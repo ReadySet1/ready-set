@@ -180,244 +180,223 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
           </div>
         )}
       </CardHeader>
-      <form onSubmit={handleSubmit(submitHandler)}>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {/* County Field */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="county"
-                className={errors.county ? "text-red-500" : ""}
-              >
-                County <span className="text-red-500">*</span>
-              </Label>
-              <Controller
-                name="county"
-                control={control}
-                render={({ field }) => {
-                  return (
-                    <Select
-                      value={field.value || ""}
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                      }}
-                      key={field.value || "empty"}
-                    >
-                      <SelectTrigger
-                        id="county"
-                        className={errors.county ? "border-red-500" : ""}
-                      >
-                        <SelectValue placeholder="Select County">
-                          {field.value
-                            ? availableCounties.find(
-                                (c) => c.value === field.value,
-                              )?.label
-                            : "Select County"}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="z-[9999] max-h-[200px] overflow-y-auto">
-                        {availableCounties && availableCounties.length > 0 ? (
-                          availableCounties.map((county) => (
-                            <SelectItem key={county.value} value={county.value}>
-                              {county.label}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="" disabled>
-                            Loading counties...
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  );
-                }}
-              />
-              {errors.county && (
-                <p className="mt-1 text-xs text-red-500">
-                  {errors.county.message}
-                </p>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* County Selection */}
+          <div className="space-y-2">
+            <Label
+              htmlFor="county"
+              className={errors.county ? "text-red-500" : ""}
+            >
+              County <span className="text-red-500">*</span>
+            </Label>
+            <Controller
+              name="county"
+              control={control}
+              render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger
+                    className={errors.county ? "border-red-500" : ""}
+                  >
+                    <SelectValue placeholder="Select a county" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCounties.map((county) => (
+                      <SelectItem key={county.value} value={county.value}>
+                        {county.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
-            </div>
-
-            {/* Name Field */}
-            <div className="space-y-2">
-              <Label htmlFor="name">Location Name</Label>
-              <Input
-                id="name"
-                placeholder="e.g. Main Office, Downtown Store"
-                {...register("name")}
-              />
-            </div>
-
-            {/* Street Address 1 */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="street1"
-                className={errors.street1 ? "text-red-500" : ""}
-              >
-                Street Address <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="street1"
-                placeholder="123 Main St"
-                {...register("street1")}
-                className={errors.street1 ? "border-red-500" : ""}
-              />
-              {errors.street1 && (
-                <p className="mt-1 text-xs text-red-500">
-                  {errors.street1.message}
-                </p>
-              )}
-            </div>
-
-            {/* Street Address 2 */}
-            <div className="space-y-2">
-              <Label htmlFor="street2">Street Address 2</Label>
-              <Input
-                id="street2"
-                placeholder="Apt 4B, Suite 100, etc."
-                {...register("street2")}
-              />
-            </div>
-
-            {/* City */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="city"
-                className={errors.city ? "text-red-500" : ""}
-              >
-                City <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="city"
-                placeholder="San Francisco"
-                {...register("city")}
-                className={errors.city ? "border-red-500" : ""}
-              />
-              {errors.city && (
-                <p className="mt-1 text-xs text-red-500">
-                  {errors.city.message}
-                </p>
-              )}
-            </div>
-
-            {/* State */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="state"
-                className={errors.state ? "text-red-500" : ""}
-              >
-                State <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="state"
-                placeholder="CA or California"
-                {...register("state")}
-                className={errors.state ? "border-red-500" : ""}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Enter "CA" or "California" (will be normalized to CA)
+            />
+            {errors.county && (
+              <p className="mt-1 text-xs text-red-500">
+                {errors.county.message}
               </p>
-              {errors.state && (
-                <p className="mt-1 text-xs text-red-500">
-                  {errors.state.message}
-                </p>
-              )}
-            </div>
-
-            {/* ZIP Code */}
-            <div className="space-y-2">
-              <Label htmlFor="zip" className={errors.zip ? "text-red-500" : ""}>
-                ZIP Code <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="zip"
-                placeholder="94103"
-                {...register("zip")}
-                className={errors.zip ? "border-red-500" : ""}
-              />
-              {errors.zip && (
-                <p className="mt-1 text-xs text-red-500">
-                  {errors.zip.message}
-                </p>
-              )}
-            </div>
-
-            {/* Location Phone Number */}
-            <div className="space-y-2">
-              <Label htmlFor="locationNumber">Location Phone Number</Label>
-              <Input
-                id="locationNumber"
-                placeholder="415-555-1234"
-                {...register("locationNumber")}
-              />
-            </div>
-
-            {/* Parking/Loading */}
-            <div className="space-y-2">
-              <Label htmlFor="parkingLoading">
-                Parking / Loading Information
-              </Label>
-              <Input
-                id="parkingLoading"
-                placeholder="Parking garage on 2nd floor"
-                {...register("parkingLoading")}
-              />
-            </div>
+            )}
           </div>
 
-          <div className="flex flex-col space-y-3 pt-4">
-            {/* Is Restaurant Checkbox */}
-            <div className="flex items-center space-x-2">
-              <Controller
-                name="isRestaurant"
-                control={control}
-                render={({ field }) => (
-                  <Checkbox
-                    id="isRestaurant"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                )}
-              />
-              <Label htmlFor="isRestaurant" className="cursor-pointer">
-                This is a restaurant
-              </Label>
-            </div>
-
-            {/* Is Shared Checkbox */}
-            <div className="flex items-center space-x-2">
-              <Controller
-                name="isShared"
-                control={control}
-                render={({ field }) => (
-                  <Checkbox
-                    id="isShared"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                )}
-              />
-              <Label htmlFor="isShared" className="cursor-pointer">
-                Make this address shared (available to all users)
-              </Label>
-            </div>
+          {/* Address Name */}
+          <div className="space-y-2">
+            <Label htmlFor="name">Address Name (Optional)</Label>
+            <Input
+              id="name"
+              placeholder="Home, Office, etc."
+              {...register("name")}
+            />
           </div>
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving..." : "Save Address"}
-          </Button>
-        </CardFooter>
-      </form>
+
+          {/* Street Address 1 */}
+          <div className="space-y-2 md:col-span-2">
+            <Label
+              htmlFor="street1"
+              className={errors.street1 ? "text-red-500" : ""}
+            >
+              Street Address <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="street1"
+              placeholder="123 Main St"
+              {...register("street1")}
+              className={errors.street1 ? "border-red-500" : ""}
+            />
+            {errors.street1 && (
+              <p className="mt-1 text-xs text-red-500">
+                {errors.street1.message}
+              </p>
+            )}
+          </div>
+
+          {/* Street Address 2 */}
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="street2">Street Address 2 (Optional)</Label>
+            <Input
+              id="street2"
+              placeholder="Apt, Suite, Unit, etc."
+              {...register("street2")}
+            />
+          </div>
+
+          {/* City */}
+          <div className="space-y-2">
+            <Label htmlFor="city" className={errors.city ? "text-red-500" : ""}>
+              City <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="city"
+              placeholder="San Francisco"
+              {...register("city")}
+              className={errors.city ? "border-red-500" : ""}
+            />
+            {errors.city && (
+              <p className="mt-1 text-xs text-red-500">{errors.city.message}</p>
+            )}
+          </div>
+
+          {/* State */}
+          <div className="space-y-2">
+            <Label
+              htmlFor="state"
+              className={errors.state ? "text-red-500" : ""}
+            >
+              State <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="state"
+              placeholder="CA"
+              {...register("state")}
+              className={errors.state ? "border-red-500" : ""}
+            />
+            {errors.state && (
+              <p className="mt-1 text-xs text-red-500">
+                {errors.state.message}
+              </p>
+            )}
+          </div>
+
+          {/* ZIP Code */}
+          <div className="space-y-2">
+            <Label htmlFor="zip" className={errors.zip ? "text-red-500" : ""}>
+              ZIP Code <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="zip"
+              placeholder="94103"
+              {...register("zip")}
+              className={errors.zip ? "border-red-500" : ""}
+            />
+            {errors.zip && (
+              <p className="mt-1 text-xs text-red-500">{errors.zip.message}</p>
+            )}
+          </div>
+
+          {/* Location Phone Number */}
+          <div className="space-y-2">
+            <Label htmlFor="locationNumber">Location Phone Number</Label>
+            <Input
+              id="locationNumber"
+              placeholder="415-555-1234"
+              {...register("locationNumber")}
+            />
+          </div>
+
+          {/* Parking/Loading */}
+          <div className="space-y-2">
+            <Label htmlFor="parkingLoading">
+              Parking / Loading Information
+            </Label>
+            <Input
+              id="parkingLoading"
+              placeholder="Parking garage on 2nd floor"
+              {...register("parkingLoading")}
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col space-y-3 pt-4">
+          {/* Is Restaurant Checkbox */}
+          <div className="flex items-center space-x-2">
+            <Controller
+              name="isRestaurant"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="isRestaurant"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
+            />
+            <Label htmlFor="isRestaurant" className="cursor-pointer">
+              This is a restaurant
+            </Label>
+          </div>
+
+          {/* Is Shared Checkbox */}
+          <div className="flex items-center space-x-2">
+            <Controller
+              name="isShared"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="isShared"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
+            />
+            <Label htmlFor="isShared" className="cursor-pointer">
+              Make this address shared (available to all users)
+            </Label>
+          </div>
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={isSubmitting}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          disabled={isSubmitting}
+          className="min-w-[120px]"
+          onClick={handleSubmit(submitHandler)}
+        >
+          {isSubmitting ? (
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              Saving...
+            </div>
+          ) : (
+            "Save Address"
+          )}
+        </Button>
+      </CardFooter>
     </Card>
   );
 };
