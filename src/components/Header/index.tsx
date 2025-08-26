@@ -506,20 +506,19 @@ const Header: React.FC = () => {
               ) : effectiveUser ? (
                 <>
                   {roleMenuItem && roleMenuItem.path ? (
-                    <Link href={roleMenuItem.path}>
-                      <p
-                        className={`loginBtn hidden px-7 py-3 font-medium lg:block ${
-                          sticky
-                            ? "text-dark dark:text-white"
-                            : isVirtualAssistantPage ||
-                                isHomePage ||
-                                isLogisticsPage
-                              ? "text-white"
-                              : "text-dark dark:text-white"
-                        }`}
-                      >
-                        {roleMenuItem.title}
-                      </p>
+                    <Link
+                      href={roleMenuItem.path}
+                      className={`loginBtn hidden px-7 py-3 font-medium lg:block ${
+                        sticky
+                          ? "text-dark dark:text-white"
+                          : isVirtualAssistantPage ||
+                              isHomePage ||
+                              isLogisticsPage
+                            ? "text-white"
+                            : "text-dark dark:text-white"
+                      }`}
+                    >
+                      {roleMenuItem.title}
                     </Link>
                   ) : effectiveUserRole === null ? (
                     <div
