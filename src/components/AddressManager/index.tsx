@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/pagination";
 import AddAddressForm from "./AddAddressForm";
 import { Spinner } from "@/components/ui/spinner";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AddressManagerProps {
   onAddressesLoaded?: (addresses: Address[]) => void;
@@ -85,6 +86,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
 
   const supabase = createClient();
   const { control } = useForm();
+  const { toast } = useToast();
 
   useEffect(() => {
     let isMounted = true;
@@ -362,6 +364,10 @@ const AddressManager: React.FC<AddressManagerProps> = ({
 
         // Address added successfully
         setShowAddForm(false);
+        toast({
+          title: "Address added successfully!",
+          description: "Your new address has been added to your list.",
+        });
         // Refetch addresses
         fetchAddresses();
       } catch (err) {
@@ -374,7 +380,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
         setIsLoading(false);
       }
     },
-    [fetchAddresses, onError, setUser, supabase.auth],
+    [fetchAddresses, onError, setUser, supabase.auth, toast],
   );
 
   const handleToggleAddForm = () => {
@@ -432,16 +438,39 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   return (
     <div className="address-manager w-full space-y-4">
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-red-500">
-          <p>{error}</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setError(null)}
-            className="mt-2 text-red-700 hover:bg-red-100 hover:text-red-900"
-          >
-            Dismiss
-          </Button>
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-red-700">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-red-400"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm font-medium">{error}</p>
+              <p className="mt-1 text-xs text-red-600">
+                Please check your input and try again. If the problem persists,
+                contact support.
+              </p>
+            </div>
+            <div className="ml-auto pl-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setError(null)}
+                className="text-red-700 hover:bg-red-100 hover:text-red-900"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 

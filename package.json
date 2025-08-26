@@ -35,7 +35,9 @@
     "type-check": "tsc --noEmit",
     "pre-push": "node scripts/type-check.js",
     "env:list": "tsx scripts/list-coolify-resources.ts",
-    "env:sync": "tsx scripts/sync-env.ts"
+    "env:sync": "tsx scripts/sync-env.ts",
+    "test:address": "tsx scripts/test-address-creation.ts",
+    "test:forms": "tsx scripts/test-nested-forms.ts"
   },
   "trustedDependencies": [
     "@testing-library/react"

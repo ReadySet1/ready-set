@@ -146,6 +146,7 @@ export async function POST(request: NextRequest) {
     // Get the authorization header
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error("POST /api/addresses: Missing or invalid authorization header");
       return NextResponse.json(
         { error: "Authentication required - Invalid authorization header" },
         { status: 401 },
@@ -162,7 +163,7 @@ export async function POST(request: NextRequest) {
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !currentUser?.id) {
-      console.error("Auth error:", authError);
+      console.error("POST /api/addresses: Auth error:", authError);
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 },
@@ -170,49 +171,113 @@ export async function POST(request: NextRequest) {
     }
 
     const formData: AddressFormData = await request.json();
+    console.log("POST /api/addresses: Received form data:", { 
+      userId: currentUser.id, 
+      formData: { ...formData, createdBy: currentUser.id } 
+    });
 
-    // Basic validation
-    if (
-      !formData.street1 ||
-      !formData.city ||
-      !formData.state ||
-      !formData.zip
-    ) {
+    // Enhanced validation with detailed error messages
+    const validationErrors: string[] = [];
+    if (!formData.street1?.trim()) {
+      validationErrors.push("Street address is required");
+    }
+    if (!formData.city?.trim()) {
+      validationErrors.push("City is required");
+    }
+    if (!formData.state?.trim()) {
+      validationErrors.push("State is required");
+    }
+    if (!formData.zip?.trim()) {
+      validationErrors.push("ZIP code is required");
+    }
+    if (!formData.county?.trim()) {
+      validationErrors.push("County is required");
+    }
+
+    if (validationErrors.length > 0) {
+      console.error("POST /api/addresses: Validation failed:", validationErrors);
       return NextResponse.json(
-        { error: "Required fields missing" },
+        { error: "Validation failed", details: validationErrors },
         { status: 400 },
       );
     }
 
-    // Create a new address
-    const newAddress = {
-      ...formData,
-      createdBy: currentUser.id,
-    };
+    // Use database transaction to ensure data consistency
+    const result = await prisma.$transaction(async (tx) => {
+      // Create a new address
+      const newAddress = {
+        ...formData,
+        createdBy: currentUser.id,
+        // Ensure boolean fields are properly set
+        isRestaurant: Boolean(formData.isRestaurant),
+        isShared: Boolean(formData.isShared),
+        // Normalize state to uppercase
+        state: formData.state.trim().toUpperCase(),
+        // Normalize ZIP code
+        zip: formData.zip.trim(),
+        // Normalize city and street
+        city: formData.city.trim(),
+        street1: formData.street1.trim(),
+        street2: formData.street2?.trim() || null,
+        county: formData.county.trim(),
+        locationNumber: formData.locationNumber?.trim() || null,
+        parkingLoading: formData.parkingLoading?.trim() || null,
+        name: formData.name?.trim() || null,
+      };
 
-    console.log("Creating new address:", newAddress);
+      console.log("POST /api/addresses: Creating address with normalized data:", newAddress);
 
-    const createdAddress = await prisma.address.create({
-      data: newAddress,
+      const createdAddress = await tx.address.create({
+        data: newAddress,
+      });
+
+      console.log("POST /api/addresses: Address created successfully:", { 
+        addressId: createdAddress.id, 
+        userId: currentUser.id 
+      });
+
+      // Create userAddress relation to track ownership if it's not shared
+      if (!formData.isShared) {
+        await tx.userAddress.create({
+          data: {
+            userId: currentUser.id,
+            addressId: createdAddress.id,
+            isDefault: false, // Could be set based on user preferences
+          },
+        });
+        console.log("POST /api/addresses: UserAddress relation created");
+      }
+
+      return createdAddress;
     });
 
-    // Create userAddress relation to track ownership if it's not shared
-    if (!formData.isShared) {
-      await prisma.userAddress.create({
-        data: {
-          userId: currentUser.id,
-          addressId: createdAddress.id,
-          isDefault: false, // Could be set based on user preferences
-        },
-      });
-    }
+    console.log("POST /api/addresses: Transaction completed successfully:", { 
+      addressId: result.id, 
+      userId: currentUser.id 
+    });
 
-    console.log("Created address:", createdAddress);
-    return NextResponse.json(createdAddress, { status: 201 });
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    console.error("Error creating address:", error);
+    console.error("POST /api/addresses: Critical error:", error);
+    
+    // Provide more specific error messages based on error type
+    if (error instanceof Error) {
+      if (error.message.includes('Unique constraint')) {
+        return NextResponse.json(
+          { error: "An address with these details already exists" },
+          { status: 409 }
+        );
+      }
+      if (error.message.includes('Foreign key constraint')) {
+        return NextResponse.json(
+          { error: "Invalid user reference" },
+          { status: 400 }
+        );
+      }
+    }
+    
     return NextResponse.json(
-      { error: "Failed to create address" },
+      { error: "Failed to create address. Please try again." },
       { status: 500 },
     );
   }
