@@ -40,7 +40,9 @@
     "test:forms": "tsx scripts/test-nested-forms.ts"
   },
   "trustedDependencies": [
-    "@testing-library/react"
+    "@testing-library/react",
+    "@swc/core",
+    "unrs-resolver"
   ],
   "dependencies": {
     "@faker-js/faker": "^9.3.0",

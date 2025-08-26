@@ -176,7 +176,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   </div>
 );
 
-export default {
+const AuthSkeletonComponents = {
   AuthButtonsSkeleton,
   UserProfileSkeleton,
   DashboardCardSkeleton,
@@ -185,3 +185,5 @@ export default {
   LoadingSpinner,
   LoadingState,
 };
+
+export default AuthSkeletonComponents;
