@@ -313,35 +313,19 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       setIsLoading(false);
       isRequestPending.current = false;
     }
-  }, [
-    user,
-    filterType,
-    pagination.currentPage,
-    pagination.limit,
-    onAddressesLoaded,
-    onError,
-    supabase.auth,
-  ]);
+  }, [user, filterType, pagination, onAddressesLoaded, onError, supabase.auth]);
 
   // Main effect for fetching addresses
   useEffect(() => {
     if (user) {
       console.log("🔄 Triggering address fetch", {
         user: !!user,
-        isLoading,
         filterType,
         currentPage: pagination.currentPage,
       });
       debouncedFetch(fetchAddresses);
     }
-  }, [
-    user,
-    filterType,
-    pagination.currentPage,
-    pagination.limit,
-    debouncedFetch,
-    fetchAddresses,
-  ]);
+  }, [user, filterType, pagination, debouncedFetch, fetchAddresses]);
 
   // Create a stable refresh function
   const refreshAddresses = useCallback(() => {

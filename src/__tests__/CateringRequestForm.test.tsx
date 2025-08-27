@@ -48,40 +48,36 @@ jest.mock("@/hooks/use-upload-file", () => ({
 jest.mock("@/components/AddressManager", () => {
   return {
     default: ({ onAddressesLoaded, onAddressSelected }: any) => {
-      // Simulate addresses being loaded after a short delay
-      React.useEffect(() => {
-        const timer = setTimeout(() => {
-          const mockAddresses = [
-            {
-              id: "1",
-              street1: "123 Main St",
-              street2: null,
-              city: "Test City",
-              state: "TS",
-              zip: "12345",
-              locationNumber: null,
-              parkingLoading: null,
-              isRestaurant: false,
-              isShared: false,
-            },
-            {
-              id: "2",
-              street1: "456 Oak Ave",
-              street2: "Suite 100",
-              city: "Test City",
-              state: "TS",
-              zip: "12345",
-              locationNumber: "A1",
-              parkingLoading: "Front door",
-              isRestaurant: true,
-              isShared: true,
-            },
-          ];
-          onAddressesLoaded(mockAddresses);
-        }, 100);
+      // Simulate addresses being loaded immediately instead of using useEffect
+      const mockAddresses = [
+        {
+          id: "1",
+          street1: "123 Main St",
+          street2: null,
+          city: "Test City",
+          state: "TS",
+          zip: "12345",
+          locationNumber: null,
+          parkingLoading: null,
+          isRestaurant: false,
+          isShared: false,
+        },
+        {
+          id: "2",
+          street1: "456 Oak Ave",
+          street2: "Suite 100",
+          city: "Test City",
+          state: "TS",
+          zip: "12345",
+          locationNumber: "A1",
+          parkingLoading: "Front door",
+          isRestaurant: true,
+          isShared: true,
+        },
+      ];
 
-        return () => clearTimeout(timer);
-      }, [onAddressesLoaded]);
+      // Call onAddressesLoaded immediately
+      onAddressesLoaded(mockAddresses);
 
       return (
         <div data-testid="address-manager">
