@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import AddressManager from "@/components/AddressManager";
 import { UserContext } from "@/contexts/UserContext";
+import { createMockUserContext, mockAddresses } from "./__mocks__/test-utils";
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -39,47 +40,6 @@ jest.mock("react-hook-form", () => ({
   }),
 }));
 
-const mockAddresses = [
-  {
-    id: "1",
-    street1: "123 Main St",
-    street2: null,
-    city: "Test City",
-    state: "TS",
-    zip: "12345",
-    county: "Test County",
-    isRestaurant: false,
-    isShared: false,
-    locationNumber: null,
-    parkingLoading: null,
-    createdAt: new Date(),
-    createdBy: "test-user-id",
-    updatedAt: new Date(),
-  },
-  {
-    id: "2",
-    street1: "456 Oak Ave",
-    street2: "Suite 100",
-    city: "Test City",
-    state: "TS",
-    zip: "12345",
-    county: "Test County",
-    isRestaurant: true,
-    isShared: true,
-    locationNumber: "A1",
-    parkingLoading: "Front door",
-    createdAt: new Date(),
-    createdBy: "test-user-id",
-    updatedAt: new Date(),
-  },
-];
-
-const mockUser = {
-  id: "test-user-id",
-  email: "test@example.com",
-  user_metadata: { name: "Test User" },
-};
-
 const renderAddressManager = (props = {}) => {
   const defaultProps = {
     onAddressesLoaded: jest.fn(),
@@ -89,16 +49,7 @@ const renderAddressManager = (props = {}) => {
   };
 
   return render(
-    <UserContext.Provider
-      value={{
-        session: { access_token: "test-token" },
-        user: mockUser,
-        userRole: "client",
-        isLoading: false,
-        error: null,
-        refreshUserData: jest.fn(),
-      }}
-    >
+    <UserContext.Provider value={createMockUserContext()}>
       <AddressManager {...defaultProps} />
     </UserContext.Provider>,
   );
@@ -159,16 +110,7 @@ describe("AddressManager", () => {
 
       // Rerender with same user (should not trigger new fetch)
       rerender(
-        <UserContext.Provider
-          value={{
-            session: { access_token: "test-token" },
-            user: mockUser,
-            userRole: "client",
-            isLoading: false,
-            error: null,
-            refreshUserData: jest.fn(),
-          }}
-        >
+        <UserContext.Provider value={createMockUserContext()}>
           <AddressManager
             onAddressesLoaded={onAddressesLoaded}
             onAddressSelected={jest.fn()}

@@ -1,51 +1,51 @@
 import React from "react";
 import { render, screen, waitFor, act } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import CateringRequestForm from "@/components/CateringRequest/CateringRequestForm";
 import { UserContext } from "@/contexts/UserContext";
+import { createMockUserContext } from "./__mocks__/test-utils";
 
 // Mock Supabase client
-vi.mock("@/utils/supabase/client", () => ({
+jest.mock("@/utils/supabase/client", () => ({
   createClient: () => ({
     auth: {
-      getUser: vi.fn().mockResolvedValue({
+      getUser: jest.fn().mockResolvedValue({
         data: { user: { id: "test-user-id", email: "test@example.com" } },
         error: null,
       }),
-      getSession: vi.fn().mockResolvedValue({
+      getSession: jest.fn().mockResolvedValue({
         data: { session: { access_token: "test-token" } },
         error: null,
       }),
-      onAuthStateChange: vi.fn().mockReturnValue({
-        data: { subscription: { unsubscribe: vi.fn() } },
+      onAuthStateChange: jest.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: jest.fn() } },
       }),
     },
   }),
 }));
 
 // Mock toast
-vi.mock("react-hot-toast", () => ({
+jest.mock("react-hot-toast", () => ({
   default: {
-    error: vi.fn(),
-    success: vi.fn(),
+    error: jest.fn(),
+    success: jest.fn(),
   },
 }));
 
 // Mock useUploadFile hook
-vi.mock("@/hooks/use-upload-file", () => ({
+jest.mock("@/hooks/use-upload-file", () => ({
   useUploadFile: () => ({
-    onUpload: vi.fn(),
+    onUpload: jest.fn(),
     uploadedFiles: [],
     progresses: {},
     isUploading: false,
     tempEntityId: "temp-123",
-    updateEntityId: vi.fn(),
-    deleteFile: vi.fn(),
+    updateEntityId: jest.fn(),
+    deleteFile: jest.fn(),
   }),
 }));
 
 // Mock AddressManager component
-vi.mock("@/components/AddressManager", () => {
+jest.mock("@/components/AddressManager", () => {
   return {
     default: ({ onAddressesLoaded, onAddressSelected }: any) => {
       // Simulate addresses being loaded after a short delay
@@ -100,28 +100,13 @@ vi.mock("@/components/AddressManager", () => {
 });
 
 // Mock HostSection component
-vi.mock("@/components/CateringRequest/HostSection", () => ({
+jest.mock("@/components/CateringRequest/HostSection", () => ({
   HostSection: () => <div data-testid="host-section">Host Section</div>,
 }));
 
-const mockUser = {
-  id: "test-user-id",
-  email: "test@example.com",
-  user_metadata: { name: "Test User" },
-};
-
 const renderCateringRequestForm = () => {
   return render(
-    <UserContext.Provider
-      value={{
-        session: { access_token: "test-token" },
-        user: mockUser,
-        userRole: "client",
-        isLoading: false,
-        error: null,
-        refreshUserData: vi.fn(),
-      }}
-    >
+    <UserContext.Provider value={createMockUserContext()}>
       <CateringRequestForm />
     </UserContext.Provider>,
   );
@@ -129,11 +114,11 @@ const renderCateringRequestForm = () => {
 
 describe("CateringRequestForm", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe("Component Rendering", () => {
@@ -189,7 +174,7 @@ describe("CateringRequestForm", () => {
 
   describe("Address Integration", () => {
     it("should load addresses without infinite loops", async () => {
-      const consoleSpy = vi.spyOn(console, "log");
+      const consoleSpy = jest.spyOn(console, "log");
 
       renderCateringRequestForm();
 
@@ -204,7 +189,7 @@ describe("CateringRequestForm", () => {
       });
 
       // Should only log the addresses loaded message once per AddressManager
-      const addressLoadedLogs = consoleSpy.mock.calls.filter((call) =>
+      const addressLoadedLogs = consoleSpy.mock.calls.filter((call: any[]) =>
         call[0]?.includes(
           "handleAddressesLoaded called in CateringRequestForm",
         ),
@@ -243,16 +228,7 @@ describe("CateringRequestForm", () => {
       };
 
       render(
-        <UserContext.Provider
-          value={{
-            session: { access_token: "test-token" },
-            user: mockUser,
-            userRole: "client",
-            isLoading: false,
-            error: null,
-            refreshUserData: vi.fn(),
-          }}
-        >
+        <UserContext.Provider value={createMockUserContext()}>
           <TestWrapper />
         </UserContext.Provider>,
       );
@@ -402,16 +378,7 @@ describe("CateringRequestForm", () => {
       };
 
       render(
-        <UserContext.Provider
-          value={{
-            session: { access_token: "test-token" },
-            user: mockUser,
-            userRole: "client",
-            isLoading: false,
-            error: null,
-            refreshUserData: vi.fn(),
-          }}
-        >
+        <UserContext.Provider value={createMockUserContext()}>
           <TestComponent />
         </UserContext.Provider>,
       );
@@ -442,14 +409,11 @@ describe("CateringRequestForm", () => {
     it("should handle missing session gracefully", () => {
       render(
         <UserContext.Provider
-          value={{
+          value={createMockUserContext({
             session: null,
             user: null,
             userRole: null,
-            isLoading: false,
-            error: null,
-            refreshUserData: vi.fn(),
-          }}
+          })}
         >
           <CateringRequestForm />
         </UserContext.Provider>,
@@ -475,7 +439,7 @@ describe("CateringRequestForm", () => {
     });
 
     it("should handle address loading callbacks properly", async () => {
-      const consoleSpy = vi.spyOn(console, "log");
+      const consoleSpy = jest.spyOn(console, "log");
 
       renderCateringRequestForm();
 
@@ -501,7 +465,7 @@ describe("CateringRequestForm", () => {
       });
 
       // Should be called twice (once for each AddressManager)
-      const addressLoadedCalls = consoleSpy.mock.calls.filter((call) =>
+      const addressLoadedCalls = consoleSpy.mock.calls.filter((call: any[]) =>
         call[0]?.includes(
           "handleAddressesLoaded called in CateringRequestForm",
         ),

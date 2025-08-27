@@ -6,127 +6,61 @@ import {
   act,
   fireEvent,
 } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import CateringRequestForm from "@/components/CateringRequest/CateringRequestForm";
 import { UserContext } from "@/contexts/UserContext";
+import { createMockUserContext, mockAddresses } from "./__mocks__/test-utils";
 
 // Mock fetch globally
-global.fetch = vi.fn();
+global.fetch = jest.fn();
 
 // Mock Supabase client
-vi.mock("@/utils/supabase/client", () => ({
+jest.mock("@/utils/supabase/client", () => ({
   createClient: () => ({
     auth: {
-      getUser: vi.fn().mockResolvedValue({
+      getUser: jest.fn().mockResolvedValue({
         data: { user: { id: "test-user-id", email: "test@example.com" } },
         error: null,
       }),
-      getSession: vi.fn().mockResolvedValue({
+      getSession: jest.fn().mockResolvedValue({
         data: { session: { access_token: "test-token" } },
         error: null,
       }),
-      onAuthStateChange: vi.fn().mockReturnValue({
-        data: { subscription: { unsubscribe: vi.fn() } },
+      onAuthStateChange: jest.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: jest.fn() } },
       }),
     },
   }),
 }));
 
 // Mock toast
-vi.mock("react-hot-toast", () => ({
+jest.mock("react-hot-toast", () => ({
   default: {
-    error: vi.fn(),
-    success: vi.fn(),
+    error: jest.fn(),
+    success: jest.fn(),
   },
 }));
 
 // Mock useUploadFile hook
-vi.mock("@/hooks/use-upload-file", () => ({
+jest.mock("@/hooks/use-upload-file", () => ({
   useUploadFile: () => ({
-    onUpload: vi.fn(),
+    onUpload: jest.fn(),
     uploadedFiles: [],
     progresses: {},
     isUploading: false,
     tempEntityId: "temp-123",
-    updateEntityId: vi.fn(),
-    deleteFile: vi.fn(),
+    updateEntityId: jest.fn(),
+    deleteFile: jest.fn(),
   }),
 }));
 
 // Mock HostSection component
-vi.mock("@/components/CateringRequest/HostSection", () => ({
+jest.mock("@/components/CateringRequest/HostSection", () => ({
   HostSection: () => <div data-testid="host-section">Host Section</div>,
 }));
 
-const mockAddresses = [
-  {
-    id: "1",
-    street1: "123 Main St",
-    street2: null,
-    city: "Test City",
-    state: "TS",
-    zip: "12345",
-    county: "Test County",
-    isRestaurant: false,
-    isShared: false,
-    locationNumber: null,
-    parkingLoading: null,
-    createdAt: new Date(),
-    createdBy: "test-user-id",
-    updatedAt: new Date(),
-  },
-  {
-    id: "2",
-    street1: "456 Oak Ave",
-    street2: "Suite 100",
-    city: "Test City",
-    state: "TS",
-    zip: "12345",
-    county: "Test County",
-    isRestaurant: true,
-    isShared: true,
-    locationNumber: "A1",
-    parkingLoading: "Front door",
-    createdAt: new Date(),
-    createdBy: "test-user-id",
-    updatedAt: new Date(),
-  },
-  {
-    id: "3",
-    street1: "789 Pine Rd",
-    street2: null,
-    city: "Test City",
-    state: "TS",
-    zip: "12345",
-    county: "Test County",
-    isRestaurant: false,
-    isShared: true,
-    locationNumber: null,
-    parkingLoading: "Back entrance",
-    createdAt: new Date(),
-    createdBy: "test-user-id",
-    updatedAt: new Date(),
-  },
-];
-
-const mockUser = {
-  id: "test-user-id",
-  email: "test@example.com",
-  user_metadata: { name: "Test User" },
-};
-
 const renderCateringRequestForm = () => {
   return render(
-    <UserContext.Provider
-      value={{
-        session: { access_token: "test-token" },
-        user: mockUser,
-        userRole: "client",
-        isLoading: false,
-        error: null,
-        refreshUserData: vi.fn(),
-      }}
-    >
+    <UserContext.Provider value={createMockUserContext()}>
       <CateringRequestForm />
     </UserContext.Provider>,
   );
@@ -134,7 +68,7 @@ const renderCateringRequestForm = () => {
 
 describe("CateringRequest Integration Tests", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     // Mock successful API response
     (global.fetch as any).mockResolvedValue({
       ok: true,
@@ -154,12 +88,12 @@ describe("CateringRequest Integration Tests", () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe("Address Loading Integration", () => {
     it("should load addresses for both pickup and delivery without infinite loops", async () => {
-      const consoleSpy = vi.spyOn(console, "log");
+      const consoleSpy = jest.spyOn(console, "log");
 
       renderCateringRequestForm();
 
@@ -177,7 +111,7 @@ describe("CateringRequest Integration Tests", () => {
       expect(global.fetch).toHaveBeenCalledTimes(2);
 
       // Should only log the addresses loaded message twice (once for pickup, once for delivery)
-      const addressLoadedLogs = consoleSpy.mock.calls.filter((call) =>
+      const addressLoadedLogs = consoleSpy.mock.calls.filter((call: any[]) =>
         call[0]?.includes(
           "handleAddressesLoaded called in CateringRequestForm",
         ),
@@ -214,16 +148,7 @@ describe("CateringRequest Integration Tests", () => {
       };
 
       render(
-        <UserContext.Provider
-          value={{
-            session: { access_token: "test-token" },
-            user: mockUser,
-            userRole: "client",
-            isLoading: false,
-            error: null,
-            refreshUserData: vi.fn(),
-          }}
-        >
+        <UserContext.Provider value={createMockUserContext()}>
           <TestComponent />
         </UserContext.Provider>,
       );
