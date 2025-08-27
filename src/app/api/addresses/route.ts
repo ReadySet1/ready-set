@@ -6,6 +6,46 @@ import { prisma } from "@/lib/db/prisma-client";
 import { AddressFormData } from "@/types/address";
 import { createClient } from "@/utils/supabase/server";
 
+// Simple in-memory rate limiting (in production, use Redis)
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 30; // 30 requests per minute
+
+function checkRateLimit(userId: string): { allowed: boolean; remaining: number; resetTime: number } {
+  const now = Date.now();
+  const userLimit = rateLimitMap.get(userId);
+
+  if (!userLimit || now > userLimit.resetTime) {
+    // Reset or create new limit
+    rateLimitMap.set(userId, {
+      count: 1,
+      resetTime: now + RATE_LIMIT_WINDOW,
+    });
+    return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - 1, resetTime: now + RATE_LIMIT_WINDOW };
+  }
+
+  if (userLimit.count >= MAX_REQUESTS_PER_WINDOW) {
+    return { allowed: false, remaining: 0, resetTime: userLimit.resetTime };
+  }
+
+  // Increment count
+  userLimit.count++;
+  rateLimitMap.set(userId, userLimit);
+
+  return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - userLimit.count, resetTime: userLimit.resetTime };
+}
+
+// Clean up old rate limit entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, limit] of rateLimitMap.entries()) {
+    if (now > limit.resetTime) {
+      rateLimitMap.delete(userId);
+    }
+  }
+}, RATE_LIMIT_WINDOW);
+
 /**
  * GET handler for fetching addresses
  */
@@ -37,6 +77,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Check rate limit
+    const rateLimit = checkRateLimit(currentUser.id);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { 
+          error: "Rate limit exceeded", 
+          retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000) 
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': Math.ceil((rateLimit.resetTime - Date.now()) / 1000).toString(),
+            'X-RateLimit-Limit': MAX_REQUESTS_PER_WINDOW.toString(),
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'X-RateLimit-Reset': new Date(rateLimit.resetTime).toISOString(),
+          }
+        },
+      );
+    }
+
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
@@ -49,6 +109,24 @@ export async function GET(request: NextRequest) {
     if (id) {
       const address = await prisma.address.findUnique({
         where: { id },
+        // Optimize query by selecting only needed fields
+        select: {
+          id: true,
+          name: true,
+          street1: true,
+          street2: true,
+          city: true,
+          state: true,
+          zip: true,
+          county: true,
+          isRestaurant: true,
+          isShared: true,
+          locationNumber: true,
+          parkingLoading: true,
+          createdAt: true,
+          createdBy: true,
+          updatedAt: true,
+        },
       });
 
       // Check if address exists
@@ -67,7 +145,17 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      return NextResponse.json(address);
+      // Add cache headers for individual address requests
+      const response = NextResponse.json(address);
+      response.headers.set('Cache-Control', 'private, max-age=300'); // 5 minutes
+      response.headers.set('ETag', `"${currentUser.id}-${id}"`);
+      
+      // Add rate limit headers
+      response.headers.set('X-RateLimit-Limit', MAX_REQUESTS_PER_WINDOW.toString());
+      response.headers.set('X-RateLimit-Remaining', rateLimit.remaining.toString());
+      response.headers.set('X-RateLimit-Reset', new Date(rateLimit.resetTime).toISOString());
+      
+      return response;
     }
 
     // Different query strategies based on filter parameter
@@ -76,6 +164,24 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" as const },
       skip,
       take: limit,
+      // Optimize query by selecting only needed fields
+      select: {
+        id: true,
+        name: true,
+        street1: true,
+        street2: true,
+        city: true,
+        state: true,
+        zip: true,
+        county: true,
+        isRestaurant: true,
+        isShared: true,
+        locationNumber: true,
+        parkingLoading: true,
+        createdAt: true,
+        createdBy: true,
+        updatedAt: true,
+      },
     };
 
     // Build the query based on the filter
@@ -102,7 +208,7 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // Execute the query with pagination
+    // Execute the query with pagination using Promise.all for parallel execution
     const [addresses, totalCount] = await Promise.all([
       prisma.address.findMany(addressesQuery),
       prisma.address.count({ where: addressesQuery.where }),
@@ -117,8 +223,8 @@ export async function GET(request: NextRequest) {
       `Found ${addresses.length} addresses for user ${currentUser.id} (page ${page} of ${totalPages})`,
     );
 
-    // Return paginated response
-    return NextResponse.json({
+    // Return paginated response with cache headers
+    const response = NextResponse.json({
       addresses,
       pagination: {
         currentPage: page,
@@ -129,6 +235,18 @@ export async function GET(request: NextRequest) {
         limit,
       },
     });
+
+    // Add cache headers to prevent unnecessary refetches
+    // Short cache for paginated results to allow for real-time updates
+    response.headers.set('Cache-Control', 'private, max-age=60'); // 1 minute
+    response.headers.set('ETag', `"${currentUser.id}-${filterParam}-${page}-${limit}"`);
+    
+    // Add rate limit headers
+    response.headers.set('X-RateLimit-Limit', MAX_REQUESTS_PER_WINDOW.toString());
+    response.headers.set('X-RateLimit-Remaining', rateLimit.remaining.toString());
+    response.headers.set('X-RateLimit-Reset', new Date(rateLimit.resetTime).toISOString());
+    
+    return response;
   } catch (error) {
     console.error("Error fetching addresses:", error);
     return NextResponse.json(
