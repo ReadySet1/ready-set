@@ -83,6 +83,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fetchAttempts = useRef(0);
   const MAX_FETCH_ATTEMPTS = 3;
+  const hasInitialFetch = useRef(false); // Flag to track if it's the initial fetch
 
   const supabase = createClient();
   const { control } = useForm();
@@ -109,6 +110,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
             // User is authenticated, set loading to false so addresses can be fetched
             setIsLoading(false);
             fetchAttempts.current = 0; // Reset attempts for new user
+            hasInitialFetch.current = false; // Allow initial fetch for new user
           }
         }
       } catch (err) {
@@ -136,6 +138,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
           setError(null);
           setIsLoading(false); // Allow addresses to be fetched
           fetchAttempts.current = 0; // Reset attempts for new user
+          hasInitialFetch.current = false; // Allow initial fetch for new user
         } else if (event === "SIGNED_OUT") {
           setAddresses([]);
           setError("Authentication required to load addresses.");
@@ -313,23 +316,47 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       setIsLoading(false);
       isRequestPending.current = false;
     }
-  }, [user, filterType, pagination, onAddressesLoaded, onError, supabase.auth]);
+  }, [user, filterType, onAddressesLoaded, onError, supabase.auth]);
 
   // Main effect for fetching addresses
   useEffect(() => {
-    if (user) {
-      console.log("🔄 Triggering address fetch", {
+    if (user && !hasInitialFetch.current) {
+      console.log("🔄 Initial address fetch triggered", {
         user: !!user,
+        filterType,
+        currentPage: pagination.currentPage,
+      });
+      hasInitialFetch.current = true;
+      debouncedFetch(fetchAddresses);
+    }
+  }, [user, filterType, debouncedFetch, fetchAddresses]);
+
+  // Separate effect for filter changes
+  useEffect(() => {
+    if (user && hasInitialFetch.current) {
+      console.log("🔄 Filter changed, refetching addresses", {
         filterType,
         currentPage: pagination.currentPage,
       });
       debouncedFetch(fetchAddresses);
     }
-  }, [user, filterType, pagination, debouncedFetch, fetchAddresses]);
+  }, [filterType, user, debouncedFetch, fetchAddresses]);
+
+  // Separate effect for pagination changes (only when manually changed)
+  useEffect(() => {
+    if (user && hasInitialFetch.current && pagination.currentPage > 1) {
+      console.log(
+        "🔄 Pagination changed, fetching addresses for page",
+        pagination.currentPage,
+      );
+      debouncedFetch(fetchAddresses);
+    }
+  }, [pagination.currentPage, user, debouncedFetch, fetchAddresses]);
 
   // Create a stable refresh function
   const refreshAddresses = useCallback(() => {
     fetchAttempts.current = 0; // Reset attempts for manual refresh
+    hasInitialFetch.current = false; // Allow refetch on manual refresh
     fetchAddresses();
   }, [fetchAddresses]);
 
