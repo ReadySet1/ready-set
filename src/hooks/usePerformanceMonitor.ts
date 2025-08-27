@@ -40,7 +40,11 @@ export function usePerformanceMonitor() {
     if (recentCalls.length >= 3) {
       const intervals = [];
       for (let i = 1; i < recentCalls.length; i++) {
-        intervals.push(recentCalls[i].timestamp - recentCalls[i - 1].timestamp);
+        const currentCall = recentCalls[i];
+        const previousCall = recentCalls[i - 1];
+        if (currentCall && previousCall) {
+          intervals.push(currentCall.timestamp - previousCall.timestamp);
+        }
       }
 
       const suspiciousIntervals = intervals.filter(

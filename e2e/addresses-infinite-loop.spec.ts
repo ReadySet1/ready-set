@@ -147,11 +147,18 @@ test.describe('Addresses Dashboard - Infinite Loop Prevention', () => {
       renderCount++;
     });
     
-    observer.observe(page.locator('[data-testid="addresses-content"]').first(), {
-      childList: true,
-      subtree: true,
-      attributes: true
-    });
+    // Get the actual DOM element from the locator
+    const element = await page.locator('[data-testid="addresses-content"]').first().elementHandle();
+    if (element) {
+      const domElement = await element.asElement();
+      if (domElement && domElement instanceof Node) {
+        observer.observe(domElement, {
+          childList: true,
+          subtree: true,
+          attributes: true
+        });
+      }
+    }
     
     // Wait a bit to see if unnecessary re-renders occur
     await page.waitForTimeout(3000);
@@ -268,7 +275,11 @@ test.describe('Addresses Dashboard - Performance Tests', () => {
     // Calculate time between calls
     const timeBetweenCalls: number[] = [];
     for (let i = 1; i < apiCalls.length; i++) {
-      timeBetweenCalls.push(apiCalls[i].timestamp - apiCalls[i-1].timestamp);
+      const currentCall = apiCalls[i];
+      const previousCall = apiCalls[i-1];
+      if (currentCall && previousCall) {
+        timeBetweenCalls.push(currentCall.timestamp - previousCall.timestamp);
+      }
     }
     
     // Should not have calls every 460-500ms as reported in the logs
