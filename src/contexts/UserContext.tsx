@@ -23,7 +23,7 @@ type UserContextType = {
 };
 
 // Create the context
-const UserContext = createContext<UserContextType>({
+export const UserContext = createContext<UserContextType>({
   session: null,
   user: null,
   userRole: null,
