@@ -108,116 +108,147 @@ const AddressModal: React.FC<AddressModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] w-[95vw] max-w-[500px] overflow-y-auto border bg-white shadow-lg dark:bg-gray-950">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-center text-xl font-semibold">
             {addressToEdit ? "Edit Address" : "Add Address"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
-              <Label htmlFor="county" className="sm:text-right">
-                County
-              </Label>
-              <Controller
-                name="county"
-                control={control}
-                defaultValue=""
-                render={({ field }) => (
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || ""}
-                  >
-                    <SelectTrigger className="sm:col-span-3">
-                      <SelectValue placeholder="Please Select" />
-                    </SelectTrigger>
-                    <SelectContent className="z-[1002]">
-                      {COUNTIES.map((county) => (
-                        <SelectItem key={county.value} value={county.value}>
-                          {county.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
-              <Label htmlFor="name" className="sm:text-right">
-                Name
-              </Label>
-              <Input
-                id="name"
-                className="sm:col-span-3"
-                {...register("name")}
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
-              <Label htmlFor="street1" className="sm:text-right">
-                Street Address 1
-              </Label>
-              <Input
-                id="street1"
-                className="sm:col-span-3"
-                {...register("street1")}
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
-              <Label htmlFor="street2" className="sm:text-right">
-                Street Address 2
-              </Label>
-              <Input
-                id="street2"
-                className="sm:col-span-3"
-                {...register("street2")}
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
-              <Label htmlFor="city" className="sm:text-right">
-                City
-              </Label>
-              <Input
-                id="city"
-                className="sm:col-span-3"
-                {...register("city")}
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
-              <Label htmlFor="state" className="sm:text-right">
-                State
-              </Label>
-              <Input
-                id="state"
-                className="sm:col-span-3"
-                {...register("state")}
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
-              <Label htmlFor="zip" className="sm:text-right">
-                Zip
-              </Label>
-              <Input id="zip" className="sm:col-span-3" {...register("zip")} />
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
-              <Label htmlFor="locationNumber" className="sm:text-right">
-                Location Phone Number
-              </Label>
-              <Input
-                id="locationNumber"
-                className="sm:col-span-3"
-                {...register("locationNumber")}
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
-              <Label htmlFor="parkingLoading" className="sm:text-right">
-                Parking / Loading
-              </Label>
-              <Input
-                id="parkingLoading"
-                className="sm:col-span-3"
-                {...register("parkingLoading")}
-              />
-            </div>
-            <div className="flex items-center space-x-2 sm:col-span-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* County Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="county" className="text-sm font-medium">
+              County
+            </Label>
+            <Controller
+              name="county"
+              control={control}
+              defaultValue=""
+              render={({ field }) => (
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value || ""}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Please Select" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[1002]">
+                    {COUNTIES.map((county) => (
+                      <SelectItem key={county.value} value={county.value}>
+                        {county.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+
+          {/* Name */}
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-sm font-medium">
+              Name
+            </Label>
+            <Input
+              id="name"
+              className="w-full"
+              placeholder="Enter location name"
+              {...register("name")}
+            />
+          </div>
+
+          {/* Street Address 1 */}
+          <div className="space-y-2">
+            <Label htmlFor="street1" className="text-sm font-medium">
+              Street Address 1
+            </Label>
+            <Input
+              id="street1"
+              className="w-full"
+              placeholder="Enter street address"
+              {...register("street1")}
+            />
+          </div>
+
+          {/* Street Address 2 */}
+          <div className="space-y-2">
+            <Label htmlFor="street2" className="text-sm font-medium">
+              Street Address 2
+            </Label>
+            <Input
+              id="street2"
+              className="w-full"
+              placeholder="Enter apartment, suite, etc. (optional)"
+              {...register("street2")}
+            />
+          </div>
+
+          {/* City */}
+          <div className="space-y-2">
+            <Label htmlFor="city" className="text-sm font-medium">
+              City
+            </Label>
+            <Input
+              id="city"
+              className="w-full"
+              placeholder="Enter city"
+              {...register("city")}
+            />
+          </div>
+
+          {/* State */}
+          <div className="space-y-2">
+            <Label htmlFor="state" className="text-sm font-medium">
+              State
+            </Label>
+            <Input
+              id="state"
+              className="w-full"
+              placeholder="Enter state"
+              {...register("state")}
+            />
+          </div>
+
+          {/* Zip Code */}
+          <div className="space-y-2">
+            <Label htmlFor="zip" className="text-sm font-medium">
+              Zip
+            </Label>
+            <Input
+              id="zip"
+              className="w-full"
+              placeholder="Enter ZIP code"
+              {...register("zip")}
+            />
+          </div>
+
+          {/* Location Phone Number */}
+          <div className="space-y-2">
+            <Label htmlFor="locationNumber" className="text-sm font-medium">
+              Location Phone Number
+            </Label>
+            <Input
+              id="locationNumber"
+              className="w-full"
+              placeholder="Enter phone number"
+              {...register("locationNumber")}
+            />
+          </div>
+
+          {/* Parking / Loading */}
+          <div className="space-y-2">
+            <Label htmlFor="parkingLoading" className="text-sm font-medium">
+              Parking / Loading
+            </Label>
+            <Input
+              id="parkingLoading"
+              className="w-full"
+              placeholder="Enter parking or loading instructions"
+              {...register("parkingLoading")}
+            />
+          </div>
+
+          {/* Checkboxes */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3">
               <Controller
                 name="isRestaurant"
                 control={control}
@@ -230,9 +261,12 @@ const AddressModal: React.FC<AddressModalProps> = ({
                   />
                 )}
               />
-              <Label htmlFor="isRestaurant">Is this a restaurant?</Label>
+              <Label htmlFor="isRestaurant" className="text-sm">
+                Is this a restaurant?
+              </Label>
             </div>
-            <div className="flex items-center space-x-2 sm:col-span-4">
+
+            <div className="flex items-center space-x-3">
               <Controller
                 name="isShared"
                 control={control}
@@ -245,11 +279,25 @@ const AddressModal: React.FC<AddressModalProps> = ({
                   />
                 )}
               />
-              <Label htmlFor="isShared">Is this a shared address?</Label>
+              <Label htmlFor="isShared" className="text-sm">
+                Is this a shared address?
+              </Label>
             </div>
           </div>
-          <div className="flex justify-end">
-            <Button type="submit">{addressToEdit ? "Update" : "Save"}</Button>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="px-6"
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="px-6">
+              {addressToEdit ? "Update" : "Save"}
+            </Button>
           </div>
         </form>
       </DialogContent>
