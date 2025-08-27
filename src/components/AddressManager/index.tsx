@@ -105,6 +105,10 @@ const AddressManager: React.FC<AddressManagerProps> = ({
               onError("Authentication required to load addresses.");
             }
             setIsLoading(false);
+          } else {
+            // User is authenticated, set loading to false so addresses can be fetched
+            setIsLoading(false);
+            fetchAttempts.current = 0; // Reset attempts for new user
           }
         }
       } catch (err) {
@@ -130,12 +134,16 @@ const AddressManager: React.FC<AddressManagerProps> = ({
 
         if (event === "SIGNED_IN" && newUser) {
           setError(null);
+          setIsLoading(false); // Allow addresses to be fetched
+          fetchAttempts.current = 0; // Reset attempts for new user
         } else if (event === "SIGNED_OUT") {
           setAddresses([]);
           setError("Authentication required to load addresses.");
           if (onError) {
             onError("Authentication required to load addresses.");
           }
+          setIsLoading(false);
+          fetchAttempts.current = 0; // Reset attempts
         }
       },
     );
@@ -272,14 +280,27 @@ const AddressManager: React.FC<AddressManagerProps> = ({
         validAddresses = [];
       }
 
+      console.log("✅ Addresses fetched successfully", {
+        count: validAddresses.length,
+        addresses: validAddresses.map((a) => ({
+          id: a.id,
+          name: a.name || "Unnamed Address",
+          street1: a.street1,
+        })),
+      });
+
+      // Set addresses first, then call callback in next tick to avoid render phase issues
       setAddresses(validAddresses);
+
+      // Call onAddressesLoaded in next tick to avoid React render phase violations
+      if (onAddressesLoaded) {
+        setTimeout(() => {
+          onAddressesLoaded(validAddresses);
+        }, 0);
+      }
       setPagination(paginationData);
 
       fetchAttempts.current = 0;
-
-      if (onAddressesLoaded) {
-        onAddressesLoaded(validAddresses);
-      }
     } catch (err) {
       console.error("Fetch Addresses Catch Block:", err);
       setAddresses([]);
@@ -295,28 +316,45 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   }, [
     user,
     filterType,
-    pagination,
+    pagination.currentPage,
+    pagination.limit,
     onAddressesLoaded,
     onError,
-    MAX_FETCH_ATTEMPTS,
     supabase.auth,
   ]);
 
+  // Main effect for fetching addresses
   useEffect(() => {
     if (user) {
+      console.log("🔄 Triggering address fetch", {
+        user: !!user,
+        isLoading,
+        filterType,
+        currentPage: pagination.currentPage,
+      });
       debouncedFetch(fetchAddresses);
     }
-  }, [user, filterType, pagination, debouncedFetch, fetchAddresses]);
+  }, [
+    user,
+    filterType,
+    pagination.currentPage,
+    pagination.limit,
+    debouncedFetch,
+    fetchAddresses,
+  ]);
+
+  // Create a stable refresh function
+  const refreshAddresses = useCallback(() => {
+    fetchAttempts.current = 0; // Reset attempts for manual refresh
+    fetchAddresses();
+  }, [fetchAddresses]);
 
   // Expose refresh function to parent component
   useEffect(() => {
     if (onRefresh) {
-      onRefresh(() => {
-        fetchAttempts.current = 0; // Reset attempts for manual refresh
-        fetchAddresses();
-      });
+      onRefresh(refreshAddresses);
     }
-  }, [onRefresh, fetchAddresses]);
+  }, [onRefresh, refreshAddresses]);
 
   const handleAddAddress = useCallback(
     async (newAddress: Partial<Address>) => {
@@ -496,7 +534,10 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       {isLoading ? (
         <div className="flex items-center justify-center p-4">
           <Spinner />
-          <p className="ml-2 text-gray-600">Loading addresses...</p>
+          <p className="ml-2 text-gray-600">
+            Loading addresses... (isLoading: {isLoading.toString()}, addresses
+            count: {addresses.length})
+          </p>
         </div>
       ) : (
         <div className="mb-6">

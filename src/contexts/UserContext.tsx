@@ -172,6 +172,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [supabase, setSupabase] = useState<any>(null);
   const [hasImmediateData, setHasImmediateData] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   console.log(
     "🟢 UserProviderClient state initialized - user:",
@@ -181,7 +182,13 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   );
 
   // 🔥 IMMEDIATE COOKIE CHECK (NOT in useEffect) - executes during render
-  if (typeof window !== "undefined" && !user && !hasImmediateData) {
+  // Only run on client after hydration to prevent server/client mismatches
+  if (
+    typeof window !== "undefined" &&
+    isHydrated &&
+    !user &&
+    !hasImmediateData
+  ) {
     console.log("🔥 IMMEDIATE cookie check during render...");
     const cookies = document.cookie;
     const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
@@ -205,13 +212,15 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
           const normalizedRole = sessionData.userRole.toLowerCase() as UserType;
 
-          // Set state immediately during render
+          // Set state in next tick to avoid render phase issues
           if (!user) {
-            setUser(mockUser);
-            setUserRole(normalizedRole);
-            setHasImmediateData(true);
-            setIsLoading(false);
-            console.log("🔥 IMMEDIATE: Auth state set successfully!");
+            setTimeout(() => {
+              setUser(mockUser);
+              setUserRole(normalizedRole);
+              setHasImmediateData(true);
+              setIsLoading(false);
+              console.log("🔥 IMMEDIATE: Auth state set successfully!");
+            }, 0);
           }
         }
       } catch (error) {
@@ -222,10 +231,15 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     }
   }
 
+  // Set hydration flag to prevent server/client mismatches
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
   // Hydrate auth state synchronously on mount using server-side data
   useEffect(() => {
     console.log("🚀🚀🚀 FORCED UserContext useEffect TRIGGERED!");
-    console.log("🚀 FORCED UserContext: Starting hydration check...");
+    console.log("🚀🚀🚀 FORCED UserContext: Starting hydration check...");
     console.log("🚀 Window available?", typeof window !== "undefined");
 
     // Force check cookies directly as backup
@@ -259,14 +273,15 @@ function UserProviderClient({ children }: { children: ReactNode }) {
             const normalizedRole =
               sessionData.userRole.toLowerCase() as UserType;
 
-            setUser(mockUser);
-            setUserRole(normalizedRole);
-            setHasImmediateData(true);
-            setIsLoading(false);
-
-            console.log(
-              "✅ FORCED Hydrated auth state successfully with manual parsing!",
-            );
+            setTimeout(() => {
+              setUser(mockUser);
+              setUserRole(normalizedRole);
+              setHasImmediateData(true);
+              setIsLoading(false);
+              console.log(
+                "✅ FORCED Hydrated auth state successfully with manual parsing!",
+              );
+            }, 0);
             return; // Exit early since we found the data
           }
         } catch (error) {
@@ -291,10 +306,12 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           : undefined,
       } as unknown as User;
 
-      setUser(mockUser);
-      setUserRole(recoveredState.userRole);
-      setHasImmediateData(true);
-      setIsLoading(false); // We have hydrated data, not loading anymore
+      setTimeout(() => {
+        setUser(mockUser);
+        setUserRole(recoveredState.userRole);
+        setHasImmediateData(true);
+        setIsLoading(false); // We have hydrated data, not loading anymore
+      }, 0);
 
       console.log(
         "✅ Hydrated auth state successfully - user should be visible in header",
@@ -547,6 +564,24 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }
   };
+
+  // Prevent hydration mismatches by ensuring consistent initial render
+  if (!isHydrated) {
+    return (
+      <UserContext.Provider
+        value={{
+          session: null,
+          user: null,
+          userRole: null,
+          isLoading: true,
+          error: null,
+          refreshUserData,
+        }}
+      >
+        {children}
+      </UserContext.Provider>
+    );
+  }
 
   return (
     <UserContext.Provider

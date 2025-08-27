@@ -328,6 +328,15 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   }, [supabase]);
 
   const handleAddressesLoaded = useCallback((loadedAddresses: Address[]) => {
+    console.log("📥 handleAddressesLoaded called in CateringRequestForm", {
+      count: loadedAddresses.length,
+      addresses: loadedAddresses.map((a) => ({
+        id: a.id,
+        street1: a.street1,
+        city: a.city,
+        state: a.state,
+      })),
+    });
     setAddresses(loadedAddresses);
   }, []);
 
