@@ -85,6 +85,16 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   const MAX_FETCH_ATTEMPTS = 3;
   const hasInitialFetch = useRef(false); // Flag to track if it's the initial fetch
 
+  // Create refs to store current pagination values to avoid dependency issues
+  const currentPageRef = useRef(pagination.currentPage);
+  const limitRef = useRef(pagination.limit);
+
+  // Update refs when pagination changes
+  useEffect(() => {
+    currentPageRef.current = pagination.currentPage;
+    limitRef.current = pagination.limit;
+  }, [pagination.currentPage, pagination.limit]);
+
   const supabase = createClient();
   const { control } = useForm();
   const { toast } = useToast();
@@ -229,11 +239,15 @@ const AddressManager: React.FC<AddressManagerProps> = ({
     setError(null);
 
     try {
+      // Use ref values to avoid dependency issues
+      const currentPage = currentPageRef.current;
+      const limit = limitRef.current;
+
       console.log(
-        `Fetching addresses with filter=${filterType}, page=${pagination.currentPage}`,
+        `Fetching addresses with filter=${filterType}, page=${currentPage}`,
       );
       const response = await fetch(
-        `/api/addresses?filter=${filterType}&page=${pagination.currentPage}&limit=${pagination.limit}`,
+        `/api/addresses?filter=${filterType}&page=${currentPage}&limit=${limit}`,
         {
           headers: {
             Authorization: `Bearer ${session.access_token}`,
@@ -261,7 +275,14 @@ const AddressManager: React.FC<AddressManagerProps> = ({
 
       // Handle both old format (array) and new format (paginated object)
       let validAddresses: Address[] = [];
-      let paginationData: PaginationData = pagination;
+      let paginationData: PaginationData = {
+        currentPage: currentPageRef.current,
+        totalPages: 1,
+        totalCount: 0,
+        hasNextPage: false,
+        hasPrevPage: false,
+        limit: limitRef.current,
+      };
 
       if (Array.isArray(data)) {
         // Old format - backward compatibility
@@ -324,7 +345,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       console.log("🔄 Initial address fetch triggered", {
         user: !!user,
         filterType,
-        currentPage: pagination.currentPage,
+        currentPage: currentPageRef.current,
       });
       hasInitialFetch.current = true;
       debouncedFetch(fetchAddresses);
@@ -336,7 +357,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
     if (user && hasInitialFetch.current) {
       console.log("🔄 Filter changed, refetching addresses", {
         filterType,
-        currentPage: pagination.currentPage,
+        currentPage: currentPageRef.current,
       });
       debouncedFetch(fetchAddresses);
     }
@@ -344,10 +365,10 @@ const AddressManager: React.FC<AddressManagerProps> = ({
 
   // Separate effect for pagination changes (only when manually changed)
   useEffect(() => {
-    if (user && hasInitialFetch.current && pagination.currentPage > 1) {
+    if (user && hasInitialFetch.current && currentPageRef.current > 1) {
       console.log(
         "🔄 Pagination changed, fetching addresses for page",
-        pagination.currentPage,
+        currentPageRef.current,
       );
       debouncedFetch(fetchAddresses);
     }
