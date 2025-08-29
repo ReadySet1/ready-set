@@ -16,7 +16,13 @@ const Signin = ({
 }: {
   searchParams?: { error?: string; message?: string; returnTo?: string };
 }) => {
-  const { isLoading: isUserLoading, session } = useUser();
+  const {
+    isLoading: isUserLoading,
+    session,
+    isAuthenticating,
+    authProgress,
+    clearAuthError,
+  } = useUser();
   const router = useRouter();
 
   // Replace useActionState with useState
@@ -116,6 +122,26 @@ const Signin = ({
     }
   }, [isRedirecting]);
 
+  // Integrate with UserContext auth progress
+  useEffect(() => {
+    if (
+      authProgress.step === "authenticating" ||
+      authProgress.step === "fetching_profile"
+    ) {
+      setLoading(true);
+      setIsRedirecting(false);
+      setShowSuccessMessage(false);
+    } else if (authProgress.step === "redirecting") {
+      setLoading(false);
+      setIsRedirecting(true);
+      setShowSuccessMessage(true);
+    } else if (authProgress.step === "complete") {
+      setLoading(false);
+      setIsRedirecting(false);
+      setShowSuccessMessage(false);
+    }
+  }, [authProgress.step]);
+
   // Manual form submission handler to replace formAction
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,6 +149,9 @@ const Signin = ({
     setErrors((prev) => ({ ...prev, general: "" }));
     setIsRedirecting(false);
     setShowSuccessMessage(false);
+
+    // Clear any previous auth errors from context
+    clearAuthError();
 
     // Validate form data
     if (!loginData.email) {
@@ -205,6 +234,9 @@ const Signin = ({
       setIsRedirecting(false);
       setShowSuccessMessage(false);
     }
+
+    // Clear auth errors from context when user starts typing
+    clearAuthError();
   };
 
   const handleMagicLinkEmailChange = (
@@ -218,6 +250,9 @@ const Signin = ({
       setIsRedirecting(false);
       setShowSuccessMessage(false);
     }
+
+    // Clear auth errors from context when user starts typing
+    clearAuthError();
   };
 
   const handleSendMagicLink = async (e: React.FormEvent) => {
@@ -277,7 +312,7 @@ const Signin = ({
             <div className="text-center">
               <Loader />
               <p className="mt-4 text-gray-600 dark:text-gray-400">
-                Loading...
+                {authProgress.message || "Loading..."}
               </p>
             </div>
           </div>
@@ -318,12 +353,6 @@ const Signin = ({
                 </Link>
               </div>
 
-              {searchParams?.message && (
-                <div className="mb-4 rounded border border-green-400 bg-green-100 p-3 text-green-700">
-                  {searchParams.message}
-                </div>
-              )}
-
               {/* Success message for successful login */}
               {showSuccessMessage && (
                 <div className="mb-4 rounded border border-green-400 bg-green-100 p-3 text-green-700">
@@ -339,7 +368,8 @@ const Signin = ({
                         clipRule="evenodd"
                       />
                     </svg>
-                    Login successful! Redirecting to dashboard...
+                    {formState?.message ||
+                      "Login successful! Redirecting to dashboard..."}
                   </div>
                 </div>
               )}
@@ -354,10 +384,28 @@ const Signin = ({
                 </div>
               )}
 
+              {/* Auth progress from UserContext */}
+              {authProgress.step !== "idle" &&
+                !showSuccessMessage &&
+                !isRedirecting && (
+                  <div className="mb-4 rounded border border-blue-400 bg-blue-100 p-3 text-blue-700">
+                    <div className="flex items-center">
+                      <Loader />
+                      <span className="ml-2">{authProgress.message}</span>
+                    </div>
+                  </div>
+                )}
+
               {/* Error message */}
               {errors.general && !showSuccessMessage && !isRedirecting && (
                 <div className="mb-4 rounded border border-red-400 bg-red-100 p-3 text-red-700">
                   {errors.general}
+                </div>
+              )}
+
+              {searchParams?.message && (
+                <div className="mb-4 rounded border border-green-400 bg-green-100 p-3 text-green-700">
+                  {searchParams.message}
                 </div>
               )}
 
@@ -443,7 +491,7 @@ const Signin = ({
                       placeholder="Password"
                       className={`w-full rounded-md border ${
                         errors.password ? "border-red-500" : "border-stroke"
-                      } bg-transparent px-5 py-3 text-base text-body-color outline-none transition focus:border-primary focus-visible:shadow-none dark:border-dark-3 dark:text-white`}
+                      } bg-transparent px-5 py-3 text-base text-dark outline-none transition focus:border-primary focus-visible:shadow-none dark:border-dark-3 dark:text-white`}
                       value={loginData.password}
                       onChange={handleInputChange}
                       required
@@ -458,7 +506,7 @@ const Signin = ({
                     <button
                       type="submit"
                       className="flex w-full items-center justify-center rounded-md bg-primary px-5 py-3 text-base font-medium text-white transition duration-300 ease-in-out hover:bg-blue-dark"
-                      disabled={loading || isRedirecting}
+                      disabled={loading || isRedirecting || isAuthenticating}
                     >
                       {loading ? (
                         <>
@@ -469,6 +517,13 @@ const Signin = ({
                         <>
                           <Loader />
                           <span className="ml-2">Redirecting...</span>
+                        </>
+                      ) : isAuthenticating ? (
+                        <>
+                          <Loader />
+                          <span className="ml-2">
+                            {authProgress.message || "Authenticating..."}
+                          </span>
                         </>
                       ) : (
                         "Sign in"
