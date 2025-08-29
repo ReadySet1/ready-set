@@ -44,9 +44,9 @@ export async function login(
   
   console.log(`🚀 [${requestId}] Login attempt started`);
   
-  try {
-    await cookies();
-    const supabase = await createClient();
+  // Use cookies() to opt out of caching
+  await cookies();
+  const supabase = await createClient();
 
     const email = formData.get("email")?.toString().toLowerCase() || "";
     const password = formData.get("password")?.toString() || "";
@@ -241,36 +241,28 @@ export async function login(
       message: `Welcome back! Redirecting to your dashboard...`
     };
 
-    // Log success metrics for monitoring
+    // Log success metrics for monitoring BEFORE redirect
     console.log(`📊 [${requestId}] Login metrics:`, {
       email: email,
-      userType: profile.type,
+      userType: profile?.type || 'unknown',
       redirectPath: redirectPath,
       executionTime: `${executionTime}ms`,
       timestamp: new Date().toISOString()
     });
 
-    // Always redirect to the determined path
+    // CRITICAL: Call redirect() immediately after determining path
+    // Do NOT create objects or do extensive logging after this point
+    // This will throw a NEXT_REDIRECT error that Next.js handles automatically
     redirect(redirectPath);
 
-    // This is unreachable but satisfies TypeScript
-    return successState;
-    
-  } catch (error: any) {
-    const executionTime = Date.now() - startTime;
-    console.error(`💥 [${requestId}] Unexpected error during login:`, {
-      error: error.message,
-      stack: error.stack,
-      executionTime: `${executionTime}ms`,
-      timestamp: new Date().toISOString()
-    });
-
-    // Return a user-friendly error message
-    return {
-      error: "An unexpected error occurred during login. Please try again or contact support if the problem persists.",
-      success: false
-    };
-  }
+         // This code is unreachable but satisfies TypeScript
+     // The successState is not needed since redirect() handles the response
+     return {
+       success: true,
+       redirectTo: redirectPath,
+       userType: profile?.type || 'unknown',
+       message: `Welcome back! Redirecting to your dashboard...`
+     };
 }
 
 export async function signup(formData: FormData) {
