@@ -35,10 +35,14 @@
     "type-check": "tsc --noEmit",
     "pre-push": "node scripts/type-check.js",
     "env:list": "tsx scripts/list-coolify-resources.ts",
-    "env:sync": "tsx scripts/sync-env.ts"
+    "env:sync": "tsx scripts/sync-env.ts",
+    "test:address": "tsx scripts/test-address-creation.ts",
+    "test:forms": "tsx scripts/test-nested-forms.ts"
   },
   "trustedDependencies": [
-    "@testing-library/react"
+    "@testing-library/react",
+    "@swc/core",
+    "unrs-resolver"
   ],
   "dependencies": {
     "@faker-js/faker": "^9.3.0",
@@ -80,6 +84,8 @@
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.48.1",
+    "@tanstack/react-query": "^5.85.5",
+    "@tanstack/react-query-devtools": "^5.85.5",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.15.4",
     "@types/react-virtualized": "^9.22.0",
@@ -221,7 +227,6 @@
       "minimatch@>=10.0.0": "9.0.5",
       "prismjs@<1.30.0": ">=1.30.0",
       "next@>=15.3.0 <15.3.3": ">=15.3.3",
-
       "better-call@<1.0.12": ">=1.0.12"
     }
   },

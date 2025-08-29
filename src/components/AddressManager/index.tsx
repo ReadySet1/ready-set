@@ -20,8 +20,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import AddAddressForm from "./AddAddressForm";
 import { Spinner } from "@/components/ui/spinner";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AddressManagerProps {
   onAddressesLoaded?: (addresses: Address[]) => void;
@@ -31,6 +40,15 @@ interface AddressManagerProps {
   showFilters?: boolean;
   showManagementButtons?: boolean;
   onRefresh?: (refreshFn: () => void) => void;
+}
+
+interface PaginationData {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  limit: number;
 }
 
 const AddressManager: React.FC<AddressManagerProps> = ({
@@ -53,13 +71,33 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+  const [pagination, setPagination] = useState<PaginationData>({
+    currentPage: 1,
+    totalPages: 1,
+    totalCount: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+    limit: 5,
+  });
   const isRequestPending = useRef(false);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fetchAttempts = useRef(0);
   const MAX_FETCH_ATTEMPTS = 3;
+  const hasInitialFetch = useRef(false); // Flag to track if it's the initial fetch
+
+  // Create refs to store current pagination values to avoid dependency issues
+  const currentPageRef = useRef(pagination.currentPage);
+  const limitRef = useRef(pagination.limit);
+
+  // Update refs when pagination changes
+  useEffect(() => {
+    currentPageRef.current = pagination.currentPage;
+    limitRef.current = pagination.limit;
+  }, [pagination.currentPage, pagination.limit]);
 
   const supabase = createClient();
   const { control } = useForm();
+  const { toast } = useToast();
 
   useEffect(() => {
     let isMounted = true;
@@ -78,6 +116,11 @@ const AddressManager: React.FC<AddressManagerProps> = ({
               onError("Authentication required to load addresses.");
             }
             setIsLoading(false);
+          } else {
+            // User is authenticated, set loading to false so addresses can be fetched
+            setIsLoading(false);
+            fetchAttempts.current = 0; // Reset attempts for new user
+            hasInitialFetch.current = false; // Allow initial fetch for new user
           }
         }
       } catch (err) {
@@ -103,12 +146,17 @@ const AddressManager: React.FC<AddressManagerProps> = ({
 
         if (event === "SIGNED_IN" && newUser) {
           setError(null);
+          setIsLoading(false); // Allow addresses to be fetched
+          fetchAttempts.current = 0; // Reset attempts for new user
+          hasInitialFetch.current = false; // Allow initial fetch for new user
         } else if (event === "SIGNED_OUT") {
           setAddresses([]);
           setError("Authentication required to load addresses.");
           if (onError) {
             onError("Authentication required to load addresses.");
           }
+          setIsLoading(false);
+          fetchAttempts.current = 0; // Reset attempts
         }
       },
     );
@@ -137,7 +185,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
     fetchTimeoutRef.current = setTimeout(() => {
       fn();
       fetchTimeoutRef.current = null;
-    }, 500);
+    }, 100); // Reduced delay for better testing
   }, []);
 
   const fetchAddresses = useCallback(async () => {
@@ -191,13 +239,22 @@ const AddressManager: React.FC<AddressManagerProps> = ({
     setError(null);
 
     try {
-      console.log(`Fetching addresses with filter=${filterType}`);
-      const response = await fetch(`/api/addresses?filter=${filterType}`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
+      // Use ref values to avoid dependency issues
+      const currentPage = currentPageRef.current;
+      const limit = limitRef.current;
+
+      console.log(
+        `Fetching addresses with filter=${filterType}, page=${currentPage}`,
+      );
+      const response = await fetch(
+        `/api/addresses?filter=${filterType}&page=${currentPage}&limit=${limit}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -215,45 +272,121 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       }
 
       const data = await response.json();
-      const validAddresses = Array.isArray(data) ? data : [];
+
+      // Handle both old format (array) and new format (paginated object)
+      let validAddresses: Address[] = [];
+      let paginationData: PaginationData = {
+        currentPage: currentPageRef.current,
+        totalPages: 1,
+        totalCount: 0,
+        hasNextPage: false,
+        hasPrevPage: false,
+        limit: limitRef.current,
+      };
+
+      if (Array.isArray(data)) {
+        // Old format - backward compatibility
+        validAddresses = data;
+        paginationData = {
+          currentPage: 1,
+          totalPages: 1,
+          totalCount: data.length,
+          hasNextPage: false,
+          hasPrevPage: false,
+          limit: data.length,
+        };
+      } else if (data.addresses && data.pagination) {
+        // New paginated format
+        validAddresses = data.addresses;
+        paginationData = data.pagination;
+      } else {
+        console.warn("Unexpected data format from API:", data);
+        validAddresses = [];
+      }
+
+      console.log("✅ Addresses fetched successfully", {
+        count: validAddresses.length,
+        addresses: validAddresses.map((a) => ({
+          id: a.id,
+          name: a.name || "Unnamed Address",
+          street1: a.street1,
+        })),
+      });
+
+      // Set addresses first, then call callback in next tick to avoid render phase issues
       setAddresses(validAddresses);
 
-      fetchAttempts.current = 0;
-
+      // Call onAddressesLoaded in next tick to avoid React render phase violations
       if (onAddressesLoaded) {
-        onAddressesLoaded(validAddresses);
+        setTimeout(() => {
+          onAddressesLoaded(validAddresses);
+        }, 0);
       }
+      setPagination(paginationData);
+
+      fetchAttempts.current = 0;
     } catch (err) {
       console.error("Fetch Addresses Catch Block:", err);
       setAddresses([]);
+      if (onError) {
+        onError(
+          `Error fetching addresses: ${err instanceof Error ? err.message : "Unknown error"}`,
+        );
+      }
     } finally {
       setIsLoading(false);
       isRequestPending.current = false;
     }
-  }, [
-    user,
-    filterType,
-    onAddressesLoaded,
-    onError,
-    MAX_FETCH_ATTEMPTS,
-    supabase.auth,
-  ]);
+  }, [user, filterType, onAddressesLoaded, onError, supabase.auth]);
 
+  // Main effect for fetching addresses
   useEffect(() => {
-    if (user) {
+    if (user && !hasInitialFetch.current) {
+      console.log("🔄 Initial address fetch triggered", {
+        user: !!user,
+        filterType,
+        currentPage: currentPageRef.current,
+      });
+      hasInitialFetch.current = true;
       debouncedFetch(fetchAddresses);
     }
-  }, [user, filterType, fetchAddresses, debouncedFetch]);
+  }, [user, filterType, debouncedFetch, fetchAddresses]);
+
+  // Separate effect for filter changes
+  useEffect(() => {
+    if (user && hasInitialFetch.current) {
+      console.log("🔄 Filter changed, refetching addresses", {
+        filterType,
+        currentPage: currentPageRef.current,
+      });
+      debouncedFetch(fetchAddresses);
+    }
+  }, [filterType, user, debouncedFetch, fetchAddresses]);
+
+  // Separate effect for pagination changes (only when manually changed)
+  useEffect(() => {
+    if (user && hasInitialFetch.current && currentPageRef.current > 1) {
+      console.log(
+        "🔄 Pagination changed, fetching addresses for page",
+        currentPageRef.current,
+      );
+      debouncedFetch(fetchAddresses);
+    }
+  }, [pagination.currentPage, user, debouncedFetch, fetchAddresses]);
+
+  // Create a stable refresh function
+  const refreshAddresses = useCallback(() => {
+    fetchAttempts.current = 0; // Reset attempts for manual refresh
+    hasInitialFetch.current = false; // Allow refetch on manual refresh
+    fetchAddresses();
+  }, [fetchAddresses]);
 
   // Expose refresh function to parent component
   useEffect(() => {
     if (onRefresh) {
-      onRefresh(() => {
-        fetchAttempts.current = 0; // Reset attempts for manual refresh
-        fetchAddresses();
-      });
+      onRefresh(refreshAddresses);
     }
-  }, [onRefresh, fetchAddresses]);
+  }, [onRefresh, refreshAddresses]);
 
   const handleAddAddress = useCallback(
     async (newAddress: Partial<Address>) => {
@@ -300,6 +433,10 @@ const AddressManager: React.FC<AddressManagerProps> = ({
 
         // Address added successfully
         setShowAddForm(false);
+        toast({
+          title: "Address added successfully!",
+          description: "Your new address has been added to your list.",
+        });
         // Refetch addresses
         fetchAddresses();
       } catch (err) {
@@ -312,7 +449,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
         setIsLoading(false);
       }
     },
-    [fetchAddresses, onError, setUser, supabase.auth],
+    [fetchAddresses, onError, setUser, supabase.auth, toast],
   );
 
   const handleToggleAddForm = () => {
@@ -337,6 +474,24 @@ const AddressManager: React.FC<AddressManagerProps> = ({
 
   const handleFilterChange = (value: string) => {
     setFilterType(value as "all" | "shared" | "private");
+    // Reset to first page when filter changes
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPagination((prev) => ({ ...prev, currentPage: newPage }));
+  };
+
+  const handlePrevPage = () => {
+    if (pagination.hasPrevPage) {
+      setPagination((prev) => ({ ...prev, currentPage: prev.currentPage - 1 }));
+    }
+  };
+
+  const handleNextPage = () => {
+    if (pagination.hasNextPage) {
+      setPagination((prev) => ({ ...prev, currentPage: prev.currentPage + 1 }));
+    }
   };
 
   const getAddressBadge = (address: Address) => {
@@ -352,16 +507,39 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   return (
     <div className="address-manager w-full space-y-4">
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-red-500">
-          <p>{error}</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setError(null)}
-            className="mt-2 text-red-700 hover:bg-red-100 hover:text-red-900"
-          >
-            Dismiss
-          </Button>
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-red-700">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-red-400"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm font-medium">{error}</p>
+              <p className="mt-1 text-xs text-red-600">
+                Please check your input and try again. If the problem persists,
+                contact support.
+              </p>
+            </div>
+            <div className="ml-auto pl-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setError(null)}
+                className="text-red-700 hover:bg-red-100 hover:text-red-900"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -388,7 +566,10 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       {isLoading ? (
         <div className="flex items-center justify-center p-4">
           <Spinner />
-          <p className="ml-2 text-gray-600">Loading addresses...</p>
+          <p className="ml-2 text-gray-600">
+            Loading addresses... (isLoading: {isLoading.toString()}, addresses
+            count: {addresses.length})
+          </p>
         </div>
       ) : (
         <div className="mb-6">
@@ -454,10 +635,10 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       )}
 
       {showManagementButtons && (
-        <div className="flex space-x-4 pb-6">
+        <div className="flex flex-col gap-3 pb-6 sm:flex-row sm:space-x-4">
           <Link
             href="/addresses"
-            className="rounded-md bg-blue-500 px-4 py-2 text-white transition hover:bg-blue-600"
+            className="rounded-md bg-blue-500 px-4 py-2 text-center text-white transition hover:bg-blue-600 sm:text-left"
           >
             Manage Addresses
           </Link>
@@ -494,6 +675,46 @@ const AddressManager: React.FC<AddressManagerProps> = ({
               isRestaurant: false,
             }}
           />
+        </div>
+      )}
+
+      {/* Pagination Section */}
+      {!isLoading && pagination.totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between border-t bg-slate-50 p-4">
+          <Pagination>
+            <PaginationContent className="flex-wrap gap-1">
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={handlePrevPage}
+                  className={`${!pagination.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
+                />
+              </PaginationItem>
+              {/* Basic Pagination - Consider a more advanced version for many pages */}
+              {[...Array(pagination.totalPages)].map((_, i) => (
+                <PaginationItem key={i} className="hidden sm:block">
+                  <PaginationLink
+                    onClick={() => handlePageChange(i + 1)}
+                    isActive={pagination.currentPage === i + 1}
+                    className={`cursor-pointer text-sm ${pagination.currentPage === i + 1 ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "hover:bg-slate-200"}`}
+                  >
+                    {i + 1}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              {/* Mobile: Show current page info */}
+              <PaginationItem className="sm:hidden">
+                <span className="px-3 py-2 text-sm text-slate-600">
+                  {pagination.currentPage} of {pagination.totalPages}
+                </span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  onClick={handleNextPage}
+                  className={`${!pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
     </div>

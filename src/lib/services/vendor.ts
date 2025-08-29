@@ -34,7 +34,7 @@ export interface OrderData {
   };
 }
 
-export interface VendorMetrics {
+export interface UserOrderMetrics {
   activeOrders: number;
   completedOrders: number;
   cancelledOrders: number;
@@ -58,7 +58,7 @@ export async function getCurrentUserId() {
   return profile ? profile.id : null;
 }
 
-export async function checkVendorAccess() {
+export async function checkOrderAccess() {
   const user = await getCurrentUser();
   if (!user?.email) {
     return false;
@@ -69,15 +69,52 @@ export async function checkVendorAccess() {
     select: { id: true, type: true }
   });
 
-  if (!profile || profile.type !== 'VENDOR') {
+  if (!profile) {
     return false;
   }
 
-  return true;
+  // Allow access to users with VENDOR type or users who have orders
+  if (profile.type === 'VENDOR') {
+    return true;
+  }
+
+  // Check if user has any orders (catering or on-demand)
+  const [cateringCount, onDemandCount] = await Promise.all([
+    prisma.cateringRequest.count({
+      where: { userId: profile.id, deletedAt: null }
+    }),
+    prisma.onDemand.count({
+      where: { userId: profile.id, deletedAt: null }
+    })
+  ]);
+
+  return (cateringCount + onDemandCount) > 0;
 }
 
-// Get vendor's orders
+// Check if current user has vendor access
+export async function checkVendorAccess(): Promise<boolean> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return false;
+    }
+    
+    // Check if user has any orders (basic vendor access check)
+    const result = await getUserOrders(1, 1);
+    return result.orders.length > 0;
+  } catch (error) {
+    console.error('Error checking vendor access:', error);
+    return false;
+  }
+}
+
+// Get vendor orders (alias for getUserOrders for backward compatibility)
 export async function getVendorOrders(limit = 10, page = 1) {
+  return getUserOrders(limit, page);
+}
+
+// Get user's orders
+export async function getUserOrders(limit = 10, page = 1) {
   const userId = await getCurrentUserId();
   if (!userId) {
     throw new Error("Unauthorized");
@@ -189,26 +226,26 @@ export async function getVendorOrders(limit = 10, page = 1) {
   };
 }
 
-// Get vendor metrics
-export async function getVendorMetrics() {
+// Get user order metrics
+export async function getUserOrderMetrics() {
   const userId = await getCurrentUserId();
   if (!userId) {
     throw new Error("Unauthorized");
   }
 
-  // Count active catering orders
+  // Count active catering orders (ACTIVE, ASSIGNED, IN_PROGRESS, CONFIRMED)
   const activeCateringCount = await prisma.cateringRequest.count({
     where: {
       userId: userId,
-      status: "ACTIVE"
+      status: { in: ["ACTIVE", "ASSIGNED", "IN_PROGRESS", "CONFIRMED"] }
     }
   });
 
-  // Count active on-demand orders
+  // Count active on-demand orders (ACTIVE, ASSIGNED, IN_PROGRESS, CONFIRMED)
   const activeOnDemandCount = await prisma.onDemand.count({
     where: {
       userId: userId,
-      status: "ACTIVE"
+      status: { in: ["ACTIVE", "ASSIGNED", "IN_PROGRESS", "CONFIRMED"] }
     }
   });
 

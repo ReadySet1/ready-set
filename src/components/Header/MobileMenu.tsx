@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/contexts/UserContext";
 import { MenuItem } from "@/types/menu";
 import { UserType } from "@/types/user";
+import { clearAuthCookies } from "@/utils/auth/cookies";
 
 // Map user roles to their specific menu items
 const ROLE_MENU_ITEMS: Record<UserType, MenuItem> = {
@@ -203,6 +204,10 @@ const MobileMenuOverlay: React.FC<{
 
     try {
       setIsSigningOut(true);
+
+      // Clear all authentication cookies before signing out
+      clearAuthCookies();
+
       await supabase.auth.signOut();
       window.location.href = "/";
       navbarToggleHandler();

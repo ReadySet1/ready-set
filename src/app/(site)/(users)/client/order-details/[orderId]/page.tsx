@@ -124,7 +124,7 @@ const OrderDetailsPage = () => {
     if (orderId) {
       fetchOrderDetails();
     }
-  }, [orderId]);
+  }, [orderId, router]);
 
   const formatCurrency = (amount: number | string | null) => {
     if (!amount) return "$0.00";
