@@ -7,7 +7,6 @@ import React, {
   useState,
   useEffect,
   ReactNode,
-  useCallback,
 } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
@@ -40,7 +39,7 @@ type UserContextType = {
 };
 
 // Create the context
-const UserContext = createContext<UserContextType>({
+export const UserContext = createContext<UserContextType>({
   session: null,
   user: null,
   userRole: null,
@@ -62,18 +61,62 @@ export const useUser = () => {
   return context;
 };
 
-// Helper function to fetch user role
+// Import auth hydration utilities
+import {
+  recoverAuthState,
+  clearAllHydrationData,
+} from "@/utils/auth/hydration";
+import AuthErrorBoundary from "@/components/ErrorBoundary/AuthErrorBoundary";
+import {
+  retryAuthOperation,
+  setCachedUserProfile,
+  getCachedUserProfile,
+  persistAuthState,
+  getPersistedAuthState,
+  clearPersistedAuthState,
+} from "@/utils/supabase/client";
+
+// Enhanced helper function to fetch user role with caching and retry
 const fetchUserRole = async (
   supabase: any,
   user: User,
   setUserRole: (role: UserType) => void,
 ) => {
   try {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("type")
-      .eq("id", user.id)
-      .single();
+    // Check cache first
+    const cachedProfile = getCachedUserProfile(user.id);
+    if (cachedProfile && cachedProfile.type) {
+      console.log("Using cached user profile:", cachedProfile);
+      setUserRole(cachedProfile.type);
+      return cachedProfile.type;
+    }
+
+    // Fetch from database with retry mechanism
+    const profile = await retryAuthOperation(
+      async () => {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("type, email, name")
+          .eq("id", user.id)
+          .single();
+
+        if (error) throw error;
+        return data;
+      },
+      {
+        maxAttempts: 3,
+        baseDelay: 1000,
+        retryCondition: (error) => {
+          // Retry on network errors but not on "not found" errors
+          return (
+            !error?.code?.includes("PGRST116") &&
+            (error?.message?.includes("network") ||
+              error?.message?.includes("timeout") ||
+              error?.message?.includes("connection"))
+          );
+        },
+      },
+    );
 
     let role = UserType.CLIENT;
     if (profile?.type) {
@@ -90,16 +133,58 @@ const fetchUserRole = async (
       }
     }
 
+    // Cache the profile data for future use (persistent across sessions)
+    if (profile) {
+      setCachedUserProfile(
+        user.id,
+        {
+          type: role,
+          email: profile.email || user.email,
+          name:
+            profile.name ||
+            user.user_metadata?.name ||
+            user.email?.split("@")[0],
+        },
+        true,
+      ); // persistent = true
+    }
+
+    // Persist auth state for reliability
+    if (user.email && role) {
+      persistAuthState({
+        userId: user.id,
+        email: user.email,
+        userRole: role,
+        sessionData: profile,
+      });
+    }
+
     setUserRole(role);
     return role;
   } catch (err) {
     console.error("Error fetching user role:", err);
+
+    // Try to use any persisted auth state as fallback
+    const persistedState = getPersistedAuthState();
+    if (
+      persistedState &&
+      persistedState.userId === user.id &&
+      persistedState.userRole
+    ) {
+      console.log("Using persisted auth state as fallback:", persistedState);
+      const fallbackRole = persistedState.userRole as UserType;
+      setUserRole(fallbackRole);
+      return fallbackRole;
+    }
+
     return null;
   }
 };
 
 // Create a client component wrapper
 function UserProviderClient({ children }: { children: ReactNode }) {
+  console.log("🟢 UserProviderClient MOUNTING - this should appear first!");
+
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<UserType | null>(null);
@@ -117,6 +202,155 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     message: string;
   }>({ step: "idle", message: "" });
   const [supabase, setSupabase] = useState<any>(null);
+  const [hasImmediateData, setHasImmediateData] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  console.log(
+    "🟢 UserProviderClient state initialized - user:",
+    !!user,
+    "isLoading:",
+    isLoading,
+  );
+
+  // 🔥 IMMEDIATE COOKIE CHECK (NOT in useEffect) - executes during render
+  // Only run on client after hydration to prevent server/client mismatches
+  if (
+    typeof window !== "undefined" &&
+    isHydrated &&
+    !user &&
+    !hasImmediateData
+  ) {
+    console.log("🔥 IMMEDIATE cookie check during render...");
+    const cookies = document.cookie;
+    const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
+
+    if (sessionMatch && sessionMatch[1]) {
+      try {
+        const decoded = decodeURIComponent(sessionMatch[1]);
+        const sessionData = JSON.parse(decoded);
+        console.log("🔥 IMMEDIATE: Found session data:", sessionData);
+
+        if (sessionData.userId && sessionData.email && sessionData.userRole) {
+          console.log("🔥 IMMEDIATE: Setting user state immediately!");
+
+          const mockUser = {
+            id: sessionData.userId,
+            email: sessionData.email,
+            user_metadata: {
+              name: sessionData.email?.split("@")[0] || "User",
+            },
+          } as unknown as User;
+
+          const normalizedRole = sessionData.userRole.toLowerCase() as UserType;
+
+          // Set state in next tick to avoid render phase issues
+          if (!user) {
+            setTimeout(() => {
+              setUser(mockUser);
+              setUserRole(normalizedRole);
+              setHasImmediateData(true);
+              setIsLoading(false);
+              console.log("🔥 IMMEDIATE: Auth state set successfully!");
+            }, 0);
+          }
+        }
+      } catch (error) {
+        console.error("🔥 IMMEDIATE: Failed to parse cookie:", error);
+      }
+    } else {
+      console.log("🔥 IMMEDIATE: No session cookie found");
+    }
+  }
+
+  // Set hydration flag to prevent server/client mismatches
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  // Hydrate auth state synchronously on mount using server-side data
+  useEffect(() => {
+    console.log("🚀🚀🚀 FORCED UserContext useEffect TRIGGERED!");
+    console.log("🚀🚀🚀 FORCED UserContext: Starting hydration check...");
+    console.log("🚀 Window available?", typeof window !== "undefined");
+
+    // Force check cookies directly as backup
+    if (typeof window !== "undefined") {
+      const cookies = document.cookie;
+      console.log("🍪 FORCED Cookie check - length:", cookies.length);
+      console.log("🍪 FORCED Cookie preview:", cookies.substring(0, 200));
+
+      // Manual cookie parsing as backup
+      const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
+      if (sessionMatch && sessionMatch[1]) {
+        console.log("🔍 FORCED Found session cookie manually!");
+        try {
+          const decoded = decodeURIComponent(sessionMatch[1]);
+          const sessionData = JSON.parse(decoded);
+          console.log("📊 FORCED Manual session data:", sessionData);
+
+          if (sessionData.userId && sessionData.email && sessionData.userRole) {
+            console.log("✅ FORCED Creating user from manual parsing...");
+
+            // Create user object directly from cookie data
+            const mockUser = {
+              id: sessionData.userId,
+              email: sessionData.email,
+              user_metadata: {
+                name: sessionData.email?.split("@")[0] || "User",
+              },
+            } as unknown as User;
+
+            // Normalize userRole to lowercase
+            const normalizedRole =
+              sessionData.userRole.toLowerCase() as UserType;
+
+            setTimeout(() => {
+              setUser(mockUser);
+              setUserRole(normalizedRole);
+              setHasImmediateData(true);
+              setIsLoading(false);
+              console.log(
+                "✅ FORCED Hydrated auth state successfully with manual parsing!",
+              );
+            }, 0);
+            return; // Exit early since we found the data
+          }
+        } catch (error) {
+          console.error("❌ FORCED Manual parsing failed:", error);
+        }
+      }
+    }
+
+    // Fallback to original method
+    const recoveredState = recoverAuthState();
+    if (recoveredState) {
+      console.log("✅ Recovered auth state from hydration:", recoveredState);
+
+      // Create a mock user object from recovered state
+      const mockUser = {
+        id: recoveredState.userId,
+        email: recoveredState.email,
+        user_metadata: recoveredState.profileData
+          ? {
+              name: recoveredState.profileData.name,
+            }
+          : undefined,
+      } as unknown as User;
+
+      setTimeout(() => {
+        setUser(mockUser);
+        setUserRole(recoveredState.userRole);
+        setHasImmediateData(true);
+        setIsLoading(false); // We have hydrated data, not loading anymore
+      }, 0);
+
+      console.log(
+        "✅ Hydrated auth state successfully - user should be visible in header",
+      );
+    } else {
+      console.log("❌ No auth state found during hydration check");
+    }
+  }, []);
 
   // Initialize Supabase
   useEffect(() => {
@@ -138,45 +372,14 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           err,
         );
         setError("Authentication initialization failed");
-        setIsLoading(false);
-        setAuthProgressState({ step: "idle", message: "" });
+        if (!hasImmediateData) {
+          setIsLoading(false);
+        }
       }
     };
 
     initSupabase();
-  }, []);
-
-  // Function to set auth progress with optional custom message
-  const setAuthProgress = useCallback(
-    (step: UserContextType["authProgress"]["step"], message?: string) => {
-      const defaultMessages = {
-        idle: "",
-        connecting: "Connecting to authentication service...",
-        authenticating: "Verifying credentials...",
-        fetching_profile: "Loading user profile...",
-        redirecting: "Redirecting to dashboard...",
-        complete: "Authentication complete!",
-      };
-
-      setAuthProgressState({
-        step,
-        message: message || defaultMessages[step],
-      });
-
-      // Update isAuthenticating state based on progress
-      setIsAuthenticating(step !== "idle" && step !== "complete");
-
-      console.log(
-        `🔄 UserContext: Auth progress - ${step}: ${message || defaultMessages[step]}`,
-      );
-    },
-    [],
-  );
-
-  // Function to clear auth errors
-  const clearAuthError = useCallback(() => {
-    setError(null);
-  }, []);
+  }, [hasImmediateData]);
 
   // Load user data
   useEffect(() => {
@@ -185,41 +388,86 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       return;
     }
 
-    console.log("🔐 UserContext: Setting up auth state...");
+    console.log("Setting up auth state...");
     let mounted = true;
     let authListener: any = null;
 
     const setupAuth = async () => {
       try {
-        console.log("👤 UserContext: Getting initial user data...");
-        setAuthProgress("fetching_profile", "Checking current session...");
+        console.log("UserContext: Getting initial user data...");
 
+        // Add a small delay to allow middleware session refresh to complete
+        // especially important after login redirects
+        await new Promise((resolve) => setTimeout(resolve, 150));
+
+        // Use retry mechanism for getting user data
         const {
           data: { user: currentUser },
           error: getUserError,
-        } = await supabase.auth.getUser();
+        } = await retryAuthOperation<{
+          data: { user: User | null };
+          error: any;
+        }>(() => supabase.auth.getUser(), {
+          maxAttempts: 3,
+          baseDelay: 500,
+          retryCondition: (error) => {
+            // Retry on network errors AND session missing errors (which can happen during login transitions)
+            return (
+              error?.message?.includes("network") ||
+              error?.message?.includes("timeout") ||
+              error?.message?.includes("connection") ||
+              error?.message?.includes("Auth session missing")
+            );
+          },
+        });
 
         if (!mounted) return;
 
         if (getUserError) {
-          console.error("❌ UserContext: Error getting user:", getUserError);
-          setError("Failed to retrieve user session");
-          setIsLoading(false);
-          setAuthProgress("idle");
+          console.error("❌ Error getting user:", getUserError);
+
+          // If we have immediate hydration data but Supabase session is missing,
+          // try to recover gracefully without showing error immediately
+          if (
+            hasImmediateData &&
+            getUserError.message?.includes("Auth session missing")
+          ) {
+            console.log(
+              "⚠️  Session missing but we have hydration data, continuing with hydrated state",
+            );
+            // Don't set error or stop loading immediately, let hydration data work
+            return;
+          }
+
+          if (!hasImmediateData) {
+            setIsLoading(false);
+          }
           return;
         }
 
         if (currentUser) {
-          setUser(currentUser);
-          console.log("✅ UserContext: User found. Fetching user role...");
-          setAuthProgress("fetching_profile", "Loading user permissions...");
+          // If we have immediate data, verify it matches current user
+          if (hasImmediateData) {
+            console.log(
+              "UserContext: Verifying immediate data with current user...",
+            );
+            // Update user object with full Supabase user data
+            setUser(currentUser);
 
-          const role = await fetchUserRole(supabase, currentUser, setUserRole);
-
-          if (mounted) {
-            setAuthProgress("complete", "Session loaded successfully");
-            // Reset to idle after a brief moment to show completion
-            setTimeout(() => setAuthProgress("idle"), 1000);
+            // Only fetch role from DB if hydrated data doesn't match current user ID
+            const recoveredState = recoverAuthState();
+            if (!recoveredState || recoveredState.userId !== currentUser.id) {
+              console.log(
+                "UserContext: Hydrated data mismatch, fetching fresh role...",
+              );
+              await fetchUserRole(supabase, currentUser, setUserRole);
+            }
+          } else {
+            // No immediate data, fetch everything normally
+            setUser(currentUser);
+            console.log("UserContext: User found. Fetching user role...");
+            await fetchUserRole(supabase, currentUser, setUserRole);
+            setIsLoading(false);
           }
         } else {
           console.log(
@@ -227,88 +475,44 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           );
           setUser(null);
           setUserRole(null);
-          setAuthProgress("idle");
+          if (!hasImmediateData) {
+            setIsLoading(false);
+          }
         }
 
-        setIsLoading(false);
-
-        // Set up auth state change listener
-        console.log("👂 UserContext: Setting up auth state change listener...");
         const { data: listener } = supabase.auth.onAuthStateChange(
           async (event: string, session: Session | null) => {
             if (!mounted) return;
 
-            console.log(`🔄 UserContext: Auth state changed: ${event}`);
+            console.log("Auth state changed:", _event);
+            setSession(session);
 
-            // Handle different auth events
-            switch (event) {
-              case "SIGNED_IN":
-                console.log("✅ UserContext: User signed in");
-                setAuthProgress("authenticating", "Signing you in...");
-                setSession(session);
-                setUser(session?.user || null);
+            const newUser = session?.user || null;
+            setUser(newUser);
 
-                if (session?.user) {
-                  setAuthProgress(
-                    "fetching_profile",
-                    "Loading your profile...",
-                  );
-                  const role = await fetchUserRole(
-                    supabase,
-                    session.user,
-                    setUserRole,
-                  );
-                  setAuthProgress("redirecting", "Redirecting to dashboard...");
-                }
-                break;
+            if (!newUser) {
+              setUserRole(null);
+              setHasImmediateData(false);
+              setIsLoading(false);
+              // Clear all auth data when user signs out
+              clearAllHydrationData();
+              clearPersistedAuthState();
+              return;
+            }
 
-              case "SIGNED_OUT":
-                console.log("👋 UserContext: User signed out");
-                setAuthProgress("idle", "Signed out successfully");
-                setSession(null);
-                setUser(null);
-                setUserRole(null);
-                // Reset to idle after showing completion
-                setTimeout(() => setAuthProgress("idle"), 1500);
-                break;
-
-              case "TOKEN_REFRESHED":
-                console.log("🔄 UserContext: Token refreshed");
-                setSession(session);
-                setUser(session?.user || null);
-                if (session?.user) {
-                  const role = await fetchUserRole(
-                    supabase,
-                    session.user,
-                    setUserRole,
-                  );
-                }
-                break;
-
-              case "USER_UPDATED":
-                console.log("📝 UserContext: User updated");
-                setSession(session);
-                setUser(session?.user || null);
-                if (session?.user) {
-                  const role = await fetchUserRole(
-                    supabase,
-                    session.user,
-                    setUserRole,
-                  );
-                }
-                break;
-
-              default:
-                console.log(`ℹ️ UserContext: Unhandled auth event: ${event}`);
-                setSession(session);
-                setUser(session?.user || null);
-                if (session?.user) {
-                  const role = await fetchUserRole(
-                    supabase,
-                    session.user,
-                    setUserRole,
-                  );
-                }
+            // Clear immediate data flag on auth state changes
+            if (
+              _event === "SIGNED_IN" ||
+              _event === "SIGNED_OUT" ||
+              _event === "TOKEN_REFRESHED"
+            ) {
+              if (newUser?.id !== currentUser?.id) {
+                console.log("Auth state change: fetching fresh user role...");
+                setHasImmediateData(false);
+                setIsLoading(true);
+                await fetchUserRole(supabase, newUser, setUserRole);
+                setIsLoading(false);
+              }
             }
           },
         );
@@ -332,20 +536,39 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         authListener.subscription.unsubscribe();
       }
     };
-  }, [supabase, setAuthProgress]);
+  }, [supabase, hasImmediateData]);
 
   // Function to manually refresh user data
   const refreshUserData = async () => {
     if (!supabase) return;
 
+    // Clear all auth data when manually refreshing
+    clearAllHydrationData();
+    clearPersistedAuthState();
+    setHasImmediateData(false);
     setIsLoading(true);
-    setAuthProgress("fetching_profile", "Refreshing user data...");
 
     try {
+      // Use retry mechanism for refresh operation
       const {
         data: { user: currentUser },
         error: getUserError,
-      } = await supabase.auth.getUser();
+      } = await retryAuthOperation<{ data: { user: User | null }; error: any }>(
+        () => supabase.auth.getUser(),
+        {
+          maxAttempts: 3,
+          baseDelay: 1000,
+          retryCondition: (error) => {
+            // Retry on network/temporary errors
+            return (
+              error?.message?.includes("network") ||
+              error?.message?.includes("timeout") ||
+              error?.message?.includes("connection") ||
+              error?.message?.includes("temporary")
+            );
+          },
+        },
+      );
 
       if (getUserError) {
         throw getUserError;
@@ -354,22 +577,57 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       setUser(currentUser);
 
       if (currentUser) {
-        const role = await fetchUserRole(supabase, currentUser, setUserRole);
-        setAuthProgress("complete", "Data refreshed successfully");
+        await fetchUserRole(supabase, currentUser, setUserRole);
       } else {
         setUserRole(null);
         setAuthProgress("idle");
       }
     } catch (err) {
-      console.error("❌ UserContext: Error refreshing user data:", err);
-      setError("Failed to refresh user data");
-      setAuthProgress("idle");
+      console.error("Error refreshing user data:", err);
+      setError("Failed to refresh user data. Please try again.");
+
+      // Try to recover from persisted state as last resort
+      try {
+        const persistedState = getPersistedAuthState();
+        if (persistedState) {
+          console.log("Attempting recovery from persisted state...");
+          const mockUser = {
+            id: persistedState.userId,
+            email: persistedState.email,
+          } as User;
+
+          setUser(mockUser);
+          setUserRole(persistedState.userRole as UserType);
+          setError(null); // Clear error if recovery succeeds
+          console.log("Successfully recovered from persisted state");
+        }
+      } catch (recoveryError) {
+        console.error("Failed to recover from persisted state:", recoveryError);
+      }
     } finally {
       setIsLoading(false);
       // Reset to idle after showing completion
       setTimeout(() => setAuthProgress("idle"), 1000);
     }
   };
+
+  // Prevent hydration mismatches by ensuring consistent initial render
+  if (!isHydrated) {
+    return (
+      <UserContext.Provider
+        value={{
+          session: null,
+          user: null,
+          userRole: null,
+          isLoading: true,
+          error: null,
+          refreshUserData,
+        }}
+      >
+        {children}
+      </UserContext.Provider>
+    );
+  }
 
   return (
     <UserContext.Provider
@@ -379,11 +637,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         userRole,
         isLoading,
         error,
-        isAuthenticating,
-        authProgress,
         refreshUserData,
-        clearAuthError,
-        setAuthProgress,
       }}
     >
       {children}
@@ -393,5 +647,23 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
 // Export the provider component
 export function UserProvider({ children }: { children: ReactNode }) {
-  return <UserProviderClient>{children}</UserProviderClient>;
+  console.log("🔵 UserProvider wrapper called!");
+  return (
+    <AuthErrorBoundary
+      onError={(error, errorInfo) => {
+        // Log auth errors for monitoring
+        console.error("🚨 Auth Error Boundary triggered:", {
+          error: error.message,
+          stack: error.stack,
+          componentStack: errorInfo.componentStack,
+          timestamp: new Date().toISOString(),
+        });
+
+        // You can add error reporting service here
+        // e.g., Sentry, LogRocket, etc.
+      }}
+    >
+      <UserProviderClient>{children}</UserProviderClient>
+    </AuthErrorBoundary>
+  );
 }

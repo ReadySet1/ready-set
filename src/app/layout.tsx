@@ -11,6 +11,7 @@ import { UserProvider } from "@/contexts/UserContext";
 import { Toaster } from "@/components/ui/toaster";
 import { CONSTANTS } from "@/constants";
 import UmamiAnalytics from "@/components/Analytics/UmamiAnalytics";
+import QueryProvider from "@/providers/QueryProvider";
 import type { Metadata } from "next";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://readysetllc.com";
@@ -81,9 +82,11 @@ export default function RootLayout({
       <head></head>
       <body className="overflow-x-hidden">
         <GlobalErrorBoundary>
-          <UserProvider>
-            <ClientLayout>{children}</ClientLayout>
-          </UserProvider>
+          <QueryProvider>
+            <UserProvider>
+              <ClientLayout>{children}</ClientLayout>
+            </UserProvider>
+          </QueryProvider>
         </GlobalErrorBoundary>
         <Toaster />
         {/* {process.env.NODE_ENV === "development" && <VercelToolbar />} */}

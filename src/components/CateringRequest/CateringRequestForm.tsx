@@ -24,6 +24,8 @@ import {
 import { useUploadFile, UploadedFile } from "@/hooks/use-upload-file";
 import { FileWithPath } from "react-dropzone";
 import { HostSection } from "./HostSection";
+import { useUser } from "@/contexts/UserContext";
+import { getOrderCreationRedirectRoute } from "@/utils/routing";
 
 // Form field components
 const InputField: React.FC<{
@@ -223,6 +225,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   isAdminMode = false,
 }) => {
   const router = useRouter();
+  const { userRole } = useUser();
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -325,6 +328,15 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   }, [supabase]);
 
   const handleAddressesLoaded = useCallback((loadedAddresses: Address[]) => {
+    console.log("📥 handleAddressesLoaded called in CateringRequestForm", {
+      count: loadedAddresses.length,
+      addresses: loadedAddresses.map((a) => ({
+        id: a.id,
+        street1: a.street1,
+        city: a.city,
+        state: a.state,
+      })),
+    });
     setAddresses(loadedAddresses);
   }, []);
 
@@ -549,9 +561,12 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
       toast.success("Catering request submitted successfully!");
       setErrorMessage("");
 
-      // --- Redirect to Vendor Dashboard ---
-      console.log("Redirecting user to vendor dashboard");
-      router.push("/vendor");
+      // --- Redirect based on user role instead of hardcoded vendor dashboard ---
+      const redirectRoute = getOrderCreationRedirectRoute(userRole);
+      console.log(
+        `Redirecting user to ${redirectRoute} based on role: ${userRole}`,
+      );
+      router.push(redirectRoute);
       // --- End Redirect Logic ---
     } catch (error) {
       console.error("Error submitting order:", error);

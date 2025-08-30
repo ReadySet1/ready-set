@@ -6,6 +6,46 @@ import { prisma } from "@/lib/db/prisma-client";
 import { AddressFormData } from "@/types/address";
 import { createClient } from "@/utils/supabase/server";
 
+// Simple in-memory rate limiting (in production, use Redis)
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 30; // 30 requests per minute
+
+function checkRateLimit(userId: string): { allowed: boolean; remaining: number; resetTime: number } {
+  const now = Date.now();
+  const userLimit = rateLimitMap.get(userId);
+
+  if (!userLimit || now > userLimit.resetTime) {
+    // Reset or create new limit
+    rateLimitMap.set(userId, {
+      count: 1,
+      resetTime: now + RATE_LIMIT_WINDOW,
+    });
+    return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - 1, resetTime: now + RATE_LIMIT_WINDOW };
+  }
+
+  if (userLimit.count >= MAX_REQUESTS_PER_WINDOW) {
+    return { allowed: false, remaining: 0, resetTime: userLimit.resetTime };
+  }
+
+  // Increment count
+  userLimit.count++;
+  rateLimitMap.set(userId, userLimit);
+
+  return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - userLimit.count, resetTime: userLimit.resetTime };
+}
+
+// Clean up old rate limit entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, limit] of rateLimitMap.entries()) {
+    if (now > limit.resetTime) {
+      rateLimitMap.delete(userId);
+    }
+  }
+}, RATE_LIMIT_WINDOW);
+
 /**
  * GET handler for fetching addresses
  */
@@ -37,6 +77,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Check rate limit
+    const rateLimit = checkRateLimit(currentUser.id);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { 
+          error: "Rate limit exceeded", 
+          retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000) 
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': Math.ceil((rateLimit.resetTime - Date.now()) / 1000).toString(),
+            'X-RateLimit-Limit': MAX_REQUESTS_PER_WINDOW.toString(),
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'X-RateLimit-Reset': new Date(rateLimit.resetTime).toISOString(),
+          }
+        },
+      );
+    }
+
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
@@ -49,6 +109,24 @@ export async function GET(request: NextRequest) {
     if (id) {
       const address = await prisma.address.findUnique({
         where: { id },
+        // Optimize query by selecting only needed fields
+        select: {
+          id: true,
+          name: true,
+          street1: true,
+          street2: true,
+          city: true,
+          state: true,
+          zip: true,
+          county: true,
+          isRestaurant: true,
+          isShared: true,
+          locationNumber: true,
+          parkingLoading: true,
+          createdAt: true,
+          createdBy: true,
+          updatedAt: true,
+        },
       });
 
       // Check if address exists
@@ -67,7 +145,17 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      return NextResponse.json(address);
+      // Add cache headers for individual address requests
+      const response = NextResponse.json(address);
+      response.headers.set('Cache-Control', 'private, max-age=300'); // 5 minutes
+      response.headers.set('ETag', `"${currentUser.id}-${id}"`);
+      
+      // Add rate limit headers
+      response.headers.set('X-RateLimit-Limit', MAX_REQUESTS_PER_WINDOW.toString());
+      response.headers.set('X-RateLimit-Remaining', rateLimit.remaining.toString());
+      response.headers.set('X-RateLimit-Reset', new Date(rateLimit.resetTime).toISOString());
+      
+      return response;
     }
 
     // Different query strategies based on filter parameter
@@ -76,6 +164,24 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" as const },
       skip,
       take: limit,
+      // Optimize query by selecting only needed fields
+      select: {
+        id: true,
+        name: true,
+        street1: true,
+        street2: true,
+        city: true,
+        state: true,
+        zip: true,
+        county: true,
+        isRestaurant: true,
+        isShared: true,
+        locationNumber: true,
+        parkingLoading: true,
+        createdAt: true,
+        createdBy: true,
+        updatedAt: true,
+      },
     };
 
     // Build the query based on the filter
@@ -102,7 +208,7 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // Execute the query with pagination
+    // Execute the query with pagination using Promise.all for parallel execution
     const [addresses, totalCount] = await Promise.all([
       prisma.address.findMany(addressesQuery),
       prisma.address.count({ where: addressesQuery.where }),
@@ -117,8 +223,8 @@ export async function GET(request: NextRequest) {
       `Found ${addresses.length} addresses for user ${currentUser.id} (page ${page} of ${totalPages})`,
     );
 
-    // Return paginated response
-    return NextResponse.json({
+    // Return paginated response with cache headers
+    const response = NextResponse.json({
       addresses,
       pagination: {
         currentPage: page,
@@ -129,6 +235,18 @@ export async function GET(request: NextRequest) {
         limit,
       },
     });
+
+    // Add cache headers to prevent unnecessary refetches
+    // Short cache for paginated results to allow for real-time updates
+    response.headers.set('Cache-Control', 'private, max-age=60'); // 1 minute
+    response.headers.set('ETag', `"${currentUser.id}-${filterParam}-${page}-${limit}"`);
+    
+    // Add rate limit headers
+    response.headers.set('X-RateLimit-Limit', MAX_REQUESTS_PER_WINDOW.toString());
+    response.headers.set('X-RateLimit-Remaining', rateLimit.remaining.toString());
+    response.headers.set('X-RateLimit-Reset', new Date(rateLimit.resetTime).toISOString());
+    
+    return response;
   } catch (error) {
     console.error("Error fetching addresses:", error);
     return NextResponse.json(
@@ -146,6 +264,7 @@ export async function POST(request: NextRequest) {
     // Get the authorization header
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error("POST /api/addresses: Missing or invalid authorization header");
       return NextResponse.json(
         { error: "Authentication required - Invalid authorization header" },
         { status: 401 },
@@ -162,7 +281,7 @@ export async function POST(request: NextRequest) {
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !currentUser?.id) {
-      console.error("Auth error:", authError);
+      console.error("POST /api/addresses: Auth error:", authError);
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 },
@@ -170,49 +289,113 @@ export async function POST(request: NextRequest) {
     }
 
     const formData: AddressFormData = await request.json();
+    console.log("POST /api/addresses: Received form data:", { 
+      userId: currentUser.id, 
+      formData: { ...formData, createdBy: currentUser.id } 
+    });
 
-    // Basic validation
-    if (
-      !formData.street1 ||
-      !formData.city ||
-      !formData.state ||
-      !formData.zip
-    ) {
+    // Enhanced validation with detailed error messages
+    const validationErrors: string[] = [];
+    if (!formData.street1?.trim()) {
+      validationErrors.push("Street address is required");
+    }
+    if (!formData.city?.trim()) {
+      validationErrors.push("City is required");
+    }
+    if (!formData.state?.trim()) {
+      validationErrors.push("State is required");
+    }
+    if (!formData.zip?.trim()) {
+      validationErrors.push("ZIP code is required");
+    }
+    if (!formData.county?.trim()) {
+      validationErrors.push("County is required");
+    }
+
+    if (validationErrors.length > 0) {
+      console.error("POST /api/addresses: Validation failed:", validationErrors);
       return NextResponse.json(
-        { error: "Required fields missing" },
+        { error: "Validation failed", details: validationErrors },
         { status: 400 },
       );
     }
 
-    // Create a new address
-    const newAddress = {
-      ...formData,
-      createdBy: currentUser.id,
-    };
+    // Use database transaction to ensure data consistency
+    const result = await prisma.$transaction(async (tx) => {
+      // Create a new address
+      const newAddress = {
+        ...formData,
+        createdBy: currentUser.id,
+        // Ensure boolean fields are properly set
+        isRestaurant: Boolean(formData.isRestaurant),
+        isShared: Boolean(formData.isShared),
+        // Normalize state to uppercase
+        state: formData.state.trim().toUpperCase(),
+        // Normalize ZIP code
+        zip: formData.zip.trim(),
+        // Normalize city and street
+        city: formData.city.trim(),
+        street1: formData.street1.trim(),
+        street2: formData.street2?.trim() || null,
+        county: formData.county.trim(),
+        locationNumber: formData.locationNumber?.trim() || null,
+        parkingLoading: formData.parkingLoading?.trim() || null,
+        name: formData.name?.trim() || null,
+      };
 
-    console.log("Creating new address:", newAddress);
+      console.log("POST /api/addresses: Creating address with normalized data:", newAddress);
 
-    const createdAddress = await prisma.address.create({
-      data: newAddress,
+      const createdAddress = await tx.address.create({
+        data: newAddress,
+      });
+
+      console.log("POST /api/addresses: Address created successfully:", { 
+        addressId: createdAddress.id, 
+        userId: currentUser.id 
+      });
+
+      // Create userAddress relation to track ownership if it's not shared
+      if (!formData.isShared) {
+        await tx.userAddress.create({
+          data: {
+            userId: currentUser.id,
+            addressId: createdAddress.id,
+            isDefault: false, // Could be set based on user preferences
+          },
+        });
+        console.log("POST /api/addresses: UserAddress relation created");
+      }
+
+      return createdAddress;
     });
 
-    // Create userAddress relation to track ownership if it's not shared
-    if (!formData.isShared) {
-      await prisma.userAddress.create({
-        data: {
-          userId: currentUser.id,
-          addressId: createdAddress.id,
-          isDefault: false, // Could be set based on user preferences
-        },
-      });
-    }
+    console.log("POST /api/addresses: Transaction completed successfully:", { 
+      addressId: result.id, 
+      userId: currentUser.id 
+    });
 
-    console.log("Created address:", createdAddress);
-    return NextResponse.json(createdAddress, { status: 201 });
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    console.error("Error creating address:", error);
+    console.error("POST /api/addresses: Critical error:", error);
+    
+    // Provide more specific error messages based on error type
+    if (error instanceof Error) {
+      if (error.message.includes('Unique constraint')) {
+        return NextResponse.json(
+          { error: "An address with these details already exists" },
+          { status: 409 }
+        );
+      }
+      if (error.message.includes('Foreign key constraint')) {
+        return NextResponse.json(
+          { error: "Invalid user reference" },
+          { status: 400 }
+        );
+      }
+    }
+    
     return NextResponse.json(
-      { error: "Failed to create address" },
+      { error: "Failed to create address. Please try again." },
       { status: 500 },
     );
   }

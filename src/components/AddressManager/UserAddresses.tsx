@@ -1,13 +1,18 @@
 // src/components/AddressManager/UserAddresses.tsx
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { User } from "@supabase/supabase-js";
-import { createClient } from "@/utils/supabase/client";
 import { Address } from "@/types/address";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  useAddresses,
+  useCreateAddress,
+  useUpdateAddress,
+  useDeleteAddress,
+} from "@/hooks/useAddresses";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,9 +44,6 @@ interface PaginationData {
 }
 
 const UserAddresses: React.FC = () => {
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [addressToEdit, setAddressToEdit] = useState<Address | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -58,13 +60,14 @@ const UserAddresses: React.FC = () => {
     hasPrevPage: false,
     limit: 5,
   });
-  // Router not needed for this component anymore
 
   // Get user from parent component's session
-  useEffect(() => {
+  React.useEffect(() => {
     const getUser = async () => {
       try {
-        const supabase = await createClient();
+        const supabase = await import("@/utils/supabase/client").then((m) =>
+          m.createClient(),
+        );
         const {
           data: { user },
           error,
@@ -75,166 +78,57 @@ const UserAddresses: React.FC = () => {
         setUser(user);
       } catch (error) {
         console.error("Error getting user:", error);
-        setError("Authentication error. Please sign in again.");
-        setIsLoading(false);
+        setUser(null);
       }
     };
 
     getUser();
   }, []);
 
-  // Fetch addresses based on filter
-  const fetchAddresses = useCallback(async () => {
-    if (!user) {
-      setIsLoading(false);
-      return;
-    }
+  // Use React Query for data fetching
+  const { data, isLoading, error, refetch } = useAddresses(
+    {
+      filter: filterType,
+      page: pagination.currentPage,
+      limit: pagination.limit,
+    },
+    {
+      enabled: !!user,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  );
 
-    setIsLoading(true);
-    setError(null);
+  // Extract addresses and pagination from React Query response
+  const addresses = data?.addresses || [];
+  const paginationData = data?.pagination || pagination;
 
-    try {
-      // Get current session for authentication
-      const supabase = await createClient();
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+  // React Query mutations
+  const createAddressMutation = useCreateAddress();
+  const updateAddressMutation = useUpdateAddress();
+  const deleteAddressMutation = useDeleteAddress();
 
-      if (sessionError || !session) {
-        throw new Error("Authentication required. Please sign in again.");
-      }
-
-      const response = await fetch(
-        `/api/addresses?filter=${filterType}&page=${pagination.currentPage}&limit=${pagination.limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Session expired. Please sign in again.");
-        }
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Handle both old format (array) and new format (paginated object)
-      let validAddresses: Address[] = [];
-      let paginationData: PaginationData = pagination;
-
-      if (Array.isArray(data)) {
-        // Old format - backward compatibility
-        validAddresses = data;
-        paginationData = {
-          currentPage: 1,
-          totalPages: 1,
-          totalCount: data.length,
-          hasNextPage: false,
-          hasPrevPage: false,
-          limit: data.length,
-        };
-      } else if (data.addresses && data.pagination) {
-        // New paginated format
-        validAddresses = data.addresses;
-        paginationData = data.pagination;
-      } else {
-        console.warn("Unexpected data format from API:", data);
-        validAddresses = [];
-      }
-
-      console.log(
-        `Fetched ${validAddresses.length} addresses for user ${user.id} with filter "${filterType}" (page ${paginationData.currentPage} of ${paginationData.totalPages})`,
-      );
-      setAddresses(validAddresses);
-      setPagination(paginationData);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      console.error("Error fetching addresses:", errorMessage);
-      setError(`Failed to load addresses: ${errorMessage}`);
-
-      // If it's an auth error, just show the error
-      if (
-        errorMessage.includes("Authentication") ||
-        errorMessage.includes("Session expired")
-      ) {
-        setError("Authentication error. Please refresh the page.");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, filterType, pagination]);
-
-  useEffect(() => {
-    if (user) {
-      fetchAddresses();
-    }
-  }, [user, filterType, fetchAddresses]);
-
+  // Handle delete address using React Query mutation
   const handleDeleteAddress = async (addressId: string) => {
-    setIsLoading(true);
-    setError(null);
-
     try {
-      // Get current session for authentication
-      const supabase = await createClient();
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (sessionError || !session) {
-        throw new Error("Authentication required. Please sign in again.");
-      }
-
-      const response = await fetch(`/api/addresses?id=${addressId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Session expired. Please sign in again.");
-        }
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete address");
-      }
-
-      // Update the local state to remove the deleted address
-      setAddresses((prev) => prev.filter((addr) => addr.id !== addressId));
+      await deleteAddressMutation.mutateAsync(addressId);
       setDeleteConfirmAddress(null);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       console.error("Error deleting address:", errorMessage);
-      setError(`Failed to delete address: ${errorMessage}`);
-
-      // If it's an auth error, just show the error
-      if (
-        errorMessage.includes("Authentication") ||
-        errorMessage.includes("Session expired")
-      ) {
-        setError("Authentication error. Please refresh the page.");
-      }
-    } finally {
-      setIsLoading(false);
+      // React Query will handle the error state
     }
   };
 
+  // Memoize the handleAddressUpdated callback to prevent unnecessary re-renders
   const handleAddressUpdated = useCallback(() => {
-    fetchAddresses();
+    // Use React Query refetch to get fresh data
+    if (user) {
+      refetch();
+    }
     setAddressToEdit(null);
     setIsModalOpen(false);
-  }, [fetchAddresses]);
+  }, [user, refetch]);
 
   const handleEditAddress = (address: Address) => {
     setAddressToEdit(address);
@@ -250,6 +144,32 @@ const UserAddresses: React.FC = () => {
   const isAddressOwner = (address: Address) => {
     return address.createdBy === user?.id;
   };
+
+  // Memoize the filter change handler to prevent unnecessary re-renders
+  const handleFilterChange = useCallback((value: string) => {
+    setFilterType(value as "all" | "shared" | "private");
+    // Reset to first page when filter changes
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  // Memoize pagination handlers to prevent unnecessary re-renders
+  const handlePageChange = useCallback((newPage: number) => {
+    setPagination((prev) => ({ ...prev, currentPage: newPage }));
+  }, []);
+
+  const handlePrevPage = useCallback(() => {
+    setPagination((prev) => ({
+      ...prev,
+      currentPage: Math.max(1, prev.currentPage - 1),
+    }));
+  }, []);
+
+  const handleNextPage = useCallback(() => {
+    setPagination((prev) => ({
+      ...prev,
+      currentPage: Math.min(prev.totalPages, prev.currentPage + 1),
+    }));
+  }, []);
 
   if (isLoading && !user) {
     return (
@@ -291,11 +211,7 @@ const UserAddresses: React.FC = () => {
         <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Tabs
             defaultValue={filterType}
-            onValueChange={(value) => {
-              setFilterType(value as any);
-              // Reset to first page when filter changes
-              setPagination((prev) => ({ ...prev, currentPage: 1 }));
-            }}
+            onValueChange={handleFilterChange}
             className="w-full sm:w-auto"
           >
             <TabsList className="grid w-full grid-cols-3 gap-1 sm:w-auto">
@@ -318,22 +234,23 @@ const UserAddresses: React.FC = () => {
       </div>
 
       {/* Error Display */}
+      {/* React Query error handling */}
       {error && (
         <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-500">
-          {error}
+          {error.message || "An error occurred while loading addresses"}
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setError(null)}
+            onClick={() => refetch()}
             className="ml-2 h-auto p-1 text-red-700"
           >
-            Dismiss
+            Retry
           </Button>
         </div>
       )}
 
       {/* Content Area */}
-      <div>
+      <div data-testid="addresses-content">
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Spinner />
@@ -465,27 +382,24 @@ const UserAddresses: React.FC = () => {
 
       {/* Pagination Section */}
       {!isLoading && pagination.totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-between border-t bg-slate-50 p-4">
+        <div
+          className="mt-6 flex items-center justify-between border-t bg-slate-50 p-4"
+          data-testid="pagination"
+        >
           <Pagination>
             <PaginationContent className="flex-wrap gap-1">
               <PaginationItem>
                 <PaginationPrevious
-                  onClick={() =>
-                    setPagination((prev) => ({
-                      ...prev,
-                      currentPage: Math.max(1, prev.currentPage - 1),
-                    }))
-                  }
+                  onClick={handlePrevPage}
                   className={`${!pagination.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
+                  data-testid="pagination-previous"
                 />
               </PaginationItem>
               {/* Basic Pagination - Consider a more advanced version for many pages */}
               {[...Array(pagination.totalPages)].map((_, i) => (
                 <PaginationItem key={i} className="hidden sm:block">
                   <PaginationLink
-                    onClick={() =>
-                      setPagination((prev) => ({ ...prev, currentPage: i + 1 }))
-                    }
+                    onClick={() => handlePageChange(i + 1)}
                     isActive={pagination.currentPage === i + 1}
                     className={`cursor-pointer text-sm ${pagination.currentPage === i + 1 ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "hover:bg-slate-200"}`}
                   >
@@ -501,16 +415,9 @@ const UserAddresses: React.FC = () => {
               </PaginationItem>
               <PaginationItem>
                 <PaginationNext
-                  onClick={() =>
-                    setPagination((prev) => ({
-                      ...prev,
-                      currentPage: Math.min(
-                        prev.totalPages,
-                        prev.currentPage + 1,
-                      ),
-                    }))
-                  }
+                  onClick={handleNextPage}
                   className={`${!pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
+                  data-testid="pagination-next"
                 />
               </PaginationItem>
             </PaginationContent>

@@ -3,6 +3,8 @@ import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CateringRequestForm from "../CateringRequestForm";
 import { Address } from "@/types/address";
+import { useUser } from "@/contexts/UserContext";
+import { UserType } from "@/types/user";
 
 // Mock Next.js router
 const mockPush = jest.fn();
@@ -94,6 +96,10 @@ global.ResizeObserver = jest.fn().mockImplementation(() => ({
   disconnect: jest.fn(),
 }));
 
+// Mock the UserContext
+jest.mock("@/contexts/UserContext");
+const mockUseUser = useUser as jest.MockedFunction<typeof useUser>;
+
 // Mock addresses data
 const mockAddresses: Address[] = [
   {
@@ -175,7 +181,17 @@ describe("CateringRequestForm", () => {
     expect(screen.getByLabelText(/headcount/i)).toBeInTheDocument();
   });
 
-  it("redirects to vendor dashboard after successful form submission", async () => {
+  it("redirects to client dashboard for client users after successful form submission", async () => {
+    // Mock user context for client role
+    mockUseUser.mockReturnValue({
+      userRole: UserType.CLIENT,
+      session: null,
+      user: null,
+      isLoading: false,
+      error: null,
+      refreshUserData: jest.fn(),
+    });
+
     const user = userEvent.setup();
     await act(async () => {
       render(<CateringRequestForm />);
@@ -224,7 +240,72 @@ describe("CateringRequestForm", () => {
       await user.click(submitButton);
     });
 
-    // Verify that router.push was called with the vendor dashboard path
+    // Verify that router.push was called with the client dashboard path for client users
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith("/client");
+    });
+  });
+
+  it("redirects to vendor dashboard for vendor users after successful form submission", async () => {
+    // Mock user context for vendor role
+    mockUseUser.mockReturnValue({
+      userRole: UserType.VENDOR,
+      session: null,
+      user: null,
+      isLoading: false,
+      error: null,
+      refreshUserData: jest.fn(),
+    });
+
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<CateringRequestForm />);
+    });
+
+    // Fill out the form with valid data
+    await act(async () => {
+      // Fill brokerage field
+      const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
+      await user.selectOptions(brokerageSelect, "Ez Cater");
+
+      // Fill order number
+      await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
+
+      // Fill date
+      await user.type(screen.getByLabelText(/date/i), "2024-12-31");
+
+      // Fill headcount
+      await user.type(screen.getByLabelText(/headcount/i), "50");
+
+      // Fill pickup time
+      await user.type(screen.getByLabelText(/pick up time/i), "10:00");
+
+      // Fill arrival time
+      await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+
+      // Fill client attention
+      await user.type(screen.getByLabelText(/client.*attention/i), "John Doe");
+
+      // Fill order total
+      await user.type(screen.getByLabelText(/order total/i), "1000");
+
+      // Select "No" for host requirement
+      const hostNoRadio = screen.getByRole("button", { name: /no/i });
+      await user.click(hostNoRadio);
+
+      // Simulate address selection
+      mockHandleAddressSelect(mockAddress);
+    });
+
+    // Submit the form
+    await act(async () => {
+      const submitButton = screen.getByRole("button", {
+        name: /submit catering request/i,
+      });
+      await user.click(submitButton);
+    });
+
+    // Verify that router.push was called with the vendor dashboard path for vendor users
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/vendor");
     });
