@@ -417,6 +417,10 @@ describe("CateringOrderForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     // Mock successful API response
@@ -447,6 +451,10 @@ describe("CateringOrderForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     // Mock successful API response
@@ -477,6 +485,10 @@ describe("CateringOrderForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     // Mock successful API response
@@ -507,6 +519,10 @@ describe("CateringOrderForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     // Mock successful API response
@@ -537,6 +553,10 @@ describe("CateringOrderForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     // Mock failed API response

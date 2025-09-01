@@ -523,7 +523,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         if (mounted) {
           setError("Authentication setup failed");
           setIsLoading(false);
-          setAuthProgress("idle");
+          setAuthProgressState({ step: "idle", message: "" });
         }
       }
     };
@@ -580,7 +580,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         await fetchUserRole(supabase, currentUser, setUserRole);
       } else {
         setUserRole(null);
-        setAuthProgress("idle");
+        setAuthProgressState({ step: "idle", message: "" });
       }
     } catch (err) {
       console.error("Error refreshing user data:", err);
@@ -607,7 +607,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
       // Reset to idle after showing completion
-      setTimeout(() => setAuthProgress("idle"), 1000);
+      setTimeout(
+        () => setAuthProgressState({ step: "idle", message: "" }),
+        1000,
+      );
     }
   };
 
