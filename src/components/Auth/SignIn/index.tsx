@@ -124,6 +124,8 @@ const Signin = ({
 
   // Integrate with UserContext auth progress
   useEffect(() => {
+    if (!authProgress) return;
+
     if (
       authProgress.step === "authenticating" ||
       authProgress.step === "fetching_profile"
@@ -140,7 +142,7 @@ const Signin = ({
       setIsRedirecting(false);
       setShowSuccessMessage(false);
     }
-  }, [authProgress.step]);
+  }, [authProgress?.step]);
 
   // Manual form submission handler to replace formAction
   const handleLogin = async (e: React.FormEvent) => {
@@ -312,7 +314,7 @@ const Signin = ({
             <div className="text-center">
               <Loader />
               <p className="mt-4 text-gray-600 dark:text-gray-400">
-                {authProgress.message || "Loading..."}
+                {authProgress?.message || "Loading..."}
               </p>
             </div>
           </div>
@@ -385,13 +387,13 @@ const Signin = ({
               )}
 
               {/* Auth progress from UserContext */}
-              {authProgress.step !== "idle" &&
+              {authProgress?.step !== "idle" &&
                 !showSuccessMessage &&
                 !isRedirecting && (
                   <div className="mb-4 rounded border border-blue-400 bg-blue-100 p-3 text-blue-700">
                     <div className="flex items-center">
                       <Loader />
-                      <span className="ml-2">{authProgress.message}</span>
+                      <span className="ml-2">{authProgress?.message}</span>
                     </div>
                   </div>
                 )}
@@ -522,7 +524,7 @@ const Signin = ({
                         <>
                           <Loader />
                           <span className="ml-2">
-                            {authProgress.message || "Authenticating..."}
+                            {authProgress?.message || "Authenticating..."}
                           </span>
                         </>
                       ) : (

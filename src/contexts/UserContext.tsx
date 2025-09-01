@@ -484,7 +484,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           async (event: string, session: Session | null) => {
             if (!mounted) return;
 
-            console.log("Auth state changed:", _event);
+            console.log("Auth state changed:", event);
             setSession(session);
 
             const newUser = session?.user || null;
@@ -502,9 +502,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
             // Clear immediate data flag on auth state changes
             if (
-              _event === "SIGNED_IN" ||
-              _event === "SIGNED_OUT" ||
-              _event === "TOKEN_REFRESHED"
+              event === "SIGNED_IN" ||
+              event === "SIGNED_OUT" ||
+              event === "TOKEN_REFRESHED"
             ) {
               if (newUser?.id !== currentUser?.id) {
                 console.log("Auth state change: fetching fresh user role...");
@@ -621,7 +621,11 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           userRole: null,
           isLoading: true,
           error: null,
+          isAuthenticating: false,
+          authProgress: { step: "idle", message: "" },
           refreshUserData,
+          clearAuthError: () => {},
+          setAuthProgress: () => {},
         }}
       >
         {children}
@@ -637,7 +641,12 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         userRole,
         isLoading,
         error,
+        isAuthenticating,
+        authProgress,
         refreshUserData,
+        clearAuthError: () => setError(null),
+        setAuthProgress: (step, message = "") =>
+          setAuthProgressState({ step, message }),
       }}
     >
       {children}
