@@ -87,10 +87,21 @@ describe("AddressManager Refresh Functionality", () => {
       error: null,
     });
 
-    // Mock successful address fetch
+    // Mock successful address fetch with pagination
     (fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(mockAddresses),
+      json: () =>
+        Promise.resolve({
+          addresses: mockAddresses,
+          pagination: {
+            currentPage: 1,
+            totalPages: 1,
+            totalCount: mockAddresses.length,
+            hasNextPage: false,
+            hasPrevPage: false,
+            limit: 5,
+          },
+        }),
     });
   });
 
@@ -111,7 +122,7 @@ describe("AddressManager Refresh Functionality", () => {
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        "/api/addresses?filter=all",
+        "/api/addresses?filter=all&page=1&limit=5",
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: "Bearer mock-token",
@@ -170,7 +181,18 @@ describe("AddressManager Refresh Functionality", () => {
 
     (fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(newMockAddresses),
+      json: () =>
+        Promise.resolve({
+          addresses: newMockAddresses,
+          pagination: {
+            currentPage: 1,
+            totalPages: 1,
+            totalCount: newMockAddresses.length,
+            hasNextPage: false,
+            hasPrevPage: false,
+            limit: 5,
+          },
+        }),
     });
 
     // Call refresh function
@@ -182,7 +204,7 @@ describe("AddressManager Refresh Functionality", () => {
     // Verify addresses are refetched
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        "/api/addresses?filter=all",
+        "/api/addresses?filter=all&page=1&limit=5",
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: "Bearer mock-token",
@@ -211,7 +233,18 @@ describe("AddressManager Refresh Functionality", () => {
       .mockRejectedValueOnce(new Error("Network error"))
       .mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(mockAddresses),
+        json: () =>
+          Promise.resolve({
+            addresses: mockAddresses,
+            pagination: {
+              currentPage: 1,
+              totalPages: 1,
+              totalCount: mockAddresses.length,
+              hasNextPage: false,
+              hasPrevPage: false,
+              limit: 5,
+            },
+          }),
       });
 
     render(
@@ -259,10 +292,120 @@ describe("AddressManager Refresh Functionality", () => {
     render(<AddressManager {...defaultProps} />);
 
     // Wait for the error to be handled
+    await waitFor(
+      () => {
+        expect(mockOnError).toHaveBeenCalledWith(
+          "Error fetching addresses: Internal Server Error",
+        );
+      },
+      { timeout: 5000 },
+    );
+  });
+});
+
+describe("AddressManager Pagination", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (fetch as jest.Mock).mockClear();
+
+    // Mock successful auth
+    mockSupabase.auth.getUser.mockResolvedValue({
+      data: { user: { id: "user1" } },
+      error: null,
+    });
+
+    mockSupabase.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: "mock-token", user: { id: "user1" } } },
+      error: null,
+    });
+  });
+
+  it("fetches addresses with pagination parameters", async () => {
+    const mockPaginatedResponse = {
+      addresses: mockAddresses.slice(0, 2), // First 2 addresses
+      pagination: {
+        currentPage: 1,
+        totalPages: 2,
+        totalCount: 4,
+        hasNextPage: true,
+        hasPrevPage: false,
+        limit: 5,
+      },
+    };
+
+    (fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockPaginatedResponse),
+    });
+
+    render(<AddressManager {...defaultProps} />);
+
     await waitFor(() => {
-      expect(mockOnError).toHaveBeenCalledWith(
-        "Error fetching addresses: Internal Server Error",
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/addresses?filter=all&page=1&limit=5",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer mock-token",
+            "Content-Type": "application/json",
+          }),
+        }),
       );
-    }, { timeout: 5000 });
+    });
+  });
+
+  it("handles backward compatibility with old API format", async () => {
+    // Mock old format response (array of addresses)
+    (fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockAddresses),
+    });
+
+    render(<AddressManager {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(mockOnAddressesLoaded).toHaveBeenCalledWith(mockAddresses);
+    });
+  });
+
+  it("resets to first page when filter changes", async () => {
+    const mockPaginatedResponse = {
+      addresses: mockAddresses.slice(0, 2),
+      pagination: {
+        currentPage: 1,
+        totalPages: 2,
+        totalCount: 4,
+        hasNextPage: true,
+        hasPrevPage: false,
+        limit: 5,
+      },
+    };
+
+    (fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockPaginatedResponse),
+    });
+
+    render(<AddressManager {...defaultProps} />);
+
+    // Wait for initial load
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/addresses?filter=all&page=1&limit=5",
+        expect.anything(),
+      );
+    });
+
+    // Change filter
+    const tabsList = screen.getByRole("tablist");
+    const privateTab = screen.getByRole("tab", { name: /your addresses/i });
+    fireEvent.click(privateTab);
+
+    // Should reset to page 1
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/addresses?filter=private&page=1&limit=5",
+        expect.anything(),
+      );
+    });
   });
 });

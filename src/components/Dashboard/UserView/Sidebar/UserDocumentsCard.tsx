@@ -1,7 +1,13 @@
 // src/components/Dashboard/UserView/Sidebar/UserDocumentsCard.tsx
 
 import { FileText, Upload, Trash2, Download } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import UserProfileUploads from "@/components/Uploader/user-profile-uploads";
 import { UploadHooks, UserFormValues } from "../types";
 import { Button } from "@/components/ui/button";
@@ -18,33 +24,35 @@ export default function UserDocumentsCard({
   uploadHooks,
   userType,
   setRefreshTrigger,
-  isUserProfile
+  isUserProfile,
 }: UserDocumentsCardProps) {
   // Get all uploaded files from relevant hooks based on user type
-  const allUploadedFiles = Object.entries(uploadHooks).reduce((acc, [hookName, hook]) => {
-    // For drivers, include all files
-    if (userType === "driver") {
-      return [...acc, ...(hook.uploadedFiles || [])];
-    }
-    // For other users, only include general files
-    if (hookName === "general_files") {
-      return [...acc, ...(hook.uploadedFiles || [])];
-    }
-    return acc;
-  }, [] as any[]);
+  const allUploadedFiles = Object.entries(uploadHooks).reduce(
+    (acc, [hookName, hook]) => {
+      // For drivers, include all files
+      if (userType === "driver") {
+        return [...acc, ...(hook.uploadedFiles || [])];
+      }
+      // For other users, only include general files
+      if (hookName === "general_files") {
+        return [...acc, ...(hook.uploadedFiles || [])];
+      }
+      return acc;
+    },
+    [] as any[],
+  );
 
-  console.log('Upload Hooks:', uploadHooks);
-  console.log('All Uploaded Files:', allUploadedFiles);
+  console.log("Upload Hooks:", uploadHooks);
+  console.log("All Uploaded Files:", allUploadedFiles);
 
   const handleDelete = async (fileId: string) => {
     try {
-      const response = await fetch("/api/file-uploads", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/file-uploads?fileId=${encodeURIComponent(fileId)}`,
+        {
+          method: "DELETE",
         },
-        body: JSON.stringify({ fileId }),
-      });
+      );
 
       if (!response.ok) {
         throw new Error("Failed to delete file");
@@ -71,17 +79,24 @@ export default function UserDocumentsCard({
         {/* Existing Files Section */}
         {allUploadedFiles.length > 0 && (
           <div className="mb-4 space-y-2">
-            <h4 className="text-sm font-medium text-slate-700">Uploaded Files</h4>
+            <h4 className="text-sm font-medium text-slate-700">
+              Uploaded Files
+            </h4>
             <div className="divide-y divide-slate-200 rounded-md border border-slate-200">
               {allUploadedFiles.map((file) => (
-                <div key={file.key} className="flex items-center justify-between p-3">
+                <div
+                  key={file.key}
+                  className="flex items-center justify-between p-3"
+                >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900">{file.name}</p>
+                    <p className="truncate text-sm font-medium text-slate-900">
+                      {file.name}
+                    </p>
                     <p className="text-xs text-slate-500">
                       {formatFileSize(file.size)}
                       {file.category && (
                         <span className="ml-2 text-xs text-slate-400">
-                          ({file.category.replace(/_/g, ' ')})
+                          ({file.category.replace(/_/g, " ")})
                         </span>
                       )}
                     </p>
@@ -90,7 +105,7 @@ export default function UserDocumentsCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => window.open(file.url, '_blank')}
+                      onClick={() => window.open(file.url, "_blank")}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
@@ -99,7 +114,7 @@ export default function UserDocumentsCard({
                       size="sm"
                       onClick={() => handleDelete(file.key)}
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="text-destructive h-4 w-4" />
                     </Button>
                   </div>
                 </div>

@@ -117,7 +117,7 @@ const Contact = () => {
                   Let&#39;s talk about your needs.
                 </h2>
               </div>
-              <div className="mb-12 flex flex-wrap justify-between lg:mb-0">
+              <div className="mb-12 flex flex-wrap justify-between p-8 pt-16 lg:mb-0">
                 <div className="mb-8 flex w-[330px] max-w-full">
                   <div className="mr-6 text-[32px] text-yellow-600">
                     <svg
@@ -134,11 +134,26 @@ const Contact = () => {
                     <h3 className="mb-[18px] text-lg font-semibold text-dark dark:text-white">
                       Our Service Area
                     </h3>
-                    <p className="text-base text-body-color dark:text-dark-6">
-                      Palo Alto, CA · San Mateo, CA · Mountain View, CA · San
-                      Jose, CA · Oakland, CA · Sunnyvale, CA · Richmond, CA ·
-                      Hayward, CA · Concord, CA · San Francisco, CA
-                    </p>
+                    <div className="space-y-3">
+                      <div>
+                        <h4 className="mb-2 text-sm font-semibold text-dark dark:text-white">
+                          California
+                        </h4>
+                        <p className="text-base text-body-color dark:text-dark-6">
+                          Palo Alto, CA · San Mateo, CA · Mountain View, CA ·
+                          San Jose, CA · Oakland, CA · Sunnyvale, CA · Richmond,
+                          CA · Hayward, CA · Concord, CA · San Francisco, CA
+                        </p>
+                      </div>
+                      <div>
+                        <h4 className="mb-2 text-sm font-semibold text-dark dark:text-white">
+                          Texas
+                        </h4>
+                        <p className="text-base text-body-color dark:text-dark-6">
+                          Austin, TX · Dallas, TX
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="mb-8 flex w-[330px] max-w-full">

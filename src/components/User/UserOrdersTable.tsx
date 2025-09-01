@@ -95,12 +95,12 @@ const ClientOrders: React.FC = () => {
       <div className="absolute left-0 top-0 -z-[1] h-1/2 w-full bg-[#E9F9FF] dark:bg-dark-700 lg:h-[45%] xl:h-1/2"></div>
       <div className="container px-4">
         <div className="-mx-4 flex flex-wrap items-center">
-          <div className="w-full px-4 ">
+          <div className="w-full px-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle>Your Orders</CardTitle>
                 <CardDescription className="max-w-lg text-balance leading-relaxed">
-                  View and manage your orders. 
+                  View and manage your orders.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -115,8 +115,8 @@ const ClientOrders: React.FC = () => {
                       No orders found
                     </h3>
                     <p className="max-w-md text-gray-500 dark:text-gray-400">
-                      You don&apos;t have any orders at the moment.
-                      Check back soon or contact us if you need support. 
+                      You don&apos;t have any orders at the moment. Check back
+                      soon or contact us if you need support.
                     </p>
                   </div>
                 ) : (
@@ -145,7 +145,9 @@ const ClientOrders: React.FC = () => {
                       </TableHeader>
                       <TableBody>
                         {orders.map((order, index) => (
-                          <TableRow key={`${order.id}-${order.order_number}-${index}`}>
+                          <TableRow
+                            key={`${order.id}-${order.order_number}-${index}`}
+                          >
                             <TableCell>
                               <Link
                                 href={`/order-status/${order.order_number}`}
@@ -181,12 +183,33 @@ const ClientOrders: React.FC = () => {
                               {new Date(order.date).toLocaleDateString()}
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
-                              {order.address.street1}, {order.address.city},{" "}
-                              {order.address.state}
+                              {(() => {
+                                const addressParts = [
+                                  order.address.street1,
+                                  order.address.city,
+                                  order.address.state,
+                                ].filter(
+                                  (part) => part && part !== "undefined",
+                                );
+                                return addressParts.length > 0
+                                  ? addressParts.join(", ")
+                                  : "N/A";
+                              })()}
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
                               {order.delivery_address
-                                ? `${order.delivery_address.street1}, ${order.delivery_address.city}, ${order.delivery_address.state}`
+                                ? (() => {
+                                    const addressParts = [
+                                      order.delivery_address.street1,
+                                      order.delivery_address.city,
+                                      order.delivery_address.state,
+                                    ].filter(
+                                      (part) => part && part !== "undefined",
+                                    );
+                                    return addressParts.length > 0
+                                      ? addressParts.join(", ")
+                                      : "N/A";
+                                  })()
                                 : "N/A"}
                             </TableCell>
                             <TableCell className="text-right">

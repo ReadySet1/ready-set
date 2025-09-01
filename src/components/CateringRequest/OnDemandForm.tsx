@@ -18,6 +18,8 @@ import {
   Package,
   Truck,
 } from "lucide-react";
+import { useUser } from "@/contexts/UserContext";
+import { getOrderCreationRedirectRoute } from "@/utils/routing";
 
 // Form field components
 const InputField: React.FC<{
@@ -203,6 +205,7 @@ interface OnDemandFormData {
 
 const OnDemandOrderForm: React.FC = () => {
   const router = useRouter();
+  const { userRole } = useUser();
   const [user, setUser] = useState<User | null>(null);
   const [supabase, setSupabase] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -350,9 +353,12 @@ const OnDemandOrderForm: React.FC = () => {
         reset();
         toast.success("On-demand request submitted successfully!");
 
-        // Redirect to vendor dashboard
-        console.log("Redirecting user to vendor dashboard");
-        router.push("/vendor");
+        // Redirect based on user role instead of hardcoded vendor dashboard
+        const redirectRoute = getOrderCreationRedirectRoute(userRole);
+        console.log(
+          `Redirecting user to ${redirectRoute} based on role: ${userRole}`,
+        );
+        router.push(redirectRoute);
       } else {
         const errorData = await response.json();
         console.error("Failed to create on-demand request", errorData);

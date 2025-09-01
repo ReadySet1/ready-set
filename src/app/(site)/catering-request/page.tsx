@@ -23,19 +23,23 @@ const DeliveryChecklist = () => {
     "Check if a host is needed and for how long",
     "Note any special delivery or setup instructions",
     "Confirm payment details are accurate",
-    "Include any necessary dietary restrictions or allergen information"
+    "Include any necessary dietary restrictions or allergen information",
   ];
 
   return (
     <div className="mx-auto mb-8 max-w-3xl py-4">
-      <div 
+      <div
         className="flex cursor-pointer items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:bg-gray-50"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <h3 className="text-lg font-medium text-gray-800">8-Point Delivery Checklist</h3>
-        <ChevronDown className={`h-5 w-5 transform text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <h3 className="text-lg font-medium text-gray-800">
+          8-Point Delivery Checklist
+        </h3>
+        <ChevronDown
+          className={`h-5 w-5 transform text-gray-500 transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
       </div>
-      
+
       {isOpen && (
         <div className="mt-2 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <ul className="space-y-2">
@@ -66,14 +70,14 @@ const CateringPage = () => {
       const client = await createClient();
       setSupabase(client);
     };
-    
+
     initSupabase();
   }, []);
 
   useEffect(() => {
     // Skip if Supabase client is not yet initialized
     if (!supabase) return;
-    
+
     // Fetch the session when the component mounts
     const fetchSession = async () => {
       try {
@@ -90,10 +94,12 @@ const CateringPage = () => {
     fetchSession();
 
     // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, session: Session | null) => {
         setSession(session);
-      }
+      },
     );
 
     // Clean up subscription on unmount
@@ -102,12 +108,13 @@ const CateringPage = () => {
     };
   }, [supabase]); // Depend on supabase client
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isLoading && !session) {
-      router.push("/login?redirect=/catering");
-    }
-  }, [session, isLoading, router]);
+  // Allow form to be shown without authentication for now
+  // TODO: Decide if authentication should be required for catering requests
+  // useEffect(() => {
+  //   if (!isLoading && !session) {
+  //     router.push("/sign-in?redirect=/catering-request");
+  //   }
+  // }, [session, isLoading, router]);
 
   if (isLoading) {
     return (
@@ -118,14 +125,15 @@ const CateringPage = () => {
     );
   }
 
-  if (!session) {
-    return null;
-  }
+  // Allow form to be shown without authentication for now
+  // if (!session) {
+  //   return null;
+  // }
 
   return (
     <section
       id="catering-request"
-      className="bg-gray-50 pb-16 dark:bg-gray-900 lg:pb-24 pt-32"
+      className="bg-gray-50 pb-16 pt-32 dark:bg-gray-900 lg:pb-24"
     >
       <div className="container px-4 sm:px-6 lg:px-8">
         <div className="mb-12">
@@ -136,13 +144,13 @@ const CateringPage = () => {
             center
           />
         </div>
-        
+
         <DeliveryChecklist />
-        
+
         <div className="mx-auto">
           <CateringRequestForm />
         </div>
-        
+
         {/* <div className="mt-16">
           <h2 className="mb-8 text-center text-2xl font-bold text-gray-800 dark:text-white">
             Frequently Asked Questions

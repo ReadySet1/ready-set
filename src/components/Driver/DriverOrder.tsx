@@ -99,7 +99,7 @@ interface DriverStatusCardProps {
   updateDriverStatus: (newStatus: string) => Promise<void>;
 }
 
-const BackButton: React.FC = () => {
+const BackButton: React.FC<{ href: string }> = ({ href }) => {
   const router = useRouter();
 
   return (
@@ -107,7 +107,7 @@ const BackButton: React.FC = () => {
       variant="ghost"
       size="sm"
       className="hover:bg-accent flex items-center gap-2"
-      onClick={() => router.push("/driver")}
+      onClick={() => router.push(href)}
     >
       <ArrowLeftIcon className="h-4 w-4" />
       Back to Dashboard
@@ -241,7 +241,7 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   );
 };
 
-const OrderPage: React.FC = () => {
+const OrderPage: React.FC<{ backHref: string }> = ({ backHref }) => {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -366,7 +366,7 @@ const OrderPage: React.FC = () => {
     <div className="bg-background min-h-screen">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
-          <BackButton />
+          <BackButton href={backHref} />
         </div>
 
         <h1 className="mb-6 text-center text-3xl font-bold">Order Dashboard</h1>
@@ -441,10 +441,17 @@ const OrderPage: React.FC = () => {
                   </div>
                   <p className="mb-2 text-sm text-gray-900">
                     {order.pickupAddress
-                      ? `${order.pickupAddress.street1 || ""}, ${order.pickupAddress.city || ""}, ${order.pickupAddress.state || ""} ${order.pickupAddress.zip || ""}`
-                          .replace(/,\s*,/g, ",")
-                          .replace(/^,\s*/, "")
-                          .replace(/,\s*$/, "") || "N/A"
+                      ? (() => {
+                          const addressParts = [
+                            order.pickupAddress.street1,
+                            order.pickupAddress.city,
+                            order.pickupAddress.state,
+                            order.pickupAddress.zip,
+                          ].filter((part) => part && part !== "undefined");
+                          return addressParts.length > 0
+                            ? addressParts.join(", ")
+                            : "N/A";
+                        })()
                       : "N/A"}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -463,10 +470,17 @@ const OrderPage: React.FC = () => {
                   </div>
                   <p className="mb-2 text-sm text-gray-900">
                     {order.deliveryAddress
-                      ? `${order.deliveryAddress.street1 || ""}, ${order.deliveryAddress.city || ""}, ${order.deliveryAddress.state || ""} ${order.deliveryAddress.zip || ""}`
-                          .replace(/,\s*,/g, ",")
-                          .replace(/^,\s*/, "")
-                          .replace(/,\s*$/, "") || "N/A"
+                      ? (() => {
+                          const addressParts = [
+                            order.deliveryAddress.street1,
+                            order.deliveryAddress.city,
+                            order.deliveryAddress.state,
+                            order.deliveryAddress.zip,
+                          ].filter((part) => part && part !== "undefined");
+                          return addressParts.length > 0
+                            ? addressParts.join(", ")
+                            : "N/A";
+                        })()
                       : "N/A"}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -565,7 +579,11 @@ const OrderPage: React.FC = () => {
 };
 
 // Page wrapper component that includes the order page with proper layout
-const DriverDashboardPage: React.FC = () => {
+type DriverDashboardPageProps = { backHref?: string };
+
+const DriverDashboardPage: React.FC<DriverDashboardPageProps> = ({
+  backHref = "/driver",
+}) => {
   const [orderNumber, setOrderNumber] = useState("");
   const pathname = usePathname();
 
@@ -588,7 +606,7 @@ const DriverDashboardPage: React.FC = () => {
       <main className="mx-auto w-full max-w-[1440px] px-4 pb-16 sm:px-6 md:pt-8 lg:px-8 lg:pt-8">
         <div className="grid grid-cols-1 gap-8">
           {/* Breadcrumb can be added here if needed */}
-          <OrderPage />
+          <OrderPage backHref={backHref} />
         </div>
       </main>
     </div>
