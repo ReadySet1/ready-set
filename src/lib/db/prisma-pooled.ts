@@ -112,18 +112,21 @@ const createOptimizedPrismaClient = (): PrismaClient => {
     throw new Error('DATABASE_URL is not defined. Please check your environment variables.')
   }
 
-  // Build connection string with pooling parameters
+  // Build connection string with optimized parameters
   const pooledUrl = new URL(databaseUrl)
   
-  // Add connection pooling parameters
+  // Add connection pooling parameters (compatible with Supabase and standard PostgreSQL)
   pooledUrl.searchParams.set('connection_limit', POOL_CONFIG.connectionLimit.toString())
   pooledUrl.searchParams.set('pool_timeout', '30')
-  pooledUrl.searchParams.set('pgbouncer', 'true')
-  pooledUrl.searchParams.set('statement_cache_size', '0')
   
   // Add performance optimizations
   pooledUrl.searchParams.set('connect_timeout', '10')
   pooledUrl.searchParams.set('socket_timeout', '30')
+  
+  // Only add pgbouncer params if not already present and not Supabase
+  if (!databaseUrl.includes('supabase.co') && !pooledUrl.searchParams.has('pgbouncer')) {
+    pooledUrl.searchParams.set('statement_cache_size', '0')
+  }
 
   const client = new PrismaClient({
     log: LOG_CONFIG,
@@ -139,6 +142,34 @@ const createOptimizedPrismaClient = (): PrismaClient => {
       isolationLevel: 'ReadCommitted'
     }
   });
+
+  // Add connection retry logic with exponential backoff
+  const originalConnect = client.$connect.bind(client);
+  client.$connect = async () => {
+    let retries = 0;
+    const maxRetries = 3;
+    
+    while (retries < maxRetries) {
+      try {
+        await originalConnect();
+        if (retries > 0) {
+          console.log(`✅ Database reconnected after ${retries} retries`);
+        }
+        return;
+      } catch (error) {
+        retries++;
+        const delay = Math.min(1000 * Math.pow(2, retries), 5000); // Exponential backoff, max 5s
+        
+        if (retries < maxRetries) {
+          console.warn(`⚠️ Database connection attempt ${retries} failed, retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          console.error(`❌ Database connection failed after ${maxRetries} attempts:`, error);
+          throw error;
+        }
+      }
+    }
+  };
 
   // Enhanced error handling and query monitoring
   // Note: Event listeners temporarily disabled due to TypeScript compatibility
