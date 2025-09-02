@@ -49,9 +49,11 @@ model Profile {
   userDispatches      Dispatch[]        @relation("UserDispatch")
   fileUploads         FileUpload[]
   jobApplications     JobApplication[]  @relation("ProfileToJobApplication")
-  onDemandRequests    OnDemand[]
-  sessions            Session[]
-  userAddresses       UserAddress[]
+  onDemandRequests     OnDemand[]
+  sessions             Session[]
+  userAddresses        UserAddress[]
+  clientConfigurations ClientConfiguration[] @relation("ClientConfigurations")
+  calculationHistory   CalculationHistory[]   @relation("CalculationHistory")
 
   @@index([email])
   @@index([type])
@@ -443,4 +445,81 @@ enum FormType {
   FLOWER
   BAKERY
   SPECIALTY
+}
+
+model CalculatorTemplate {
+  id                   String               @id @default(uuid()) @db.Uuid
+  name                 String
+  description          String?
+  isActive             Boolean              @default(true) @map("is_active")
+  createdAt            DateTime             @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt            DateTime             @updatedAt @db.Timestamptz(6) @map("updated_at")
+  pricingRules         PricingRule[]
+  clientConfigurations ClientConfiguration[]
+  calculationHistory   CalculationHistory[]
+
+  @@index([isActive])
+  @@map("calculator_templates")
+}
+
+model PricingRule {
+  id             String             @id @default(uuid()) @db.Uuid
+  templateId     String             @db.Uuid @map("template_id")
+  ruleType       String             @map("rule_type") // 'customer_charge' or 'driver_payment'
+  ruleName       String             @map("rule_name") // 'base_fee', 'mileage', 'toll', etc.
+  baseAmount     Decimal?           @db.Decimal(10, 2) @map("base_amount")
+  perUnitAmount  Decimal?           @db.Decimal(10, 2) @map("per_unit_amount")
+  thresholdValue Decimal?           @db.Decimal(10, 2) @map("threshold_value")
+  thresholdType  String?            @map("threshold_type") // 'above', 'below', 'between'
+  appliesWhen    String?            @map("applies_when") // JSON string for complex conditions
+  priority       Int                @default(0)
+  createdAt      DateTime           @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt      DateTime           @updatedAt @db.Timestamptz(6) @map("updated_at")
+  template       CalculatorTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, ruleType, ruleName], name: "unique_template_rule")
+  @@index([templateId])
+  @@index([ruleType])
+  @@map("pricing_rules")
+}
+
+model ClientConfiguration {
+  id                 String               @id @default(uuid()) @db.Uuid
+  clientId           String?              @db.Uuid @map("client_id")
+  templateId         String               @db.Uuid @map("template_id")
+  clientName         String               @map("client_name")
+  ruleOverrides      Json                 @default("{}") @map("rule_overrides")
+  areaRules          Json                 @default("[]") @map("area_rules")
+  isActive           Boolean              @default(true) @map("is_active")
+  createdAt          DateTime             @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt          DateTime             @updatedAt @db.Timestamptz(6) @map("updated_at")
+  client             Profile?             @relation("ClientConfigurations", fields: [clientId], references: [id])
+  template           CalculatorTemplate   @relation(fields: [templateId], references: [id])
+  calculationHistory CalculationHistory[]
+
+  @@index([clientId])
+  @@index([templateId])
+  @@map("client_configurations")
+}
+
+model CalculationHistory {
+  id               String               @id @default(uuid()) @db.Uuid
+  templateId       String?              @db.Uuid @map("template_id")
+  clientConfigId   String?              @db.Uuid @map("client_config_id")
+  userId           String?              @db.Uuid @map("user_id")
+  inputData        Json                 @map("input_data")
+  customerCharges  Json                 @map("customer_charges")
+  driverPayments   Json                 @map("driver_payments")
+  customerTotal    Decimal              @db.Decimal(10, 2) @map("customer_total")
+  driverTotal      Decimal              @db.Decimal(10, 2) @map("driver_total")
+  notes            String?
+  createdAt        DateTime             @default(now()) @db.Timestamptz(6) @map("created_at")
+  template         CalculatorTemplate?  @relation(fields: [templateId], references: [id])
+  clientConfig     ClientConfiguration? @relation(fields: [clientConfigId], references: [id])
+  user             Profile?             @relation("CalculationHistory", fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([templateId])
+  @@map("calculation_history")
 }
