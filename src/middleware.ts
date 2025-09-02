@@ -18,24 +18,20 @@ const PROTECTED_ROUTES = [
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  console.log('🔄 [Main Middleware] Processing request for:', pathname);
   
   // Skip middleware for specific paths
   if (request.nextUrl.pathname.startsWith('/auth/callback') ||
       request.nextUrl.pathname === "/complete-profile") {
-    console.log('⏭️  [Main Middleware] Skipping auth callback or complete profile');
     return NextResponse.next();
   }
 
   // Handle redirects for renamed or moved pages
   if (request.nextUrl.pathname === "/resources") {
-    console.log('🔀 [Main Middleware] Redirecting /resources to /free-resources');
     return NextResponse.redirect(new URL('/free-resources', request.url));
   }
 
   try {
     // Update the user's session using Supabase middleware helper
-    console.log('🔄 [Main Middleware] Updating session...');
     const response = await updateSession(request);
     
     // Check if the path is a protected route
@@ -44,11 +40,8 @@ export async function middleware(request: NextRequest) {
       pathname === route || pathname.startsWith(`${route}/`)
     );
 
-    console.log('🔒 [Main Middleware] Is protected route?', isProtectedRoute, 'for path:', pathname);
-
     // Only check auth for protected routes
     if (isProtectedRoute) {
-      console.log('🔐 [Main Middleware] Checking authentication for protected route...');
       try {
         // Create Supabase client from the middleware response
         const { createClient } = await import('@/utils/supabase/server');
@@ -57,11 +50,10 @@ export async function middleware(request: NextRequest) {
         // Get the current user
         const { data: { user }, error } = await supabase.auth.getUser();
 
-        console.log('👤 [Main Middleware] User check result:', {
-          hasUser: !!user,
-          userEmail: user?.email,
-          error: error?.message
-        });
+        // Only log authentication failures for debugging
+        if (!user || error) {
+          console.log('❌ [Middleware] Auth failed for protected route:', pathname, error?.message);
+        }
 
         if (!user || error) {
           // User is not authenticated, redirect to sign-in
@@ -102,11 +94,8 @@ export async function middleware(request: NextRequest) {
         // On error, redirect to sign-in as a safety measure
         return NextResponse.redirect(new URL('/sign-in', request.url));
       }
-    } else {
-      console.log('🔓 [Main Middleware] Non-protected route, allowing through');
     }
     
-    console.log('✅ [Main Middleware] Request processed successfully');
     return response;
   } catch (error) {
     console.error('Error in middleware:', error);
