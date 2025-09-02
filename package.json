@@ -37,7 +37,14 @@
     "env:list": "tsx scripts/list-coolify-resources.ts",
     "env:sync": "tsx scripts/sync-env.ts",
     "test:address": "tsx scripts/test-address-creation.ts",
-    "test:forms": "tsx scripts/test-nested-forms.ts"
+    "test:forms": "tsx scripts/test-nested-forms.ts",
+    "calculator:migrate": "tsx scripts/apply-calculator-migration.ts",
+    "calculator:migrate:force": "tsx scripts/apply-calculator-migration.ts --force",
+    "calculator:migrate:status": "tsx scripts/apply-calculator-migration.ts --status",
+    "calculator:data": "tsx scripts/migrate-calculator-data.ts",
+    "calculator:data:force": "tsx scripts/migrate-calculator-data.ts --force",
+    "calculator:test": "tsx scripts/migrate-calculator-data.ts --test",
+    "calculator:setup": "pnpm calculator:migrate && pnpm db:generate && pnpm calculator:data && pnpm calculator:test"
   },
   "trustedDependencies": [
     "@testing-library/react",
