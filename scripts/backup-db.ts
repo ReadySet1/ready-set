@@ -49,7 +49,7 @@ function cleanDatabaseUrl(databaseUrl: string): string {
 
 async function getDatabaseStats() {
   const databaseUrl =
-    process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL;
+    process.env.DIRECT_URL || process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL;
   if (!databaseUrl) {
     throw new Error("Database URL not found in environment variables");
   }
@@ -59,7 +59,12 @@ async function getDatabaseStats() {
   process.env.PGPASSWORD = url.password;
 
   try {
-    // Get table count
+    // Check for PostGIS extension
+    const { stdout: postgisCheck } = await execAsync(`
+      psql "${cleanUrl}" -t -c "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'postgis');"
+    `);
+
+    // Get table count including tracking tables
     const { stdout: tableCount } = await execAsync(`
       psql "${cleanUrl}" -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';"
     `);
@@ -69,19 +74,46 @@ async function getDatabaseStats() {
       psql "${cleanUrl}" -t -c "SELECT pg_size_pretty(pg_database_size(current_database()));"
     `);
 
-    // Get table sizes
+    // Get table sizes with special handling for geography columns
     const { stdout: tableSizes } = await execAsync(`
       psql "${cleanUrl}" -t -c "
-        SELECT table_name, pg_size_pretty(pg_total_relation_size(quote_ident(table_name)))
-        FROM information_schema.tables
-        WHERE table_schema = 'public'
-        ORDER BY pg_total_relation_size(quote_ident(table_name)) DESC;
+        SELECT 
+          t.table_name, 
+          pg_size_pretty(pg_total_relation_size(quote_ident(t.table_name))),
+          CASE 
+            WHEN EXISTS (
+              SELECT 1 FROM information_schema.columns c 
+              WHERE c.table_schema = 'public' 
+              AND c.table_name = t.table_name 
+              AND c.udt_name = 'geography'
+            ) THEN 'PostGIS'
+            ELSE 'Regular'
+          END as table_type
+        FROM information_schema.tables t
+        WHERE t.table_schema = 'public'
+        ORDER BY pg_total_relation_size(quote_ident(t.table_name)) DESC;
+      "
+    `);
+
+    // Check for tracking tables specifically
+    const { stdout: trackingTables } = await execAsync(`
+      psql "${cleanUrl}" -t -c "
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name IN ('drivers', 'driver_locations', 'driver_shifts', 'shift_breaks', 'deliveries', 'tracking_events', 'geofences')
+        ORDER BY table_name;
       "
     `);
 
     return {
       tableCount: parseInt(tableCount.trim()),
       databaseSize: dbSize.trim(),
+      hasPostGIS: postgisCheck.trim() === 't',
+      trackingTables: trackingTables
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => line.trim()),
       tables: tableSizes
         .split("\n")
         .filter((line) => line.trim())
@@ -89,7 +121,8 @@ async function getDatabaseStats() {
           const parts = line.trim().split("|");
           const name = parts[0]?.trim() || '';
           const size = parts[1]?.trim() || '';
-          return { name, size };
+          const type = parts[2]?.trim() || 'Regular';
+          return { name, size, type };
         }),
     };
   } finally {
@@ -104,9 +137,18 @@ async function backupDatabase() {
     const dbStats = await getDatabaseStats();
     console.log(`Database size: ${dbStats.databaseSize}`);
     console.log(`Number of tables: ${dbStats.tableCount}`);
+    console.log(`PostGIS extension: ${dbStats.hasPostGIS ? '✅ Enabled' : '❌ Not found'}`);
+    
+    if (dbStats.trackingTables.length > 0) {
+      console.log(`Driver tracking tables found: ${dbStats.trackingTables.join(', ')}`);
+    } else {
+      console.log("⚠️  No driver tracking tables found");
+    }
+    
     console.log("\nTable sizes:");
     dbStats.tables.forEach((table) => {
-      console.log(`- ${table.name}: ${table.size}`);
+      const typeIcon = table.type === 'PostGIS' ? '🗺️' : '📊';
+      console.log(`${typeIcon} ${table.name}: ${table.size} (${table.type})`);
     });
 
     // Ensure backup directory exists
@@ -119,10 +161,10 @@ async function backupDatabase() {
     console.log("\n📦 Creating database backup...");
 
     const databaseUrl =
-      process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL;
+      process.env.DIRECT_URL || process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL;
     if (!databaseUrl) {
       throw new Error(
-        "Neither POSTGRES_PRISMA_URL nor POSTGRES_URL environment variable is set",
+        "No database URL found in environment variables. Check DATABASE_URL, DIRECT_URL, POSTGRES_PRISMA_URL, or POSTGRES_URL",
       );
     }
 
@@ -139,7 +181,9 @@ async function backupDatabase() {
       `-f "${filepath}"`,
       "--format=p",
       "--no-owner",
-      "--verbose", // Added verbose flag
+      "--verbose",
+      // Include both schema and data (default behavior)
+      // Note: --extension flag is not valid for pg_dump, PostGIS will be included automatically if present
     ]
       .filter(Boolean)
       .join(" ");
@@ -162,7 +206,28 @@ async function backupDatabase() {
     // Quick backup verification
     const backupContent = await readFile(filepath, "utf-8");
     const tableCount = (backupContent.match(/CREATE TABLE/g) || []).length;
+    const extensionCount = (backupContent.match(/CREATE EXTENSION/g) || []).length;
+    const geographyColumns = (backupContent.match(/geography\(/g) || []).length;
+    
     console.log(`📋 Tables in backup: ${tableCount}`);
+    console.log(`🔧 Extensions in backup: ${extensionCount}`);
+    
+    if (geographyColumns > 0) {
+      console.log(`🗺️ PostGIS geography columns: ${geographyColumns}`);
+    }
+    
+    // Check for specific tracking tables in backup
+    const trackingTablesInBackup = dbStats.trackingTables.filter(table => 
+      backupContent.includes(`CREATE TABLE public.${table}`)
+    );
+    
+    if (dbStats.trackingTables.length > 0) {
+      console.log(`🚚 Tracking tables in backup: ${trackingTablesInBackup.length}/${dbStats.trackingTables.length}`);
+      if (trackingTablesInBackup.length < dbStats.trackingTables.length) {
+        const missingTables = dbStats.trackingTables.filter(table => !trackingTablesInBackup.includes(table));
+        console.warn(`⚠️  Missing tracking tables: ${missingTables.join(', ')}`);
+      }
+    }
 
     if (tableCount !== dbStats.tableCount) {
       console.warn(

@@ -201,20 +201,20 @@ const DriverDeliveries: React.FC = () => {
     setFilteredDeliveries(filtered);
   }, [deliveries, activeTab, statusFilter]);
 
-  // Get time of day greeting
-  const getGreeting = (): string => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
-
-  // Format the user's first name
+  // Format the user's first name (for future use if needed)
   const getFirstName = (): string => {
     const fullName = userProfile?.name;
     if (!fullName) return "";
     const nameParts = fullName.split(" ");
     return nameParts[0] || "";
+  };
+
+  // Get time-based greeting
+  const getGreeting = (): string => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
   };
 
   const handleNextPage = () => setPage((prev) => prev + 1);

@@ -17,6 +17,7 @@ import {
   Calculator,
   Flower,
   Package,
+  NavigationIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -122,6 +123,12 @@ export function AppSidebar() {
       href: "/admin",
       icon: Home,
       isActive: pathname === "/admin",
+    },
+    {
+      title: "Driver Tracking",
+      href: "/admin/tracking",
+      icon: NavigationIcon,
+      isActive: pathname?.includes("/admin/tracking") ?? false,
     },
     {
       title: "Catering Orders",

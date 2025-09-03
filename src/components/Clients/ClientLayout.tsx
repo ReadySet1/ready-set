@@ -25,6 +25,7 @@ export default function ClientLayout({
   const isStudioRoute = pathname?.startsWith("/studio");
   const isHomePage = pathname === "/";
   const isProfilePage = pathname === "/profile";
+  const isDriverRoute = pathname?.startsWith("/driver");
 
   // Create a unique key for Header component that changes when auth state changes
   const headerKey = `header-${user?.id || "anonymous"}-${userRole || "no-role"}-${isLoading ? "loading" : "loaded"}`;
@@ -62,9 +63,10 @@ export default function ClientLayout({
       {!isBackendAdminRoute &&
         !isStudioRoute &&
         !isHomePage &&
-        !isProfilePage && <Header key={headerKey} />}
+        !isProfilePage &&
+        !isDriverRoute && <Header key={headerKey} />}
       <main className="flex-grow">{children}</main>
-      {!isBackendAdminRoute && !isStudioRoute && <Footer />}
+      {!isBackendAdminRoute && !isStudioRoute && !isDriverRoute && <Footer />}
       <ScrollToTop />
     </ThemeProvider>
   );

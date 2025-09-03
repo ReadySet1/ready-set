@@ -1,25 +1,38 @@
 // src/app/api/profile/route.ts
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/utils/prismaDB";
-import { withAuth } from '@/lib/auth-middleware';
 import { createClient } from "@/utils/supabase/server";
 import { PrismaTransaction } from "@/types/prisma-types";
 
 export async function GET(request: NextRequest) {
   try {
-    // Use standardized authentication
-    const authResult = await withAuth(request, {
-      requireAuth: true
-    });
+    // Initialize Supabase client
+    const supabase = await createClient();
+    
+    // Get user session from Supabase
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!authResult.success) {
-      return authResult.response;
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { context } = authResult;
-    const { user } = context;
+    // Try to get user from the profiles table in Supabase first
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profile) {
+      // Return the user info directly from Supabase profiles table
+      return NextResponse.json({
+        ...profile,
+        id: user.id, // Auth user ID takes precedence
+        email: user.email || profile.email // Use auth email if available
+      });
+    }
     
-    // Get the user's profile from database
+    // Fallback: Get the user's profile from Prisma database
     const userData = await prisma.profile.findUnique({
       where: { id: user.id },
       select: {
@@ -34,6 +47,19 @@ export async function GET(request: NextRequest) {
     });
     
     if (!userData) {
+      // If no profile exists, check user metadata for basic info
+      if (user.user_metadata && (user.user_metadata.type || user.user_metadata.role)) {
+        return NextResponse.json({
+          id: user.id,
+          email: user.email,
+          type: user.user_metadata.type || user.user_metadata.role,
+          name: user.user_metadata.name || user.email,
+          contactName: user.user_metadata.contactName,
+          image: user.user_metadata.avatar_url,
+          status: 'ACTIVE'
+        });
+      }
+      
       return NextResponse.json({ error: "User profile not found" }, { status: 404 });
     }
     
@@ -49,19 +75,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Use standardized authentication
-    const authResult = await withAuth(request, {
-      allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
-      requireAuth: true
-    });
-
-    if (!authResult.success) {
-      return authResult.response;
-    }
-
-    // Parse request body
-    const { profileData, userTableData } = await request.json();
-    
     // Initialize Supabase client
     const supabase = await createClient();
     
@@ -71,9 +84,26 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Check if user has admin privileges (for creating profiles for others)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('type')
+      .eq('id', user.id)
+      .single();
+
+    const userType = profile?.type || user.user_metadata?.type || user.user_metadata?.role;
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(userType);
+
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    }
+
+    // Parse request body
+    const { profileData, userTableData } = await request.json();
     
-    // Verify that the user is creating their own profile
-    if (user.id !== profileData.auth_user_id) {
+    // Verify that the user is creating their own profile or is an admin
+    if (!isAdmin && user.id !== profileData.auth_user_id) {
       return NextResponse.json({ error: "Unauthorized to create profile for another user" }, { status: 403 });
     }
 
