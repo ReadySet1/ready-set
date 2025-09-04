@@ -176,7 +176,7 @@ export const envInfo = {
 };
 
 // Default export for convenience
-export default {
+const envConfig = {
   isDev,
   isProd,
   isTest,
@@ -197,3 +197,5 @@ export default {
   buildOptimizations,
   envInfo,
 };
+
+export default envConfig;

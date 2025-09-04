@@ -135,7 +135,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
     };
-  }, [syncPendingItems]);
+  }, [syncPendingItems, offlineStatus.pendingUpdates]);
 
   // Periodically check queue status
   useEffect(() => {
