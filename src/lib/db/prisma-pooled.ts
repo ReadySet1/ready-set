@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import type { Prisma } from '@prisma/client'
+import { loggers } from '@/utils/logger'
 
 /**
  * Optimized Prisma Client with Connection Pooling
@@ -42,7 +43,7 @@ const LOG_CONFIG: any[] = isDevelopment
 
 // Create a mock Prisma client for build-time
 const createMockPrismaClient = (): PrismaClient => {
-  console.log('⚠️ Creating mock Prisma client for build-time analysis (pooled)')
+  // Mock client creation logging removed for production builds
   
   // Create a mock client with all the necessary methods
   const mockClient = {
@@ -100,7 +101,7 @@ const createMockPrismaClient = (): PrismaClient => {
 
 // Create optimized Prisma client with connection pooling
 const createOptimizedPrismaClient = (): PrismaClient => {
-  console.log('🔄 Creating optimized Prisma client with connection pooling...')
+  // Client creation logging removed for production builds
   
   // During build time, we might not have a database connection
   if (isBuildTime) {
@@ -144,8 +145,8 @@ const createOptimizedPrismaClient = (): PrismaClient => {
   // Note: Event listeners temporarily disabled due to TypeScript compatibility
   // TODO: Implement proper event monitoring after Prisma client type fixes
 
-  // Connection management
-  console.log('✅ Optimized Prisma client created with configuration:', {
+  // Connection management using centralized logger
+  loggers.prisma.info('Optimized Prisma client created with configuration', {
     connectionLimit: POOL_CONFIG.connectionLimit,
     environment: process.env.NODE_ENV,
     pooling: 'enabled',
@@ -162,22 +163,19 @@ try {
   // Use global instance if available (for development hot reload)
   if (globalThis.prismaPooled) {
     prismaPooled = globalThis.prismaPooled
-    console.log('🔄 Using existing global Prisma pooled client')
   } else {
     prismaPooled = createOptimizedPrismaClient()
     
     // Store in global for development hot reload
     if (isDevelopment && !isBuildTime) {
       globalThis.prismaPooled = prismaPooled
-      console.log('💾 Stored Prisma pooled client in global for development')
     }
   }
 } catch (error) {
-  console.error('❌ Failed to initialize Prisma pooled client:', error)
+  loggers.prisma.error('Failed to initialize Prisma pooled client', error)
   
   // In production build, create a mock client for build-time analysis
   if (isBuildTime) {
-    console.log('⚠️ Creating mock Prisma pooled client for build-time analysis')
     prismaPooled = createMockPrismaClient()
   } else {
     throw error
@@ -186,9 +184,8 @@ try {
 
 // Graceful shutdown handling
 const handleShutdown = async () => {
-  console.log('🔄 Gracefully disconnecting Prisma client...')
   await prismaPooled.$disconnect()
-  console.log('✅ Prisma client disconnected')
+  loggers.prisma.info('Prisma client disconnected')
 }
 
 // Register shutdown handlers
@@ -213,13 +210,13 @@ export const queryMetrics = {
       const duration = performance.now() - startTime
       
       if (duration > 500) {
-        console.warn(`⚠️ Slow query detected: ${queryName} (${duration.toFixed(2)}ms)`)
+        loggers.prisma.warn(`Slow query detected: ${queryName} (${duration.toFixed(2)}ms)`)
       }
       
       return result
     } catch (error) {
       const duration = performance.now() - startTime
-      console.error(`❌ Query failed: ${queryName} (${duration.toFixed(2)}ms)`, error)
+      loggers.prisma.error(`Query failed: ${queryName} (${duration.toFixed(2)}ms)`, error)
       throw error
     }
   }
@@ -234,7 +231,7 @@ export const healthCheck = {
       await prismaPooled.$queryRaw`SELECT 1`
       return true
     } catch (error) {
-      console.error('❌ Database connection check failed:', error)
+      loggers.prisma.error('Database connection check failed', error)
       return false
     }
   },

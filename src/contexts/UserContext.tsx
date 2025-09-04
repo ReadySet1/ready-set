@@ -75,6 +75,7 @@ import {
   getPersistedAuthState,
   clearPersistedAuthState,
 } from "@/utils/supabase/client";
+import { loggers } from "@/utils/logger";
 
 // Enhanced helper function to fetch user role with caching and retry
 const fetchUserRole = async (
@@ -86,7 +87,7 @@ const fetchUserRole = async (
     // Check cache first
     const cachedProfile = getCachedUserProfile(user.id);
     if (cachedProfile && cachedProfile.type) {
-      console.log("Using cached user profile:", cachedProfile);
+      loggers.userContext.debug("Using cached user profile", cachedProfile);
       setUserRole(cachedProfile.type);
       return cachedProfile.type;
     }
@@ -162,7 +163,7 @@ const fetchUserRole = async (
     setUserRole(role);
     return role;
   } catch (err) {
-    console.error("Error fetching user role:", err);
+    loggers.userContext.error("Error fetching user role", err);
 
     // Try to use any persisted auth state as fallback
     const persistedState = getPersistedAuthState();
@@ -171,7 +172,10 @@ const fetchUserRole = async (
       persistedState.userId === user.id &&
       persistedState.userRole
     ) {
-      console.log("Using persisted auth state as fallback:", persistedState);
+      loggers.userContext.debug(
+        "Using persisted auth state as fallback",
+        persistedState,
+      );
       const fallbackRole = persistedState.userRole as UserType;
       setUserRole(fallbackRole);
       return fallbackRole;
@@ -183,7 +187,10 @@ const fetchUserRole = async (
 
 // Create a client component wrapper
 function UserProviderClient({ children }: { children: ReactNode }) {
-  console.log("🟢 UserProviderClient MOUNTING - this should appear first!");
+  // Component mounting logs using centralized logger
+  loggers.userContext.debug(
+    "UserProviderClient MOUNTING - this should appear first!",
+  );
 
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -205,12 +212,11 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   const [hasImmediateData, setHasImmediateData] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  console.log(
-    "🟢 UserProviderClient state initialized - user:",
-    !!user,
-    "isLoading:",
+  // State initialization logs using centralized logger
+  loggers.userContext.debug("UserProviderClient state initialized", {
+    hasUser: !!user,
     isLoading,
-  );
+  });
 
   // 🔥 IMMEDIATE COOKIE CHECK (NOT in useEffect) - executes during render
   // Only run on client after hydration to prevent server/client mismatches
@@ -659,12 +665,13 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
 // Export the provider component
 export function UserProvider({ children }: { children: ReactNode }) {
-  console.log("🔵 UserProvider wrapper called!");
+  // Provider wrapper logs using centralized logger
+  loggers.userContext.debug("UserProvider wrapper called!");
   return (
     <AuthErrorBoundary
       onError={(error, errorInfo) => {
-        // Log auth errors for monitoring
-        console.error("🚨 Auth Error Boundary triggered:", {
+        // Log auth errors for monitoring using centralized logger
+        loggers.auth.error("Auth Error Boundary triggered", {
           error: error.message,
           stack: error.stack,
           componentStack: errorInfo.componentStack,
