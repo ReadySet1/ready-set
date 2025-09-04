@@ -259,4 +259,45 @@ export async function PUT(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// DELETE - Delete a driver
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const driverId = searchParams.get('id');
+
+    if (!driverId) {
+      return NextResponse.json(
+        { success: false, error: 'Missing driver ID' },
+        { status: 400 }
+      );
+    }
+
+    const query = 'DELETE FROM drivers WHERE id = $1 RETURNING id';
+    const result = await pool.query(query, [driverId]);
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Driver not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Driver deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting driver:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to delete driver',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
 } 

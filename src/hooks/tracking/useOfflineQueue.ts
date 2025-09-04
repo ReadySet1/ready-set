@@ -8,6 +8,7 @@ interface UseOfflineQueueReturn {
   queuedItems: number;
   registerServiceWorker: () => Promise<void>;
   syncPendingItems: () => Promise<void>;
+  syncOfflineData: () => Promise<void>;
 }
 
 export function useOfflineQueue(): UseOfflineQueueReturn {
@@ -102,6 +103,11 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
     }
   }, []);
 
+  // Sync offline data (alias for syncPendingItems)
+  const syncOfflineData = useCallback(async () => {
+    await syncPendingItems();
+  }, [syncPendingItems]);
+
   // Monitor online/offline status
   useEffect(() => {
     // Set actual status on mount to avoid SSR/client mismatch
@@ -154,6 +160,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
     offlineStatus,
     queuedItems,
     registerServiceWorker,
-    syncPendingItems
+    syncPendingItems,
+    syncOfflineData
   };
 }
