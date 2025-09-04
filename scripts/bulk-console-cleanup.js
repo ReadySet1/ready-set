@@ -96,6 +96,11 @@ function addLoggerImport(content, filePath) {
   // Determine the correct import path based on file location
   let importPath = '@/utils/logger';
   
+  // Check if logger import already exists
+  if (content.includes("import { loggers } from")) {
+    return content;
+  }
+  
   // Adjust import path based on file location
   if (filePath.includes('src/app/')) {
     importPath = '@/utils/logger';
@@ -111,16 +116,17 @@ function addLoggerImport(content, filePath) {
   const lines = content.split('\n');
   let insertIndex = 0;
   
-  // Look for existing imports
+  // Find the last import statement
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].startsWith('import ')) {
       insertIndex = i + 1;
     } else if (lines[i].trim() === '' && insertIndex > 0) {
+      // Stop at first empty line after imports
       break;
     }
   }
   
-  // Add the import
+  // Add the import after the last import statement
   const importStatement = `import { loggers } from '${importPath}';`;
   lines.splice(insertIndex, 0, importStatement);
   

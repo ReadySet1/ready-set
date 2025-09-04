@@ -22,8 +22,8 @@ import {
 import { CombinedOrder } from "@/types/models";
 import { Prisma } from "@prisma/client";
 import { CateringRequest, OnDemand, Decimal } from "@/types/prisma";
+import { loggers } from "@/utils/logger";
 import {
-import { loggers } from '@/utils/logger';
   DashboardCardSkeleton,
   OrderCardSkeleton,
   QuickActionsSkeleton,
