@@ -17,6 +17,7 @@ import toast from "react-hot-toast";
 import { createClient } from "@/utils/supabase/client";
 import OAuthVendorForm from "@/components/Auth/SignUp/ui/OAuthVendorForm";
 import OAuthClientForm from "@/components/Auth/SignUp/ui/OAuthClientForm";
+import { loggers } from '@/utils/logger';
 
 // Only allowing client and vendor types for OAuth users
 const userTypes = ["vendor", "client"] as const;
@@ -53,7 +54,7 @@ export default function CompleteProfile() {
 
     if (loading) {
       loadingTimeout = setTimeout(() => {
-        console.log("Loading timeout reached, resetting loading state");
+        loggers.app.debug("Loading timeout reached, resetting loading state");
         setLoading(false);
         setError("Operation timed out. Please try again.");
       }, 30000); // 30 second timeout
@@ -70,7 +71,7 @@ export default function CompleteProfile() {
       if (!supabase) return; // Wait until supabase is initialized
       
       try {
-        console.log("Fetching user data...");
+        loggers.app.debug("Fetching user data...");
         
         // Simple user fetch with no custom timeouts
         const { data, error } = await supabase.auth.getUser();
@@ -83,20 +84,20 @@ export default function CompleteProfile() {
         }
 
         if (!data.user) {
-          console.log("No user found, redirecting to sign-in");
+          loggers.app.debug("No user found, redirecting to sign-in");
           router.push("/sign-in");
           return;
         }
 
         const userId = data.user.id;
-        console.log("User found:", userId);
-        console.log("User metadata:", data.user.user_metadata);
-        console.log("App metadata:", data.user.app_metadata);
+        loggers.app.debug("User found:", userId);
+        loggers.app.debug("User metadata:", data.user.user_metadata);
+        loggers.app.debug("App metadata:", data.user.app_metadata);
         setUser(data.user);
 
         // Check if userType exists in metadata and use it
         if (data.user.user_metadata?.userType) {
-          console.log("User type found in metadata:", data.user.user_metadata.userType);
+          loggers.app.debug("User type found in metadata:", data.user.user_metadata.userType);
           setUserType(data.user.user_metadata.userType as UserType);
         }
 
@@ -108,10 +109,10 @@ export default function CompleteProfile() {
             { user_id: userId }
           );
 
-          console.log("Raw user query result:", rawUserData, rawUserError);
+          loggers.app.debug("Raw user query result:", rawUserData, rawUserError);
 
           if (!rawUserError && rawUserData) {
-            console.log("User found in public.user table via RPC, redirecting to home");
+            loggers.app.debug("User found in public.user table via RPC, redirecting to home");
             router.push("/");
             return;
           }
@@ -127,10 +128,10 @@ export default function CompleteProfile() {
           .eq("id", userId)
           .limit(1);
 
-        console.log("Public user table search result:", publicUserData, publicUserError);
+        loggers.app.debug("Public user table search result:", publicUserData, publicUserError);
 
         if (!publicUserError && publicUserData && publicUserData.length > 0) {
-          console.log("User found in public.user table, redirecting to home");
+          loggers.app.debug("User found in public.user table, redirecting to home");
           router.push("/");
           return;
         }
@@ -142,17 +143,17 @@ export default function CompleteProfile() {
           .eq("auth_user_id", userId)
           .limit(1);
 
-        console.log("Profiles table search result:", profilesData, profilesError);
+        loggers.app.debug("Profiles table search result:", profilesData, profilesError);
 
         if (!profilesError && profilesData && profilesData.length > 0) {
-          console.log("User already has a profile, redirecting to home");
+          loggers.app.debug("User already has a profile, redirecting to home");
           router.push("/");
           return;
         }
 
         // Special debug: Log user data from Supabase to see what's going on
-        console.log("User not found in public.user or profiles tables!");
-        console.log("This user needs to complete their profile");
+        loggers.app.debug("User not found in public.user or profiles tables!");
+        loggers.app.debug("This user needs to complete their profile");
 
         // Allow profile completion
         setLoading(false);
@@ -169,7 +170,7 @@ export default function CompleteProfile() {
   }, [router, supabase]);
 
   const handleUserTypeSelection = (type: UserType) => {
-    console.log("User type selected:", type);
+    loggers.app.debug("User type selected:", type);
     setUserType(type);
     setStep(2);
   };
@@ -180,7 +181,7 @@ export default function CompleteProfile() {
       return;
     }
     
-    console.log("Form submission started:", formData);
+    loggers.app.debug("Form submission started:", formData);
     setLoading(true);
     setError(null);
   
@@ -192,7 +193,7 @@ export default function CompleteProfile() {
     }
   
     try {
-      console.log("Creating profile for user:", user.id);
+      loggers.app.debug("Creating profile for user:", user.id);
   
       // Prepare profile data
       const profileData = {
@@ -226,7 +227,7 @@ export default function CompleteProfile() {
         is_temporary_password: false,
       };
   
-      console.log("Profile data to insert:", profileData);
+      loggers.app.debug("Profile data to insert:", profileData);
   
       // Prepare user table data
       const userTableData = {
@@ -259,7 +260,7 @@ export default function CompleteProfile() {
       };
   
       // Try direct Supabase insertion first for better error handling
-      console.log("Inserting profile data directly via Supabase...");
+      loggers.app.debug("Inserting profile data directly via Supabase...");
       
       try {
         // Insert into profiles table first
@@ -272,7 +273,7 @@ export default function CompleteProfile() {
           throw new Error(`Profile insertion failed: ${profileInsertError.message}`);
         }
         
-        console.log("Profile inserted successfully:", profileInsertData);
+        loggers.app.debug("Profile inserted successfully:", profileInsertData);
         
         // Insert into user table (public schema, not 'users')
         const { data: userInsertData, error: userInsertError } = await supabase
@@ -284,7 +285,7 @@ export default function CompleteProfile() {
           throw new Error(`User insertion failed: ${userInsertError.message}`);
         }
         
-        console.log("User inserted successfully:", userInsertData);
+        loggers.app.debug("User inserted successfully:", userInsertData);
         
         // Success with direct Supabase insertion
         toast.success("Profile completed successfully");
@@ -294,11 +295,11 @@ export default function CompleteProfile() {
         return;
       } catch (supabaseError) {
         // If direct Supabase insertion fails, fall back to API route
-        console.warn("Direct Supabase insertion failed, falling back to API route:", supabaseError);
+        loggers.app.warn("Direct Supabase insertion failed, falling back to API route:", supabaseError);
       }
 
       // Fall back to the API route for profile creation
-      console.log("Falling back to API route for profile creation...");
+      loggers.app.debug("Falling back to API route for profile creation...");
       
       const response = await fetch('/api/profile', {
         method: 'POST',
@@ -317,7 +318,7 @@ export default function CompleteProfile() {
       }
   
       // Success - show toast and redirect
-      console.log("Profile created successfully via API");
+      loggers.app.debug("Profile created successfully via API");
       toast.success("Profile completed successfully");
       
       // Short timeout to allow the toast to display before redirecting
@@ -338,7 +339,7 @@ export default function CompleteProfile() {
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
-      console.log("Form submission process completed");
+      loggers.app.debug("Form submission process completed");
       setLoading(false);
     }
   };
@@ -364,7 +365,7 @@ export default function CompleteProfile() {
   );
 
   const renderForm = () => {
-    console.log("Rendering form for user type:", userType);
+    loggers.app.debug("Rendering form for user type:", userType);
     switch (userType) {
       case "vendor":
         interface UserMetadata {
@@ -470,13 +471,13 @@ export default function CompleteProfile() {
 
   // Debug function to manually redirect user
   const debugRedirectHome = () => {
-    console.log("Manual redirect triggered by user");
+    loggers.app.debug("Manual redirect triggered by user");
     router.push("/");
   };
 
   // Debug function to manually clear state and retry
   const debugRetry = () => {
-    console.log("Manual retry triggered by user");
+    loggers.app.debug("Manual retry triggered by user");
     setLoading(false);
     setError(null);
   };

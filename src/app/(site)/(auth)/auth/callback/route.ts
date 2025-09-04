@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient as createSupabaseServerClient } from '@/utils/supabase/server';
+import { loggers } from '@/utils/logger';
 
 // Define default home routes for each user type
 const USER_HOME_ROUTES: Record<string, string> = {
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
       }
       
       // Log the successful authentication
-      console.log('Authentication successful:', session ? 'Session created' : 'No session created');
+      loggers.app.debug('Authentication successful:', session ? 'Session created' : 'No session created');
       
       // If we have a session, determine the correct dashboard based on user role
       if (session) {
@@ -53,11 +54,11 @@ export async function GET(request: Request) {
 
           // Normalize the user type to lowercase for consistent handling
           const userTypeKey = profile.type.toLowerCase();
-          console.log('User role for redirection:', userTypeKey);
+          loggers.app.debug('User role for redirection:', userTypeKey);
           
           // Get the appropriate home route for this user type, fallback to next param
           const homeRoute = USER_HOME_ROUTES[userTypeKey] || next;
-          console.log('Redirecting to user dashboard:', homeRoute);
+          loggers.app.debug('Redirecting to user dashboard:', homeRoute);
           
           // Redirect to the appropriate dashboard
           return NextResponse.redirect(new URL(homeRoute, requestUrl.origin));

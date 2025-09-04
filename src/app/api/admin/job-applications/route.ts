@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { ApplicationStatus } from "@/types/job-application";
 import { createClient } from "@/utils/supabase/server";
+import { loggers } from '@/utils/logger';
 
 // Route segment config
 export const dynamic = 'force-dynamic';
@@ -193,7 +194,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    console.log("API: Fetched applications with corrected fileUploads:", processedApplications.map((app: any) => ({
+    loggers.app.debug("API: Fetched applications with corrected fileUploads:", processedApplications.map((app: any) => ({
       id: app.id,
       hasFileUploads: app.hasFileUploads,
       fileUploadCount: app.fileUploadCount,

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useUser } from "@/contexts/UserContext";
 import ModernUserProfile from "@/components/Dashboard/UserView/AdminProfileView";
+import { loggers } from '@/utils/logger';
 
 export default function EditUser() {
   const router = useRouter();
@@ -22,14 +23,14 @@ export default function EditUser() {
     // If this is an admin route with a valid UUID, allow bypass of authentication
     if (userId && userId.length > 30) {
       // This is likely a UUID, which indicates we're in admin mode
-      console.log("Admin route detected with UUID, bypassing auth check");
+      loggers.app.debug("Admin route detected with UUID, bypassing auth check");
       setBypassAuth(true);
       return;
     }
 
     // For non-admin routes, enforce authentication
     if (!isUserLoading && !session && !bypassAuth) {
-      console.log("No session detected, redirecting to sign-in");
+      loggers.app.debug("No session detected, redirecting to sign-in");
       router.push('/sign-in');
     }
   }, [session, isUserLoading, router, userId, bypassAuth]);

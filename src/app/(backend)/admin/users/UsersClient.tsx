@@ -66,6 +66,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { UserType, UserStatus } from "@/types/prisma";
 import {
+import { loggers } from '@/utils/logger';
   ApiTypeUtils,
   ApiUserTypeFilter,
   ApiUserStatusFilter,
@@ -358,7 +359,7 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
               createdAt: user.createdAt || new Date().toISOString(),
             }));
         } else {
-          console.warn(
+          loggers.app.warn(
             "Users array not found or invalid, using empty array fallback",
           );
           validatedUsers = [];
@@ -372,10 +373,10 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
 
         // Log validation issues for debugging
         if (data.users && !Array.isArray(data.users)) {
-          console.warn("Users data is not an array:", typeof data.users);
+          loggers.app.warn("Users data is not an array:", typeof data.users);
         }
         if (validatedUsers.length !== (data.users?.length || 0)) {
-          console.warn(
+          loggers.app.warn(
             `Filtered ${(data.users?.length || 0) - validatedUsers.length} invalid users from response`,
           );
         }

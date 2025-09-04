@@ -23,6 +23,7 @@ import { CombinedOrder } from "@/types/models";
 import { Prisma } from "@prisma/client";
 import { CateringRequest, OnDemand, Decimal } from "@/types/prisma";
 import {
+import { loggers } from '@/utils/logger';
   DashboardCardSkeleton,
   OrderCardSkeleton,
   QuickActionsSkeleton,
@@ -524,7 +525,7 @@ const ClientPage = async () => {
 
   // Validate user has client access
   if (userRole.toLowerCase() !== "client") {
-    console.log(
+    loggers.app.debug(
       "User does not have client role, redirecting to appropriate dashboard",
     );
     // Redirect to their appropriate dashboard based on role
