@@ -201,6 +201,9 @@ export async function GET(request: NextRequest) {
     // --- Build WHERE Clause ---
     const where: any = {};
 
+    // Exclude soft-deleted users by default
+    where.deletedAt = null;
+
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
