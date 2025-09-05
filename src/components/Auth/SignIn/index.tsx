@@ -16,7 +16,13 @@ const Signin = ({
 }: {
   searchParams?: { error?: string; message?: string; returnTo?: string };
 }) => {
-  const { isLoading: isUserLoading, session } = useUser();
+  const {
+    isLoading: isUserLoading,
+    session,
+    isAuthenticating,
+    authProgress,
+    clearAuthError,
+  } = useUser();
   const router = useRouter();
 
   // Replace useActionState with useState
@@ -40,6 +46,13 @@ const Signin = ({
     general: "",
   });
 
+  // New states for improved UX
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [redirectTimeout, setRedirectTimeout] = useState<NodeJS.Timeout | null>(
+    null,
+  );
+
   // Get returnTo from URL parameters
   const [returnTo, setReturnTo] = useState<string>("/");
 
@@ -56,14 +69,26 @@ const Signin = ({
     if (formState?.error) {
       setErrors((prev) => ({ ...prev, general: formState.error || "" }));
       setLoading(false);
+      setIsRedirecting(false);
+      setShowSuccessMessage(false);
     }
-    
+
     // If redirectTo is set in the state, we're being redirected by the server
     if (formState?.redirectTo) {
-      console.log("Login action is handling redirect to:", formState.redirectTo);
+      console.log(
+        "Login action is handling redirect to:",
+        formState.redirectTo,
+      );
       // Let the server handle the redirect
     }
-  }, [formState, loginData.email, returnTo]);
+
+    // Reset states when form data changes (user starts typing again)
+    if (loginData.email || loginData.password) {
+      setIsRedirecting(false);
+      setShowSuccessMessage(false);
+      setErrors((prev) => ({ ...prev, general: "" }));
+    }
+  }, [formState, loginData.email, loginData.password, returnTo]);
 
   useEffect(() => {
     if (searchParams?.error) {
@@ -71,11 +96,64 @@ const Signin = ({
     }
   }, [searchParams]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (redirectTimeout) {
+        clearTimeout(redirectTimeout);
+      }
+    };
+  }, [redirectTimeout]);
+
+  // Add timeout for redirect state to prevent infinite loading
+  useEffect(() => {
+    if (isRedirecting) {
+      const redirectTimeout = setTimeout(() => {
+        // If redirect takes too long, reset the state
+        setIsRedirecting(false);
+        setShowSuccessMessage(false);
+        setErrors((prev) => ({
+          ...prev,
+          general: "Redirect is taking longer than expected. Please wait...",
+        }));
+      }, 10000); // 10 second timeout
+
+      return () => clearTimeout(redirectTimeout);
+    }
+  }, [isRedirecting]);
+
+  // Integrate with UserContext auth progress
+  useEffect(() => {
+    if (!authProgress) return;
+
+    if (
+      authProgress.step === "authenticating" ||
+      authProgress.step === "fetching_profile"
+    ) {
+      setLoading(true);
+      setIsRedirecting(false);
+      setShowSuccessMessage(false);
+    } else if (authProgress.step === "redirecting") {
+      setLoading(false);
+      setIsRedirecting(true);
+      setShowSuccessMessage(true);
+    } else if (authProgress.step === "complete") {
+      setLoading(false);
+      setIsRedirecting(false);
+      setShowSuccessMessage(false);
+    }
+  }, [authProgress?.step]);
+
   // Manual form submission handler to replace formAction
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrors((prev) => ({ ...prev, general: "" }));
+    setIsRedirecting(false);
+    setShowSuccessMessage(false);
+
+    // Clear any previous auth errors from context
+    clearAuthError();
 
     // Validate form data
     if (!loginData.email) {
@@ -106,10 +184,44 @@ const Signin = ({
       // Call the login action
       const result = await login(null, formData);
       setFormState(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
-      setFormState({ error: "An unexpected error occurred. Please try again." });
+
+      // Check if this is a Next.js redirect error (successful authentication)
+      if (error?.digest && error.digest.includes("NEXT_REDIRECT")) {
+        // This is a successful redirect - show success message and redirect state
+        setShowSuccessMessage(true);
+        setIsRedirecting(true);
+        setLoading(false);
+
+        // Set a timeout to show redirect message
+        const timeout = setTimeout(() => {
+          setIsRedirecting(true);
+        }, 500);
+        setRedirectTimeout(timeout);
+
+        // Don't show error message for successful redirects
+        return;
+      }
+
+      // Handle actual errors with more specific messages
+      let errorMessage = "An unexpected error occurred. Please try again.";
+
+      if (error?.message) {
+        if (error.message.includes("fetch")) {
+          errorMessage =
+            "Network error. Please check your connection and try again.";
+        } else if (error.message.includes("timeout")) {
+          errorMessage = "Request timed out. Please try again.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      setFormState({ error: errorMessage });
       setLoading(false);
+      setIsRedirecting(false);
+      setShowSuccessMessage(false);
     }
   };
 
@@ -118,6 +230,15 @@ const Signin = ({
     const processedValue = name === "email" ? value.toLowerCase() : value;
     setLoginData((prev) => ({ ...prev, [name]: processedValue }));
     setErrors((prev) => ({ ...prev, [name]: "", general: "" }));
+
+    // Clear redirect states when user starts typing
+    if (isRedirecting || showSuccessMessage) {
+      setIsRedirecting(false);
+      setShowSuccessMessage(false);
+    }
+
+    // Clear auth errors from context when user starts typing
+    clearAuthError();
   };
 
   const handleMagicLinkEmailChange = (
@@ -125,6 +246,15 @@ const Signin = ({
   ) => {
     setMagicLinkEmail(e.target.value.toLowerCase());
     setErrors((prev) => ({ ...prev, magicLinkEmail: "", general: "" }));
+
+    // Clear redirect states when user starts typing
+    if (isRedirecting || showSuccessMessage) {
+      setIsRedirecting(false);
+      setShowSuccessMessage(false);
+    }
+
+    // Clear auth errors from context when user starts typing
+    clearAuthError();
   };
 
   const handleSendMagicLink = async (e: React.FormEvent) => {
@@ -162,9 +292,10 @@ const Signin = ({
       setMagicLinkSent(true);
     } catch (error: any) {
       console.error("Magic link error:", error);
-      let errorMessage = "Unable to send magic link. Please check your email and try again.";
+      let errorMessage =
+        "Unable to send magic link. Please check your email and try again.";
       if (error?.message?.includes("User not found")) {
-         errorMessage = "Email not found. Please sign up first.";
+        errorMessage = "Email not found. Please sign up first.";
       }
       setErrors((prev) => ({
         ...prev,
@@ -175,8 +306,6 @@ const Signin = ({
     }
   };
 
-
-
   if (isUserLoading) {
     return (
       <section className="bg-[#F4F7FF] py-14 dark:bg-dark lg:py-20">
@@ -185,7 +314,7 @@ const Signin = ({
             <div className="text-center">
               <Loader />
               <p className="mt-4 text-gray-600 dark:text-gray-400">
-                Loading...
+                {authProgress?.message || "Loading..."}
               </p>
             </div>
           </div>
@@ -195,7 +324,7 @@ const Signin = ({
   }
 
   if (session) {
-     return null;
+    return null;
   }
 
   return (
@@ -226,15 +355,59 @@ const Signin = ({
                 </Link>
               </div>
 
-              {searchParams?.message && (
+              {/* Success message for successful login */}
+              {showSuccessMessage && (
                 <div className="mb-4 rounded border border-green-400 bg-green-100 p-3 text-green-700">
-                  {searchParams.message}
+                  <div className="flex items-center">
+                    <svg
+                      className="mr-2 h-5 w-5 text-green-600"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    {formState?.message ||
+                      "Login successful! Redirecting to dashboard..."}
+                  </div>
                 </div>
               )}
 
-              {errors.general && (
+              {/* Redirect loading state */}
+              {isRedirecting && !showSuccessMessage && (
+                <div className="mb-4 rounded border border-blue-400 bg-blue-100 p-3 text-blue-700">
+                  <div className="flex items-center">
+                    <Loader />
+                    <span className="ml-2">Redirecting to dashboard...</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Auth progress from UserContext */}
+              {authProgress?.step !== "idle" &&
+                !showSuccessMessage &&
+                !isRedirecting && (
+                  <div className="mb-4 rounded border border-blue-400 bg-blue-100 p-3 text-blue-700">
+                    <div className="flex items-center">
+                      <Loader />
+                      <span className="ml-2">{authProgress?.message}</span>
+                    </div>
+                  </div>
+                )}
+
+              {/* Error message */}
+              {errors.general && !showSuccessMessage && !isRedirecting && (
                 <div className="mb-4 rounded border border-red-400 bg-red-100 p-3 text-red-700">
                   {errors.general}
+                </div>
+              )}
+
+              {searchParams?.message && (
+                <div className="mb-4 rounded border border-green-400 bg-green-100 p-3 text-green-700">
+                  {searchParams.message}
                 </div>
               )}
 
@@ -267,7 +440,7 @@ const Signin = ({
                 </span>
                 <div className="flex-grow border-t border-gray-300 dark:border-dark-3"></div>
               </div>
-              
+
               {/* Secondary options: Email/Password or Magic Link */}
               <div className="mb-5 flex rounded border">
                 <button
@@ -308,7 +481,9 @@ const Signin = ({
                       required
                     />
                     {errors.email && (
-                      <p className="mt-1 text-sm text-red-500">{errors.email}</p>
+                      <p className="mt-1 text-sm text-red-500">
+                        {errors.email}
+                      </p>
                     )}
                   </div>
                   <div className="mb-4">
@@ -318,7 +493,7 @@ const Signin = ({
                       placeholder="Password"
                       className={`w-full rounded-md border ${
                         errors.password ? "border-red-500" : "border-stroke"
-                      } bg-transparent px-5 py-3 text-base text-body-color outline-none transition focus:border-primary focus-visible:shadow-none dark:border-dark-3 dark:text-white`}
+                      } bg-transparent px-5 py-3 text-base text-dark outline-none transition focus:border-primary focus-visible:shadow-none dark:border-dark-3 dark:text-white`}
                       value={loginData.password}
                       onChange={handleInputChange}
                       required
@@ -333,12 +508,24 @@ const Signin = ({
                     <button
                       type="submit"
                       className="flex w-full items-center justify-center rounded-md bg-primary px-5 py-3 text-base font-medium text-white transition duration-300 ease-in-out hover:bg-blue-dark"
-                      disabled={loading}
+                      disabled={loading || isRedirecting || isAuthenticating}
                     >
                       {loading ? (
                         <>
                           <Loader />
                           <span className="ml-2">Signing in...</span>
+                        </>
+                      ) : isRedirecting ? (
+                        <>
+                          <Loader />
+                          <span className="ml-2">Redirecting...</span>
+                        </>
+                      ) : isAuthenticating ? (
+                        <>
+                          <Loader />
+                          <span className="ml-2">
+                            {authProgress?.message || "Authenticating..."}
+                          </span>
                         </>
                       ) : (
                         "Sign in"
@@ -408,7 +595,7 @@ const Signin = ({
                   )}
                 </form>
               )}
-              
+
               <div>
                 <span className="absolute right-1 top-1">
                   <svg
