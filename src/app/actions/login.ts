@@ -4,6 +4,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
+import { softDeleteHelpers } from "@/utils/prismaDB";
 
 import { UserType } from "@/types/user";
 
@@ -181,7 +182,7 @@ export async function login(
     // Get user type from profile
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("type, email")
+      .select("type, email, deletedAt")
       .eq("id", user.id)
       .single();
 
@@ -197,6 +198,15 @@ export async function login(
       console.error(`❌ [${requestId}] No profile type found for user: ${user.id}`);
       return { 
         error: "Login successful but user profile is incomplete. Please contact support.",
+        success: false 
+      };
+    }
+
+    // Check if user account has been soft-deleted
+    if (profile.deletedAt) {
+      console.log(`❌ [${requestId}] Login attempt by soft-deleted user: ${user.id}`);
+      return { 
+        error: "Account has been deactivated. Please contact support for assistance.",
         success: false 
       };
     }

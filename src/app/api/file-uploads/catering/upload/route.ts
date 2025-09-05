@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
+import { validateUserNotSoftDeleted } from '@/lib/soft-delete-handlers';
 
 export async function POST(request: NextRequest) {
   console.log("Catering file upload API endpoint called");
@@ -63,6 +64,15 @@ export async function POST(request: NextRequest) {
         { error: "Missing required fields" },
         { status: 400 }
       );
+    }
+
+    // Validate that the user is not soft-deleted
+    const userValidation = await validateUserNotSoftDeleted(userId);
+    if (!userValidation.isValid) {
+      console.log("User validation failed:", userValidation.error);
+      return NextResponse.json({ 
+        error: userValidation.error 
+      }, { status: 403 });
     }
     
     // Upload file to Supabase Storage

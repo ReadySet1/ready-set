@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { CateringNeedHost } from "@/types/order";
 import { localTimeToUtc } from "@/lib/utils/timezone";
+import { validateUserNotSoftDeleted } from "@/lib/soft-delete-handlers";
 
 // Validates and processes a catering request submission
 export async function POST(request: NextRequest) {
@@ -26,6 +27,14 @@ export async function POST(request: NextRequest) {
 
     // Use the client ID from the request if in admin mode, otherwise use the authenticated user's ID
     const userId = data.clientId || user.id;
+
+    // Validate that the user is not soft-deleted
+    const userValidation = await validateUserNotSoftDeleted(userId);
+    if (!userValidation.isValid) {
+      return NextResponse.json({ 
+        message: userValidation.error 
+      }, { status: 403 });
+    }
 
     // Validate required fields
     const requiredFields = [

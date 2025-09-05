@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { loggers } from '@/utils/logger';
+import { softDeleteMiddleware, softDeleteProfile, restoreProfile, isProfileSoftDeleted } from '@/lib/prisma/middleware/softDelete';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -22,9 +23,11 @@ loggers.prisma.debug('Prisma Environment initialized', {
 
 // Create Prisma client with optimized configuration
 function createPrismaClient(): PrismaClient {
+  let client: PrismaClient;
+
   // Test environment - minimal configuration
   if (isTest) {
-    return new PrismaClient({
+    client = new PrismaClient({
       log: ['error'],
       datasources: {
         db: {
@@ -33,10 +36,9 @@ function createPrismaClient(): PrismaClient {
       }
     });
   }
-
   // Production environment - optimized for serverless
-  if (isProduction) {
-    return new PrismaClient({
+  else if (isProduction) {
+    client = new PrismaClient({
       log: ['error'],
       datasources: {
         db: {
@@ -52,16 +54,22 @@ function createPrismaClient(): PrismaClient {
       },
     });
   }
-
   // Development environment - full logging
-  return new PrismaClient({
-    log: ['query', 'info', 'warn', 'error'],
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL
+  else {
+    client = new PrismaClient({
+      log: ['query', 'info', 'warn', 'error'],
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL
+        }
       }
-    }
-  });
+    });
+  }
+
+  // Apply soft delete middleware
+  client.$use(softDeleteMiddleware);
+
+  return client;
 }
 
 // Singleton pattern with global caching for development
@@ -119,6 +127,112 @@ if (isProduction) {
     await disconnectPrisma();
   });
 }
+
+// Soft delete helper methods
+export const softDeleteHelpers = {
+  /**
+   * Soft delete a Profile record
+   */
+  async deleteProfile(profileId: string): Promise<void> {
+    await softDeleteProfile(prisma, profileId);
+  },
+
+  /**
+   * Restore a soft-deleted Profile record
+   */
+  async restoreProfile(profileId: string): Promise<void> {
+    await restoreProfile(prisma, profileId);
+  },
+
+  /**
+   * Check if a Profile is soft-deleted
+   */
+  async isProfileSoftDeleted(profileId: string): Promise<boolean> {
+    return await isProfileSoftDeleted(prisma, profileId);
+  },
+
+  /**
+   * Find active (non-deleted) profiles
+   */
+  async findManyActive(args?: any) {
+    return prisma.profile.findMany({
+      ...args,
+      where: {
+        ...args?.where,
+        deletedAt: null
+      }
+    });
+  },
+
+  /**
+   * Find first active (non-deleted) profile
+   */
+  async findFirstActive(args?: any) {
+    return prisma.profile.findFirst({
+      ...args,
+      where: {
+        ...args?.where,
+        deletedAt: null
+      }
+    });
+  },
+
+  /**
+   * Find unique active (non-deleted) profile
+   */
+  async findUniqueActive(args: any) {
+    return prisma.profile.findUnique({
+      ...args,
+      where: {
+        ...args.where,
+        deletedAt: null
+      }
+    });
+  },
+
+  /**
+   * Count active (non-deleted) profiles
+   */
+  async countActive(args?: any) {
+    return prisma.profile.count({
+      ...args,
+      where: {
+        ...args?.where,
+        deletedAt: null
+      }
+    });
+  },
+
+  /**
+   * Find profiles including soft-deleted ones
+   */
+  async findManyIncludingDeleted(args?: any) {
+    return prisma.profile.findMany({
+      ...args,
+      includeDeleted: true
+    });
+  },
+
+  /**
+   * Find first profile including soft-deleted ones
+   */
+  async findFirstIncludingDeleted(args?: any) {
+    return prisma.profile.findFirst({
+      ...args,
+      includeDeleted: true
+    });
+  },
+
+  /**
+   * Find unique profile including soft-deleted ones
+   */
+  async findUniqueIncludingDeleted(args: any) {
+    return prisma.profile.findUnique({
+      ...args,
+      includeDeleted: true
+    });
+  }
+};
 
 // Export default for compatibility
 export default prisma;

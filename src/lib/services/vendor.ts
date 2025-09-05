@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 import { notFound } from "next/navigation";
+import { getOrdersExcludingSoftDeletedUsers } from "@/lib/soft-delete-handlers";
 
 // Custom types for cleaner data structure
 export interface OrderData {
@@ -126,30 +127,14 @@ export async function getUserOrders(limit = 10, page = 1) {
   // Fetch more records than needed to properly sort and paginate
   const fetchLimit = Math.max(limit * 10, 50); // Fetch more to ensure proper sorting
 
-  // Fetch catering requests
-  const cateringRequests = await prisma.cateringRequest.findMany({
-    where: {
-      userId: userId
-    },
-    include: {
-      pickupAddress: true,
-      deliveryAddress: true,
-    },
-    orderBy: { pickupDateTime: 'desc' },
-    take: fetchLimit
+  // Fetch catering requests (excluding soft-deleted users)
+  const cateringRequests = await getOrdersExcludingSoftDeletedUsers('catering', {
+    userId: userId
   });
 
-  // Fetch on-demand requests
-  const onDemandRequests = await prisma.onDemand.findMany({
-    where: {
-      userId: userId
-    },
-    include: {
-      pickupAddress: true,
-      deliveryAddress: true,
-    },
-    orderBy: { pickupDateTime: 'desc' },
-    take: fetchLimit
+  // Fetch on-demand requests (excluding soft-deleted users)
+  const onDemandRequests = await getOrdersExcludingSoftDeletedUsers('ondemand', {
+    userId: userId
   });
 
   // Transform the data to a unified format
