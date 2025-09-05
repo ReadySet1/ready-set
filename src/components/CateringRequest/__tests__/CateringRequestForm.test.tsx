@@ -190,6 +190,10 @@ describe("CateringRequestForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     const user = userEvent.setup();
@@ -255,6 +259,10 @@ describe("CateringRequestForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     const user = userEvent.setup();

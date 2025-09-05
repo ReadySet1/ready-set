@@ -56,7 +56,11 @@ const defaultMockUserContext = {
   userRole: null,
   isLoading: false,
   error: null,
+  isAuthenticating: false,
+  authProgress: { step: "idle" as const, message: "" },
   refreshUserData: jest.fn(),
+  clearAuthError: jest.fn(),
+  setAuthProgress: jest.fn(),
 };
 
 describe("Header Component", () => {

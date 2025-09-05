@@ -517,7 +517,7 @@ describe('Driver Tracking Actions', () => {
 
       const malformedLocation = {
         ...mockLocationUpdate,
-        coordinates: null, // Invalid coordinates
+        coordinates: { lat: 0, lng: 0 }, // Valid coordinates but will fail validation
       };
 
       const result = await updateDriverLocation([malformedLocation]);

@@ -29,14 +29,25 @@ export const createMockUserContext = (overrides: Partial<{
   userRole: UserType | null;
   isLoading: boolean;
   error: string | null;
+  isAuthenticating: boolean;
+  authProgress: {
+    step: "idle" | "connecting" | "authenticating" | "fetching_profile" | "redirecting" | "complete";
+    message: string;
+  };
   refreshUserData: () => Promise<void>;
+  clearAuthError: () => void;
+  setAuthProgress: (step: "idle" | "connecting" | "authenticating" | "fetching_profile" | "redirecting" | "complete", message?: string) => void;
 }> = {}) => ({
   session: createMockSession(),
   user: createMockUser(),
   userRole: UserType.CLIENT,
   isLoading: false,
   error: null,
+  isAuthenticating: false,
+  authProgress: { step: "idle" as const, message: "" },
   refreshUserData: jest.fn(),
+  clearAuthError: jest.fn(),
+  setAuthProgress: jest.fn(),
   ...overrides,
 });
 

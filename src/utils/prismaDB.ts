@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { loggers } from '@/utils/logger';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -10,7 +11,8 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development';
 const isTest = process.env.NODE_ENV === 'test';
 
-console.log('🔧 Prisma Environment:', {
+// Environment logging using centralized logger
+loggers.prisma.debug('Prisma Environment initialized', {
   NODE_ENV: process.env.NODE_ENV,
   NEXT_RUNTIME: process.env.NEXT_RUNTIME,
   hasDatabase: !!process.env.DATABASE_URL,
@@ -20,11 +22,8 @@ console.log('🔧 Prisma Environment:', {
 
 // Create Prisma client with optimized configuration
 function createPrismaClient(): PrismaClient {
-  console.log('🟢 Creating new Prisma client...');
-  
   // Test environment - minimal configuration
   if (isTest) {
-    console.log('🧪 Test environment - using basic client');
     return new PrismaClient({
       log: ['error'],
       datasources: {
@@ -37,7 +36,6 @@ function createPrismaClient(): PrismaClient {
 
   // Production environment - optimized for serverless
   if (isProduction) {
-    console.log('🚀 Production environment - optimized client');
     return new PrismaClient({
       log: ['error'],
       datasources: {
@@ -56,7 +54,6 @@ function createPrismaClient(): PrismaClient {
   }
 
   // Development environment - full logging
-  console.log('🔧 Development environment - debug client');
   return new PrismaClient({
     log: ['query', 'info', 'warn', 'error'],
     datasources: {
@@ -72,10 +69,7 @@ const getPrismaClient = (): PrismaClient => {
   // In development, use global to prevent re-initialization during hot reloads
   if (isDevelopment) {
     if (!global.__prisma) {
-      console.log('🔄 Creating new global Prisma client for development');
       global.__prisma = createPrismaClient();
-    } else {
-      console.log('♻️ Reusing existing global Prisma client');
     }
     return global.__prisma;
   }
@@ -90,22 +84,20 @@ export const prisma = getPrismaClient();
 // Enhanced connection management
 export async function connectPrisma(): Promise<void> {
   try {
-    console.log('🔌 Attempting to connect to database...');
     await prisma.$connect();
-    console.log('✅ Database connected successfully');
+    loggers.prisma.info('Database connected successfully');
   } catch (error) {
-    console.error('❌ Database connection failed:', error);
+    loggers.prisma.error('Database connection failed', error);
     throw new Error(`Failed to connect to database: ${error}`);
   }
 }
 
 export async function disconnectPrisma(): Promise<void> {
   try {
-    console.log('🔌 Disconnecting from database...');
     await prisma.$disconnect();
-    console.log('✅ Database disconnected successfully');
+    loggers.prisma.info('Database disconnected successfully');
   } catch (error) {
-    console.error('❌ Database disconnection failed:', error);
+    loggers.prisma.error('Database disconnection failed', error);
   }
 }
 
@@ -113,10 +105,10 @@ export async function disconnectPrisma(): Promise<void> {
 export async function checkDatabaseHealth(): Promise<boolean> {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    console.log('💚 Database health check passed');
+    loggers.prisma.info('Database health check passed');
     return true;
   } catch (error) {
-    console.error('💔 Database health check failed:', error);
+    loggers.prisma.error('Database health check failed', error);
     return false;
   }
 }
@@ -124,7 +116,6 @@ export async function checkDatabaseHealth(): Promise<boolean> {
 // Graceful shutdown for serverless
 if (isProduction) {
   process.on('beforeExit', async () => {
-    console.log('🔄 Gracefully shutting down Prisma client...');
     await disconnectPrisma();
   });
 }

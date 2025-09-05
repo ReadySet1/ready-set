@@ -21,7 +21,6 @@ describe('/api/tracking/drivers', () => {
       update: jest.fn().mockReturnThis(),
       delete: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
       single: jest.fn(),
       order: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),

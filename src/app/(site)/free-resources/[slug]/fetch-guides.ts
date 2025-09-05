@@ -3,6 +3,7 @@
 import { notFound } from 'next/navigation';
 import { safeFetch } from '@/lib/fetch-utils';
 import { getGuideBySlug } from '@/sanity/lib/queries';
+import { loggers } from '@/utils/logger';
 
 // Define types for Portable Text blocks
 interface PortableTextSpan {
@@ -671,12 +672,12 @@ export async function fetchGuideData(slug: string): Promise<Guide | null> {
     // If it's a local 'npm run build', use static fallbacks first.
     // This avoids hitting external APIs during a local static build explicitly.
     if (shouldForceStaticFallback()) {
-      console.log(`[fetchGuideData] Local 'npm run build' detected, forcing static fallback for guide: ${slug}`);
+      loggers.app.debug(`[fetchGuideData] Local 'npm run build' detected, forcing static fallback for guide: ${slug}`);
       const staticGuide = STATIC_FALLBACK_GUIDES[slug];
       if (staticGuide) {
         return staticGuide;
       }
-      console.warn(`[fetchGuideData] No specific static fallback found for ${slug}, returning generic.`);
+      loggers.app.warn(`[fetchGuideData] No specific static fallback found for ${slug}, returning generic.`);
       // Return a generic fallback if no specific one exists
       return {
         _id: `static-${slug}`,
@@ -705,43 +706,43 @@ export async function fetchGuideData(slug: string): Promise<Guide | null> {
       const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
       const url = new URL(`/api/guides/${slug}`, baseUrl).toString();
       
-      console.log(`[fetchGuideData] Attempting to fetch guide ${slug} from API route: ${url}`);
+      loggers.app.debug(`[fetchGuideData] Attempting to fetch guide ${slug} from API route: ${url}`);
       const response = await safeFetch<{data?: Guide}>(url);
       
       if (response && typeof response === 'object' && 'data' in response && response.data) {
-        console.log(`[fetchGuideData] Guide ${slug} fetched successfully from API route.`);
+        loggers.app.debug(`[fetchGuideData] Guide ${slug} fetched successfully from API route.`);
         return response.data;
       }
       
       if (response && typeof response === 'object' && '_id' in response) {
-        console.log(`[fetchGuideData] Guide ${slug} fetched successfully from API route (legacy format).`);
+        loggers.app.debug(`[fetchGuideData] Guide ${slug} fetched successfully from API route (legacy format).`);
         return response as unknown as Guide;
       }
       
-      console.warn(`[fetchGuideData] API route for guide ${slug} returned empty or invalid data, trying direct Sanity query.`);
+      loggers.app.warn(`[fetchGuideData] API route for guide ${slug} returned empty or invalid data, trying direct Sanity query.`);
 
     } catch (apiError) {
-      console.warn(`[fetchGuideData] API fetch failed for guide ${slug}, falling back to direct Sanity query:`, apiError);
+      loggers.app.warn(`[fetchGuideData] API fetch failed for guide ${slug}, falling back to direct Sanity query:`, apiError);
       // API route failed, trying direct Sanity query as fallback
     }
     
     // Fallback to direct Sanity query
-    console.log(`[fetchGuideData] Attempting to fetch guide ${slug} directly from Sanity.`);
+    loggers.app.debug(`[fetchGuideData] Attempting to fetch guide ${slug} directly from Sanity.`);
     const guide = await getGuideBySlug(slug);
     
     if (!guide || guide._id === undefined || guide._id.startsWith("fallback-")) {
-      console.warn(`[fetchGuideData] Direct Sanity query for guide ${slug} returned empty, null, or fallback. It might indicate a CORS/network issue or missing data.`);
+      loggers.app.warn(`[fetchGuideData] Direct Sanity query for guide ${slug} returned empty, null, or fallback. It might indicate a CORS/network issue or missing data.`);
       // If Sanity itself fails, as a last resort, return a static fallback
       const staticGuide = STATIC_FALLBACK_GUIDES[slug];
       if (staticGuide) {
-        console.log(`[fetchGuideData] Using static fallback for guide: ${slug} after direct Sanity query failure.`);
+        loggers.app.debug(`[fetchGuideData] Using static fallback for guide: ${slug} after direct Sanity query failure.`);
         return staticGuide;
       }
       console.error(`[fetchGuideData] No real data and no specific static fallback for ${slug}. Returning null.`);
       return null;
     }
     
-    console.log(`[fetchGuideData] Guide ${slug} fetched successfully directly from Sanity.`);
+    loggers.app.debug(`[fetchGuideData] Guide ${slug} fetched successfully directly from Sanity.`);
     return guide as unknown as Guide;
   } catch (error) {
     console.error(`[fetchGuideData] CRITICAL ERROR fetching guide with slug ${slug}:`, error);
@@ -749,7 +750,7 @@ export async function fetchGuideData(slug: string): Promise<Guide | null> {
     // Final fallback in case of ANY unhandled error during fetch
     const staticGuide = STATIC_FALLBACK_GUIDES[slug];
     if (staticGuide) {
-      console.log(`[fetchGuideData] Using static fallback for guide: ${slug} due to critical error.`);
+      loggers.app.debug(`[fetchGuideData] Using static fallback for guide: ${slug} due to critical error.`);
       return staticGuide;
     }
     

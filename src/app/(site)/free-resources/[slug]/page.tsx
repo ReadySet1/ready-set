@@ -6,6 +6,7 @@ import React from "react";
 import Logo from "@/components/ui/logo";
 import type { Metadata } from "next";
 import { DownloadButtonWrapper } from "./DownloadButtonWrapper";
+import { loggers } from '@/utils/logger';
 
 export const revalidate = 30;
 
@@ -155,9 +156,9 @@ async function getGuide(slug: string): Promise<GuideDocument | null> {
     // Only log during development, not during build
     if (process.env.NODE_ENV === 'development') {
       if (guide) {
-        console.log(`✅ [Direct Sanity] Successfully fetched guide: ${slug}`);
+        loggers.app.debug(`✅ [Direct Sanity] Successfully fetched guide: ${slug}`);
       } else {
-        console.log(`❌ [Direct Sanity] No guide found for slug: ${slug}`);
+        loggers.app.debug(`❌ [Direct Sanity] No guide found for slug: ${slug}`);
       }
     }
     
@@ -167,7 +168,7 @@ async function getGuide(slug: string): Promise<GuideDocument | null> {
     if (error instanceof TypeError && error.message.includes('arrayBuffer')) {
       // This is a known issue during build with Sanity client, return null gracefully
       if (process.env.NODE_ENV !== 'production') {
-        console.warn(`⚠️ [Build] Sanity client error during build for ${slug}, this is expected during static generation`);
+        loggers.app.warn(`⚠️ [Build] Sanity client error during build for ${slug}, this is expected during static generation`);
       }
       return null;
     }
@@ -442,13 +443,13 @@ export async function generateStaticParams() {
     // Add null check for guides
     if (!guides || !Array.isArray(guides)) {
       if (process.env.NODE_ENV !== 'production') {
-        console.warn('⚠️ No guides found or invalid response from Sanity, using fallback slugs');
+        loggers.app.warn('⚠️ No guides found or invalid response from Sanity, using fallback slugs');
       }
       throw new Error('Invalid guides response');
     }
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`📄 Found ${guides.length} guides for static generation`);
+      loggers.app.debug(`📄 Found ${guides.length} guides for static generation`);
     }
     
     return guides.map((guide: { slug: string }) => ({
@@ -474,7 +475,7 @@ export async function generateStaticParams() {
     ];
     
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`🔄 Using ${staticGuideSlugs.length} fallback guide slugs`);
+      loggers.app.debug(`🔄 Using ${staticGuideSlugs.length} fallback guide slugs`);
     }
     
     return staticGuideSlugs.map((slug) => ({

@@ -17,6 +17,7 @@ import toast from "react-hot-toast";
 import { createClient } from "@/utils/supabase/client";
 import OAuthVendorForm from "@/components/Auth/SignUp/ui/OAuthVendorForm";
 import OAuthClientForm from "@/components/Auth/SignUp/ui/OAuthClientForm";
+import { loggers } from "@/utils/logger";
 
 // Only allowing client and vendor types for OAuth users
 const userTypes = ["vendor", "client"] as const;
@@ -42,7 +43,7 @@ export default function CompleteProfile() {
       const client = await createClient();
       setSupabase(client);
     };
-    
+
     initSupabase();
   }, []);
 
@@ -53,7 +54,7 @@ export default function CompleteProfile() {
 
     if (loading) {
       loadingTimeout = setTimeout(() => {
-        console.log("Loading timeout reached, resetting loading state");
+        loggers.app.debug("Loading timeout reached, resetting loading state");
         setLoading(false);
         setError("Operation timed out. Please try again.");
       }, 30000); // 30 second timeout
@@ -68,10 +69,10 @@ export default function CompleteProfile() {
   useEffect(() => {
     const fetchUser = async () => {
       if (!supabase) return; // Wait until supabase is initialized
-      
+
       try {
-        console.log("Fetching user data...");
-        
+        loggers.app.debug("Fetching user data...");
+
         // Simple user fetch with no custom timeouts
         const { data, error } = await supabase.auth.getUser();
 
@@ -83,20 +84,23 @@ export default function CompleteProfile() {
         }
 
         if (!data.user) {
-          console.log("No user found, redirecting to sign-in");
+          loggers.app.debug("No user found, redirecting to sign-in");
           router.push("/sign-in");
           return;
         }
 
         const userId = data.user.id;
-        console.log("User found:", userId);
-        console.log("User metadata:", data.user.user_metadata);
-        console.log("App metadata:", data.user.app_metadata);
+        loggers.app.debug("User found:", userId);
+        loggers.app.debug("User metadata:", data.user.user_metadata);
+        loggers.app.debug("App metadata:", data.user.app_metadata);
         setUser(data.user);
 
         // Check if userType exists in metadata and use it
         if (data.user.user_metadata?.userType) {
-          console.log("User type found in metadata:", data.user.user_metadata.userType);
+          loggers.app.debug(
+            "User type found in metadata:",
+            data.user.user_metadata.userType,
+          );
           setUserType(data.user.user_metadata.userType as UserType);
         }
 
@@ -104,14 +108,19 @@ export default function CompleteProfile() {
         // This ensures we're definitely checking the right table
         try {
           const { data: rawUserData, error: rawUserError } = await supabase.rpc(
-            'get_user_by_id',
-            { user_id: userId }
+            "get_user_by_id",
+            { user_id: userId },
           );
 
-          console.log("Raw user query result:", rawUserData, rawUserError);
+          loggers.app.debug("Raw user query result:", {
+            data: rawUserData,
+            error: rawUserError,
+          });
 
           if (!rawUserError && rawUserData) {
-            console.log("User found in public.user table via RPC, redirecting to home");
+            loggers.app.debug(
+              "User found in public.user table via RPC, redirecting to home",
+            );
             router.push("/");
             return;
           }
@@ -127,10 +136,15 @@ export default function CompleteProfile() {
           .eq("id", userId)
           .limit(1);
 
-        console.log("Public user table search result:", publicUserData, publicUserError);
+        loggers.app.debug("Public user table search result:", {
+          data: publicUserData,
+          error: publicUserError,
+        });
 
         if (!publicUserError && publicUserData && publicUserData.length > 0) {
-          console.log("User found in public.user table, redirecting to home");
+          loggers.app.debug(
+            "User found in public.user table, redirecting to home",
+          );
           router.push("/");
           return;
         }
@@ -142,17 +156,20 @@ export default function CompleteProfile() {
           .eq("auth_user_id", userId)
           .limit(1);
 
-        console.log("Profiles table search result:", profilesData, profilesError);
+        loggers.app.debug("Profiles table search result:", {
+          data: profilesData,
+          error: profilesError,
+        });
 
         if (!profilesError && profilesData && profilesData.length > 0) {
-          console.log("User already has a profile, redirecting to home");
+          loggers.app.debug("User already has a profile, redirecting to home");
           router.push("/");
           return;
         }
 
         // Special debug: Log user data from Supabase to see what's going on
-        console.log("User not found in public.user or profiles tables!");
-        console.log("This user needs to complete their profile");
+        loggers.app.debug("User not found in public.user or profiles tables!");
+        loggers.app.debug("This user needs to complete their profile");
 
         // Allow profile completion
         setLoading(false);
@@ -169,7 +186,7 @@ export default function CompleteProfile() {
   }, [router, supabase]);
 
   const handleUserTypeSelection = (type: UserType) => {
-    console.log("User type selected:", type);
+    loggers.app.debug("User type selected:", type);
     setUserType(type);
     setStep(2);
   };
@@ -179,30 +196,34 @@ export default function CompleteProfile() {
       setError("Supabase client not initialized");
       return;
     }
-    
-    console.log("Form submission started:", formData);
+
+    loggers.app.debug("Form submission started:", formData);
     setLoading(true);
     setError(null);
-  
+
     if (!user) {
       console.error("No user found in state");
       setError("User not authenticated");
       setLoading(false);
       return;
     }
-  
+
     try {
-      console.log("Creating profile for user:", user.id);
-  
+      loggers.app.debug("Creating profile for user:", user.id);
+
       // Prepare profile data
       const profileData = {
         auth_user_id: user.id,
         guid: null,
-        name: user.user_metadata?.full_name || formData.contact_name || user.user_metadata?.name,
+        name:
+          user.user_metadata?.full_name ||
+          formData.contact_name ||
+          user.user_metadata?.name,
         image: user.user_metadata?.avatar_url || user.user_metadata?.picture,
         type: userType,
         company_name: formData.company || null,
-        contact_name: formData.contact_name || user.user_metadata?.full_name || null,
+        contact_name:
+          formData.contact_name || user.user_metadata?.full_name || null,
         contact_number: formData.phone || null,
         website: formData.website || null,
         street1: formData.street1 || null,
@@ -212,12 +233,20 @@ export default function CompleteProfile() {
         zip: formData.zip || null,
         location_number: null,
         parking_loading: formData.parking || null,
-        counties: Array.isArray(formData.countiesServed) ? formData.countiesServed.join(",") : null,
-        time_needed: Array.isArray(formData.timeNeeded) ? formData.timeNeeded.join(",") : null,
+        counties: Array.isArray(formData.countiesServed)
+          ? formData.countiesServed.join(",")
+          : null,
+        time_needed: Array.isArray(formData.timeNeeded)
+          ? formData.timeNeeded.join(",")
+          : null,
         frequency: formData.frequency || null,
-        provide: Array.isArray(formData.provisions) ? formData.provisions.join(",") : null,
+        provide: Array.isArray(formData.provisions)
+          ? formData.provisions.join(",")
+          : null,
         head_count: formData.head_count || null,
-        catering_brokerage: Array.isArray(formData.cateringBrokerage) ? formData.cateringBrokerage.join(",") : null,
+        catering_brokerage: Array.isArray(formData.cateringBrokerage)
+          ? formData.cateringBrokerage.join(",")
+          : null,
         status: "pending",
         side_notes: null,
         confirmation_code: null,
@@ -225,9 +254,9 @@ export default function CompleteProfile() {
         updated_at: new Date(),
         is_temporary_password: false,
       };
-  
-      console.log("Profile data to insert:", profileData);
-  
+
+      loggers.app.debug("Profile data to insert:", profileData);
+
       // Prepare user table data
       const userTableData = {
         id: user.id,
@@ -257,35 +286,36 @@ export default function CompleteProfile() {
         updated_at: new Date(),
         isTemporaryPassword: false,
       };
-  
+
       // Try direct Supabase insertion first for better error handling
-      console.log("Inserting profile data directly via Supabase...");
-      
+      loggers.app.debug("Inserting profile data directly via Supabase...");
+
       try {
         // Insert into profiles table first
-        const { data: profileInsertData, error: profileInsertError } = await supabase
-          .from('profiles')
-          .insert([profileData]);
-          
+        const { data: profileInsertData, error: profileInsertError } =
+          await supabase.from("profiles").insert([profileData]);
+
         if (profileInsertError) {
           console.error("Error inserting profile:", profileInsertError);
-          throw new Error(`Profile insertion failed: ${profileInsertError.message}`);
+          throw new Error(
+            `Profile insertion failed: ${profileInsertError.message}`,
+          );
         }
-        
-        console.log("Profile inserted successfully:", profileInsertData);
-        
+
+        loggers.app.debug("Profile inserted successfully:", profileInsertData);
+
         // Insert into user table (public schema, not 'users')
         const { data: userInsertData, error: userInsertError } = await supabase
-          .from('user')
+          .from("user")
           .insert([userTableData]);
-          
+
         if (userInsertError) {
           console.error("Error inserting user:", userInsertError);
           throw new Error(`User insertion failed: ${userInsertError.message}`);
         }
-        
-        console.log("User inserted successfully:", userInsertData);
-        
+
+        loggers.app.debug("User inserted successfully:", userInsertData);
+
         // Success with direct Supabase insertion
         toast.success("Profile completed successfully");
         setTimeout(() => {
@@ -294,51 +324,53 @@ export default function CompleteProfile() {
         return;
       } catch (supabaseError) {
         // If direct Supabase insertion fails, fall back to API route
-        console.warn("Direct Supabase insertion failed, falling back to API route:", supabaseError);
+        loggers.app.warn(
+          "Direct Supabase insertion failed, falling back to API route:",
+          supabaseError,
+        );
       }
 
       // Fall back to the API route for profile creation
-      console.log("Falling back to API route for profile creation...");
-      
-      const response = await fetch('/api/profile', {
-        method: 'POST',
+      loggers.app.debug("Falling back to API route for profile creation...");
+
+      const response = await fetch("/api/profile", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           profileData,
-          userTableData
+          userTableData,
         }),
       });
-  
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Profile creation failed');
+        throw new Error(errorData.error || "Profile creation failed");
       }
-  
+
       // Success - show toast and redirect
-      console.log("Profile created successfully via API");
+      loggers.app.debug("Profile created successfully via API");
       toast.success("Profile completed successfully");
-      
+
       // Short timeout to allow the toast to display before redirecting
       setTimeout(() => {
         router.push("/");
       }, 500);
-      
+
       return;
-      
     } catch (err) {
       console.error("CompleteProfile Error:", err);
-      
+
       let errorMessage = "An unexpected error occurred";
       if (err instanceof Error) {
         errorMessage = err.message;
       }
-      
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
-      console.log("Form submission process completed");
+      loggers.app.debug("Form submission process completed");
       setLoading(false);
     }
   };
@@ -364,7 +396,7 @@ export default function CompleteProfile() {
   );
 
   const renderForm = () => {
-    console.log("Rendering form for user type:", userType);
+    loggers.app.debug("Rendering form for user type:", userType);
     switch (userType) {
       case "vendor":
         interface UserMetadata {
@@ -470,13 +502,13 @@ export default function CompleteProfile() {
 
   // Debug function to manually redirect user
   const debugRedirectHome = () => {
-    console.log("Manual redirect triggered by user");
+    loggers.app.debug("Manual redirect triggered by user");
     router.push("/");
   };
 
   // Debug function to manually clear state and retry
   const debugRetry = () => {
-    console.log("Manual retry triggered by user");
+    loggers.app.debug("Manual retry triggered by user");
     setLoading(false);
     setError(null);
   };
@@ -518,7 +550,7 @@ export default function CompleteProfile() {
                 {/* Cancel button */}
                 <Button
                   variant="outline"
-                  className="mt-4 mb-2"
+                  className="mb-2 mt-4"
                   onClick={() => {
                     setLoading(false);
                     setError("Operation cancelled. Please try again.");
@@ -526,9 +558,9 @@ export default function CompleteProfile() {
                 >
                   Cancel
                 </Button>
-                
+
                 {/* Debug buttons */}
-                <div className="flex space-x-2 mt-2">
+                <div className="mt-2 flex space-x-2">
                   <Button
                     variant="outline"
                     size="sm"

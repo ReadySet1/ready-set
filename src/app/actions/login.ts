@@ -30,88 +30,176 @@ const USER_HOME_ROUTES: Record<string, string> = {
 export interface FormState {
   error?: string;
   redirectTo?: string;
+  success?: boolean;
+  userType?: string;
+  message?: string;
 }
 
 export async function login(
   prevState: FormState | null,
   formData: FormData
 ): Promise<FormState> {
+  const startTime = Date.now();
+  const requestId = `login_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  console.log(`🚀 [${requestId}] Login attempt started`);
+  
+  // Use cookies() to opt out of caching
   await cookies();
   const supabase = await createClient();
 
-  const email = formData.get("email")?.toString().toLowerCase() || "";
-  const password = formData.get("password")?.toString() || "";
-  const returnTo = formData.get("returnTo")?.toString();
+    const email = formData.get("email")?.toString().toLowerCase() || "";
+    const password = formData.get("password")?.toString() || "";
+    const returnTo = formData.get("returnTo")?.toString();
 
-  console.log("🔍 Login attempt for email:", email);
+    console.log(`🔍 [${requestId}] Login attempt for email: ${email}, returnTo: ${returnTo || 'default'}`);
 
-  if (!email || !password) {
-    return { error: "Email and password are required" };
-  }
-
-  // Test connection to Supabase first
-  try {
-    const { data: connectionTest, error: connectionError } = await supabase
-      .from("profiles")
-      .select("count")
-      .limit(1);
-    
-    console.log("✅ Supabase connection test:", connectionTest ? "SUCCESS" : "FAILED");
-    if (connectionError) {
-      console.error("❌ Supabase connection error:", connectionError);
+    // Enhanced input validation with specific error messages
+    if (!email || !password) {
+      const missingFields = [];
+      if (!email) missingFields.push('email');
+      if (!password) missingFields.push('password');
+      
+      console.log(`❌ [${requestId}] Validation failed: Missing ${missingFields.join(', ')}`);
+      return { 
+        error: `Please provide ${missingFields.join(' and ')} to continue.`,
+        success: false 
+      };
     }
-  } catch (testError) {
-    console.error("❌ Supabase connection test failed:", testError);
-  }
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.log(`❌ [${requestId}] Validation failed: Invalid email format`);
+      return { 
+        error: "Please enter a valid email address.",
+        success: false 
+      };
+    }
 
-  console.log("🔐 Auth attempt result:", error ? `FAILED: ${error.message}` : "SUCCESS");
+    // Test connection to Supabase first
+    console.log(`🔌 [${requestId}] Testing Supabase connection...`);
+    try {
+      const { data: connectionTest, error: connectionError } = await supabase
+        .from("profiles")
+        .select("count")
+        .limit(1);
+      
+      if (connectionError) {
+        console.error(`❌ [${requestId}] Supabase connection error:`, connectionError);
+        return { 
+          error: "Unable to connect to authentication service. Please try again later.",
+          success: false 
+        };
+      }
+      
+      console.log(`✅ [${requestId}] Supabase connection test: SUCCESS`);
+    } catch (testError) {
+      console.error(`❌ [${requestId}] Supabase connection test failed:`, testError);
+      return { 
+        error: "Authentication service is temporarily unavailable. Please try again later.",
+        success: false 
+      };
+    }
 
-  if (error) {
-    // Check if user exists in profiles table
-    const { data: userData, error: profileError } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("email", email)
-      .maybeSingle();
-
-    console.log("👤 Profile lookup result:", {
-      found: !!userData,
-      email: userData?.email,
-      error: profileError?.message
+    // Attempt authentication
+    console.log(`🔐 [${requestId}] Attempting authentication...`);
+    const { error: authError, data: authData } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
 
-    return userData 
-      ? { error: "Incorrect password. Please try again or use Magic Link." }
-      : { error: "Account not found. Please check your email or sign up." };
-  }
+    if (authError) {
+      console.log(`❌ [${requestId}] Authentication failed: ${authError.message}`);
+      
+      // Enhanced error handling with specific messages
+      if (authError.message.includes('Invalid login credentials')) {
+        // Check if user exists in profiles table for more specific error
+        try {
+          const { data: userData, error: profileError } = await supabase
+            .from("profiles")
+            .select("email, type")
+            .eq("email", email)
+            .maybeSingle();
 
-  // Get user profile to determine the correct dashboard
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Failed to get user data" };
-  }
+          if (profileError) {
+            console.error(`❌ [${requestId}] Profile lookup error:`, profileError);
+          }
 
-  // Get user type from profile
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("type")
-    .eq("id", user.id)
-    .single();
+          if (userData) {
+            console.log(`❌ [${requestId}] User exists but password is incorrect`);
+            return { 
+              error: "Incorrect password. Please check your password and try again, or use Magic Link for password-free sign in.",
+              success: false 
+            };
+          } else {
+            console.log(`❌ [${requestId}] User account not found`);
+            return { 
+              error: "Account not found. Please check your email address or sign up for a new account.",
+              success: false 
+            };
+          }
+        } catch (profileLookupError) {
+          console.error(`❌ [${requestId}] Profile lookup failed:`, profileLookupError);
+          return { 
+            error: "Unable to verify account status. Please try again or contact support.",
+            success: false 
+          };
+        }
+      } else if (authError.message.includes('Email not confirmed')) {
+        return { 
+          error: "Please check your email and click the confirmation link before signing in.",
+          success: false 
+        };
+      } else if (authError.message.includes('Too many requests')) {
+        return { 
+          error: "Too many login attempts. Please wait a few minutes before trying again.",
+          success: false 
+        };
+      } else {
+        // Generic error with logging for debugging
+        console.error(`❌ [${requestId}] Unexpected auth error:`, authError);
+        return { 
+          error: "Authentication failed. Please try again or contact support if the problem persists.",
+          success: false 
+        };
+      }
+    }
 
-  if (profileError) {
-    console.error("Error fetching user profile:", profileError);
-    return { error: "Failed to get user profile" };
-  }
+    // Authentication successful - get user profile
+    console.log(`✅ [${requestId}] Authentication successful, fetching user profile...`);
+    const { data: { user }, error: getUserError } = await supabase.auth.getUser();
+    
+    if (getUserError || !user) {
+      console.error(`❌ [${requestId}] Failed to get user data:`, getUserError);
+      return { 
+        error: "Login successful but unable to retrieve user information. Please try again.",
+        success: false 
+      };
+    }
 
-  if (!profile?.type) {
-    console.error("No profile type found for user:", user.id);
-    return { error: "User profile type not found" };
-  }
+    // Get user type from profile
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("type, email")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) {
+      console.error(`❌ [${requestId}] Error fetching user profile:`, profileError);
+      return { 
+        error: "Login successful but unable to determine user role. Please contact support.",
+        success: false 
+      };
+    }
+
+    if (!profile?.type) {
+      console.error(`❌ [${requestId}] No profile type found for user: ${user.id}`);
+      return { 
+        error: "Login successful but user profile is incomplete. Please contact support.",
+        success: false 
+      };
+    }
 
   console.log("User profile type from DB:", profile.type);
   
@@ -174,34 +262,62 @@ export async function login(
     // Don't fail login if prefetch fails
   }
 
-  // Determine where to redirect the user
-  let redirectPath: string;
+    // Determine where to redirect the user
+    let redirectPath: string;
 
-  // If returnTo is provided and the user has access to that path, use it
-  if (returnTo && returnTo !== '/') {
-    // Check if the user has access to the returnTo path
-    const hasAccess = PROTECTED_ROUTES[userTypeKey]?.test(returnTo);
-    
-    if (hasAccess) {
-      console.log("Redirecting user to returnTo path:", returnTo);
-      redirectPath = returnTo;
+    // If returnTo is provided and the user has access to that path, use it
+    if (returnTo && returnTo !== '/') {
+      // Check if the user has access to the returnTo path
+      const hasAccess = PROTECTED_ROUTES[userTypeKey]?.test(returnTo);
+      
+      if (hasAccess) {
+        console.log(`🔄 [${requestId}] Redirecting user to returnTo path: ${returnTo}`);
+        redirectPath = returnTo;
+      } else {
+        // If user doesn't have access to returnTo path, use their default home route
+        redirectPath = USER_HOME_ROUTES[userTypeKey] || "/";
+        console.log(`⚠️ [${requestId}] User doesn't have access to returnTo path ${returnTo}, redirecting to default home: ${redirectPath}`);
+      }
     } else {
-      // If user doesn't have access to returnTo path, use their default home route
+      // Use the default home route for this user type
       redirectPath = USER_HOME_ROUTES[userTypeKey] || "/";
-      console.log("User doesn't have access to returnTo path, redirecting to default home:", redirectPath);
+      console.log(`🏠 [${requestId}] No valid returnTo path provided, redirecting to default home: ${redirectPath}`);
     }
-  } else {
-    // Use the default home route for this user type
-    redirectPath = USER_HOME_ROUTES[userTypeKey] || "/";
-    console.log("No valid returnTo path provided, redirecting to default home:", redirectPath);
-  }
 
-  // Always redirect to the determined path
-  console.log("Final redirect destination:", redirectPath);
-  redirect(redirectPath);
+    // Calculate execution time
+    const executionTime = Date.now() - startTime;
+    console.log(`✅ [${requestId}] Login successful! Redirecting to: ${redirectPath} (took ${executionTime}ms)`);
 
-  // This is unreachable but satisfies TypeScript
-  return { redirectTo: redirectPath };
+    // Return success state before redirect
+    const successState: FormState = {
+      success: true,
+      redirectTo: redirectPath,
+      userType: profile.type,
+      message: `Welcome back! Redirecting to your dashboard...`
+    };
+
+    // Log success metrics for monitoring BEFORE redirect
+    console.log(`📊 [${requestId}] Login metrics:`, {
+      email: email,
+      userType: profile?.type || 'unknown',
+      redirectPath: redirectPath,
+      executionTime: `${executionTime}ms`,
+      timestamp: new Date().toISOString()
+    });
+
+    // CRITICAL: Call redirect() immediately after determining path
+    // Do NOT create objects or do extensive logging after this point
+    // This will throw a NEXT_REDIRECT error that Next.js handles automatically
+    redirect(redirectPath);
+
+         // This code is unreachable but satisfies TypeScript
+     // The successState is not needed since redirect() handles the response
+     return {
+       success: true,
+       redirectTo: redirectPath,
+       userType: profile?.type || 'unknown',
+       message: `Welcome back! Redirecting to your dashboard...`
+     };
 }
 
 export async function signup(formData: FormData) {

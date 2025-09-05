@@ -19,7 +19,23 @@ type UserContextType = {
   userRole: UserType | null;
   isLoading: boolean;
   error: string | null;
+  isAuthenticating: boolean;
+  authProgress: {
+    step:
+      | "idle"
+      | "connecting"
+      | "authenticating"
+      | "fetching_profile"
+      | "redirecting"
+      | "complete";
+    message: string;
+  };
   refreshUserData: () => Promise<void>;
+  clearAuthError: () => void;
+  setAuthProgress: (
+    step: UserContextType["authProgress"]["step"],
+    message?: string,
+  ) => void;
 };
 
 // Create the context
@@ -29,7 +45,11 @@ export const UserContext = createContext<UserContextType>({
   userRole: null,
   isLoading: true,
   error: null,
+  isAuthenticating: false,
+  authProgress: { step: "idle", message: "" },
   refreshUserData: async () => {},
+  clearAuthError: () => {},
+  setAuthProgress: () => {},
 });
 
 // Export the hook for using the context
@@ -55,6 +75,7 @@ import {
   getPersistedAuthState,
   clearPersistedAuthState,
 } from "@/utils/supabase/client";
+import { loggers } from "@/utils/logger";
 
 // Enhanced helper function to fetch user role with caching and retry
 const fetchUserRole = async (
@@ -66,7 +87,7 @@ const fetchUserRole = async (
     // Check cache first
     const cachedProfile = getCachedUserProfile(user.id);
     if (cachedProfile && cachedProfile.type) {
-      console.log("Using cached user profile:", cachedProfile);
+      loggers.userContext.debug("Using cached user profile", cachedProfile);
       setUserRole(cachedProfile.type);
       return cachedProfile.type;
     }
@@ -142,7 +163,7 @@ const fetchUserRole = async (
     setUserRole(role);
     return role;
   } catch (err) {
-    console.error("Error fetching user role:", err);
+    loggers.userContext.error("Error fetching user role", err);
 
     // Try to use any persisted auth state as fallback
     const persistedState = getPersistedAuthState();
@@ -151,7 +172,10 @@ const fetchUserRole = async (
       persistedState.userId === user.id &&
       persistedState.userRole
     ) {
-      console.log("Using persisted auth state as fallback:", persistedState);
+      loggers.userContext.debug(
+        "Using persisted auth state as fallback",
+        persistedState,
+      );
       const fallbackRole = persistedState.userRole as UserType;
       setUserRole(fallbackRole);
       return fallbackRole;
@@ -163,23 +187,36 @@ const fetchUserRole = async (
 
 // Create a client component wrapper
 function UserProviderClient({ children }: { children: ReactNode }) {
-  console.log("🟢 UserProviderClient MOUNTING - this should appear first!");
+  // Component mounting logs using centralized logger
+  loggers.userContext.debug(
+    "UserProviderClient MOUNTING - this should appear first!",
+  );
 
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<UserType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [authProgress, setAuthProgressState] = useState<{
+    step:
+      | "idle"
+      | "connecting"
+      | "authenticating"
+      | "fetching_profile"
+      | "redirecting"
+      | "complete";
+    message: string;
+  }>({ step: "idle", message: "" });
   const [supabase, setSupabase] = useState<any>(null);
   const [hasImmediateData, setHasImmediateData] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  console.log(
-    "🟢 UserProviderClient state initialized - user:",
-    !!user,
-    "isLoading:",
+  // State initialization logs using centralized logger
+  loggers.userContext.debug("UserProviderClient state initialized", {
+    hasUser: !!user,
     isLoading,
-  );
+  });
 
   // 🔥 IMMEDIATE COOKIE CHECK (NOT in useEffect) - executes during render
   // Only run on client after hydration to prevent server/client mismatches
@@ -324,13 +361,22 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   // Initialize Supabase
   useEffect(() => {
     const initSupabase = async () => {
-      console.log("Initializing Supabase client...");
+      console.log("🔌 UserContext: Initializing Supabase client...");
+      setAuthProgressState({
+        step: "connecting",
+        message: "Connecting to authentication service...",
+      });
+
       try {
         const client = await createClient();
-        console.log("Supabase client initialized successfully");
+        console.log("✅ UserContext: Supabase client initialized successfully");
         setSupabase(client);
+        setAuthProgressState({ step: "idle", message: "" });
       } catch (err) {
-        console.error("Failed to initialize Supabase client:", err);
+        console.error(
+          "❌ UserContext: Failed to initialize Supabase client:",
+          err,
+        );
         setError("Authentication initialization failed");
         if (!hasImmediateData) {
           setIsLoading(false);
@@ -344,7 +390,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   // Load user data
   useEffect(() => {
     if (!supabase) {
-      console.log("Waiting for Supabase client...");
+      console.log("⏳ UserContext: Waiting for Supabase client...");
       return;
     }
 
@@ -430,7 +476,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
             setIsLoading(false);
           }
         } else {
-          console.log("UserContext: No user found. Setting loading to false.");
+          console.log(
+            "ℹ️ UserContext: No user found. Setting loading to false.",
+          );
           setUser(null);
           setUserRole(null);
           if (!hasImmediateData) {
@@ -439,10 +487,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         }
 
         const { data: listener } = supabase.auth.onAuthStateChange(
-          async (_event: string, session: Session | null) => {
+          async (event: string, session: Session | null) => {
             if (!mounted) return;
 
-            console.log("Auth state changed:", _event);
+            console.log("Auth state changed:", event);
             setSession(session);
 
             const newUser = session?.user || null;
@@ -460,9 +508,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
             // Clear immediate data flag on auth state changes
             if (
-              _event === "SIGNED_IN" ||
-              _event === "SIGNED_OUT" ||
-              _event === "TOKEN_REFRESHED"
+              event === "SIGNED_IN" ||
+              event === "SIGNED_OUT" ||
+              event === "TOKEN_REFRESHED"
             ) {
               if (newUser?.id !== currentUser?.id) {
                 console.log("Auth state change: fetching fresh user role...");
@@ -477,10 +525,11 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
         authListener = listener;
       } catch (error) {
-        console.error("Error in auth setup:", error);
+        console.error("💥 UserContext: Error in auth setup:", error);
         if (mounted) {
           setError("Authentication setup failed");
           setIsLoading(false);
+          setAuthProgressState({ step: "idle", message: "" });
         }
       }
     };
@@ -537,6 +586,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         await fetchUserRole(supabase, currentUser, setUserRole);
       } else {
         setUserRole(null);
+        setAuthProgressState({ step: "idle", message: "" });
       }
     } catch (err) {
       console.error("Error refreshing user data:", err);
@@ -562,6 +612,11 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       }
     } finally {
       setIsLoading(false);
+      // Reset to idle after showing completion
+      setTimeout(
+        () => setAuthProgressState({ step: "idle", message: "" }),
+        1000,
+      );
     }
   };
 
@@ -575,7 +630,11 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           userRole: null,
           isLoading: true,
           error: null,
+          isAuthenticating: false,
+          authProgress: { step: "idle", message: "" },
           refreshUserData,
+          clearAuthError: () => {},
+          setAuthProgress: () => {},
         }}
       >
         {children}
@@ -591,7 +650,12 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         userRole,
         isLoading,
         error,
+        isAuthenticating,
+        authProgress,
         refreshUserData,
+        clearAuthError: () => setError(null),
+        setAuthProgress: (step, message = "") =>
+          setAuthProgressState({ step, message }),
       }}
     >
       {children}
@@ -601,12 +665,13 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
 // Export the provider component
 export function UserProvider({ children }: { children: ReactNode }) {
-  console.log("🔵 UserProvider wrapper called!");
+  // Provider wrapper logs using centralized logger
+  loggers.userContext.debug("UserProvider wrapper called!");
   return (
     <AuthErrorBoundary
       onError={(error, errorInfo) => {
-        // Log auth errors for monitoring
-        console.error("🚨 Auth Error Boundary triggered:", {
+        // Log auth errors for monitoring using centralized logger
+        loggers.auth.error("Auth Error Boundary triggered", {
           error: error.message,
           stack: error.stack,
           componentStack: errorInfo.componentStack,
