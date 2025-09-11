@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { prisma } from "@/lib/db/prisma";
+import { prisma, withDatabaseRetry } from "@/utils/prismaDB";
 import { Prisma } from "@prisma/client";
 import { 
     CateringRequest, 
@@ -106,30 +106,32 @@ export async function GET(req: NextRequest) {
 
     orderByClause = validSortFields[sortField] || { pickupDateTime: 'desc' };
 
-    // Fetch data with optimized query
-    const [cateringOrders, totalCount] = await Promise.all([
-      prisma.cateringRequest.findMany({
-        where: whereClause,
-        skip,
-        take: limit,
-        orderBy: orderByClause,
-        include: {
-          user: {
-            select: { id: true, name: true, email: true, contactNumber: true }
-          },
-          pickupAddress: true,
-          deliveryAddress: true,
-          dispatches: {
-            include: {
-              driver: {
-                select: { id: true, name: true, email: true, contactNumber: true }
+    // Fetch data with optimized query and retry logic
+    const [cateringOrders, totalCount] = await withDatabaseRetry(async () => {
+      return Promise.all([
+        prisma.cateringRequest.findMany({
+          where: whereClause,
+          skip,
+          take: limit,
+          orderBy: orderByClause,
+          include: {
+            user: {
+              select: { id: true, name: true, email: true, contactNumber: true }
+            },
+            pickupAddress: true,
+            deliveryAddress: true,
+            dispatches: {
+              include: {
+                driver: {
+                  select: { id: true, name: true, email: true, contactNumber: true }
+                }
               }
             }
-          }
-        },
-      }),
-      prisma.cateringRequest.count({ where: whereClause }),
-    ]) as [CateringOrderWithDetails[], number]; 
+          },
+        }),
+        prisma.cateringRequest.count({ where: whereClause }),
+      ]);
+    }); 
 
     const totalPages = Math.ceil(totalCount / limit);
 
