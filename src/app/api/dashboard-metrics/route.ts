@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { CateringStatus } from '@/types/order-status';
-import { prisma } from '@/utils/prismaDB';
+import { prisma, withDatabaseRetry } from '@/utils/prismaDB';
 import { logError } from '@/utils/error-logging';
 import { createClient } from '@/utils/supabase/server';
 import { 
@@ -95,22 +95,24 @@ export async function GET(request: NextRequest) {
     let totalVendors = 1;
 
     try {
-      // Execute queries
+      // Execute queries with retry logic
       const [totalRevenueResult, deliveriesRequestsResult, salesTotalResult, totalVendorsResult] =
-        await Promise.all([
-          prisma.cateringRequest.aggregate({
-            _sum: { orderTotal: true },
-            where: { ...baseWhere, status: CateringStatus.COMPLETED }
-          }),
-          prisma.cateringRequest.count({ where: baseWhere }),
-          prisma.cateringRequest.count({
-            where: { ...baseWhere, status: CateringStatus.COMPLETED }
-          }),
-          // Always query the actual vendor count from database for all user types
-          prisma.profile.count({
-            where: { deletedAt: null, type: "VENDOR" }
-          })
-        ]);
+        await withDatabaseRetry(async () => {
+          return Promise.all([
+            prisma.cateringRequest.aggregate({
+              _sum: { orderTotal: true },
+              where: { ...baseWhere, status: CateringStatus.COMPLETED }
+            }),
+            prisma.cateringRequest.count({ where: baseWhere }),
+            prisma.cateringRequest.count({
+              where: { ...baseWhere, status: CateringStatus.COMPLETED }
+            }),
+            // Always query the actual vendor count from database for all user types
+            prisma.profile.count({
+              where: { deletedAt: null, type: "VENDOR" }
+            })
+          ]);
+        });
 
       totalRevenue = Number(totalRevenueResult._sum.orderTotal || 0);
       deliveriesRequests = deliveriesRequestsResult;

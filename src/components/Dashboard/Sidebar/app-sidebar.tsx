@@ -124,12 +124,6 @@ export function AppSidebar() {
       isActive: pathname === "/admin",
     },
     {
-      title: "Driver Tracking",
-      href: "/admin/tracking",
-      icon: NavigationIcon,
-      isActive: pathname?.includes("/admin/tracking") ?? false,
-    },
-    {
       title: "Catering Orders",
       href: "/admin/catering-orders",
       icon: Truck,
