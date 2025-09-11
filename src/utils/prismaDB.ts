@@ -53,14 +53,20 @@ function createPrismaClient(): PrismaClient {
     });
   }
 
-  // Development environment - full logging
+  // Development environment - full logging with connection stability
+  console.log('🔧 Development environment - debug client');
   return new PrismaClient({
     log: ['query', 'info', 'warn', 'error'],
     datasources: {
       db: {
         url: process.env.DATABASE_URL
       }
-    }
+    },
+    // Add connection stability for development
+    transactionOptions: {
+      maxWait: 60000, // 1 minute
+      timeout: 30000, // 30 seconds
+    },
   });
 }
 
@@ -81,14 +87,26 @@ const getPrismaClient = (): PrismaClient => {
 // Export the singleton instance
 export const prisma = getPrismaClient();
 
-// Enhanced connection management
-export async function connectPrisma(): Promise<void> {
-  try {
-    await prisma.$connect();
-    loggers.prisma.info('Database connected successfully');
-  } catch (error) {
-    loggers.prisma.error('Database connection failed', error);
-    throw new Error(`Failed to connect to database: ${error}`);
+// Enhanced connection management with retry logic
+export async function connectPrisma(retries = 3): Promise<void> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`🔌 Attempting to connect to database (attempt ${attempt}/${retries})...`);
+      await prisma.$connect();
+      console.log('✅ Database connected successfully');
+      return;
+    } catch (error) {
+      console.error(`❌ Database connection failed on attempt ${attempt}:`, error);
+      
+      if (attempt === retries) {
+        throw new Error(`Failed to connect to database after ${retries} attempts: ${error}`);
+      }
+      
+      // Wait before retrying (exponential backoff)
+      const delay = Math.pow(2, attempt) * 1000;
+      console.log(`⏳ Waiting ${delay}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
 }
 
@@ -101,16 +119,68 @@ export async function disconnectPrisma(): Promise<void> {
   }
 }
 
-// Health check function
-export async function checkDatabaseHealth(): Promise<boolean> {
+// Health check function with automatic reconnection
+export async function checkDatabaseHealth(autoReconnect = true): Promise<boolean> {
   try {
     await prisma.$queryRaw`SELECT 1`;
     loggers.prisma.info('Database health check passed');
     return true;
   } catch (error) {
-    loggers.prisma.error('Database health check failed', error);
+    console.error('💔 Database health check failed:', error);
+    
+    if (autoReconnect && isDevelopment) {
+      console.log('🔄 Attempting to reconnect...');
+      try {
+        await disconnectPrisma();
+        await connectPrisma();
+        // Test again after reconnection
+        await prisma.$queryRaw`SELECT 1`;
+        console.log('✅ Database reconnected successfully');
+        return true;
+      } catch (reconnectError) {
+        console.error('❌ Failed to reconnect:', reconnectError);
+      }
+    }
+    
     return false;
   }
+}
+
+// Wrapper function for database operations with automatic retry
+export async function withDatabaseRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries = 2
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      const isConnectionError = error?.code === 'P2028' || 
+                               error?.message?.includes('Engine is not yet connected') ||
+                               error?.message?.includes('Connection refused') ||
+                               error?.message?.includes('Response from the Engine was empty');
+      
+      if (isConnectionError && attempt <= maxRetries && isDevelopment) {
+        console.log(`🔄 Database connection error on attempt ${attempt}, retrying...`);
+        
+        // Attempt to reconnect
+        try {
+          await disconnectPrisma();
+          await connectPrisma();
+        } catch (reconnectError) {
+          console.error('❌ Reconnection failed:', reconnectError);
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        continue;
+      }
+      
+      throw error;
+    }
+  }
+  
+  throw new Error('Unreachable code');
 }
 
 // Graceful shutdown for serverless

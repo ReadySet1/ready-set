@@ -1,7 +1,7 @@
 // src/app/api/users/route.ts
 
 import { NextResponse, NextRequest } from "next/server";
-import { prisma } from "@/utils/prismaDB";
+import { prisma, withDatabaseRetry } from "@/utils/prismaDB";
 import { createClient } from "@/utils/supabase/server";
 import { Prisma } from '@prisma/client';
 import { UserStatus, UserType, PrismaClientKnownRequestError, PrismaClientValidationError } from '@/types/prisma';
@@ -224,28 +224,30 @@ export async function GET(request: NextRequest) {
       (orderBy as any)[sortField] = sortOrder;
     }
 
-    // --- Execute Query ---
-    const [users, totalCount] = await Promise.all([
-      prisma.profile.findMany({
-        where,
-        orderBy,
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          type: true,
-          status: true,
-          contactNumber: true,
-          companyName: true,
-          contactName: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      }),
-      prisma.profile.count({ where }),
-    ]);
+    // --- Execute Query with retry logic ---
+    const [users, totalCount] = await withDatabaseRetry(async () => {
+      return Promise.all([
+        prisma.profile.findMany({
+          where,
+          orderBy,
+          skip: (page - 1) * limit,
+          take: limit,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            type: true,
+            status: true,
+            contactNumber: true,
+            companyName: true,
+            contactName: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        prisma.profile.count({ where }),
+      ]);
+    });
 
     // --- Calculate Pagination ---
     const totalPages = Math.ceil(totalCount / limit);

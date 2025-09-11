@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/utils/prismaDB";
+import { prisma, withDatabaseRetry } from "@/utils/prismaDB";
 import { ApplicationStatus } from "@/types/job-application";
 import { createClient } from "@/utils/supabase/server";
 import { loggers } from '@/utils/logger';
@@ -152,30 +152,33 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get total count for pagination
-    const totalCount = await prisma.jobApplication.count({ where });
-    const totalPages = Math.ceil(totalCount / limit);
-
-    // Fetch applications with pagination and optimized file upload query
-    const applications = await prisma.jobApplication.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit,
-      include: {
-        fileUploads: {
-          select: {
-            id: true,
-            fileName: true,
-            fileType: true,
-            fileSize: true,
-            uploadedAt: true,
-            category: true,
+    // Get total count and applications with retry logic
+    const [totalCount, applications] = await withDatabaseRetry(async () => {
+      return Promise.all([
+        prisma.jobApplication.count({ where }),
+        prisma.jobApplication.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+          include: {
+            fileUploads: {
+              select: {
+                id: true,
+                fileName: true,
+                fileType: true,
+                fileSize: true,
+                uploadedAt: true,
+                category: true,
+              },
+            },
           },
-        },
-      },
+        })
+      ]);
     });
 
+    const totalPages = Math.ceil(totalCount / limit);
+    
     // Process applications to fix file upload inconsistency
     const processedApplications = applications.map((app: any) => {
       const fileUploadCount = app.fileUploads?.length || 0;
