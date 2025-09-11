@@ -1,11 +1,11 @@
 {
-  "timestamp": "2025-09-04T06:09:25.956Z",
+  "timestamp": "2025-09-05T22:53:02.603Z",
   "analysis": {
     "totalFiles": 810,
-    "totalLogs": 1838,
+    "totalLogs": 1696,
     "byPriority": {
-      "critical": 792,
-      "high": 1044,
+      "critical": 790,
+      "high": 904,
       "medium": 1,
       "low": 1
     },
@@ -31,18 +31,16 @@
         },
         {
           "path": "src/app/api/admin/job-applications/[id]/status/route.ts",
-          "totalLogs": 8,
+          "totalLogs": 2,
           "byType": {
-            "log": 6,
             "error": 2
           },
           "priority": "medium"
         },
         {
           "path": "src/app/api/admin/job-applications/route.ts",
-          "totalLogs": 3,
+          "totalLogs": 2,
           "byType": {
-            "log": 1,
             "error": 2
           },
           "priority": "medium"
@@ -329,15 +327,6 @@
           "path": "src/app/api/order/orders/route.ts",
           "totalLogs": 1,
           "byType": {
-            "error": 1
-          },
-          "priority": "medium"
-        },
-        {
-          "path": "src/app/api/orders/[order_number]/files/route.ts",
-          "totalLogs": 11,
-          "byType": {
-            "log": 10,
             "error": 1
           },
           "priority": "medium"
@@ -1089,16 +1078,6 @@
           "priority": "medium"
         },
         {
-          "path": "src/lib/services/brokerSyncService.ts",
-          "totalLogs": 15,
-          "byType": {
-            "log": 9,
-            "error": 1,
-            "warn": 5
-          },
-          "priority": "medium"
-        },
-        {
           "path": "src/lib/services/carrierService.ts",
           "totalLogs": 7,
           "byType": {
@@ -1148,9 +1127,8 @@
       "low": [
         {
           "path": "src/app/(backend)/admin/users/[id]/page.tsx",
-          "totalLogs": 4,
+          "totalLogs": 2,
           "byType": {
-            "log": 2,
             "error": 2
           },
           "priority": "low"
@@ -1197,9 +1175,8 @@
         },
         {
           "path": "src/app/(site)/(users)/client/page.tsx",
-          "totalLogs": 3,
+          "totalLogs": 2,
           "byType": {
-            "log": 1,
             "error": 2
           },
           "priority": "low"
@@ -1246,21 +1223,17 @@
         },
         {
           "path": "src/app/(site)/free-resources/[slug]/fetch-guides.ts",
-          "totalLogs": 14,
+          "totalLogs": 2,
           "byType": {
-            "log": 8,
-            "error": 2,
-            "warn": 4
+            "error": 2
           },
           "priority": "low"
         },
         {
           "path": "src/app/(site)/free-resources/[slug]/page.tsx",
-          "totalLogs": 8,
+          "totalLogs": 2,
           "byType": {
-            "log": 4,
-            "error": 2,
-            "warn": 2
+            "error": 2
           },
           "priority": "low"
         },
@@ -1503,9 +1476,9 @@
       ]
     },
     "byType": {
-      "log": 970,
-      "error": 792,
-      "warn": 74,
+      "log": 847,
+      "error": 790,
+      "warn": 57,
       "info": 1,
       "debug": 1
     },
@@ -2200,501 +2173,185 @@
       },
       "src/app/(backend)/admin/catering-orders/_actions/catering-orders.ts": {
         "path": "src/app/(backend)/admin/catering-orders/_actions/catering-orders.ts",
-        "totalLogs": 70,
+        "totalLogs": 25,
         "logs": [
           {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 65
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 66
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 79
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 84
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 96
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 99
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 110
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 113
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 124
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 127
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 150
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 154
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 159
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 164
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 171
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 183
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 189
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 202
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 219
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 226
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 242
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 249
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 254
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 262
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 272
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 295
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 305
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 311
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 325
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 339
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 360
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 378
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 393
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 455
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 456
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 520
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 540
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 548
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 557
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 587
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 591
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 595
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 605
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 609
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 615
+            "type": "error",
+            "description": "console.error",
+            "priority": "critical",
+            "match": "console.error(",
+            "line": 57
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 56
+            "line": 72
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 71
+            "line": 187
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 186
+            "line": 205
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 204
+            "line": 210
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 209
+            "line": 214
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 213
+            "line": 271
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 270
+            "line": 298
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 297
+            "line": 302
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 301
+            "line": 381
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 380
+            "line": 384
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 383
+            "line": 390
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 389
+            "line": 398
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 397
+            "line": 414
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 413
+            "line": 418
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 417
+            "line": 424
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 423
+            "line": 465
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 464
+            "line": 476
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 475
+            "line": 547
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 546
+            "line": 601
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 600
+            "line": 614
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 613
+            "line": 619
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 618
+            "line": 623
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 622
+            "line": 638
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 637
-          },
-          {
-            "type": "error",
-            "description": "console.error",
-            "priority": "critical",
-            "match": "console.error(",
-            "line": 640
+            "line": 641
           }
         ],
         "byType": {
-          "log": 45,
           "error": 25
         },
         "priority": "low",
@@ -2702,107 +2359,70 @@
       },
       "src/app/(backend)/admin/users/UsersClient.tsx": {
         "path": "src/app/(backend)/admin/users/UsersClient.tsx",
-        "totalLogs": 8,
+        "totalLogs": 5,
         "logs": [
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 322
+            "line": 323
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 410
+            "line": 411
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 437
+            "line": 438
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 559
+            "line": 560
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 753
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 361
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 375
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 378
+            "line": 754
           }
         ],
         "byType": {
-          "error": 5,
-          "warn": 3
+          "error": 5
         },
         "priority": "low",
         "shouldClean": false
       },
       "src/app/(backend)/admin/users/[id]/page.tsx": {
         "path": "src/app/(backend)/admin/users/[id]/page.tsx",
-        "totalLogs": 4,
+        "totalLogs": 2,
         "logs": [
           {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 25
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 32
+            "type": "error",
+            "description": "console.error",
+            "priority": "critical",
+            "match": "console.error(",
+            "line": 45
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 44
-          },
-          {
-            "type": "error",
-            "description": "console.error",
-            "priority": "critical",
-            "match": "console.error(",
-            "line": 53
+            "line": 54
           }
         ],
         "byType": {
-          "log": 2,
           "error": 2
         },
         "priority": "low",
@@ -2828,60 +2448,38 @@
       },
       "src/app/(site)/(auth)/auth/callback/route.ts": {
         "path": "src/app/(site)/(auth)/auth/callback/route.ts",
-        "totalLogs": 7,
+        "totalLogs": 4,
         "logs": [
           {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 37
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 56
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 60
+            "type": "error",
+            "description": "console.error",
+            "priority": "critical",
+            "match": "console.error(",
+            "line": 30
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 29
+            "line": 51
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 50
+            "line": 66
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 65
-          },
-          {
-            "type": "error",
-            "description": "console.error",
-            "priority": "critical",
-            "match": "console.error(",
-            "line": 74
+            "line": 75
           }
         ],
         "byType": {
-          "log": 3,
           "error": 4
         },
         "priority": "low",
@@ -2907,265 +2505,60 @@
       },
       "src/app/(site)/(auth)/complete-profile/page.tsx": {
         "path": "src/app/(site)/(auth)/complete-profile/page.tsx",
-        "totalLogs": 36,
+        "totalLogs": 7,
         "logs": [
           {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 56
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 73
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 86
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 92
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 93
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 94
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 99
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 111
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 114
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 130
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 133
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 145
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 148
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 154
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 155
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 172
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 183
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 195
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 229
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 262
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 275
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 287
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 301
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 320
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 341
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 367
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 473
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 479
+            "type": "error",
+            "description": "console.error",
+            "priority": "critical",
+            "match": "console.error(",
+            "line": 80
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 79
+            "line": 128
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 119
+            "line": 177
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 160
+            "line": 205
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 188
+            "line": 299
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 271
+            "line": 313
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 283
-          },
-          {
-            "type": "error",
-            "description": "console.error",
-            "priority": "critical",
-            "match": "console.error(",
-            "line": 331
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 297
+            "line": 363
           }
         ],
         "byType": {
-          "log": 28,
-          "error": 7,
-          "warn": 1
+          "error": 7
         },
         "priority": "low",
         "shouldClean": false
@@ -3226,32 +2619,24 @@
       },
       "src/app/(site)/(users)/client/page.tsx": {
         "path": "src/app/(site)/(users)/client/page.tsx",
-        "totalLogs": 3,
+        "totalLogs": 2,
         "logs": [
           {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 527
+            "type": "error",
+            "description": "console.error",
+            "priority": "critical",
+            "match": "console.error(",
+            "line": 86
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 85
-          },
-          {
-            "type": "error",
-            "description": "console.error",
-            "priority": "critical",
-            "match": "console.error(",
-            "line": 521
+            "line": 522
           }
         ],
         "byType": {
-          "log": 1,
           "error": 2
         },
         "priority": "low",
@@ -3349,180 +2734,50 @@
       },
       "src/app/(site)/free-resources/[slug]/fetch-guides.ts": {
         "path": "src/app/(site)/free-resources/[slug]/fetch-guides.ts",
-        "totalLogs": 14,
+        "totalLogs": 2,
         "logs": [
           {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 674
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 708
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 712
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 717
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 729
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 737
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 744
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 752
+            "type": "error",
+            "description": "console.error",
+            "priority": "critical",
+            "match": "console.error(",
+            "line": 741
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 740
-          },
-          {
-            "type": "error",
-            "description": "console.error",
-            "priority": "critical",
-            "match": "console.error(",
-            "line": 747
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 679
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 721
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 724
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 733
+            "line": 748
           }
         ],
         "byType": {
-          "log": 8,
-          "error": 2,
-          "warn": 4
+          "error": 2
         },
         "priority": "low",
         "shouldClean": true
       },
       "src/app/(site)/free-resources/[slug]/page.tsx": {
         "path": "src/app/(site)/free-resources/[slug]/page.tsx",
-        "totalLogs": 8,
+        "totalLogs": 2,
         "logs": [
           {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 158
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 160
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 451
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 477
+            "type": "error",
+            "description": "console.error",
+            "priority": "critical",
+            "match": "console.error(",
+            "line": 178
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 177
-          },
-          {
-            "type": "error",
-            "description": "console.error",
-            "priority": "critical",
-            "match": "console.error(",
-            "line": 459
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 170
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 445
+            "line": 460
           }
         ],
         "byType": {
-          "log": 4,
-          "error": 2,
-          "warn": 2
+          "error": 2
         },
         "priority": "low",
         "shouldClean": true
@@ -3682,163 +2937,98 @@
       },
       "src/app/actions/admin/job-applications.ts": {
         "path": "src/app/actions/admin/job-applications.ts",
-        "totalLogs": 8,
+        "totalLogs": 6,
         "logs": [
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 18
+            "line": 19
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 30
+            "line": 31
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 136
+            "line": 137
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 173
+            "line": 174
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 185
+            "line": 186
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 244
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 39
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 194
+            "line": 245
           }
         ],
         "byType": {
-          "error": 6,
-          "warn": 2
+          "error": 6
         },
         "priority": "low",
         "shouldClean": false
       },
       "src/app/actions/delete-file.ts": {
         "path": "src/app/actions/delete-file.ts",
-        "totalLogs": 12,
+        "totalLogs": 5,
         "logs": [
           {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 17
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 31
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 35
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 50
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 59
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 69
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 75
+            "type": "error",
+            "description": "console.error",
+            "priority": "critical",
+            "match": "console.error(",
+            "line": 43
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 42
+            "line": 57
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 56
+            "line": 63
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 62
+            "line": 81
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 80
-          },
-          {
-            "type": "error",
-            "description": "console.error",
-            "priority": "critical",
-            "match": "console.error(",
-            "line": 93
+            "line": 94
           }
         ],
         "byType": {
-          "log": 7,
           "error": 5
         },
         "priority": "low",
@@ -4736,67 +3926,24 @@
       },
       "src/app/api/admin/job-applications/[id]/status/route.ts": {
         "path": "src/app/api/admin/job-applications/[id]/status/route.ts",
-        "totalLogs": 8,
+        "totalLogs": 2,
         "logs": [
           {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 19
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 24
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 26
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 95
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 96
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 97
+            "type": "error",
+            "description": "console.error",
+            "priority": "critical",
+            "match": "console.error(",
+            "line": 63
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 62
-          },
-          {
-            "type": "error",
-            "description": "console.error",
-            "priority": "critical",
-            "match": "console.error(",
-            "line": 132
+            "line": 133
           }
         ],
         "byType": {
-          "log": 6,
           "error": 2
         },
         "priority": "medium",
@@ -4804,32 +3951,24 @@
       },
       "src/app/api/admin/job-applications/route.ts": {
         "path": "src/app/api/admin/job-applications/route.ts",
-        "totalLogs": 3,
+        "totalLogs": 2,
         "logs": [
           {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 196
+            "type": "error",
+            "description": "console.error",
+            "priority": "critical",
+            "match": "console.error(",
+            "line": 34
           },
           {
             "type": "error",
             "description": "console.error",
             "priority": "critical",
             "match": "console.error(",
-            "line": 33
-          },
-          {
-            "type": "error",
-            "description": "console.error",
-            "priority": "critical",
-            "match": "console.error(",
-            "line": 214
+            "line": 215
           }
         ],
         "byType": {
-          "log": 1,
           "error": 2
         },
         "priority": "medium",
@@ -7354,95 +6493,6 @@
           }
         ],
         "byType": {
-          "error": 1
-        },
-        "priority": "medium",
-        "shouldClean": true
-      },
-      "src/app/api/orders/[order_number]/files/route.ts": {
-        "path": "src/app/api/orders/[order_number]/files/route.ts",
-        "totalLogs": 11,
-        "logs": [
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 14
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 22
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 30
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 41
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 52
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 61
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 83
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 104
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 113
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 145
-          },
-          {
-            "type": "error",
-            "description": "console.error",
-            "priority": "critical",
-            "match": "console.error(",
-            "line": 149
-          }
-        ],
-        "byType": {
-          "log": 10,
           "error": 1
         },
         "priority": "medium",
@@ -15711,121 +14761,21 @@
       },
       "src/lib/services/brokerSyncService.ts": {
         "path": "src/lib/services/brokerSyncService.ts",
-        "totalLogs": 15,
+        "totalLogs": 1,
         "logs": [
           {
             "type": "log",
             "description": "console.log",
             "priority": "high",
             "match": "console.log(",
-            "line": 34
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 41
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 48
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 51
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 55
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 65
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 72
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 96
-          },
-          {
-            "type": "log",
-            "description": "console.log",
-            "priority": "high",
-            "match": "console.log(",
-            "line": 116
-          },
-          {
-            "type": "error",
-            "description": "console.error",
-            "priority": "critical",
-            "match": "console.error(",
-            "line": 109
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 77
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 84
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 100
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 104
-          },
-          {
-            "type": "warn",
-            "description": "console.warn",
-            "priority": "high",
-            "match": "console.warn(",
-            "line": 119
+            "line": 49
           }
         ],
         "byType": {
-          "log": 9,
-          "error": 1,
-          "warn": 5
+          "log": 1
         },
         "priority": "medium",
-        "shouldClean": true
+        "shouldClean": false
       },
       "src/lib/services/carrierService.ts": {
         "path": "src/lib/services/carrierService.ts",
@@ -17796,25 +16746,6 @@
         "types": {
           "error": 1
         }
-      },
-      {
-        "file": "src/app/api/orders/[order_number]/files/route.ts",
-        "reason": "Medium priority file with many logs",
-        "logs": 11,
-        "types": {
-          "log": 10,
-          "error": 1
-        }
-      },
-      {
-        "file": "src/lib/services/brokerSyncService.ts",
-        "reason": "Medium priority file with many logs",
-        "logs": 15,
-        "types": {
-          "log": 9,
-          "error": 1,
-          "warn": 5
-        }
       }
     ],
     "later": [
@@ -17829,18 +16760,16 @@
       {
         "file": "src/app/api/admin/job-applications/[id]/status/route.ts",
         "reason": "Medium priority file with moderate logs",
-        "logs": 8,
+        "logs": 2,
         "types": {
-          "log": 6,
           "error": 2
         }
       },
       {
         "file": "src/app/api/admin/job-applications/route.ts",
         "reason": "Medium priority file with moderate logs",
-        "logs": 3,
+        "logs": 2,
         "types": {
-          "log": 1,
           "error": 2
         }
       },
@@ -18925,9 +17854,8 @@
       {
         "file": "src/app/(backend)/admin/users/[id]/page.tsx",
         "reason": "Low priority file",
-        "logs": 4,
+        "logs": 2,
         "types": {
-          "log": 2,
           "error": 2
         }
       },
@@ -18974,9 +17902,8 @@
       {
         "file": "src/app/(site)/(users)/client/page.tsx",
         "reason": "Low priority file",
-        "logs": 3,
+        "logs": 2,
         "types": {
-          "log": 1,
           "error": 2
         }
       },
@@ -19023,21 +17950,17 @@
       {
         "file": "src/app/(site)/free-resources/[slug]/fetch-guides.ts",
         "reason": "Low priority file",
-        "logs": 14,
+        "logs": 2,
         "types": {
-          "log": 8,
-          "error": 2,
-          "warn": 4
+          "error": 2
         }
       },
       {
         "file": "src/app/(site)/free-resources/[slug]/page.tsx",
         "reason": "Low priority file",
-        "logs": 8,
+        "logs": 2,
         "types": {
-          "log": 4,
-          "error": 2,
-          "warn": 2
+          "error": 2
         }
       },
       {
@@ -19281,10 +18204,10 @@
   },
   "summary": {
     "totalFiles": 810,
-    "filesWithLogs": 295,
-    "totalLogs": 1838,
+    "filesWithLogs": 294,
+    "totalLogs": 1696,
     "immediateCleanup": 0,
-    "nextCleanup": 3,
+    "nextCleanup": 1,
     "laterCleanup": 172
   }
 }
