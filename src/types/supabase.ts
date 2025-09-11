@@ -6,67 +6,9 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// Calculator System Type Aliases for easy access
-export type CalculatorTemplate = Database['public']['Tables']['calculator_templates']['Row']
-export type CalculatorTemplateInsert = Database['public']['Tables']['calculator_templates']['Insert']
-export type CalculatorTemplateUpdate = Database['public']['Tables']['calculator_templates']['Update']
-
-export type PricingRule = Database['public']['Tables']['pricing_rules']['Row']
-export type PricingRuleInsert = Database['public']['Tables']['pricing_rules']['Insert']
-export type PricingRuleUpdate = Database['public']['Tables']['pricing_rules']['Update']
-
-export type ClientConfiguration = Database['public']['Tables']['client_configurations']['Row']
-export type ClientConfigurationInsert = Database['public']['Tables']['client_configurations']['Insert']
-export type ClientConfigurationUpdate = Database['public']['Tables']['client_configurations']['Update']
-
-export type CalculationHistory = Database['public']['Tables']['calculation_history']['Row']
-export type CalculationHistoryInsert = Database['public']['Tables']['calculation_history']['Insert']
-export type CalculationHistoryUpdate = Database['public']['Tables']['calculation_history']['Update']
-
-export interface Database {
+export type Database = {
   public: {
     Tables: {
-      profiles: {
-        Row: {
-          id: string
-          updated_at?: string
-          username?: string
-          full_name?: string
-          avatar_url?: string
-          email?: string
-          type?: string
-          created_at?: string
-        }
-        Insert: {
-          id: string
-          updated_at?: string
-          username?: string
-          full_name?: string
-          avatar_url?: string
-          email?: string
-          type?: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          updated_at?: string
-          username?: string
-          full_name?: string
-          avatar_url?: string
-          email?: string
-          type?: string
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_id_fkey"
-            columns: ["id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      // Calculator System Tables
       calculator_templates: {
         Row: {
           created_at: string
@@ -262,7 +204,105 @@ export interface Database {
           },
         ]
       }
-      // Add other tables as needed
+      profiles: {
+        Row: {
+          cateringBrokerage: string | null
+          city: string | null
+          companyName: string | null
+          confirmationCode: string | null
+          contactName: string | null
+          contactNumber: string | null
+          counties: Json | null
+          createdAt: string
+          deletedAt: string | null
+          email: string
+          frequency: string | null
+          guid: string | null
+          headCount: number | null
+          id: string
+          image: string | null
+          isTemporaryPassword: boolean
+          locationNumber: string | null
+          name: string | null
+          parkingLoading: string | null
+          provide: string | null
+          sideNotes: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["UserStatus"]
+          street1: string | null
+          street2: string | null
+          timeNeeded: string | null
+          type: Database["public"]["Enums"]["UserType"]
+          updatedAt: string
+          website: string | null
+          zip: string | null
+        }
+        Insert: {
+          cateringBrokerage?: string | null
+          city?: string | null
+          companyName?: string | null
+          confirmationCode?: string | null
+          contactName?: string | null
+          contactNumber?: string | null
+          counties?: Json | null
+          createdAt?: string
+          deletedAt?: string | null
+          email: string
+          frequency?: string | null
+          guid?: string | null
+          headCount?: number | null
+          id?: string
+          image?: string | null
+          isTemporaryPassword?: boolean
+          locationNumber?: string | null
+          name?: string | null
+          parkingLoading?: string | null
+          provide?: string | null
+          sideNotes?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["UserStatus"]
+          street1?: string | null
+          street2?: string | null
+          timeNeeded?: string | null
+          type?: Database["public"]["Enums"]["UserType"]
+          updatedAt?: string
+          website?: string | null
+          zip?: string | null
+        }
+        Update: {
+          cateringBrokerage?: string | null
+          city?: string | null
+          companyName?: string | null
+          confirmationCode?: string | null
+          contactName?: string | null
+          contactNumber?: string | null
+          counties?: Json | null
+          createdAt?: string
+          deletedAt?: string | null
+          email?: string
+          frequency?: string | null
+          guid?: string | null
+          headCount?: number | null
+          id?: string
+          image?: string | null
+          isTemporaryPassword?: boolean
+          locationNumber?: string | null
+          name?: string | null
+          parkingLoading?: string | null
+          provide?: string | null
+          sideNotes?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["UserStatus"]
+          street1?: string | null
+          street2?: string | null
+          timeNeeded?: string | null
+          type?: Database["public"]["Enums"]["UserType"]
+          updatedAt?: string
+          website?: string | null
+          zip?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -271,7 +311,39 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
+      UserStatus: "ACTIVE" | "PENDING" | "DELETED"
+      UserType:
+        | "VENDOR"
+        | "CLIENT"
+        | "DRIVER"
+        | "ADMIN"
+        | "HELPDESK"
+        | "SUPER_ADMIN"
+    }
+    CompositeTypes: {
       [_ in never]: never
     }
   }
-} 
+}
+
+// Calculator System Type Aliases for easy access
+export type CalculatorTemplate = Database['public']['Tables']['calculator_templates']['Row']
+export type CalculatorTemplateInsert = Database['public']['Tables']['calculator_templates']['Insert']
+export type CalculatorTemplateUpdate = Database['public']['Tables']['calculator_templates']['Update']
+
+export type PricingRule = Database['public']['Tables']['pricing_rules']['Row']
+export type PricingRuleInsert = Database['public']['Tables']['pricing_rules']['Insert']
+export type PricingRuleUpdate = Database['public']['Tables']['pricing_rules']['Update']
+
+export type ClientConfiguration = Database['public']['Tables']['client_configurations']['Row']
+export type ClientConfigurationInsert = Database['public']['Tables']['client_configurations']['Insert']
+export type ClientConfigurationUpdate = Database['public']['Tables']['client_configurations']['Update']
+
+export type CalculationHistory = Database['public']['Tables']['calculation_history']['Row']
+export type CalculationHistoryInsert = Database['public']['Tables']['calculation_history']['Insert']
+export type CalculationHistoryUpdate = Database['public']['Tables']['calculation_history']['Update']
+
+// Type aliases for other important tables
+export type Profile = Database['public']['Tables']['profiles']['Row']
+export type ProfileInsert = Database['public']['Tables']['profiles']['Insert']
+export type ProfileUpdate = Database['public']['Tables']['profiles']['Update'] 

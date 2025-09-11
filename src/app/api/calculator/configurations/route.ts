@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { CalculatorService } from '@/lib/calculator/calculator-service';
 import { CreateClientConfigSchema, ConfigurationError } from '@/types/calculator';
 import { createClient } from '@/utils/supabase/server';
-import { prisma } from '@/utils/prismaDB';
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,13 +34,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user profile from database to check type
-    const userProfile = await prisma.profile.findUnique({
-      where: { email: authUser.email! },
-      select: { id: true, type: true }
-    });
+    // Get user profile from Supabase to check type
+    const { data: userProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, type')
+      .eq('email', authUser.email!)
+      .single();
 
-    if (!userProfile) {
+    if (profileError || !userProfile) {
+      console.error('Profile fetch error:', profileError);
       return NextResponse.json(
         { success: false, error: 'User profile not found' },
         { status: 404 }
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
       ? clientId 
       : userProfile.id;
 
-    const configurations = await CalculatorService.getClientConfigurations(effectiveClientId);
+    const configurations = await CalculatorService.getClientConfigurations(supabase, effectiveClientId);
     
     return NextResponse.json({
       success: true,
@@ -109,13 +110,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user profile from database to check type
-    const userProfile = await prisma.profile.findUnique({
-      where: { email: authUser.email! },
-      select: { id: true, type: true }
-    });
+    // Get user profile from Supabase to check type
+    const { data: userProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, type')
+      .eq('email', authUser.email!)
+      .single();
 
-    if (!userProfile) {
+    if (profileError || !userProfile) {
+      console.error('Profile fetch error:', profileError);
       return NextResponse.json(
         { success: false, error: 'User profile not found' },
         { status: 404 }
@@ -141,7 +144,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     const validatedInput = CreateClientConfigSchema.parse(body);
     
-    const configuration = await CalculatorService.createClientConfig(validatedInput);
+    const configuration = await CalculatorService.createClientConfig(supabase, validatedInput);
     
     return NextResponse.json({
       success: true,

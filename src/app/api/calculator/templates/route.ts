@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { CreateTemplateSchema, ConfigurationError } from '@/types/calculator';
-import { createClient } from '@/server/auth';
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {

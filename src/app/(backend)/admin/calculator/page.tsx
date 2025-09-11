@@ -1,4 +1,4 @@
-// Delivery Calculator System - Admin Interface
+// Delivery Calculator System - Admin Interface (Updated to use Ready Set Food template)
 // Flexible calculator system for all delivery types
 
 'use client';
@@ -12,7 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calculator, History, Info, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Calculator, History, Info, CheckCircle, AlertTriangle, Settings } from 'lucide-react';
+import Link from 'next/link';
 
 export default function CalculatorPage() {
   const [savedCalculations, setSavedCalculations] = useState<Array<{
@@ -31,18 +32,30 @@ export default function CalculatorPage() {
     error: templatesError 
   } = useCalculatorConfig({ autoLoad: true });
 
-  // Set default template when templates load
+  // Set default template when templates load (prioritize Ready Set Food template)
   useEffect(() => {
     if (templates.length > 0 && !selectedTemplateId) {
+      console.log('🔍 Available templates:', templates.map(t => `${t.name} (${t.id})`));
+      
       // Find Ready Set Food template first, then Standard Delivery, or use first one
-      const readySetTemplate = templates.find(t => t.name === 'Ready Set Food Standard Delivery');
-      const standardTemplate = templates.find(t => t.name === 'Standard Delivery');
+      const readySetTemplate = templates.find(t => 
+        t.name === 'Ready Set Food Standard Delivery'
+      );
+      const standardTemplate = templates.find(t => 
+        t.name === 'Standard Delivery'
+      );
       const defaultTemplate = readySetTemplate || standardTemplate || templates[0];
       
       if (defaultTemplate) {
         setSelectedTemplateId(defaultTemplate.id);
         console.log('🎯 Selected template:', defaultTemplate.name, 'ID:', defaultTemplate.id);
-        console.log('📋 Available templates:', templates.map(t => t.name).join(', '));
+        
+        // Show success message if Ready Set Food template is found
+        if (readySetTemplate) {
+          console.log('✅ Ready Set Food template found and selected!');
+        } else {
+          console.warn('⚠️ Ready Set Food template not found, using fallback:', defaultTemplate.name);
+        }
       }
     }
   }, [templates, selectedTemplateId]);
@@ -68,6 +81,8 @@ export default function CalculatorPage() {
     ]);
   };
 
+  const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
+
   if (isLoadingTemplates) {
     return (
       <div className="container mx-auto py-8">
@@ -87,11 +102,19 @@ export default function CalculatorPage() {
           <AlertDescription className="text-red-800">
             <strong>Calculator System Not Ready</strong>
             <br />
-            The new calculator system needs to be set up. Please run the migration:
+            {templatesError || 'The calculator system needs to be set up.'}
             <br />
-            <code className="mt-2 block bg-gray-800 text-white p-2 rounded">
-              pnpm calculator:setup
-            </code>
+            <strong>Templates found:</strong> {templates.length}
+            {templates.length === 0 && (
+              <>
+                <br />
+                Please ensure the Ready Set Food template migration has been applied:
+                <br />
+                <code className="mt-2 block bg-gray-800 text-white p-2 rounded">
+                  pnpm tsx scripts/final-ready-set-setup.sql
+                </code>
+              </>
+            )}
           </AlertDescription>
         </Alert>
       </div>
@@ -118,16 +141,39 @@ export default function CalculatorPage() {
             System Ready
           </Badge>
           <Badge variant="secondary">{templates.length} Templates</Badge>
+          
+          <Link href="/admin/calculator/settings">
+            <Button variant="outline" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Settings
+            </Button>
+          </Link>
         </div>
       </div>
 
       {/* Status Banner */}
-      <Alert className="border-blue-200 bg-blue-50">
+      <Alert className={selectedTemplate?.name === 'Ready Set Food Standard Delivery' 
+        ? "border-green-200 bg-green-50" 
+        : "border-blue-200 bg-blue-50"
+      }>
         <Info className="h-4 w-4" />
-        <AlertDescription className="text-blue-800">
-          <strong>Flexible Calculator System Active!</strong> Configurable pricing rules for all delivery types.
-          <br />
-          <strong>Available templates:</strong> {templates.map(t => t.name).join(', ')}
+        <AlertDescription className={selectedTemplate?.name === 'Ready Set Food Standard Delivery' 
+          ? "text-green-800" 
+          : "text-blue-800"
+        }>
+          {selectedTemplate?.name === 'Ready Set Food Standard Delivery' ? (
+            <>
+              <strong>✅ Ready Set Food Template Active!</strong> Using correct tiered compensation rules.
+              <br />
+              <strong>Test Scenario 1:</strong> 20 people, $250, 8 miles should give Customer $65, Driver $35
+            </>
+          ) : (
+            <>
+              <strong>Flexible Calculator System Active!</strong> Currently using template: {selectedTemplate?.name}
+              <br />
+              <strong>Available templates:</strong> {templates.map(t => t.name).join(', ')}
+            </>
+          )}
         </AlertDescription>
       </Alert>
 
@@ -201,6 +247,7 @@ export default function CalculatorPage() {
                       <div className="mt-2 text-xs text-gray-500">
                         Mileage: {calc.input.mileage} mi | Headcount: {calc.input.headcount} | 
                         Stops: {calc.input.numberOfStops} | Bridge: {calc.input.requiresBridge ? 'Yes' : 'No'}
+                        {calc.input.tips && calc.input.tips > 0 && ` | Tips: $${calc.input.tips}`}
                       </div>
                     </div>
                   ))}
@@ -224,9 +271,16 @@ export default function CalculatorPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     {template.name}
-                    {selectedTemplateId === template.id && (
-                      <Badge variant="default">Active</Badge>
-                    )}
+                    <div className="flex gap-2">
+                      {selectedTemplateId === template.id && (
+                        <Badge variant="default">Active</Badge>
+                      )}
+                      {template.name === 'Ready Set Food Standard Delivery' && (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          Ready Set
+                        </Badge>
+                      )}
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -241,6 +295,11 @@ export default function CalculatorPage() {
                     <div className="text-sm">
                       <strong>Status:</strong> {template.isActive ? 'Active' : 'Inactive'}
                     </div>
+                    {template.name === 'Ready Set Food Standard Delivery' && (
+                      <div className="text-sm text-green-600">
+                        <strong>Features:</strong> Tiered compensation, $0.35 mileage rate
+                      </div>
+                    )}
                   </div>
                   
                   <Button
@@ -263,24 +322,26 @@ export default function CalculatorPage() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <h4 className="font-semibold mb-2">Flexible Pricing Rules</h4>
+                  <h4 className="font-semibold mb-2">Ready Set Food Features</h4>
                   <ul className="text-sm space-y-1">
-                    <li>• Configurable base fees and rates</li>
-                    <li>• Distance-based pricing with thresholds</li>
-                    <li>• Bridge tolls and extra stop charges</li>
-                    <li>• Headcount-based adjustments</li>
-                    <li>• Custom rule evaluation</li>
+                    <li>• Tiered base fees: $65, $75, $85, $95, $105</li>
+                    <li>• Tiered driver pay: $35, $40, $50, $60, $70</li>
+                    <li>• Mileage: $0.35/mile for drivers (&gt;10 miles)</li>
+                    <li>• Long distance: $3/mile for customers (&gt;10 miles)</li>
+                    <li>• Bridge tolls: $8 each way</li>
+                    <li>• Tip pass-through (excludes bonus structure)</li>
                   </ul>
                 </div>
                 
                 <div>
-                  <h4 className="font-semibold mb-2">Advanced Features</h4>
+                  <h4 className="font-semibold mb-2">System Features</h4>
                   <ul className="text-sm space-y-1">
-                    <li>• Client-specific configurations</li>
+                    <li>• Multiple delivery templates</li>
                     <li>• Real-time profit analysis</li>
                     <li>• Historical calculation tracking</li>
-                    <li>• Multiple delivery templates</li>
+                    <li>• Admin configuration interface</li>
                     <li>• API integration ready</li>
+                    <li>• Flexible rule evaluation</li>
                   </ul>
                 </div>
               </div>

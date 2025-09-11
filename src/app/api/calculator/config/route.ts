@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CalculatorService } from '@/lib/calculator/calculator-service';
 import { ConfigurationError } from '@/types/calculator';
-import { createClient } from '@/server/auth';
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +29,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const config = await CalculatorService.getCalculatorConfig(templateId, clientConfigId || undefined);
+    // Get template with rules
+    const template = await CalculatorService.getTemplateWithRules(supabase, templateId);
+    if (!template) {
+      return NextResponse.json(
+        { success: false, error: 'Calculator template not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get client configuration if specified
+    let clientConfig = null;
+    if (clientConfigId) {
+      const configs = await CalculatorService.getClientConfigurations(supabase, undefined);
+      clientConfig = configs.find(config => config.id === clientConfigId) || null;
+    }
+
+    const config = {
+      template,
+      rules: template.pricingRules || [],
+      clientConfig,
+      areaRules: clientConfig?.areaRules || []
+    };
     
     return NextResponse.json({
       success: true,

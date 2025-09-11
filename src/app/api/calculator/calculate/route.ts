@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CalculatorService } from '@/lib/calculator/calculator-service';
 import { CalculationInputSchema, ConfigurationError, CalculatorError } from '@/types/calculator';
-import { createClient } from '@/server/auth';
+import { createClient } from '@/utils/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       ...inputData,
       customFields: {
         ...inputData.customFields,
-        userId: user.id
+        userId: user?.id || 'test-user'
       }
     });
 
@@ -46,10 +46,11 @@ export async function POST(request: NextRequest) {
 
     // Perform calculation
     const result = await CalculatorService.calculate(
+      supabase,
       templateId,
       validatedInput,
       clientConfigId,
-      saveHistory
+      user?.id || 'test-user'
     );
 
     console.log('📊 Calculation Result:', {
@@ -58,6 +59,18 @@ export async function POST(request: NextRequest) {
       templateUsed: result.templateUsed,
       hasRules: !!result.templateUsed
     });
+
+    // Save to history if requested
+    if (saveHistory) {
+      await CalculatorService.saveCalculationHistory(
+        supabase,
+        templateId,
+        validatedInput,
+        result,
+        clientConfigId,
+        user?.id || 'test-user'
+      );
+    }
     
     return NextResponse.json({
       success: true,
