@@ -1,6 +1,7 @@
 // src/lib/auth.ts
 import { createClient } from "@/utils/supabase/server";
 import { UserType } from "@/types/user";
+import { Database } from "@/types/supabase";
 // Note: If UserType enum from Prisma is available/generated for frontend/server code,
 // you could import and use it for stronger type safety, e.g.:
 //  // Adjust import path as needed
@@ -89,7 +90,7 @@ export async function updateUserRole(userId: string, role: string) {
   console.log(`Updating profile type for user ${userId} to ${role}`);
   const { error: updateProfileError } = await supabase
       .from("profiles")
-      .update({ type: role }) // Use the role value directly (ensure correct case)
+      .update({ type: role as Database['public']['Enums']['UserType'] }) // Use the role value directly (ensure correct case)
       .eq("id", userId);     // Changed: Use 'id' instead of 'auth_user_id'
 
   if (updateProfileError) {

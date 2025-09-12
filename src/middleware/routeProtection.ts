@@ -58,10 +58,9 @@ export async function protectRoutes(request: Request) {
     }
 
     // Get user's role from profiles table
-    // Note: deletedAt column temporarily removed from query until database is updated
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('type')
+      .select('type, deletedAt')
       .eq('id', user.id)
       .single();
 
@@ -70,16 +69,15 @@ export async function protectRoutes(request: Request) {
       return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // TODO: Check if user account has been soft-deleted
-    // Note: Soft-delete check temporarily disabled until deletedAt column is added to database
-    // if (profile.deletedAt) {
-    //   console.log(`Access attempt by soft-deleted user: ${user.id}`);
-    //   // Sign out the user and redirect to sign-in with error message
-    //   await supabase.auth.signOut();
-    //   const url = new URL('/sign-in', request.url);
-    //   url.searchParams.set('error', 'Account has been deactivated');
-    //   return NextResponse.redirect(url);
-    // }
+    // Check if user account has been soft-deleted
+    if (profile.deletedAt) {
+      console.log(`Access attempt by soft-deleted user: ${user.id}`);
+      // Sign out the user and redirect to sign-in with error message
+      await supabase.auth.signOut();
+      const url = new URL('/sign-in', request.url);
+      url.searchParams.set('error', 'Account has been deactivated');
+      return NextResponse.redirect(url);
+    }
 
     // Add debug logging
     console.log('User profile type from DB:', profile.type);

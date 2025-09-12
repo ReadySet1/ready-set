@@ -180,10 +180,9 @@ export async function login(
     }
 
     // Get user type from profile
-    // Note: deletedAt column temporarily removed from query until database is updated
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("type, email")
+      .select("type, email, deletedAt")
       .eq("id", user.id)
       .single();
 
@@ -203,15 +202,14 @@ export async function login(
       };
     }
 
-    // TODO: Check if user account has been soft-deleted
-    // Note: Soft-delete check temporarily disabled until deletedAt column is added to database
-    // if (profile.deletedAt) {
-    //   console.log(`❌ [${requestId}] Login attempt by soft-deleted user: ${user.id}`);
-    //   return { 
-    //     error: "Account has been deactivated. Please contact support for assistance.",
-    //     success: false 
-    //   };
-    // }
+    // Check if user account has been soft-deleted
+    if (profile.deletedAt) {
+      console.log(`❌ [${requestId}] Login attempt by soft-deleted user: ${user.id}`);
+      return { 
+        error: "Account has been deactivated. Please contact support for assistance.",
+        success: false 
+      };
+    }
 
   console.log("User profile type from DB:", profile.type);
   
