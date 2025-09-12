@@ -516,4 +516,154 @@ export class CalculatorService {
       // Don't throw here - saving history is not critical
     }
   }
+
+  /**
+   * Get calculation history with pagination
+   */
+  static async getCalculationHistory(
+    supabase: any,
+    options: {
+      userId?: string;
+      templateId?: string;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<any[]> {
+    try {
+      let query = supabase
+        .from('calculation_history')
+        .select(`
+          *,
+          calculator_templates (
+            name,
+            description
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (options.userId) {
+        query = query.eq('user_id', options.userId);
+      }
+
+      if (options.templateId) {
+        query = query.eq('template_id', options.templateId);
+      }
+
+      if (options.limit) {
+        query = query.limit(options.limit);
+      }
+
+      if (options.offset) {
+        query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching calculation history:', error);
+        throw new Error('Failed to fetch calculation history');
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getCalculationHistory:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new pricing rule (placeholder implementation)
+   */
+  static async createRule(input: any): Promise<PricingRule> {
+    // This would typically create a rule in the database
+    // For now, return a mock rule to prevent errors
+    console.warn('createRule called but not implemented - returning mock rule');
+    return {
+      id: 'mock-' + Date.now(),
+      ruleName: input.ruleName || 'mock_rule',
+      ruleType: input.ruleType || 'customer_charge',
+      baseAmount: input.baseAmount || 0,
+      perUnitAmount: input.perUnitAmount || 0,
+      thresholdValue: input.thresholdValue || 0,
+      thresholdType: input.thresholdType || null,
+      priority: input.priority || 1,
+      isActive: input.isActive || true
+    };
+  }
+
+  /**
+   * Update an existing pricing rule (placeholder implementation)
+   */
+  static async updateRule(id: string, updates: any): Promise<PricingRule> {
+    // This would typically update a rule in the database
+    // For now, return a mock updated rule to prevent errors
+    console.warn('updateRule called but not implemented - returning mock rule');
+    return {
+      id,
+      ruleName: updates.ruleName || 'updated_rule',
+      ruleType: updates.ruleType || 'customer_charge',
+      baseAmount: updates.baseAmount || 0,
+      perUnitAmount: updates.perUnitAmount || 0,
+      thresholdValue: updates.thresholdValue || 0,
+      thresholdType: updates.thresholdType || null,
+      priority: updates.priority || 1,
+      isActive: updates.isActive !== undefined ? updates.isActive : true
+    };
+  }
+
+  /**
+   * Delete a pricing rule (placeholder implementation)
+   */
+  static async deleteRule(id: string): Promise<void> {
+    // This would typically delete a rule from the database
+    // For now, just log the action to prevent errors
+    console.warn('deleteRule called but not implemented - rule ID:', id);
+  }
+
+  /**
+   * Create a new calculator template (placeholder implementation)
+   */
+  static async createTemplate(input: any): Promise<CalculatorTemplate> {
+    // This would typically create a template in the database
+    // For now, return a mock template to prevent errors
+    console.warn('createTemplate called but not implemented - returning mock template');
+    return {
+      id: 'mock-template-' + Date.now(),
+      name: input.name || 'Mock Template',
+      description: input.description || 'Mock template for development',
+      isActive: input.isActive !== undefined ? input.isActive : true,
+      pricingRules: []
+    };
+  }
+
+  /**
+   * Update an existing calculator template (placeholder implementation)
+   */
+  static async updateTemplate(id: string, updates: any): Promise<CalculatorTemplate> {
+    // This would typically update a template in the database
+    // For now, return a mock updated template to prevent errors
+    console.warn('updateTemplate called but not implemented - returning mock template');
+    return {
+      id,
+      name: updates.name || 'Updated Template',
+      description: updates.description || 'Updated template for development',
+      isActive: updates.isActive !== undefined ? updates.isActive : true,
+      pricingRules: []
+    };
+  }
+
+  /**
+   * Get calculator configuration for a template and optional client config
+   */
+  static async getCalculatorConfig(templateId: string, clientConfigId?: string): Promise<any> {
+    // This would typically combine template and client config data
+    // For now, return a basic configuration
+    console.warn('getCalculatorConfig called but returning basic config');
+    return {
+      templateId,
+      clientConfigId,
+      template: null,
+      clientConfig: null
+    };
+  }
 }

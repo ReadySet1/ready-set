@@ -8,24 +8,10 @@ import { createClient } from '@/utils/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized - Invalid authorization header' },
-        { status: 401 }
-      );
-    }
-
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-    
-    // Initialize Supabase client
+    // Use session-based authentication (consistent with other endpoints)
     const supabase = await createClient();
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
     
-    // Verify the token by getting the user
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
-
     if (authError || !authUser) {
       console.error('Auth error:', authError);
       return NextResponse.json(
@@ -84,24 +70,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized - Invalid authorization header' },
-        { status: 401 }
-      );
-    }
-
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-    
-    // Initialize Supabase client
+    // Use session-based authentication (consistent with other endpoints)
     const supabase = await createClient();
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
     
-    // Verify the token by getting the user
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
-
     if (authError || !authUser) {
       console.error('Auth error:', authError);
       return NextResponse.json(

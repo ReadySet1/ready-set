@@ -112,18 +112,10 @@ export function useCalculatorConfig(options: UseCalculatorConfigOptions = {}): U
       setIsLoadingTemplates(true);
       setError(null);
       
-      // Get authentication session
-      const supabase = createClient();
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !session) {
-        throw new Error('Authentication required. Please sign in again.');
-      }
-      
+      // Use session-based authentication (cookies will be included automatically)
       const response = await fetch('/api/calculator/templates', {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
         },
         credentials: 'include',
       });
@@ -153,14 +145,7 @@ export function useCalculatorConfig(options: UseCalculatorConfigOptions = {}): U
     try {
       setError(null);
       
-      // Get authentication session
-      const supabase = createClient();
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !session) {
-        throw new Error('Authentication required. Please sign in again.');
-      }
-      
+      // Use session-based authentication (cookies will be included automatically)
       const url = new URL('/api/calculator/configurations', window.location.origin);
       if (clientId) {
         url.searchParams.set('clientId', clientId);
@@ -169,7 +154,6 @@ export function useCalculatorConfig(options: UseCalculatorConfigOptions = {}): U
       const response = await fetch(url.toString(), {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
         },
         credentials: 'include',
       });

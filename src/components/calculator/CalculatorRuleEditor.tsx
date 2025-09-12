@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { READY_SET_TIERS } from '@/types/calculator';
 import type { PricingRule, TierConfiguration } from '@/types/calculator';
+import { createClient } from '@/utils/supabase/client';
 
 interface CalculatorRuleEditorProps {
   templateId: string;
@@ -49,10 +50,31 @@ export function CalculatorRuleEditor({
     loadRules();
   }, [templateId]);
 
+  // Get authorization headers
+  const getAuthHeaders = async () => {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.access_token) {
+      throw new Error('No authentication token available');
+    }
+    
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`
+    };
+  };
+
   const loadRules = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/calculator/rules?templateId=${templateId}`);
+      setError(null);
+      
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/calculator/rules?templateId=${templateId}`, {
+        headers
+      });
+      
       const data = await response.json();
       
       if (data.success) {
@@ -61,7 +83,7 @@ export function CalculatorRuleEditor({
         setError(data.error || 'Failed to load rules');
       }
     } catch (err) {
-      setError('Failed to load calculator rules');
+      setError(err instanceof Error ? err.message : 'Failed to load calculator rules');
       console.error('Error loading rules:', err);
     } finally {
       setLoading(false);
@@ -87,11 +109,13 @@ export function CalculatorRuleEditor({
       setSaving(true);
       setError(null);
 
+      const headers = await getAuthHeaders();
+
       // Save rule changes
       for (const rule of rules) {
         const response = await fetch(`/api/calculator/rules/${rule.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             baseAmount: rule.baseAmount,
             perUnitAmount: rule.perUnitAmount,
@@ -101,7 +125,8 @@ export function CalculatorRuleEditor({
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to update rule ${rule.ruleName}`);
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to update rule ${rule.ruleName}`);
         }
       }
 
