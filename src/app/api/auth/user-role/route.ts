@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     // Retrieve user's profile from the database
     const profile = await prisma.profile.findUnique({
       where: { id: user.id },
-      select: { type: true }
+      select: { type: true, deletedAt: true }
     });
 
     if (!profile) {
@@ -60,6 +60,18 @@ export async function GET(req: NextRequest) {
           error: "User profile not found"
         }, 
         { status: 404 }
+      );
+    }
+
+    // Check if user account has been soft-deleted
+    if (profile.deletedAt) {
+      return NextResponse.json(
+        { 
+          isAdmin: false, 
+          isSuperAdmin: false,
+          error: "Account has been deactivated"
+        }, 
+        { status: 403 }
       );
     }
 

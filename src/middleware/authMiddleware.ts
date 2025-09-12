@@ -30,8 +30,13 @@ export async function validateAdminRole(request: Request) {
 
     const dbUser = await prisma.profile.findUnique({
       where: { email: user.email },
-      select: { type: true },
+      select: { type: true, deletedAt: true },
     });
+
+    // Check if user account has been soft-deleted
+    if (dbUser?.deletedAt) {
+      return NextResponse.json({ error: "Account has been deactivated" }, { status: 403 });
+    }
 
     if (!dbUser || !hasAdminPrivileges(dbUser.type)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
