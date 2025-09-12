@@ -521,3 +521,27 @@ model CalculationHistory {
   @@index([templateId])
   @@map("calculation_history")
 }
+
+model Testimonial {
+  id          String              @id @default(uuid()) @db.Uuid
+  name        String
+  role        String?
+  content     String
+  image       String?
+  rating      Int                 @default(5)
+  category    TestimonialCategory @default(CLIENTS)
+  isActive    Boolean             @default(true) @map("is_active")
+  sortOrder   Int                 @default(0) @map("sort_order")
+  createdAt   DateTime            @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt   DateTime            @updatedAt @db.Timestamptz(6) @map("updated_at")
+
+  @@index([category, isActive, sortOrder])
+  @@index([isActive])
+  @@map("testimonials")
+}
+
+enum TestimonialCategory {
+  CLIENTS
+  VENDORS
+  DRIVERS
+}
