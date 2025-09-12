@@ -68,19 +68,19 @@ export class SoftDeleteMonitoringService {
         prisma.userAudit.count({
           where: {
             action: 'SOFT_DELETE',
-            performedAt: { gte: startTime, lte: endTime },
+            createdAt: { gte: startTime, lte: endTime },
           },
         }),
         prisma.userAudit.count({
           where: {
             action: 'RESTORE',
-            performedAt: { gte: startTime, lte: endTime },
+            createdAt: { gte: startTime, lte: endTime },
           },
         }),
         prisma.userAudit.count({
           where: {
             action: 'PERMANENT_DELETE',
-            performedAt: { gte: startTime, lte: endTime },
+            createdAt: { gte: startTime, lte: endTime },
           },
         }),
       ]);
@@ -378,6 +378,9 @@ export class SoftDeleteMonitoringService {
       
       case 'single_user_mass_deletion':
         const topDeleter = metrics.deletionsByUser[0];
+        if (!topDeleter) {
+          return 'Mass deletion pattern detected but no specific user data available.';
+        }
         return `Mass deletion by single user detected: ${topDeleter.userEmail} performed ${topDeleter.count} deletions. Review for potential misuse.`;
       
       case 'low_restoration_rate':

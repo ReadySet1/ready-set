@@ -107,7 +107,8 @@ export class SoftDeleteCleanupService {
       const processedToday = await prisma.userAudit.count({
         where: {
           action: 'PERMANENT_DELETE',
-          performedAt: { gte: todayStart },
+          performedBy: { not: null },
+          createdAt: { gte: todayStart },
           metadata: {
             path: ['operation'],
             equals: 'automated_cleanup',
@@ -364,12 +365,13 @@ export class SoftDeleteCleanupService {
           equals: 'automated_cleanup',
         },
       },
-      orderBy: { performedAt: 'desc' },
+      orderBy: { createdAt: 'desc' },
       take: 100,
       select: {
         id: true,
         userId: true,
-        performedAt: true,
+        performedBy: true,
+        createdAt: true,
         reason: true,
         metadata: true,
       },

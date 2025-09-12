@@ -237,7 +237,9 @@ export class HistoricalDataAnalysisService {
 
       // Check for users with no email
       const usersWithoutEmail = await prisma.profile.count({
-        where: { email: null }
+        where: { 
+          email: ''
+        }
       });
       if (usersWithoutEmail > 0) {
         dataIntegrityIssues.push(`${usersWithoutEmail} users have null email addresses`);

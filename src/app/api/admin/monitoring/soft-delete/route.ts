@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       select: { type: true }
     });
 
-    if (!requesterProfile || ![UserType.ADMIN, UserType.SUPER_ADMIN].includes(requesterProfile.type)) {
+    if (!requesterProfile || ![UserType.ADMIN, UserType.SUPER_ADMIN].includes(requesterProfile.type as any)) {
       return NextResponse.json(
         { error: 'Forbidden: Only Admin or Super Admin can access monitoring data' },
         { status: 403 }
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
       select: { type: true, email: true }
     });
 
-    if (!requesterProfile || ![UserType.ADMIN, UserType.SUPER_ADMIN].includes(requesterProfile.type)) {
+    if (!requesterProfile || ![UserType.ADMIN, UserType.SUPER_ADMIN].includes(requesterProfile.type as any)) {
       return NextResponse.json(
         { error: 'Forbidden: Only Admin or Super Admin can trigger monitoring checks' },
         { status: 403 }

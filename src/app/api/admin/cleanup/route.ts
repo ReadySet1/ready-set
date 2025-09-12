@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
         performedBy: user.id,
         changes: {
           operation: 'manual_cleanup',
-          result,
+          result: JSON.parse(JSON.stringify(result)),
         },
         reason: `Manual cleanup ${dryRun ? 'dry-run' : 'operation'} completed`,
         metadata: {
