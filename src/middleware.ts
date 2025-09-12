@@ -78,31 +78,39 @@ export async function middleware(request: NextRequest) {
 
         // Check for admin-only routes
         if (pathname.startsWith('/admin')) {
-          // Get user profile to check role and deletion status
-          const { data: profile } = await supabase
+          // Get user profile to check role
+          // Note: deletedAt column temporarily removed from query until database is updated
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('type, deletedAt')
+            .select('type')
             .eq('id', user.id)
             .single();
           
-          // Check if user account has been soft-deleted
-          if (profile?.deletedAt) {
-            console.log(`Access attempt by soft-deleted user: ${user.id}`);
-            // Sign out the user and redirect to sign-in with error message
-            await supabase.auth.signOut();
-            const redirectUrl = new URL('/sign-in', request.url);
-            redirectUrl.searchParams.set('error', 'Account has been deactivated');
-            const response = NextResponse.redirect(redirectUrl);
-            
-            // Add tracking headers
-            response.headers.set('x-auth-redirect', 'true');
-            response.headers.set('x-redirect-from', pathname);
-            response.headers.set('x-redirect-reason', 'account-deactivated');
-            
-            return response;
+          if (profileError || !profile) {
+            console.error('Error fetching user profile in middleware:', profileError);
+            // On error, redirect to sign-in as a safety measure
+            return NextResponse.redirect(new URL('/sign-in', request.url));
           }
           
-          if (!profile || !['admin', 'super_admin', 'helpdesk'].includes((profile.type ?? '').toLowerCase())) {
+          // TODO: Check if user account has been soft-deleted
+          // Note: Soft-delete check temporarily disabled until deletedAt column is added to database
+          // if (profile.deletedAt) {
+          //   console.log(`Access attempt by soft-deleted user: ${user.id}`);
+          //   // Sign out the user and redirect to sign-in with error message
+          //   await supabase.auth.signOut();
+          //   const redirectUrl = new URL('/sign-in', request.url);
+          //   redirectUrl.searchParams.set('error', 'Account has been deactivated');
+          //   const response = NextResponse.redirect(redirectUrl);
+          //   
+          //   // Add tracking headers
+          //   response.headers.set('x-auth-redirect', 'true');
+          //   response.headers.set('x-redirect-from', pathname);
+          //   response.headers.set('x-redirect-reason', 'account-deactivated');
+          //   
+          //   return response;
+          // }
+          
+          if (!['admin', 'super_admin', 'helpdesk'].includes((profile.type ?? '').toLowerCase())) {
             // User is authenticated but not authorized
             const response = NextResponse.redirect(new URL('/', request.url));
             

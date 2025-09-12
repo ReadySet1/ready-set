@@ -21,28 +21,36 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user profile exists and is not soft-deleted
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('deletedAt')
-      .eq('id', user.id)
-      .single();
+    // TODO: Check if user profile exists and is not soft-deleted
+    // Note: Soft-delete check temporarily disabled until deletedAt column is added to database
+    // const { data: profile, error: profileError } = await supabase
+    //   .from('profiles')
+    //   .select('deletedAt')
+    //   .eq('id', user.id)
+    //   .single();
 
-    if (profileError) {
-      console.error('Error fetching user profile:', profileError);
-      return NextResponse.json(
-        { error: 'Unable to verify account status' },
-        { status: 500 }
-      );
-    }
+    // if (profileError) {
+    //   console.error('Error fetching user profile:', profileError);
+    //   return NextResponse.json(
+    //     { error: 'Unable to verify account status' },
+    //     { status: 500 }
+    //   );
+    // }
 
-    // Check if user account has been soft-deleted
-    if (profile?.deletedAt) {
-      return NextResponse.json(
-        { error: 'Account has been deactivated' },
-        { status: 403 }
-      );
-    }
+    // if (!profile) {
+    //   return NextResponse.json(
+    //     { error: 'User profile not found' },
+    //     { status: 404 }
+    //   );
+    // }
+
+    // // Check if user account has been soft-deleted
+    // if (profile.deletedAt) {
+    //   return NextResponse.json(
+    //     { error: 'Account has been deactivated' },
+    //     { status: 403 }
+    //   );
+    // }
     
     // Return the user data
     return NextResponse.json(user);
