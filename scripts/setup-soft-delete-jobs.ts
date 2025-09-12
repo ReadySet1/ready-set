@@ -249,7 +249,7 @@ main();
   fs.writeFileSync(path.join(jobsDir, 'daily-metrics.ts'), metricsScript);
   
   // Make scripts executable
-  await execAsync(\`chmod +x \${path.join(jobsDir, '*.ts')}\`).catch(() => {
+  await execAsync(`chmod +x ${path.join(jobsDir, '*.ts')}`).catch(() => {
     // Ignore errors on non-Unix systems
   });
   
@@ -267,18 +267,18 @@ function generateCrontabEntries(): string {
     .filter(job => job.enabled)
     .map(job => {
       const command = job.command.replace('/path/to/your/project', projectPath);
-      return \`# \${job.description}
-\${job.schedule} \${command} >> /var/log/\${job.name}.log 2>&1\`;
+      return `# ${job.description}
+${job.schedule} ${command} >> /var/log/${job.name}.log 2>&1`;
     })
-    .join('\\n\\n');
+    .join('\n\n');
   
-  const crontabContent = \`# Soft Delete Scheduled Jobs
-# Generated on \${new Date().toISOString()}
-# Project: \${projectPath}
+  const crontabContent = `# Soft Delete Scheduled Jobs
+# Generated on ${new Date().toISOString()}
+# Project: ${projectPath}
 
-\${entries}
+${entries}
 
-\`;
+`;
   
   return crontabContent;
 }
@@ -289,7 +289,7 @@ function generateCrontabEntries(): string {
 function createEnvironmentTemplate(): void {
   console.log('🔧 Creating environment configuration template...');
   
-  const envTemplate = \`# Soft Delete Job Configuration
+  const envTemplate = `# Soft Delete Job Configuration
 # Add these to your .env file
 
 # Cleanup Job Settings
@@ -309,7 +309,7 @@ SOFT_DELETE_LOG_FILE=/var/log/soft-delete.log
 
 # Database Connection (if different from main app)
 # CLEANUP_DATABASE_URL=your_database_url_here
-\`;
+`;
   
   const envPath = path.join(process.cwd(), '.env.soft-delete.template');
   fs.writeFileSync(envPath, envTemplate);
@@ -323,7 +323,7 @@ SOFT_DELETE_LOG_FILE=/var/log/soft-delete.log
 function createMonitoringDashboard(): void {
   console.log('📊 Creating monitoring dashboard script...');
   
-  const dashboardScript = \`#!/usr/bin/env ts-node
+  const dashboardScript = `#!/usr/bin/env ts-node
 
 /**
  * Soft Delete Monitoring Dashboard
@@ -417,7 +417,7 @@ async function main() {
 }
 
 main();
-\`;
+`;
   
   const dashboardPath = path.join(process.cwd(), 'scripts', 'soft-delete-dashboard.ts');
   fs.writeFileSync(dashboardPath, dashboardScript);
@@ -451,7 +451,7 @@ async function main() {
     console.log('Next steps:');
     console.log('1. Review and configure environment variables in .env.soft-delete.template');
     console.log('2. Install the crontab entries:');
-    console.log(\`   crontab \${crontabPath}\`);
+    console.log(`   crontab ${crontabPath}`);
     console.log('3. Test the jobs manually:');
     console.log('   npm run job:cleanup-soft-deleted');
     console.log('   npm run job:monitor-soft-delete');
@@ -474,4 +474,3 @@ if (require.main === module) {
 }
 
 export { SOFT_DELETE_JOBS, setupPackageJsonScripts, createJobScripts };
-\`;
