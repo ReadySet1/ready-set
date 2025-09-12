@@ -252,116 +252,116 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
     normalizedUserType === "ADMIN" || normalizedUserType === "SUPER_ADMIN";
   const canPermanentlyDelete = normalizedUserType === "SUPER_ADMIN";
 
-  // --- Data Fetching Functions ---
-  const fetchActiveUsers = async () => {
-    const params = new URLSearchParams();
-    params.append("page", page.toString());
-    params.append("limit", ITEMS_PER_PAGE.toString());
-    if (searchTerm) params.append("search", searchTerm);
-    if (statusFilter !== "all") params.append("status", statusFilter);
-    if (typeFilter !== "all") params.append("type", typeFilter);
-    params.append("sort", sortField);
-    params.append("direction", sortDirection);
-
-    const apiUrl = `/api/users?${params.toString()}`;
-
-    // Get the session and ensure authentication
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      throw new Error("No active session - please log in again");
-    }
-
-    const response = await fetch(apiUrl, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      let errorData;
-      try {
-        errorData = await response.json();
-      } catch (parseError) {
-        errorData = null;
-      }
-
-      let errorMessage = "An unexpected error occurred";
-      if (errorData?.error) {
-        errorMessage = errorData.error;
-      } else if (response.status === 403) {
-        errorMessage = "You don't have permission to access this resource";
-      } else if (response.status === 401) {
-        errorMessage = "Please log in again to continue";
-      } else if (response.status === 500) {
-        errorMessage = "Server error. Please try again later.";
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    return data;
-  };
-
-  const fetchDeletedUsers = async () => {
-    const params = new URLSearchParams();
-    params.append("page", page.toString());
-    params.append("limit", ITEMS_PER_PAGE.toString());
-    if (searchTerm) params.append("search", searchTerm);
-    if (typeFilter !== "all") params.append("type", typeFilter);
-    params.append("sort", sortField);
-    params.append("direction", sortDirection);
-
-    const apiUrl = `/api/users/deleted?${params.toString()}`;
-
-    // Get the session and ensure authentication
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      throw new Error("No active session - please log in again");
-    }
-
-    const response = await fetch(apiUrl, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      let errorData;
-      try {
-        errorData = await response.json();
-      } catch (parseError) {
-        errorData = null;
-      }
-
-      let errorMessage = "An unexpected error occurred";
-      if (errorData?.error) {
-        errorMessage = errorData.error;
-      } else if (response.status === 403) {
-        errorMessage = "You don't have permission to access this resource";
-      } else if (response.status === 401) {
-        errorMessage = "Please log in again to continue";
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    return data;
-  };
-
   // --- Data Fetching Effect ---
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout | null = null;
     let isMounted = true;
+
+    // Move fetch functions inside useEffect to avoid dependency issues
+    const fetchActiveUsers = async () => {
+      const params = new URLSearchParams();
+      params.append("page", page.toString());
+      params.append("limit", ITEMS_PER_PAGE.toString());
+      if (searchTerm) params.append("search", searchTerm);
+      if (statusFilter !== "all") params.append("status", statusFilter);
+      if (typeFilter !== "all") params.append("type", typeFilter);
+      params.append("sort", sortField);
+      params.append("direction", sortDirection);
+
+      const apiUrl = `/api/users?${params.toString()}`;
+
+      // Get the session and ensure authentication
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("No active session - please log in again");
+      }
+
+      const response = await fetch(apiUrl, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          errorData = null;
+        }
+
+        let errorMessage = "An unexpected error occurred";
+        if (errorData?.error) {
+          errorMessage = errorData.error;
+        } else if (response.status === 403) {
+          errorMessage = "You don't have permission to access this resource";
+        } else if (response.status === 401) {
+          errorMessage = "Please log in again to continue";
+        } else if (response.status === 500) {
+          errorMessage = "Server error. Please try again later.";
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      return data;
+    };
+
+    const fetchDeletedUsers = async () => {
+      const params = new URLSearchParams();
+      params.append("page", page.toString());
+      params.append("limit", ITEMS_PER_PAGE.toString());
+      if (searchTerm) params.append("search", searchTerm);
+      if (typeFilter !== "all") params.append("type", typeFilter);
+      params.append("sort", sortField);
+      params.append("direction", sortDirection);
+
+      const apiUrl = `/api/users/deleted?${params.toString()}`;
+
+      // Get the session and ensure authentication
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("No active session - please log in again");
+      }
+
+      const response = await fetch(apiUrl, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          errorData = null;
+        }
+
+        let errorMessage = "An unexpected error occurred";
+        if (errorData?.error) {
+          errorMessage = errorData.error;
+        } else if (response.status === 403) {
+          errorMessage = "You don't have permission to access this resource";
+        } else if (response.status === 401) {
+          errorMessage = "Please log in again to continue";
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      return data;
+    };
 
     const fetchData = async () => {
       if (!isMounted) return;
