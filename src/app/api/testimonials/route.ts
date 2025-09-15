@@ -38,27 +38,14 @@ export async function GET(request: NextRequest) {
     const active = activeParam !== null ? activeParam === 'true' : true;
     const limit = limitParam ? parseInt(limitParam, 10) : undefined;
     
-    // TODO: testimonials table does not exist in current database schema
-    // Need to create testimonials table in database before enabling this endpoint
-    return NextResponse.json(
-      { 
-        error: 'Testimonials feature not yet implemented', 
-        details: 'Testimonials table does not exist in database schema' 
-      }, 
-      { status: 501 }
-    );
-
-    // Build query (commented out until table is created)
-    /*
+    // Build query
     let query = supabase
       .from('testimonials')
       .select('*')
       .eq('is_active', active)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false });
-    */
     
-    /*
     // Add category filter if specified
     if (category && ['CLIENTS', 'VENDORS', 'DRIVERS'].includes(category)) {
       query = query.eq('category', category);
@@ -102,7 +89,6 @@ export async function GET(request: NextRequest) {
       count: formattedTestimonials.length,
       testimonials: formattedTestimonials,
     });
-    */
     
   } catch (error) {
     console.error('Unexpected error in testimonials API:', error);
@@ -121,17 +107,6 @@ export async function GET(request: NextRequest) {
  * Creates a new testimonial (for admin use)
  */
 export async function POST(request: NextRequest) {
-  // TODO: testimonials table does not exist in current database schema
-  // Need to create testimonials table in database before enabling this endpoint
-  return NextResponse.json(
-    { 
-      error: 'Testimonials feature not yet implemented', 
-      details: 'Testimonials table does not exist in database schema' 
-    }, 
-    { status: 501 }
-  );
-
-  /*
   try {
     const supabase = await createClient();
     const body = await request.json();
@@ -208,5 +183,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-  */
 }
