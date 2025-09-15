@@ -12,9 +12,9 @@ declare global {
   var prismaPooled: PrismaClient | undefined;
 }
 
-// Environment configuration
-const isDevelopment = process.env.NODE_ENV === 'development'
-const isProduction = process.env.NODE_ENV === 'production'
+// Environment configuration - Use VERCEL_ENV for more accurate environment detection
+const isDevelopment = process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'development'
+const isProduction = process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'production'
 const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build'
 const databaseUrl = process.env.DATABASE_URL
 const directUrl = process.env.DIRECT_URL
