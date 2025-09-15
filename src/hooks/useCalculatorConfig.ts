@@ -353,7 +353,14 @@ export function useCalculatorHistory(options: UseCalculatorHistoryOptions = {}):
         throw new Error(errorData.error || 'Failed to load calculation history');
       }
       
-      const { data: historyData } = await response.json();
+      const responseData = await response.json();
+      console.log('📊 Frontend History Debug:', {
+        responseData,
+        historyData: responseData.data,
+        historyLength: responseData.data?.length || 0
+      });
+      
+      const historyData = responseData.data;
       setHistory(historyData || []);
     } catch (err) {
       const errorMessage = err instanceof Error 

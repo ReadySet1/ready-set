@@ -41,7 +41,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const template = await CalculatorService.getTemplate(params.id);
+    const template = await CalculatorService.getTemplateWithRules(supabase, params.id);
     
     if (!template) {
       return NextResponse.json(
@@ -74,17 +74,47 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getServerSession(authOptions);
+    // Get the authorization header
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - Invalid authorization header' },
+        { status: 401 }
+      );
+    }
+
+    // Extract the token
+    const token = authHeader.split(' ')[1];
     
-    if (!session) {
+    // Initialize Supabase client
+    const supabase = await createClient();
+    
+    // Verify the token by getting the user
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !authUser) {
+      console.error('Auth error:', authError);
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
+    // Get user profile from database
+    const userProfile = await prisma.profile.findUnique({
+      where: { email: authUser.email! },
+      select: { id: true, type: true }
+    });
+
+    if (!userProfile) {
+      return NextResponse.json(
+        { success: false, error: 'User profile not found' },
+        { status: 404 }
+      );
+    }
+
     // Check if user has admin privileges
-    if (!['ADMIN', 'SUPER_ADMIN'].includes(session.user?.type || '')) {
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(userProfile.type || '')) {
       return NextResponse.json(
         { success: false, error: 'Insufficient permissions' },
         { status: 403 }
@@ -122,17 +152,47 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getServerSession(authOptions);
+    // Get the authorization header
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - Invalid authorization header' },
+        { status: 401 }
+      );
+    }
+
+    // Extract the token
+    const token = authHeader.split(' ')[1];
     
-    if (!session) {
+    // Initialize Supabase client
+    const supabase = await createClient();
+    
+    // Verify the token by getting the user
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !authUser) {
+      console.error('Auth error:', authError);
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
+    // Get user profile from database
+    const userProfile = await prisma.profile.findUnique({
+      where: { email: authUser.email! },
+      select: { id: true, type: true }
+    });
+
+    if (!userProfile) {
+      return NextResponse.json(
+        { success: false, error: 'User profile not found' },
+        { status: 404 }
+      );
+    }
+
     // Check if user has super admin privileges for deletion
-    if (session.user?.type !== 'SUPER_ADMIN') {
+    if (userProfile.type !== 'SUPER_ADMIN') {
       return NextResponse.json(
         { success: false, error: 'Insufficient permissions' },
         { status: 403 }

@@ -85,7 +85,9 @@ describe('Ready Set Food Calculator Rules', () => {
         mileage: 8,
         requiresBridge: false,
         numberOfStops: 1,
-        tips: 0
+        tips: 0,
+        adjustments: 0,
+        mileageRate: 0.35
       };
 
       const result = calculatorEngine.calculate(input);
@@ -118,7 +120,9 @@ describe('Ready Set Food Calculator Rules', () => {
         mileage: 12,
         requiresBridge: false,
         numberOfStops: 1,
-        tips: 0
+        tips: 0,
+        adjustments: 0,
+        mileageRate: 0.35
       };
 
       const result = calculatorEngine.calculate(input);
@@ -153,7 +157,9 @@ describe('Ready Set Food Calculator Rules', () => {
         mileage: 20,
         requiresBridge: true,
         numberOfStops: 1,
-        tips: 0
+        tips: 0,
+        adjustments: 0,
+        mileageRate: 0.35
       };
 
       const result = calculatorEngine.calculate(input);
@@ -189,7 +195,9 @@ describe('Ready Set Food Calculator Rules', () => {
         mileage: 15,
         requiresBridge: false,
         numberOfStops: 1,
-        tips: 20
+        tips: 20,
+        adjustments: 0,
+        mileageRate: 0.35
       };
 
       const result = calculatorEngine.calculate(input);
@@ -227,7 +235,9 @@ describe('Ready Set Food Calculator Rules', () => {
         mileage: 5,
         requiresBridge: false,
         numberOfStops: 1,
-        tips: 0
+        tips: 0,
+        adjustments: 0,
+        mileageRate: 0.35
       };
 
       const result1 = calculatorEngine.calculate(input1);
@@ -243,7 +253,9 @@ describe('Ready Set Food Calculator Rules', () => {
         mileage: 5,
         requiresBridge: false,
         numberOfStops: 1,
-        tips: 0
+        tips: 0,
+        adjustments: 0,
+        mileageRate: 0.35
       };
 
       const result2 = calculatorEngine.calculate(input2);
@@ -262,7 +274,9 @@ describe('Ready Set Food Calculator Rules', () => {
         mileage: 0,
         requiresBridge: false,
         numberOfStops: 1,
-        tips: 0
+        tips: 0,
+        adjustments: 0,
+        mileageRate: 0.35
       };
 
       const result = calculatorEngine.calculate(input);
@@ -281,7 +295,9 @@ describe('Ready Set Food Calculator Rules', () => {
         mileage: 12,
         requiresBridge: false,
         numberOfStops: 1,
-        tips: -10 // Invalid negative tip
+        tips: -10, // Invalid negative tip
+        adjustments: 0,
+        mileageRate: 0.35
       };
 
       expect(() => {
@@ -296,7 +312,9 @@ describe('Ready Set Food Calculator Rules', () => {
         mileage: 25,
         requiresBridge: true,
         numberOfStops: 1,
-        tips: 0
+        tips: 0,
+        adjustments: 0,
+        mileageRate: 0.35
       };
 
       const result = calculatorEngine.calculate(input);

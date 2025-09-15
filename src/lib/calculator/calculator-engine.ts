@@ -282,9 +282,9 @@ export class CalculatorEngine {
       const results = appliesWhen.conditions.map((cond: any) => this.evaluateCondition(cond, input));
       
       if (appliesWhen.logic === 'AND') {
-        return results.every(r => r);
+        return results.every((r: boolean) => r);
       } else if (appliesWhen.logic === 'OR') {
-        return results.some(r => r);
+        return results.some((r: boolean) => r);
       }
     }
 
@@ -512,7 +512,7 @@ export class CalculatorEngine {
   private evaluateTieredBaseFee(rule: PricingRule, context: RuleContext): number {
     const tier = this.determineTier(context.input);
     const tierConfig = READY_SET_TIERS.find(t => t.tier === tier);
-    return tierConfig?.customerBaseFee || READY_SET_TIERS[0].customerBaseFee;
+    return tierConfig?.customerBaseFee || READY_SET_TIERS[0]?.customerBaseFee || 65;
   }
 
   /**
@@ -529,7 +529,7 @@ export class CalculatorEngine {
     
     const tier = this.determineTier(context.input);
     const tierConfig = READY_SET_TIERS.find(t => t.tier === tier);
-    return tierConfig?.driverBasePay || READY_SET_TIERS[0].driverBasePay;
+    return tierConfig?.driverBasePay || READY_SET_TIERS[0]?.driverBasePay || 35;
   }
 
   /**
@@ -571,7 +571,11 @@ export class CalculatorEngine {
    */
   private getTemplateId(): string {
     const allRules = Array.from(this.rules.values()).flat();
-    return allRules.length > 0 ? allRules[0].templateId : 'unknown';
+    console.log('🏷️  CalculatorEngine.getTemplateId() - All rules:', allRules.length);
+    console.log('🏷️  First rule templateId:', allRules[0]?.templateId);
+    const templateId = allRules.length > 0 ? allRules[0]?.templateId || 'unknown' : 'unknown';
+    console.log('🏷️  Final templateId:', templateId);
+    return templateId;
   }
 
   /**

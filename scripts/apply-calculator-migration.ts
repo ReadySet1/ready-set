@@ -49,7 +49,7 @@ async function applyCalculatorMigration() {
     for (let i = 0; i < statements.length; i++) {
       const statement = statements[i];
       
-      if (statement.trim()) {
+      if (statement && statement.trim()) {
         try {
           await prisma.$executeRawUnsafe(statement);
           console.log(`   ✓ Statement ${i + 1}/${statements.length} executed`);

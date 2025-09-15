@@ -474,7 +474,7 @@ function RuleEditor({
               step="0.01"
               value={rule.baseAmount || ''}
               onChange={(e) => onUpdate({ 
-                baseAmount: e.target.value ? parseFloat(e.target.value) : null 
+                baseAmount: e.target.value ? parseFloat(e.target.value) : undefined 
               })}
               placeholder="0.00"
             />
@@ -488,7 +488,7 @@ function RuleEditor({
               step="0.01"
               value={rule.perUnitAmount || ''}
               onChange={(e) => onUpdate({ 
-                perUnitAmount: e.target.value ? parseFloat(e.target.value) : null 
+                perUnitAmount: e.target.value ? parseFloat(e.target.value) : undefined 
               })}
               placeholder="0.00"
             />
@@ -502,7 +502,7 @@ function RuleEditor({
               step="0.01"
               value={rule.thresholdValue || ''}
               onChange={(e) => onUpdate({ 
-                thresholdValue: e.target.value ? parseFloat(e.target.value) : null 
+                thresholdValue: e.target.value ? parseFloat(e.target.value) : undefined 
               })}
               placeholder="0"
             />
@@ -513,7 +513,7 @@ function RuleEditor({
             <select
               id={`type-${rule.id}`}
               value={rule.thresholdType || ''}
-              onChange={(e) => onUpdate({ thresholdType: e.target.value || null })}
+              onChange={(e) => onUpdate({ thresholdType: e.target.value ? e.target.value as 'above' | 'below' | 'between' : undefined })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             >
               <option value="">None</option>

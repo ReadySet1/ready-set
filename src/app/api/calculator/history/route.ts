@@ -54,17 +54,28 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
 
     // Non-admin users can only see their own history
-    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(session.user?.type || '');
-    const effectiveUserId = isAdmin ? userId : session.user?.id;
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(userProfile.type || '');
+    const effectiveUserId = isAdmin ? userId : userProfile.id;
 
     // Validate limit
     const validatedLimit = Math.min(Math.max(limit, 1), 100); // Between 1 and 100
 
     const history = await CalculatorService.getCalculationHistory(
+      supabase,
+      {
+        userId: effectiveUserId,
+        templateId,
+        limit: validatedLimit
+      }
+    );
+    
+    console.log('📊 History API Debug:', {
       effectiveUserId,
       templateId,
-      validatedLimit
-    );
+      limit: validatedLimit,
+      historyCount: history.length,
+      history: history.slice(0, 2) // Show first 2 entries for debugging
+    });
     
     return NextResponse.json({
       success: true,

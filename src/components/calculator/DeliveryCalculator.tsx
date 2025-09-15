@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Calculator, DollarSign, Truck, Users, MapPin, Check, Save, Settings, History, AlertTriangle } from 'lucide-react';
-import { useCalculatorConfig, useCalculator } from '@/hooks/useCalculatorConfig';
+import { useCalculatorConfig, useCalculator, useCalculatorHistory } from '@/hooks/useCalculatorConfig';
 import { 
   CalculationInput, 
   CalculationResult,
@@ -67,6 +67,19 @@ export function DeliveryCalculator({
     clearError: clearCalculationError
   } = useCalculator(config);
 
+  // Hook for calculation history
+  const { 
+    history: savedResults, 
+    isLoading: isLoadingHistory, 
+    error: historyError,
+    loadHistory: reloadHistory,
+    clearError: clearHistoryError
+  } = useCalculatorHistory({ 
+    templateId: config?.template?.id,
+    limit: 10,
+    autoLoad: true 
+  });
+
   // Form state
   const [input, setInput] = useState<CalculationInput>({
     headcount: 0,
@@ -82,7 +95,6 @@ export function DeliveryCalculator({
 
   // UI state
   const [activeTab, setActiveTab] = useState('input');
-  const [savedResults, setSavedResults] = useState<CalculationResult[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -167,14 +179,14 @@ export function DeliveryCalculator({
         onSaveCalculation(input, result);
       }
 
-      // Add to local state for immediate UI feedback
-      setSavedResults(prev => [result, ...prev.slice(0, 4)]); // Keep last 5
+      // Reload history from database to show the new calculation
+      await reloadHistory();
       
       // Show success feedback
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000); // Hide after 3 seconds
       
-      console.log('✅ Calculation saved successfully');
+      console.log('✅ Calculation saved successfully and history reloaded');
       
     } catch (error) {
       console.error('❌ Failed to save calculation:', error);
@@ -842,28 +854,42 @@ export function DeliveryCalculator({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {savedResults.length > 0 ? (
+              {isLoadingHistory ? (
+                <div className="text-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-slate-400" />
+                  <p className="text-slate-500">Loading calculation history...</p>
+                </div>
+              ) : historyError ? (
+                <div className="text-center text-red-500 py-16">
+                  <AlertTriangle className="h-8 w-8 mx-auto mb-4" />
+                  <p className="text-red-600 mb-2">Failed to load calculation history</p>
+                  <p className="text-slate-500 text-sm">{historyError}</p>
+                </div>
+              ) : savedResults.length > 0 ? (
                 <div className="space-y-4">
-                  {savedResults.map((savedResult, index) => (
-                    <div key={index} className="border border-slate-200 rounded-2xl p-6 bg-gradient-to-r from-white to-slate-50 shadow-sm hover:shadow-md transition-shadow duration-200">
-                      <div className="flex justify-between items-center">
-                        <div className="flex gap-6">
-                          <span className="font-semibold text-slate-900">
-                            Customer: <span className="text-emerald-600">${savedResult.customerCharges.total.toFixed(2)}</span>
-                          </span>
-                          <span className="font-semibold text-slate-900">
-                            Driver: <span className="text-blue-600">${savedResult.driverPayments.total.toFixed(2)}</span>
-                          </span>
-                          <span className={`font-semibold ${savedResult.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            Profit: ${savedResult.profit.toFixed(2)}
+                  {savedResults.map((savedResult, index) => {
+                    const profit = Number(savedResult.customer_total) - Number(savedResult.driver_total);
+                    return (
+                      <div key={savedResult.id || index} className="border border-slate-200 rounded-2xl p-6 bg-gradient-to-r from-white to-slate-50 shadow-sm hover:shadow-md transition-shadow duration-200">
+                        <div className="flex justify-between items-center">
+                          <div className="flex gap-6">
+                            <span className="font-semibold text-slate-900">
+                              Customer: <span className="text-emerald-600">${Number(savedResult.customer_total).toFixed(2)}</span>
+                            </span>
+                            <span className="font-semibold text-slate-900">
+                              Driver: <span className="text-blue-600">${Number(savedResult.driver_total).toFixed(2)}</span>
+                            </span>
+                            <span className={`font-semibold ${profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                              Profit: ${profit.toFixed(2)}
+                            </span>
+                          </div>
+                          <span className="text-sm text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                            {new Date(savedResult.created_at).toLocaleString()}
                           </span>
                         </div>
-                        <span className="text-sm text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
-                          {savedResult.calculatedAt.toLocaleString()}
-                        </span>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center text-slate-500 py-16">

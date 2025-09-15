@@ -1,9 +1,22 @@
 // Calculator save endpoint - saves calculation results to database
 import { NextRequest, NextResponse } from 'next/server';
 import { CalculationInput, CalculationResult } from '@/types/calculator';
+import { CalculatorService } from '@/lib/calculator/calculator-service';
+import { createClient } from '@/utils/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
+    // Get authenticated user
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please sign in' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { templateId, clientConfigId, input, result } = body as {
       templateId: string;
@@ -20,13 +33,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For now, we'll just return a success response
-    // In a real implementation, you would save to your database here
-    console.log('Calculation saved:', {
+    // Save calculation to database using the existing service
+    await CalculatorService.saveCalculationHistory(
+      supabase,
       templateId,
-      clientConfigId,
       input,
       result,
+      clientConfigId,
+      user.id
+    );
+
+    console.log('✅ Calculation saved to database:', {
+      templateId,
+      clientConfigId,
+      userId: user.id,
       timestamp: new Date().toISOString(),
     });
 
@@ -34,19 +54,17 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Calculation saved successfully',
       data: {
-        id: Math.random().toString(36).substr(2, 9), // Generate a mock ID
         templateId,
         clientConfigId,
-        input,
-        result,
+        userId: user.id,
         timestamp: new Date().toISOString(),
       }
     });
 
   } catch (error) {
-    console.error('Error saving calculation:', error);
+    console.error('❌ Error saving calculation:', error);
     return NextResponse.json(
-      { error: 'Failed to save calculation' },
+      { error: 'Failed to save calculation to database' },
       { status: 500 }
     );
   }
