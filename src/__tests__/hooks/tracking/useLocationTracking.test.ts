@@ -129,7 +129,7 @@ describe('useLocationTracking', () => {
     // Simulate position update
     if (watchCallback) {
       await act(async () => {
-        watchCallback(mockPosition);
+        (watchCallback as (position: any) => void)(mockPosition);
       });
     }
 
