@@ -16,6 +16,7 @@ declare global {
 const isDevelopment = process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'development'
 const isProduction = process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'production'
 const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build'
+const isVercelServerless = !!process.env.VERCEL
 const databaseUrl = process.env.DATABASE_URL
 const directUrl = process.env.DIRECT_URL
 
@@ -112,33 +113,59 @@ const createOptimizedPrismaClient = (): PrismaClient => {
     throw new Error('DATABASE_URL is not defined. Please check your environment variables.')
   }
 
-  // Build connection string with optimized parameters
-  const pooledUrl = new URL(databaseUrl)
+  // Build connection string with serverless optimizations
+  let connectionUrl = databaseUrl
   
-  // Add connection pooling parameters (compatible with Supabase and standard PostgreSQL)
-  pooledUrl.searchParams.set('connection_limit', POOL_CONFIG.connectionLimit.toString())
-  pooledUrl.searchParams.set('pool_timeout', '30')
-  
-  // Add performance optimizations
-  pooledUrl.searchParams.set('connect_timeout', '10')
-  pooledUrl.searchParams.set('socket_timeout', '30')
-  
-  // Only add pgbouncer params if not already present and not Supabase
-  if (!databaseUrl.includes('supabase.co') && !pooledUrl.searchParams.has('pgbouncer')) {
+  // For Supabase in serverless environments, optimize connection string
+  if (databaseUrl.includes('supabase.co')) {
+    const url = new URL(databaseUrl)
+    
+    if (isVercelServerless) {
+      // Serverless environment optimizations for Supabase
+      console.log('🔧 Configuring Supabase connection for Vercel serverless environment')
+      
+      // Use pgbouncer for connection pooling and disable prepared statements
+      url.searchParams.set('pgbouncer', 'true')
+      url.searchParams.set('statement_cache_size', '0')
+      
+      // Connection timeouts optimized for serverless
+      url.searchParams.set('connect_timeout', '10')
+      url.searchParams.set('socket_timeout', '30')
+      
+      // Pool configuration for serverless
+      url.searchParams.set('pool_timeout', '10')
+      
+      connectionUrl = url.toString()
+      
+      console.log('✅ Applied serverless optimizations for Supabase')
+    } else {
+      // Local development - use direct connection for better debugging
+      console.log('🔧 Using direct Supabase connection for local development')
+      connectionUrl = directUrl || databaseUrl
+    }
+  } else {
+    // Non-Supabase PostgreSQL - apply standard pooling
+    const pooledUrl = new URL(databaseUrl)
+    pooledUrl.searchParams.set('connection_limit', POOL_CONFIG.connectionLimit.toString())
+    pooledUrl.searchParams.set('pool_timeout', '30')
+    pooledUrl.searchParams.set('connect_timeout', '10')
+    pooledUrl.searchParams.set('socket_timeout', '30')
     pooledUrl.searchParams.set('statement_cache_size', '0')
+    connectionUrl = pooledUrl.toString()
   }
 
   const client = new PrismaClient({
     log: LOG_CONFIG,
     datasources: {
       db: {
-        url: pooledUrl.toString()
+        url: connectionUrl
       }
     },
     errorFormat: isDevelopment ? 'pretty' : 'minimal',
     transactionOptions: {
-      maxWait: POOL_CONFIG.acquireTimeout,
-      timeout: POOL_CONFIG.transactionTimeout,
+      // Serverless-optimized timeouts
+      maxWait: isVercelServerless ? 20000 : POOL_CONFIG.acquireTimeout, // 20s for serverless vs 60s
+      timeout: isVercelServerless ? 30000 : POOL_CONFIG.transactionTimeout, // 30s for serverless vs 60s
       isolationLevel: 'ReadCommitted'
     }
   });
@@ -179,8 +206,12 @@ const createOptimizedPrismaClient = (): PrismaClient => {
   console.log('✅ Optimized Prisma client created with configuration:', {
     connectionLimit: POOL_CONFIG.connectionLimit,
     environment: process.env.NODE_ENV,
+    serverless: isVercelServerless,
+    vercelEnv: process.env.VERCEL_ENV,
     pooling: 'enabled',
-    directConnection: !!directUrl
+    directConnection: !!directUrl,
+    supabase: databaseUrl.includes('supabase.co'),
+    preparedStatements: isVercelServerless && databaseUrl.includes('supabase.co') ? 'disabled' : 'enabled'
   })
 
   return client
@@ -278,15 +309,35 @@ export const healthCheck = {
       return {
         activeConnections: result[0]?.count || 0,
         maxConnections: POOL_CONFIG.maxConnections,
+        serverless: isVercelServerless,
+        preparedStatementsDisabled: isVercelServerless && databaseUrl.includes('supabase.co'),
         healthy: true
       }
     } catch (error) {
       return {
         activeConnections: 0,
         maxConnections: POOL_CONFIG.maxConnections,
+        serverless: isVercelServerless,
+        preparedStatementsDisabled: isVercelServerless && databaseUrl.includes('supabase.co'),
         healthy: false,
         error: error instanceof Error ? error.message : 'Unknown error'
       }
+    }
+  },
+
+  /**
+   * Debug prepared statement issues
+   */
+  async debugPreparedStatements() {
+    try {
+      const result = await prismaPooled.$queryRaw<Array<{ name: string; statement: string; from_sql: boolean }>>`
+        SELECT name, statement, from_sql FROM pg_prepared_statements LIMIT 10
+      `
+      console.log('🔍 Current prepared statements:', result)
+      return result
+    } catch (error) {
+      console.warn('⚠️ Could not fetch prepared statements (expected in serverless):', error)
+      return []
     }
   }
 }

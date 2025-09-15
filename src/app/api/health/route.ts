@@ -1,6 +1,6 @@
 // src/app/api/health/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { prismaPooled } from '@/lib/db/prisma-pooled';
+import { prismaPooled, healthCheck } from '@/lib/db/prisma-pooled';
 import { addSecurityHeaders } from '@/lib/auth-middleware';
 import { getErrorMetrics } from '@/lib/error-logging';
 
@@ -49,6 +49,10 @@ async function checkDatabaseHealth(): Promise<ServiceHealth> {
     // Test a more complex query
     const userCount = await prismaPooled.profile.count();
     
+    // Get connection info and debug prepared statements
+    const connectionInfo = await healthCheck.getConnectionInfo();
+    const preparedStatements = await healthCheck.debugPreparedStatements();
+    
     const responseTime = performance.now() - start;
     
     return {
@@ -58,7 +62,16 @@ async function checkDatabaseHealth(): Promise<ServiceHealth> {
       details: {
         connectionTime: `${responseTime.toFixed(2)}ms`,
         userCount,
-        poolingEnabled: true
+        poolingEnabled: true,
+        serverless: connectionInfo.serverless,
+        preparedStatementsDisabled: connectionInfo.preparedStatementsDisabled,
+        activeConnections: connectionInfo.activeConnections,
+        preparedStatementsCount: preparedStatements.length,
+        environment: {
+          NODE_ENV: process.env.NODE_ENV,
+          VERCEL_ENV: process.env.VERCEL_ENV,
+          isVercel: !!process.env.VERCEL
+        }
       }
     };
   } catch (error) {
@@ -67,7 +80,13 @@ async function checkDatabaseHealth(): Promise<ServiceHealth> {
       responseTime: performance.now() - start,
       message: 'Database connection failed',
       details: {
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
+        serverless: !!process.env.VERCEL,
+        environment: {
+          NODE_ENV: process.env.NODE_ENV,
+          VERCEL_ENV: process.env.VERCEL_ENV,
+          isVercel: !!process.env.VERCEL
+        }
       }
     };
   }
