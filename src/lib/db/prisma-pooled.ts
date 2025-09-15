@@ -310,7 +310,7 @@ export const healthCheck = {
         activeConnections: result[0]?.count || 0,
         maxConnections: POOL_CONFIG.maxConnections,
         serverless: isVercelServerless,
-        preparedStatementsDisabled: isVercelServerless && databaseUrl.includes('supabase.co'),
+        preparedStatementsDisabled: isVercelServerless && (databaseUrl?.includes('supabase.co') ?? false),
         healthy: true
       }
     } catch (error) {
@@ -318,7 +318,7 @@ export const healthCheck = {
         activeConnections: 0,
         maxConnections: POOL_CONFIG.maxConnections,
         serverless: isVercelServerless,
-        preparedStatementsDisabled: isVercelServerless && databaseUrl.includes('supabase.co'),
+        preparedStatementsDisabled: isVercelServerless && (databaseUrl?.includes('supabase.co') ?? false),
         healthy: false,
         error: error instanceof Error ? error.message : 'Unknown error'
       }
