@@ -105,7 +105,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
       setIsConnected(false);
       scheduleReconnect();
     }
-  }, []);
+  }, [scheduleReconnect]);
 
   // Schedule reconnection with exponential backoff
   const scheduleReconnect = useCallback(() => {

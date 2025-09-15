@@ -142,7 +142,7 @@ const Signin = ({
       setIsRedirecting(false);
       setShowSuccessMessage(false);
     }
-  }, [authProgress?.step]);
+  }, [authProgress]);
 
   // Manual form submission handler to replace formAction
   const handleLogin = async (e: React.FormEvent) => {
