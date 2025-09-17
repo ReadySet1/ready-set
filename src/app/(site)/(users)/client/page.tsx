@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/db/prisma";
+import { prisma, withDatabaseRetry } from "@/lib/db/prisma";
 import { redirect } from "next/navigation";
 import {
   CateringStatus,
@@ -89,45 +89,52 @@ const formatDateTime = (date: string, time: string | null | undefined) => {
   }
 };
 
-// Data fetching function
+// Data fetching function with database retry logic
 async function getClientDashboardData(
   userId: string,
 ): Promise<ClientDashboardData> {
-  // Fetch recent catering orders
-  const recentCateringOrders = await prisma.cateringRequest.findMany({
-    where: {
-      userId,
-      deletedAt: null,
-    },
-    orderBy: { createdAt: "desc" },
-    take: 3,
-    select: {
-      id: true,
-      orderNumber: true,
-      status: true,
-      pickupDateTime: true,
-      arrivalDateTime: true,
-      orderTotal: true,
-    },
-  });
+  // Fetch recent orders with retry logic to handle prepared statement errors
+  const [recentCateringOrders, recentOnDemandOrders] = await withDatabaseRetry(
+    async () => {
+      return Promise.all([
+        // Fetch recent catering orders
+        prisma.cateringRequest.findMany({
+          where: {
+            userId,
+            deletedAt: null,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            pickupDateTime: true,
+            arrivalDateTime: true,
+            orderTotal: true,
+          },
+        }),
 
-  // Fetch recent on-demand orders
-  const recentOnDemandOrders = await prisma.onDemand.findMany({
-    where: {
-      userId,
-      deletedAt: null,
+        // Fetch recent on-demand orders
+        prisma.onDemand.findMany({
+          where: {
+            userId,
+            deletedAt: null,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            pickupDateTime: true,
+            arrivalDateTime: true,
+            orderTotal: true,
+          },
+        }),
+      ]);
     },
-    orderBy: { createdAt: "desc" },
-    take: 3,
-    select: {
-      id: true,
-      orderNumber: true,
-      status: true,
-      pickupDateTime: true,
-      arrivalDateTime: true,
-      orderTotal: true,
-    },
-  });
+  );
 
   // Combine and sort orders
   const combinedOrders: CombinedOrder[] = [
@@ -168,46 +175,48 @@ async function getClientDashboardData(
     )
     .slice(0, 3);
 
-  // Get stats
+  // Get stats with database retry logic to handle prepared statement errors
   const [
     activeCateringCount,
     activeOnDemandCount,
     completedCateringCount,
     completedOnDemandCount,
     savedLocationsCount,
-  ] = await Promise.all([
-    prisma.cateringRequest.count({
-      where: {
-        userId,
-        status: { in: [CateringStatus.ACTIVE, CateringStatus.ASSIGNED] },
-        deletedAt: null,
-      },
-    }),
-    prisma.onDemand.count({
-      where: {
-        userId,
-        status: { in: [OnDemandStatus.ACTIVE, OnDemandStatus.ASSIGNED] },
-        deletedAt: null,
-      },
-    }),
-    prisma.cateringRequest.count({
-      where: {
-        userId,
-        status: CateringStatus.COMPLETED,
-        deletedAt: null,
-      },
-    }),
-    prisma.onDemand.count({
-      where: {
-        userId,
-        status: OnDemandStatus.COMPLETED,
-        deletedAt: null,
-      },
-    }),
-    prisma.userAddress.count({
-      where: { userId },
-    }),
-  ]);
+  ] = await withDatabaseRetry(async () => {
+    return Promise.all([
+      prisma.cateringRequest.count({
+        where: {
+          userId,
+          status: { in: [CateringStatus.ACTIVE, CateringStatus.ASSIGNED] },
+          deletedAt: null,
+        },
+      }),
+      prisma.onDemand.count({
+        where: {
+          userId,
+          status: { in: [OnDemandStatus.ACTIVE, OnDemandStatus.ASSIGNED] },
+          deletedAt: null,
+        },
+      }),
+      prisma.cateringRequest.count({
+        where: {
+          userId,
+          status: CateringStatus.COMPLETED,
+          deletedAt: null,
+        },
+      }),
+      prisma.onDemand.count({
+        where: {
+          userId,
+          status: OnDemandStatus.COMPLETED,
+          deletedAt: null,
+        },
+      }),
+      prisma.userAddress.count({
+        where: { userId },
+      }),
+    ]);
+  });
 
   return {
     recentOrders: combinedOrders,
