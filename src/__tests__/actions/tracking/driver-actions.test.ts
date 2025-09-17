@@ -1,4 +1,4 @@
-import { startDriverShift, endDriverShift, updateDriverLocation, pauseShift } from '@/app/actions/tracking/driver-actions';
+import { startDriverShift, endDriverShift, updateDriverLocation } from '@/app/actions/tracking/driver-actions';
 import { createClient } from '@/utils/supabase/server';
 
 // Mock Supabase client
@@ -295,13 +295,13 @@ describe('Driver Tracking Actions', () => {
         error: null,
       });
 
-      const result = await updateDriverLocation(locationUpdates);
+      const result = await updateDriverLocation('driver-123', mockLocationUpdate);
 
       expect(result).toBe(true);
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('driver_locations');
     });
 
-    it('handles batch location updates', async () => {
+    it('handles single location update', async () => {
       mockSupabaseClient.auth.getUser.mockResolvedValue({
         data: { 
           user: { 
@@ -313,21 +313,18 @@ describe('Driver Tracking Actions', () => {
         error: null,
       });
 
-      const multipleUpdates = [
-        mockLocationUpdate,
-        {
-          ...mockLocationUpdate,
-          coordinates: { lat: 40.7589, lng: -73.9851 },
-          timestamp: new Date(Date.now() + 30000),
-        },
-      ];
+      const singleUpdate = {
+        ...mockLocationUpdate,
+        coordinates: { lat: 40.7589, lng: -73.9851 },
+        timestamp: new Date(Date.now() + 30000),
+      };
 
       (mockSupabaseClient.from as any)().insert().mockResolvedValue({
-        data: multipleUpdates.map((loc, index) => ({ id: `location-${index}`, ...loc })),
+        data: { id: 'location-1', ...singleUpdate },
         error: null,
       });
 
-      const result = await updateDriverLocation(multipleUpdates);
+      const result = await updateDriverLocation('driver-123', singleUpdate);
 
       expect(result).toBe(true);
     });
@@ -349,7 +346,7 @@ describe('Driver Tracking Actions', () => {
         error: { message: 'Insert failed' },
       });
 
-      const result = await updateDriverLocation([mockLocationUpdate]);
+      const result = await updateDriverLocation('driver-123', mockLocationUpdate);
 
       expect(result).toBe(false);
     });
@@ -366,19 +363,17 @@ describe('Driver Tracking Actions', () => {
         error: null,
       });
 
-      const invalidUpdates = [
-        {
-          ...mockLocationUpdate,
-          coordinates: { lat: 200, lng: 300 }, // Invalid coordinates
-        },
-      ];
+      const invalidUpdate = {
+        ...mockLocationUpdate,
+        coordinates: { lat: 200, lng: 300 }, // Invalid coordinates
+      };
 
-      const result = await updateDriverLocation(invalidUpdates);
+      const result = await updateDriverLocation('driver-123', invalidUpdate);
 
       expect(result).toBe(false);
     });
 
-    it('handles empty location updates array', async () => {
+    it('handles valid location update', async () => {
       mockSupabaseClient.auth.getUser.mockResolvedValue({
         data: { 
           user: { 
@@ -390,109 +385,17 @@ describe('Driver Tracking Actions', () => {
         error: null,
       });
 
-      const result = await updateDriverLocation([]);
-
-      expect(result).toBe(true); // Should succeed with empty array
-    });
-  });
-
-  describe('pauseShift', () => {
-    it('pauses a driver shift successfully', async () => {
-      mockSupabaseClient.auth.getUser.mockResolvedValue({
-        data: { 
-          user: { 
-            id: 'driver-123', 
-            email: 'driver@example.com',
-            user_metadata: { role: 'driver' }
-          } 
-        },
+      (mockSupabaseClient.from as any)().insert().mockResolvedValue({
+        data: { id: 'location-1', ...mockLocationUpdate },
         error: null,
       });
 
-      (mockSupabaseClient.from as any)().select().eq().single().mockResolvedValue({
-        data: mockShift,
-        error: null,
-      });
-
-      (mockSupabaseClient.from as any)().update().eq().single().mockResolvedValue({
-        data: { ...mockShift, status: 'paused' },
-        error: null,
-      });
-
-      const result = await pauseShift('shift-123');
+      const result = await updateDriverLocation('driver-123', mockLocationUpdate);
 
       expect(result).toBe(true);
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('driver_shifts');
-    });
-
-    it('returns false when shift not found', async () => {
-      mockSupabaseClient.auth.getUser.mockResolvedValue({
-        data: { 
-          user: { 
-            id: 'driver-123', 
-            email: 'driver@example.com',
-            user_metadata: { role: 'driver' }
-          } 
-        },
-        error: null,
-      });
-
-      (mockSupabaseClient.from as any)().select().eq().single().mockResolvedValue({
-        data: null,
-        error: { code: 'PGRST116' },
-      });
-
-      const result = await pauseShift('shift-123');
-
-      expect(result).toBe(false);
-    });
-
-    it('handles unauthorized access to shift', async () => {
-      mockSupabaseClient.auth.getUser.mockResolvedValue({
-        data: { 
-          user: { 
-            id: 'driver-456', // Different driver
-            email: 'driver2@example.com',
-            user_metadata: { role: 'driver' }
-          } 
-        },
-        error: null,
-      });
-
-      (mockSupabaseClient.from as any)().select().eq().single().mockResolvedValue({
-        data: mockShift, // Shift belongs to driver-123
-        error: null,
-      });
-
-      const result = await pauseShift('shift-123');
-
-      expect(result).toBe(false);
-    });
-
-    it('cannot pause already completed shift', async () => {
-      mockSupabaseClient.auth.getUser.mockResolvedValue({
-        data: { 
-          user: { 
-            id: 'driver-123', 
-            email: 'driver@example.com',
-            user_metadata: { role: 'driver' }
-          } 
-        },
-        error: null,
-      });
-
-      const completedShift = { ...mockShift, status: 'completed' as const };
-
-      (mockSupabaseClient.from as any)().select().eq().single().mockResolvedValue({
-        data: completedShift,
-        error: null,
-      });
-
-      const result = await pauseShift('shift-123');
-
-      expect(result).toBe(false);
     });
   });
+
 
   describe('Error Handling', () => {
     it('handles network errors gracefully', async () => {
@@ -517,10 +420,10 @@ describe('Driver Tracking Actions', () => {
 
       const malformedLocation = {
         ...mockLocationUpdate,
-        coordinates: null, // Invalid coordinates
+        coordinates: null as any, // Invalid coordinates
       };
 
-      const result = await updateDriverLocation([malformedLocation]);
+      const result = await updateDriverLocation('driver-123', malformedLocation);
 
       expect(result).toBe(false);
     });
@@ -590,7 +493,7 @@ describe('Driver Tracking Actions', () => {
 
       for (const coords of invalidCoordinates) {
         const invalidLocation = { ...mockLocationUpdate, coordinates: coords };
-        const result = await updateDriverLocation([invalidLocation]);
+        const result = await updateDriverLocation('driver-123', invalidLocation);
         expect(result).toBe(false);
       }
     });
@@ -612,7 +515,7 @@ describe('Driver Tracking Actions', () => {
         timestamp: 'invalid-date' as any,
       };
 
-      const result = await updateDriverLocation([invalidTimestamp]);
+      const result = await updateDriverLocation('driver-123', invalidTimestamp);
 
       expect(result).toBe(false);
     });

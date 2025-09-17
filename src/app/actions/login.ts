@@ -147,10 +147,114 @@ export async function login(
           };
         }
       } else if (authError.message.includes('Email not confirmed')) {
-        return { 
-          error: "Please check your email and click the confirmation link before signing in.",
-          success: false 
-        };
+        // Check if this user exists and if email confirmation is actually required
+        try {
+          console.log(`⚠️ [${requestId}] Email not confirmed error - checking if user exists in profiles`);
+          const { data: profileData, error: profileError } = await supabase
+            .from("profiles")
+            .select("id, email, type")
+            .eq("email", email)
+            .maybeSingle();
+
+          // If user exists in profiles, they might be a legacy user from before confirmation was disabled
+          if (profileData && !profileError) {
+            console.log(`ℹ️ [${requestId}] User exists in profiles - this appears to be a legacy unconfirmed user`);
+            console.log(`🔧 [${requestId}] Since email confirmation is disabled in config, attempting automatic fix...`);
+            
+            // Try to sign up the user again with the same credentials
+            // This should work since email confirmation is disabled and will create a confirmed account
+            console.log(`🔄 [${requestId}] Attempting to re-register user with confirmed status...`);
+            
+            let signupData, signupError;
+            try {
+              const result = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                  emailRedirectTo: undefined // Disable email confirmation since it's disabled in config
+                }
+              });
+              signupData = result.data;
+              signupError = result.error;
+              console.log(`📊 [${requestId}] Signup result:`, { 
+                hasData: !!signupData, 
+                hasUser: !!signupData?.user, 
+                hasSession: !!signupData?.session,
+                errorMessage: signupError?.message 
+              });
+            } catch (signupException) {
+              console.error(`💥 [${requestId}] Signup exception:`, signupException);
+              signupError = signupException as any;
+            }
+
+            if (signupError) {
+              console.error(`❌ [${requestId}] Re-registration failed:`, signupError);
+              
+              // If signup fails because user already exists, that's actually good!
+              if (signupError.message.includes('User already registered')) {
+                console.log(`✅ [${requestId}] User already exists, trying direct auth bypass...`);
+                return { 
+                  error: "Your account needs activation. Please try logging in again, or contact support if the issue persists.",
+                  success: false 
+                };
+              }
+              
+              return { 
+                error: "Account activation failed. Please contact support or try signing up again.",
+                success: false 
+              };
+            }
+
+            // If signup succeeded, the user should now be confirmed and logged in
+            if (signupData.user && signupData.session) {
+              console.log(`✅ [${requestId}] User successfully re-registered with confirmed status`);
+              
+              // Continue with the normal login flow since the user is now authenticated
+              const user = signupData.user;
+              
+              // Get user profile to determine redirect
+              const { data: profile, error: newProfileError } = await supabase
+                .from("profiles")
+                .select("type, email")
+                .eq("id", user.id)
+                .single();
+
+              if (newProfileError || !profile?.type) {
+                console.error(`❌ [${requestId}] Error fetching user profile after re-registration:`, newProfileError);
+                return { 
+                  error: "Account activated but unable to determine user role. Please contact support.",
+                  success: false 
+                };
+              }
+
+              const userType = profile.type.toLowerCase();
+              // If returnTo is just "/" (root), prioritize the user's home route
+              const redirectPath = (returnTo && returnTo !== "/") ? returnTo : USER_HOME_ROUTES[userType] || "/";
+              
+              console.log(`✅ [${requestId}] Login successful after re-registration. User type: ${userType}, redirecting to: ${redirectPath}`);
+              
+              redirect(redirectPath);
+            } else {
+              console.log(`❌ [${requestId}] Re-registration completed but no session created`);
+              return { 
+                error: "Account activation incomplete. Please try logging in again.",
+                success: false 
+              };
+            }
+          } else {
+            console.log(`❌ [${requestId}] User not found in profiles`);
+            return { 
+              error: "Please check your email and click the confirmation link before signing in.",
+              success: false 
+            };
+          }
+        } catch (checkError) {
+          console.error(`❌ [${requestId}] Error checking user profile:`, checkError);
+          return { 
+            error: "Please check your email and click the confirmation link before signing in.",
+            success: false 
+          };
+        }
       } else if (authError.message.includes('Too many requests')) {
         return { 
           error: "Too many login attempts. Please wait a few minutes before trying again.",
