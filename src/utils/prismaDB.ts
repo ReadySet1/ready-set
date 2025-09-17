@@ -45,13 +45,6 @@ function createPrismaClient(): PrismaClient {
           url: process.env.DATABASE_URL
         }
       },
-      // Optimize for serverless environments
-      // @ts-ignore - This is a valid Prisma option for serverless
-      __internal: {
-        engine: {
-          closePromise: () => Promise.resolve(),
-        },
-      },
     });
   }
 
@@ -152,6 +145,32 @@ export async function checkDatabaseHealth(autoReconnect = true): Promise<boolean
   }
 }
 
+// Check if error is related to prepared statements
+function isPreparedStatementError(error: any): boolean {
+  return error?.code === '42P05' || // prepared statement already exists
+         error?.code === '26000' || // prepared statement does not exist
+         error?.message?.includes('prepared statement') ||
+         error?.message?.includes('already exists') ||
+         error?.message?.includes('does not exist');
+}
+
+// Reset Prisma connection to clear prepared statements
+export async function resetPrismaConnection(): Promise<void> {
+  try {
+    console.log('🔄 Resetting Prisma connection to clear prepared statements...');
+    await prisma.$disconnect();
+    // Force a longer delay to ensure connection is fully closed and prepared statements are cleared
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await prisma.$connect();
+    // Test the connection with a simple query
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('✅ Prisma connection reset successfully');
+  } catch (error) {
+    console.error('❌ Failed to reset Prisma connection:', error);
+    throw error;
+  }
+}
+
 // Wrapper function for database operations with automatic retry
 export async function withDatabaseRetry<T>(
   operation: () => Promise<T>,
@@ -166,15 +185,26 @@ export async function withDatabaseRetry<T>(
                                error?.message?.includes('Connection refused') ||
                                error?.message?.includes('Response from the Engine was empty');
       
-      if (isConnectionError && attempt <= maxRetries && isDevelopment) {
-        console.log(`🔄 Database connection error on attempt ${attempt}, retrying...`);
+      const isPreparedStmtError = isPreparedStatementError(error);
+      
+      if ((isConnectionError || isPreparedStmtError) && attempt <= maxRetries && isDevelopment) {
+        console.log(`🔄 Database ${isPreparedStmtError ? 'prepared statement' : 'connection'} error on attempt ${attempt}, retrying...`);
         
-        // Attempt to reconnect
-        try {
-          await disconnectPrisma();
-          await connectPrisma();
-        } catch (reconnectError) {
-          console.error('❌ Reconnection failed:', reconnectError);
+        // For prepared statement errors, reset the connection
+        if (isPreparedStmtError) {
+          try {
+            await resetPrismaConnection();
+          } catch (resetError) {
+            console.error('❌ Connection reset failed:', resetError);
+          }
+        } else {
+          // Attempt to reconnect for connection errors
+          try {
+            await disconnectPrisma();
+            await connectPrisma();
+          } catch (reconnectError) {
+            console.error('❌ Reconnection failed:', reconnectError);
+          }
         }
         
         // Wait before retry
