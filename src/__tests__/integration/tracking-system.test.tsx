@@ -89,65 +89,116 @@ describe("Tracking System Integration", () => {
   const mockDrivers = [
     {
       id: "driver-1",
-      name: "John Doe",
-      email: "john@example.com",
-      phone: "+1234567890",
-      status: "active",
-      currentLocation: {
-        lat: 40.7128,
-        lng: -74.006,
-        accuracy: 10,
-        timestamp: new Date(),
+      userId: "user-1",
+      employeeId: "EMP001",
+      vehicleNumber: "V001",
+      licenseNumber: "DL123456",
+      phoneNumber: "+1234567890",
+      isActive: true,
+      isOnDuty: true,
+      lastKnownLocation: {
+        coordinates: [-74.006, 40.7128] as [number, number], // [lng, lat]
       },
+      lastLocationUpdate: new Date(),
+      traccarDeviceId: 1,
       currentShift: {
         id: "shift-1",
+        driverId: "driver-1",
         startTime: new Date(Date.now() - 3600000), // 1 hour ago
-        status: "active",
+        startLocation: { lat: 40.7128, lng: -74.006 },
+        totalDistanceKm: 15.5,
+        deliveryCount: 2,
+        status: "active" as const,
+        breaks: [],
+        metadata: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
+      currentShiftId: "shift-1",
+      shiftStartTime: new Date(Date.now() - 3600000),
       vehicleInfo: {
         number: "V001",
         type: "van",
       },
+      deliveryCount: 2,
+      totalDistanceKm: 15.5,
+      activeDeliveries: 1,
+      metadata: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
     {
       id: "driver-2",
-      name: "Jane Smith",
-      email: "jane@example.com",
-      phone: "+0987654321",
-      status: "offline",
-      currentLocation: null,
-      currentShift: null,
+      userId: "user-2",
+      employeeId: "EMP002",
+      vehicleNumber: "V002",
+      licenseNumber: "DL789012",
+      phoneNumber: "+0987654321",
+      isActive: true,
+      isOnDuty: false,
+      lastKnownLocation: undefined,
+      lastLocationUpdate: undefined,
+      traccarDeviceId: 2,
+      currentShift: undefined,
+      currentShiftId: undefined,
+      shiftStartTime: undefined,
       vehicleInfo: {
         number: "V002",
         type: "car",
       },
+      deliveryCount: 0,
+      totalDistanceKm: 0,
+      activeDeliveries: 0,
+      metadata: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
   ];
 
   const mockDeliveries = [
     {
       id: "delivery-1",
+      cateringRequestId: "catering-1",
       driverId: "driver-1",
-      status: "ASSIGNED" as const,
-      pickupLocation: { coordinates: [-74.006, 40.7128] },
-      deliveryLocation: { coordinates: [-73.9851, 40.7589] },
+      status: DriverStatus.ASSIGNED,
+      pickupLocation: { coordinates: [-74.006, 40.7128] as [number, number] },
+      deliveryLocation: {
+        coordinates: [-73.9851, 40.7589] as [number, number],
+      },
       estimatedArrival: new Date(Date.now() + 3600000),
+      actualArrival: undefined,
       route: [],
+      proofOfDelivery: undefined,
+      actualDistanceKm: undefined,
+      routePolyline: undefined,
       metadata: { customerName: "Customer A" },
-      assignedAt: new Date(),
+      assignedAt: new Date(Date.now() - 1800000),
+      startedAt: undefined,
+      arrivedAt: undefined,
+      completedAt: undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
     },
     {
       id: "delivery-2",
+      onDemandId: "ondemand-1",
       driverId: "driver-1",
-      status: "EN_ROUTE_TO_CLIENT" as const,
-      pickupLocation: { coordinates: [-73.9851, 40.7589] },
-      deliveryLocation: { coordinates: [-73.9934, 40.7505] },
+      status: DriverStatus.EN_ROUTE_TO_CLIENT,
+      pickupLocation: { coordinates: [-73.9851, 40.7589] as [number, number] },
+      deliveryLocation: {
+        coordinates: [-73.9934, 40.7505] as [number, number],
+      },
       estimatedArrival: new Date(Date.now() + 1800000),
+      actualArrival: undefined,
       route: [],
+      proofOfDelivery: undefined,
+      actualDistanceKm: undefined,
+      routePolyline: undefined,
       metadata: { customerName: "Customer B" },
-      assignedAt: new Date(),
+      assignedAt: new Date(Date.now() - 900000),
+      startedAt: new Date(Date.now() - 600000),
+      arrivedAt: undefined,
+      completedAt: undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
     },
@@ -328,11 +379,13 @@ describe("Tracking System Integration", () => {
 
       // Mock active deliveries
       mockUseDriverDeliveries.mockReturnValue({
-        activeDeliveries: [mockDeliveries[1]], // in_transit delivery
+        activeDeliveries: mockDeliveries.filter(
+          (d) => d.status === DriverStatus.EN_ROUTE_TO_CLIENT,
+        ),
         updateDeliveryStatus: mockUpdateDeliveryStatus,
         loading: false,
         error: null,
-        refreshShift: jest.fn(),
+        refreshDeliveries: jest.fn(),
       });
 
       render(<DriverTrackingPortal />);
@@ -419,12 +472,11 @@ describe("Tracking System Integration", () => {
       const mockRefreshData = jest.fn();
       mockUseRealTimeTracking.mockReturnValue({
         activeDrivers: mockDrivers,
-        deliveries: mockDeliveries,
-        loading: false,
+        recentLocations: [],
+        activeDeliveries: mockDeliveries,
         error: null,
-        refreshData: mockRefreshData,
+        reconnect: mockRefreshData,
         isConnected: true,
-        lastUpdate: new Date(),
       });
 
       render(<AdminTrackingDashboard />);
@@ -454,12 +506,11 @@ describe("Tracking System Integration", () => {
       const mockRefreshData = jest.fn();
       mockUseRealTimeTracking.mockReturnValue({
         activeDrivers: [],
-        deliveries: [],
-        loading: false,
+        recentLocations: [],
+        activeDeliveries: [],
         error: "Connection lost",
-        refreshData: mockRefreshData,
+        reconnect: mockRefreshData,
         isConnected: false,
-        lastUpdate: new Date(),
       });
 
       render(<AdminTrackingDashboard />);
@@ -503,10 +554,15 @@ describe("Tracking System Integration", () => {
 
       // Mock coming back online
       mockUseOfflineQueue.mockReturnValue({
-        offlineStatus: { isOnline: true, lastSync: new Date() },
-        queuedItems: [],
-        syncOfflineData: mockSyncOfflineData,
-        addToQueue: mockAddToQueue,
+        offlineStatus: {
+          isOnline: true,
+          lastSync: new Date(),
+          pendingUpdates: 0,
+          syncInProgress: false,
+        },
+        queuedItems: 0,
+        registerServiceWorker: jest.fn(),
+        syncPendingItems: mockSyncOfflineData,
       });
 
       // Re-render to show online status
@@ -565,12 +621,11 @@ describe("Tracking System Integration", () => {
       const mockRefreshData = jest.fn();
       mockUseRealTimeTracking.mockReturnValue({
         activeDrivers: mockDrivers,
-        deliveries: mockDeliveries,
-        loading: false,
+        recentLocations: [],
+        activeDeliveries: mockDeliveries,
         error: null,
-        refreshData: mockRefreshData,
+        reconnect: mockRefreshData,
         isConnected: true,
-        lastUpdate: new Date(),
       });
 
       render(<AdminTrackingDashboard />);
@@ -611,6 +666,7 @@ describe("Tracking System Integration", () => {
         endBreak: jest.fn(),
         loading: false,
         error: "Failed to start shift",
+        refreshShift: jest.fn(),
       });
 
       render(<DriverTrackingPortal />);
@@ -620,12 +676,13 @@ describe("Tracking System Integration", () => {
 
     it("handles delivery update errors", async () => {
       mockUseDriverDeliveries.mockReturnValue({
-        activeDeliveries: [mockDeliveries[1]],
+        activeDeliveries: mockDeliveries.slice(0, 1),
         updateDeliveryStatus: jest
           .fn()
           .mockRejectedValue(new Error("Update failed")),
         loading: false,
         error: "Failed to update delivery",
+        refreshDeliveries: jest.fn(),
       });
 
       render(<DriverTrackingPortal />);
@@ -640,35 +697,103 @@ describe("Tracking System Integration", () => {
     it("handles large numbers of drivers and deliveries efficiently", () => {
       const largeDrivers = Array.from({ length: 100 }, (_, i) => ({
         id: `driver-${i}`,
-        name: `Driver ${i}`,
-        email: `driver${i}@example.com`,
-        status: i % 2 === 0 ? "active" : "offline",
-        currentLocation: i % 2 === 0 ? { lat: 40.7128, lng: -74.006 } : null,
+        userId: `user-${i}`,
+        employeeId: `EMP${i.toString().padStart(3, "0")}`,
+        vehicleNumber: `V${i.toString().padStart(3, "0")}`,
+        licenseNumber: `DL${i}${i}${i}${i}${i}${i}`,
+        phoneNumber: `+123456${i.toString().padStart(4, "0")}`,
+        isActive: true,
+        isOnDuty: i % 2 === 0,
+        lastKnownLocation:
+          i % 2 === 0
+            ? {
+                coordinates: [-74.006 + i * 0.001, 40.7128 + i * 0.001] as [
+                  number,
+                  number,
+                ],
+              }
+            : undefined,
+        lastLocationUpdate: i % 2 === 0 ? new Date() : undefined,
+        traccarDeviceId: i,
         currentShift:
           i % 2 === 0
-            ? { id: `shift-${i}`, startTime: new Date(), status: "active" }
-            : null,
+            ? {
+                id: `shift-${i}`,
+                driverId: `driver-${i}`,
+                startTime: new Date(Date.now() - 3600000),
+                startLocation: { lat: 40.7128, lng: -74.006 },
+                totalDistanceKm: Math.random() * 50,
+                deliveryCount: Math.floor(Math.random() * 10),
+                status: "active" as const,
+                breaks: [],
+                metadata: {},
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              }
+            : undefined,
+        currentShiftId: i % 2 === 0 ? `shift-${i}` : undefined,
+        shiftStartTime:
+          i % 2 === 0 ? new Date(Date.now() - 3600000) : undefined,
+        vehicleInfo: {
+          number: `V${i.toString().padStart(3, "0")}`,
+          type: i % 3 === 0 ? "van" : i % 3 === 1 ? "car" : "truck",
+        },
+        deliveryCount: Math.floor(Math.random() * 10),
+        totalDistanceKm: Math.random() * 100,
+        activeDeliveries: Math.floor(Math.random() * 3),
+        metadata: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
       }));
 
       const largeDeliveries = Array.from({ length: 50 }, (_, i) => ({
         id: `delivery-${i}`,
+        cateringRequestId: i % 2 === 0 ? `catering-${i}` : undefined,
+        onDemandId: i % 2 === 1 ? `ondemand-${i}` : undefined,
+        driverId: i % 2 === 0 ? `driver-${i}` : `driver-${Math.floor(i / 2)}`,
         status:
-          i % 3 === 0 ? "pending" : i % 3 === 1 ? "in_transit" : "completed",
-        pickupLocation: { lat: 40.7128, lng: -74.006 },
-        deliveryLocation: { lat: 40.7589, lng: -73.9851 },
-        estimatedArrival: new Date(Date.now() + 3600000),
-        driverId: i % 2 === 0 ? `driver-${i}` : null,
-        customerName: `Customer ${i}`,
+          i % 3 === 0
+            ? DriverStatus.ASSIGNED
+            : i % 3 === 1
+              ? DriverStatus.EN_ROUTE_TO_CLIENT
+              : DriverStatus.COMPLETED,
+        pickupLocation: {
+          coordinates: [-74.006 + i * 0.001, 40.7128 + i * 0.001] as [
+            number,
+            number,
+          ],
+        },
+        deliveryLocation: {
+          coordinates: [-73.9851 + i * 0.001, 40.7589 + i * 0.001] as [
+            number,
+            number,
+          ],
+        },
+        estimatedArrival: new Date(Date.now() + 3600000 + i * 60000),
+        actualArrival: i % 3 === 2 ? new Date(Date.now() - 3600000) : undefined,
+        route: [],
+        proofOfDelivery: i % 3 === 2 ? `proof-${i}` : undefined,
+        actualDistanceKm: i % 3 === 2 ? Math.random() * 20 : undefined,
+        routePolyline: undefined,
+        metadata: { customerName: `Customer ${i}` },
+        assignedAt: new Date(Date.now() - 7200000 + i * 120000),
+        startedAt:
+          i % 3 !== 0 ? new Date(Date.now() - 3600000 + i * 60000) : undefined,
+        arrivedAt:
+          i % 3 === 2 ? new Date(Date.now() - 1800000 + i * 30000) : undefined,
+        completedAt:
+          i % 3 === 2 ? new Date(Date.now() - 900000 + i * 15000) : undefined,
+        createdAt: new Date(Date.now() - 86400000 + i * 1800000),
+        updatedAt: new Date(Date.now() - 3600000 + i * 60000),
       }));
 
       mockUseRealTimeTracking.mockReturnValue({
         activeDrivers: largeDrivers,
-        deliveries: largeDeliveries,
-        loading: false,
+        recentLocations: [],
+        activeDeliveries: largeDeliveries,
         error: null,
-        refreshData: jest.fn(),
+        reconnect: jest.fn(),
         isConnected: true,
-        lastUpdate: new Date(),
       });
 
       render(<AdminTrackingDashboard />);

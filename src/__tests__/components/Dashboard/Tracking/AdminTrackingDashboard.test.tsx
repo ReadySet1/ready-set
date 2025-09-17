@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AdminTrackingDashboard from "@/components/Dashboard/Tracking/AdminTrackingDashboard";
 import { useRealTimeTracking } from "@/hooks/tracking/useRealTimeTracking";
+import { DriverStatus } from "@/types/user";
 
 // Mock the tracking hook
 jest.mock("@/hooks/tracking/useRealTimeTracking");
@@ -67,59 +68,122 @@ describe("AdminTrackingDashboard", () => {
   const mockDrivers = [
     {
       id: "driver-1",
-      name: "John Doe",
-      email: "john@example.com",
-      phone: "+1234567890",
-      status: "active",
-      currentLocation: {
-        lat: 40.7128,
-        lng: -74.006,
-        accuracy: 10,
-        timestamp: new Date(),
+      userId: "user-1",
+      employeeId: "EMP001",
+      vehicleNumber: "V001",
+      licenseNumber: "DL123456",
+      phoneNumber: "+1234567890",
+      isActive: true,
+      isOnDuty: true,
+      lastKnownLocation: {
+        coordinates: [-74.006, 40.7128] as [number, number], // [lng, lat]
       },
+      lastLocationUpdate: new Date(),
+      traccarDeviceId: 1,
       currentShift: {
         id: "shift-1",
+        driverId: "driver-1",
         startTime: new Date(Date.now() - 3600000), // 1 hour ago
-        status: "active",
+        startLocation: { lat: 40.7128, lng: -74.006 },
+        totalDistanceKm: 15.5,
+        deliveryCount: 2,
+        status: "active" as const,
+        breaks: [],
+        metadata: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
+      currentShiftId: "shift-1",
+      shiftStartTime: new Date(Date.now() - 3600000),
       vehicleInfo: {
         number: "V001",
         type: "van",
       },
+      deliveryCount: 2,
+      totalDistanceKm: 15.5,
+      activeDeliveries: 1,
+      metadata: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
     {
       id: "driver-2",
-      name: "Jane Smith",
-      email: "jane@example.com",
-      phone: "+0987654321",
-      status: "offline",
-      currentLocation: null,
-      currentShift: null,
+      userId: "user-2",
+      employeeId: "EMP002",
+      vehicleNumber: "V002",
+      licenseNumber: "DL789012",
+      phoneNumber: "+0987654321",
+      isActive: true,
+      isOnDuty: false,
+      lastKnownLocation: undefined,
+      lastLocationUpdate: undefined,
+      traccarDeviceId: 2,
+      currentShift: undefined,
+      currentShiftId: undefined,
+      shiftStartTime: undefined,
       vehicleInfo: {
         number: "V002",
         type: "car",
       },
+      deliveryCount: 0,
+      totalDistanceKm: 0,
+      activeDeliveries: 0,
+      metadata: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
   ];
 
   const mockDeliveries = [
     {
       id: "delivery-1",
-      status: "pending",
-      pickupLocation: { lat: 40.7128, lng: -74.006 },
-      deliveryLocation: { lat: 40.7589, lng: -73.9851 },
+      cateringRequestId: "catering-1",
+      driverId: "driver-1",
+      status: DriverStatus.ASSIGNED,
+      pickupLocation: {
+        coordinates: [-74.006, 40.7128] as [number, number], // [lng, lat]
+      },
+      deliveryLocation: {
+        coordinates: [-73.9851, 40.7589] as [number, number], // [lng, lat]
+      },
       estimatedArrival: new Date(Date.now() + 3600000),
-      driverId: null,
-      customerName: "Customer A",
+      actualArrival: undefined,
+      route: [],
+      proofOfDelivery: undefined,
+      actualDistanceKm: undefined,
+      routePolyline: undefined,
+      metadata: { customerName: "Customer A" },
+      assignedAt: new Date(Date.now() - 1800000),
+      startedAt: undefined,
+      arrivedAt: undefined,
+      completedAt: undefined,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
     {
       id: "delivery-2",
-      status: "in_transit",
-      pickupLocation: { lat: 40.7589, lng: -73.9851 },
-      deliveryLocation: { lat: 40.7505, lng: -73.9934 },
-      estimatedArrival: new Date(Date.now() + 1800000),
+      onDemandId: "ondemand-1",
       driverId: "driver-1",
-      customerName: "Customer B",
+      status: DriverStatus.EN_ROUTE_TO_CLIENT,
+      pickupLocation: {
+        coordinates: [-73.9851, 40.7589] as [number, number], // [lng, lat]
+      },
+      deliveryLocation: {
+        coordinates: [-73.9934, 40.7505] as [number, number], // [lng, lat]
+      },
+      estimatedArrival: new Date(Date.now() + 1800000),
+      actualArrival: undefined,
+      route: [],
+      proofOfDelivery: undefined,
+      actualDistanceKm: undefined,
+      routePolyline: undefined,
+      metadata: { customerName: "Customer B" },
+      assignedAt: new Date(Date.now() - 900000),
+      startedAt: new Date(Date.now() - 600000),
+      arrivedAt: undefined,
+      completedAt: undefined,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
   ];
 
@@ -254,7 +318,7 @@ describe("AdminTrackingDashboard", () => {
   it("shows active drivers count", () => {
     render(<AdminTrackingDashboard />);
     const activeDrivers = mockDrivers.filter(
-      (d) => d.status === "active",
+      (d) => d.isActive && d.isOnDuty,
     ).length;
     expect(
       screen.getByText(new RegExp(`${activeDrivers} Active`, "i")),
@@ -263,9 +327,7 @@ describe("AdminTrackingDashboard", () => {
 
   it("shows offline drivers count", () => {
     render(<AdminTrackingDashboard />);
-    const offlineDrivers = mockDrivers.filter(
-      (d) => d.status === "offline",
-    ).length;
+    const offlineDrivers = mockDrivers.filter((d) => !d.isOnDuty).length;
     expect(
       screen.getByText(new RegExp(`${offlineDrivers} Offline`, "i")),
     ).toBeInTheDocument();
@@ -274,7 +336,7 @@ describe("AdminTrackingDashboard", () => {
   it("displays pending deliveries count", () => {
     render(<AdminTrackingDashboard />);
     const pendingDeliveries = mockDeliveries.filter(
-      (d) => d.status === "pending",
+      (d) => d.status === DriverStatus.ASSIGNED,
     ).length;
     expect(
       screen.getByText(new RegExp(`${pendingDeliveries} Pending`, "i")),
@@ -284,7 +346,7 @@ describe("AdminTrackingDashboard", () => {
   it("displays in-transit deliveries count", () => {
     render(<AdminTrackingDashboard />);
     const inTransitDeliveries = mockDeliveries.filter(
-      (d) => d.status === "in_transit",
+      (d) => d.status === DriverStatus.EN_ROUTE_TO_CLIENT,
     ).length;
     expect(
       screen.getByText(new RegExp(`${inTransitDeliveries} In Transit`, "i")),
@@ -314,6 +376,7 @@ describe("AdminTrackingDashboard", () => {
   it("displays empty state when no drivers", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
+      recentLocations: [],
       activeDeliveries: mockDeliveries,
       error: null,
       reconnect: jest.fn(),
@@ -341,6 +404,7 @@ describe("AdminTrackingDashboard", () => {
   it("shows connection retry button when disconnected", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
+      recentLocations: [],
       activeDeliveries: [],
       error: "Connection lost",
       reconnect: jest.fn(),
@@ -357,6 +421,7 @@ describe("AdminTrackingDashboard", () => {
     const mockRefreshData = jest.fn();
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
+      recentLocations: [],
       activeDeliveries: [],
       error: "Connection lost",
       reconnect: mockRefreshData,

@@ -83,10 +83,10 @@ describe("DriverTrackingPortal", () => {
     driverId: "driver-123",
     status: "ARRIVED_AT_VENDOR" as DriverStatus, // Use valid DriverStatus enum value
     pickupLocation: {
-      coordinates: [-74.006, 40.7128], // [lng, lat] format
+      coordinates: [-74.006, 40.7128] as [number, number], // [lng, lat] format
     },
     deliveryLocation: {
-      coordinates: [-73.9851, 40.7589], // [lng, lat] format
+      coordinates: [-73.9851, 40.7589] as [number, number], // [lng, lat] format
     },
     estimatedArrival: new Date(Date.now() + 3600000),
     route: [],
@@ -390,8 +390,8 @@ describe("DriverTrackingPortal", () => {
         syncInProgress: false,
       },
       queuedItems: 2,
-      syncOfflineData: jest.fn(),
-      addToQueue: jest.fn(),
+      registerServiceWorker: jest.fn(),
+      syncPendingItems: jest.fn(),
     });
 
     render(<DriverTrackingPortal />);

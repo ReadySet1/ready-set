@@ -206,7 +206,7 @@ export async function login(
             }
 
             // If signup succeeded, the user should now be confirmed and logged in
-            if (signupData.user && signupData.session) {
+            if (signupData && signupData.user && signupData.session) {
               console.log(`✅ [${requestId}] User successfully re-registered with confirmed status`);
               
               // Continue with the normal login flow since the user is now authenticated
