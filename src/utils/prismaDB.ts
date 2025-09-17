@@ -51,10 +51,18 @@ function createPrismaClient(): PrismaClient {
   // Development environment - full logging with connection stability
   console.log('🔧 Development environment - debug client');
   
-  // Modify database URL to disable prepared statements in development
-  const devDatabaseUrl = process.env.DATABASE_URL + (
-    process.env.DATABASE_URL?.includes('?') ? '&' : '?'
-  ) + 'statement_cache_size=0&prepared_statements=false';
+  // Modify database URL to disable prepared statements and improve connection stability in development
+  const baseUrl = process.env.DATABASE_URL || '';
+  const hasParams = baseUrl.includes('?');
+  const devParams = [
+    'statement_cache_size=0',
+    'prepared_statements=false',
+    'connection_limit=10',
+    'pool_timeout=60',
+    'pgbouncer=true'
+  ].join('&');
+  
+  const devDatabaseUrl = baseUrl + (hasParams ? '&' : '?') + devParams;
   
   return new PrismaClient({
     log: ['query', 'info', 'warn', 'error'],
@@ -65,9 +73,11 @@ function createPrismaClient(): PrismaClient {
     },
     // Add connection stability for development
     transactionOptions: {
-      maxWait: 60000, // 1 minute
-      timeout: 30000, // 30 seconds
-    }
+      maxWait: 30000, // 30 seconds
+      timeout: 20000, // 20 seconds
+    },
+    // Reduce query engine restarts
+    errorFormat: 'minimal'
   });
 }
 
@@ -168,8 +178,10 @@ export async function resetPrismaConnection(): Promise<void> {
   // If already resetting, wait for it to complete
   if (isResettingConnection) {
     console.log('⏳ Connection reset already in progress, waiting...');
-    while (isResettingConnection) {
+    let waitCount = 0;
+    while (isResettingConnection && waitCount < 100) { // Max 10 seconds wait
       await new Promise(resolve => setTimeout(resolve, 100));
+      waitCount++;
     }
     return;
   }
@@ -180,23 +192,43 @@ export async function resetPrismaConnection(): Promise<void> {
     
     // In development, recreate the global client to clear all state
     if (isDevelopment && global.__prisma) {
-      await global.__prisma.$disconnect();
+      try {
+        await global.__prisma.$disconnect();
+      } catch (disconnectError) {
+        console.warn('⚠️ Error during disconnect, continuing with reset:', disconnectError);
+      }
+      
       global.__prisma = undefined;
       console.log('🔄 Cleared global Prisma client in development');
       
-      // Wait a bit longer for the connection to fully close
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for the connection to fully close
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Recreate the client
       global.__prisma = createPrismaClient();
-      await global.__prisma.$connect();
       
-      // Test the new connection
-      await global.__prisma.$queryRaw`SELECT 1`;
+      // Test the new connection with retry
+      let testRetries = 3;
+      while (testRetries > 0) {
+        try {
+          await global.__prisma.$queryRaw`SELECT 1`;
+          break;
+        } catch (testError) {
+          testRetries--;
+          if (testRetries === 0) throw testError;
+          console.log(`🔄 Connection test failed, retrying... (${testRetries} attempts left)`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
     } else {
       // For production, just disconnect and reconnect
-      await prisma.$disconnect();
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      try {
+        await prisma.$disconnect();
+      } catch (disconnectError) {
+        console.warn('⚠️ Error during disconnect, continuing with reset:', disconnectError);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
       await prisma.$connect();
       await prisma.$queryRaw`SELECT 1`;
     }
@@ -204,7 +236,7 @@ export async function resetPrismaConnection(): Promise<void> {
     console.log('✅ Prisma connection reset successfully');
   } catch (error) {
     console.error('❌ Failed to reset Prisma connection:', error);
-    throw error;
+    // Don't throw here to prevent cascade failures
   } finally {
     isResettingConnection = false;
   }

@@ -175,93 +175,65 @@ async function getClientDashboardData(
     )
     .slice(0, 3);
 
-  // Get stats with database retry logic to handle prepared statement errors
-  const [
-    activeCateringCount,
-    activeOnDemandCount,
-    completedCateringCount,
-    completedOnDemandCount,
-    savedLocationsCount,
-  ] = await withDatabaseRetry(
+  // Get stats with simplified retry logic to avoid nested retries
+  const stats = await withDatabaseRetry(
     async () => {
-      // Execute count queries individually to avoid prepared statement conflicts
-      const results = await Promise.allSettled([
-        withDatabaseRetry(
-          async () =>
-            prisma.cateringRequest.count({
-              where: {
-                userId,
-                status: {
-                  in: [CateringStatus.ACTIVE, CateringStatus.ASSIGNED],
-                },
-                deletedAt: null,
-              },
-            }),
-          2,
-          "activeCateringCount",
-        ),
+      // Execute all count queries in parallel without nested retries
+      const [
+        activeCateringCount,
+        activeOnDemandCount,
+        completedCateringCount,
+        completedOnDemandCount,
+        savedLocationsCount,
+      ] = await Promise.all([
+        prisma.cateringRequest.count({
+          where: {
+            userId,
+            status: {
+              in: [CateringStatus.ACTIVE, CateringStatus.ASSIGNED],
+            },
+            deletedAt: null,
+          },
+        }),
 
-        withDatabaseRetry(
-          async () =>
-            prisma.onDemand.count({
-              where: {
-                userId,
-                status: {
-                  in: [OnDemandStatus.ACTIVE, OnDemandStatus.ASSIGNED],
-                },
-                deletedAt: null,
-              },
-            }),
-          2,
-          "activeOnDemandCount",
-        ),
+        prisma.onDemand.count({
+          where: {
+            userId,
+            status: {
+              in: [OnDemandStatus.ACTIVE, OnDemandStatus.ASSIGNED],
+            },
+            deletedAt: null,
+          },
+        }),
 
-        withDatabaseRetry(
-          async () =>
-            prisma.cateringRequest.count({
-              where: {
-                userId,
-                status: CateringStatus.COMPLETED,
-                deletedAt: null,
-              },
-            }),
-          2,
-          "completedCateringCount",
-        ),
+        prisma.cateringRequest.count({
+          where: {
+            userId,
+            status: CateringStatus.COMPLETED,
+            deletedAt: null,
+          },
+        }),
 
-        withDatabaseRetry(
-          async () =>
-            prisma.onDemand.count({
-              where: {
-                userId,
-                status: OnDemandStatus.COMPLETED,
-                deletedAt: null,
-              },
-            }),
-          2,
-          "completedOnDemandCount",
-        ),
+        prisma.onDemand.count({
+          where: {
+            userId,
+            status: OnDemandStatus.COMPLETED,
+            deletedAt: null,
+          },
+        }),
 
-        withDatabaseRetry(
-          async () =>
-            prisma.userAddress.count({
-              where: { userId },
-            }),
-          2,
-          "savedLocationsCount",
-        ),
+        prisma.userAddress.count({
+          where: { userId },
+        }),
       ]);
 
-      // Check if any queries failed
-      const values = results.map((result, index) => {
-        if (result.status === "rejected") {
-          console.error(`Query ${index} failed:`, result.reason);
-          return 0; // Return 0 as fallback for failed count queries
-        }
-        return result.value;
-      });
-
-      return values;
+      return {
+        activeCateringCount,
+        activeOnDemandCount,
+        completedCateringCount,
+        completedOnDemandCount,
+        savedLocationsCount,
+      };
     },
     3,
     "client dashboard stats",
@@ -270,9 +242,12 @@ async function getClientDashboardData(
   return {
     recentOrders: combinedOrders,
     stats: {
-      activeOrders: activeCateringCount + activeOnDemandCount,
-      completedOrders: completedCateringCount + completedOnDemandCount,
-      savedLocations: savedLocationsCount,
+      activeOrders:
+        (stats.activeCateringCount ?? 0) + (stats.activeOnDemandCount ?? 0),
+      completedOrders:
+        (stats.completedCateringCount ?? 0) +
+        (stats.completedOnDemandCount ?? 0),
+      savedLocations: stats.savedLocationsCount ?? 0,
     },
   };
 }
