@@ -132,30 +132,106 @@ export async function getUserOrders(limit = 10, page = 1) {
     // Fetch more records than needed to properly sort and paginate
     const fetchLimit = Math.max(limit * 10, 50); // Fetch more to ensure proper sorting
 
-    // Fetch catering requests
-    const cateringRequests = await prisma.cateringRequest.findMany({
+    // Fetch catering requests with database retry to handle connection issues
+    const cateringRequests = await withDatabaseRetry(async () => {
+      return await prisma.cateringRequest.findMany({
       where: {
         userId: userId
       },
       include: {
-        pickupAddress: true,
-        deliveryAddress: true,
+        pickupAddress: {
+          select: {
+            id: true,
+            name: true,
+            street1: true,
+            street2: true,
+            city: true,
+            state: true,
+            zip: true,
+            county: true,
+            isRestaurant: true,
+            isShared: true,
+            locationNumber: true,
+            parkingLoading: true,
+            latitude: true,
+            longitude: true,
+            // Exclude createdAt, updatedAt, deletedAt to avoid conversion issues
+          }
+        },
+        deliveryAddress: {
+          select: {
+            id: true,
+            name: true,
+            street1: true,
+            street2: true,
+            city: true,
+            state: true,
+            zip: true,
+            county: true,
+            isRestaurant: true,
+            isShared: true,
+            locationNumber: true,
+            parkingLoading: true,
+            latitude: true,
+            longitude: true,
+            // Exclude createdAt, updatedAt, deletedAt to avoid conversion issues
+          }
+        },
       },
       orderBy: { pickupDateTime: 'desc' },
       take: fetchLimit
+      });
     });
 
-    // Fetch on-demand requests
-    const onDemandRequests = await prisma.onDemand.findMany({
+    // Fetch on-demand requests with database retry to handle connection issues
+    const onDemandRequests = await withDatabaseRetry(async () => {
+      return await prisma.onDemand.findMany({
       where: {
         userId: userId
       },
       include: {
-        pickupAddress: true,
-        deliveryAddress: true,
+        pickupAddress: {
+          select: {
+            id: true,
+            name: true,
+            street1: true,
+            street2: true,
+            city: true,
+            state: true,
+            zip: true,
+            county: true,
+            isRestaurant: true,
+            isShared: true,
+            locationNumber: true,
+            parkingLoading: true,
+            latitude: true,
+            longitude: true,
+            // Exclude createdAt, updatedAt, deletedAt to avoid conversion issues
+          }
+        },
+        deliveryAddress: {
+          select: {
+            id: true,
+            name: true,
+            street1: true,
+            street2: true,
+            city: true,
+            state: true,
+            zip: true,
+            county: true,
+            isRestaurant: true,
+            isShared: true,
+            locationNumber: true,
+            parkingLoading: true,
+            latitude: true,
+            longitude: true,
+            // Exclude createdAt, updatedAt, deletedAt to avoid conversion issues
+          }
+        },
       },
       orderBy: { pickupDateTime: 'desc' },
       take: fetchLimit
+      });
     });
 
     // Transform the data to a unified format

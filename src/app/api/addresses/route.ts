@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma-client";
+import { withDatabaseRetry } from "@/utils/prismaDB";
 import { AddressFormData } from "@/types/address";
 import { createClient } from "@/utils/supabase/server";
 
@@ -107,26 +108,28 @@ export async function GET(request: NextRequest) {
 
     // If requesting a specific address by ID
     if (id) {
-      const address = await prisma.address.findUnique({
-        where: { id },
-        // Optimize query by selecting only needed fields
-        select: {
-          id: true,
-          name: true,
-          street1: true,
-          street2: true,
-          city: true,
-          state: true,
-          zip: true,
-          county: true,
-          isRestaurant: true,
-          isShared: true,
-          locationNumber: true,
-          parkingLoading: true,
-          createdAt: true,
-          createdBy: true,
-          updatedAt: true,
-        },
+      const address = await withDatabaseRetry(async () => {
+        return await prisma.address.findUnique({
+          where: { id },
+          // Optimize query by selecting only needed fields
+          select: {
+            id: true,
+            name: true,
+            street1: true,
+            street2: true,
+            city: true,
+            state: true,
+            zip: true,
+            county: true,
+            isRestaurant: true,
+            isShared: true,
+            locationNumber: true,
+            parkingLoading: true,
+            createdAt: true,
+            createdBy: true,
+            updatedAt: true,
+          },
+        });
       });
 
       // Check if address exists
@@ -208,11 +211,13 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // Execute the query with pagination using Promise.all for parallel execution
-    const [addresses, totalCount] = await Promise.all([
-      prisma.address.findMany(addressesQuery),
-      prisma.address.count({ where: addressesQuery.where }),
-    ]);
+    // Execute the query with pagination using withDatabaseRetry to handle prepared statement conflicts
+    const [addresses, totalCount] = await withDatabaseRetry(async () => {
+      return await Promise.all([
+        prisma.address.findMany(addressesQuery),
+        prisma.address.count({ where: addressesQuery.where }),
+      ]);
+    });
 
     // Calculate pagination info
     const totalPages = Math.ceil(totalCount / limit);
@@ -320,8 +325,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use database transaction to ensure data consistency
-    const result = await prisma.$transaction(async (tx) => {
+    // Use database transaction with retry mechanism to ensure data consistency
+    const result = await withDatabaseRetry(async () => {
+      return await prisma.$transaction(async (tx) => {
       // Create a new address
       const newAddress = {
         ...formData,
@@ -367,6 +373,7 @@ export async function POST(request: NextRequest) {
       }
 
       return createdAddress;
+      });
     });
 
     console.log("POST /api/addresses: Transaction completed successfully:", { 

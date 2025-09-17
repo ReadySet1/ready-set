@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { CateringNeedHost } from "@/types/order";
 import { localTimeToUtc } from "@/lib/utils/timezone";
+import { randomUUID } from "crypto";
 
 // Validates and processes a catering request submission
 export async function POST(request: NextRequest) {
@@ -136,6 +137,7 @@ export async function POST(request: NextRequest) {
     // Create catering request in the database
     const cateringRequest = await prisma.cateringRequest.create({
       data: {
+        id: randomUUID(), // Explicitly generate UUID to fix null constraint violation
         userId,
         brokerage: data.brokerage,
         orderNumber: data.orderNumber,
