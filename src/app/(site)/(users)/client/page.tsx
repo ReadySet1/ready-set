@@ -182,41 +182,90 @@ async function getClientDashboardData(
     completedCateringCount,
     completedOnDemandCount,
     savedLocationsCount,
-  ] = await withDatabaseRetry(async () => {
-    return Promise.all([
-      prisma.cateringRequest.count({
-        where: {
-          userId,
-          status: { in: [CateringStatus.ACTIVE, CateringStatus.ASSIGNED] },
-          deletedAt: null,
-        },
-      }),
-      prisma.onDemand.count({
-        where: {
-          userId,
-          status: { in: [OnDemandStatus.ACTIVE, OnDemandStatus.ASSIGNED] },
-          deletedAt: null,
-        },
-      }),
-      prisma.cateringRequest.count({
-        where: {
-          userId,
-          status: CateringStatus.COMPLETED,
-          deletedAt: null,
-        },
-      }),
-      prisma.onDemand.count({
-        where: {
-          userId,
-          status: OnDemandStatus.COMPLETED,
-          deletedAt: null,
-        },
-      }),
-      prisma.userAddress.count({
-        where: { userId },
-      }),
-    ]);
-  });
+  ] = await withDatabaseRetry(
+    async () => {
+      // Execute count queries individually to avoid prepared statement conflicts
+      const results = await Promise.allSettled([
+        withDatabaseRetry(
+          async () =>
+            prisma.cateringRequest.count({
+              where: {
+                userId,
+                status: {
+                  in: [CateringStatus.ACTIVE, CateringStatus.ASSIGNED],
+                },
+                deletedAt: null,
+              },
+            }),
+          2,
+          "activeCateringCount",
+        ),
+
+        withDatabaseRetry(
+          async () =>
+            prisma.onDemand.count({
+              where: {
+                userId,
+                status: {
+                  in: [OnDemandStatus.ACTIVE, OnDemandStatus.ASSIGNED],
+                },
+                deletedAt: null,
+              },
+            }),
+          2,
+          "activeOnDemandCount",
+        ),
+
+        withDatabaseRetry(
+          async () =>
+            prisma.cateringRequest.count({
+              where: {
+                userId,
+                status: CateringStatus.COMPLETED,
+                deletedAt: null,
+              },
+            }),
+          2,
+          "completedCateringCount",
+        ),
+
+        withDatabaseRetry(
+          async () =>
+            prisma.onDemand.count({
+              where: {
+                userId,
+                status: OnDemandStatus.COMPLETED,
+                deletedAt: null,
+              },
+            }),
+          2,
+          "completedOnDemandCount",
+        ),
+
+        withDatabaseRetry(
+          async () =>
+            prisma.userAddress.count({
+              where: { userId },
+            }),
+          2,
+          "savedLocationsCount",
+        ),
+      ]);
+
+      // Check if any queries failed
+      const values = results.map((result, index) => {
+        if (result.status === "rejected") {
+          console.error(`Query ${index} failed:`, result.reason);
+          return 0; // Return 0 as fallback for failed count queries
+        }
+        return result.value;
+      });
+
+      return values;
+    },
+    3,
+    "client dashboard stats",
+  );
 
   return {
     recentOrders: combinedOrders,

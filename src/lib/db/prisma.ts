@@ -1,2 +1,2 @@
-// Re-export the unified Prisma client
-export { prisma, default } from '@/utils/prismaDB'; 
+// Re-export the unified Prisma client and utilities
+export { prisma, default, withDatabaseRetry } from '@/utils/prismaDB'; 

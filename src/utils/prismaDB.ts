@@ -50,18 +50,24 @@ function createPrismaClient(): PrismaClient {
 
   // Development environment - full logging with connection stability
   console.log('🔧 Development environment - debug client');
+  
+  // Modify database URL to disable prepared statements in development
+  const devDatabaseUrl = process.env.DATABASE_URL + (
+    process.env.DATABASE_URL?.includes('?') ? '&' : '?'
+  ) + 'statement_cache_size=0&prepared_statements=false';
+  
   return new PrismaClient({
     log: ['query', 'info', 'warn', 'error'],
     datasources: {
       db: {
-        url: process.env.DATABASE_URL
+        url: devDatabaseUrl
       }
     },
     // Add connection stability for development
     transactionOptions: {
       maxWait: 60000, // 1 minute
       timeout: 30000, // 30 seconds
-    },
+    }
   });
 }
 
@@ -154,40 +160,87 @@ function isPreparedStatementError(error: any): boolean {
          error?.message?.includes('does not exist');
 }
 
+// Global flag to prevent concurrent connection resets
+let isResettingConnection = false;
+
 // Reset Prisma connection to clear prepared statements
 export async function resetPrismaConnection(): Promise<void> {
+  // If already resetting, wait for it to complete
+  if (isResettingConnection) {
+    console.log('⏳ Connection reset already in progress, waiting...');
+    while (isResettingConnection) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return;
+  }
+
+  isResettingConnection = true;
   try {
     console.log('🔄 Resetting Prisma connection to clear prepared statements...');
-    await prisma.$disconnect();
-    // Force a longer delay to ensure connection is fully closed and prepared statements are cleared
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await prisma.$connect();
-    // Test the connection with a simple query
-    await prisma.$queryRaw`SELECT 1`;
+    
+    // In development, recreate the global client to clear all state
+    if (isDevelopment && global.__prisma) {
+      await global.__prisma.$disconnect();
+      global.__prisma = undefined;
+      console.log('🔄 Cleared global Prisma client in development');
+      
+      // Wait a bit longer for the connection to fully close
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Recreate the client
+      global.__prisma = createPrismaClient();
+      await global.__prisma.$connect();
+      
+      // Test the new connection
+      await global.__prisma.$queryRaw`SELECT 1`;
+    } else {
+      // For production, just disconnect and reconnect
+      await prisma.$disconnect();
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await prisma.$connect();
+      await prisma.$queryRaw`SELECT 1`;
+    }
+    
     console.log('✅ Prisma connection reset successfully');
   } catch (error) {
     console.error('❌ Failed to reset Prisma connection:', error);
     throw error;
+  } finally {
+    isResettingConnection = false;
   }
 }
 
 // Wrapper function for database operations with automatic retry
 export async function withDatabaseRetry<T>(
   operation: () => Promise<T>,
-  maxRetries = 2
+  maxRetries = 3,
+  operationName = 'database operation'
 ): Promise<T> {
+  let lastError: any;
+  
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
     try {
       return await operation();
     } catch (error: any) {
+      lastError = error;
+      
       const isConnectionError = error?.code === 'P2028' || 
                                error?.message?.includes('Engine is not yet connected') ||
                                error?.message?.includes('Connection refused') ||
-                               error?.message?.includes('Response from the Engine was empty');
+                               error?.message?.includes('Response from the Engine was empty') ||
+                               error?.message?.includes('Connection terminated');
       
       const isPreparedStmtError = isPreparedStatementError(error);
       
-      if ((isConnectionError || isPreparedStmtError) && attempt <= maxRetries && isDevelopment) {
+      // Log the specific error details
+      console.error(`❌ ${operationName} failed on attempt ${attempt}:`, {
+        code: error?.code,
+        message: error?.message?.substring(0, 200),
+        isPreparedStmtError,
+        isConnectionError
+      });
+      
+      if ((isConnectionError || isPreparedStmtError) && attempt <= maxRetries) {
         console.log(`🔄 Database ${isPreparedStmtError ? 'prepared statement' : 'connection'} error on attempt ${attempt}, retrying...`);
         
         // For prepared statement errors, reset the connection
@@ -196,6 +249,7 @@ export async function withDatabaseRetry<T>(
             await resetPrismaConnection();
           } catch (resetError) {
             console.error('❌ Connection reset failed:', resetError);
+            // Continue to retry even if reset fails
           }
         } else {
           // Attempt to reconnect for connection errors
@@ -204,19 +258,24 @@ export async function withDatabaseRetry<T>(
             await connectPrisma();
           } catch (reconnectError) {
             console.error('❌ Reconnection failed:', reconnectError);
+            // Continue to retry even if reconnection fails
           }
         }
         
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        // Exponential backoff with jitter
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 1000, 5000);
+        console.log(`⏳ Waiting ${Math.round(delay)}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
       
+      // If we're here, either it's not a retryable error or we've exhausted retries
+      console.error(`💥 ${operationName} failed after ${attempt} attempts. Final error:`, error);
       throw error;
     }
   }
   
-  throw new Error('Unreachable code');
+  throw lastError || new Error('Unreachable code in withDatabaseRetry');
 }
 
 // Graceful shutdown for serverless
