@@ -187,9 +187,22 @@ const createOptimizedPrismaClient = (): PrismaClient => {
       
       console.log('✅ Applied serverless optimizations for Supabase')
     } else {
-      // Local development - use direct connection for better debugging
-      console.log('🔧 Using direct Supabase connection for local development')
-      connectionUrl = directUrl || databaseUrl
+      // Local development - use pooled connection since direct port (5432) is not accessible
+      console.log('🔧 Using pooled Supabase connection for local development')
+      const url = new URL(databaseUrl)
+      
+      // Since we're using a pooled connection (port 6543), disable prepared statements
+      // to avoid "prepared statement does not exist" errors with pgbouncer
+      url.searchParams.set('pgbouncer', 'true')
+      url.searchParams.set('statement_cache_size', '0')
+      
+      // Connection timeouts for local development
+      url.searchParams.set('connect_timeout', '10')
+      url.searchParams.set('socket_timeout', '30')
+      url.searchParams.set('pool_timeout', '10')
+      
+      connectionUrl = url.toString()
+      console.log('✅ Applied pooled connection optimizations for local development')
     }
   } else {
     // Non-Supabase PostgreSQL - apply standard pooling
