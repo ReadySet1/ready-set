@@ -489,9 +489,6 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
-  } finally {
-    // Disconnect Prisma Client after use
-    await prisma.$disconnect();
   }
 }
 

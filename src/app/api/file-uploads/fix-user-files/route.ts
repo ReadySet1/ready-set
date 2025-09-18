@@ -98,7 +98,5 @@ export async function POST(request: NextRequest) {
       { error: "Failed to fix user files", details: error.message || String(error) },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 } 

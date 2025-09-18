@@ -211,7 +211,5 @@ export async function POST(request: Request) {
       { error: "An unexpected error occurred" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

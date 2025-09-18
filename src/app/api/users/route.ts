@@ -149,8 +149,6 @@ export async function GET(request: NextRequest) {
       return addSecurityHeaders(response);
     }
 
-    console.log('🔍 [Users API] Authenticated user ID:', authUser.id);
-
     // Get user profile from Supabase (same approach as current-user route)
     const { data: dbUser, error: profileError } = await supabase
       .from('profiles')
@@ -163,17 +161,6 @@ export async function GET(request: NextRequest) {
       const response = NextResponse.json({ error: "User profile not found" }, { status: 404 });
       return addSecurityHeaders(response);
     }
-
-    console.log('🔍 [Users API] Database user type:', dbUser.type);
-    console.log('🔍 [Users API] Expected types:', UserType.ADMIN, UserType.SUPER_ADMIN, UserType.HELPDESK);
-    console.log('🔍 [Users API] Type comparison:', {
-      isAdmin: dbUser.type === UserType.ADMIN,
-      isSuperAdmin: dbUser.type === UserType.SUPER_ADMIN,
-      isHelpdesk: dbUser.type === UserType.HELPDESK,
-      hasType: !!dbUser.type,
-      normalizedType: dbUser.type?.toUpperCase(),
-      hasAdminPrivileges: hasAdminPrivileges(dbUser.type || '')
-    });
 
     // Check if user has admin privileges using the helper function
     if (!dbUser.type || !hasAdminPrivileges(dbUser.type)) {

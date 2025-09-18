@@ -1,18 +1,12 @@
-import React from "react";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-} from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import DriverTrackingPortal from "@/components/Driver/DriverTrackingPortal";
-import { useLocationTracking } from "@/hooks/tracking/useLocationTracking";
-import { useDriverShift } from "@/hooks/tracking/useDriverShift";
-import { useDriverDeliveries } from "@/hooks/tracking/useDriverDeliveries";
-import { useOfflineQueue } from "@/hooks/tracking/useOfflineQueue";
-import { DriverStatus } from "@/types/user";
+import React from 'react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import DriverTrackingPortal from '@/components/Driver/DriverTrackingPortal';
+import { useLocationTracking } from '@/hooks/tracking/useLocationTracking';
+import { useDriverShift } from '@/hooks/tracking/useDriverShift';
+import { useDriverDeliveries } from '@/hooks/tracking/useDriverDeliveries';
+import { useOfflineQueue } from '@/hooks/tracking/useOfflineQueue';
+import { DriverStatus } from '@/types/user';
 
 // Mock the tracking hooks
 jest.mock("@/hooks/tracking/useLocationTracking");
@@ -68,8 +62,8 @@ describe("DriverTrackingPortal", () => {
     id: "shift-123",
     driverId: "driver-123",
     startTime: new Date(),
-    startLocation: { lat: 40.7128, lng: -74.006 },
-    status: "active" as const,
+    startLocation: defaultLocationUpdate.coordinates,
+    status: 'active' as const,
     totalDistanceKm: 0,
     deliveryCount: 0,
     breaks: [],
@@ -79,14 +73,14 @@ describe("DriverTrackingPortal", () => {
   };
 
   const defaultDelivery = {
-    id: "delivery-123",
-    driverId: "driver-123",
-    status: "ARRIVED_AT_VENDOR" as DriverStatus, // Use valid DriverStatus enum value
+    id: 'delivery-123',
+    driverId: 'driver-123',
+    status: DriverStatus.ASSIGNED,
     pickupLocation: {
-      coordinates: [-74.006, 40.7128] as [number, number], // [lng, lat] format
+      coordinates: [-74.0060, 40.7128] as [number, number] // [lng, lat] format
     },
     deliveryLocation: {
-      coordinates: [-73.9851, 40.7589] as [number, number], // [lng, lat] format
+      coordinates: [-73.9851, 40.7589] as [number, number] // [lng, lat] format
     },
     estimatedArrival: new Date(Date.now() + 3600000),
     route: [],
@@ -139,8 +133,8 @@ describe("DriverTrackingPortal", () => {
         syncInProgress: false,
       },
       queuedItems: 0,
-      registerServiceWorker: jest.fn(),
       syncPendingItems: jest.fn(),
+      registerServiceWorker: jest.fn(),
     });
   });
 
@@ -158,8 +152,8 @@ describe("DriverTrackingPortal", () => {
         syncInProgress: false,
       },
       queuedItems: 0,
-      registerServiceWorker: jest.fn(),
       syncPendingItems: jest.fn(),
+      registerServiceWorker: jest.fn(),
     });
 
     render(<DriverTrackingPortal />);
@@ -390,8 +384,8 @@ describe("DriverTrackingPortal", () => {
         syncInProgress: false,
       },
       queuedItems: 2,
-      registerServiceWorker: jest.fn(),
       syncPendingItems: jest.fn(),
+      registerServiceWorker: jest.fn(),
     });
 
     render(<DriverTrackingPortal />);

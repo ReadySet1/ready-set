@@ -1,2 +1,2 @@
-// Re-export the unified Prisma client and utilities
-export { prisma, default, withDatabaseRetry } from '@/utils/prismaDB'; 
+// Re-export the optimized Prisma client with connection pooling
+export { prismaPooled as prisma, default as prismaPooled } from '@/lib/db/prisma-pooled';

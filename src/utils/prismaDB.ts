@@ -1,114 +1,26 @@
-import { PrismaClient } from '@prisma/client';
-import { prismaLogger } from './logger';
+/**
+ * Unified Prisma Client Export
+ * 
+ * This module now re-exports the optimized pooled client to fix connection issues.
+ * All existing imports from '@/utils/prismaDB' will now use the connection-pooled client.
+ */
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __prisma: PrismaClient | undefined;
-}
+// Re-export the optimized pooled client as the main export
+export { prismaPooled as prisma, queryMetrics, healthCheck } from '@/lib/db/prisma-pooled';
 
-// Environment checks
-const isProduction = process.env.NODE_ENV === 'production';
-const isDevelopment = process.env.NODE_ENV === 'development';
-const isTest = process.env.NODE_ENV === 'test';
+// For backward compatibility, also export as default
+export { default } from '@/lib/db/prisma-pooled';
 
-prismaLogger.debug('🔧 Prisma Environment:', {
-  NODE_ENV: process.env.NODE_ENV,
-  NEXT_RUNTIME: process.env.NEXT_RUNTIME,
-  hasDatabase: !!process.env.DATABASE_URL,
-  databasePreview: process.env.DATABASE_URL ? 
-    `${process.env.DATABASE_URL.substring(0, 20)}...` : 'NOT SET'
-});
-
-// Create Prisma client with optimized configuration
-function createPrismaClient(): PrismaClient {
-  prismaLogger.debug('🟢 Creating new Prisma client...');
-  
-  // Test environment - minimal configuration
-  if (isTest) {
-    prismaLogger.debug('🧪 Test environment - using basic client');
-    return new PrismaClient({
-      log: ['error'],
-      datasources: {
-        db: {
-          url: process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test'
-        }
-      }
-    });
-  }
-
-  // Production environment - optimized for serverless
-  if (isProduction) {
-    prismaLogger.debug('🚀 Production environment - optimized client');
-    return new PrismaClient({
-      log: ['error'],
-      datasources: {
-        db: {
-          url: process.env.DATABASE_URL
-        }
-      },
-    });
-  }
-
-  // Development environment - full logging with connection stability
-  prismaLogger.debug('🔧 Development environment - debug client');
-  
-  // Modify database URL to disable prepared statements and improve connection stability in development
-  const baseUrl = process.env.DATABASE_URL || '';
-  const hasParams = baseUrl.includes('?');
-  const devParams = [
-    'statement_cache_size=0',
-    'prepared_statements=false',
-    'connection_limit=10',
-    'pool_timeout=60',
-    'pgbouncer=true'
-  ].join('&');
-  
-  const devDatabaseUrl = baseUrl + (hasParams ? '&' : '?') + devParams;
-  
-  return new PrismaClient({
-    log: ['query', 'info', 'warn', 'error'],
-    datasources: {
-      db: {
-        url: devDatabaseUrl
-      }
-    },
-    // Add connection stability for development
-    transactionOptions: {
-      maxWait: 30000, // 30 seconds
-      timeout: 20000, // 20 seconds
-    },
-    // Reduce query engine restarts
-    errorFormat: 'minimal'
-  });
-}
-
-// Singleton pattern with global caching for development
-const getPrismaClient = (): PrismaClient => {
-  // In development, use global to prevent re-initialization during hot reloads
-  if (isDevelopment) {
-    if (!global.__prisma) {
-      prismaLogger.debug('🔄 Creating new global Prisma client for development');
-      global.__prisma = createPrismaClient();
-    } else {
-      prismaLogger.debug('♻️ Reusing existing global Prisma client');
-    }
-    return global.__prisma;
-  }
-
-  // In production/test, create new instance each time
-  return createPrismaClient();
-};
-
-// Export the singleton instance
-export const prisma = getPrismaClient();
+// Legacy function exports for backward compatibility
+import { prismaPooled } from '@/lib/db/prisma-pooled';
 
 // Enhanced connection management with retry logic
 export async function connectPrisma(retries = 3): Promise<void> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      prismaLogger.debug(`🔌 Attempting to connect to database (attempt ${attempt}/${retries})...`);
-      await prisma.$connect();
-      prismaLogger.debug('✅ Database connected successfully');
+      console.log(`🔌 Attempting to connect to database (attempt ${attempt}/${retries})...`);
+      await prismaPooled.$connect();
+      console.log('✅ Database connected successfully');
       return;
     } catch (error) {
       console.error(`❌ Database connection failed on attempt ${attempt}:`, error);
@@ -119,7 +31,7 @@ export async function connectPrisma(retries = 3): Promise<void> {
       
       // Wait before retrying (exponential backoff)
       const delay = Math.pow(2, attempt) * 1000;
-      prismaLogger.debug(`⏳ Waiting ${delay}ms before retry...`);
+      console.log(`⏳ Waiting ${delay}ms before retry...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -127,9 +39,9 @@ export async function connectPrisma(retries = 3): Promise<void> {
 
 export async function disconnectPrisma(): Promise<void> {
   try {
-    prismaLogger.debug('🔌 Disconnecting from database...');
-    await prisma.$disconnect();
-    prismaLogger.debug('✅ Database disconnected successfully');
+    console.log('🔌 Disconnecting from database...');
+    await prismaPooled.$disconnect();
+    console.log('✅ Database disconnected successfully');
   } catch (error) {
     console.error('❌ Database disconnection failed:', error);
   }
@@ -138,20 +50,20 @@ export async function disconnectPrisma(): Promise<void> {
 // Health check function with automatic reconnection
 export async function checkDatabaseHealth(autoReconnect = true): Promise<boolean> {
   try {
-    await prisma.$queryRaw`SELECT 1`;
-    prismaLogger.debug('💚 Database health check passed');
+    await prismaPooled.$queryRaw`SELECT 1`;
+    console.log('💚 Database health check passed');
     return true;
   } catch (error) {
     console.error('💔 Database health check failed:', error);
     
-    if (autoReconnect && isDevelopment) {
-      prismaLogger.debug('🔄 Attempting to reconnect...');
+    if (autoReconnect) {
+      console.log('🔄 Attempting to reconnect...');
       try {
         await disconnectPrisma();
         await connectPrisma();
         // Test again after reconnection
-        await prisma.$queryRaw`SELECT 1`;
-        prismaLogger.debug('✅ Database reconnected successfully');
+        await prismaPooled.$queryRaw`SELECT 1`;
+        console.log('✅ Database reconnected successfully');
         return true;
       } catch (reconnectError) {
         console.error('❌ Failed to reconnect:', reconnectError);
@@ -274,7 +186,7 @@ export async function withDatabaseRetry<T>(
       });
       
       if ((isConnectionError || isPreparedStmtError) && attempt <= maxRetries) {
-        prismaLogger.debug(`🔄 Database ${isPreparedStmtError ? 'prepared statement' : 'connection'} error on attempt ${attempt}, retrying...`);
+        console.log(`🔄 Database ${isPreparedStmtError ? 'prepared statement' : 'connection'} error on attempt ${attempt}, retrying...`);
         
         // For prepared statement errors, reset the connection
         if (isPreparedStmtError) {
@@ -297,7 +209,7 @@ export async function withDatabaseRetry<T>(
         
         // Exponential backoff with jitter
         const delay = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 1000, 5000);
-        prismaLogger.debug(`⏳ Waiting ${Math.round(delay)}ms before retry...`);
+        console.log(`⏳ Waiting ${Math.round(delay)}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
@@ -312,16 +224,10 @@ export async function withDatabaseRetry<T>(
 }
 
 // Graceful shutdown for serverless
-if (isProduction) {
-  process.on('beforeExit', async () => {
-    prismaLogger.debug('🔄 Gracefully shutting down Prisma client...');
-    await disconnectPrisma();
-  });
-}
-
-// Export default for compatibility
-export default prisma;
-
+process.on('beforeExit', async () => {
+  console.log('🔄 Gracefully shutting down Prisma client...');
+  await disconnectPrisma();
+});
 // Types for better TypeScript support
-export type PrismaClientInstance = typeof prisma;
-export type PrismaTransaction = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+export type PrismaClientInstance = typeof prismaPooled;
+export type PrismaTransaction = Parameters<Parameters<typeof prismaPooled.$transaction>[0]>[0];

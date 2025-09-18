@@ -190,8 +190,6 @@ export async function GET(request: NextRequest) {
         'X-Response-Time': `${duration.toFixed(2)}ms`,
       }
     });
-  } finally {
-    await prisma.$disconnect();
   }
 }
 

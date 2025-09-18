@@ -15,7 +15,6 @@ import {
   Plus,
   ClipboardList,
   Calculator,
-  Flower,
   Package,
   NavigationIcon,
 } from "lucide-react";
@@ -163,16 +162,10 @@ export function AppSidebar() {
   // Tools and Calculators
   const toolsItems: SidebarNavItem[] = [
     {
-      title: "Drives Calculator",
-      href: "/admin/drives-calculator",
+      title: "Calculator",
+      href: "/admin/calculator",
       icon: Calculator,
-      isActive: pathname?.includes("/admin/drives-calculator") ?? false,
-    },
-    {
-      title: "Flower Calculator",
-      href: "/admin/flower-calculator",
-      icon: Flower,
-      isActive: pathname?.includes("/admin/flower-calculator") ?? false,
+      isActive: pathname?.includes("/admin/calculator") ?? false,
     },
     {
       title: "Logistics Tools",

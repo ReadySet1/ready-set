@@ -158,8 +158,5 @@ export async function GET(req: NextRequest, props: { params: Promise<{ order_num
       { message: "Error fetching order", error: (error as Error).message },
       { status: 500 },
     );
-  } finally {
-    // Disconnect Prisma client
-    await prisma.$disconnect();
   }
 }
