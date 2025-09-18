@@ -1,4 +1,4 @@
-import { startDriverShift, endDriverShift, updateDriverLocation } from '@/app/actions/tracking/driver-actions';
+import { startDriverShift, endDriverShift, updateDriverLocation, pauseShift } from '@/app/actions/tracking/driver-actions';
 import { createClient } from '@/utils/supabase/server';
 
 // Mock Supabase client

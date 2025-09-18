@@ -13,6 +13,20 @@ export { default } from '@/lib/db/prisma-pooled';
 
 // Legacy function exports for backward compatibility
 import { prismaPooled } from '@/lib/db/prisma-pooled';
+import { prismaLogger } from './logger';
+
+// Environment configuration
+const isDevelopment = process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'development';
+
+// Import PrismaClient for type definitions
+import { PrismaClient } from '@prisma/client';
+
+// Create function to make a new Prisma client
+const createPrismaClient = (): PrismaClient => {
+  return new PrismaClient({
+    log: isDevelopment ? ['query', 'error', 'warn', 'info'] : ['error', 'warn'],
+  });
+};
 
 // Enhanced connection management with retry logic
 export async function connectPrisma(retries = 3): Promise<void> {
@@ -86,6 +100,12 @@ function isPreparedStatementError(error: any): boolean {
 // Global flag to prevent concurrent connection resets
 let isResettingConnection = false;
 
+// Declare global type for the Prisma client
+declare global {
+  // eslint-disable-next-line no-var
+  var __prisma: PrismaClient | undefined;
+}
+
 // Reset Prisma connection to clear prepared statements
 export async function resetPrismaConnection(): Promise<void> {
   // If already resetting, wait for it to complete
@@ -136,14 +156,14 @@ export async function resetPrismaConnection(): Promise<void> {
     } else {
       // For production, just disconnect and reconnect
       try {
-        await prisma.$disconnect();
+        await prismaPooled.$disconnect();
       } catch (disconnectError) {
         console.warn('⚠️ Error during disconnect, continuing with reset:', disconnectError);
       }
       
       await new Promise(resolve => setTimeout(resolve, 2000));
-      await prisma.$connect();
-      await prisma.$queryRaw`SELECT 1`;
+      await prismaPooled.$connect();
+      await prismaPooled.$queryRaw`SELECT 1`;
     }
     
     prismaLogger.debug('✅ Prisma connection reset successfully');

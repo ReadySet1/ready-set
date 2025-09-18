@@ -76,12 +76,12 @@ export async function GET(request: NextRequest) {
       role: testimonial.role,
       content: testimonial.content,
       image: testimonial.image,
-      rating: testimonial.rating,
+      rating: testimonial.rating ?? 5, // Provide default rating of 5 if null
       category: testimonial.category as 'CLIENTS' | 'VENDORS' | 'DRIVERS',
-      isActive: testimonial.is_active,
-      sortOrder: testimonial.sort_order,
-      createdAt: testimonial.created_at,
-      updatedAt: testimonial.updated_at,
+      isActive: testimonial.is_active ?? true, // Provide default isActive if null
+      sortOrder: testimonial.sort_order ?? 0, // Provide default sortOrder if null
+      createdAt: testimonial.created_at ?? new Date().toISOString(),
+      updatedAt: testimonial.updated_at ?? new Date().toISOString(),
     }));
     
     return NextResponse.json({

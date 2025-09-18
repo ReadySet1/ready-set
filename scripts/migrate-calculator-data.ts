@@ -325,7 +325,7 @@ async function migrateCalculatorData() {
       }
     });
 
-    const totalRules = finalTemplates.reduce((sum, template) => sum + template.pricingRules.length, 0);
+    const totalRules = finalTemplates.reduce((sum: number, template: any) => sum + template.pricingRules.length, 0);
 
     console.log('✅ Migration completed successfully!');
     console.log(`   📊 Created ${finalTemplates.length} templates with ${totalRules} total rules`);

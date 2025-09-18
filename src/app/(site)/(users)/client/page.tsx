@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma, withDatabaseRetry } from "@/lib/db/prisma";
+import { prisma } from "@/lib/db/prisma";
+import { withDatabaseRetry } from "@/utils/prismaDB";
 import { redirect } from "next/navigation";
 import {
   CateringStatus,

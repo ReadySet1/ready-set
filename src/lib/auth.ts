@@ -55,6 +55,7 @@ export async function syncOAuthProfile(userId: string, metadata: any) {
     image: userImage,
     type: "CLIENT",           // Changed: Match enum case 'CLIENT'
     status: "PENDING",        // Changed: Match enum case 'PENDING'
+    updatedAt: new Date().toISOString(), // Add required updatedAt field
     // Add default values for other *required* fields from your Prisma schema if necessary
     // e.g., companyName: null, contactName: null, etc. if they are NOT NULL without defaults
   });

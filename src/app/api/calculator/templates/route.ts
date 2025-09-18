@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { CreateTemplateSchema, ConfigurationError } from '@/types/calculator';
 import { CalculatorService } from '@/lib/calculator/calculator-service';
 import { createClient } from '@/utils/supabase/server';
+import { prisma } from '@/lib/db/prisma';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,48 +19,45 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch templates directly from Supabase
-    const { data: templates, error } = await supabase
-      .from('calculator_templates')
-      .select(`
-        *,
-        pricing_rules (
-          *
-        )
-      `)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
+    // Fetch templates from Prisma database
+    const templates = await prisma.calculatorTemplate.findMany({
+      where: {
+        isActive: true
+      },
+      include: {
+        pricingRules: {
+          orderBy: {
+            priority: 'desc'
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
 
-    if (error) {
-      console.error('Supabase error fetching templates:', error);
-      return NextResponse.json(
-        { success: false, error: `Failed to fetch templates: ${error.message}` },
-        { status: 500 }
-      );
-    }
-
-    // Map Supabase data to our format
-    const mappedTemplates = (templates || []).map(template => ({
+    // Map Prisma data to our format
+    const mappedTemplates = templates.map((template: any) => ({
       id: template.id,
       name: template.name,
       description: template.description,
-      isActive: template.is_active,
-      createdAt: new Date(template.created_at),
-      updatedAt: new Date(template.updated_at),
-      pricingRules: template.pricing_rules?.map(rule => ({
+      isActive: template.isActive,
+      createdAt: template.createdAt,
+      updatedAt: template.updatedAt,
+      pricingRules: template.pricingRules.map((rule: any) => ({
         id: rule.id,
-        templateId: rule.template_id,
-        ruleType: rule.rule_type,
-        ruleName: rule.rule_name,
-        baseAmount: rule.base_amount ? parseFloat(rule.base_amount.toString()) : undefined,
-        perUnitAmount: rule.per_unit_amount ? parseFloat(rule.per_unit_amount.toString()) : undefined,
-        thresholdValue: rule.threshold_value ? parseFloat(rule.threshold_value.toString()) : undefined,
-        thresholdType: rule.threshold_type,
-        appliesWhen: rule.applies_when ? JSON.parse(rule.applies_when) : undefined,
+        templateId: rule.templateId,
+        ruleType: rule.ruleType,
+        ruleName: rule.ruleName,
+        baseAmount: rule.baseAmount ? parseFloat(rule.baseAmount.toString()) : undefined,
+        perUnitAmount: rule.perUnitAmount ? parseFloat(rule.perUnitAmount.toString()) : undefined,
+        thresholdValue: rule.thresholdValue ? parseFloat(rule.thresholdValue.toString()) : undefined,
+        thresholdType: rule.thresholdType,
+        appliesWhen: rule.appliesWhen ? JSON.parse(rule.appliesWhen) : undefined,
         priority: rule.priority,
-        createdAt: new Date(rule.created_at),
-        updatedAt: new Date(rule.updated_at)
-      })) || []
+        createdAt: rule.createdAt,
+        updatedAt: rule.updatedAt
+      }))
     }));
     
     return NextResponse.json({

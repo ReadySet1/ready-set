@@ -94,7 +94,7 @@ describe("Tracking System Integration", () => {
       isActive: true,
       isOnDuty: true,
       lastKnownLocation: {
-        coordinates: [-74.0060, 40.7128] as [number, number], // [lng, lat]
+        coordinates: [-74.006, 40.7128] as [number, number], // [lng, lat]
       },
       lastLocationUpdate: new Date(),
       vehicleInfo: {
@@ -128,8 +128,10 @@ describe("Tracking System Integration", () => {
       id: "delivery-1",
       driverId: "driver-1",
       status: DriverStatus.ASSIGNED,
-      pickupLocation: { coordinates: [-74.0060, 40.7128] as [number, number] },
-      deliveryLocation: { coordinates: [-73.9851, 40.7589] as [number, number] },
+      pickupLocation: { coordinates: [-74.006, 40.7128] as [number, number] },
+      deliveryLocation: {
+        coordinates: [-73.9851, 40.7589] as [number, number],
+      },
       estimatedArrival: new Date(Date.now() + 3600000),
       route: [],
       metadata: {},
@@ -142,7 +144,9 @@ describe("Tracking System Integration", () => {
       driverId: "driver-1",
       status: DriverStatus.EN_ROUTE_TO_CLIENT,
       pickupLocation: { coordinates: [-73.9851, 40.7589] as [number, number] },
-      deliveryLocation: { coordinates: [-73.9934, 40.7505] as [number, number] },
+      deliveryLocation: {
+        coordinates: [-73.9934, 40.7505] as [number, number],
+      },
       estimatedArrival: new Date(Date.now() + 1800000),
       route: [],
       metadata: {},
@@ -186,7 +190,6 @@ describe("Tracking System Integration", () => {
       refreshShift: jest.fn(),
       loading: false,
       error: null,
-      refreshShift: jest.fn(),
     });
 
     mockUseDriverDeliveries.mockReturnValue({
@@ -195,7 +198,6 @@ describe("Tracking System Integration", () => {
       refreshDeliveries: jest.fn(),
       loading: false,
       error: null,
-      refreshDeliveries: jest.fn(),
     });
 
     mockUseOfflineQueue.mockReturnValue({
@@ -250,7 +252,6 @@ describe("Tracking System Integration", () => {
         refreshShift: jest.fn(),
         loading: false,
         error: null,
-        refreshShift: jest.fn(),
       });
 
       render(<DriverTrackingPortal />);
@@ -269,7 +270,7 @@ describe("Tracking System Integration", () => {
           id: "shift-1",
           driverId: "driver-1",
           startTime: new Date(),
-          startLocation: { lat: 40.7128, lng: -74.0060 },
+          startLocation: { lat: 40.7128, lng: -74.006 },
           status: "active" as const,
           totalDistanceKm: 0,
           deliveryCount: 0,
@@ -286,7 +287,6 @@ describe("Tracking System Integration", () => {
         refreshShift: jest.fn(),
         loading: false,
         error: null,
-        refreshShift: jest.fn(),
       });
 
       // Re-render to show active shift
@@ -310,7 +310,7 @@ describe("Tracking System Integration", () => {
           id: "shift-1",
           driverId: "driver-1",
           startTime: new Date(),
-          startLocation: { lat: 40.7128, lng: -74.0060 },
+          startLocation: { lat: 40.7128, lng: -74.006 },
           status: "active" as const,
           totalDistanceKm: 0,
           deliveryCount: 0,
@@ -327,7 +327,6 @@ describe("Tracking System Integration", () => {
         refreshShift: jest.fn(),
         loading: false,
         error: null,
-        refreshShift: jest.fn(),
       });
 
       // Mock active deliveries
@@ -337,7 +336,6 @@ describe("Tracking System Integration", () => {
         refreshDeliveries: jest.fn(),
         loading: false,
         error: null,
-        refreshDeliveries: jest.fn(),
       });
 
       render(<DriverTrackingPortal />);
@@ -363,7 +361,7 @@ describe("Tracking System Integration", () => {
           id: "shift-1",
           driverId: "driver-1",
           startTime: new Date(),
-          startLocation: { lat: 40.7128, lng: -74.0060 },
+          startLocation: { lat: 40.7128, lng: -74.006 },
           status: "active" as const,
           totalDistanceKm: 0,
           deliveryCount: 0,
@@ -380,7 +378,6 @@ describe("Tracking System Integration", () => {
         refreshShift: jest.fn(),
         loading: false,
         error: null,
-        refreshShift: jest.fn(),
       });
 
       render(<DriverTrackingPortal />);
@@ -620,7 +617,6 @@ describe("Tracking System Integration", () => {
         refreshShift: jest.fn(),
         loading: false,
         error: "Failed to start shift",
-        refreshShift: jest.fn(),
       });
 
       render(<DriverTrackingPortal />);
@@ -631,7 +627,9 @@ describe("Tracking System Integration", () => {
     it("handles delivery update errors", async () => {
       mockUseDriverDeliveries.mockReturnValue({
         activeDeliveries: [mockDeliveries[1]!],
-        updateDeliveryStatus: jest.fn().mockRejectedValue(new Error('Update failed')),
+        updateDeliveryStatus: jest
+          .fn()
+          .mockRejectedValue(new Error("Update failed")),
         refreshDeliveries: jest.fn(),
         loading: false,
         error: "Failed to update delivery",
@@ -649,17 +647,20 @@ describe("Tracking System Integration", () => {
     it("handles large numbers of drivers and deliveries efficiently", () => {
       const largeDrivers = Array.from({ length: 100 }, (_, i) => ({
         id: `driver-${i}`,
-        employeeId: `EMP${String(i).padStart(3, '0')}`,
-        phoneNumber: `+1234567${String(i).padStart(3, '0')}`,
+        employeeId: `EMP${String(i).padStart(3, "0")}`,
+        phoneNumber: `+1234567${String(i).padStart(3, "0")}`,
         isActive: true,
         isOnDuty: i % 2 === 0,
-        lastKnownLocation: i % 2 === 0 ? {
-          coordinates: [-74.0060, 40.7128] as [number, number]
-        } : undefined,
+        lastKnownLocation:
+          i % 2 === 0
+            ? {
+                coordinates: [-74.006, 40.7128] as [number, number],
+              }
+            : undefined,
         lastLocationUpdate: i % 2 === 0 ? new Date() : undefined,
         vehicleInfo: {
-          number: `V${String(i).padStart(3, '0')}`,
-          type: 'van',
+          number: `V${String(i).padStart(3, "0")}`,
+          type: "van",
         },
         metadata: {},
         createdAt: new Date(),
@@ -735,7 +736,6 @@ describe("Tracking System Integration", () => {
         refreshShift: jest.fn(),
         loading: false,
         error: null,
-        refreshShift: jest.fn(),
       });
 
       mockUseLocationTracking.mockReturnValue({

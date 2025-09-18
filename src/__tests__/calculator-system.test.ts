@@ -347,7 +347,7 @@ describe('Calculator System', () => {
       
       // Rules should be sorted by priority (highest first)
       for (let i = 0; i < customerRules.length - 1; i++) {
-        expect(customerRules[i].priority).toBeGreaterThanOrEqual(customerRules[i + 1].priority);
+        expect(customerRules[i]?.priority ?? 0).toBeGreaterThanOrEqual(customerRules[i + 1]?.priority ?? 0);
       }
     });
   });

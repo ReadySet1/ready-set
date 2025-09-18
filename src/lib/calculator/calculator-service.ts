@@ -237,7 +237,7 @@ export class CalculatorService {
       }
 
       // Create CalculatorEngine with the template's pricing rules
-      const calculatorEngine = new CalculatorEngine(template.pricingRules || [], clientConfig || null);
+      const calculatorEngine = new CalculatorEngine(template.pricingRules || [], clientConfig || undefined);
 
       // Perform the calculation using the engine
       const result = calculatorEngine.calculate(input);
