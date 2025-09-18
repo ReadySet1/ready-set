@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { prismaLogger } from './logger';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -10,7 +11,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development';
 const isTest = process.env.NODE_ENV === 'test';
 
-console.log('🔧 Prisma Environment:', {
+prismaLogger.debug('🔧 Prisma Environment:', {
   NODE_ENV: process.env.NODE_ENV,
   NEXT_RUNTIME: process.env.NEXT_RUNTIME,
   hasDatabase: !!process.env.DATABASE_URL,
@@ -20,11 +21,11 @@ console.log('🔧 Prisma Environment:', {
 
 // Create Prisma client with optimized configuration
 function createPrismaClient(): PrismaClient {
-  console.log('🟢 Creating new Prisma client...');
+  prismaLogger.debug('🟢 Creating new Prisma client...');
   
   // Test environment - minimal configuration
   if (isTest) {
-    console.log('🧪 Test environment - using basic client');
+    prismaLogger.debug('🧪 Test environment - using basic client');
     return new PrismaClient({
       log: ['error'],
       datasources: {
@@ -37,7 +38,7 @@ function createPrismaClient(): PrismaClient {
 
   // Production environment - optimized for serverless
   if (isProduction) {
-    console.log('🚀 Production environment - optimized client');
+    prismaLogger.debug('🚀 Production environment - optimized client');
     return new PrismaClient({
       log: ['error'],
       datasources: {
@@ -49,7 +50,7 @@ function createPrismaClient(): PrismaClient {
   }
 
   // Development environment - full logging with connection stability
-  console.log('🔧 Development environment - debug client');
+  prismaLogger.debug('🔧 Development environment - debug client');
   
   // Modify database URL to disable prepared statements and improve connection stability in development
   const baseUrl = process.env.DATABASE_URL || '';
@@ -86,10 +87,10 @@ const getPrismaClient = (): PrismaClient => {
   // In development, use global to prevent re-initialization during hot reloads
   if (isDevelopment) {
     if (!global.__prisma) {
-      console.log('🔄 Creating new global Prisma client for development');
+      prismaLogger.debug('🔄 Creating new global Prisma client for development');
       global.__prisma = createPrismaClient();
     } else {
-      console.log('♻️ Reusing existing global Prisma client');
+      prismaLogger.debug('♻️ Reusing existing global Prisma client');
     }
     return global.__prisma;
   }
@@ -105,9 +106,9 @@ export const prisma = getPrismaClient();
 export async function connectPrisma(retries = 3): Promise<void> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      console.log(`🔌 Attempting to connect to database (attempt ${attempt}/${retries})...`);
+      prismaLogger.debug(`🔌 Attempting to connect to database (attempt ${attempt}/${retries})...`);
       await prisma.$connect();
-      console.log('✅ Database connected successfully');
+      prismaLogger.debug('✅ Database connected successfully');
       return;
     } catch (error) {
       console.error(`❌ Database connection failed on attempt ${attempt}:`, error);
@@ -118,7 +119,7 @@ export async function connectPrisma(retries = 3): Promise<void> {
       
       // Wait before retrying (exponential backoff)
       const delay = Math.pow(2, attempt) * 1000;
-      console.log(`⏳ Waiting ${delay}ms before retry...`);
+      prismaLogger.debug(`⏳ Waiting ${delay}ms before retry...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -126,9 +127,9 @@ export async function connectPrisma(retries = 3): Promise<void> {
 
 export async function disconnectPrisma(): Promise<void> {
   try {
-    console.log('🔌 Disconnecting from database...');
+    prismaLogger.debug('🔌 Disconnecting from database...');
     await prisma.$disconnect();
-    console.log('✅ Database disconnected successfully');
+    prismaLogger.debug('✅ Database disconnected successfully');
   } catch (error) {
     console.error('❌ Database disconnection failed:', error);
   }
@@ -138,19 +139,19 @@ export async function disconnectPrisma(): Promise<void> {
 export async function checkDatabaseHealth(autoReconnect = true): Promise<boolean> {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    console.log('💚 Database health check passed');
+    prismaLogger.debug('💚 Database health check passed');
     return true;
   } catch (error) {
     console.error('💔 Database health check failed:', error);
     
     if (autoReconnect && isDevelopment) {
-      console.log('🔄 Attempting to reconnect...');
+      prismaLogger.debug('🔄 Attempting to reconnect...');
       try {
         await disconnectPrisma();
         await connectPrisma();
         // Test again after reconnection
         await prisma.$queryRaw`SELECT 1`;
-        console.log('✅ Database reconnected successfully');
+        prismaLogger.debug('✅ Database reconnected successfully');
         return true;
       } catch (reconnectError) {
         console.error('❌ Failed to reconnect:', reconnectError);
@@ -177,7 +178,7 @@ let isResettingConnection = false;
 export async function resetPrismaConnection(): Promise<void> {
   // If already resetting, wait for it to complete
   if (isResettingConnection) {
-    console.log('⏳ Connection reset already in progress, waiting...');
+    prismaLogger.debug('⏳ Connection reset already in progress, waiting...');
     let waitCount = 0;
     while (isResettingConnection && waitCount < 100) { // Max 10 seconds wait
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -188,7 +189,7 @@ export async function resetPrismaConnection(): Promise<void> {
 
   isResettingConnection = true;
   try {
-    console.log('🔄 Resetting Prisma connection to clear prepared statements...');
+    prismaLogger.debug('🔄 Resetting Prisma connection to clear prepared statements...');
     
     // In development, recreate the global client to clear all state
     if (isDevelopment && global.__prisma) {
@@ -199,7 +200,7 @@ export async function resetPrismaConnection(): Promise<void> {
       }
       
       global.__prisma = undefined;
-      console.log('🔄 Cleared global Prisma client in development');
+      prismaLogger.debug('🔄 Cleared global Prisma client in development');
       
       // Wait for the connection to fully close
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -216,7 +217,7 @@ export async function resetPrismaConnection(): Promise<void> {
         } catch (testError) {
           testRetries--;
           if (testRetries === 0) throw testError;
-          console.log(`🔄 Connection test failed, retrying... (${testRetries} attempts left)`);
+          prismaLogger.debug(`🔄 Connection test failed, retrying... (${testRetries} attempts left)`);
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
@@ -233,7 +234,7 @@ export async function resetPrismaConnection(): Promise<void> {
       await prisma.$queryRaw`SELECT 1`;
     }
     
-    console.log('✅ Prisma connection reset successfully');
+    prismaLogger.debug('✅ Prisma connection reset successfully');
   } catch (error) {
     console.error('❌ Failed to reset Prisma connection:', error);
     // Don't throw here to prevent cascade failures
@@ -273,7 +274,7 @@ export async function withDatabaseRetry<T>(
       });
       
       if ((isConnectionError || isPreparedStmtError) && attempt <= maxRetries) {
-        console.log(`🔄 Database ${isPreparedStmtError ? 'prepared statement' : 'connection'} error on attempt ${attempt}, retrying...`);
+        prismaLogger.debug(`🔄 Database ${isPreparedStmtError ? 'prepared statement' : 'connection'} error on attempt ${attempt}, retrying...`);
         
         // For prepared statement errors, reset the connection
         if (isPreparedStmtError) {
@@ -296,7 +297,7 @@ export async function withDatabaseRetry<T>(
         
         // Exponential backoff with jitter
         const delay = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 1000, 5000);
-        console.log(`⏳ Waiting ${Math.round(delay)}ms before retry...`);
+        prismaLogger.debug(`⏳ Waiting ${Math.round(delay)}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
@@ -313,7 +314,7 @@ export async function withDatabaseRetry<T>(
 // Graceful shutdown for serverless
 if (isProduction) {
   process.on('beforeExit', async () => {
-    console.log('🔄 Gracefully shutting down Prisma client...');
+    prismaLogger.debug('🔄 Gracefully shutting down Prisma client...');
     await disconnectPrisma();
   });
 }

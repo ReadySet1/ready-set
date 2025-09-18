@@ -11,6 +11,7 @@ import React, {
 import { createClient } from "@/utils/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { UserType } from "@/types/user";
+import { authLogger } from "@/utils/logger";
 
 // Define user context types
 type UserContextType = {
@@ -183,7 +184,9 @@ const fetchUserRole = async (
 
 // Create a client component wrapper
 function UserProviderClient({ children }: { children: ReactNode }) {
-  console.log("🟢 UserProviderClient MOUNTING - this should appear first!");
+  authLogger.debug(
+    "🟢 UserProviderClient MOUNTING - this should appear first!",
+  );
 
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -205,7 +208,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   const [hasImmediateData, setHasImmediateData] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  console.log(
+  authLogger.debug(
     "🟢 UserProviderClient state initialized - user:",
     !!user,
     "isLoading:",
@@ -659,7 +662,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
 // Export the provider component
 export function UserProvider({ children }: { children: ReactNode }) {
-  console.log("🔵 UserProvider wrapper called!");
+  authLogger.debug("🔵 UserProvider wrapper called!");
   return (
     <AuthErrorBoundary
       onError={(error, errorInfo) => {

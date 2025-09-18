@@ -14,6 +14,7 @@ import { UserType } from "@/types/user";
 import MobileMenu from "./MobileMenu";
 import { AuthButtonsSkeleton } from "@/components/Skeleton/AuthSkeleton";
 import { clearAuthCookies, hasAuthCookies } from "@/utils/auth/cookies";
+import { uiLogger } from "@/utils/logger";
 
 // Define base menu items (visible to all users)
 const baseMenuItems: MenuItem[] = [
@@ -77,7 +78,7 @@ const ROLE_MENU_ITEMS: Record<UserType, MenuItem> = {
   },
   [UserType.DRIVER]: {
     id: 3,
-    title: "Dashboard", 
+    title: "Dashboard",
     path: "/driver",
   },
   [UserType.ADMIN]: {
@@ -219,7 +220,7 @@ const Header: React.FC = () => {
 
   // Debug authentication state in header
   useEffect(() => {
-    console.log("🔧 Header component state update:", {
+    uiLogger.debug("🔧 Header component state update:", {
       hasUser: !!user,
       userId: user?.id,
       userEmail: user?.email,
@@ -233,7 +234,7 @@ const Header: React.FC = () => {
 
   // Manual cookie check as fallback when UserContext fails
   useEffect(() => {
-    console.log(
+    uiLogger.debug(
       "🆘 HEADER FALLBACK useEffect TRIGGERED - checking conditions:",
       {
         hasUser: !!user,
@@ -245,12 +246,14 @@ const Header: React.FC = () => {
 
     // Don't run fallback logic if we're in the process of signing out
     if (isSigningOut) {
-      console.log("🆘 HEADER FALLBACK: Skipping due to sign-out in progress");
+      uiLogger.debug(
+        "🆘 HEADER FALLBACK: Skipping due to sign-out in progress",
+      );
       return;
     }
 
     if (!user && !isLoading && typeof window !== "undefined") {
-      console.log(
+      uiLogger.debug(
         "🆘🆘🆘 HEADER FALLBACK: No user from context, checking cookies manually...",
       );
 
@@ -261,7 +264,10 @@ const Header: React.FC = () => {
         try {
           const decoded = decodeURIComponent(sessionMatch[1]);
           const sessionData = JSON.parse(decoded);
-          console.log("🆘 HEADER FALLBACK: Found session data:", sessionData);
+          uiLogger.debug(
+            "🆘 HEADER FALLBACK: Found session data:",
+            sessionData,
+          );
 
           // Additional validation: check if the session data is still valid
           // Don't set fallback user if the session appears to be expired or invalid
@@ -278,11 +284,11 @@ const Header: React.FC = () => {
 
               setFallbackUser(mockUser);
               setFallbackRole(sessionData.userRole.toLowerCase());
-              console.log(
+              uiLogger.debug(
                 "✅ HEADER FALLBACK: Set fallback user successfully!",
               );
             } else {
-              console.log(
+              uiLogger.debug(
                 "🆘 HEADER FALLBACK: Session data found but no valid auth cookies, clearing fallback state",
               );
               setFallbackUser(null);
@@ -297,7 +303,7 @@ const Header: React.FC = () => {
         }
       } else {
         // No session cookie found, ensure fallback state is cleared
-        console.log(
+        uiLogger.debug(
           "🆘 HEADER FALLBACK: No session cookie found, clearing fallback state",
         );
         setFallbackUser(null);
@@ -386,7 +392,7 @@ const Header: React.FC = () => {
       ? ROLE_MENU_ITEMS[effectiveUserRole as UserType]
       : null;
 
-  console.log("🔧 Header effective auth state:", {
+  uiLogger.debug("🔧 Header effective auth state:", {
     hasEffectiveUser: !!effectiveUser,
     effectiveUserRole,
     hasRoleMenuItem: !!roleMenuItem,

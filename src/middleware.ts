@@ -1,6 +1,7 @@
 // src/middleware.ts
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
+import { logger } from "@/utils/logger";
 
 // Protected routes that require session refresh
 const PROTECTED_ROUTES = [
@@ -18,7 +19,7 @@ const PROTECTED_ROUTES = [
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  console.log('🔄 [Main Middleware] Processing request for:', pathname);
+  logger.debug('🔄 [Main Middleware] Processing request for:', pathname);
   
   // Skip middleware for specific paths
   if (request.nextUrl.pathname.startsWith('/auth/callback') ||
@@ -35,7 +36,7 @@ export async function middleware(request: NextRequest) {
 
   try {
     // Update the user's session using Supabase middleware helper
-    console.log('🔄 [Main Middleware] Updating session...');
+    logger.debug('🔄 [Main Middleware] Updating session...');
     const response = await updateSession(request);
     
     // Check if the path is a protected route
@@ -106,7 +107,7 @@ export async function middleware(request: NextRequest) {
       console.log('🔓 [Main Middleware] Non-protected route, allowing through');
     }
     
-    console.log('✅ [Main Middleware] Request processed successfully');
+    logger.debug('✅ [Main Middleware] Request processed successfully');
     return response;
   } catch (error) {
     console.error('Error in middleware:', error);
