@@ -6,6 +6,7 @@ import { useLocationTracking } from '@/hooks/tracking/useLocationTracking';
 import { useDriverShift } from '@/hooks/tracking/useDriverShift';
 import { useDriverDeliveries } from '@/hooks/tracking/useDriverDeliveries';
 import { useOfflineQueue } from '@/hooks/tracking/useOfflineQueue';
+import { DriverStatus } from '@/types/user';
 
 // Mock the tracking hooks
 jest.mock('@/hooks/tracking/useLocationTracking');
@@ -53,9 +54,8 @@ describe('DriverTrackingPortal', () => {
     id: 'shift-123',
     driverId: 'driver-123',
     startTime: new Date(),
-    startLocation: defaultLocationUpdate,
+    startLocation: defaultLocationUpdate.coordinates,
     status: 'active' as const,
-    totalMiles: 0,
     totalDistanceKm: 0,
     deliveryCount: 0,
     breaks: [],
@@ -67,12 +67,12 @@ describe('DriverTrackingPortal', () => {
   const defaultDelivery = {
     id: 'delivery-123',
     driverId: 'driver-123',
-    status: 'ASSIGNED' as const, // Use valid DriverStatus enum value
+    status: DriverStatus.ASSIGNED,
     pickupLocation: {
-      coordinates: [-74.0060, 40.7128] // [lng, lat] format
+      coordinates: [-74.0060, 40.7128] as [number, number] // [lng, lat] format
     },
     deliveryLocation: {
-      coordinates: [-73.9851, 40.7589] // [lng, lat] format
+      coordinates: [-73.9851, 40.7589] as [number, number] // [lng, lat] format
     },
     estimatedArrival: new Date(Date.now() + 3600000),
     route: [],
@@ -125,8 +125,8 @@ describe('DriverTrackingPortal', () => {
         syncInProgress: false,
       },
       queuedItems: 0,
-      syncOfflineData: jest.fn(),
-      addToQueue: jest.fn(),
+      syncPendingItems: jest.fn(),
+      registerServiceWorker: jest.fn(),
     });
   });
 
@@ -144,8 +144,8 @@ describe('DriverTrackingPortal', () => {
         syncInProgress: false,
       },
       queuedItems: 0,
-      syncOfflineData: jest.fn(),
-      addToQueue: jest.fn(),
+      syncPendingItems: jest.fn(),
+      registerServiceWorker: jest.fn(),
     });
 
     render(<DriverTrackingPortal />);
@@ -372,8 +372,8 @@ describe('DriverTrackingPortal', () => {
         syncInProgress: false,
       },
       queuedItems: 2,
-      syncOfflineData: jest.fn(),
-      addToQueue: jest.fn(),
+      syncPendingItems: jest.fn(),
+      registerServiceWorker: jest.fn(),
     });
 
     render(<DriverTrackingPortal />);

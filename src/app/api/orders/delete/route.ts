@@ -332,7 +332,5 @@ export async function DELETE(req: NextRequest) {
       success: false, 
       error: 'An error occurred while deleting the order. Please try again.'
     }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
   }
 }

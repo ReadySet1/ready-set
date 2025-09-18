@@ -41,7 +41,7 @@ export async function updateSession(request: NextRequest) {
     )
 
     // Refresh the session
-    await supabase.auth.getSession()
+    await supabase.auth.getUser()
     return response
   } catch (error) {
     console.error('Error in updateSession middleware:', error)

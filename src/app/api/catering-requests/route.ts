@@ -190,7 +190,5 @@ export async function POST(request: NextRequest) {
       { message: error instanceof Error ? error.message : "Failed to process catering request" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 } 

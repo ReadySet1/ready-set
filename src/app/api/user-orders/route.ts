@@ -97,8 +97,5 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("Error fetching user orders:", error);
     return NextResponse.json({ message: "Error fetching user orders" }, { status: 500 });
-  } finally {
-    // Disconnect Prisma client
-    await prisma.$disconnect();
   }
 }

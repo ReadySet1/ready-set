@@ -8,6 +8,7 @@ import { useDriverShift } from '@/hooks/tracking/useDriverShift';
 import { useDriverDeliveries } from '@/hooks/tracking/useDriverDeliveries';
 import { useOfflineQueue } from '@/hooks/tracking/useOfflineQueue';
 import { useRealTimeTracking } from '@/hooks/tracking/useRealTimeTracking';
+import { DriverStatus } from '@/types/user';
 
 // Mock all the tracking hooks
 jest.mock('@/hooks/tracking/useLocationTracking');
@@ -78,59 +79,66 @@ describe('Tracking System Integration', () => {
   const mockDrivers = [
     {
       id: 'driver-1',
-      name: 'John Doe',
-      email: 'john@example.com',
-      phone: '+1234567890',
-      status: 'active',
-      currentLocation: {
-        lat: 40.7128,
-        lng: -74.0060,
-        accuracy: 10,
-        timestamp: new Date(),
+      employeeId: 'EMP001',
+      phoneNumber: '+1234567890',
+      isActive: true,
+      isOnDuty: true,
+      lastKnownLocation: {
+        coordinates: [-74.0060, 40.7128] as [number, number], // [lng, lat]
       },
-      currentShift: {
-        id: 'shift-1',
-        startTime: new Date(Date.now() - 3600000), // 1 hour ago
-        status: 'active',
-      },
+      lastLocationUpdate: new Date(),
       vehicleInfo: {
         number: 'V001',
         type: 'van',
       },
+      metadata: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
     {
       id: 'driver-2',
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      phone: '+0987654321',
-      status: 'offline',
-      currentLocation: null,
-      currentShift: null,
+      employeeId: 'EMP002',
+      phoneNumber: '+0987654321',
+      isActive: true,
+      isOnDuty: false,
+      lastKnownLocation: undefined,
+      lastLocationUpdate: undefined,
       vehicleInfo: {
         number: 'V002',
         type: 'car',
       },
+      metadata: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
   ];
 
   const mockDeliveries = [
     {
       id: 'delivery-1',
-      status: 'pending',
-      pickupLocation: { lat: 40.7128, lng: -74.0060 },
-      deliveryLocation: { lat: 40.7589, lng: -73.9851 },
+      driverId: 'driver-1',
+      status: DriverStatus.ASSIGNED,
+      pickupLocation: { coordinates: [-74.0060, 40.7128] as [number, number] },
+      deliveryLocation: { coordinates: [-73.9851, 40.7589] as [number, number] },
       estimatedArrival: new Date(Date.now() + 3600000),
-      driverId: null,
-      customerName: 'Customer A',
+      route: [],
+      metadata: {},
+      assignedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
     {
       id: 'delivery-2',
-      status: 'in_transit',
-      pickupLocation: { lat: 40.7589, lng: -73.9851 },
-      deliveryLocation: { lat: 40.7505, lng: -73.9934 },
-      estimatedArrival: new Date(Date.now() + 1800000),
       driverId: 'driver-1',
-      customerName: 'Customer B',
+      status: DriverStatus.EN_ROUTE_TO_CLIENT,
+      pickupLocation: { coordinates: [-73.9851, 40.7589] as [number, number] },
+      deliveryLocation: { coordinates: [-73.9934, 40.7505] as [number, number] },
+      estimatedArrival: new Date(Date.now() + 1800000),
+      route: [],
+      metadata: {},
+      assignedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
   ];
 
@@ -165,6 +173,7 @@ describe('Tracking System Integration', () => {
       endShift: jest.fn().mockResolvedValue(true),
       startBreak: jest.fn().mockResolvedValue(true),
       endBreak: jest.fn().mockResolvedValue(true),
+      refreshShift: jest.fn(),
       loading: false,
       error: null,
     });
@@ -172,26 +181,26 @@ describe('Tracking System Integration', () => {
     mockUseDriverDeliveries.mockReturnValue({
       activeDeliveries: [],
       updateDeliveryStatus: jest.fn().mockResolvedValue(true),
+      refreshDeliveries: jest.fn(),
       loading: false,
       error: null,
     });
 
     mockUseOfflineQueue.mockReturnValue({
-      offlineStatus: { isOnline: true, lastSync: new Date() },
-      queuedItems: [],
-      syncOfflineData: jest.fn(),
-      addToQueue: jest.fn(),
+      offlineStatus: { isOnline: true, lastSync: new Date(), pendingUpdates: 0, syncInProgress: false },
+      queuedItems: 0,
+      registerServiceWorker: jest.fn(),
+      syncPendingItems: jest.fn(),
     });
 
     // Default mock implementations for admin dashboard
     mockUseRealTimeTracking.mockReturnValue({
-      drivers: mockDrivers,
-      deliveries: mockDeliveries,
-      loading: false,
+      activeDrivers: mockDrivers,
+      activeDeliveries: mockDeliveries,
+      recentLocations: [],
       error: null,
-      refreshData: jest.fn(),
+      reconnect: jest.fn(),
       isConnected: true,
-      lastUpdate: new Date(),
     });
   });
 
@@ -221,6 +230,7 @@ describe('Tracking System Integration', () => {
         endShift: mockEndShift,
         startBreak: jest.fn(),
         endBreak: jest.fn(),
+        refreshShift: jest.fn(),
         loading: false,
         error: null,
       });
@@ -241,16 +251,21 @@ describe('Tracking System Integration', () => {
           id: 'shift-1',
           driverId: 'driver-1',
           startTime: new Date(),
+          startLocation: { lat: 40.7128, lng: -74.0060 },
           status: 'active' as const,
-          totalMiles: 0,
+          totalDistanceKm: 0,
           deliveryCount: 0,
           breaks: [],
+          metadata: {},
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
         isShiftActive: true,
         startShift: mockStartShift,
         endShift: mockEndShift,
         startBreak: jest.fn(),
         endBreak: jest.fn(),
+        refreshShift: jest.fn(),
         loading: false,
         error: null,
       });
@@ -276,24 +291,30 @@ describe('Tracking System Integration', () => {
           id: 'shift-1',
           driverId: 'driver-1',
           startTime: new Date(),
+          startLocation: { lat: 40.7128, lng: -74.0060 },
           status: 'active' as const,
-          totalMiles: 0,
+          totalDistanceKm: 0,
           deliveryCount: 0,
           breaks: [],
+          metadata: {},
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
         isShiftActive: true,
         startShift: jest.fn(),
         endShift: jest.fn(),
         startBreak: jest.fn(),
         endBreak: jest.fn(),
+        refreshShift: jest.fn(),
         loading: false,
         error: null,
       });
 
       // Mock active deliveries
       mockUseDriverDeliveries.mockReturnValue({
-        activeDeliveries: [mockDeliveries[1]], // in_transit delivery
+        activeDeliveries: [mockDeliveries[1]!], // in_transit delivery
         updateDeliveryStatus: mockUpdateDeliveryStatus,
+        refreshDeliveries: jest.fn(),
         loading: false,
         error: null,
       });
@@ -319,16 +340,21 @@ describe('Tracking System Integration', () => {
           id: 'shift-1',
           driverId: 'driver-1',
           startTime: new Date(),
+          startLocation: { lat: 40.7128, lng: -74.0060 },
           status: 'active' as const,
-          totalMiles: 0,
+          totalDistanceKm: 0,
           deliveryCount: 0,
           breaks: [],
+          metadata: {},
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
         isShiftActive: true,
         startShift: jest.fn(),
         endShift: jest.fn(),
         startBreak: mockStartBreak,
         endBreak: mockEndBreak,
+        refreshShift: jest.fn(),
         loading: false,
         error: null,
       });
@@ -370,13 +396,12 @@ describe('Tracking System Integration', () => {
     it('handles driver selection and delivery assignment', async () => {
       const mockRefreshData = jest.fn();
       mockUseRealTimeTracking.mockReturnValue({
-        drivers: mockDrivers,
-        deliveries: mockDeliveries,
-        loading: false,
+        activeDrivers: mockDrivers,
+        activeDeliveries: mockDeliveries,
+      recentLocations: [],
         error: null,
-        refreshData: mockRefreshData,
+        reconnect: jest.fn(),
         isConnected: true,
-        lastUpdate: new Date(),
       });
 
       render(<AdminTrackingDashboard />);
@@ -405,13 +430,12 @@ describe('Tracking System Integration', () => {
     it('handles connection failures gracefully', async () => {
       const mockRefreshData = jest.fn();
       mockUseRealTimeTracking.mockReturnValue({
-        drivers: [],
-        deliveries: [],
-        loading: false,
+        activeDrivers: [],
+        activeDeliveries: [],
+        recentLocations: [],
         error: 'Connection lost',
-        refreshData: mockRefreshData,
+        reconnect: jest.fn(),
         isConnected: false,
-        lastUpdate: new Date(),
       });
 
       render(<AdminTrackingDashboard />);
@@ -434,13 +458,10 @@ describe('Tracking System Integration', () => {
 
       // Mock offline status
       mockUseOfflineQueue.mockReturnValue({
-        offlineStatus: { isOnline: false, lastSync: new Date() },
-        queuedItems: [
-          { id: 'item-1', type: 'location', data: mockLocationUpdate },
-          { id: 'item-2', type: 'delivery', data: { deliveryId: 'delivery-1', status: 'completed' } },
-        ],
-        syncOfflineData: mockSyncOfflineData,
-        addToQueue: mockAddToQueue,
+        offlineStatus: { isOnline: false, lastSync: new Date(), pendingUpdates: 2, syncInProgress: false },
+        queuedItems: 2,
+        registerServiceWorker: jest.fn(),
+        syncPendingItems: mockSyncOfflineData,
       });
 
       render(<DriverTrackingPortal />);
@@ -451,10 +472,10 @@ describe('Tracking System Integration', () => {
 
       // Mock coming back online
       mockUseOfflineQueue.mockReturnValue({
-        offlineStatus: { isOnline: true, lastSync: new Date() },
-        queuedItems: [],
-        syncOfflineData: mockSyncOfflineData,
-        addToQueue: mockAddToQueue,
+        offlineStatus: { isOnline: true, lastSync: new Date(), pendingUpdates: 0, syncInProgress: false },
+        queuedItems: 0,
+        registerServiceWorker: jest.fn(),
+        syncPendingItems: mockSyncOfflineData,
       });
 
       // Re-render to show online status
@@ -467,10 +488,10 @@ describe('Tracking System Integration', () => {
       const mockAddToQueue = jest.fn();
 
       mockUseOfflineQueue.mockReturnValue({
-        offlineStatus: { isOnline: false, lastSync: new Date() },
-        queuedItems: [],
-        syncOfflineData: jest.fn(),
-        addToQueue: mockAddToQueue,
+        offlineStatus: { isOnline: false, lastSync: new Date(), pendingUpdates: 0, syncInProgress: false },
+        queuedItems: 0,
+        registerServiceWorker: jest.fn(),
+        syncPendingItems: jest.fn(),
       });
 
       render(<DriverTrackingPortal />);
@@ -505,13 +526,12 @@ describe('Tracking System Integration', () => {
     it('handles real-time updates across components', async () => {
       const mockRefreshData = jest.fn();
       mockUseRealTimeTracking.mockReturnValue({
-        drivers: mockDrivers,
-        deliveries: mockDeliveries,
-        loading: false,
+        activeDrivers: mockDrivers,
+        activeDeliveries: mockDeliveries,
+      recentLocations: [],
         error: null,
-        refreshData: mockRefreshData,
+        reconnect: jest.fn(),
         isConnected: true,
-        lastUpdate: new Date(),
       });
 
       render(<AdminTrackingDashboard />);
@@ -548,6 +568,7 @@ describe('Tracking System Integration', () => {
         endShift: jest.fn(),
         startBreak: jest.fn(),
         endBreak: jest.fn(),
+        refreshShift: jest.fn(),
         loading: false,
         error: 'Failed to start shift',
       });
@@ -559,8 +580,9 @@ describe('Tracking System Integration', () => {
 
     it('handles delivery update errors', async () => {
       mockUseDriverDeliveries.mockReturnValue({
-        activeDeliveries: [mockDeliveries[1]],
+        activeDeliveries: [mockDeliveries[1]!],
         updateDeliveryStatus: jest.fn().mockRejectedValue(new Error('Update failed')),
+        refreshDeliveries: jest.fn(),
         loading: false,
         error: 'Failed to update delivery',
       });
@@ -575,11 +597,21 @@ describe('Tracking System Integration', () => {
     it('handles large numbers of drivers and deliveries efficiently', () => {
       const largeDrivers = Array.from({ length: 100 }, (_, i) => ({
         id: `driver-${i}`,
-        name: `Driver ${i}`,
-        email: `driver${i}@example.com`,
-        status: i % 2 === 0 ? 'active' : 'offline',
-        currentLocation: i % 2 === 0 ? { lat: 40.7128, lng: -74.0060 } : null,
-        currentShift: i % 2 === 0 ? { id: `shift-${i}`, startTime: new Date(), status: 'active' } : null,
+        employeeId: `EMP${String(i).padStart(3, '0')}`,
+        phoneNumber: `+1234567${String(i).padStart(3, '0')}`,
+        isActive: true,
+        isOnDuty: i % 2 === 0,
+        lastKnownLocation: i % 2 === 0 ? {
+          coordinates: [-74.0060, 40.7128] as [number, number]
+        } : undefined,
+        lastLocationUpdate: i % 2 === 0 ? new Date() : undefined,
+        vehicleInfo: {
+          number: `V${String(i).padStart(3, '0')}`,
+          type: 'van',
+        },
+        metadata: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
       }));
 
       const largeDeliveries = Array.from({ length: 50 }, (_, i) => ({
@@ -593,13 +625,12 @@ describe('Tracking System Integration', () => {
       }));
 
       mockUseRealTimeTracking.mockReturnValue({
-        drivers: largeDrivers,
-        deliveries: largeDeliveries,
-        loading: false,
+        activeDrivers: largeDrivers,
+        activeDeliveries: [],
+        recentLocations: [],
         error: null,
-        refreshData: jest.fn(),
+        reconnect: jest.fn(),
         isConnected: true,
-        lastUpdate: new Date(),
       });
 
       render(<AdminTrackingDashboard />);
@@ -618,6 +649,7 @@ describe('Tracking System Integration', () => {
         endShift: jest.fn(),
         startBreak: jest.fn(),
         endBreak: jest.fn(),
+        refreshShift: jest.fn(),
         loading: false,
         error: null,
       });

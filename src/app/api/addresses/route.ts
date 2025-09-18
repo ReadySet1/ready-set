@@ -46,28 +46,43 @@ setInterval(() => {
   }
 }, RATE_LIMIT_WINDOW);
 
+// Helper function to authenticate user via multiple methods
+async function authenticateUser(request: NextRequest) {
+  // Try bearer token authentication first (for backward compatibility)
+  const authHeader = request.headers.get('authorization');
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (!error && user?.id) {
+      return { user, error: null };
+    }
+  }
+  
+  // Fallback to cookie-based authentication (more secure)
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    if (!error && user?.id) {
+      return { user, error: null };
+    }
+    
+    return { user: null, error: error || new Error('No valid authentication found') };
+  } catch (err) {
+    return { user: null, error: err as Error };
+  }
+}
+
 /**
  * GET handler for fetching addresses
  */
 export async function GET(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: "Authentication required - Invalid authorization header" },
-        { status: 401 },
-      );
-    }
-
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-    
-    // Initialize Supabase client
-    const supabase = await createClient();
-    
-    // Verify the token by getting the user
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token);
+    // Authenticate user using multiple methods
+    const { user: currentUser, error: authError } = await authenticateUser(request);
 
     if (authError || !currentUser?.id) {
       console.error("Auth error:", authError);
@@ -261,24 +276,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error("POST /api/addresses: Missing or invalid authorization header");
-      return NextResponse.json(
-        { error: "Authentication required - Invalid authorization header" },
-        { status: 401 },
-      );
-    }
-
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-    
-    // Initialize Supabase client
-    const supabase = await createClient();
-    
-    // Verify the token by getting the user
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token);
+    // Authenticate user using multiple methods
+    const { user: currentUser, error: authError } = await authenticateUser(request);
 
     if (authError || !currentUser?.id) {
       console.error("POST /api/addresses: Auth error:", authError);
@@ -406,23 +405,8 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: "Authentication required - Invalid authorization header" },
-        { status: 401 },
-      );
-    }
-
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-    
-    // Initialize Supabase client
-    const supabase = await createClient();
-    
-    // Verify the token by getting the user
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token);
+    // Authenticate user using multiple methods
+    const { user: currentUser, error: authError } = await authenticateUser(request);
 
     if (authError || !currentUser?.id) {
       console.error("Auth error:", authError);
@@ -515,23 +499,8 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: "Authentication required - Invalid authorization header" },
-        { status: 401 },
-      );
-    }
-
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-    
-    // Initialize Supabase client
-    const supabase = await createClient();
-    
-    // Verify the token by getting the user
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token);
+    // Authenticate user using multiple methods
+    const { user: currentUser, error: authError } = await authenticateUser(request);
 
     if (authError || !currentUser?.id) {
       console.error("Auth error:", authError);

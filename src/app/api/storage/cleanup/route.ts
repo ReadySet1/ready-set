@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     // Check if user is admin
-    const isAdmin = user?.type === 'admin' || user?.type === 'super_admin';
+    const isAdmin = user?.type === 'ADMIN' || user?.type === 'SUPER_ADMIN';
     
     if (userError || !isAdmin) {
       return NextResponse.json(

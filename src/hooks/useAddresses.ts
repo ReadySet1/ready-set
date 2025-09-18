@@ -28,17 +28,17 @@ interface UseAddressesOptions {
 // Fetch addresses with proper error handling and authentication
 const fetchAddresses = async (params: AddressesQueryParams): Promise<AddressesResponse> => {
   const supabase = await createClient();
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-  if (sessionError || !session) {
+  if (userError || !user) {
     throw new Error('Authentication required. Please sign in again.');
   }
 
   const response = await fetch(
     `/api/addresses?filter=${params.filter}&page=${params.page}&limit=${params.limit}`,
     {
+      credentials: 'include',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
     }
@@ -87,16 +87,16 @@ const fetchAddresses = async (params: AddressesQueryParams): Promise<AddressesRe
 // Create address mutation
 const createAddress = async (addressData: AddressFormData): Promise<Address> => {
   const supabase = await createClient();
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-  if (sessionError || !session) {
+  if (userError || !user) {
     throw new Error('Authentication required. Please sign in again.');
   }
 
   const response = await fetch('/api/addresses', {
     method: 'POST',
+    credentials: 'include',
     headers: {
-      Authorization: `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(addressData),
@@ -113,16 +113,16 @@ const createAddress = async (addressData: AddressFormData): Promise<Address> => 
 // Update address mutation
 const updateAddress = async ({ id, data }: { id: string; data: Partial<AddressFormData> }): Promise<Address> => {
   const supabase = await createClient();
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-  if (sessionError || !session) {
+  if (userError || !user) {
     throw new Error('Authentication required. Please sign in again.');
   }
 
   const response = await fetch(`/api/addresses?id=${id}`, {
     method: 'PUT',
+    credentials: 'include',
     headers: {
-      Authorization: `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(data),
@@ -139,16 +139,16 @@ const updateAddress = async ({ id, data }: { id: string; data: Partial<AddressFo
 // Delete address mutation
 const deleteAddress = async (id: string): Promise<void> => {
   const supabase = await createClient();
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-  if (sessionError || !session) {
+  if (userError || !user) {
     throw new Error('Authentication required. Please sign in again.');
   }
 
   const response = await fetch(`/api/addresses?id=${id}`, {
     method: 'DELETE',
+    credentials: 'include',
     headers: {
-      Authorization: `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     },
   });

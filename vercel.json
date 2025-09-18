@@ -10,8 +10,7 @@
   "build": {
     "env": {
       "PRISMA_SKIP_POSTINSTALL_GENERATE": "true",
-      "NEXT_TELEMETRY_DISABLED": "1",
-      "NODE_ENV": "production"
+      "NEXT_TELEMETRY_DISABLED": "1"
     }
   },
   "headers": [

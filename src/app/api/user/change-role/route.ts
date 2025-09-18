@@ -75,7 +75,5 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error updating user role:', error);
     return NextResponse.json({ message: 'Error updating user role' }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
   }
 }

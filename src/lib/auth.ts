@@ -80,7 +80,7 @@ export async function syncOAuthProfile(userId: string, metadata: any) {
 }
 
 // IMPORTANT: Ensure the 'role' string passed here matches the UserType enum case (e.g., "VENDOR", "CLIENT")
-export async function updateUserRole(userId: string, role: string) {
+export async function updateUserRole(userId: string, role: 'VENDOR' | 'CLIENT' | 'DRIVER' | 'ADMIN' | 'HELPDESK' | 'SUPER_ADMIN') {
   const supabase = await createClient();
   let profileError: any = null;
   let authError: any = null;
