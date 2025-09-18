@@ -519,14 +519,8 @@ export class CalculatorEngine {
    * Evaluates tiered base pay for drivers based on Ready Set compensation rules
    */
   private evaluateTieredBasePay(rule: PricingRule, context: RuleContext): number {
-    const { tips } = context.input;
-    
-    // Critical Rule: If there's a tip, driver gets tip only (no base pay from bonus structure)
-    // This implements the mutually exclusive rule: tips OR bonus structure, never both
-    if (tips && tips > 0) {
-      return 0; // Base pay is 0, tip will be handled separately
-    }
-    
+    // Driver always gets base pay regardless of tips
+    // Tips are handled separately as a pass-through
     const tier = this.determineTier(context.input);
     const tierConfig = READY_SET_TIERS.find(t => t.tier === tier);
     return tierConfig?.driverBasePay || READY_SET_TIERS[0]?.driverBasePay || 35;

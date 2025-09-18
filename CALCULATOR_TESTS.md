@@ -40,9 +40,9 @@ Test these examples to verify the calculator matches the compensation rules exac
 - Tips: `0`
 
 **Expected Results**:
-- **Customer Total**: $81 ($75 base + $6 long distance)
+- **Customer Total**: $81.00 ($75 base + $6 long distance)
 - **Driver Total**: $40.70 ($40 base + $0.70 mileage)
-- **Profit**: ~$40
+- **Profit**: ~$40.30
 - **Breakdown**:
   - Customer: $75 Tier 2 base + $6 long distance (2 miles × $3)
   - Driver: $40 Tier 2 base + $0.70 mileage (2 miles × $0.35)
@@ -83,13 +83,13 @@ Test these examples to verify the calculator matches the compensation rules exac
 - Tips: `20`
 
 **Expected Results**:
-- **Customer Total**: $96.75 ($75 base + $15 long distance + $20 tip)
-- **Driver Total**: $21.75 ($20 tip + $1.75 mileage only)
-- **Profit**: ~$75
+- **Customer Total**: $110.00 ($75 base + $15 long distance + $20 tip)
+- **Driver Total**: $61.75 ($40 base + $1.75 mileage + $20 tip)
+- **Profit**: ~$48.25
 - **Breakdown**:
   - Customer: $75 Tier 2 base + $15 long distance (5 miles × $3) + $20 tip = $110
-  - Driver: $20 tip + $1.75 mileage (5 miles × $0.35) = $21.75
-- **Key Rule**: With direct tip, driver gets 100% tip but NO bonus structure payment
+  - Driver: $40 Tier 2 base + $1.75 mileage (5 miles × $0.35) + $20 tip = $61.75
+- **Key Rule**: With direct tip, driver gets base pay + mileage + 100% tip pass-through
 
 ---
 
@@ -118,7 +118,7 @@ const testExamples = [
   {
     name: "Example 4 (With Tip)",
     input: { headcount: 30, foodCost: 400, mileage: 15, requiresBridge: false, numberOfStops: 1, tips: 20 },
-    expected: { customer: 110, driver: 21.75 }
+    expected: { customer: 110, driver: 61.75 }
   }
 ];
 

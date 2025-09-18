@@ -66,14 +66,14 @@ Weekly bonus can be reduced for:
 
 ### Example 4 (With Direct Tip):
 **Input**: 30 people, $400 order, 15 miles, $20 tip
-- **Customer pays**: ~$95 (includes tip)
-- **Driver gets**: $21.75 ($20 tip + $1.75 mileage only)
-- **Note**: With direct tip, driver gets 100% tip but NO bonus structure payment
+- **Customer pays**: $110 (base + long distance + tip)
+- **Driver gets**: $61.75 ($40 base + $1.75 mileage + $20 tip)
+- **Note**: With direct tip, driver gets base pay + mileage + 100% tip pass-through
 
 ## Key Calculator Rules:
 1. **Payout determination**: Lesser of headcount vs order value categories
 2. **Mileage**: First 10 miles included, $0.35/mile thereafter
-3. **Either/Or**: Bonus structure OR direct tips (never both)
+3. **Tips**: 100% pass-through to driver in addition to base pay and mileage
 4. **Bridge tolls**: $8 flat reimbursement to driver
 5. **Weekly accumulation**: Bonuses calculated weekly, subject to performance deductions
 

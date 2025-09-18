@@ -89,7 +89,7 @@ export function DeliveryCalculator({
     numberOfStops: 1,
     tips: 0,
     adjustments: 0,
-    mileageRate: 0.70,
+    mileageRate: 0.35,
     deliveryArea: ''
   });
 
@@ -489,8 +489,8 @@ export function DeliveryCalculator({
                     min="0"
                     step="0.01"
                     value={input.mileageRate}
-                    onChange={(e) => handleInputChange('mileageRate', parseFloat(e.target.value) || 0.70)}
-                    placeholder="0.70"
+                    onChange={(e) => handleInputChange('mileageRate', parseFloat(e.target.value) || 0.35)}
+                    placeholder="0.35"
                     className="h-9 border-slate-200 focus:border-slate-400 focus:ring-slate-200 bg-white/80"
                   />
                 </div>
