@@ -6,16 +6,19 @@ import { withAuth } from '@/lib/auth-middleware';
 export async function GET(request: NextRequest) {
   try {
     // Use standardized authentication with role-based access
+    // Allow CLIENT role as well since they need to see drivers for order management
     const authResult = await withAuth(request, {
-      allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
+      allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'HELPDESK', 'CLIENT'],
       requireAuth: true
     });
 
     if (!authResult.success) {
+      console.error('Driver API access denied:', authResult.response);
       return authResult.response;
     }
 
     const { context } = authResult;
+    console.log('Driver API accessed by user:', context.user?.type, context.user?.email);
 
     // Fetch all drivers - only authorized personnel can see this sensitive data
     const drivers = await prisma.profile.findMany({
