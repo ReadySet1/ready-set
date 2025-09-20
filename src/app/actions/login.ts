@@ -282,12 +282,12 @@ export async function login(
       };
     }
 
-    // Get user type from profile
+    // Get user type from profile - use maybeSingle() to handle cases where profile doesn't exist
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("type, email")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
     if (profileError) {
       console.error(`❌ [${requestId}] Error fetching user profile:`, profileError);
@@ -297,12 +297,29 @@ export async function login(
       };
     }
 
-    if (!profile?.type) {
-      console.error(`❌ [${requestId}] No profile type found for user: ${user.id}`);
-      return { 
-        error: "Login successful but user profile is incomplete. Please contact support.",
-        success: false 
+    // If no profile exists or profile has no type, redirect to profile completion
+    if (!profile || !profile.type) {
+      console.log(`ℹ️ [${requestId}] User profile ${!profile ? 'does not exist' : 'has no type'} for user: ${user.id}, redirecting to profile completion`);
+      
+      // Set basic session data for the profile completion process
+      const cookieStore = await cookies();
+      const sessionData = {
+        userId: user.id,
+        email: user.email || '',
+        userRole: 'guest', // Temporary role until profile is completed
+        timestamp: Date.now()
       };
+      
+      cookieStore.set('user-session-data', JSON.stringify(sessionData), {
+        path: '/',
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7 // 7 days
+      });
+
+      console.log(`🔄 [${requestId}] Redirecting to profile completion for user: ${user.id}`);
+      redirect('/complete-profile');
     }
 
   console.log("User profile type from DB:", profile.type);
