@@ -167,8 +167,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   // Check for bucket existence but don't try to create it (requires admin privileges)
   const ensureStorageBucketExists = useCallback(async () => {
     try {
-      console.log("Checking storage bucket configuration:", STORAGE_BUCKET);
-
       // Refresh auth session
       const {
         data: { session },
@@ -189,9 +187,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
         // Don't try to create the bucket - just log the error
         if (bucketsError.message.includes("permission")) {
-          console.log(
-            "Permission error listing buckets - this is expected for non-admin users",
-          );
+          // Permission error listing buckets - this is expected for non-admin users
         }
         return;
       }
@@ -201,16 +197,8 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         buckets &&
         Array.isArray(buckets) &&
         buckets.some((bucket) => bucket.name === STORAGE_BUCKET);
-      console.log(
-        "Available buckets:",
-        buckets?.map((b) => b.name).join(", ") || "none",
-      );
 
       if (!bucketExists) {
-        console.log(
-          `Bucket '${STORAGE_BUCKET}' not found in the list, but it might still exist with restricted permissions`,
-        );
-
         // Test accessing the bucket to see if it's actually accessible
         const { data, error: accessError } = await supabase.storage
           .from(STORAGE_BUCKET)
@@ -225,15 +213,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
               "File storage is not configured properly. Please contact support.",
             );
           } else {
-            console.log(
-              `Cannot access bucket contents but it might exist: ${accessError.message}`,
-            );
           }
         } else {
-          console.log(`Bucket '${STORAGE_BUCKET}' exists and is accessible`);
         }
       } else {
-        console.log(`Bucket '${STORAGE_BUCKET}' exists in the list`);
       }
     } catch (error) {
       console.error("Error checking storage bucket:", error);
@@ -248,7 +231,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     }
 
     setIsLoading(true);
-    console.log("Fetching order details for:", orderNumber);
 
     try {
       // Refresh auth session before making the request
@@ -302,7 +284,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       }
 
       const orderData = await orderResponse.json();
-      console.log("Order data received:", orderData);
 
       // Transform the data to match our types
       const transformedOrder: Order = {
@@ -327,7 +308,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
       // Fetch files with improved error handling
       try {
-        console.log(`Fetching files for order: ${orderNumber}`);
         const filesResponse = await fetch(
           `/api/orders/${encodeURIComponent(orderNumber)}/files`,
           {
@@ -344,7 +324,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         }
 
         const filesData = await filesResponse.json();
-        console.log("Files data received:", filesData);
 
         const filesArray = Array.isArray(filesData)
           ? filesData
@@ -562,11 +541,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         return;
       }
 
-      console.log(
-        `Updating driver status for order ${order.orderNumber} to:`,
-        newStatus,
-      );
-
       const response = await fetch(
         `/api/orders/${encodeURIComponent(order.orderNumber)}`,
         {
@@ -602,21 +576,11 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       }
 
       const updatedOrder = await response.json();
-      console.log(
-        `Driver status for order ${order.orderNumber} updated response:`,
-        updatedOrder,
-      );
       setOrder(updatedOrder);
       toast.success("Driver status updated successfully!");
 
       // If driver status is updated to completed, also update the main order status
-      console.log(
-        `Checking if driver status '${newStatus}' requires order status update.`,
-      );
       if (newStatus === DriverStatus.COMPLETED) {
-        console.log(
-          `Triggering order status update to COMPLETED for order ${order.orderNumber}`,
-        );
         await handleOrderStatusChange(OrderStatus.COMPLETED);
       }
     } catch (error) {
@@ -644,11 +608,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         router.push("/auth/login");
         return;
       }
-
-      console.log(
-        `Updating internal ORDER status for order ${order.orderNumber} to:`,
-        newStatus,
-      );
 
       const response = await fetch(
         `/api/orders/${encodeURIComponent(order.orderNumber)}`,
@@ -682,10 +641,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         );
       }
       const updatedOrderData = await response.json();
-      console.log(
-        `Internal order status for order ${order.orderNumber} updated response:`,
-        updatedOrderData,
-      );
       return updatedOrderData as Order;
     };
 
