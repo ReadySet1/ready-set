@@ -179,7 +179,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
   // Check for bucket existence but don't try to create it (requires admin privileges)
   const ensureStorageBucketExists = useCallback(async () => {
     try {
-
       // Refresh auth session
       const {
         data: { session },
@@ -212,9 +211,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         buckets.some((bucket) => bucket.name === STORAGE_BUCKET);
 
       if (!bucketExists) {
-          `Bucket '${STORAGE_BUCKET}' not found in the list, but it might still exist with restricted permissions`,
-        );
-
         // Test accessing the bucket to see if it's actually accessible
         const { data, error: accessError } = await supabase.storage
           .from(STORAGE_BUCKET)
@@ -229,12 +225,13 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
               "File storage is not configured properly. Please contact support.",
             );
           } else {
-              `Cannot access bucket contents but it might exist: ${accessError.message}`,
-            );
+            // Cannot access bucket contents but it might exist
           }
         } else {
+          // Bucket is accessible and working properly
         }
       } else {
+        // Bucket found in the list and should be accessible
       }
     } catch (error) {
       console.error("Error checking storage bucket:", error);
@@ -524,7 +521,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       setForceCloseDialog(true);
       setIsDriverDialogOpen(false);
 
-
       toast.success(
         isDriverAssigned
           ? "Driver updated successfully!"
@@ -559,10 +555,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         router.push("/auth/login");
         return;
       }
-
-        `Updating driver status for on-demand order ${order.orderNumber} to:`,
-        newStatus,
-      );
 
       const response = await fetch(
         `/api/orders/${encodeURIComponent(order.orderNumber)}`,
@@ -599,18 +591,11 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       }
 
       const updatedOrder = await response.json();
-        `Driver status for on-demand order ${order.orderNumber} updated response:`,
-        updatedOrder,
-      );
       setOrder(updatedOrder);
       toast.success("Driver status updated successfully!");
 
       // If driver status is updated to completed, also update the main order status
-        `Checking if driver status '${newStatus}' requires order status update.`,
-      );
       if (newStatus === DriverStatus.COMPLETED) {
-          `Triggering order status update to COMPLETED for on-demand order ${order.orderNumber}`,
-        );
         await handleOrderStatusChange(OrderStatus.COMPLETED);
       }
     } catch (error) {
@@ -638,10 +623,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         router.push("/auth/login");
         return;
       }
-
-        `Updating internal ORDER status for on-demand order ${order.orderNumber} to:`,
-        newStatus,
-      );
 
       const response = await fetch(
         `/api/orders/${encodeURIComponent(order.orderNumber)}`,
@@ -675,9 +656,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         );
       }
       const updatedOrderData = await response.json();
-        `Internal order status for on-demand order ${order.orderNumber} updated response:`,
-        updatedOrderData,
-      );
       return updatedOrderData as Order;
     };
 
