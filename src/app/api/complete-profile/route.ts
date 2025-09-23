@@ -128,7 +128,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error completing profile:', error);
     
-    if (error?.code === "P2002") {
+    // Check if this is a Prisma error with a code property
+    if (error && typeof error === 'object' && 'code' in error && error.code === "P2002") {
       return NextResponse.json(
         { error: "Profile already exists for this user" },
         { status: 409 }

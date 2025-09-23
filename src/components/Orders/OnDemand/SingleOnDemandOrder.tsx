@@ -158,6 +158,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
   const [files, setFiles] = useState<FileUpload[]>([]);
+  const [forceCloseDialog, setForceCloseDialog] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -526,8 +527,24 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         );
       }
 
+      // Wait for the order details to refresh before closing the dialog
+      console.log("🔄 Refreshing order details...");
       await fetchOrderDetails();
+      console.log("✅ Order details refreshed");
+
+      // Add a small delay to ensure state updates are processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Close the dialog only after the data has been refreshed
+      console.log("🚪 Closing dialog...");
+      console.log("Current dialog state before closing:", isDriverDialogOpen);
+
+      // Use both methods to ensure dialog closes
+      setForceCloseDialog(true);
       setIsDriverDialogOpen(false);
+
+      console.log("✅ Dialog closed, new state should be false");
+
       toast.success(
         isDriverAssigned
           ? "Driver updated successfully!"
@@ -1209,8 +1226,13 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       </motion.div>
 
       <DriverAssignmentDialog
-        isOpen={isDriverDialogOpen}
-        onOpenChange={setIsDriverDialogOpen}
+        isOpen={isDriverDialogOpen && !forceCloseDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setForceCloseDialog(false);
+          }
+          setIsDriverDialogOpen(open);
+        }}
         isDriverAssigned={isDriverAssigned}
         drivers={drivers}
         selectedDriver={selectedDriver}
