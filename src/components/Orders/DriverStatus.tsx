@@ -11,17 +11,18 @@ import {
 } from "../ui/dropdown-menu";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
-import { DriverStatus, OrderStatus } from "@/types/order";
+import { DriverStatus, OrderStatus, Driver } from "@/types/order";
 import { Clock, MapPin, Phone, Mail, Truck, AlertTriangle } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatDateTimeForDisplay, getRelativeTime } from "@/lib/utils/date-display";
-
-interface Driver {
-  id: string;
-  name?: string | null;
-  email?: string | null;
-  contact_number?: string | null;
-}
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  formatDateTimeForDisplay,
+  getRelativeTime,
+} from "@/lib/utils/date-display";
 
 interface DriverStatusCardProps {
   order: {
@@ -60,8 +61,10 @@ const driverStatusProgress: Record<DriverStatus, number> = {
 const driverStatusColors: Record<DriverStatus, string> = {
   [DriverStatus.ASSIGNED]: "border-yellow-300 bg-yellow-100 text-yellow-800",
   [DriverStatus.ARRIVED_AT_VENDOR]: "border-blue-300 bg-blue-100 text-blue-800",
-  [DriverStatus.EN_ROUTE_TO_CLIENT]: "border-green-300 bg-green-100 text-green-800",
-  [DriverStatus.ARRIVED_TO_CLIENT]: "border-purple-300 bg-purple-100 text-purple-800",
+  [DriverStatus.EN_ROUTE_TO_CLIENT]:
+    "border-green-300 bg-green-100 text-green-800",
+  [DriverStatus.ARRIVED_TO_CLIENT]:
+    "border-purple-300 bg-purple-100 text-purple-800",
   [DriverStatus.COMPLETED]: "border-gray-300 bg-gray-100 text-gray-800",
 };
 
@@ -94,11 +97,13 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   };
 
   // Calculate estimated time for delivery (simple placeholder implementation)
-  const getEstimatedTimeRemaining = (status: DriverStatus | null | undefined) => {
+  const getEstimatedTimeRemaining = (
+    status: DriverStatus | null | undefined,
+  ) => {
     if (!status || status === DriverStatus.COMPLETED) return null;
-    
+
     let timeEstimate;
-    switch(status) {
+    switch (status) {
       case DriverStatus.ASSIGNED:
         timeEstimate = "~30-45 min";
         break;
@@ -122,14 +127,16 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   };
 
   return (
-    <Card className="mx-auto w-full max-w-5xl shadow-md hover:shadow-lg transition-shadow duration-200">
+    <Card className="mx-auto w-full max-w-5xl shadow-md transition-shadow duration-200 hover:shadow-lg">
       <CardContent className="p-5">
         {driverInfo ? (
           <div className="space-y-5">
             {/* Driver Info Section - With enhanced contact details */}
-            <div className="bg-white rounded-lg p-4 shadow-sm border border-slate-100">
-              <h3 className="text-lg font-semibold mb-3 text-slate-800">Driver Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="rounded-lg border border-slate-100 bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-lg font-semibold text-slate-800">
+                Driver Information
+              </h3>
+              <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500">Driver Name:</span>
                   <span className="font-medium text-slate-900">
@@ -139,16 +146,22 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                 {driverInfo.email && (
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-slate-400" />
-                    <a href={`mailto:${driverInfo.email}`} className="font-medium text-blue-600 hover:underline">
+                    <a
+                      href={`mailto:${driverInfo.email}`}
+                      className="font-medium text-blue-600 hover:underline"
+                    >
                       {driverInfo.email}
                     </a>
                   </div>
                 )}
-                {driverInfo.contact_number && (
+                {driverInfo.contactNumber && (
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-slate-400" />
-                    <a href={`tel:${driverInfo.contact_number}`} className="font-medium text-blue-600 hover:underline">
-                      {driverInfo.contact_number}
+                    <a
+                      href={`tel:${driverInfo.contactNumber}`}
+                      className="font-medium text-blue-600 hover:underline"
+                    >
+                      {driverInfo.contactNumber}
                     </a>
                   </div>
                 )}
@@ -172,46 +185,58 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
             </div>
 
             {/* Status and Progress */}
-            <div className="space-y-4 py-4 bg-white rounded-lg p-4 shadow-sm border border-slate-100">
+            <div className="space-y-4 rounded-lg border border-slate-100 bg-white p-4 py-4 shadow-sm">
               <div className="flex flex-col items-center justify-center">
-                <span className="mb-2 text-xl font-medium text-slate-800">Driver Status</span>
-                
-                <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+                <span className="mb-2 text-xl font-medium text-slate-800">
+                  Driver Status
+                </span>
+
+                <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
                   <Badge
                     variant="outline"
-                    className={cn("px-4 py-2 text-lg font-medium", getStatusColor(order.driver_status))}
+                    className={cn(
+                      "px-4 py-2 text-lg font-medium",
+                      getStatusColor(order.driver_status),
+                    )}
                   >
                     {getDisplayStatus(order.driver_status)}
                   </Badge>
-                  
+
                   {/* Show estimated delivery time */}
                   {getEstimatedTimeRemaining(order.driver_status) && (
-                    <span className="text-sm bg-slate-100 px-3 py-1 rounded-full text-slate-700 flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5" /> 
+                    <span className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
+                      <Clock className="h-3.5 w-3.5" />
                       {getEstimatedTimeRemaining(order.driver_status)}
                     </span>
                   )}
                 </div>
               </div>
-              
+
               {/* Enhanced progress bar with timestamps */}
               <div className="relative">
                 <Progress
                   value={getProgressValue(order.driver_status)}
-                  className="w-full h-3 bg-slate-200"
+                  className="h-3 w-full bg-slate-200"
                   indicatorClassName={cn("transition-all duration-500", {
-                    "bg-yellow-400": order.driver_status === DriverStatus.ASSIGNED,
-                    "bg-blue-500": order.driver_status === DriverStatus.ARRIVED_AT_VENDOR,
-                    "bg-green-500": order.driver_status === DriverStatus.EN_ROUTE_TO_CLIENT,
-                    "bg-purple-500": order.driver_status === DriverStatus.ARRIVED_TO_CLIENT,
-                    "bg-slate-500": order.driver_status === DriverStatus.COMPLETED,
+                    "bg-yellow-400":
+                      order.driver_status === DriverStatus.ASSIGNED,
+                    "bg-blue-500":
+                      order.driver_status === DriverStatus.ARRIVED_AT_VENDOR,
+                    "bg-green-500":
+                      order.driver_status === DriverStatus.EN_ROUTE_TO_CLIENT,
+                    "bg-purple-500":
+                      order.driver_status === DriverStatus.ARRIVED_TO_CLIENT,
+                    "bg-slate-500":
+                      order.driver_status === DriverStatus.COMPLETED,
                   })}
                 />
-                
-                <div className="flex justify-between mt-1 text-xs text-slate-500">
+
+                <div className="mt-1 flex justify-between text-xs text-slate-500">
                   <div className="flex flex-col items-center">
                     <span>Assigned</span>
-                    <span className="text-[10px]">{formatDateTime(order.pickup_time)}</span>
+                    <span className="text-[10px]">
+                      {formatDateTime(order.pickup_time)}
+                    </span>
                   </div>
                   <div className="flex flex-col items-center">
                     <span>At Vendor</span>
@@ -221,11 +246,15 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                   </div>
                   <div className="flex flex-col items-center">
                     <span>Arrived</span>
-                    <span className="text-[10px]">{formatDateTime(order.arrival_time)}</span>
+                    <span className="text-[10px]">
+                      {formatDateTime(order.arrival_time)}
+                    </span>
                   </div>
                   <div className="flex flex-col items-center">
                     <span>Completed</span>
-                    <span className="text-[10px]">{formatDateTime(order.complete_time)}</span>
+                    <span className="text-[10px]">
+                      {formatDateTime(order.complete_time)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -236,8 +265,8 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
               <div className="flex justify-center pt-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="border-slate-300 bg-white hover:bg-slate-50"
                     >
                       Update Status
@@ -247,10 +276,13 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                     {Object.entries(driverStatusMap).map(([status, label]) => (
                       <DropdownMenuItem
                         key={status}
-                        onClick={() => updateDriverStatus(status as DriverStatus)}
+                        onClick={() =>
+                          updateDriverStatus(status as DriverStatus)
+                        }
                         className={cn(
                           "cursor-pointer",
-                          status === order.driver_status && "bg-slate-100 font-medium"
+                          status === order.driver_status &&
+                            "bg-slate-100 font-medium",
                         )}
                       >
                         {label}
@@ -262,14 +294,21 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
             )}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-            <Truck className="h-14 w-14 mb-4 text-slate-300" />
-            <p className="text-lg font-medium">No driver assigned to this order yet</p>
-            <p className="text-sm mt-2 max-w-md text-center">A driver will be assigned soon. You'll be able to track their progress once they're on the way.</p>
-            
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 py-8 text-slate-500">
+            <Truck className="mb-4 h-14 w-14 text-slate-300" />
+            <p className="text-lg font-medium">
+              No driver assigned to this order yet
+            </p>
+            <p className="mt-2 max-w-md text-center text-sm">
+              A driver will be assigned soon. You'll be able to track their
+              progress once they're on the way.
+            </p>
+
             <div className="mt-6 flex items-center gap-2 text-amber-600">
               <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm">Estimated assignment: within 30 minutes</span>
+              <span className="text-sm">
+                Estimated assignment: within 30 minutes
+              </span>
             </div>
           </div>
         )}
