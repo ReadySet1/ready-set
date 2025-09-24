@@ -259,39 +259,6 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                 </div>
               </div>
             </div>
-
-            {/* Update Status Button - Only show if editable */}
-            {isEditable && (
-              <div className="flex justify-center pt-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="border-slate-300 bg-white hover:bg-slate-50"
-                    >
-                      Update Status
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    {Object.entries(driverStatusMap).map(([status, label]) => (
-                      <DropdownMenuItem
-                        key={status}
-                        onClick={() =>
-                          updateDriverStatus(status as DriverStatus)
-                        }
-                        className={cn(
-                          "cursor-pointer",
-                          status === order.driver_status &&
-                            "bg-slate-100 font-medium",
-                        )}
-                      >
-                        {label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 py-8 text-slate-500">

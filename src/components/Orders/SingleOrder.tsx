@@ -750,11 +750,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         {/* Modern Header */}
         <div className="mb-8">
           {/* Title Section */}
-          <div className="mb-6">
+          <div className="mb-6 mt-20">
             <h1 className="text-3xl font-bold text-slate-800">
-              {order.order_type === "catering"
-                ? "Catering Request"
-                : "On-Demand Order"}
+              Order {order.orderNumber}
             </h1>
           </div>
         </div>

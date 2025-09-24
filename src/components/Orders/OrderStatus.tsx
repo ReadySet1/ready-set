@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { CheckCircle, Clock, XCircle, Truck } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
-import { OrderStatus, OrderType } from '@/types/order';
+import { OrderStatus, OrderType } from "@/types/order";
 
 interface StatusBadgeProps {
   status: OrderStatus;
@@ -105,24 +105,6 @@ export const OrderStatusCard: React.FC<OrderStatusProps> = ({
         <div className="mb-4 flex items-center justify-between">
           <span className="text-sm font-medium">Current Status:</span>
           <StatusBadge status={status} />
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Change Status:</span>
-          <Select
-            onValueChange={(value) => handleStatusChange(value as OrderStatus)}
-            value={status}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select new status" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.values(OrderStatus).map((statusValue) => (
-                <SelectItem key={statusValue} value={statusValue}>
-                  {statusValue.charAt(0).toUpperCase() + statusValue.slice(1).toLowerCase()}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
     </div>
