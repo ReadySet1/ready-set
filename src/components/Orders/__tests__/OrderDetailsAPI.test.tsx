@@ -46,9 +46,33 @@ jest.mock("@/lib/services/brokerSyncService", () => ({
   syncOrderStatusWithBroker: jest.fn().mockResolvedValue(undefined),
 }));
 
-// Mock fetch globally
-const mockFetch = jest.fn();
+// Mock fetch globally with proper Response typing
+const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 global.fetch = mockFetch;
+
+// Helper function to create mock Response objects
+const createMockResponse = (
+  data: any,
+  options: { ok?: boolean; status?: number } = {},
+) =>
+  ({
+    ok: options.ok ?? true,
+    status: options.status ?? 200,
+    statusText: options.ok === false ? "Not Found" : "OK",
+    headers: new Headers(),
+    redirected: false,
+    type: "basic" as ResponseType,
+    url: "",
+    clone: jest.fn() as any,
+    body: null,
+    bodyUsed: false,
+    arrayBuffer: jest.fn() as any,
+    blob: jest.fn() as any,
+    formData: jest.fn() as any,
+    json: jest.fn().mockResolvedValue(data) as any,
+    text: jest.fn().mockResolvedValue(JSON.stringify(data)) as any,
+    bytes: jest.fn() as any,
+  }) as Response;
 
 describe("Order Details API Integration Tests", () => {
   const mockDriverData = {
@@ -104,10 +128,7 @@ describe("Order Details API Integration Tests", () => {
 
   describe("Driver Information API Tests", () => {
     it("should fetch driver information with correct API call", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockOrderData),
-      });
+      mockFetch.mockResolvedValue(createMockResponse(mockOrderData));
 
       const response = await fetch(
         "/api/orders/SF-56780?include=dispatch.driver",
@@ -138,10 +159,7 @@ describe("Order Details API Integration Tests", () => {
         dispatches: [],
       };
 
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(orderWithoutDriver),
-      });
+      mockFetch.mockResolvedValue(createMockResponse(orderWithoutDriver));
 
       const response = await fetch(
         "/api/orders/SF-56780?include=dispatch.driver",
@@ -153,10 +171,7 @@ describe("Order Details API Integration Tests", () => {
     });
 
     it("should validate driver data structure", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockOrderData),
-      });
+      mockFetch.mockResolvedValue(createMockResponse(mockOrderData));
 
       const response = await fetch(
         "/api/orders/SF-56780?include=dispatch.driver",
@@ -183,10 +198,7 @@ describe("Order Details API Integration Tests", () => {
 
   describe("Order Data API Tests", () => {
     it("should fetch order information with correct API call", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockOrderData),
-      });
+      mockFetch.mockResolvedValue(createMockResponse(mockOrderData));
 
       const response = await fetch(
         "/api/orders/SF-56780?include=dispatch.driver",
@@ -214,10 +226,7 @@ describe("Order Details API Integration Tests", () => {
     });
 
     it("should validate customer information", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockOrderData),
-      });
+      mockFetch.mockResolvedValue(createMockResponse(mockOrderData));
 
       const response = await fetch(
         "/api/orders/SF-56780?include=dispatch.driver",
@@ -231,10 +240,7 @@ describe("Order Details API Integration Tests", () => {
     });
 
     it("should validate address information", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockOrderData),
-      });
+      mockFetch.mockResolvedValue(createMockResponse(mockOrderData));
 
       const response = await fetch(
         "/api/orders/SF-56780?include=dispatch.driver",
@@ -257,11 +263,12 @@ describe("Order Details API Integration Tests", () => {
     });
 
     it("should handle API errors gracefully", async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 404,
-        json: () => Promise.resolve({ error: "Order not found" }),
-      });
+      mockFetch.mockResolvedValue(
+        createMockResponse(
+          { error: "Order not found" },
+          { ok: false, status: 404 },
+        ),
+      );
 
       const response = await fetch(
         "/api/orders/SF-56780?include=dispatch.driver",
@@ -275,10 +282,7 @@ describe("Order Details API Integration Tests", () => {
     });
 
     it("should validate API response structure", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockOrderData),
-      });
+      mockFetch.mockResolvedValue(createMockResponse(mockOrderData));
 
       const response = await fetch(
         "/api/orders/SF-56780?include=dispatch.driver",
@@ -306,10 +310,7 @@ describe("Order Details API Integration Tests", () => {
       for (const status of validStatuses) {
         const orderWithStatus = { ...mockOrderData, status };
 
-        mockFetch.mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve(orderWithStatus),
-        });
+        mockFetch.mockResolvedValue(createMockResponse(orderWithStatus));
 
         const response = await fetch(
           "/api/orders/SF-56780?include=dispatch.driver",
@@ -326,10 +327,7 @@ describe("Order Details API Integration Tests", () => {
       for (const orderType of validOrderTypes) {
         const orderWithType = { ...mockOrderData, order_type: orderType };
 
-        mockFetch.mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve(orderWithType),
-        });
+        mockFetch.mockResolvedValue(createMockResponse(orderWithType));
 
         const response = await fetch(
           "/api/orders/SF-56780?include=dispatch.driver",
@@ -343,10 +341,7 @@ describe("Order Details API Integration Tests", () => {
 
   describe("API Performance Tests", () => {
     it("should complete API call within reasonable time", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockOrderData),
-      });
+      mockFetch.mockResolvedValue(createMockResponse(mockOrderData));
 
       const startTime = Date.now();
 
@@ -364,10 +359,7 @@ describe("Order Details API Integration Tests", () => {
     });
 
     it("should handle concurrent API calls", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockOrderData),
-      });
+      mockFetch.mockResolvedValue(createMockResponse(mockOrderData));
 
       const promises = Array(5)
         .fill(null)
