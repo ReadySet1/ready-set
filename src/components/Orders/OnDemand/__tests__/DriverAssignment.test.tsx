@@ -192,7 +192,8 @@ describe("OnDemand Driver Assignment Functionality", () => {
       });
 
       const driverSelectButton = screen.getAllByText("Select")[0];
-      await userEvent.click(driverSelectButton);
+      expect(driverSelectButton).toBeInTheDocument();
+      await userEvent.click(driverSelectButton!);
 
       // Wait for driver to be selected
       await waitFor(() => {
@@ -360,7 +361,8 @@ describe("OnDemand Driver Assignment Functionality", () => {
       });
 
       const driverSelectButton = screen.getAllByText("Select")[0];
-      await userEvent.click(driverSelectButton);
+      expect(driverSelectButton).toBeInTheDocument();
+      await userEvent.click(driverSelectButton!);
 
       await waitFor(() => {
         expect(screen.getByText("Selected")).toBeInTheDocument();
@@ -410,7 +412,8 @@ describe("OnDemand Driver Assignment Functionality", () => {
       });
 
       const driverSelectButton = screen.getAllByText("Select")[0];
-      await userEvent.click(driverSelectButton);
+      expect(driverSelectButton).toBeInTheDocument();
+      await userEvent.click(driverSelectButton!);
 
       // Verify driver is selected and button is enabled
       await waitFor(() => {
@@ -459,7 +462,8 @@ describe("OnDemand Driver Assignment Functionality", () => {
       });
 
       const driverSelectButton = screen.getAllByText("Select")[0];
-      await userEvent.click(driverSelectButton);
+      expect(driverSelectButton).toBeInTheDocument();
+      await userEvent.click(driverSelectButton!);
 
       await waitFor(() => {
         expect(screen.getByText("Selected")).toBeInTheDocument();
@@ -524,7 +528,8 @@ describe("OnDemand Driver Assignment Functionality", () => {
       });
 
       const driverSelectButton = screen.getAllByText("Select")[0];
-      await userEvent.click(driverSelectButton);
+      expect(driverSelectButton).toBeInTheDocument();
+      await userEvent.click(driverSelectButton!);
 
       await waitFor(() => {
         expect(screen.getByText("Selected")).toBeInTheDocument();

@@ -767,19 +767,13 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         className="container mx-auto px-6 py-8"
       >
         {/* Modern Header */}
-        <div className="mb-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mb-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="mb-3 flex items-center gap-4">
+              <div className="mb-2 flex items-center gap-4">
                 <h1 className="text-3xl font-bold text-slate-800">
                   On-Demand Order
                 </h1>
-                <Badge
-                  className={`${statusInfo.className} flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold shadow-sm`}
-                >
-                  {statusInfo.icon}
-                  {order.status}
-                </Badge>
                 {onDemandOrder && (
                   <div
                     className={`flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700`}
@@ -791,52 +785,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-6 text-slate-600">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  <span className="font-medium">{order.orderNumber}</span>
-                </div>
-                {order.pickupDateTime && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {new Date(order.pickupDateTime).toLocaleDateString(
-                        undefined,
-                        {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        },
-                      )}
-                    </span>
-                  </div>
-                )}
-                {order.pickupDateTime && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {new Date(order.pickupDateTime).toLocaleTimeString(
-                        undefined,
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                onClick={handleOpenDriverDialog}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-6 py-2.5 text-white shadow-lg transition-all duration-200 hover:from-cyan-600 hover:to-blue-600 hover:shadow-xl"
-              >
-                <Truck className="h-4 w-4" />
-                {isDriverAssigned ? "Update Driver" : "Assign Driver"}
-              </Button>
             </div>
           </div>
         </div>

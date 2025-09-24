@@ -242,7 +242,8 @@ describe("Driver Assignment Functionality", () => {
 
       // Click on first driver
       const driverSelectButton = screen.getAllByText("Select")[0];
-      await userEvent.click(driverSelectButton);
+      expect(driverSelectButton).toBeInTheDocument();
+      await userEvent.click(driverSelectButton!);
 
       // Check if driver is selected
       await waitFor(() => {
@@ -311,7 +312,8 @@ describe("Driver Assignment Functionality", () => {
       });
 
       const driverSelectButton = screen.getAllByText("Select")[0];
-      await userEvent.click(driverSelectButton);
+      expect(driverSelectButton).toBeInTheDocument();
+      await userEvent.click(driverSelectButton!);
 
       // Wait for driver to be selected
       await waitFor(() => {
@@ -394,7 +396,8 @@ describe("Driver Assignment Functionality", () => {
       });
 
       const driverSelectButton = screen.getAllByText("Select")[0];
-      await userEvent.click(driverSelectButton);
+      expect(driverSelectButton).toBeInTheDocument();
+      await userEvent.click(driverSelectButton!);
 
       await waitFor(() => {
         expect(screen.getByText("Selected")).toBeInTheDocument();
@@ -469,7 +472,8 @@ describe("Driver Assignment Functionality", () => {
 
       // Select a driver
       const driverSelectButton = screen.getAllByText("Select")[0];
-      await userEvent.click(driverSelectButton);
+      expect(driverSelectButton).toBeInTheDocument();
+      await userEvent.click(driverSelectButton!);
 
       // Wait for driver to be selected
       await waitFor(() => {
@@ -710,7 +714,8 @@ describe("Driver Assignment Functionality", () => {
       });
 
       const driverSelectButton = screen.getAllByText("Select")[0];
-      await userEvent.click(driverSelectButton);
+      expect(driverSelectButton).toBeInTheDocument();
+      await userEvent.click(driverSelectButton!);
 
       await waitFor(() => {
         expect(screen.getByText("Selected")).toBeInTheDocument();
@@ -757,7 +762,8 @@ describe("Driver Assignment Functionality", () => {
       });
 
       const driverSelectButton = screen.getAllByText("Select")[0];
-      await userEvent.click(driverSelectButton);
+      expect(driverSelectButton).toBeInTheDocument();
+      await userEvent.click(driverSelectButton!);
 
       await waitFor(() => {
         expect(screen.getByText("Selected")).toBeInTheDocument();
