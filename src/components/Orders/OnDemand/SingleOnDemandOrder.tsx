@@ -41,7 +41,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FileUpload } from "@/types/file";
 import { createClient } from "@/utils/supabase/client";
 import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
-import { UserType } from "@/types/user";
+import { UserType } from "@/types/client-enums";
 
 // Make sure the bucket name is user-assets
 const STORAGE_BUCKET = "user-assets";
@@ -822,6 +822,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                   initialStatus={order.status}
                   orderId={order.id}
                   onStatusChange={handleOrderStatusChange}
+                  canChangeStatus={userRoles.isAdmin || userRoles.isSuperAdmin}
                 />
               </div>
             </div>
