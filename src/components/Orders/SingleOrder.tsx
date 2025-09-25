@@ -53,6 +53,11 @@ const STORAGE_BUCKET = "user-assets";
 interface SingleOrderProps {
   onDeleteSuccess: () => void;
   showHeader?: boolean;
+  // Granular permission props for role-based functionality
+  canAssignDriver?: boolean;
+  canUpdateDriverStatus?: boolean;
+  canDeleteOrder?: boolean;
+  canEditOrder?: boolean;
 }
 
 // Enhanced status config with more detailed styling
@@ -123,6 +128,10 @@ const OrderSkeleton: React.FC = () => (
 const SingleOrder: React.FC<SingleOrderProps> = ({
   onDeleteSuccess,
   showHeader = true,
+  canAssignDriver = false,
+  canUpdateDriverStatus = false,
+  canDeleteOrder = false,
+  canEditOrder = false,
 }) => {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -783,6 +792,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                   }}
                   driverInfo={driverInfo}
                   updateDriverStatus={updateDriverStatus}
+                  canAssignDriver={canAssignDriver}
+                  canUpdateDriverStatus={canUpdateDriverStatus}
+                  onAssignDriver={handleOpenDriverDialog}
                 />
                 <Separator />
                 <OrderStatusCard

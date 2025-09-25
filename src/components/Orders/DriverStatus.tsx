@@ -38,6 +38,10 @@ interface DriverStatusCardProps {
   driverInfo: Driver | null;
   updateDriverStatus: (newStatus: DriverStatus) => Promise<void>;
   isEditable?: boolean; // New prop to control if status can be edited
+  // Granular permission props
+  canAssignDriver?: boolean;
+  canUpdateDriverStatus?: boolean;
+  onAssignDriver?: () => void; // Callback for assign driver action
 }
 
 // Update the status maps to use the enum with UPPERCASE keys
@@ -73,6 +77,9 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   driverInfo,
   updateDriverStatus,
   isEditable = true,
+  canAssignDriver = false,
+  canUpdateDriverStatus = false,
+  onAssignDriver,
 }) => {
   const getProgressValue = (status: DriverStatus | null | undefined) => {
     return status ? driverStatusProgress[status] : 0;
@@ -258,6 +265,21 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Driver management buttons */}
+              {canAssignDriver && onAssignDriver && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    onClick={onAssignDriver}
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                  >
+                    <Truck className="mr-2 h-4 w-4" />
+                    {driverInfo ? "Change Driver" : "Assign Driver"}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -271,12 +293,25 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
               progress once they're on the way.
             </p>
 
-            <div className="mt-6 flex items-center gap-2 text-amber-600">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm">
-                Estimated assignment: within 30 minutes
-              </span>
-            </div>
+            {canAssignDriver && onAssignDriver && (
+              <Button
+                onClick={onAssignDriver}
+                className="mt-4 bg-blue-600 text-white hover:bg-blue-700"
+                size="sm"
+              >
+                <Truck className="mr-2 h-4 w-4" />
+                Assign Driver
+              </Button>
+            )}
+
+            {!canAssignDriver && (
+              <div className="mt-6 flex items-center gap-2 text-amber-600">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-sm">
+                  Estimated assignment: within 30 minutes
+                </span>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

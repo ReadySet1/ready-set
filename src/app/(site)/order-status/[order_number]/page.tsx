@@ -27,7 +27,14 @@ const OrderPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <SingleOrder onDeleteSuccess={handleDeleteSuccess} showHeader={true} />
+      <SingleOrder
+        onDeleteSuccess={handleDeleteSuccess}
+        showHeader={true}
+        canAssignDriver={false}
+        canUpdateDriverStatus={false}
+        canDeleteOrder={false}
+        canEditOrder={false}
+      />
     </div>
   );
 };
