@@ -42,6 +42,7 @@ interface DriverStatusCardProps {
   canAssignDriver?: boolean;
   canUpdateDriverStatus?: boolean;
   onAssignDriver?: () => void; // Callback for assign driver action
+  showAssignDriverButton?: boolean; // New prop to control button visibility
 }
 
 // Update the status maps to use the enum with UPPERCASE keys
@@ -80,6 +81,7 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   canAssignDriver = false,
   canUpdateDriverStatus = false,
   onAssignDriver,
+  showAssignDriverButton = true,
 }) => {
   const getProgressValue = (status: DriverStatus | null | undefined) => {
     return status ? driverStatusProgress[status] : 0;
@@ -267,7 +269,7 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
               </div>
 
               {/* Driver management buttons */}
-              {canAssignDriver && onAssignDriver && (
+              {canAssignDriver && onAssignDriver && showAssignDriverButton && (
                 <div className="mt-4 flex justify-center">
                   <Button
                     onClick={onAssignDriver}
@@ -293,7 +295,7 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
               progress once they're on the way.
             </p>
 
-            {canAssignDriver && onAssignDriver && (
+            {canAssignDriver && onAssignDriver && showAssignDriverButton && (
               <Button
                 onClick={onAssignDriver}
                 className="mt-4 bg-blue-600 text-white hover:bg-blue-700"

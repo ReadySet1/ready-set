@@ -734,3 +734,193 @@ describe("SingleOrder - Order Data API Tests", () => {
     });
   });
 });
+
+describe("SingleOrder - Role-based Visibility Tests", () => {
+  const mockOrderData = {
+    id: "1",
+    orderNumber: "CV-PBMD00/1",
+    status: "active",
+    order_type: "catering",
+    order_total: "250.00",
+    pickupDateTime: "2025-07-18T08:00:00Z",
+    dispatches: [],
+    user: {
+      name: "CaterValley System",
+      email: "system@catervalley.com",
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockParams.mockReturnValue({ order_number: "CV-PBMD00/1" });
+
+    mockFetch.mockImplementation((url: string) => {
+      if (
+        url.includes("/api/orders/") &&
+        url.includes("?include=dispatch.driver")
+      ) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockOrderData),
+        });
+      }
+      if (url.includes("/api/orders/") && url.includes("/files")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([]),
+        });
+      }
+      if (url.includes("/api/drivers")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([]),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ message: "Success" }),
+      });
+    });
+  });
+
+  it("should show order information for admin users", async () => {
+    // Mock admin user role
+    mockSupabase.from.mockReturnValue({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          single: jest.fn().mockResolvedValue({
+            data: { type: "admin" },
+            error: null,
+          }),
+        })),
+      })),
+    });
+
+    mockPathname.mockReturnValue("/admin/catering-orders/CV-PBMD00%2F1");
+
+    const { default: SingleOrder } = await import(
+      "@/components/Orders/SingleOrder"
+    );
+
+    await act(async () => {
+      render(<SingleOrder onDeleteSuccess={() => {}} />);
+    });
+
+    await waitFor(() => {
+      // Should show all order information for admin
+      expect(screen.getByText("Catering Request")).toBeInTheDocument();
+      expect(screen.getByText("CV-PBMD00/1")).toBeInTheDocument();
+      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Fri, Jul 18, 2025")).toBeInTheDocument();
+      expect(screen.getByText("8:00 AM")).toBeInTheDocument();
+    });
+  });
+
+  it("should show order information for super admin users", async () => {
+    // Mock super admin user role
+    mockSupabase.from.mockReturnValue({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          single: jest.fn().mockResolvedValue({
+            data: { type: "super_admin" },
+            error: null,
+          }),
+        })),
+      })),
+    });
+
+    mockPathname.mockReturnValue("/admin/catering-orders/CV-PBMD00%2F1");
+
+    const { default: SingleOrder } = await import(
+      "@/components/Orders/SingleOrder"
+    );
+
+    await act(async () => {
+      render(<SingleOrder onDeleteSuccess={() => {}} />);
+    });
+
+    await waitFor(() => {
+      // Should show all order information for super admin
+      expect(screen.getByText("Catering Request")).toBeInTheDocument();
+      expect(screen.getByText("CV-PBMD00/1")).toBeInTheDocument();
+      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Fri, Jul 18, 2025")).toBeInTheDocument();
+      expect(screen.getByText("8:00 AM")).toBeInTheDocument();
+    });
+  });
+
+  it("should hide order information for non-admin users", async () => {
+    // Mock regular user role
+    mockSupabase.from.mockReturnValue({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          single: jest.fn().mockResolvedValue({
+            data: { type: "client" },
+            error: null,
+          }),
+        })),
+      })),
+    });
+
+    mockPathname.mockReturnValue("/admin/catering-orders/CV-PBMD00%2F1");
+
+    const { default: SingleOrder } = await import(
+      "@/components/Orders/SingleOrder"
+    );
+
+    await act(async () => {
+      render(<SingleOrder onDeleteSuccess={() => {}} />);
+    });
+
+    await waitFor(() => {
+      // Should not show granular order information for non-admin users
+      expect(screen.queryByText("Catering Request")).not.toBeInTheDocument();
+      expect(screen.queryByText("CV-PBMD00/1")).not.toBeInTheDocument();
+      expect(screen.queryByText("ACTIVE")).not.toBeInTheDocument();
+      expect(screen.queryByText("Fri, Jul 18, 2025")).not.toBeInTheDocument();
+      expect(screen.queryByText("8:00 AM")).not.toBeInTheDocument();
+    });
+  });
+
+  it("should allow granular permission overrides", async () => {
+    // Mock regular user role but with explicit permissions
+    mockSupabase.from.mockReturnValue({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          single: jest.fn().mockResolvedValue({
+            data: { type: "client" },
+            error: null,
+          }),
+        })),
+      })),
+    });
+
+    mockPathname.mockReturnValue("/admin/catering-orders/CV-PBMD00%2F1");
+
+    const { default: SingleOrder } = await import(
+      "@/components/Orders/SingleOrder"
+    );
+
+    await act(async () => {
+      render(
+        <SingleOrder
+          onDeleteSuccess={() => {}}
+          canViewOrderTitle={true}
+          canViewOrderNumber={true}
+          canViewOrderStatus={true}
+          canViewDeliveryDate={true}
+          canViewDeliveryTime={true}
+        />,
+      );
+    });
+
+    await waitFor(() => {
+      // Should show order information when explicitly granted permissions
+      expect(screen.getByText("Catering Request")).toBeInTheDocument();
+      expect(screen.getByText("CV-PBMD00/1")).toBeInTheDocument();
+      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Fri, Jul 18, 2025")).toBeInTheDocument();
+      expect(screen.getByText("8:00 AM")).toBeInTheDocument();
+    });
+  });
+});

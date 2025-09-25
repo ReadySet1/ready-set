@@ -93,6 +93,12 @@ const OrderPage = () => {
           canUpdateDriverStatus={true}
           canDeleteOrder={true}
           canEditOrder={true}
+          // Enable all granular permissions for admin users
+          canViewOrderTitle={true}
+          canViewOrderStatus={true}
+          canViewOrderNumber={true}
+          canViewDeliveryDate={true}
+          canViewDeliveryTime={true}
         />
       </div>
     </div>

@@ -58,6 +58,12 @@ interface SingleOrderProps {
   canUpdateDriverStatus?: boolean;
   canDeleteOrder?: boolean;
   canEditOrder?: boolean;
+  // Granular visibility props for order information
+  canViewOrderTitle?: boolean;
+  canViewOrderStatus?: boolean;
+  canViewOrderNumber?: boolean;
+  canViewDeliveryDate?: boolean;
+  canViewDeliveryTime?: boolean;
 }
 
 // Enhanced status config with more detailed styling
@@ -132,6 +138,12 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   canUpdateDriverStatus = false,
   canDeleteOrder = false,
   canEditOrder = false,
+  // Granular visibility props with default values
+  canViewOrderTitle = false,
+  canViewOrderStatus = false,
+  canViewOrderNumber = false,
+  canViewDeliveryDate = false,
+  canViewDeliveryTime = false,
 }) => {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -711,6 +723,20 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     return userRoles.isAdmin || userRoles.isSuperAdmin || userRoles.isHelpdesk;
   };
 
+  // Set granular permissions based on user roles
+  const effectivePermissions = {
+    canViewOrderTitle:
+      canViewOrderTitle || userRoles.isAdmin || userRoles.isSuperAdmin,
+    canViewOrderStatus:
+      canViewOrderStatus || userRoles.isAdmin || userRoles.isSuperAdmin,
+    canViewOrderNumber:
+      canViewOrderNumber || userRoles.isAdmin || userRoles.isSuperAdmin,
+    canViewDeliveryDate:
+      canViewDeliveryDate || userRoles.isAdmin || userRoles.isSuperAdmin,
+    canViewDeliveryTime:
+      canViewDeliveryTime || userRoles.isAdmin || userRoles.isSuperAdmin,
+  };
+
   if (isLoading) {
     return <OrderSkeleton />;
   }
@@ -754,15 +780,93 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="container mx-auto px-6 pb-8 pt-16"
+        className={`container mx-auto px-6 pb-8 ${effectivePermissions.canViewOrderTitle ? "pt-8" : "pt-16"}`}
       >
         {/* Modern Header */}
         <div className="mb-8">
           {/* Title Section */}
-          <div className="mb-6 mt-20">
-            <h1 className="text-3xl font-bold text-slate-800">
-              Order {order.orderNumber}
-            </h1>
+          <div
+            className={`mb-6 ${effectivePermissions.canViewOrderTitle ? "mt-8" : "mt-20"}`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                {/* Order Title and Status - Only visible to admin/super admin */}
+                {effectivePermissions.canViewOrderTitle && (
+                  <div className="mb-4 flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-slate-800">
+                      {order.order_type === "catering"
+                        ? "Catering Request"
+                        : "On-Demand Order"}
+                    </h1>
+                    {effectivePermissions.canViewOrderStatus && (
+                      <Badge className="border-slate-200 bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+                        {order.status.toUpperCase()}
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
+                {/* Order Details Row - Only visible to admin/super admin */}
+                {(effectivePermissions.canViewOrderNumber ||
+                  effectivePermissions.canViewDeliveryDate ||
+                  effectivePermissions.canViewDeliveryTime) && (
+                  <div className="flex items-center gap-6 text-sm text-slate-600">
+                    {effectivePermissions.canViewOrderNumber && (
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-slate-500" />
+                        <span className="font-medium">{order.orderNumber}</span>
+                      </div>
+                    )}
+                    {effectivePermissions.canViewDeliveryDate &&
+                      order.pickupDateTime && (
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-slate-500" />
+                          <span>
+                            {new Date(order.pickupDateTime).toLocaleDateString(
+                              undefined,
+                              {
+                                weekday: "short",
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )}
+                          </span>
+                        </div>
+                      )}
+                    {effectivePermissions.canViewDeliveryTime &&
+                      order.pickupDateTime && (
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-slate-500" />
+                          <span>
+                            {new Date(order.pickupDateTime).toLocaleTimeString(
+                              undefined,
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                              },
+                            )}
+                          </span>
+                        </div>
+                      )}
+                  </div>
+                )}
+              </div>
+
+              {/* Assign Driver Button - Top Right */}
+              {canAssignDriver && (
+                <div className="ml-6">
+                  <Button
+                    onClick={handleOpenDriverDialog}
+                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white shadow-sm hover:bg-blue-700"
+                  >
+                    <Truck className="h-4 w-4" />
+                    Assign Driver
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -795,6 +899,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                   canAssignDriver={canAssignDriver}
                   canUpdateDriverStatus={canUpdateDriverStatus}
                   onAssignDriver={handleOpenDriverDialog}
+                  showAssignDriverButton={false}
                 />
                 <Separator />
                 <OrderStatusCard
