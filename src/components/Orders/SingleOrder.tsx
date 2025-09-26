@@ -464,7 +464,19 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   };
 
   const handleAssignOrEditDriver = async () => {
-    if (!order || !selectedDriver) return;
+    if (!order || !selectedDriver) {
+      console.log("❌ Missing order or selectedDriver:", {
+        order: !!order,
+        selectedDriver,
+      });
+      return;
+    }
+
+    console.log("🚀 Starting driver assignment:", {
+      orderId: order.id,
+      driverId: selectedDriver,
+      orderType: order.order_type,
+    });
 
     try {
       const {
@@ -479,6 +491,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         return;
       }
 
+      console.log("📡 Making API call to assign driver...");
       const response = await fetch("/api/orders/assignDriver", {
         method: "POST",
         headers: {
@@ -494,7 +507,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         }),
       });
 
+      console.log("📊 API Response status:", response.status);
+
       if (!response.ok) {
+        console.error("❌ API call failed with status:", response.status);
         if (response.status === 401) {
           toast.error("Session expired. Please log in again.");
           router.push("/auth/login");
@@ -506,8 +522,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         try {
           const errorData = await response.json();
           errorText = errorData.error || errorData.message || "";
+          console.error("❌ API Error details:", errorData);
         } catch (parseError) {
           errorText = "";
+          console.error("❌ Failed to parse error response:", parseError);
         }
 
         throw new Error(
@@ -515,17 +533,20 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         );
       }
 
-      await response.json();
+      const result = await response.json();
+      console.log("✅ Driver assignment successful:", result);
 
-      // Wait for the order details to refresh before closing the dialog
+      // Close the dialog first
+      console.log("🚪 Closing dialog...");
+      setIsDriverDialogOpen(false);
+
+      // Wait for the order details to refresh after closing
+      console.log("🔄 Refreshing order details...");
       await fetchOrderDetails();
 
       // Add a small delay to ensure state updates are processed
       await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Close the dialog only after the data has been refreshed
-      setForceCloseDialog(true);
-      setIsDriverDialogOpen(false);
+      console.log("✅ Assignment process completed");
 
       toast.success(
         isDriverAssigned
@@ -534,6 +555,11 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       );
     } catch (error) {
       console.error("❌ Failed to assign/edit driver:", error);
+      console.error("❌ Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+        error,
+      });
       toast.error(
         error instanceof Error
           ? error.message

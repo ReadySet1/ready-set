@@ -509,17 +509,17 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         );
       }
 
-      // Wait for the order details to refresh before closing the dialog
+      const result = await response.json();
+      console.log("✅ Driver assignment successful:", result);
+
+      // Close the dialog first
+      setIsDriverDialogOpen(false);
+
+      // Wait for the order details to refresh after closing
       await fetchOrderDetails();
 
       // Add a small delay to ensure state updates are processed
       await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Close the dialog only after the data has been refreshed
-
-      // Use both methods to ensure dialog closes
-      setForceCloseDialog(true);
-      setIsDriverDialogOpen(false);
 
       toast.success(
         isDriverAssigned

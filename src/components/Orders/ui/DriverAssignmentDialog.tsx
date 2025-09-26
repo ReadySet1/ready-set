@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +40,9 @@ import {
   X,
   Info,
   UserCheck,
+  AlertCircle,
+  Clock,
+  MapPin,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
@@ -66,6 +70,7 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredDrivers, setFilteredDrivers] = useState<Driver[]>(drivers);
+  const [isAssigning, setIsAssigning] = useState(false);
   const itemsPerPage = 4; // Reduced for better mobile experience
 
   // Filter drivers when search term or drivers array changes
@@ -117,6 +122,26 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
     return drivers.find((driver) => driver.id === selectedDriver);
   };
 
+  // Handle driver selection - simplified for now
+  const handleDriverSelection = (driverId: string) => {
+    // Direct selection without confirmation for now
+    onDriverSelection(driverId);
+  };
+
+  // Handle final assignment
+  const handleFinalAssignment = async () => {
+    if (!selectedDriver) return;
+
+    setIsAssigning(true);
+    try {
+      await onAssignOrEditDriver();
+    } catch (error) {
+      console.error("Error assigning driver:", error);
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="z-[9999] m-4 max-h-[90vh] w-[95vw] max-w-[700px] gap-0 overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl">
@@ -163,15 +188,30 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
                         {getSelectedDriver()?.contactNumber || "No phone"}
                       </span>
                     </div>
+                    <div className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                      <MapPin className="h-3 w-3" />
+                      <span>
+                        Driver ID: {getSelectedDriver()?.id?.slice(-8) || "N/A"}
+                      </span>
+                    </div>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className="flex-shrink-0 border-primary/30 bg-primary/20 font-medium text-primary shadow-sm"
-                  >
-                    <CheckCircle className="mr-1 h-3 w-3" />
-                    <span className="hidden sm:inline">Selected</span>
-                    <span className="sm:hidden">✓</span>
-                  </Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge
+                      variant="outline"
+                      className="flex-shrink-0 border-primary/30 bg-primary/20 font-medium text-primary shadow-sm"
+                    >
+                      <CheckCircle className="mr-1 h-3 w-3" />
+                      <span className="hidden sm:inline">Selected</span>
+                      <span className="sm:hidden">✓</span>
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="border-green-200 bg-green-50 text-xs text-green-700"
+                    >
+                      <RadioTower className="mr-1 h-2.5 w-2.5" />
+                      Active
+                    </Badge>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -244,11 +284,12 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
                             transition={{ duration: 0.2, delay: index * 0.05 }}
-                            className={
+                            className={cn(
+                              "border-b transition-colors hover:bg-slate-100/50 data-[state=selected]:bg-slate-100 dark:hover:bg-slate-800/50 dark:data-[state=selected]:bg-slate-800",
                               selectedDriver === driver.id
                                 ? "border-l-4 border-l-primary bg-gradient-to-r from-yellow-50 to-white"
-                                : "transition-colors hover:bg-slate-50/50"
-                            }
+                                : "transition-colors hover:bg-slate-50/50",
+                            )}
                           >
                             <TableCell className="py-4">
                               <div className="flex items-center gap-3">
@@ -287,7 +328,7 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
                             </TableCell>
                             <TableCell className="text-right">
                               <Button
-                                onClick={() => onDriverSelection(driver.id)}
+                                onClick={() => handleDriverSelection(driver.id)}
                                 variant={
                                   selectedDriver === driver.id
                                     ? "default"
@@ -369,7 +410,7 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
                               </Badge>
                             </div>
                             <Button
-                              onClick={() => onDriverSelection(driver.id)}
+                              onClick={() => handleDriverSelection(driver.id)}
                               variant={
                                 selectedDriver === driver.id
                                   ? "default"
@@ -473,11 +514,21 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
             Cancel
           </Button>
           <Button
-            onClick={onAssignOrEditDriver}
-            disabled={!selectedDriver}
+            onClick={handleFinalAssignment}
+            disabled={!selectedDriver || isAssigning}
             className="h-11 w-full bg-gradient-to-r from-primary to-custom-yellow font-medium text-white shadow-sm transition-all hover:from-primary/90 hover:to-custom-yellow/90 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
-            {isDriverAssigned ? "Update Driver" : "Assign Driver"}
+            {isAssigning ? (
+              <>
+                <Clock className="mr-2 h-4 w-4 animate-spin" />
+                {isDriverAssigned ? "Updating..." : "Assigning..."}
+              </>
+            ) : (
+              <>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                {isDriverAssigned ? "Update Driver" : "Assign Driver"}
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
