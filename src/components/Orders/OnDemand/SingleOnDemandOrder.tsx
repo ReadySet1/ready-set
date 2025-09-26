@@ -1127,11 +1127,8 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       </motion.div>
 
       <DriverAssignmentDialog
-        isOpen={isDriverDialogOpen && !forceCloseDialog}
+        isOpen={isDriverDialogOpen}
         onOpenChange={(open) => {
-          if (!open) {
-            setForceCloseDialog(false);
-          }
           setIsDriverDialogOpen(open);
         }}
         isDriverAssigned={isDriverAssigned}

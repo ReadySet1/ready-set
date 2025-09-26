@@ -319,10 +319,19 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       setOrder(transformedOrder);
 
       // Set driver info if available
+      console.log("🔍 Checking driver info in orderData:", {
+        dispatches: orderData.dispatches,
+        hasDispatches: orderData.dispatches?.length > 0,
+        firstDispatch: orderData.dispatches?.[0],
+        driver: orderData.dispatches?.[0]?.driver,
+      });
+
       if (orderData.dispatches?.length > 0 && orderData.dispatches[0]?.driver) {
+        console.log("✅ Setting driver info:", orderData.dispatches[0].driver);
         setDriverInfo(orderData.dispatches[0].driver);
         setIsDriverAssigned(true);
       } else {
+        console.log("❌ No driver info found, clearing driver state");
         setDriverInfo(null);
         setIsDriverAssigned(false);
       }
@@ -538,7 +547,11 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
       // Close the dialog first
       console.log("🚪 Closing dialog...");
+      console.log("🔍 Current dialog state before closing:", {
+        isDriverDialogOpen,
+      });
       setIsDriverDialogOpen(false);
+      console.log("🔍 Dialog state set to false");
 
       // Wait for the order details to refresh after closing
       console.log("🔄 Refreshing order details...");
@@ -1199,11 +1212,8 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       </motion.div>
 
       <DriverAssignmentDialog
-        isOpen={isDriverDialogOpen && !forceCloseDialog}
+        isOpen={isDriverDialogOpen}
         onOpenChange={(open) => {
-          if (!open) {
-            setForceCloseDialog(false);
-          }
           setIsDriverDialogOpen(open);
         }}
         isDriverAssigned={isDriverAssigned}

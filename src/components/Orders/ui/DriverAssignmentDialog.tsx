@@ -142,9 +142,18 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
     }
   };
 
+  // Debug logging
+  useEffect(() => {
+    console.log("🔍 DialogFooter state:", {
+      selectedDriver,
+      isAssigning,
+      isDriverAssigned,
+    });
+  }, [selectedDriver, isAssigning, isDriverAssigned]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="z-[9999] m-4 max-h-[90vh] w-[95vw] max-w-[700px] gap-0 overflow-hidden rounded-2xl border-none bg-white p-0 shadow-2xl">
+      <DialogContent className="z-[9999] m-4 flex max-h-[90vh] w-[95vw] max-w-[700px] flex-col gap-0 overflow-y-auto rounded-2xl border-none bg-white p-0 shadow-2xl">
         <DialogHeader className="border-b bg-gradient-to-r from-yellow-50 via-primary/10 to-white px-4 pb-4 pt-6 sm:px-6">
           <DialogTitle className="flex items-center gap-2 bg-gradient-to-r from-primary to-custom-yellow bg-clip-text text-lg font-bold text-transparent sm:text-xl">
             <Truck className="h-5 w-5 text-primary" />
@@ -157,7 +166,7 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden px-4 py-4 sm:px-6">
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
           {/* Show selected driver at the top if one is selected */}
           <AnimatePresence>
             {selectedDriver && (
@@ -505,7 +514,7 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
           </div>
         </div>
 
-        <DialogFooter className="flex flex-col-reverse gap-3 border-t bg-gradient-to-r from-slate-50 to-white p-4 sm:flex-row sm:gap-2 sm:p-6">
+        <DialogFooter className="mt-auto flex flex-col-reverse gap-3 border-t bg-gradient-to-r from-slate-50 to-white p-4 sm:flex-row sm:gap-2 sm:p-6">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
