@@ -815,6 +815,11 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                   }}
                   driverInfo={driverInfo}
                   updateDriverStatus={updateDriverStatus}
+                  canAssignDriver={userRoles.isAdmin || userRoles.isSuperAdmin}
+                  canUpdateDriverStatus={
+                    userRoles.isAdmin || userRoles.isSuperAdmin
+                  }
+                  onAssignDriver={handleOpenDriverDialog}
                 />
                 <Separator />
                 <OrderStatusCard
