@@ -685,6 +685,254 @@ describe("Driver Assignment Functionality", () => {
     });
   });
 
+  describe("Role-Based Driver Assignment Tests", () => {
+    it("should allow admin users to assign drivers", async () => {
+      // Mock admin user session
+      mockSupabase.auth.getSession.mockResolvedValue({
+        data: {
+          session: { access_token: "admin-token", user: { id: "admin-user" } },
+        },
+        error: null,
+      });
+
+      // Mock admin role check
+      mockSupabase.from.mockReturnValue({
+        select: jest.fn(() => ({
+          eq: jest.fn(() => ({
+            single: jest.fn().mockResolvedValue({
+              data: { type: UserType.ADMIN },
+              error: null,
+            }),
+          })),
+        })),
+      });
+
+      const { default: SingleOrder } = await import(
+        "@/components/Orders/SingleOrder"
+      );
+
+      await act(async () => {
+        render(
+          <SingleOrder onDeleteSuccess={() => {}} canAssignDriver={true} />,
+        );
+      });
+
+      // Wait for component to load with admin permissions
+      await waitFor(() => {
+        expect(screen.getByText("Assign Driver")).toBeInTheDocument();
+      });
+
+      const assignButton = screen.getByText("Assign Driver");
+      await userEvent.click(assignButton);
+
+      // Verify dialog opens
+      await waitFor(() => {
+        expect(
+          screen.getByText("Select a driver to assign to this order."),
+        ).toBeInTheDocument();
+      });
+
+      // Select driver
+      await waitFor(() => {
+        expect(screen.getByText("David Sanchez")).toBeInTheDocument();
+      });
+
+      const driverSelectButton = screen.getAllByText("Select")[0];
+      await userEvent.click(driverSelectButton!);
+
+      await waitFor(() => {
+        expect(screen.getByText("Selected")).toBeInTheDocument();
+      });
+
+      // Complete assignment
+      const assignDriverButton = screen.getByRole("button", {
+        name: /assign driver/i,
+      });
+      await userEvent.click(assignDriverButton);
+
+      // Verify API call was made with correct authorization
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(
+          "/api/orders/assignDriver",
+          expect.objectContaining({
+            headers: expect.objectContaining({
+              Authorization: "Bearer admin-token",
+            }),
+          }),
+        );
+      });
+    });
+
+    it("should allow super admin users to assign drivers", async () => {
+      // Mock super admin user session
+      mockSupabase.auth.getSession.mockResolvedValue({
+        data: {
+          session: {
+            access_token: "super-admin-token",
+            user: { id: "super-admin-user" },
+          },
+        },
+        error: null,
+      });
+
+      // Mock super admin role check
+      mockSupabase.from.mockReturnValue({
+        select: jest.fn(() => ({
+          eq: jest.fn(() => ({
+            single: jest.fn().mockResolvedValue({
+              data: { type: UserType.SUPER_ADMIN },
+              error: null,
+            }),
+          })),
+        })),
+      });
+
+      const { default: SingleOrder } = await import(
+        "@/components/Orders/SingleOrder"
+      );
+
+      await act(async () => {
+        render(
+          <SingleOrder onDeleteSuccess={() => {}} canAssignDriver={true} />,
+        );
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Assign Driver")).toBeInTheDocument();
+      });
+
+      const assignButton = screen.getByText("Assign Driver");
+      await userEvent.click(assignButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Select a driver to assign to this order."),
+        ).toBeInTheDocument();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("David Sanchez")).toBeInTheDocument();
+      });
+
+      const driverSelectButton = screen.getAllByText("Select")[0];
+      await userEvent.click(driverSelectButton!);
+
+      await waitFor(() => {
+        expect(screen.getByText("Selected")).toBeInTheDocument();
+      });
+
+      const assignDriverButton = screen.getByRole("button", {
+        name: /assign driver/i,
+      });
+      await userEvent.click(assignDriverButton);
+
+      // Verify API call was made with super admin authorization
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(
+          "/api/orders/assignDriver",
+          expect.objectContaining({
+            headers: expect.objectContaining({
+              Authorization: "Bearer super-admin-token",
+            }),
+          }),
+        );
+      });
+    });
+
+    it("should prevent regular users from accessing driver assignment", async () => {
+      // Mock regular user session (non-admin)
+      mockSupabase.auth.getSession.mockResolvedValue({
+        data: {
+          session: { access_token: "user-token", user: { id: "regular-user" } },
+        },
+        error: null,
+      });
+
+      // Mock regular user role check
+      mockSupabase.from.mockReturnValue({
+        select: jest.fn(() => ({
+          eq: jest.fn(() => ({
+            single: jest.fn().mockResolvedValue({
+              data: { type: UserType.CLIENT },
+              error: null,
+            }),
+          })),
+        })),
+      });
+
+      const { default: SingleOrder } = await import(
+        "@/components/Orders/SingleOrder"
+      );
+
+      await act(async () => {
+        render(
+          <SingleOrder onDeleteSuccess={() => {}} canAssignDriver={false} />,
+        );
+      });
+
+      // Wait for component to load
+      await waitFor(() => {
+        expect(screen.getByText("Driver & Status")).toBeInTheDocument();
+      });
+
+      // Verify Assign Driver button is not visible for regular users
+      expect(screen.queryByText("Assign Driver")).not.toBeInTheDocument();
+      expect(screen.queryByText("Update Driver")).not.toBeInTheDocument();
+    });
+
+    it("should allow updating driver assignment for admin users", async () => {
+      // Mock order with existing driver assignment
+      const orderWithDriver = {
+        ...mockOrder,
+        dispatches: [
+          {
+            id: "dispatch-123",
+            driverId: "d2e6f3ef-d801-4dd0-b840-c8de7754a6bd",
+            driver: mockDrivers[0],
+          },
+        ],
+      };
+
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes("/api/orders/SF-56780?include=dispatch.driver")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(orderWithDriver),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([]),
+        });
+      });
+
+      const { default: SingleOrder } = await import(
+        "@/components/Orders/SingleOrder"
+      );
+
+      await act(async () => {
+        render(
+          <SingleOrder onDeleteSuccess={() => {}} canAssignDriver={true} />,
+        );
+      });
+
+      // Wait for Update Driver button to appear
+      await waitFor(() => {
+        expect(screen.getByText("Update Driver")).toBeInTheDocument();
+      });
+
+      const updateButton = screen.getByText("Update Driver");
+      await userEvent.click(updateButton);
+
+      // Verify dialog opens with update title
+      await waitFor(() => {
+        expect(
+          screen.getByText("Update Driver Assignment"),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("Error Handling", () => {
     it("should handle authentication errors", async () => {
       // Mock authentication error
