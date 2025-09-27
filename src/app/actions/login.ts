@@ -3,7 +3,7 @@
 "use server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createClient } from "@/utils/supabase/server";
+import { createClient, createAdminClient } from "@/utils/supabase/server";
 
 import { UserType } from "@/types/user";
 
@@ -221,13 +221,13 @@ export async function login(
 
               if (newProfileError || !profile?.type) {
                 console.error(`❌ [${requestId}] Error fetching user profile after re-registration:`, newProfileError);
-                return { 
+                return {
                   error: "Account activated but unable to determine user role. Please contact support.",
-                  success: false 
+                  success: false
                 };
               }
 
-              const userType = profile.type.toLowerCase();
+              const userType = profile.type!.toLowerCase(); // profile.type is guaranteed to be non-null here
               // If returnTo is just "/" (root), prioritize the user's home route
               const redirectPath = (returnTo && returnTo !== "/") ? returnTo : USER_HOME_ROUTES[userType] || "/";
               
@@ -282,32 +282,67 @@ export async function login(
       };
     }
 
-    // Get user type from profile - use maybeSingle() to handle cases where profile doesn't exist
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("type, email")
-      .eq("id", user.id)
-      .maybeSingle();
 
-    if (profileError) {
-      console.error(`❌ [${requestId}] Error fetching user profile:`, profileError);
-      return { 
-        error: "Login successful but unable to determine user role. Please contact support.",
-        success: false 
+    // Get user type from profile (or create if missing)
+
+    let userType = profile?.type;
+
+    // If no profile exists, create one with default values
+    if (profileError || !profile) {
+      console.log(`⚠️ [${requestId}] No profile found for user ${user.id}, creating default profile...`);
+
+      try {
+        // Use admin client to bypass RLS policies for profile creation
+        const adminSupabase = await createAdminClient();
+
+        // Use upsert to handle existing profiles gracefully
+        const { data: newProfile, error: createError } = await adminSupabase
+          .from("profiles")
+          .upsert({
+            id: user.id,
+            email: user.email || '',
+            name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+            type: 'CLIENT', // Default to CLIENT as the most common user type
+            status: 'ACTIVE'
+          }, {
+            onConflict: 'id'
+          })
+          .select("type, email")
+          .single();
+
+        if (createError) {
+          console.error(`❌ [${requestId}] Error creating default profile:`, createError);
+          return {
+            error: "Login successful but unable to create user profile. Please contact support.",
+            success: false
+          };
+        }
+
+        userType = newProfile?.type;
+        console.log(`✅ [${requestId}] Default profile created/updated successfully for user: ${user.id}`);
+      } catch (createProfileError) {
+        console.error(`❌ [${requestId}] Exception creating default profile:`, createProfileError);
+        return {
+          error: "Login successful but unable to set up user account. Please contact support.",
+          success: false
+        };
+      }
+    }
+
+    // Double-check that we have a valid profile and userType
+    if (!profile && !userType) {
+      console.error(`❌ [${requestId}] Profile creation failed and no existing profile found for user: ${user.id}`);
+      return {
+        error: "Login successful but unable to access user profile. Please contact support.",
+        success: false
       };
     }
 
-    // If no profile exists or profile has no type, redirect to profile completion
-    if (!profile || !profile.type) {
-      console.log(`ℹ️ [${requestId}] User profile ${!profile ? 'does not exist' : 'has no type'} for user: ${user.id}, redirecting to profile completion`);
-      
-      // Set basic session data for the profile completion process
-      const cookieStore = await cookies();
-      const sessionData = {
-        userId: user.id,
-        email: user.email || '',
-        userRole: 'guest', // Temporary role until profile is completed
-        timestamp: Date.now()
+    if (!userType) {
+      console.error(`❌ [${requestId}] No profile type found for user: ${user.id}`);
+      return {
+        error: "Login successful but user profile is incomplete. Please contact support.",
+        success: false
       };
       
       cookieStore.set('user-session-data', JSON.stringify(sessionData), {
@@ -322,20 +357,20 @@ export async function login(
       redirect('/complete-profile');
     }
 
-  console.log("User profile type from DB:", profile.type);
-  
+  console.log("User profile type from DB:", userType);
+
   // Normalize the user type to lowercase for consistent handling
-  const userTypeKey = profile.type.toLowerCase();
+  const userTypeKey = userType.toLowerCase();
   console.log("Normalized user type for redirection:", userTypeKey);
 
   // Set immediate session data in cookies for client-side access
   const cookieStore = await cookies();
-  
+
   // Set user session data that can be read immediately by client
   // Normalize userRole to match TypeScript enum (lowercase)
-  const normalizedUserRole = profile.type ? Object.values(UserType).find(
-    enumValue => enumValue.toUpperCase() === profile.type!.toUpperCase()
-  ) || profile.type.toLowerCase() : 'customer';
+  const normalizedUserRole = userType ? Object.values(UserType).find(
+    enumValue => enumValue.toUpperCase() === userType.toUpperCase()
+  ) || userType.toLowerCase() : 'customer';
   
   const sessionData = {
     userId: user.id,
@@ -413,14 +448,14 @@ export async function login(
     const successState: FormState = {
       success: true,
       redirectTo: redirectPath,
-      userType: profile.type,
+      userType: userType,
       message: `Welcome back! Redirecting to your dashboard...`
     };
 
     // Log success metrics for monitoring BEFORE redirect
     console.log(`📊 [${requestId}] Login metrics:`, {
       email: email,
-      userType: profile?.type || 'unknown',
+      userType: userType || 'unknown',
       redirectPath: redirectPath,
       executionTime: `${executionTime}ms`,
       timestamp: new Date().toISOString()
@@ -436,7 +471,7 @@ export async function login(
      return {
        success: true,
        redirectTo: redirectPath,
-       userType: profile?.type || 'unknown',
+       userType: userType || 'unknown',
        message: `Welcome back! Redirecting to your dashboard...`
      };
 }

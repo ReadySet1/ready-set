@@ -209,6 +209,15 @@ export async function POST(request: Request) {
         status: authError.status,
         name: authError.name
       });
+
+      // Check if user already exists
+      if (authError.message?.includes('User already registered') || authError.status === 422) {
+        return NextResponse.json(
+          { error: "Account found", details: "An account with this email already exists. Please try signing in instead." },
+          { status: 400 }
+        );
+      }
+
       return NextResponse.json(
         { error: "Failed to create user in authentication system", details: authError.message },
         { status: 500 }
