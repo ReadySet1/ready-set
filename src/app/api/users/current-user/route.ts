@@ -29,7 +29,9 @@ export async function GET(request: Request) {
       .single();
 
     if (profile) {
-      console.log(`[${requestId}] Found user in profiles table:`, profile);
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log(`[${requestId}] Found user in profiles table:`, profile);
+      }
       
       // Return the user info directly from Supabase
       // Ensure ID is correct by spreading profile first, then overriding with auth user data
@@ -42,7 +44,9 @@ export async function GET(request: Request) {
     
     // If we still can't find a role, check user metadata
     if (user.user_metadata && (user.user_metadata.type || user.user_metadata.role)) {
-      console.log(`[${requestId}] Using role from user metadata:`, user.user_metadata);
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log(`[${requestId}] Using role from user metadata:`, user.user_metadata);
+      }
       
       // Return the user with metadata info
       return NextResponse.json({

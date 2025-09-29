@@ -1,0 +1,68 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🚀 Running pre-push validation..."
+
+# 1. Type checking
+echo "📝 Type checking..."
+pnpm run typecheck
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript errors found."
+  exit 1
+fi
+
+# 2. Lint
+echo "🧹 Linting..."
+pnpm run lint
+if [ $? -ne 0 ]; then
+  echo "❌ Linting errors found."
+  exit 1
+fi
+
+# 3. Prisma Generate & Validate
+echo "🗄️  Generating Prisma client and validating..."
+pnpm prisma generate
+pnpm prisma validate
+if [ $? -ne 0 ]; then
+  echo "❌ Prisma validation failed."
+  exit 1
+fi
+
+# 4. Run all unit tests
+echo "🧪 Running unit tests..."
+pnpm run test:unit --passWithNoTests
+if [ $? -ne 0 ]; then
+  echo "❌ Unit tests failed."
+  exit 1
+fi
+
+# 5. Run integration tests (if they exist)
+echo "🔗 Running integration tests..."
+pnpm run test:integration --passWithNoTests
+if [ $? -ne 0 ]; then
+  echo "❌ Integration tests failed."
+  exit 1
+fi
+
+# 6. Build validation
+echo "🏗️  Testing production build..."
+pnpm run build:no-typecheck
+if [ $? -ne 0 ]; then
+  echo "❌ Production build failed."
+  exit 1
+fi
+
+# 7. Optional: Run e2e tests (comment out if too slow for regular pushes)
+# These are typically slow, so only enable for critical branches or before merging to main
+# echo "🎭 Running e2e tests..."
+# pnpm run test:e2e
+# if [ $? -ne 0 ]; then
+#   echo "❌ E2E tests failed."
+#   exit 1
+# fi
+
+echo "✅ All pre-push checks passed! Safe to push."
+echo ""
+echo "💡 Next steps:"
+echo "   - Create a PR using the GitHub template"
+echo "   - Before merging to main, run: pnpm run deploy:pre-checks"

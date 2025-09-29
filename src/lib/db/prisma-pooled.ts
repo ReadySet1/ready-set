@@ -38,9 +38,25 @@ const POOL_CONFIG = {
 }
 
 // Enhanced logging configuration
-const LOG_CONFIG: any[] = isDevelopment 
-  ? ['query', 'error', 'warn', 'info']
-  : ['error', 'warn']
+// Use environment variable to control detailed logging
+const LOG_CONFIG: any[] = (() => {
+  // Check for detailed logging environment variable
+  const enableDetailedLogs = process.env.PRISMA_LOG_LEVEL?.split(',') || process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug';
+  
+  if (enableDetailedLogs && Array.isArray(enableDetailedLogs)) {
+    // Use custom log levels from environment
+    return enableDetailedLogs;
+  } else if (enableDetailedLogs === true || process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+    // Enable all logs when debug mode is on
+    return ['query', 'error', 'warn', 'info'];
+  } else if (isDevelopment) {
+    // Default development: only warnings and errors (much quieter)
+    return ['warn', 'error'];
+  } else {
+    // Production: only errors and warnings
+    return ['error', 'warn'];
+  }
+})();
 
 // Create a mock Prisma client for build-time
 const createMockPrismaClient = (): PrismaClient => {

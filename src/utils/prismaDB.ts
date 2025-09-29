@@ -23,8 +23,22 @@ import { PrismaClient } from '@prisma/client';
 
 // Create function to make a new Prisma client
 const createPrismaClient = (): PrismaClient => {
+  // Use environment variable to control detailed logging  
+  const enableDetailedLogs = process.env.PRISMA_LOG_LEVEL?.split(',') || process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug';
+  
+  let logConfig: any[];
+  if (enableDetailedLogs && Array.isArray(enableDetailedLogs)) {
+    logConfig = enableDetailedLogs;
+  } else if (enableDetailedLogs === true || process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+    logConfig = ['query', 'error', 'warn', 'info'];
+  } else if (isDevelopment) {
+    logConfig = ['warn', 'error']; // Quieter development logs
+  } else {
+    logConfig = ['error', 'warn'];
+  }
+
   return new PrismaClient({
-    log: isDevelopment ? ['query', 'error', 'warn', 'info'] : ['error', 'warn'],
+    log: logConfig,
   });
 };
 

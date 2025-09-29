@@ -1,172 +1,330 @@
 # Calculator Test Cases - Ready Set Food Delivery
 
-Test these examples to verify the calculator matches the compensation rules exactly.
-
-## Server Info
-🌐 **Calculator URL**: http://localhost:3000/admin/calculator
+Separate test suites for KASA (Client Pricing) and Destino (Driver Compensation) calculators.
 
 ---
 
-## Test Cases
+## 🏢 KASA CALCULATOR - Client Pricing Tests
 
-### ✅ Test 1: Example 1 (Easy)
-**Scenario**: 20 people, $250 order, 8 miles, no bridge, no tip
+### Test K1: Small Order Within 10 Miles
+**Scenario**: 20 people, $250 order, 8 miles, no tolls
 
 **Input Parameters**:
 - Headcount: `20`
 - Food Cost: `250`
-- Mileage: `8`
-- Bridge Required: `No`
-- Number of Stops: `1`
-- Tips: `0`
+- Total Mileage: `8`
+- Toll Fees: `0`
 
 **Expected Results**:
-- **Customer Total**: ~$65 (Tier 1 base fee)
-- **Driver Total**: $35 (Tier 1 base pay - both headcount and order qualify for Tier 1)
-- **Profit**: ~$30
-- **Notes**: $35 base payment includes first 10 miles, no mileage charge needed
+- **Rate Type**: Within 10 Miles
+- **Delivery Cost**: $30.00 (Tier: <$300 food cost)
+- **Mileage Charge**: $0.00 (within 10 miles)
+- **Toll Fees**: $0.00
+- **Total Client Charge**: $30.00
+
+**Notes**: Uses lower "Within 10 Miles" rate table, no mileage surcharge
 
 ---
 
-### ✅ Test 2: Example 2 (Normal)
-**Scenario**: 35 people, $450 order, 12 miles, no bridge, no tip
+### Test K2: Medium Order Slightly Over 10 Miles
+**Scenario**: 35 people, $450 order, 12 miles, no tolls
 
 **Input Parameters**:
 - Headcount: `35`
 - Food Cost: `450`
-- Mileage: `12`
-- Bridge Required: `No`
-- Number of Stops: `1`
-- Tips: `0`
+- Total Mileage: `12`
+- Toll Fees: `0`
 
 **Expected Results**:
-- **Customer Total**: $81.00 ($75 base + $6 long distance)
-- **Driver Total**: $40.70 ($40 base + $0.70 mileage)
-- **Profit**: ~$40.30
-- **Breakdown**:
-  - Customer: $75 Tier 2 base + $6 long distance (2 miles × $3)
-  - Driver: $40 Tier 2 base + $0.70 mileage (2 miles × $0.35)
+- **Rate Type**: Regular Rate
+- **Delivery Cost**: $70.00 (Tier: $300-599 food cost)
+- **Mileage Charge**: $6.00 (2 miles × $3.00)
+- **Toll Fees**: $0.00
+- **Total Client Charge**: $76.00
+
+**Breakdown**:
+- Base: $70 (Regular Rate for $300-599)
+- Long Distance: (12 - 10) × $3 = $6
 
 ---
 
-### ✅ Test 3: Example 3 (Complex)
-**Scenario**: 60 people, $500 order, 20 miles, bridge crossing, no tip
+### Test K3: Large Order With Tolls
+**Scenario**: 100 people, $1200 order, 14.5 miles, $8 bridge toll
+
+**Input Parameters**:
+- Headcount: `100`
+- Food Cost: `1200`
+- Total Mileage: `14.5`
+- Toll Fees: `8`
+
+**Expected Results**:
+- **Rate Type**: Regular Rate
+- **Delivery Cost**: $100.00 (Tier: $1200-1499 food cost)
+- **Mileage Charge**: $13.50 (4.5 miles × $3.00)
+- **Toll Fees**: $8.00
+- **Total Client Charge**: $121.50
+
+**Breakdown**:
+- Base: $100 (Regular Rate for $1200-1499)
+- Long Distance: (14.5 - 10) × $3 = $13.50
+- Bridge: $8
+
+---
+
+### Test K4: High Volume Within Range
+**Scenario**: 200 people, $2100 order, 9 miles, no tolls
+
+**Input Parameters**:
+- Headcount: `200`
+- Food Cost: `2100`
+- Total Mileage: `9`
+- Toll Fees: `0`
+
+**Expected Results**:
+- **Rate Type**: Within 10 Miles
+- **Delivery Cost**: $120.00 (Tier: $2100-2299 food cost)
+- **Mileage Charge**: $0.00 (within 10 miles)
+- **Toll Fees**: $0.00
+- **Total Client Charge**: $120.00
+
+**Notes**: High value order but within 10 miles = lower rate structure
+
+---
+
+## 🚗 DESTINO CALCULATOR - Driver Compensation Tests
+
+### Test D1: Basic Delivery No Bonus Deductions
+**Scenario**: 28 people, $400 order, 3.1 miles, no tips, no infractions
+
+**Input Parameters**:
+- Headcount: `28`
+- Food Cost: `400`
+- Total Mileage: `3.1`
+- Direct Tip: `No`
+- Tip Amount: `0`
+- Weekly Infractions: `None`
+
+**Expected Results**:
+- **Base Pay**: $30.00 (Tier: 25-49 headcount)
+- **Mileage Pay**: $1.09 (3.1 miles × $0.35)
+- **Bonus**: $10.00 (100% qualified)
+- **Direct Tip**: $0.00
+- **Total Driver Pay**: $41.09
+
+**Notes**: All mileage paid at $0.35/mile (not just over 10 miles)
+
+---
+
+### Test D2: Order Value Limits Tier (Lesser Rule)
+**Scenario**: 60 people, $500 order, 20 miles, no tips, no infractions
 
 **Input Parameters**:
 - Headcount: `60`
 - Food Cost: `500`
-- Mileage: `20`
-- Bridge Required: `Yes`
-- Number of Stops: `1`
-- Tips: `0`
+- Total Mileage: `20`
+- Direct Tip: `No`
+- Tip Amount: `0`
+- Weekly Infractions: `None`
 
 **Expected Results**:
-- **Customer Total**: $113 ($75 base + $30 long distance + $8 bridge)
-- **Driver Total**: $51.50 ($40 base + $3.50 mileage + $8 bridge)
-- **Profit**: ~$61.50
-- **Breakdown**:
-  - Customer: $75 Tier 2 base (by order value) + $30 long distance (10 miles × $3) + $8 bridge
-  - Driver: $40 Tier 2 base (by order value) + $3.50 mileage (10 miles × $0.35) + $8 bridge
-- **Key Rule**: Uses Tier 2 due to order value $500 (lesser of headcount vs order value rule)
+- **Base Pay**: $40.00 (Tier: $300-599 food cost - LESSER)
+- **Mileage Pay**: $7.00 (20 miles × $0.35)
+- **Bonus**: $10.00 (100% qualified)
+- **Direct Tip**: $0.00
+- **Total Driver Pay**: $57.00
+
+**Breakdown**:
+- Headcount suggests Tier 3 ($50)
+- Food cost suggests Tier 2 ($40)
+- Use LESSER = $40
 
 ---
 
-### ✅ Test 4: Example 4 (With Direct Tip)
-**Scenario**: 30 people, $400 order, 15 miles, $20 tip
+### Test D3: With Direct Tip - NO BASE PAY
+**Scenario**: 30 people, $400 order, 15 miles, $20 direct tip, no infractions
 
 **Input Parameters**:
 - Headcount: `30`
 - Food Cost: `400`
-- Mileage: `15`
-- Bridge Required: `No`
-- Number of Stops: `1`
-- Tips: `20`
+- Total Mileage: `15`
+- Direct Tip: `Yes`
+- Tip Amount: `20`
+- Weekly Infractions: `None`
 
 **Expected Results**:
-- **Customer Total**: $110.00 ($75 base + $15 long distance + $20 tip)
-- **Driver Total**: $61.75 ($40 base + $1.75 mileage + $20 tip)
-- **Profit**: ~$48.25
-- **Breakdown**:
-  - Customer: $75 Tier 2 base + $15 long distance (5 miles × $3) + $20 tip = $110
-  - Driver: $40 Tier 2 base + $1.75 mileage (5 miles × $0.35) + $20 tip = $61.75
-- **Key Rule**: With direct tip, driver gets base pay + mileage + 100% tip pass-through
+- **Base Pay**: $0.00 (❌ EXCLUDED due to tip)
+- **Mileage Pay**: $5.25 (15 miles × $0.35)
+- **Bonus**: $0.00 (❌ EXCLUDED due to tip)
+- **Direct Tip**: $20.00 (✅ 100% to driver)
+- **Total Driver Pay**: $25.25
+
+**🚨 CRITICAL RULE**: Direct tip = NO base pay, NO bonus. Only tip + mileage.
 
 ---
 
-## Browser Console Test Script
+### Test D4: With Weekly Infractions
+**Scenario**: 50 people, $700 order, 10 miles, no tip, 1 late (>15min), 1 no photo
 
-Open the calculator page and paste this in the browser console to test all scenarios:
+**Input Parameters**:
+- Headcount: `50`
+- Food Cost: `700`
+- Total Mileage: `10`
+- Direct Tip: `No`
+- Tip Amount: `0`
+- Weekly Infractions:
+  - No Photo Setup: `1` (-5%)
+  - Late Over 15 Min: `1` (-10%)
 
-```javascript
-// Test Calculator via Browser Console
-const testExamples = [
+**Expected Results**:
+- **Base Pay**: $50.00 (Tier: 50-74 headcount)
+- **Mileage Pay**: $3.50 (10 miles × $0.35)
+- **Bonus**: $8.50 ($10 × 85% = $8.50)
+- **Bonus Percentage**: 85% (100% - 5% - 10%)
+- **Direct Tip**: $0.00
+- **Total Driver Pay**: $62.00
+
+**Breakdown**:
+- Base: $50
+- Mileage: 10 × $0.35 = $3.50
+- Bonus: $10 × 0.85 = $8.50
+- Total: $62.00
+
+---
+
+### Test D5: High Volume Basic
+**Scenario**: 100 people, $1500 order, 25 miles, no tip, no infractions
+
+**Input Parameters**:
+- Headcount: `100`
+- Food Cost: `1500`
+- Total Mileage: `25`
+- Direct Tip: `No`
+- Tip Amount: `0`
+- Weekly Infractions: `None`
+
+**Expected Results**:
+- **Base Pay**: $50.00 (Case by case - using Tier 4 estimate)
+- **Mileage Pay**: $8.75 (25 miles × $0.35)
+- **Bonus**: $10.00 (100% qualified)
+- **Direct Tip**: $0.00
+- **Total Driver Pay**: $68.75
+
+**Notes**: Over 100 headcount is "case by case" - using estimated Tier 4 rate
+
+---
+
+## 📊 Tier Reference Tables
+
+### KASA Client Pricing Tiers
+
+#### Within 10 Miles
+| Headcount | Food Cost | Base Fee |
+|-----------|-----------|----------|
+| ≤24 | <$300 | $30 |
+| 25-49 | $300-599 | $40 |
+| 50-74 | $600-899 | $60 |
+| 75-99 | $900-1199 | $70 |
+| 100-124 | $1200-1499 | $80 |
+| 125-149 | $1500-1699 | $90 |
+| 150-174 | $1700-1899 | $100 |
+| 175-199 | $1900-2099 | $110 |
+| 200-249 | $2100-2299 | $120 |
+| 250-299 | $2300-2499 | $130 |
+
+#### Regular Rate (>10 Miles)
+| Headcount | Food Cost | Base Fee |
+|-----------|-----------|----------|
+| ≤24 | <$300 | $60 |
+| 25-49 | $300-599 | $70 |
+| 50-74 | $600-899 | $90 |
+| 75-99 | $900-1199 | $100 |
+| 100-124 | $1200-1499 | $120 |
+| 125-149 | $1500-1699 | $150 |
+| 150-174 | $1700-1899 | $180 |
+| 175-199 | $1900-2099 | $210 |
+| 200-249 | $2100-2299 | $280 |
+| 250-299 | $2300-2499 | $310 |
+
+### Destino Driver Compensation Tiers
+
+| Headcount | Food Cost | Base Pay |
+|-----------|-----------|----------|
+| <25 | <$300 | $25 |
+| 25-49 | $300-599 | $30 |
+| 50-74 | $600-899 | $40 |
+| 75-99 | $900-1099 | $50 |
+| 100+ | $1200+ | $50+ (case by case) |
+
+---
+
+## 🔑 Key Calculation Rules
+
+### KASA (Client)
+- ✅ Use LESSER tier (headcount vs food cost)
+- ✅ Within 10 miles = lower rate table, no mileage charge
+- ✅ Over 10 miles = higher rate table + $3/mile for excess
+- ✅ Tolls passed through at cost
+
+### Destino (Driver)
+- ✅ Use LESSER tier (headcount vs food cost)
+- ✅ ALL mileage paid at $0.35/mile (not just over 10)
+- ✅ $10 bonus standard (affected by infractions)
+- ✅ Direct tip = NO base pay, NO bonus (mutually exclusive)
+- ✅ Infractions cumulative across entire week
+
+---
+
+## 🧪 Browser Console Test Script
+
+```typescript
+// KASA Calculator Tests
+const kasaTests = [
   {
-    name: "Example 1 (Easy)",
-    input: { headcount: 20, foodCost: 250, mileage: 8, requiresBridge: false, numberOfStops: 1, tips: 0 },
-    expected: { customer: 65, driver: 35 }
+    name: "K1: Small Within 10",
+    input: { headcount: 20, foodCost: 250, mileage: 8, tolls: 0 },
+    expected: { total: 30.00 }
   },
   {
-    name: "Example 2 (Normal)", 
-    input: { headcount: 35, foodCost: 450, mileage: 12, requiresBridge: false, numberOfStops: 1, tips: 0 },
-    expected: { customer: 81, driver: 40.70 }
+    name: "K2: Medium Over 10",
+    input: { headcount: 35, foodCost: 450, mileage: 12, tolls: 0 },
+    expected: { total: 76.00 }
   },
   {
-    name: "Example 3 (Complex)",
-    input: { headcount: 60, foodCost: 500, mileage: 20, requiresBridge: true, numberOfStops: 1, tips: 0 },
-    expected: { customer: 113, driver: 51.50 }
+    name: "K3: Large With Tolls",
+    input: { headcount: 100, foodCost: 1200, mileage: 14.5, tolls: 8 },
+    expected: { total: 121.50 }
   },
   {
-    name: "Example 4 (With Tip)",
-    input: { headcount: 30, foodCost: 400, mileage: 15, requiresBridge: false, numberOfStops: 1, tips: 20 },
-    expected: { customer: 110, driver: 61.75 }
+    name: "K4: High Volume Within",
+    input: { headcount: 200, foodCost: 2100, mileage: 9, tolls: 0 },
+    expected: { total: 120.00 }
   }
 ];
 
-async function runBrowserTests() {
-  console.log('🧪 Starting Calculator Tests...\n');
-  
-  for (const test of testExamples) {
-    console.log(`\n📋 Testing: ${test.name}`);
-    console.log('Input:', test.input);
-    console.log('Expected - Customer:', `$${test.expected.customer}`, 'Driver:', `$${test.expected.driver}`);
-    
-    // You would manually enter these values in the UI and compare results
-    console.log('👆 Enter these values in the calculator and check results');
+// Destino Calculator Tests
+const destinoTests = [
+  {
+    name: "D1: Basic No Deductions",
+    input: { headcount: 28, foodCost: 400, mileage: 3.1, tip: 0, infractions: {} },
+    expected: { total: 41.09 }
+  },
+  {
+    name: "D2: Lesser Rule",
+    input: { headcount: 60, foodCost: 500, mileage: 20, tip: 0, infractions: {} },
+    expected: { total: 57.00 }
+  },
+  {
+    name: "D3: Direct Tip",
+    input: { headcount: 30, foodCost: 400, mileage: 15, tip: 20, infractions: {} },
+    expected: { total: 25.25 }
+  },
+  {
+    name: "D4: With Infractions",
+    input: { headcount: 50, foodCost: 700, mileage: 10, tip: 0, infractions: { noPhoto: 1, late15: 1 } },
+    expected: { total: 62.00 }
   }
-}
+];
 
-// Run the test
-runBrowserTests();
+console.log('🧪 Test cases ready!');
+console.log('Run kasaTests or destinoTests to see expected values');
 ```
-
----
-
-## Manual Testing Steps
-
-1. **Open Calculator**: Navigate to http://localhost:3000/admin/calculator
-2. **For each test case**:
-   - Enter the input parameters in the calculator form
-   - Click "Calculate" 
-   - Compare results with expected values
-   - Note any discrepancies
-
-3. **Key Things to Verify**:
-   - ✅ Tier selection (based on lesser of headcount vs order value)
-   - ✅ Mileage calculation (only for miles > 10 at $0.35/mile)
-   - ✅ Bridge toll handling ($8 each way)
-   - ✅ Tip logic (either bonus structure OR tip pass-through, never both)
-   - ✅ Long distance charges ($3/mile for miles > 10)
-
----
-
-## Expected Tier Logic
-
-| Headcount | Order Value | Customer Base | Driver Base |
-|-----------|-------------|---------------|-------------|
-| < 25 | < $300 | $65 | $35 |
-| 25-49 | $300-599 | $75 | $40 |
-| 50-74 | $600-899 | $85 | $50 |
-| 75-99 | $900-1099 | $95 | $60 |
-| > 100 | > $1200 | $105 | $70 |
-
-**Rule**: Uses the LOWER tier when headcount and order value suggest different tiers.

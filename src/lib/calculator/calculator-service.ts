@@ -122,14 +122,7 @@ export class CalculatorService {
     try {
       let query = supabase
         .from('client_configurations')
-        .select(`
-          *,
-          calculator_templates (
-            id,
-            name,
-            description
-          )
-        `)
+        .select('*')
         .eq('is_active', true);
 
       if (clientId) {
@@ -143,7 +136,20 @@ export class CalculatorService {
         throw new Error('Failed to fetch client configurations');
       }
 
-      return data || [];
+      // Map the database fields to camelCase for consistency
+      const mappedData = (data || []).map((config: any) => ({
+        id: config.id,
+        clientId: config.client_id,
+        templateId: config.template_id,
+        clientName: config.client_name,
+        ruleOverrides: config.rule_overrides || {},
+        areaRules: config.area_rules || [],
+        isActive: config.is_active,
+        createdAt: config.created_at,
+        updatedAt: config.updated_at
+      }));
+
+      return mappedData;
     } catch (error) {
       console.error('Error in getClientConfigurations:', error);
       throw error;
@@ -309,13 +315,7 @@ export class CalculatorService {
     try {
       let query = supabase
         .from('calculation_history')
-        .select(`
-          *,
-          calculator_templates (
-            name,
-            description
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (options.userId) {
@@ -348,7 +348,22 @@ export class CalculatorService {
         throw new Error('Failed to fetch calculation history');
       }
 
-      return data || [];
+      // Map the database fields to camelCase for consistency
+      const mappedData = (data || []).map((history: any) => ({
+        id: history.id,
+        templateId: history.template_id,
+        clientConfigId: history.client_config_id,
+        userId: history.user_id,
+        inputData: history.input_data,
+        customerCharges: history.customer_charges,
+        driverPayments: history.driver_payments,
+        customerTotal: history.customer_total,
+        driverTotal: history.driver_total,
+        notes: history.notes,
+        createdAt: history.created_at
+      }));
+
+      return mappedData;
     } catch (error) {
       console.error('Error in getCalculationHistory:', error);
       throw error;

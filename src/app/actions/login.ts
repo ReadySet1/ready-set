@@ -42,7 +42,9 @@ export async function login(
   const startTime = Date.now();
   const requestId = `login_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
-  console.log(`🚀 [${requestId}] Login attempt started`);
+  if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+    console.log(`🚀 [${requestId}] Login attempt started`);
+  }
   
   // Use cookies() to opt out of caching
   await cookies();
@@ -52,7 +54,9 @@ export async function login(
     const password = formData.get("password")?.toString() || "";
     const returnTo = formData.get("returnTo")?.toString();
 
-    console.log(`🔍 [${requestId}] Login attempt for email: ${email}, returnTo: ${returnTo || 'default'}`);
+    if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+      console.log(`🔍 [${requestId}] Login attempt for email: ${email}, returnTo: ${returnTo || 'default'}`);
+    }
 
     // Enhanced input validation with specific error messages
     if (!email || !password) {
@@ -60,7 +64,9 @@ export async function login(
       if (!email) missingFields.push('email');
       if (!password) missingFields.push('password');
       
-      console.log(`❌ [${requestId}] Validation failed: Missing ${missingFields.join(', ')}`);
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log(`❌ [${requestId}] Validation failed: Missing ${missingFields.join(', ')}`);
+      }
       return { 
         error: `Please provide ${missingFields.join(' and ')} to continue.`,
         success: false 
@@ -70,7 +76,9 @@ export async function login(
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      console.log(`❌ [${requestId}] Validation failed: Invalid email format`);
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log(`❌ [${requestId}] Validation failed: Invalid email format`);
+      }
       return { 
         error: "Please enter a valid email address.",
         success: false 
@@ -78,7 +86,9 @@ export async function login(
     }
 
     // Test connection to Supabase first
-    console.log(`🔌 [${requestId}] Testing Supabase connection...`);
+    if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+      console.log(`🔌 [${requestId}] Testing Supabase connection...`);
+    }
     try {
       const { data: connectionTest, error: connectionError } = await supabase
         .from("profiles")
@@ -93,7 +103,9 @@ export async function login(
         };
       }
       
-      console.log(`✅ [${requestId}] Supabase connection test: SUCCESS`);
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log(`✅ [${requestId}] Supabase connection test: SUCCESS`);
+      }
     } catch (testError) {
       console.error(`❌ [${requestId}] Supabase connection test failed:`, testError);
       return { 
@@ -103,14 +115,18 @@ export async function login(
     }
 
     // Attempt authentication
-    console.log(`🔐 [${requestId}] Attempting authentication...`);
+    if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+      console.log(`🔐 [${requestId}] Attempting authentication...`);
+    }
     const { error: authError, data: authData } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (authError) {
-      console.log(`❌ [${requestId}] Authentication failed: ${authError.message}`);
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log(`❌ [${requestId}] Authentication failed: ${authError.message}`);
+      }
       
       // Enhanced error handling with specific messages
       if (authError.message.includes('Invalid login credentials')) {
@@ -127,13 +143,17 @@ export async function login(
           }
 
           if (userData) {
-            console.log(`❌ [${requestId}] User exists but password is incorrect`);
+            if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+              console.log(`❌ [${requestId}] User exists but password is incorrect`);
+            }
             return { 
               error: "Incorrect password. Please check your password and try again, or use Magic Link for password-free sign in.",
               success: false 
             };
           } else {
-            console.log(`❌ [${requestId}] User account not found`);
+            if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+              console.log(`❌ [${requestId}] User account not found`);
+            }
             return { 
               error: "Account not found. Please check your email address or sign up for a new account.",
               success: false 

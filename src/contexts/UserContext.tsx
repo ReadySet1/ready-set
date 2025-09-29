@@ -87,7 +87,9 @@ const fetchUserRole = async (
     // Check cache first
     const cachedProfile = getCachedUserProfile(user.id);
     if (cachedProfile && cachedProfile.type) {
-      console.log("Using cached user profile:", cachedProfile);
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log("Using cached user profile:", cachedProfile);
+      }
       setUserRole(cachedProfile.type);
       return cachedProfile.type;
     }
@@ -223,7 +225,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     !user &&
     !hasImmediateData
   ) {
-    console.log("🔥 IMMEDIATE cookie check during render...");
+    if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+      console.log("🔥 IMMEDIATE cookie check during render...");
+    }
     const cookies = document.cookie;
     const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
 
@@ -231,10 +235,14 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       try {
         const decoded = decodeURIComponent(sessionMatch[1]);
         const sessionData = JSON.parse(decoded);
-        console.log("🔥 IMMEDIATE: Found session data:", sessionData);
+        if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+          console.log("🔥 IMMEDIATE: Found session data:", sessionData);
+        }
 
         if (sessionData.userId && sessionData.email && sessionData.userRole) {
-          console.log("🔥 IMMEDIATE: Setting user state immediately!");
+          if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+            console.log("🔥 IMMEDIATE: Setting user state immediately!");
+          }
 
           const mockUser = {
             id: sessionData.userId,
@@ -253,15 +261,21 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               setUserRole(normalizedRole);
               setHasImmediateData(true);
               setIsLoading(false);
-              console.log("🔥 IMMEDIATE: Auth state set successfully!");
+              if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+                console.log("🔥 IMMEDIATE: Auth state set successfully!");
+              }
             }, 0);
           }
         }
       } catch (error) {
-        console.error("🔥 IMMEDIATE: Failed to parse cookie:", error);
+        if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+          console.error("🔥 IMMEDIATE: Failed to parse cookie:", error);
+        }
       }
     } else {
-      console.log("🔥 IMMEDIATE: No session cookie found");
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log("🔥 IMMEDIATE: No session cookie found");
+      }
     }
   }
 
@@ -272,27 +286,37 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
   // Hydrate auth state synchronously on mount using server-side data
   useEffect(() => {
-    console.log("🚀🚀🚀 FORCED UserContext useEffect TRIGGERED!");
-    console.log("🚀🚀🚀 FORCED UserContext: Starting hydration check...");
-    console.log("🚀 Window available?", typeof window !== "undefined");
+    if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+      console.log("🚀🚀🚀 FORCED UserContext useEffect TRIGGERED!");
+      console.log("🚀🚀🚀 FORCED UserContext: Starting hydration check...");
+      console.log("🚀 Window available?", typeof window !== "undefined");
+    }
 
     // Force check cookies directly as backup
     if (typeof window !== "undefined") {
       const cookies = document.cookie;
-      console.log("🍪 FORCED Cookie check - length:", cookies.length);
-      console.log("🍪 FORCED Cookie preview:", cookies.substring(0, 200));
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log("🍪 FORCED Cookie check - length:", cookies.length);
+        console.log("🍪 FORCED Cookie preview:", cookies.substring(0, 200));
+      }
 
       // Manual cookie parsing as backup
       const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
       if (sessionMatch && sessionMatch[1]) {
-        console.log("🔍 FORCED Found session cookie manually!");
+        if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+          console.log("🔍 FORCED Found session cookie manually!");
+        }
         try {
           const decoded = decodeURIComponent(sessionMatch[1]);
           const sessionData = JSON.parse(decoded);
-          console.log("📊 FORCED Manual session data:", sessionData);
+          if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+            console.log("📊 FORCED Manual session data:", sessionData);
+          }
 
           if (sessionData.userId && sessionData.email && sessionData.userRole) {
-            console.log("✅ FORCED Creating user from manual parsing...");
+            if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+              console.log("✅ FORCED Creating user from manual parsing...");
+            }
 
             // Create user object directly from cookie data
             const mockUser = {
@@ -312,14 +336,18 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               setUserRole(normalizedRole);
               setHasImmediateData(true);
               setIsLoading(false);
-              console.log(
-                "✅ FORCED Hydrated auth state successfully with manual parsing!",
-              );
+              if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+                console.log(
+                  "✅ FORCED Hydrated auth state successfully with manual parsing!",
+                );
+              }
             }, 0);
             return; // Exit early since we found the data
           }
         } catch (error) {
-          console.error("❌ FORCED Manual parsing failed:", error);
+          if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+            console.error("❌ FORCED Manual parsing failed:", error);
+          }
         }
       }
     }
@@ -327,7 +355,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     // Fallback to original method
     const recoveredState = recoverAuthState();
     if (recoveredState) {
-      console.log("✅ Recovered auth state from hydration:", recoveredState);
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log("✅ Recovered auth state from hydration:", recoveredState);
+      }
 
       // Create a mock user object from recovered state
       const mockUser = {
@@ -347,18 +377,24 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         setIsLoading(false); // We have hydrated data, not loading anymore
       }, 0);
 
-      console.log(
-        "✅ Hydrated auth state successfully - user should be visible in header",
-      );
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log(
+          "✅ Hydrated auth state successfully - user should be visible in header",
+        );
+      }
     } else {
-      console.log("❌ No auth state found during hydration check");
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log("❌ No auth state found during hydration check");
+      }
     }
   }, []);
 
   // Initialize Supabase
   useEffect(() => {
     const initSupabase = async () => {
-      console.log("🔌 UserContext: Initializing Supabase client...");
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log("🔌 UserContext: Initializing Supabase client...");
+      }
       setAuthProgressState({
         step: "connecting",
         message: "Connecting to authentication service...",
@@ -366,7 +402,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
       try {
         const client = await createClient();
-        console.log("✅ UserContext: Supabase client initialized successfully");
+        if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+          console.log("✅ UserContext: Supabase client initialized successfully");
+        }
         setSupabase(client);
         setAuthProgressState({ step: "idle", message: "" });
       } catch (err) {
@@ -429,18 +467,20 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         if (getUserError) {
           console.error("❌ Error getting user:", getUserError);
 
-          // If we have immediate hydration data but Supabase session is missing,
-          // try to recover gracefully without showing error immediately
-          if (
-            hasImmediateData &&
-            getUserError.message?.includes("Auth session missing")
-          ) {
+        // If we have immediate hydration data but Supabase session is missing,
+        // try to recover gracefully without showing error immediately
+        if (
+          hasImmediateData &&
+          getUserError.message?.includes("Auth session missing")
+        ) {
+          if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
             console.log(
               "⚠️  Session missing but we have hydration data, continuing with hydrated state",
             );
-            // Don't set error or stop loading immediately, let hydration data work
-            return;
           }
+          // Don't set error or stop loading immediately, let hydration data work
+          return;
+        }
 
           if (!hasImmediateData) {
             setIsLoading(false);
