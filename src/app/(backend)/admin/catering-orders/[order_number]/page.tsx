@@ -26,10 +26,10 @@ const OrderPage = () => {
   useEffect(() => {
     // Get the order number from the URL params
     if (params?.order_number) {
-      const rawOrderNumber = Array.isArray(params.order_number) 
-        ? params.order_number[0] 
+      const rawOrderNumber = Array.isArray(params.order_number)
+        ? params.order_number[0]
         : params.order_number;
-      
+
       if (rawOrderNumber) {
         const decodedOrderNumber = decodeOrderNumber(rawOrderNumber);
         setOrderNumber(decodedOrderNumber);
@@ -86,7 +86,20 @@ const OrderPage = () => {
       </div>
 
       <div className="flex-1">
-        <SingleOrder onDeleteSuccess={handleDeleteSuccess} showHeader={false} />
+        <SingleOrder
+          onDeleteSuccess={handleDeleteSuccess}
+          showHeader={false}
+          canAssignDriver={true}
+          canUpdateDriverStatus={true}
+          canDeleteOrder={true}
+          canEditOrder={true}
+          // Enable all granular permissions for admin users
+          canViewOrderTitle={true}
+          canViewOrderStatus={true}
+          canViewOrderNumber={true}
+          canViewDeliveryDate={true}
+          canViewDeliveryTime={true}
+        />
       </div>
     </div>
   );

@@ -318,7 +318,7 @@ const OrderDashboardPage = () => {
                             <TableRow key={order.id}>
                               <TableCell>
                                 <Link
-                                  href={`/vendor/deliveries/${order.orderNumber}`}
+                                  href={`/vendor/deliveries/${encodeURIComponent(order.orderNumber)}`}
                                   className="font-medium hover:underline"
                                 >
                                   {order.orderNumber}

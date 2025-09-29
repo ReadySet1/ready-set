@@ -2,6 +2,8 @@
 // Simplified implementation - you'll need to adapt this to your actual auth system
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase/server';
+import { getUserRole } from '@/lib/auth';
 
 export interface AuthContext {
   user: {
@@ -67,32 +69,64 @@ export async function withAuth(
   const { allowedRoles = [], requireAuth = true } = options;
 
   try {
-    // Get session from request headers or cookies
-    // This is a simplified implementation - adapt to your auth system
+    // Create Supabase client for server-side authentication
+    const supabase = await createClient();
+    
+    // Check for Authorization header first (for API calls with Bearer token)
     const authHeader = request.headers.get('authorization');
-    const sessionCookie = request.cookies.get('session')?.value;
+    let user = null;
+    let authError = null;
+    
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const result = await supabase.auth.getUser(token);
+      user = result.data.user;
+      authError = result.error;
+    } else {
+      // Fallback to session-based authentication (cookies)
+      const result = await supabase.auth.getUser();
+      user = result.data.user;
+      authError = result.error;
+    }
 
-    if (!authHeader && !sessionCookie && requireAuth) {
+    if (authError || !user) {
+      if (requireAuth) {
+        console.error('Auth error:', authError);
+        return {
+          success: false,
+          response: NextResponse.json(
+            { error: 'Authentication required' },
+            { status: 401 }
+          ),
+          context: {} as AuthContext
+        };
+      }
+      
+      // If auth is not required and user is not found, return success with empty context
+      return {
+        success: true,
+        context: {} as AuthContext
+      };
+    }
+
+    // Get the user's role from the profiles table
+    const userRole = await getUserRole(user.id);
+    
+    if (!userRole && requireAuth) {
       return {
         success: false,
         response: NextResponse.json(
-          { error: 'Authentication required' },
-          { status: 401 }
+          { error: 'User role not found' },
+          { status: 403 }
         ),
         context: {} as AuthContext
       };
     }
 
-    // Mock user data - replace with actual session validation
-    const mockUser = {
-      id: 'user-123',
-      email: 'driver@readyset.com',
-      type: 'DRIVER' as const,
-      driverId: 'driver-456'
-    };
+    const userType = userRole as 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT';
 
     // Check role permissions
-    if (allowedRoles.length > 0 && !allowedRoles.includes(mockUser.type)) {
+    if (allowedRoles.length > 0 && userType && !allowedRoles.includes(userType)) {
       return {
         success: false,
         response: NextResponse.json(
@@ -103,13 +137,21 @@ export async function withAuth(
       };
     }
 
+    // Create auth context with real user data
+    const authUser = {
+      id: user.id,
+      email: user.email || '',
+      type: userType,
+      driverId: userType === 'DRIVER' ? user.id : undefined
+    };
+
     return {
       success: true,
       context: { 
-        user: mockUser,
-        isAdmin: ['ADMIN', 'SUPER_ADMIN'].includes(mockUser.type),
-        isSuperAdmin: ['SUPER_ADMIN'].includes(mockUser.type),
-        isHelpdesk: ['HELPDESK'].includes(mockUser.type)
+        user: authUser,
+        isAdmin: ['ADMIN', 'SUPER_ADMIN'].includes(userType),
+        isSuperAdmin: ['SUPER_ADMIN'].includes(userType),
+        isHelpdesk: ['HELPDESK'].includes(userType)
       }
     };
   } catch (error) {

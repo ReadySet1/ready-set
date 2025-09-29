@@ -282,12 +282,8 @@ export async function login(
       };
     }
 
+
     // Get user type from profile (or create if missing)
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("type, email")
-      .eq("id", user.id)
-      .maybeSingle();
 
     let userType = profile?.type;
 
@@ -348,6 +344,17 @@ export async function login(
         error: "Login successful but user profile is incomplete. Please contact support.",
         success: false
       };
+      
+      cookieStore.set('user-session-data', JSON.stringify(sessionData), {
+        path: '/',
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7 // 7 days
+      });
+
+      console.log(`🔄 [${requestId}] Redirecting to profile completion for user: ${user.id}`);
+      redirect('/complete-profile');
     }
 
   console.log("User profile type from DB:", userType);

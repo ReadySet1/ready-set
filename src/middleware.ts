@@ -71,12 +71,17 @@ export async function middleware(request: NextRequest) {
 
         // Check for admin-only routes
         if (pathname.startsWith('/admin')) {
-          // Get user profile to check role
-          const { data: profile } = await supabase
+          // Get user profile to check role - use maybeSingle() to handle missing profiles
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('type')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
+            
+          // Log profile lookup errors (except for missing profile which is handled below)
+          if (profileError) {
+            console.error('Middleware: Error fetching user profile:', profileError);
+          }
           
           if (!profile || !['admin', 'super_admin', 'helpdesk'].includes((profile.type ?? '').toLowerCase())) {
             // User is authenticated but not authorized

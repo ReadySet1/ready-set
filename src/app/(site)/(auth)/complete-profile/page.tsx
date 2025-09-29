@@ -42,7 +42,7 @@ export default function CompleteProfile() {
       const client = await createClient();
       setSupabase(client);
     };
-    
+
     initSupabase();
   }, []);
 
@@ -68,10 +68,10 @@ export default function CompleteProfile() {
   useEffect(() => {
     const fetchUser = async () => {
       if (!supabase) return; // Wait until supabase is initialized
-      
+
       try {
         console.log("Fetching user data...");
-        
+
         // Simple user fetch with no custom timeouts
         const { data, error } = await supabase.auth.getUser();
 
@@ -96,7 +96,10 @@ export default function CompleteProfile() {
 
         // Check if userType exists in metadata and use it
         if (data.user.user_metadata?.userType) {
-          console.log("User type found in metadata:", data.user.user_metadata.userType);
+          console.log(
+            "User type found in metadata:",
+            data.user.user_metadata.userType,
+          );
           setUserType(data.user.user_metadata.userType as UserType);
         }
 
@@ -104,14 +107,16 @@ export default function CompleteProfile() {
         // This ensures we're definitely checking the right table
         try {
           const { data: rawUserData, error: rawUserError } = await supabase.rpc(
-            'get_user_by_id',
-            { user_id: userId }
+            "get_user_by_id",
+            { user_id: userId },
           );
 
           console.log("Raw user query result:", rawUserData, rawUserError);
 
           if (!rawUserError && rawUserData) {
-            console.log("User found in public.user table via RPC, redirecting to home");
+            console.log(
+              "User found in public.user table via RPC, redirecting to home",
+            );
             router.push("/");
             return;
           }
@@ -127,7 +132,11 @@ export default function CompleteProfile() {
           .eq("id", userId)
           .limit(1);
 
-        console.log("Public user table search result:", publicUserData, publicUserError);
+        console.log(
+          "Public user table search result:",
+          publicUserData,
+          publicUserError,
+        );
 
         if (!publicUserError && publicUserData && publicUserData.length > 0) {
           console.log("User found in public.user table, redirecting to home");
@@ -142,7 +151,11 @@ export default function CompleteProfile() {
           .eq("auth_user_id", userId)
           .limit(1);
 
-        console.log("Profiles table search result:", profilesData, profilesError);
+        console.log(
+          "Profiles table search result:",
+          profilesData,
+          profilesError,
+        );
 
         if (!profilesError && profilesData && profilesData.length > 0) {
           console.log("User already has a profile, redirecting to home");
@@ -179,30 +192,34 @@ export default function CompleteProfile() {
       setError("Supabase client not initialized");
       return;
     }
-    
+
     console.log("Form submission started:", formData);
     setLoading(true);
     setError(null);
-  
+
     if (!user) {
       console.error("No user found in state");
       setError("User not authenticated");
       setLoading(false);
       return;
     }
-  
+
     try {
       console.log("Creating profile for user:", user.id);
-  
+
       // Prepare profile data
       const profileData = {
         auth_user_id: user.id,
         guid: null,
-        name: user.user_metadata?.full_name || formData.contact_name || user.user_metadata?.name,
+        name:
+          user.user_metadata?.full_name ||
+          formData.contact_name ||
+          user.user_metadata?.name,
         image: user.user_metadata?.avatar_url || user.user_metadata?.picture,
         type: userType,
         company_name: formData.company || null,
-        contact_name: formData.contact_name || user.user_metadata?.full_name || null,
+        contact_name:
+          formData.contact_name || user.user_metadata?.full_name || null,
         contact_number: formData.phone || null,
         website: formData.website || null,
         street1: formData.street1 || null,
@@ -212,12 +229,20 @@ export default function CompleteProfile() {
         zip: formData.zip || null,
         location_number: null,
         parking_loading: formData.parking || null,
-        counties: Array.isArray(formData.countiesServed) ? formData.countiesServed.join(",") : null,
-        time_needed: Array.isArray(formData.timeNeeded) ? formData.timeNeeded.join(",") : null,
+        counties: Array.isArray(formData.countiesServed)
+          ? formData.countiesServed.join(",")
+          : null,
+        time_needed: Array.isArray(formData.timeNeeded)
+          ? formData.timeNeeded.join(",")
+          : null,
         frequency: formData.frequency || null,
-        provide: Array.isArray(formData.provisions) ? formData.provisions.join(",") : null,
+        provide: Array.isArray(formData.provisions)
+          ? formData.provisions.join(",")
+          : null,
         head_count: formData.head_count || null,
-        catering_brokerage: Array.isArray(formData.cateringBrokerage) ? formData.cateringBrokerage.join(",") : null,
+        catering_brokerage: Array.isArray(formData.cateringBrokerage)
+          ? formData.cateringBrokerage.join(",")
+          : null,
         status: "pending",
         side_notes: null,
         confirmation_code: null,
@@ -225,9 +250,9 @@ export default function CompleteProfile() {
         updated_at: new Date(),
         is_temporary_password: false,
       };
-  
+
       console.log("Profile data to insert:", profileData);
-  
+
       // Prepare user table data
       const userTableData = {
         id: user.id,
@@ -257,84 +282,60 @@ export default function CompleteProfile() {
         updated_at: new Date(),
         isTemporaryPassword: false,
       };
-  
-      // Try direct Supabase insertion first for better error handling
-      console.log("Inserting profile data directly via Supabase...");
-      
-      try {
-        // Insert into profiles table first
-        const { data: profileInsertData, error: profileInsertError } = await supabase
-          .from('profiles')
-          .insert([profileData]);
-          
-        if (profileInsertError) {
-          console.error("Error inserting profile:", profileInsertError);
-          throw new Error(`Profile insertion failed: ${profileInsertError.message}`);
-        }
-        
-        console.log("Profile inserted successfully:", profileInsertData);
-        
-        // Insert into user table (public schema, not 'users')
-        const { data: userInsertData, error: userInsertError } = await supabase
-          .from('user')
-          .insert([userTableData]);
-          
-        if (userInsertError) {
-          console.error("Error inserting user:", userInsertError);
-          throw new Error(`User insertion failed: ${userInsertError.message}`);
-        }
-        
-        console.log("User inserted successfully:", userInsertData);
-        
-        // Success with direct Supabase insertion
-        toast.success("Profile completed successfully");
-        setTimeout(() => {
-          router.push("/");
-        }, 500);
-        return;
-      } catch (supabaseError) {
-        // If direct Supabase insertion fails, fall back to API route
-        console.warn("Direct Supabase insertion failed, falling back to API route:", supabaseError);
-      }
 
-      // Fall back to the API route for profile creation
-      console.log("Falling back to API route for profile creation...");
-      
-      const response = await fetch('/api/profile', {
-        method: 'POST',
+      // Use the dedicated profile completion API endpoint
+      console.log("Using dedicated profile completion endpoint...");
+
+      const response = await fetch("/api/complete-profile", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          profileData,
-          userTableData
+          userType: userType,
+          contact_name: formData.contact_name || user.user_metadata?.full_name,
+          phone: formData.phone,
+          company: formData.company,
+          website: formData.website,
+          street1: formData.street1,
+          street2: formData.street2,
+          city: formData.city,
+          state: formData.state,
+          zip: formData.zip,
+          parking: formData.parking,
+          countiesServed: formData.countiesServed,
+          timeNeeded: formData.timeNeeded,
+          frequency: formData.frequency,
+          provisions: formData.provisions,
+          cateringBrokerage: formData.cateringBrokerage,
+          head_count: formData.head_count,
+          email: user.email,
         }),
       });
-  
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Profile creation failed');
+        throw new Error(errorData.error || "Profile creation failed");
       }
-  
+
       // Success - show toast and redirect
       console.log("Profile created successfully via API");
       toast.success("Profile completed successfully");
-      
+
       // Short timeout to allow the toast to display before redirecting
       setTimeout(() => {
         router.push("/");
       }, 500);
-      
+
       return;
-      
     } catch (err) {
       console.error("CompleteProfile Error:", err);
-      
+
       let errorMessage = "An unexpected error occurred";
       if (err instanceof Error) {
         errorMessage = err.message;
       }
-      
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -518,7 +519,7 @@ export default function CompleteProfile() {
                 {/* Cancel button */}
                 <Button
                   variant="outline"
-                  className="mt-4 mb-2"
+                  className="mb-2 mt-4"
                   onClick={() => {
                     setLoading(false);
                     setError("Operation cancelled. Please try again.");
@@ -526,9 +527,9 @@ export default function CompleteProfile() {
                 >
                   Cancel
                 </Button>
-                
+
                 {/* Debug buttons */}
-                <div className="flex space-x-2 mt-2">
+                <div className="mt-2 flex space-x-2">
                   <Button
                     variant="outline"
                     size="sm"

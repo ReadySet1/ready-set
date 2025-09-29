@@ -41,7 +41,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FileUpload } from "@/types/file";
 import { createClient } from "@/utils/supabase/client";
 import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
-import { UserType } from "@/types/user";
+import { UserType } from "@/types/client-enums";
 
 // Make sure the bucket name is user-assets
 const STORAGE_BUCKET = "user-assets";
@@ -158,6 +158,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
   const [files, setFiles] = useState<FileUpload[]>([]);
+  const [forceCloseDialog, setForceCloseDialog] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -178,8 +179,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
   // Check for bucket existence but don't try to create it (requires admin privileges)
   const ensureStorageBucketExists = useCallback(async () => {
     try {
-      console.log("Checking storage bucket configuration:", STORAGE_BUCKET);
-
       // Refresh auth session
       const {
         data: { session },
@@ -200,9 +199,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
 
         // Don't try to create the bucket - just log the error
         if (bucketsError.message.includes("permission")) {
-          console.log(
-            "Permission error listing buckets - this is expected for non-admin users",
-          );
+          // Permission error listing buckets - this is expected for non-admin users
         }
         return;
       }
@@ -212,16 +209,8 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         buckets &&
         Array.isArray(buckets) &&
         buckets.some((bucket) => bucket.name === STORAGE_BUCKET);
-      console.log(
-        "Available buckets:",
-        buckets?.map((b) => b.name).join(", ") || "none",
-      );
 
       if (!bucketExists) {
-        console.log(
-          `Bucket '${STORAGE_BUCKET}' not found in the list, but it might still exist with restricted permissions`,
-        );
-
         // Test accessing the bucket to see if it's actually accessible
         const { data, error: accessError } = await supabase.storage
           .from(STORAGE_BUCKET)
@@ -236,15 +225,13 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
               "File storage is not configured properly. Please contact support.",
             );
           } else {
-            console.log(
-              `Cannot access bucket contents but it might exist: ${accessError.message}`,
-            );
+            // Cannot access bucket contents but it might exist
           }
         } else {
-          console.log(`Bucket '${STORAGE_BUCKET}' exists and is accessible`);
+          // Bucket is accessible and working properly
         }
       } else {
-        console.log(`Bucket '${STORAGE_BUCKET}' exists in the list`);
+        // Bucket found in the list and should be accessible
       }
     } catch (error) {
       console.error("Error checking storage bucket:", error);
@@ -259,7 +246,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
     }
 
     setIsLoading(true);
-    console.log("Fetching on-demand order details for:", orderNumber);
 
     try {
       // Refresh auth session before making the request
@@ -313,7 +299,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       }
 
       const orderData = await orderResponse.json();
-      console.log("On-demand order data received:", orderData);
 
       // Transform the data to match our types
       const transformedOrder: Order = {
@@ -338,7 +323,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
 
       // Fetch files with improved error handling
       try {
-        console.log(`Fetching files for on-demand order: ${orderNumber}`);
         const filesResponse = await fetch(
           `/api/orders/${encodeURIComponent(orderNumber)}/files`,
           {
@@ -355,7 +339,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         }
 
         const filesData = await filesResponse.json();
-        console.log("Files data received:", filesData);
 
         const filesArray = Array.isArray(filesData)
           ? filesData
@@ -526,8 +509,18 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         );
       }
 
-      await fetchOrderDetails();
+      const result = await response.json();
+      console.log("✅ Driver assignment successful:", result);
+
+      // Close the dialog first
       setIsDriverDialogOpen(false);
+
+      // Wait for the order details to refresh after closing
+      await fetchOrderDetails();
+
+      // Add a small delay to ensure state updates are processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       toast.success(
         isDriverAssigned
           ? "Driver updated successfully!"
@@ -562,11 +555,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         router.push("/auth/login");
         return;
       }
-
-      console.log(
-        `Updating driver status for on-demand order ${order.orderNumber} to:`,
-        newStatus,
-      );
 
       const response = await fetch(
         `/api/orders/${encodeURIComponent(order.orderNumber)}`,
@@ -603,21 +591,11 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       }
 
       const updatedOrder = await response.json();
-      console.log(
-        `Driver status for on-demand order ${order.orderNumber} updated response:`,
-        updatedOrder,
-      );
       setOrder(updatedOrder);
       toast.success("Driver status updated successfully!");
 
       // If driver status is updated to completed, also update the main order status
-      console.log(
-        `Checking if driver status '${newStatus}' requires order status update.`,
-      );
       if (newStatus === DriverStatus.COMPLETED) {
-        console.log(
-          `Triggering order status update to COMPLETED for on-demand order ${order.orderNumber}`,
-        );
         await handleOrderStatusChange(OrderStatus.COMPLETED);
       }
     } catch (error) {
@@ -645,11 +623,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         router.push("/auth/login");
         return;
       }
-
-      console.log(
-        `Updating internal ORDER status for on-demand order ${order.orderNumber} to:`,
-        newStatus,
-      );
 
       const response = await fetch(
         `/api/orders/${encodeURIComponent(order.orderNumber)}`,
@@ -683,10 +656,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         );
       }
       const updatedOrderData = await response.json();
-      console.log(
-        `Internal order status for on-demand order ${order.orderNumber} updated response:`,
-        updatedOrderData,
-      );
       return updatedOrderData as Order;
     };
 
@@ -798,19 +767,13 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
         className="container mx-auto px-6 py-8"
       >
         {/* Modern Header */}
-        <div className="mb-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mb-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="mb-3 flex items-center gap-4">
+              <div className="mb-2 flex items-center gap-4">
                 <h1 className="text-3xl font-bold text-slate-800">
                   On-Demand Order
                 </h1>
-                <Badge
-                  className={`${statusInfo.className} flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold shadow-sm`}
-                >
-                  {statusInfo.icon}
-                  {order.status}
-                </Badge>
                 {onDemandOrder && (
                   <div
                     className={`flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700`}
@@ -822,52 +785,6 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-6 text-slate-600">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  <span className="font-medium">{order.orderNumber}</span>
-                </div>
-                {order.pickupDateTime && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {new Date(order.pickupDateTime).toLocaleDateString(
-                        undefined,
-                        {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        },
-                      )}
-                    </span>
-                  </div>
-                )}
-                {order.pickupDateTime && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {new Date(order.pickupDateTime).toLocaleTimeString(
-                        undefined,
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                onClick={handleOpenDriverDialog}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-6 py-2.5 text-white shadow-lg transition-all duration-200 hover:from-cyan-600 hover:to-blue-600 hover:shadow-xl"
-              >
-                <Truck className="h-4 w-4" />
-                {isDriverAssigned ? "Update Driver" : "Assign Driver"}
-              </Button>
             </div>
           </div>
         </div>
@@ -898,6 +815,11 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                   }}
                   driverInfo={driverInfo}
                   updateDriverStatus={updateDriverStatus}
+                  canAssignDriver={userRoles.isAdmin || userRoles.isSuperAdmin}
+                  canUpdateDriverStatus={
+                    userRoles.isAdmin || userRoles.isSuperAdmin
+                  }
+                  onAssignDriver={handleOpenDriverDialog}
                 />
                 <Separator />
                 <OrderStatusCard
@@ -905,6 +827,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                   initialStatus={order.status}
                   orderId={order.id}
                   onStatusChange={handleOrderStatusChange}
+                  canChangeStatus={userRoles.isAdmin || userRoles.isSuperAdmin}
                 />
               </div>
             </div>
@@ -1210,7 +1133,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
 
       <DriverAssignmentDialog
         isOpen={isDriverDialogOpen}
-        onOpenChange={setIsDriverDialogOpen}
+        onOpenChange={(open) => {
+          setIsDriverDialogOpen(open);
+        }}
         isDriverAssigned={isDriverAssigned}
         drivers={drivers}
         selectedDriver={selectedDriver}
