@@ -229,6 +229,13 @@ export class CalculatorEngine {
       }
     });
 
+    // ⚠️ VALIDATION: Ensure tip exclusivity is enforced
+    const hasTips = payments.tips > 0;
+    if (hasTips && payments.basePay > 0) {
+      console.warn('🚨 Tip exclusivity violation detected! Resetting base pay to 0');
+      payments.basePay = 0;
+    }
+
     // Calculate totals
     payments.subtotal = 
       payments.basePay + 
@@ -517,10 +524,18 @@ export class CalculatorEngine {
 
   /**
    * Evaluates tiered base pay for drivers based on Ready Set compensation rules
+   * KEY RULE: If tips exist, driver gets ONLY (tip + mileage), NO base pay
    */
   private evaluateTieredBasePay(rule: PricingRule, context: RuleContext): number {
-    // Driver always gets base pay regardless of tips
-    // Tips are handled separately as a pass-through
+    // ⚠️ CRITICAL: Check tip exclusivity rule first
+    const hasTips = (context.input.tips || 0) > 0;
+    
+    if (hasTips) {
+      // When tips exist, driver gets ONLY tip + mileage (NO base pay)
+      return 0;
+    }
+
+    // Only calculate base pay when NO tips present
     const tier = this.determineTier(context.input);
     const tierConfig = READY_SET_TIERS.find(t => t.tier === tier);
     return tierConfig?.driverBasePay || READY_SET_TIERS[0]?.driverBasePay || 35;
@@ -565,10 +580,7 @@ export class CalculatorEngine {
    */
   private getTemplateId(): string {
     const allRules = Array.from(this.rules.values()).flat();
-    console.log('🏷️  CalculatorEngine.getTemplateId() - All rules:', allRules.length);
-    console.log('🏷️  First rule templateId:', allRules[0]?.templateId);
     const templateId = allRules.length > 0 ? allRules[0]?.templateId || 'unknown' : 'unknown';
-    console.log('🏷️  Final templateId:', templateId);
     return templateId;
   }
 

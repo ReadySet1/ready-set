@@ -129,11 +129,27 @@ export interface CustomerCharges {
 
 // Driver payments breakdown
 export interface DriverPayments {
+  /**
+   * Base pay from tier structure
+   * ⚠️ IMPORTANT: Set to 0 when tips > 0 (tip exclusivity rule)
+   */
   basePay: number;
+  
+  /**
+   * Mileage compensation ($0.35/mile for miles > 10)
+   * Applied regardless of tip presence
+   */
   mileagePay: number;
+  
   bridgeToll: number;
   extraStopsBonus: number;
+  
+  /**
+   * Direct tips (100% pass-through to driver)
+   * When present, excludes base pay (mutually exclusive)
+   */
   tips: number;
+  
   adjustments: number;
   customPayments: Record<string, number>;
   subtotal: number;
