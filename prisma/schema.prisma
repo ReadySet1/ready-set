@@ -56,6 +56,7 @@ model Profile {
   @@index([email])
   @@index([type])
   @@index([status])
+  @@index([type, deletedAt]) // Dashboard vendor counting optimization
   @@map("profiles")
 }
 
@@ -182,6 +183,8 @@ model CateringRequest {
   @@index([userId, status])
   @@index([deliveryAddressId, pickupDateTime])
   @@index([pricingTierId])
+  @@index([status, createdAt]) // Dashboard metrics optimization
+  @@index([status, createdAt, orderTotal]) // Dashboard revenue aggregation
   @@map("catering_requests")
 }
 

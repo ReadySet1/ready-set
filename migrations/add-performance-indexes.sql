@@ -126,8 +126,23 @@ ON "on_demand_requests" ("id") WHERE "deletedAt" IS NULL;
 
 -- Revenue calculation queries (completed orders only)
 CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_catering_revenue"
-ON "catering_requests" ("orderTotal", "createdAt") 
+ON "catering_requests" ("orderTotal", "createdAt")
 WHERE "status" = 'COMPLETED' AND "deletedAt" IS NULL;
+
+-- Dashboard metrics optimization - revenue aggregation with date filtering
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_catering_completed_revenue_date"
+ON "catering_requests" ("status", "createdAt", "orderTotal")
+WHERE "status" = 'COMPLETED' AND "deletedAt" IS NULL;
+
+-- Dashboard metrics optimization - request counts by status and date
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_catering_status_created_active"
+ON "catering_requests" ("status", "createdAt")
+WHERE "deletedAt" IS NULL;
+
+-- Dashboard metrics optimization - vendor counting (already exists but ensuring it's optimized)
+-- CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_profiles_vendor_active"
+-- ON "profiles" ("type", "deletedAt")
+-- WHERE "type" = 'VENDOR';
 
 -- User authentication and session queries
 CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_sessions_user_expires"
