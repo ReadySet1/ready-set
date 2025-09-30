@@ -317,7 +317,8 @@ export async function login(
             email: user.email || '',
             name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
             type: 'CLIENT', // Default to CLIENT as the most common user type
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            updatedAt: new Date().toISOString()
           }, {
             onConflict: 'id'
           })

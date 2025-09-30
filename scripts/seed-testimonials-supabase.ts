@@ -138,6 +138,11 @@ async function seedTestimonials() {
 
     for (let i = 0; i < testimonialsData.length; i++) {
       const testimonial = testimonialsData[i];
+      if (!testimonial) {
+        console.error(`❌ Testimonial at index ${i} is undefined`);
+        continue;
+      }
+
       const sortOrder = i + 1; // Start from 1
 
       const { data, error } = await supabase
@@ -181,6 +186,8 @@ async function seedTestimonials() {
 
     // Group by category
     const grouped = (testimonials || []).reduce((acc, testimonial) => {
+      if (!testimonial) return acc;
+
       const category = testimonial.category;
       acc[category] = acc[category] || [];
       acc[category].push(testimonial);

@@ -61,7 +61,8 @@ export async function GET(request: Request) {
                   email: session.user.email || '',
                   name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
                   type: 'CLIENT', // Default to CLIENT as the most common user type
-                  status: 'ACTIVE'
+                  status: 'ACTIVE',
+                  updatedAt: new Date().toISOString()
                 })
                 .select('type')
                 .single();
