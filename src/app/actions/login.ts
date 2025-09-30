@@ -273,22 +273,36 @@ export async function login(
     // Authentication successful - get user profile
     console.log(`✅ [${requestId}] Authentication successful, fetching user profile...`);
     const { data: { user }, error: getUserError } = await supabase.auth.getUser();
-    
+
     if (getUserError || !user) {
       console.error(`❌ [${requestId}] Failed to get user data:`, getUserError);
-      return { 
+      return {
         error: "Login successful but unable to retrieve user information. Please try again.",
-        success: false 
+        success: false
       };
     }
 
+    // Get user profile to determine user type
+    console.log(`🔍 [${requestId}] Fetching user profile for user: ${user.id}`);
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("type, email")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      console.error(`❌ [${requestId}] Error fetching user profile:`, profileError);
+      return {
+        error: "Login successful but unable to retrieve user information. Please try again.",
+        success: false
+      };
+    }
 
     // Get user type from profile (or create if missing)
-
-    let userType = profile?.type;
+    let userType: string | undefined = profile?.type;
 
     // If no profile exists, create one with default values
-    if (profileError || !profile) {
+    if (!profile) {
       console.log(`⚠️ [${requestId}] No profile found for user ${user.id}, creating default profile...`);
 
       try {
@@ -318,7 +332,7 @@ export async function login(
           };
         }
 
-        userType = newProfile?.type;
+        userType = newProfile?.type || undefined;
         console.log(`✅ [${requestId}] Default profile created/updated successfully for user: ${user.id}`);
       } catch (createProfileError) {
         console.error(`❌ [${requestId}] Exception creating default profile:`, createProfileError);
@@ -344,23 +358,12 @@ export async function login(
         error: "Login successful but user profile is incomplete. Please contact support.",
         success: false
       };
-      
-      cookieStore.set('user-session-data', JSON.stringify(sessionData), {
-        path: '/',
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7 // 7 days
-      });
-
-      console.log(`🔄 [${requestId}] Redirecting to profile completion for user: ${user.id}`);
-      redirect('/complete-profile');
     }
 
   console.log("User profile type from DB:", userType);
 
   // Normalize the user type to lowercase for consistent handling
-  const userTypeKey = userType.toLowerCase();
+  const userTypeKey = userType?.toLowerCase() || 'client';
   console.log("Normalized user type for redirection:", userTypeKey);
 
   // Set immediate session data in cookies for client-side access
@@ -369,8 +372,8 @@ export async function login(
   // Set user session data that can be read immediately by client
   // Normalize userRole to match TypeScript enum (lowercase)
   const normalizedUserRole = userType ? Object.values(UserType).find(
-    enumValue => enumValue.toUpperCase() === userType.toUpperCase()
-  ) || userType.toLowerCase() : 'customer';
+    enumValue => enumValue.toUpperCase() === (userType as string)?.toUpperCase()
+  ) || (userType as string)?.toLowerCase() : 'customer';
   
   const sessionData = {
     userId: user.id,
