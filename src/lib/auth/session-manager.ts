@@ -340,9 +340,15 @@ export class EnhancedSessionManager implements SessionManager {
   private updateLastActivity() {
     if (this.currentSession) {
       this.currentSession.lastActivityAt = Date.now();
-      this.storeSession(this.currentSession);
+      // Update localStorage directly without triggering recursion
+      try {
+        localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
+      } catch (error) {
+        authLogger.warn('EnhancedSessionManager: Failed to update last activity in localStorage', error);
+      }
+    } else {
+      localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
     }
-    localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
   }
 
   private getStoredSession(): EnhancedSession | null {
@@ -374,7 +380,12 @@ export class EnhancedSessionManager implements SessionManager {
       this.currentSession = session;
       localStorage.setItem(STORAGE_KEYS.SESSION_DATA, JSON.stringify(session));
       localStorage.setItem(STORAGE_KEYS.FINGERPRINT, JSON.stringify(session.fingerprint));
-      this.updateLastActivity();
+
+      // Update last activity timestamp directly without triggering recursion
+      if (this.currentSession) {
+        this.currentSession.lastActivityAt = Date.now();
+      }
+      localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
     } catch (error) {
       authLogger.error('EnhancedSessionManager: Failed to store session', error);
     }

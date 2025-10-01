@@ -289,6 +289,15 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           message: "Initializing authentication services...",
         });
 
+        // Add timeout for service initialization
+        const initTimeout = setTimeout(() => {
+          console.log("🔥 UserProviderClient: Service initialization timeout");
+          setAuthProgressState({ step: "idle", message: "" });
+          if (!hasImmediateData) {
+            setIsLoading(false);
+          }
+        }, 5000); // 5 second timeout
+
         const client = await createClient();
         setSupabase(client);
 
@@ -299,6 +308,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         // Initialize token refresh service
         getTokenRefreshService();
 
+        clearTimeout(initTimeout);
         setAuthProgressState({ step: "idle", message: "" });
         authLogger.debug(
           "UserProviderClient: Services initialized successfully",
@@ -424,10 +434,40 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       try {
         console.log("UserProviderClient: Getting initial user data...");
 
+        // First, quickly check if there's any session data available
+        const { data: sessionData } = await supabase.auth.getSession();
+
+        // If no session exists, immediately set loading to false - no need to authenticate
+        if (!sessionData?.session) {
+          console.log(
+            "ℹ️ No session found - user not authenticated, setting loading to false immediately",
+          );
+          setIsLoading(false);
+          setAuthProgressState({ step: "idle", message: "" });
+          setAuthState((prev) => ({
+            ...prev,
+            isLoading: false,
+            isAuthenticating: false,
+            error: null,
+          }));
+          return;
+        }
+
         setAuthProgressState({
           step: "authenticating",
           message: "Verifying authentication status...",
         });
+
+        // Add a timeout to prevent infinite loading
+        const authTimeout = setTimeout(() => {
+          if (mounted) {
+            console.log(
+              "🔥 UserProviderClient: Auth setup timeout - forcing completion",
+            );
+            setIsLoading(false);
+            setAuthProgressState({ step: "idle", message: "" });
+          }
+        }, 10000); // 10 second timeout
 
         // Add a small delay to allow middleware session refresh to complete
         // especially important after login redirects
@@ -444,38 +484,59 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           maxAttempts: 3,
           baseDelay: 500,
           retryCondition: (error) => {
-            // Retry on network errors AND session missing errors (which can happen during login transitions)
+            // Only retry on network/temporary errors, NOT on auth session missing
             return (
               error?.message?.includes("network") ||
               error?.message?.includes("timeout") ||
               error?.message?.includes("connection") ||
-              error?.message?.includes("Auth session missing")
+              error?.message?.includes("temporary") ||
+              error?.message?.includes("rate limit") ||
+              error?.message?.includes("server error")
             );
           },
         });
 
-        if (!mounted) return;
+        if (!mounted) {
+          clearTimeout(authTimeout);
+          return;
+        }
+
+        if (!mounted) {
+          clearTimeout(authTimeout);
+          return;
+        }
 
         if (getUserError) {
           console.error("❌ Error getting user:", getUserError);
+          clearTimeout(authTimeout);
 
-          // If we have immediate hydration data but Supabase session is missing,
-          // try to recover gracefully without showing error immediately
-          if (
-            hasImmediateData &&
-            getUserError.message?.includes("Auth session missing")
-          ) {
+          // Handle "Auth session missing" error - this is expected for non-authenticated users
+          if (getUserError.message?.includes("Auth session missing")) {
             console.log(
-              "⚠️  Session missing but we have hydration data, continuing with hydrated state",
+              "ℹ️ Auth session missing - user not authenticated, this is expected",
             );
-            // Don't set error or stop loading immediately, let hydration data work
+
+            // Clear any existing auth progress
+            setAuthProgressState({ step: "idle", message: "" });
+
+            // Set loading to false since we don't need to authenticate
+            setIsLoading(false);
+            setAuthState((prev) => ({
+              ...prev,
+              isLoading: false,
+              isAuthenticating: false,
+              error: null,
+            }));
+
+            // Don't return early - let the rest of the logic handle the null user case
+          } else {
+            // For other errors, handle them normally
+            if (!hasImmediateData) {
+              setIsLoading(false);
+              setAuthProgressState({ step: "idle", message: "" });
+            }
             return;
           }
-
-          if (!hasImmediateData) {
-            setIsLoading(false);
-          }
-          return;
         }
 
         if (currentUser) {
@@ -569,6 +630,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           console.log(
             "ℹ️ UserProviderClient: No user found. Setting loading to false.",
           );
+          clearTimeout(authTimeout);
           setUser(null);
           setUserRole(null);
           setEnhancedSession(null);
@@ -699,6 +761,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         authListener = listener;
       } catch (error) {
         console.error("💥 UserProviderClient: Error in auth setup:", error);
+        clearTimeout(authTimeout);
         if (mounted) {
           setError("Authentication setup failed");
           setIsLoading(false);

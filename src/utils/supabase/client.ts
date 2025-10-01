@@ -326,7 +326,10 @@ export const retryAuthOperation = async <T>(
         'temporary',
         'rate limit',
         'server error',
-        '5'
+        '5',
+        'auth session missing',
+        'session missing',
+        'session not found'
       ];
       
       const errorMessage = error?.message?.toLowerCase() || '';
