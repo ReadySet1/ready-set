@@ -98,6 +98,14 @@ export interface ErrorContext {
   // Additional custom context
   custom?: Record<string, any>;
 
+  // Request-level properties (extracted from request info)
+  endpoint?: string;
+  method?: string;
+  ip?: string;
+  userAgent?: string;
+  origin?: string;
+  referer?: string;
+
   // Timestamp
   timestamp: string;
 }
@@ -374,7 +382,8 @@ export function logError(
     ...requestInfo,
     ...context,
     stackTrace: error instanceof Error ? error.stack : undefined,
-    additionalContext: sanitizeContext(context.additionalContext)
+    additionalContext: sanitizeContext(context.additionalContext),
+    timestamp: new Date().toISOString()
   };
 
   // Determine error properties
@@ -535,6 +544,7 @@ export function collectErrorContext(additionalContext: Record<string, any> = {})
   // Collect route context (Next.js router)
   const routeContext = typeof window !== 'undefined' ? {
     path: window.location.pathname,
+    params: {},
     query: Object.fromEntries(new URLSearchParams(window.location.search)),
     referrer: document.referrer || undefined
   } : undefined;
@@ -656,7 +666,7 @@ function parseComponentStack(componentStack: string): string[] {
     .map(line => {
       // Extract component name from stack trace line
       const match = line.match(/(?:in|at)\s+([^(]+)/);
-      return match ? match[1].trim() : line.trim();
+      return match?.[1]?.trim() || line.trim();
     })
     .filter(name => name && name !== 'ErrorBoundary');
 }

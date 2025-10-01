@@ -168,7 +168,7 @@ export class NetworkRecoveryManager extends RetryManager {
       return await this.execute(operation, context);
     } catch (error) {
       // For network errors, try one more time with a longer delay
-      if (this.isRecoverableError(error as Error) && this.state.attempt < 4) {
+      if (this.isRecoverableError(error as Error) && this.getState().attempt < 4) {
         console.log('🔄 Attempting final network recovery...');
         await new Promise(resolve => setTimeout(resolve, 3000));
         return await operation();

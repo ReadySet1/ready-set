@@ -28,7 +28,11 @@ interface State {
  * Enhanced global error boundary with comprehensive error handling and reporting
  */
 class GlobalErrorBoundary extends Component<Props, State> {
-  private errorLogger: (error: Error, errorInfo: any) => void;
+  private errorLogger: (
+    error: Error,
+    errorInfo: any,
+    additionalContext?: Record<string, any>,
+  ) => void;
 
   constructor(props: Props) {
     super(props);
@@ -63,8 +67,12 @@ class GlobalErrorBoundary extends Component<Props, State> {
 
     // Log error with centralized error logging and enhanced context
     this.errorLogger(error, errorInfo, {
-      errorContext,
-      boundaryName: this.props.name || "GlobalErrorBoundary",
+      errorBoundary: {
+        name: this.props.name || "GlobalErrorBoundary",
+        level: "global",
+        retryCount: 0,
+      },
+      ...errorContext,
     });
 
     // Update state to include errorInfo

@@ -208,7 +208,7 @@ export function ErrorAnalytics({
                           <span className="text-sm capitalize">
                             {category.replace("_", " ")}
                           </span>
-                          <Badge variant="outline">{count}</Badge>
+                          <Badge variant="outline">{String(count)}</Badge>
                         </div>
                       ),
                     )}
@@ -228,7 +228,7 @@ export function ErrorAnalytics({
                         <span className="mr-2 flex-1 truncate text-sm">
                           {error.fingerprint.substring(0, 20)}...
                         </span>
-                        <Badge variant="secondary">{error.count}</Badge>
+                        <Badge variant="secondary">{String(error.count)}</Badge>
                       </div>
                     ))}
                 </div>
