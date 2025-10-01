@@ -85,17 +85,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   console.log("Enhanced file upload API endpoint called");
 
-  try {
-    // Parse form data first to avoid issues with error handling
-    const formData = await request.formData();
-    console.log("Form data keys:", Array.from(formData.keys()));
+  // Parse form data first to avoid issues with error handling
+  const formData = await request.formData();
+  console.log("Form data keys:", Array.from(formData.keys()));
 
-    // Extract important data from the form
-    const file = formData.get("file") as File;
-    const entityId = formData.get("entityId") as string;
-    let entityType = (formData.get("entityType") as string) || "job_application"; // Default value
-    const category = (formData.get("category") as string) || "";
-    console.log("File upload request received with category:", category);
+  // Extract important data from the form
+  const file = formData.get("file") as File;
+  const entityId = formData.get("entityId") as string;
+  let entityType = (formData.get("entityType") as string) || "job_application"; // Default value
+  const category = (formData.get("category") as string) || "";
+  console.log("File upload request received with category:", category);
+
+  try {
 
     // Check rate limit for uploads
     const userId = request.headers.get('x-user-id') || 'anonymous';

@@ -265,8 +265,11 @@ export function useUploadFile({
         // Loop through each file to upload with enhanced error handling
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
+          if (!file) continue; // Skip if file is somehow undefined
+
           const progressIndex = i;
           const fileProgress = fileProgresses[progressIndex];
+          if (!fileProgress) continue; // Skip if fileProgress is undefined
 
           console.log(`Processing file: ${file.name} (${file.size} bytes, type: ${file.type})`);
 
@@ -685,12 +688,12 @@ export function useUploadFile({
 
     const failedFiles = uploadSession.files.filter(f => f.status === 'error' && f.error?.retryable);
     if (failedFiles.length === 0) {
-      toast.info("No retryable failed uploads found.");
+      toast("No retryable failed uploads found.", { icon: "ℹ️" });
       return [];
     }
 
     console.log(`Retrying ${failedFiles.length} failed uploads...`);
-    toast.info(`Retrying ${failedFiles.length} failed uploads...`);
+    toast(`Retrying ${failedFiles.length} failed uploads...`, { icon: "ℹ️" });
 
     // For simplicity, we'll retry by calling onUpload again with the original files
     // In a more advanced implementation, you could store the original files and retry only failed ones

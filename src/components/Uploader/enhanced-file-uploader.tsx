@@ -98,7 +98,7 @@ export function EnhancedFileUploader({
 
   const handleCancel = () => {
     cancelUpload();
-    toast.info("Upload cancelled");
+    toast("Upload cancelled", { icon: "ℹ️" });
   };
 
   return (
