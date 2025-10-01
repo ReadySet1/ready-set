@@ -4,9 +4,10 @@ import { prisma } from "@/utils/prismaDB";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await context.params;
     const errorId = params.id;
 
     if (!errorId) {

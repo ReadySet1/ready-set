@@ -431,6 +431,8 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     let authListener: any = null;
 
     const setupAuth = async () => {
+      let authTimeout: NodeJS.Timeout | null = null;
+
       try {
         console.log("UserProviderClient: Getting initial user data...");
 
@@ -459,7 +461,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         });
 
         // Add a timeout to prevent infinite loading
-        const authTimeout = setTimeout(() => {
+        authTimeout = setTimeout(() => {
           if (mounted) {
             console.log(
               "🔥 UserProviderClient: Auth setup timeout - forcing completion",
@@ -761,7 +763,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         authListener = listener;
       } catch (error) {
         console.error("💥 UserProviderClient: Error in auth setup:", error);
-        clearTimeout(authTimeout);
+        if (authTimeout) {
+          clearTimeout(authTimeout);
+        }
         if (mounted) {
           setError("Authentication setup failed");
           setIsLoading(false);
