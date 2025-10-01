@@ -275,13 +275,13 @@ export async function GET(request: NextRequest) {
 }
 
 // POST: Create a new user
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   // Declare data variable in broader scope for error handling
   let data: any = {};
 
   try {
     // Apply rate limiting for admin operations
-    const rateLimitResponse = adminRateLimit(request as NextRequest);
+    const rateLimitResponse = adminRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
