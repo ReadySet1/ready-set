@@ -1,6 +1,6 @@
 // src/lib/error-testing.ts
-import React from 'react';
-import { ErrorSeverity, ErrorCategory } from './error-logging';
+import React from "react";
+import { ErrorSeverity, ErrorCategory } from "./error-logging";
 
 /**
  * Error simulation utilities for testing error boundaries
@@ -9,37 +9,39 @@ import { ErrorSeverity, ErrorCategory } from './error-logging';
 // Predefined test errors for different scenarios
 export const TestErrors = {
   // React Component Errors
-  REACT_ERROR: new Error('React component rendering failed'),
-  REACT_HOOK_ERROR: new Error('useEffect cleanup function threw an error'),
-  REACT_STATE_ERROR: new Error('Cannot update component while rendering a different component'),
+  REACT_ERROR: new Error("React component rendering failed"),
+  REACT_HOOK_ERROR: new Error("useEffect cleanup function threw an error"),
+  REACT_STATE_ERROR: new Error(
+    "Cannot update component while rendering a different component",
+  ),
 
   // Network Errors
-  NETWORK_ERROR: new Error('Network request failed'),
-  FETCH_ERROR: new Error('Failed to fetch resource'),
-  TIMEOUT_ERROR: new Error('Request timeout'),
-  CONNECTION_ERROR: new Error('Connection refused'),
+  NETWORK_ERROR: new Error("Network request failed"),
+  FETCH_ERROR: new Error("Failed to fetch resource"),
+  TIMEOUT_ERROR: new Error("Request timeout"),
+  CONNECTION_ERROR: new Error("Connection refused"),
 
   // Authentication Errors
-  AUTH_ERROR: new Error('Unauthorized access'),
-  TOKEN_ERROR: new Error('Invalid token'),
-  SESSION_ERROR: new Error('Session expired'),
+  AUTH_ERROR: new Error("Unauthorized access"),
+  TOKEN_ERROR: new Error("Invalid token"),
+  SESSION_ERROR: new Error("Session expired"),
 
   // Validation Errors
-  VALIDATION_ERROR: new Error('Invalid input data'),
-  REQUIRED_FIELD_ERROR: new Error('Required field missing'),
+  VALIDATION_ERROR: new Error("Invalid input data"),
+  REQUIRED_FIELD_ERROR: new Error("Required field missing"),
 
   // Chunk Loading Errors
-  CHUNK_LOAD_ERROR: new Error('Loading chunk 123 failed'),
-  SCRIPT_LOAD_ERROR: new Error('Script loading failed'),
+  CHUNK_LOAD_ERROR: new Error("Loading chunk 123 failed"),
+  SCRIPT_LOAD_ERROR: new Error("Script loading failed"),
 
   // State Management Errors
-  CONTEXT_ERROR: new Error('Context provider not found'),
-  REDUX_ERROR: new Error('Redux store error'),
+  CONTEXT_ERROR: new Error("Context provider not found"),
+  REDUX_ERROR: new Error("Redux store error"),
 
   // Generic Errors
-  GENERIC_ERROR: new Error('Something went wrong'),
-  UNKNOWN_ERROR: new Error('Unknown error occurred'),
-  RUNTIME_ERROR: new Error('Runtime error')
+  GENERIC_ERROR: new Error("Something went wrong"),
+  UNKNOWN_ERROR: new Error("Unknown error occurred"),
+  RUNTIME_ERROR: new Error("Runtime error"),
 } as const;
 
 /**
@@ -71,22 +73,27 @@ export class ErrorSimulator {
    * Simulate a chunk loading error
    */
   static simulateChunkError(error: Error = TestErrors.CHUNK_LOAD_ERROR): never {
-    const chunkError = Object.assign(error, { name: 'ChunkLoadError' });
+    const chunkError = Object.assign(error, { name: "ChunkLoadError" });
     throw chunkError;
   }
 
   /**
    * Simulate an async operation error
    */
-  static async simulateAsyncError(error: Error = TestErrors.GENERIC_ERROR, delay: number = 1000): Promise<never> {
-    await new Promise(resolve => setTimeout(resolve, delay));
+  static async simulateAsyncError(
+    error: Error = TestErrors.GENERIC_ERROR,
+    delay: number = 1000,
+  ): Promise<never> {
+    await new Promise((resolve) => setTimeout(resolve, delay));
     throw error;
   }
 
   /**
    * Simulate a promise rejection
    */
-  static simulatePromiseRejection(error: Error = TestErrors.GENERIC_ERROR): Promise<never> {
+  static simulatePromiseRejection(
+    error: Error = TestErrors.GENERIC_ERROR,
+  ): Promise<never> {
     return Promise.reject(error);
   }
 }
@@ -95,11 +102,11 @@ export class ErrorSimulator {
  * React component for testing error boundaries
  */
 export function ErrorTrigger({
-  errorType = 'react',
+  errorType = "REACT_ERROR",
   error,
-  children
+  children,
 }: {
-  errorType?: keyof typeof TestErrors | 'custom';
+  errorType?: keyof typeof TestErrors | "custom";
   error?: Error;
   children?: React.ReactNode;
 }) {
@@ -107,24 +114,29 @@ export function ErrorTrigger({
 
   React.useEffect(() => {
     if (shouldError) {
-      const errorToThrow = error || TestErrors[errorType.toUpperCase() as keyof typeof TestErrors] || TestErrors.REACT_ERROR;
+      const errorKey = errorType === "custom" ? "GENERIC_ERROR" : errorType;
+      const errorToThrow =
+        error ||
+        TestErrors[errorKey as keyof typeof TestErrors] ||
+        TestErrors.REACT_ERROR;
       ErrorSimulator.simulateComponentError(errorToThrow);
     }
   }, [shouldError, errorType, error]);
 
   return (
-    <div className="p-4 border border-gray-200 rounded-lg">
-      <div className="flex items-center justify-between mb-4">
+    <div className="rounded-lg border border-gray-200 p-4">
+      <div className="mb-4 flex items-center justify-between">
         <h3 className="font-semibold">Error Boundary Test Component</h3>
         <button
           onClick={() => setShouldError(true)}
-          className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+          className="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700"
         >
           Trigger Error
         </button>
       </div>
-      <p className="text-sm text-gray-600 mb-4">
-        This component will throw an error when the button is clicked to test error boundary functionality.
+      <p className="mb-4 text-sm text-gray-600">
+        This component will throw an error when the button is clicked to test
+        error boundary functionality.
       </p>
       {children}
     </div>
@@ -139,59 +151,59 @@ export const ErrorTesting = {
    * Test all error boundary types
    */
   testAllBoundaries: async () => {
-    console.log('🧪 Testing all error boundary types...');
+    console.log("🧪 Testing all error boundary types...");
 
     // Test component errors
     try {
       ErrorSimulator.simulateComponentError(TestErrors.REACT_ERROR);
     } catch (error) {
-      console.log('✅ Component error boundary test passed');
+      console.log("✅ Component error boundary test passed");
     }
 
     // Test network errors
     try {
       ErrorSimulator.simulateNetworkError(TestErrors.NETWORK_ERROR);
     } catch (error) {
-      console.log('✅ Network error boundary test passed');
+      console.log("✅ Network error boundary test passed");
     }
 
     // Test chunk errors
     try {
       ErrorSimulator.simulateChunkError(TestErrors.CHUNK_LOAD_ERROR);
     } catch (error) {
-      console.log('✅ Chunk load error boundary test passed');
+      console.log("✅ Chunk load error boundary test passed");
     }
 
-    console.log('🎉 All error boundary tests completed');
+    console.log("🎉 All error boundary tests completed");
   },
 
   /**
    * Test error recovery mechanisms
    */
   testErrorRecovery: async () => {
-    console.log('🔄 Testing error recovery mechanisms...');
+    console.log("🔄 Testing error recovery mechanisms...");
 
     // This would test the retry mechanisms
-    const { RetryManager } = await import('./error-recovery');
+    const { RetryManager } = await import("./error-recovery");
 
     const retryManager = new RetryManager({
       maxRetries: 2,
       retryDelay: 100,
       onRetry: (attempt) => console.log(`Retry attempt ${attempt}`),
-      onRecoverySuccess: () => console.log('✅ Recovery successful'),
-      onMaxRetriesReached: () => console.log('❌ Max retries reached')
+      onRecoverySuccess: () => console.log("✅ Recovery successful"),
+      onMaxRetriesReached: () => console.log("❌ Max retries reached"),
     });
 
     try {
       await retryManager.execute(async () => {
         // Simulate a failing operation that succeeds on retry
         if (Math.random() < 0.7) {
-          throw new Error('Temporary failure');
+          throw new Error("Temporary failure");
         }
-        return 'success';
+        return "success";
       });
     } catch (error) {
-      console.log('Recovery test completed');
+      console.log("Recovery test completed");
     }
   },
 
@@ -201,35 +213,35 @@ export const ErrorTesting = {
   generateTestScenarios: () => {
     return [
       {
-        name: 'React Component Error',
+        name: "React Component Error",
         error: TestErrors.REACT_ERROR,
         category: ErrorCategory.UNKNOWN,
-        severity: ErrorSeverity.HIGH
+        severity: ErrorSeverity.HIGH,
       },
       {
-        name: 'Network Error',
+        name: "Network Error",
         error: TestErrors.NETWORK_ERROR,
         category: ErrorCategory.API,
-        severity: ErrorSeverity.MEDIUM
+        severity: ErrorSeverity.MEDIUM,
       },
       {
-        name: 'Authentication Error',
+        name: "Authentication Error",
         error: TestErrors.AUTH_ERROR,
         category: ErrorCategory.AUTH,
-        severity: ErrorSeverity.CRITICAL
+        severity: ErrorSeverity.CRITICAL,
       },
       {
-        name: 'Chunk Loading Error',
+        name: "Chunk Loading Error",
         error: TestErrors.CHUNK_LOAD_ERROR,
         category: ErrorCategory.UNKNOWN,
-        severity: ErrorSeverity.HIGH
+        severity: ErrorSeverity.HIGH,
       },
       {
-        name: 'Validation Error',
+        name: "Validation Error",
         error: TestErrors.VALIDATION_ERROR,
         category: ErrorCategory.VALIDATION,
-        severity: ErrorSeverity.LOW
-      }
+        severity: ErrorSeverity.LOW,
+      },
     ];
   },
 
@@ -246,15 +258,17 @@ export const ErrorTesting = {
       try {
         ErrorSimulator.simulateComponentError(randomError);
       } catch (error) {
-        console.log(`Stress test iteration ${i + 1}: ${error.message}`);
+        console.log(
+          `Stress test iteration ${i + 1}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
 
       // Small delay between tests
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
-    console.log('🎯 Stress test completed');
-  }
+    console.log("🎯 Stress test completed");
+  },
 };
 
 /**
@@ -272,7 +286,7 @@ export class ErrorBoundaryTestSuite {
    * Run complete error boundary test suite
    */
   async runFullTestSuite(): Promise<void> {
-    console.log('🧪 Running complete error boundary test suite...');
+    console.log("🧪 Running complete error boundary test suite...");
 
     const startTime = Date.now();
 
@@ -298,7 +312,7 @@ export class ErrorBoundaryTestSuite {
   }
 
   private async testComponentBoundary(): Promise<void> {
-    const testName = 'Component Error Boundary Test';
+    const testName = "Component Error Boundary Test";
 
     try {
       const startTime = Date.now();
@@ -314,13 +328,13 @@ export class ErrorBoundaryTestSuite {
         testName,
         passed: false,
         error: error as Error,
-        duration: 0
+        duration: 0,
       });
     }
   }
 
   private async testSectionBoundary(): Promise<void> {
-    const testName = 'Section Error Boundary Test';
+    const testName = "Section Error Boundary Test";
 
     try {
       const startTime = Date.now();
@@ -334,13 +348,13 @@ export class ErrorBoundaryTestSuite {
         testName,
         passed: false,
         error: error as Error,
-        duration: 0
+        duration: 0,
       });
     }
   }
 
   private async testGlobalBoundary(): Promise<void> {
-    const testName = 'Global Error Boundary Test';
+    const testName = "Global Error Boundary Test";
 
     try {
       const startTime = Date.now();
@@ -354,25 +368,25 @@ export class ErrorBoundaryTestSuite {
         testName,
         passed: false,
         error: error as Error,
-        duration: 0
+        duration: 0,
       });
     }
   }
 
   private async testErrorRecovery(): Promise<void> {
-    const testName = 'Error Recovery Test';
+    const testName = "Error Recovery Test";
 
     try {
       const startTime = Date.now();
 
-      const { RetryManager } = await import('./error-recovery');
+      const { RetryManager } = await import("./error-recovery");
       const retryManager = new RetryManager({ maxRetries: 2 });
 
       await retryManager.execute(async () => {
         if (Math.random() < 0.8) {
-          throw new Error('Simulated failure');
+          throw new Error("Simulated failure");
         }
-        return 'success';
+        return "success";
       });
 
       const duration = Date.now() - startTime;
@@ -382,13 +396,13 @@ export class ErrorBoundaryTestSuite {
         testName,
         passed: false,
         error: error as Error,
-        duration: 0
+        duration: 0,
       });
     }
   }
 
   private async testNetworkErrorHandling(): Promise<void> {
-    const testName = 'Network Error Handling Test';
+    const testName = "Network Error Handling Test";
 
     try {
       const startTime = Date.now();
@@ -402,23 +416,26 @@ export class ErrorBoundaryTestSuite {
         testName,
         passed: false,
         error: error as Error,
-        duration: 0
+        duration: 0,
       });
     }
   }
 
   private printResults(): void {
-    console.log('\n📊 Error Boundary Test Results:');
-    console.table(this.results.map(result => ({
-      Test: result.testName,
-      Passed: result.passed ? '✅' : '❌',
-      Duration: `${result.duration}ms`,
-      Error: result.error?.message || 'None'
-    })));
+    console.log("\n📊 Error Boundary Test Results:");
+    console.table(
+      this.results.map((result) => ({
+        Test: result.testName,
+        Passed: result.passed ? "✅" : "❌",
+        Duration: `${result.duration}ms`,
+        Error: result.error?.message || "None",
+      })),
+    );
 
-    const passed = this.results.filter(r => r.passed).length;
+    const passed = this.results.filter((r) => r.passed).length;
     const total = this.results.length;
-    console.log(`\n🎯 Summary: ${passed}/${total} tests passed (${Math.round(passed/total * 100)}%)`);
+    console.log(
+      `\n🎯 Summary: ${passed}/${total} tests passed (${Math.round((passed / total) * 100)}%)`,
+    );
   }
 }
-
