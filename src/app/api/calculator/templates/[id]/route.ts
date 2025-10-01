@@ -8,9 +8,9 @@ import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const template = await CalculatorService.getTemplateWithRules(supabase, params.id);
+    const template = await CalculatorService.getTemplateWithRules(supabase, (await params).id);
     
     if (!template) {
       return NextResponse.json(
@@ -126,7 +126,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     // Validate input (partial update allowed)
     const validatedInput = CreateTemplateSchema.partial().parse(body);
     
-    const template = await CalculatorService.updateTemplate(params.id, validatedInput);
+    const template = await CalculatorService.updateTemplate((await params).id, validatedInput);
     
     return NextResponse.json({
       success: true,
@@ -200,7 +200,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     // For safety, deactivate instead of hard delete
-    await CalculatorService.updateTemplate(params.id, { isActive: false });
+    await CalculatorService.updateTemplate((await params).id, { isActive: false });
     
     return NextResponse.json({
       success: true,
