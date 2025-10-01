@@ -43,7 +43,7 @@ export function UploadErrorDashboard() {
 
   useEffect(() => {
     fetchErrors();
-  }, [fetchErrors]);
+  }, []);
 
   const fetchErrors = useCallback(async () => {
     try {
@@ -69,7 +69,7 @@ export function UploadErrorDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [filter, calculateStats]);
+  }, [filter]);
 
   const calculateStats = useCallback((errorList: UploadError[]) => {
     const stats: ErrorStats = {

@@ -110,7 +110,7 @@ function handlePrismaError(error: unknown): { error: ApiError; status: number } 
 }
 
 // GET: Fetch users with pagination, search, sort, filter
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   // Declare variables in broader scope for error handling
   let page = 1;
   let limit = 10;
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Apply rate limiting for admin operations
-    const rateLimitResponse = adminRateLimit(request);
+    const rateLimitResponse = await adminRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
@@ -275,13 +275,13 @@ export async function GET(request: NextRequest) {
 }
 
 // POST: Create a new user
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   // Declare data variable in broader scope for error handling
   let data: any = {};
 
   try {
     // Apply rate limiting for admin operations
-    const rateLimitResponse = adminRateLimit(request);
+    const rateLimitResponse = await adminRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
