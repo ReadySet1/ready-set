@@ -23,6 +23,85 @@ export enum ErrorCategory {
   UNKNOWN = 'unknown'
 }
 
+// Enhanced error context interface for comprehensive error collection
+export interface ErrorContext {
+  // User context
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+    isAuthenticated: boolean;
+    lastLogin?: string;
+  };
+
+  // Session context
+  session?: {
+    id: string;
+    timestamp: number;
+    duration: number;
+    pageViews: number;
+  };
+
+  // Route context
+  route?: {
+    path: string;
+    params: Record<string, any>;
+    query: Record<string, any>;
+    referrer?: string;
+  };
+
+  // Component context
+  component?: {
+    name: string;
+    props?: Record<string, any>;
+    state?: Record<string, any>;
+    hierarchy: string[]; // Component tree path
+  };
+
+  // Browser context
+  browser?: {
+    userAgent: string;
+    viewport: { width: number; height: number };
+    screen: { width: number; height: number };
+    language: string;
+    timezone: string;
+    cookiesEnabled: boolean;
+    onlineStatus: boolean;
+  };
+
+  // Request context (for API errors)
+  request?: {
+    endpoint?: string;
+    method?: string;
+    statusCode?: number;
+    responseTime?: number;
+    requestData?: Record<string, any>;
+    headers?: Record<string, string>;
+  };
+
+  // Application context
+  app?: {
+    version: string;
+    environment: string;
+    buildId?: string;
+    featureFlags?: Record<string, boolean>;
+  };
+
+  // Error boundary context
+  errorBoundary?: {
+    name: string;
+    level: 'global' | 'section' | 'component';
+    parent?: string;
+    retryCount?: number;
+  };
+
+  // Additional custom context
+  custom?: Record<string, any>;
+
+  // Timestamp
+  timestamp: string;
+}
+
 // Structured error interface
 export interface StructuredError {
   id: string;
@@ -31,20 +110,7 @@ export interface StructuredError {
   category: ErrorCategory;
   message: string;
   error: Error | unknown;
-  context: {
-    source: string;
-    endpoint?: string;
-    method?: string;
-    userId?: string;
-    sessionId?: string;
-    userAgent?: string;
-    ip?: string;
-    requestData?: Record<string, any>;
-    responseTime?: number;
-    statusCode?: number;
-    stackTrace?: string;
-    additionalContext?: Record<string, any>;
-  };
+  context: ErrorContext;
   tags: string[];
   fingerprint: string; // For error grouping
 }
@@ -57,6 +123,7 @@ interface ErrorMetrics {
   recentErrors: StructuredError[];
   topErrors: Array<{ fingerprint: string; count: number; lastSeen: string }>;
 }
+
 
 // In-memory error storage (would be replaced with database/external service in production)
 class ErrorStore {
@@ -357,8 +424,6 @@ export function logError(
     }
   }
 
-  // In production, you would also send to external monitoring service
-  // await sendToExternalMonitoring(structuredError);
 
   return structuredError;
 }
@@ -445,21 +510,200 @@ export function getErrorsBySeverity(severity: ErrorSeverity): StructuredError[] 
 }
 
 /**
- * Error boundary helper for React components
+ * Collect comprehensive error context from browser and application state
  */
-export function createErrorBoundaryLogger(componentName: string) {
-  return (error: Error, errorInfo: any) => {
-    logError(error, {
-      source: 'react',
-      category: ErrorCategory.UNKNOWN,
-      message: `React component error in ${componentName}`,
-      additionalContext: {
-        componentName,
-        errorInfo: {
-          componentStack: errorInfo.componentStack,
-          errorBoundary: componentName
-        }
+export function collectErrorContext(additionalContext: Record<string, any> = {}): ErrorContext {
+  const timestamp = new Date().toISOString();
+
+  // Collect browser context
+  const browserContext = typeof window !== 'undefined' ? {
+    userAgent: navigator.userAgent,
+    viewport: {
+      width: window.innerWidth,
+      height: window.innerHeight
+    },
+    screen: {
+      width: window.screen.width,
+      height: window.screen.height
+    },
+    language: navigator.language,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    cookiesEnabled: navigator.cookieEnabled,
+    onlineStatus: navigator.onLine
+  } : undefined;
+
+  // Collect route context (Next.js router)
+  const routeContext = typeof window !== 'undefined' ? {
+    path: window.location.pathname,
+    query: Object.fromEntries(new URLSearchParams(window.location.search)),
+    referrer: document.referrer || undefined
+  } : undefined;
+
+  // Collect user context (from localStorage or context)
+  const userContext = typeof window !== 'undefined' ? (() => {
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        return {
+          id: user.id || 'unknown',
+          email: user.email || 'unknown',
+          role: user.role || 'unknown',
+          isAuthenticated: !!user.id,
+          lastLogin: user.lastLogin || undefined
+        };
+      }
+      return {
+        id: 'anonymous',
+        email: 'anonymous',
+        role: 'guest',
+        isAuthenticated: false
+      };
+    } catch {
+      return {
+        id: 'unknown',
+        email: 'unknown',
+        role: 'unknown',
+        isAuthenticated: false
+      };
+    }
+  })() : undefined;
+
+  // Collect session context
+  const sessionContext = typeof window !== 'undefined' ? (() => {
+    try {
+      const sessionData = sessionStorage.getItem('session');
+      if (sessionData) {
+        const session = JSON.parse(sessionData);
+        return {
+          id: session.id || 'unknown',
+          timestamp: session.timestamp || Date.now(),
+          duration: session.duration || 0,
+          pageViews: session.pageViews || 1
+        };
+      }
+      return {
+        id: `session_${Date.now()}`,
+        timestamp: Date.now(),
+        duration: 0,
+        pageViews: 1
+      };
+    } catch {
+      return {
+        id: `session_${Date.now()}`,
+        timestamp: Date.now(),
+        duration: 0,
+        pageViews: 1
+      };
+    }
+  })() : undefined;
+
+  // Collect application context
+  const appContext = {
+    version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    buildId: process.env.NEXT_PUBLIC_BUILD_ID || undefined
+  };
+
+  return {
+    user: userContext,
+    session: sessionContext,
+    route: routeContext,
+    browser: browserContext,
+    app: appContext,
+    timestamp,
+    custom: additionalContext
+  };
+}
+
+/**
+ * Enhanced error boundary helper for React components with comprehensive context collection
+ */
+export function createErrorBoundaryLogger(componentName: string, level: 'global' | 'section' | 'component' = 'component') {
+  return (error: Error, errorInfo: any, additionalContext: Record<string, any> = {}) => {
+    const errorContext = collectErrorContext({
+      component: {
+        name: componentName,
+        hierarchy: errorInfo?.componentStack ? parseComponentStack(errorInfo.componentStack) : [componentName],
+        ...additionalContext
+      },
+      errorBoundary: {
+        name: componentName,
+        level,
+        retryCount: additionalContext.retryCount || 0
       }
     });
+
+    logError(error, {
+      source: 'react',
+      category: determineReactErrorCategory(error, errorInfo),
+      message: `React ${level} error in ${componentName}`,
+      ...errorContext
+    });
+  };
+}
+
+/**
+ * Parse React component stack to extract component hierarchy
+ */
+function parseComponentStack(componentStack: string): string[] {
+  if (!componentStack) return [];
+
+  return componentStack
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.includes('in ') || line.includes('at '))
+    .map(line => {
+      // Extract component name from stack trace line
+      const match = line.match(/(?:in|at)\s+([^(]+)/);
+      return match ? match[1].trim() : line.trim();
+    })
+    .filter(name => name && name !== 'ErrorBoundary');
+}
+
+/**
+ * Determine React-specific error category based on error and component stack
+ */
+function determineReactErrorCategory(error: Error, errorInfo: any): ErrorCategory {
+  const errorMessage = error.message.toLowerCase();
+  const componentStack = errorInfo?.componentStack?.toLowerCase() || '';
+
+  // Auth-related errors
+  if (errorMessage.includes('auth') || componentStack.includes('auth')) {
+    return ErrorCategory.AUTH;
+  }
+
+  // Network/API errors
+  if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('api')) {
+    return ErrorCategory.API;
+  }
+
+  // Form/validation errors
+  if (errorMessage.includes('validation') || errorMessage.includes('invalid') || errorMessage.includes('form')) {
+    return ErrorCategory.VALIDATION;
+  }
+
+  // State/context errors
+  if (errorMessage.includes('context') || errorMessage.includes('state') || errorMessage.includes('redux')) {
+    return ErrorCategory.UNKNOWN; // Could be enhanced to have a STATE category
+  }
+
+  // Component lifecycle errors
+  if (errorMessage.includes('component') || errorMessage.includes('lifecycle') || errorMessage.includes('render')) {
+    return ErrorCategory.UNKNOWN; // Could be enhanced to have a RENDER category
+  }
+
+  return ErrorCategory.UNKNOWN;
+}
+
+/**
+ * Create a React Error Boundary hook for functional components
+ */
+export function useErrorBoundary() {
+  return (error: Error, errorInfo?: { componentStack?: string }) => {
+    // This would be used with a custom hook that throws errors to be caught by boundaries
+    const enhancedError = new Error(`Component error: ${error.message}`);
+    enhancedError.stack = `${enhancedError.stack}\nComponent Stack: ${errorInfo?.componentStack || 'Not available'}`;
+    throw enhancedError;
   };
 } 
