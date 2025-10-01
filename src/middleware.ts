@@ -2,6 +2,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
 import { logger } from "@/utils/logger";
+import { getSessionManager } from "@/lib/auth/session-manager";
+import { AuthError, AuthErrorType } from "@/types/auth";
 
 // Protected routes that require session refresh
 const PROTECTED_ROUTES = [
@@ -12,14 +14,14 @@ const PROTECTED_ROUTES = [
   '/dashboard',
   '/client',
   '/driver',
-  '/vendor', 
+  '/vendor',
   '/helpdesk',
   '/profile'
 ];
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  
+
   // Skip middleware for specific paths
   if (request.nextUrl.pathname.startsWith('/auth/callback') ||
       request.nextUrl.pathname === "/complete-profile") {
@@ -34,10 +36,10 @@ export async function middleware(request: NextRequest) {
   try {
     // Update the user's session using Supabase middleware helper
     const response = await updateSession(request);
-    
+
     // Check if the path is a protected route
     const { pathname } = request.nextUrl;
-    const isProtectedRoute = PROTECTED_ROUTES.some(route => 
+    const isProtectedRoute = PROTECTED_ROUTES.some(route =>
       pathname === route || pathname.startsWith(`${route}/`)
     );
 
@@ -54,19 +56,49 @@ export async function middleware(request: NextRequest) {
         // Only log authentication failures for debugging
         if (!user || error) {
           console.log('❌ [Middleware] Auth failed for protected route:', pathname, error?.message);
-        }
 
-        if (!user || error) {
-          // User is not authenticated, redirect to sign-in
           const redirectUrl = new URL(`/sign-in?returnTo=${pathname}`, request.url);
           const response = NextResponse.redirect(redirectUrl);
-          
+
           // Add tracking headers
           response.headers.set('x-auth-redirect', 'true');
           response.headers.set('x-redirect-from', pathname);
           response.headers.set('x-redirect-reason', 'unauthenticated');
-          
+
           return response;
+        }
+
+        // Enhanced session validation using session manager
+        try {
+          const sessionManager = getSessionManager();
+
+          // Initialize session from current Supabase session
+          if (user) {
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (sessionData.session) {
+              // Initialize enhanced session for validation
+              await sessionManager.initializeFromSession(sessionData.session, user);
+            }
+          }
+
+          // Validate the session
+          const isValid = await sessionManager.validateSession();
+
+          if (!isValid) {
+            console.log('❌ [Middleware] Enhanced session validation failed for route:', pathname);
+
+            const redirectUrl = new URL(`/sign-in?returnTo=${pathname}&error=session_expired`, request.url);
+            const response = NextResponse.redirect(redirectUrl);
+
+            response.headers.set('x-auth-redirect', 'true');
+            response.headers.set('x-redirect-from', pathname);
+            response.headers.set('x-redirect-reason', 'session_invalid');
+
+            return response;
+          }
+        } catch (sessionError) {
+          console.warn('❌ [Middleware] Enhanced session validation error:', sessionError);
+          // Continue with basic auth check if enhanced validation fails
         }
 
         // Check for admin-only routes
@@ -77,31 +109,36 @@ export async function middleware(request: NextRequest) {
             .select('type')
             .eq('id', user.id)
             .maybeSingle();
-            
+
           // Log profile lookup errors (except for missing profile which is handled below)
           if (profileError) {
             console.error('Middleware: Error fetching user profile:', profileError);
           }
-          
+
           if (!profile || !['admin', 'super_admin', 'helpdesk'].includes((profile.type ?? '').toLowerCase())) {
             // User is authenticated but not authorized
             const response = NextResponse.redirect(new URL('/', request.url));
-            
+
             // Add tracking headers
             response.headers.set('x-auth-redirect', 'true');
             response.headers.set('x-redirect-from', pathname);
             response.headers.set('x-redirect-reason', 'unauthorized');
-            
+
             return response;
           }
         }
+
+        // Add session validation headers for debugging
+        response.headers.set('x-session-validated', 'true');
+        response.headers.set('x-session-timestamp', new Date().toISOString());
+
       } catch (error) {
-        console.error('Error in auth check:', error);
+        console.error('Error in enhanced auth check:', error);
         // On error, redirect to sign-in as a safety measure
         return NextResponse.redirect(new URL('/sign-in', request.url));
       }
     }
-    
+
     return response;
   } catch (error) {
     console.error('Error in middleware:', error);

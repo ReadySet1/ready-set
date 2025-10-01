@@ -375,26 +375,48 @@ export async function login(
   const normalizedUserRole = userType ? Object.values(UserType).find(
     enumValue => enumValue.toUpperCase() === (userType as string)?.toUpperCase()
   ) || (userType as string)?.toLowerCase() : 'customer';
-  
+
   const sessionData = {
     userId: user.id,
     email: user.email || '',
     userRole: normalizedUserRole,
     timestamp: Date.now()
   };
-  
+
   console.log("Normalized userRole for session:", normalizedUserRole);
-  
-  // Set session cookie with immediate user data
+
+  // Set session cookie with enhanced security - still allow client access for hydration
+  // but with improved security settings
   cookieStore.set('user-session-data', JSON.stringify(sessionData), {
     path: '/',
-    httpOnly: false, // Allow client-side access
+    httpOnly: false, // Allow client-side access for hydration
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7 // 7 days
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+    // Additional security headers
+    ...(process.env.NODE_ENV === 'production' && {
+      domain: process.env.NEXT_PUBLIC_COOKIE_DOMAIN || undefined,
+    })
   });
 
   console.log("Set immediate session data for client:", sessionData);
+
+  // Initialize enhanced session management if available
+  try {
+    const { getSessionManager } = await import('@/lib/auth/session-manager');
+    const sessionManager = getSessionManager();
+
+    // Get current session from Supabase
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session && sessionData.session.user) {
+      // Initialize enhanced session
+      await sessionManager.initializeFromSession(sessionData.session, user);
+      console.log("✅ Enhanced session initialized successfully");
+    }
+  } catch (error) {
+    console.warn("⚠️ Enhanced session initialization failed:", error);
+    // Continue with basic auth - enhanced features will work when available
+  }
 
   // Prefetch and cache user profile data for faster client-side loading
   try {

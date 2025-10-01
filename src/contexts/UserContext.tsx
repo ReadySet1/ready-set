@@ -13,54 +13,19 @@ import { Session, User } from "@supabase/supabase-js";
 import { UserType } from "@/types/user";
 import { authLogger } from "@/utils/logger";
 
-// Define user context types
-type UserContextType = {
-  session: Session | null;
-  user: User | null;
-  userRole: UserType | null;
-  isLoading: boolean;
-  error: string | null;
-  isAuthenticating: boolean;
-  authProgress: {
-    step:
-      | "idle"
-      | "connecting"
-      | "authenticating"
-      | "fetching_profile"
-      | "redirecting"
-      | "complete";
-    message: string;
-  };
-  refreshUserData: () => Promise<void>;
-  clearAuthError: () => void;
-  setAuthProgress: (
-    step: UserContextType["authProgress"]["step"],
-    message?: string,
-  ) => void;
-};
-
-// Create the context
-export const UserContext = createContext<UserContextType>({
-  session: null,
-  user: null,
-  userRole: null,
-  isLoading: true,
-  error: null,
-  isAuthenticating: false,
-  authProgress: { step: "idle", message: "" },
-  refreshUserData: async () => {},
-  clearAuthError: () => {},
-  setAuthProgress: () => {},
-});
-
-// Export the hook for using the context
-export const useUser = () => {
-  const context = useContext(UserContext);
-  if (!context) {
-    throw new Error("useUser must be used within a UserProvider");
-  }
-  return context;
-};
+// Import enhanced authentication services
+import { getSessionManager } from "@/lib/auth/session-manager";
+import { getTokenRefreshService } from "@/lib/auth/token-refresh-service";
+import { getAuthenticatedFetch } from "@/lib/auth/api-interceptor";
+import {
+  AuthState,
+  AuthContextConfig,
+  AuthError,
+  AuthErrorType,
+  DEFAULT_AUTH_CONFIG,
+  SessionFingerprint,
+  EnhancedSession,
+} from "@/types/auth";
 
 // Import auth hydration utilities
 import {
@@ -76,6 +41,84 @@ import {
   getPersistedAuthState,
   clearPersistedAuthState,
 } from "@/utils/supabase/client";
+
+// Define enhanced user context types
+type UserContextType = {
+  session: Session | null;
+  user: User | null;
+  userRole: UserType | null;
+  enhancedSession: EnhancedSession | null;
+  isLoading: boolean;
+  error: string | null;
+  isAuthenticating: boolean;
+  authState: AuthState;
+  authProgress: {
+    step:
+      | "idle"
+      | "connecting"
+      | "authenticating"
+      | "fetching_profile"
+      | "redirecting"
+      | "complete";
+    message: string;
+  };
+  // Enhanced methods
+  refreshUserData: () => Promise<void>;
+  refreshToken: () => Promise<void>;
+  logout: () => Promise<void>;
+  clearAuthError: () => void;
+  setAuthProgress: (
+    step: UserContextType["authProgress"]["step"],
+    message?: string,
+  ) => void;
+  // Session management
+  getActiveSessions: () => Promise<EnhancedSession[]>;
+  revokeSession: (sessionId: string) => Promise<void>;
+  // Activity tracking
+  updateActivity: () => void;
+};
+
+// Create the context
+export const UserContext = createContext<UserContextType>({
+  session: null,
+  user: null,
+  userRole: null,
+  enhancedSession: null,
+  isLoading: true,
+  error: null,
+  isAuthenticating: false,
+  authState: {
+    user: null,
+    session: null,
+    enhancedSession: null,
+    userRole: null,
+    isLoading: true,
+    isAuthenticating: false,
+    error: null,
+    lastActivity: Date.now(),
+    sessionExpiresAt: null,
+    needsRefresh: false,
+    suspiciousActivity: false,
+  },
+  authProgress: { step: "idle", message: "" },
+  refreshUserData: async () => {},
+  refreshToken: async () => {},
+  logout: async () => {},
+  clearAuthError: () => {},
+  setAuthProgress: () => {},
+  getActiveSessions: async () => [],
+  revokeSession: async () => {},
+  updateActivity: () => {},
+});
+
+// Export the hook for using the context
+export const useUser = () => {
+  const context = useContext(UserContext);
+  if (!context) {
+    throw new Error("useUser must be used within a UserProvider");
+  }
+  return context;
+};
 
 // Enhanced helper function to fetch user role with caching and retry
 const fetchUserRole = async (
@@ -185,15 +228,34 @@ const fetchUserRole = async (
 // Create a client component wrapper
 function UserProviderClient({ children }: { children: ReactNode }) {
   authLogger.debug(
-    "🟢 UserProviderClient MOUNTING - this should appear first!",
+    "🟢 UserProviderClient MOUNTING - Enhanced version with session management!",
   );
 
+  // Core state
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<UserType | null>(null);
+  const [enhancedSession, setEnhancedSession] =
+    useState<EnhancedSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+  // Enhanced state
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    session: null,
+    enhancedSession: null,
+    userRole: null,
+    isLoading: true,
+    isAuthenticating: false,
+    error: null,
+    lastActivity: Date.now(),
+    sessionExpiresAt: null,
+    needsRefresh: false,
+    suspiciousActivity: false,
+  });
+
   const [authProgress, setAuthProgressState] = useState<{
     step:
       | "idle"
@@ -204,7 +266,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       | "complete";
     message: string;
   }>({ step: "idle", message: "" });
+
+  // Services
   const [supabase, setSupabase] = useState<any>(null);
+  const [sessionManager, setSessionManager] = useState<any>(null);
   const [hasImmediateData, setHasImmediateData] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -215,84 +280,70 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     isLoading,
   );
 
-  // 🔥 IMMEDIATE COOKIE CHECK (NOT in useEffect) - executes during render
-  // Only run on client after hydration to prevent server/client mismatches
-  if (
-    typeof window !== "undefined" &&
-    isHydrated &&
-    !user &&
-    !hasImmediateData
-  ) {
-    console.log("🔥 IMMEDIATE cookie check during render...");
-    const cookies = document.cookie;
-    const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
-
-    if (sessionMatch && sessionMatch[1]) {
+  // Initialize services
+  useEffect(() => {
+    const initServices = async () => {
       try {
-        const decoded = decodeURIComponent(sessionMatch[1]);
-        const sessionData = JSON.parse(decoded);
-        console.log("🔥 IMMEDIATE: Found session data:", sessionData);
+        setAuthProgressState({
+          step: "connecting",
+          message: "Initializing authentication services...",
+        });
 
-        if (sessionData.userId && sessionData.email && sessionData.userRole) {
-          console.log("🔥 IMMEDIATE: Setting user state immediately!");
+        const client = await createClient();
+        setSupabase(client);
 
-          const mockUser = {
-            id: sessionData.userId,
-            email: sessionData.email,
-            user_metadata: {
-              name: sessionData.email?.split("@")[0] || "User",
-            },
-          } as unknown as User;
+        // Initialize session manager
+        const sm = getSessionManager();
+        setSessionManager(sm);
 
-          const normalizedRole = sessionData.userRole.toLowerCase() as UserType;
+        // Initialize token refresh service
+        getTokenRefreshService();
 
-          // Set state in next tick to avoid render phase issues
-          if (!user) {
-            setTimeout(() => {
-              setUser(mockUser);
-              setUserRole(normalizedRole);
-              setHasImmediateData(true);
-              setIsLoading(false);
-              console.log("🔥 IMMEDIATE: Auth state set successfully!");
-            }, 0);
-          }
+        setAuthProgressState({ step: "idle", message: "" });
+        authLogger.debug(
+          "UserProviderClient: Services initialized successfully",
+        );
+      } catch (err) {
+        console.error(
+          "UserProviderClient: Failed to initialize services:",
+          err,
+        );
+        setError("Authentication initialization failed");
+        if (!hasImmediateData) {
+          setIsLoading(false);
         }
-      } catch (error) {
-        console.error("🔥 IMMEDIATE: Failed to parse cookie:", error);
       }
-    } else {
-      console.log("🔥 IMMEDIATE: No session cookie found");
-    }
-  }
+    };
 
-  // Set hydration flag to prevent server/client mismatches
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
+    initServices();
+  }, [hasImmediateData]);
 
-  // Hydrate auth state synchronously on mount using server-side data
+  // Hydration and immediate data loading
   useEffect(() => {
-    console.log("🚀🚀🚀 FORCED UserContext useEffect TRIGGERED!");
-    console.log("🚀🚀🚀 FORCED UserContext: Starting hydration check...");
+    console.log("🚀🚀🚀 ENHANCED UserContext useEffect TRIGGERED!");
+    console.log("🚀🚀🚀 ENHANCED UserContext: Starting hydration check...");
     console.log("🚀 Window available?", typeof window !== "undefined");
+
+    // Set hydration flag to prevent server/client mismatches
+    setIsHydrated(true);
 
     // Force check cookies directly as backup
     if (typeof window !== "undefined") {
       const cookies = document.cookie;
-      console.log("🍪 FORCED Cookie check - length:", cookies.length);
-      console.log("🍪 FORCED Cookie preview:", cookies.substring(0, 200));
+      console.log("🍪 ENHANCED Cookie check - length:", cookies.length);
+      console.log("🍪 ENHANCED Cookie preview:", cookies.substring(0, 200));
 
       // Manual cookie parsing as backup
       const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
       if (sessionMatch && sessionMatch[1]) {
-        console.log("🔍 FORCED Found session cookie manually!");
+        console.log("🔍 ENHANCED Found session cookie manually!");
         try {
           const decoded = decodeURIComponent(sessionMatch[1]);
           const sessionData = JSON.parse(decoded);
-          console.log("📊 FORCED Manual session data:", sessionData);
+          console.log("📊 ENHANCED Manual session data:", sessionData);
 
           if (sessionData.userId && sessionData.email && sessionData.userRole) {
-            console.log("✅ FORCED Creating user from manual parsing...");
+            console.log("✅ ENHANCED Creating user from manual parsing...");
 
             // Create user object directly from cookie data
             const mockUser = {
@@ -313,13 +364,13 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               setHasImmediateData(true);
               setIsLoading(false);
               console.log(
-                "✅ FORCED Hydrated auth state successfully with manual parsing!",
+                "✅ ENHANCED Hydrated auth state successfully with manual parsing!",
               );
             }, 0);
             return; // Exit early since we found the data
           }
         } catch (error) {
-          console.error("❌ FORCED Manual parsing failed:", error);
+          console.error("❌ ENHANCED Manual parsing failed:", error);
         }
       }
     }
@@ -327,7 +378,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     // Fallback to original method
     const recoveredState = recoverAuthState();
     if (recoveredState) {
-      console.log("✅ Recovered auth state from hydration:", recoveredState);
+      console.log(
+        "✅ ENHANCED Recovered auth state from hydration:",
+        recoveredState,
+      );
 
       // Create a mock user object from recovered state
       const mockUser = {
@@ -348,56 +402,32 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       }, 0);
 
       console.log(
-        "✅ Hydrated auth state successfully - user should be visible in header",
+        "✅ ENHANCED Hydrated auth state successfully - user should be visible in header",
       );
     } else {
-      console.log("❌ No auth state found during hydration check");
+      console.log("❌ ENHANCED No auth state found during hydration check");
     }
   }, []);
 
-  // Initialize Supabase
+  // Enhanced auth state management
   useEffect(() => {
-    const initSupabase = async () => {
-      console.log("🔌 UserContext: Initializing Supabase client...");
-      setAuthProgressState({
-        step: "connecting",
-        message: "Connecting to authentication service...",
-      });
-
-      try {
-        const client = await createClient();
-        console.log("✅ UserContext: Supabase client initialized successfully");
-        setSupabase(client);
-        setAuthProgressState({ step: "idle", message: "" });
-      } catch (err) {
-        console.error(
-          "❌ UserContext: Failed to initialize Supabase client:",
-          err,
-        );
-        setError("Authentication initialization failed");
-        if (!hasImmediateData) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    initSupabase();
-  }, [hasImmediateData]);
-
-  // Load user data
-  useEffect(() => {
-    if (!supabase) {
-      console.log("⏳ UserContext: Waiting for Supabase client...");
+    if (!supabase || !sessionManager) {
+      console.log("⏳ UserProviderClient: Waiting for services...");
       return;
     }
 
-    console.log("Setting up auth state...");
+    console.log("Setting up enhanced auth state...");
     let mounted = true;
     let authListener: any = null;
 
     const setupAuth = async () => {
       try {
-        console.log("UserContext: Getting initial user data...");
+        console.log("UserProviderClient: Getting initial user data...");
+
+        setAuthProgressState({
+          step: "authenticating",
+          message: "Verifying authentication status...",
+        });
 
         // Add a small delay to allow middleware session refresh to complete
         // especially important after login redirects
@@ -452,42 +482,121 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           // If we have immediate data, verify it matches current user
           if (hasImmediateData) {
             console.log(
-              "UserContext: Verifying immediate data with current user...",
+              "UserProviderClient: Verifying immediate data with current user...",
             );
             // Update user object with full Supabase user data
             setUser(currentUser);
+
+            // Initialize enhanced session
+            try {
+              const sessionData = await supabase.auth.getSession();
+              if (sessionData.data.session) {
+                const enhanced = await sessionManager.initializeFromSession(
+                  sessionData.data.session,
+                  currentUser,
+                );
+                setEnhancedSession(enhanced);
+                setSession(sessionData.data.session);
+
+                // Start token refresh service
+                const tokenRefreshService = getTokenRefreshService();
+                tokenRefreshService.startAutoRefresh(sessionData.data.session);
+              }
+            } catch (sessionError) {
+              console.error(
+                "Error initializing enhanced session:",
+                sessionError,
+              );
+            }
 
             // Only fetch role from DB if hydrated data doesn't match current user ID
             const recoveredState = recoverAuthState();
             if (!recoveredState || recoveredState.userId !== currentUser.id) {
               console.log(
-                "UserContext: Hydrated data mismatch, fetching fresh role...",
+                "UserProviderClient: Hydrated data mismatch, fetching fresh role...",
               );
               await fetchUserRole(supabase, currentUser, setUserRole);
             }
           } else {
             // No immediate data, fetch everything normally
             setUser(currentUser);
-            console.log("UserContext: User found. Fetching user role...");
+
+            // Initialize enhanced session
+            try {
+              const sessionData = await supabase.auth.getSession();
+              if (sessionData.data.session) {
+                const enhanced = await sessionManager.initializeFromSession(
+                  sessionData.data.session,
+                  currentUser,
+                );
+                setEnhancedSession(enhanced);
+                setSession(sessionData.data.session);
+
+                // Start token refresh service
+                const tokenRefreshService = getTokenRefreshService();
+                tokenRefreshService.startAutoRefresh(sessionData.data.session);
+              }
+            } catch (sessionError) {
+              console.error(
+                "Error initializing enhanced session:",
+                sessionError,
+              );
+            }
+
+            console.log(
+              "UserProviderClient: User found. Fetching user role...",
+            );
             await fetchUserRole(supabase, currentUser, setUserRole);
             setIsLoading(false);
           }
+
+          // Update auth state
+          setAuthState((prev) => ({
+            ...prev,
+            user: currentUser,
+            session: session,
+            enhancedSession,
+            userRole,
+            isLoading: false,
+            isAuthenticating: false,
+            error: null,
+            lastActivity: Date.now(),
+            sessionExpiresAt: session?.expires_at
+              ? session.expires_at * 1000
+              : null,
+          }));
         } else {
           console.log(
-            "ℹ️ UserContext: No user found. Setting loading to false.",
+            "ℹ️ UserProviderClient: No user found. Setting loading to false.",
           );
           setUser(null);
           setUserRole(null);
+          setEnhancedSession(null);
+          setSession(null);
+
+          // Update auth state
+          setAuthState((prev) => ({
+            ...prev,
+            user: null,
+            session: null,
+            enhancedSession: null,
+            userRole: null,
+            isLoading: false,
+            isAuthenticating: false,
+            error: null,
+          }));
+
           if (!hasImmediateData) {
             setIsLoading(false);
           }
         }
 
+        // Set up auth state change listener
         const { data: listener } = supabase.auth.onAuthStateChange(
           async (event: string, session: Session | null) => {
             if (!mounted) return;
 
-            console.log("Auth state changed:", event);
+            console.log("Enhanced Auth state changed:", event);
             setSession(session);
 
             const newUser = session?.user || null;
@@ -495,12 +604,71 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
             if (!newUser) {
               setUserRole(null);
+              setEnhancedSession(null);
               setHasImmediateData(false);
               setIsLoading(false);
+
               // Clear all auth data when user signs out
               clearAllHydrationData();
               clearPersistedAuthState();
+
+              // Stop token refresh
+              const tokenRefreshService = getTokenRefreshService();
+              tokenRefreshService.stopAutoRefresh();
+
+              // Clear enhanced session
+              if (sessionManager) {
+                await sessionManager.clearSession();
+              }
+
+              // Update auth state
+              setAuthState((prev) => ({
+                ...prev,
+                user: null,
+                session: null,
+                enhancedSession: null,
+                userRole: null,
+                isLoading: false,
+                isAuthenticating: false,
+                error: null,
+              }));
+
               return;
+            }
+
+            // Initialize enhanced session for new sign-in
+            if (event === "SIGNED_IN" && session && sessionManager) {
+              try {
+                const enhanced = await sessionManager.initializeFromSession(
+                  session,
+                  newUser,
+                );
+                setEnhancedSession(enhanced);
+
+                // Start token refresh service
+                const tokenRefreshService = getTokenRefreshService();
+                tokenRefreshService.startAutoRefresh(session);
+
+                // Update auth state
+                setAuthState((prev) => ({
+                  ...prev,
+                  user: newUser,
+                  session,
+                  enhancedSession: enhanced,
+                  isLoading: false,
+                  isAuthenticating: false,
+                  error: null,
+                  lastActivity: Date.now(),
+                  sessionExpiresAt: session.expires_at
+                    ? session.expires_at * 1000
+                    : null,
+                }));
+              } catch (sessionError) {
+                console.error(
+                  "Error initializing enhanced session on sign-in:",
+                  sessionError,
+                );
+              }
             }
 
             // Clear immediate data flag on auth state changes
@@ -515,6 +683,14 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                 setIsLoading(true);
                 await fetchUserRole(supabase, newUser, setUserRole);
                 setIsLoading(false);
+
+                // Update auth state
+                setAuthState((prev) => ({
+                  ...prev,
+                  user: newUser,
+                  userRole,
+                  lastActivity: Date.now(),
+                }));
               }
             }
           },
@@ -522,11 +698,19 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
         authListener = listener;
       } catch (error) {
-        console.error("💥 UserContext: Error in auth setup:", error);
+        console.error("💥 UserProviderClient: Error in auth setup:", error);
         if (mounted) {
           setError("Authentication setup failed");
           setIsLoading(false);
           setAuthProgressState({ step: "idle", message: "" });
+
+          // Update auth state
+          setAuthState((prev) => ({
+            ...prev,
+            error: "Authentication setup failed",
+            isLoading: false,
+            isAuthenticating: false,
+          }));
         }
       }
     };
@@ -539,9 +723,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         authListener.subscription.unsubscribe();
       }
     };
-  }, [supabase, hasImmediateData]);
+  }, [supabase, sessionManager, hasImmediateData]);
 
-  // Function to manually refresh user data
+  // Enhanced methods
   const refreshUserData = async () => {
     if (!supabase) return;
 
@@ -550,6 +734,11 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     clearPersistedAuthState();
     setHasImmediateData(false);
     setIsLoading(true);
+
+    setAuthProgressState({
+      step: "authenticating",
+      message: "Refreshing user data...",
+    });
 
     try {
       // Use retry mechanism for refresh operation
@@ -581,9 +770,23 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
       if (currentUser) {
         await fetchUserRole(supabase, currentUser, setUserRole);
+
+        // Update auth state
+        setAuthState((prev) => ({
+          ...prev,
+          user: currentUser,
+          userRole,
+          lastActivity: Date.now(),
+        }));
       } else {
         setUserRole(null);
-        setAuthProgressState({ step: "idle", message: "" });
+
+        // Update auth state
+        setAuthState((prev) => ({
+          ...prev,
+          user: null,
+          userRole: null,
+        }));
       }
     } catch (err) {
       console.error("Error refreshing user data:", err);
@@ -603,6 +806,14 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           setUserRole(persistedState.userRole as UserType);
           setError(null); // Clear error if recovery succeeds
           console.log("Successfully recovered from persisted state");
+
+          // Update auth state
+          setAuthState((prev) => ({
+            ...prev,
+            user: mockUser,
+            userRole: persistedState.userRole as UserType,
+            error: null,
+          }));
         }
       } catch (recoveryError) {
         console.error("Failed to recover from persisted state:", recoveryError);
@@ -617,6 +828,114 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshToken = async () => {
+    if (!sessionManager) return;
+
+    setAuthProgressState({
+      step: "authenticating",
+      message: "Refreshing authentication token...",
+    });
+
+    try {
+      await sessionManager.refreshToken();
+      console.log("Token refreshed successfully");
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      setError("Failed to refresh authentication token");
+
+      // Update auth state
+      setAuthState((prev) => ({
+        ...prev,
+        error: "Failed to refresh authentication token",
+        needsRefresh: true,
+      }));
+    } finally {
+      setAuthProgressState({ step: "idle", message: "" });
+    }
+  };
+
+  const logout = async () => {
+    if (!supabase || !sessionManager) return;
+
+    setAuthProgressState({
+      step: "authenticating",
+      message: "Signing out...",
+    });
+
+    try {
+      // Stop token refresh service
+      const tokenRefreshService = getTokenRefreshService();
+      tokenRefreshService.stopAutoRefresh();
+
+      // Clear enhanced session
+      await sessionManager.clearSession();
+
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+
+      // Clear local state
+      setUser(null);
+      setUserRole(null);
+      setEnhancedSession(null);
+      setSession(null);
+      setHasImmediateData(false);
+
+      // Clear all auth data
+      clearAllHydrationData();
+      clearPersistedAuthState();
+
+      // Update auth state
+      setAuthState({
+        user: null,
+        session: null,
+        enhancedSession: null,
+        userRole: null,
+        isLoading: false,
+        isAuthenticating: false,
+        error: null,
+        lastActivity: Date.now(),
+        sessionExpiresAt: null,
+        needsRefresh: false,
+        suspiciousActivity: false,
+      });
+
+      console.log("Logout completed successfully");
+    } catch (error) {
+      console.error("Logout error:", error);
+      setError("Failed to sign out properly");
+
+      // Update auth state
+      setAuthState((prev) => ({
+        ...prev,
+        error: "Failed to sign out properly",
+      }));
+    } finally {
+      setAuthProgressState({ step: "idle", message: "" });
+    }
+  };
+
+  const getActiveSessions = async (): Promise<EnhancedSession[]> => {
+    if (!sessionManager) return [];
+    return await sessionManager.getActiveSessions();
+  };
+
+  const revokeSession = async (sessionId: string): Promise<void> => {
+    if (!sessionManager) return;
+    await sessionManager.revokeSession(sessionId);
+  };
+
+  const updateActivity = () => {
+    if (sessionManager) {
+      sessionManager.synchronizeTabs();
+    }
+
+    // Update auth state
+    setAuthState((prev) => ({
+      ...prev,
+      lastActivity: Date.now(),
+    }));
+  };
+
   // Prevent hydration mismatches by ensuring consistent initial render
   if (!isHydrated) {
     return (
@@ -625,13 +944,32 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           session: null,
           user: null,
           userRole: null,
+          enhancedSession: null,
           isLoading: true,
           error: null,
           isAuthenticating: false,
+          authState: {
+            user: null,
+            session: null,
+            enhancedSession: null,
+            userRole: null,
+            isLoading: true,
+            isAuthenticating: false,
+            error: null,
+            lastActivity: Date.now(),
+            sessionExpiresAt: null,
+            needsRefresh: false,
+            suspiciousActivity: false,
+          },
           authProgress: { step: "idle", message: "" },
           refreshUserData,
+          refreshToken,
+          logout,
           clearAuthError: () => {},
           setAuthProgress: () => {},
+          getActiveSessions,
+          revokeSession,
+          updateActivity,
         }}
       >
         {children}
@@ -645,14 +983,21 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         session,
         user,
         userRole,
+        enhancedSession,
         isLoading,
         error,
         isAuthenticating,
+        authState,
         authProgress,
         refreshUserData,
+        refreshToken,
+        logout,
         clearAuthError: () => setError(null),
         setAuthProgress: (step, message = "") =>
           setAuthProgressState({ step, message }),
+        getActiveSessions,
+        revokeSession,
+        updateActivity,
       }}
     >
       {children}
@@ -662,7 +1007,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
 // Export the provider component
 export function UserProvider({ children }: { children: ReactNode }) {
-  authLogger.debug("🔵 UserProvider wrapper called!");
+  authLogger.debug("🔵 Enhanced UserProvider wrapper called!");
   return (
     <AuthErrorBoundary
       onError={(error, errorInfo) => {
