@@ -1,7 +1,7 @@
 // src/components/auth/SessionTimeoutWarning.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useUser } from "@/contexts/UserContext";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +31,19 @@ export function SessionTimeoutWarning({
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isExtending, setIsExtending] = useState(false);
 
+  const handleLogout = useCallback(async () => {
+    try {
+      if (onLogout) {
+        await onLogout();
+      } else {
+        await logout();
+      }
+      setIsVisible(false);
+    } catch (error) {
+      console.error("Failed to logout:", error);
+    }
+  }, [onLogout, logout]);
+
   useEffect(() => {
     if (!authState.sessionExpiresAt || !authState.user) return;
 
@@ -58,7 +71,7 @@ export function SessionTimeoutWarning({
     const interval = setInterval(checkSession, 1000);
 
     return () => clearInterval(interval);
-  }, [authState.sessionExpiresAt, authState.user, warningTime]);
+  }, [authState.sessionExpiresAt, authState.user, warningTime, handleLogout]);
 
   useEffect(() => {
     if (!isVisible || timeRemaining <= 0) return;
@@ -75,7 +88,7 @@ export function SessionTimeoutWarning({
     }, 1000);
 
     return () => clearInterval(countdown);
-  }, [isVisible, timeRemaining]);
+  }, [isVisible, timeRemaining, handleLogout]);
 
   const handleExtend = async () => {
     setIsExtending(true);
@@ -90,19 +103,6 @@ export function SessionTimeoutWarning({
       console.error("Failed to extend session:", error);
     } finally {
       setIsExtending(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      if (onLogout) {
-        await onLogout();
-      } else {
-        await logout();
-      }
-      setIsVisible(false);
-    } catch (error) {
-      console.error("Failed to logout:", error);
     }
   };
 

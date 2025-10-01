@@ -542,6 +542,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         }
 
         if (currentUser) {
+          let currentEnhancedSession: EnhancedSession | null = null;
+          let currentUserRole: UserType | null = null;
+          let currentSession: Session | null = null;
+
           // If we have immediate data, verify it matches current user
           if (hasImmediateData) {
             console.log(
@@ -558,6 +562,8 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                   sessionData.data.session,
                   currentUser,
                 );
+                currentEnhancedSession = enhanced;
+                currentSession = sessionData.data.session;
                 setEnhancedSession(enhanced);
                 setSession(sessionData.data.session);
 
@@ -578,7 +584,13 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               console.log(
                 "UserProviderClient: Hydrated data mismatch, fetching fresh role...",
               );
-              await fetchUserRole(supabase, currentUser, setUserRole);
+              currentUserRole = await fetchUserRole(
+                supabase,
+                currentUser,
+                setUserRole,
+              );
+            } else {
+              currentUserRole = recoveredState.userRole; // Use existing role if data matches
             }
           } else {
             // No immediate data, fetch everything normally
@@ -592,6 +604,8 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                   sessionData.data.session,
                   currentUser,
                 );
+                currentEnhancedSession = enhanced;
+                currentSession = sessionData.data.session;
                 setEnhancedSession(enhanced);
                 setSession(sessionData.data.session);
 
@@ -609,23 +623,27 @@ function UserProviderClient({ children }: { children: ReactNode }) {
             console.log(
               "UserProviderClient: User found. Fetching user role...",
             );
-            await fetchUserRole(supabase, currentUser, setUserRole);
+            currentUserRole = await fetchUserRole(
+              supabase,
+              currentUser,
+              setUserRole,
+            );
             setIsLoading(false);
           }
 
-          // Update auth state
+          // Update auth state using local variables instead of state variables
           setAuthState((prev) => ({
             ...prev,
             user: currentUser,
-            session: session,
-            enhancedSession,
-            userRole,
+            session: currentSession,
+            enhancedSession: currentEnhancedSession,
+            userRole: currentUserRole,
             isLoading: false,
             isAuthenticating: false,
             error: null,
             lastActivity: Date.now(),
-            sessionExpiresAt: session?.expires_at
-              ? session.expires_at * 1000
+            sessionExpiresAt: currentSession?.expires_at
+              ? currentSession.expires_at * 1000
               : null,
           }));
         } else {
@@ -745,14 +763,18 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                 console.log("Auth state change: fetching fresh user role...");
                 setHasImmediateData(false);
                 setIsLoading(true);
-                await fetchUserRole(supabase, newUser, setUserRole);
+                const newUserRole = await fetchUserRole(
+                  supabase,
+                  newUser,
+                  setUserRole,
+                );
                 setIsLoading(false);
 
                 // Update auth state
                 setAuthState((prev) => ({
                   ...prev,
                   user: newUser,
-                  userRole,
+                  userRole: newUserRole, // Use the locally captured value
                   lastActivity: Date.now(),
                 }));
               }

@@ -1,5 +1,5 @@
 // src/components/Admin/UploadErrorDashboard.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { UploadErrorType } from "@/types/upload";
 
 interface UploadError {
@@ -43,9 +43,9 @@ export function UploadErrorDashboard() {
 
   useEffect(() => {
     fetchErrors();
-  }, [filter]);
+  }, [fetchErrors]);
 
-  const fetchErrors = async () => {
+  const fetchErrors = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -69,9 +69,9 @@ export function UploadErrorDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, calculateStats]);
 
-  const calculateStats = (errorList: UploadError[]) => {
+  const calculateStats = useCallback((errorList: UploadError[]) => {
     const stats: ErrorStats = {
       totalErrors: errorList.length,
       errorsByType: {} as Record<UploadErrorType, number>,
@@ -98,7 +98,7 @@ export function UploadErrorDashboard() {
     ).length;
 
     setStats(stats);
-  };
+  }, []);
 
   const resolveError = async (errorId: string) => {
     try {

@@ -1,7 +1,7 @@
 // src/components/auth/SessionManagement.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useUser } from "@/contexts/UserContext";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,15 +60,7 @@ export function SessionManagement({ className }: SessionManagementProps) {
   const [isRevoking, setIsRevoking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load sessions on mount and periodically
-  useEffect(() => {
-    loadSessions();
-
-    const interval = setInterval(loadSessions, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -80,7 +72,17 @@ export function SessionManagement({ className }: SessionManagementProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getActiveSessions]);
+
+  // Load sessions on mount and periodically
+  useEffect(() => {
+    loadSessions();
+
+    const interval = setInterval(() => {
+      loadSessions();
+    }, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, [loadSessions]);
 
   const handleRevokeSession = async (sessionId: string) => {
     try {
