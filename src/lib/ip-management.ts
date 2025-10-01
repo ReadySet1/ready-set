@@ -125,7 +125,7 @@ export class IPManager {
     }
 
     // Fallback to direct connection IP
-    return this.normalizeIP(request.ip || 'unknown');
+    return this.normalizeIP('unknown');
   }
 
   /**
@@ -141,14 +141,14 @@ export class IPManager {
   /**
    * Check if IP is private/internal
    */
-  private isPrivateIP(ip: string): boolean {
+  isPrivateIP(ip: string): boolean {
     if (ip === 'localhost' || ip === '127.0.0.1' || ip === '::1') {
       return true;
     }
 
     // Check for private IPv4 ranges
     const parts = ip.split('.').map(Number);
-    if (parts.length === 4) {
+    if (parts.length >= 4 && parts.every(part => !isNaN(part)) && parts[1] !== undefined) {
       // 10.0.0.0/8
       if (parts[0] === 10) return true;
       // 172.16.0.0/12
@@ -175,7 +175,7 @@ export class IPManager {
     const cleanIP = ip.split(':')[0];
 
     // Validate and return clean IP
-    return this.isValidIP(cleanIP) ? cleanIP : 'invalid';
+    return cleanIP && this.isValidIP(cleanIP) ? cleanIP : 'invalid';
   }
 
   /**
@@ -247,6 +247,8 @@ export interface IPAccessControlConfig {
   requireAuthentication?: boolean;
   allowPrivateIPs?: boolean;
   allowTrustedProxies?: boolean;
+  enableThreatIntelligence?: boolean;
+  geolocationRules?: GeolocationRule[];
   blockTorExitNodes?: boolean;
   blockVPNs?: boolean;
   logBlockedRequests?: boolean;
@@ -409,9 +411,9 @@ export class IPRangeManager {
   static isIPInRange(ip: string, cidr: string): boolean {
     try {
       const [range, bits] = cidr.split('/');
-      const mask = parseInt(bits);
+      const mask = bits ? parseInt(bits) : NaN;
 
-      if (isNaN(mask) || mask < 0 || mask > 32) {
+      if (!range || !bits || isNaN(mask) || mask < 0 || mask > 32) {
         return false;
       }
 
@@ -454,7 +456,13 @@ export class IPRangeManager {
     // Get common range information
     let range: string | undefined;
     if (ip.startsWith('10.')) range = '10.0.0.0/8';
-    else if (ip.startsWith('172.') && parseInt(ip.split('.')[1]) >= 16 && parseInt(ip.split('.')[1]) <= 31) range = '172.16.0.0/12';
+    else if (ip.startsWith('172.')) {
+      const parts = ip.split('.');
+      if (parts.length >= 2 && parts[1] !== undefined) {
+        const secondOctet = parseInt(parts[1]);
+        if (!isNaN(secondOctet) && secondOctet >= 16 && secondOctet <= 31) range = '172.16.0.0/12';
+      }
+    }
     else if (ip.startsWith('192.168.')) range = '192.168.0.0/16';
     else if (ip.startsWith('127.')) range = '127.0.0.0/8';
     else if (ip === '::1' || ip.startsWith('::')) range = '::1/128';
@@ -470,6 +478,8 @@ export class IPRangeManager {
     if (parts.length !== 2) return false;
 
     const [ip, bits] = parts;
+    if (!ip || !bits) return false;
+
     const mask = parseInt(bits);
 
     if (isNaN(mask) || mask < 0 || mask > 32) return false;

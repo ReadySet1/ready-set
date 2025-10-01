@@ -265,7 +265,7 @@ export async function validateRequest<T = any>(
     // Validate query parameters if schema provided
     if (querySchema) {
       const url = new URL(request.url);
-      const queryData: any = {};
+      let queryData: any = {};
 
       for (const [key, value] of url.searchParams.entries()) {
         // Handle array values (e.g., ?tags=tag1&tags=tag2)

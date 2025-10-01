@@ -60,7 +60,6 @@ export interface SecurityEvent {
   severity: SecurityEventSeverity;
   timestamp: Date;
   userId?: string;
-  userAgent?: string;
   ipAddress: string;
   userAgent?: string;
   requestPath: string;
@@ -515,11 +514,11 @@ export class SecurityLogger {
     }
 
     // Additional scoring based on details
-    if (details?.patterns?.length > 0) {
+    if (details && details.patterns && details.patterns.length > 0) {
       score += details.patterns.length;
     }
 
-    if (details?.errors?.length > 5) {
+    if (details && details.errors && details.errors.length > 5) {
       score += 2;
     }
 
@@ -544,7 +543,7 @@ export class SecurityLogger {
   }
 
   private generateTags(type: SecurityEventType, severity: SecurityEventSeverity, request: NextRequest): string[] {
-    const tags = [type, severity];
+    const tags: string[] = [type, severity];
 
     if (request.nextUrl.pathname.startsWith('/admin/')) {
       tags.push('admin');

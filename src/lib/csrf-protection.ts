@@ -326,30 +326,30 @@ export const CSRFConfigs = {
   // Strict CSRF for state-changing operations
   strict: {
     required: true,
-    methods: ['POST', 'PUT', 'DELETE', 'PATCH'],
-    exemptPaths: []
+    methods: ['POST', 'PUT', 'DELETE', 'PATCH'] as string[],
+    exemptPaths: [] as string[]
   },
 
   // Relaxed CSRF for API endpoints (requires API key bypass)
   api: {
     required: true,
-    methods: ['POST', 'PUT', 'DELETE', 'PATCH'],
-    exemptPaths: [],
+    methods: ['POST', 'PUT', 'DELETE', 'PATCH'] as string[],
+    exemptPaths: [] as string[],
     allowApiKey: true
   },
 
   // CSRF for form submissions
   forms: {
     required: true,
-    methods: ['POST'],
-    exemptPaths: ['/api/auth']
+    methods: ['POST'] as string[],
+    exemptPaths: ['/api/auth'] as string[]
   },
 
   // Optional CSRF for development/testing
   development: {
     required: false,
-    methods: ['POST', 'PUT', 'DELETE', 'PATCH'],
-    exemptPaths: []
+    methods: ['POST', 'PUT', 'DELETE', 'PATCH'] as string[],
+    exemptPaths: [] as string[]
   }
 } as const;
 

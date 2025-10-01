@@ -58,7 +58,7 @@ export const SECURITY_HEADERS = {
 // Remove undefined headers
 const filteredSecurityHeaders = Object.fromEntries(
   Object.entries(SECURITY_HEADERS).filter(([_, value]) => value !== undefined)
-);
+) as Record<string, string>;
 
 // Security headers middleware configuration
 export interface SecurityHeadersConfig {

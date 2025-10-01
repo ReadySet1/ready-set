@@ -1,6 +1,7 @@
 // src/lib/security-config.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { SecurityEventType, SecurityEventSeverity } from './security-logging';
 
 // Security configuration schema
 export const SecurityConfigSchema = z.object({
@@ -34,7 +35,33 @@ export const SecurityConfigSchema = z.object({
         maxRequests: z.number().default(10),
         strategy: z.enum(['fixed-window', 'sliding-window']).default('sliding-window')
       })
-    }).default({})
+    }).default({
+      AUTH: {
+        windowMs: 15 * 60 * 1000,
+        maxRequests: 5,
+        strategy: 'sliding-window'
+      },
+      API: {
+        windowMs: 15 * 60 * 1000,
+        maxRequests: 100,
+        strategy: 'sliding-window'
+      },
+      UPLOAD: {
+        windowMs: 60 * 60 * 1000,
+        maxRequests: 50,
+        strategy: 'sliding-window'
+      },
+      ADMIN: {
+        windowMs: 15 * 60 * 1000,
+        maxRequests: 50,
+        strategy: 'sliding-window'
+      },
+      SENSITIVE: {
+        windowMs: 5 * 60 * 1000,
+        maxRequests: 10,
+        strategy: 'sliding-window'
+      }
+    })
   }).default({}),
 
   // Request validation configuration
@@ -93,7 +120,7 @@ export const SecurityConfigSchema = z.object({
     alertWebhooks: z.array(z.string()).default([]),
     alertThresholds: z.record(z.number()).default({
       login_failure: 5,
-      unauthorized_access: 10,
+      [SecurityEventType.UNAUTHORIZED_ACCESS]: 10,
       csrf_violation: 3,
       rate_limit_exceeded: 50,
       injection_attempt: 1
@@ -190,7 +217,7 @@ export const DEFAULT_SECURITY_CONFIG: SecurityConfig = {
     alertWebhooks: [],
     alertThresholds: {
       login_failure: 5,
-      unauthorized_access: 10,
+      [SecurityEventType.UNAUTHORIZED_ACCESS]: 10,
       csrf_violation: 3,
       rate_limit_exceeded: 50,
       injection_attempt: 1
@@ -312,7 +339,7 @@ export class SecurityConfigManager {
         alertWebhooks: (process.env.SECURITY_LOGGING_WEBHOOKS || '').split(',').filter(Boolean),
         alertThresholds: {
           login_failure: parseInt(process.env.SECURITY_LOGGING_THRESHOLD_LOGIN_FAILURE || '5'),
-          unauthorized_access: parseInt(process.env.SECURITY_LOGGING_THRESHOLD_UNAUTHORIZED || '10'),
+          [SecurityEventType.UNAUTHORIZED_ACCESS]: parseInt(process.env.SECURITY_LOGGING_THRESHOLD_UNAUTHORIZED || '10'),
           csrf_violation: parseInt(process.env.SECURITY_LOGGING_THRESHOLD_CSRF || '3'),
           rate_limit_exceeded: parseInt(process.env.SECURITY_LOGGING_THRESHOLD_RATE_LIMIT || '50'),
           injection_attempt: parseInt(process.env.SECURITY_LOGGING_THRESHOLD_INJECTION || '1')
@@ -442,7 +469,7 @@ export function withSecurity(config?: Partial<SecurityConfig>) {
       })(request);
 
       if (ipControlResponse) {
-        securityLogger.log('unauthorized_access', 'high', 'IP access control violation', request);
+        securityLogger.log(SecurityEventType.UNAUTHORIZED_ACCESS, SecurityEventSeverity.HIGH, 'IP access control violation', request);
         return ipControlResponse;
       }
     }
@@ -467,7 +494,7 @@ export function withSecurity(config?: Partial<SecurityConfig>) {
     if (currentConfig.validation.enabled) {
       // Basic request size validation
       if (!SecurityValidation.validateRequestSize(request, currentConfig.validation.maxRequestSize)) {
-        securityLogger.log('validation_error', 'medium', 'Request size exceeded', request, {
+        securityLogger.log(SecurityEventType.VALIDATION_ERROR, SecurityEventSeverity.MEDIUM, 'Request size exceeded', request, {
           maxSize: currentConfig.validation.maxRequestSize
         });
         return NextResponse.json(
@@ -478,7 +505,7 @@ export function withSecurity(config?: Partial<SecurityConfig>) {
 
       // Content type validation
       if (!SecurityValidation.validateContentType(request, currentConfig.validation.allowedContentTypes)) {
-        securityLogger.log('validation_error', 'medium', 'Invalid content type', request);
+        securityLogger.log(SecurityEventType.VALIDATION_ERROR, SecurityEventSeverity.MEDIUM, 'Invalid content type', request);
         return NextResponse.json(
           { error: 'Invalid content type', code: 'INVALID_CONTENT_TYPE' },
           { status: 415 }

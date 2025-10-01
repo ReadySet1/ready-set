@@ -78,7 +78,7 @@ export class SecureAPIRoute {
   /**
    * Create a secure authentication route
    */
-  static auth<T extends any[], R>(
+  static async auth<T extends any[], R>(
     handler: (request: NextRequest & { validatedData?: any }, ...args: T) => Promise<NextResponse>,
     options: {
       validation?: Parameters<typeof import('./validation').withValidation>[0];
@@ -90,7 +90,7 @@ export class SecureAPIRoute {
     return this.create(handler, {
       rateLimit,
       validation: validation || {
-        body: await import('./validation').then(m => m.ApiSchemas.userLogin)
+        body: (await import('./validation')).ApiSchemas.userLogin
       },
       csrf: { exemptPaths: ['/api/auth'] }, // CSRF exempt for auth endpoints
       requireAuth: false // Auth endpoints don't require auth
@@ -122,7 +122,7 @@ export class SecureAPIRoute {
   /**
    * Create a secure file upload route
    */
-  static upload<T extends any[], R>(
+  static async upload<T extends any[], R>(
     handler: (request: NextRequest & { validatedData?: any; sanitizedData?: any }, ...args: T) => Promise<NextResponse>,
     options: {
       validation?: Parameters<typeof import('./validation').withValidation>[0];
@@ -135,7 +135,7 @@ export class SecureAPIRoute {
     return this.create(handler, {
       rateLimit,
       validation: validation || {
-        body: await import('./validation').then(m => m.ApiSchemas.fileUpload),
+        body: (await import('./validation')).ApiSchemas.fileUpload,
         sanitizeBody: true
       },
       csrf: { allowApiKey: true } // Allow API key bypass for uploads
@@ -238,7 +238,7 @@ export const SecurityUtils = {
 };
 
 // Environment-specific security configurations
-export const SecurityPresets = {
+export const SecurityPresets: Record<string, Partial<import('./security-config').SecurityConfig>> = {
   /**
    * Development environment - relaxed security for easier development
    */
@@ -271,24 +271,35 @@ export const SecurityPresets = {
       cookieSameSite: 'lax'
     },
     ipAccessControl: {
-      enabled: false // Disabled in development
+      enabled: false, // Disabled in development
+      allowlist: [],
+      blocklist: [],
+      allowPrivateIPs: true,
+      allowTrustedProxies: true,
+      enableThreatIntelligence: false,
+      geolocationRules: []
     },
     securityHeaders: {
       enabled: true,
       includeAll: true,
+      customHeaders: {},
+      excludeHeaders: [],
       environmentOverrides: {
         development: {
           'Content-Security-Policy': "default-src 'self' http://localhost:* ws://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' http://localhost:* https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com http://localhost:*; img-src 'self' data: https: http://localhost:*; connect-src 'self' https://*.supabase.co wss://*.supabase.co http://localhost:* ws://localhost:*;"
         }
-      }
+      },
+      pathOverrides: {}
     },
     securityLogging: {
       enabled: true,
       logLevel: 'debug',
       storeEvents: true,
       maxEventAge: 7, // 7 days in development
+      alertThresholds: {},
       retentionDays: 7,
-      enableRealTimeAlerts: false
+      enableRealTimeAlerts: false,
+      alertWebhooks: []
     }
   },
 
@@ -325,6 +336,8 @@ export const SecurityPresets = {
     },
     ipAccessControl: {
       enabled: true,
+      allowlist: [],
+      blocklist: [],
       allowPrivateIPs: false, // Block private IPs in production
       allowTrustedProxies: true,
       enableThreatIntelligence: true,
@@ -332,13 +345,18 @@ export const SecurityPresets = {
     },
     securityHeaders: {
       enabled: true,
-      includeAll: true
+      includeAll: true,
+      customHeaders: {},
+      excludeHeaders: [],
+      environmentOverrides: {},
+      pathOverrides: {}
     },
     securityLogging: {
       enabled: true,
       logLevel: 'info',
       storeEvents: true,
       maxEventAge: 90,
+      alertThresholds: {},
       retentionDays: 90,
       enableRealTimeAlerts: true,
       alertWebhooks: [] // Configure with actual webhook URLs
@@ -378,6 +396,8 @@ export const SecurityPresets = {
     },
     ipAccessControl: {
       enabled: true,
+      allowlist: [],
+      blocklist: [],
       allowPrivateIPs: false,
       allowTrustedProxies: true,
       enableThreatIntelligence: false, // Disable in staging to avoid false positives
@@ -385,15 +405,21 @@ export const SecurityPresets = {
     },
     securityHeaders: {
       enabled: true,
-      includeAll: true
+      includeAll: true,
+      customHeaders: {},
+      excludeHeaders: [],
+      environmentOverrides: {},
+      pathOverrides: {}
     },
     securityLogging: {
       enabled: true,
       logLevel: 'info',
       storeEvents: true,
       maxEventAge: 30,
+      alertThresholds: {},
       retentionDays: 30,
-      enableRealTimeAlerts: false
+      enableRealTimeAlerts: false,
+      alertWebhooks: []
     }
   }
 };
@@ -444,36 +470,35 @@ export type {
   SecurityMonitoringConfig
 } from './security-config';
 
-export {
+export type {
   SecurityEventType,
   SecurityEventSeverity,
   SecurityEvent
 } from './security-logging';
 
-export {
-  RateLimitTier,
+export type {
   RateLimitConfig,
   RateLimitConfigs
 } from './rate-limiting';
 
-export {
+export type {
   ValidationConfig,
   ValidationPatterns,
   CommonSchemas,
   ApiSchemas
 } from './validation';
 
-export {
+export type {
   CSRFConfig,
   CSRFConfigs
 } from './csrf-protection';
 
-export {
+export type {
   SecurityHeadersConfig,
   SecurityHeaderConfigs
 } from './security-headers';
 
-export {
+export type {
   IPAccessControlConfig,
   GeolocationRule
 } from './ip-management';
