@@ -234,6 +234,24 @@ model FileUpload {
   @@map("file_uploads")
 }
 
+model UploadError {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  correlationId String  @unique
+  errorType    String
+  message      String
+  userMessage  String
+  details      String?
+  userId       String?  @db.Uuid
+  timestamp    DateTime @default(now()) @db.Timestamptz(6)
+  retryable    Boolean  @default(false)
+  resolved     Boolean  @default(false)
+
+  @@index([userId])
+  @@index([errorType])
+  @@index([timestamp])
+  @@map("upload_errors")
+}
+
 model OnDemand {
   id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   guid              String?

@@ -4,6 +4,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { STORAGE_BUCKETS } from "@/utils/file-service";
 import { prisma } from "@/utils/prismaDB";
+import {
+  UploadErrorHandler,
+  RetryHandler,
+  FileValidator,
+  DEFAULT_RETRY_CONFIG,
+  DEFAULT_VALIDATION_CONFIG
+} from "@/lib/upload-error-handler";
+import { UploadSecurityManager } from "@/lib/upload-security";
+import { UploadErrorType } from "@/types/upload";
 
 // Add a new route to get a signed URL for a file
 export async function GET(request: NextRequest) {
@@ -74,7 +83,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("File upload API endpoint called");
+  console.log("Enhanced file upload API endpoint called");
 
   try {
     // Parse form data first to avoid issues with error handling
@@ -87,6 +96,73 @@ export async function POST(request: NextRequest) {
     let entityType = (formData.get("entityType") as string) || "job_application"; // Default value
     const category = (formData.get("category") as string) || "";
     console.log("File upload request received with category:", category);
+
+    // Check rate limit for uploads
+    const userId = request.headers.get('x-user-id') || 'anonymous';
+    const rateLimitPassed = await UploadSecurityManager.checkRateLimit(userId, 'UPLOAD');
+    if (!rateLimitPassed) {
+      const rateLimitError = UploadErrorHandler.createValidationError(
+        'content',
+        'Rate limit exceeded for file uploads',
+        'Too many upload attempts. Please wait a moment and try again.',
+        { userId, action: 'UPLOAD' }
+      );
+
+      UploadErrorHandler.logError(rateLimitError, { fileName: file.name, entityId, entityType });
+      await UploadErrorHandler.reportError(rateLimitError);
+
+      return NextResponse.json(
+        {
+          error: rateLimitError.userMessage,
+          errorType: rateLimitError.type,
+          correlationId: rateLimitError.correlationId,
+          retryable: rateLimitError.retryable,
+          retryAfter: 60000
+        },
+        { status: 429 }
+      );
+    }
+
+    // Enhanced validation with new error handling system
+    const validationError = FileValidator.validateFile(file, DEFAULT_VALIDATION_CONFIG);
+    if (validationError) {
+      UploadErrorHandler.logError(validationError, { fileName: file.name, entityId, entityType });
+      await UploadErrorHandler.reportError(validationError);
+
+      return NextResponse.json(
+        {
+          error: validationError.userMessage,
+          errorType: validationError.type,
+          correlationId: validationError.correlationId,
+          retryable: validationError.retryable
+        },
+        { status: 400 }
+      );
+    }
+
+    // Security validation
+    const securityCheck = await UploadSecurityManager.validateFileSecurity(file, userId);
+    if (!securityCheck.isSecure) {
+      UploadErrorHandler.logError(securityCheck.error!, {
+        fileName: file.name,
+        entityId,
+        entityType,
+        scanResults: securityCheck.scanResults
+      });
+      await UploadErrorHandler.reportError(securityCheck.error!);
+
+      return NextResponse.json(
+        {
+          error: securityCheck.error!.userMessage,
+          errorType: securityCheck.error!.type,
+          correlationId: securityCheck.error!.correlationId,
+          retryable: securityCheck.error!.retryable,
+          retryAfter: securityCheck.error!.retryAfter,
+          quarantined: securityCheck.quarantineRequired
+        },
+        { status: 403 }
+      );
+    }
 
     // Ensure job-applications/temp paths are properly handled
     let uploadPath = "temp";
@@ -243,10 +319,10 @@ export async function POST(request: NextRequest) {
       const { data, error: listError } = await supabase.storage
         .from(storageBucket)
         .list();
-      
+
       if (listError) {
         console.error(`Error accessing bucket '${storageBucket}':`, listError);
-        
+
         if (listError.message.includes("not found")) {
           // Try fallback to default bucket if the requested bucket is not found
           console.log(`Bucket '${storageBucket}' not found, falling back to '${STORAGE_BUCKETS.DEFAULT}'`);
@@ -261,33 +337,69 @@ export async function POST(request: NextRequest) {
       storageBucket = STORAGE_BUCKETS.DEFAULT;
     }
 
-    // Upload the file
-    const { data: storageData, error: storageError } = await supabase.storage
-      .from(storageBucket)
-      .upload(filePath, file, {
-        upsert: true,
-        contentType: file.type,
-      });
+    // Upload the file with retry logic and enhanced error handling
+    let storageData, storageError;
+
+    try {
+      const uploadOperation = async () => {
+        const result = await supabase.storage
+          .from(storageBucket)
+          .upload(filePath, file, {
+            upsert: true,
+            contentType: file.type,
+          });
+
+        if (result.error) {
+          throw result.error;
+        }
+
+        return result;
+      };
+
+      const result = await RetryHandler.withRetry(
+        uploadOperation,
+        {
+          ...DEFAULT_RETRY_CONFIG,
+          // Custom retry logic for storage operations
+          maxAttempts: 2, // Fewer retries for storage operations
+          baseDelay: 2000
+        },
+        (error, attempt) => {
+          console.log(`Storage upload retry attempt ${attempt} for file ${file.name}:`, error.message);
+        }
+      );
+
+      storageData = result.data;
+      storageError = result.error;
+    } catch (error) {
+      storageError = error;
+    }
 
     if (storageError) {
-      console.error("Storage upload error:", storageError);
-      
-      // Provide more specific error message based on error type
-      let errorMessage = `Error uploading ${file.name}: ${storageError.message}`;
-      let statusCode = 500;
-      
-      if (storageError.message.includes("Bucket not found")) {
-        errorMessage = `Storage bucket '${storageBucket}' not found. Please contact support.`;
-        console.error(`Bucket '${storageBucket}' does not exist or is not accessible.`);
-        statusCode = 404;
-      } else if (storageError.message.includes("permission")) {
-        errorMessage = `Permission denied to upload to '${storageBucket}'. Please contact support.`;
-        statusCode = 403;
-      }
-      
+      console.error("Storage upload error after retries:", storageError);
+
+      // Use enhanced error categorization
+      const uploadError = UploadErrorHandler.categorizeError(storageError, file);
+
+      // Log and report the error
+      UploadErrorHandler.logError(uploadError, {
+        fileName: file.name,
+        filePath,
+        bucket: storageBucket,
+        entityId,
+        entityType
+      });
+      await UploadErrorHandler.reportError(uploadError);
+
       return NextResponse.json(
-        { error: errorMessage },
-        { status: statusCode },
+        {
+          error: uploadError.userMessage,
+          errorType: uploadError.type,
+          correlationId: uploadError.correlationId,
+          retryable: uploadError.retryable,
+          retryAfter: uploadError.retryAfter
+        },
+        { status: uploadError.type === UploadErrorType.PERMISSION_ERROR ? 403 : 500 },
       );
     }
 
@@ -456,11 +568,55 @@ export async function POST(request: NextRequest) {
       dbData.userId = null;
     }
 
-    // Create the database record
+    // Create the database record with retry logic
     console.log("Creating database record with data:", dbData);
-    const fileUpload = await prisma.fileUpload.create({
-      data: dbData,
-    });
+
+    let fileUpload;
+    try {
+      const dbOperation = async () => {
+        return await prisma.fileUpload.create({
+          data: dbData,
+        });
+      };
+
+      fileUpload = await RetryHandler.withRetry(
+        dbOperation,
+        {
+          ...DEFAULT_RETRY_CONFIG,
+          maxAttempts: 2, // Fewer retries for DB operations
+          baseDelay: 1000
+        },
+        (error, attempt) => {
+          console.log(`Database record creation retry attempt ${attempt}:`, error.message);
+        }
+      );
+    } catch (error) {
+      console.error("Database record creation failed after retries:", error);
+
+      // Use enhanced error categorization for database errors
+      const dbError = UploadErrorHandler.categorizeError(error, file);
+
+      // Log and report the error
+      UploadErrorHandler.logError(dbError, {
+        fileName: file.name,
+        filePath,
+        entityId,
+        entityType,
+        dbData
+      });
+      await UploadErrorHandler.reportError(dbError);
+
+      return NextResponse.json(
+        {
+          error: dbError.userMessage,
+          errorType: dbError.type,
+          correlationId: dbError.correlationId,
+          retryable: dbError.retryable,
+          retryAfter: dbError.retryAfter
+        },
+        { status: 500 }
+      );
+    }
 
     console.log("Database record created successfully:", fileUpload.id);
 
@@ -482,10 +638,26 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("File upload error:", error);
+
+    // Use enhanced error categorization for general errors
+    const uploadError = UploadErrorHandler.categorizeError(error, file);
+
+    // Log and report the error
+    UploadErrorHandler.logError(uploadError, {
+      fileName: file?.name,
+      entityId,
+      entityType,
+      category
+    });
+    await UploadErrorHandler.reportError(uploadError);
+
     return NextResponse.json(
-      { 
-        error: "File upload failed", 
-        details: error.message || String(error)
+      {
+        error: uploadError.userMessage,
+        errorType: uploadError.type,
+        correlationId: uploadError.correlationId,
+        retryable: uploadError.retryable,
+        retryAfter: uploadError.retryAfter
       },
       { status: 500 }
     );

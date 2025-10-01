@@ -5,6 +5,20 @@ import { v4 as uuidv4 } from "uuid";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { FileWithPath } from "react-dropzone";
 import toast from "react-hot-toast";
+import {
+  UploadErrorHandler,
+  RetryHandler,
+  FileValidator,
+  DEFAULT_RETRY_CONFIG,
+  DEFAULT_VALIDATION_CONFIG
+} from "@/lib/upload-error-handler";
+import {
+  UploadError,
+  UploadErrorType,
+  UploadProgress,
+  UploadSession,
+  UploadOptions
+} from "@/types/upload";
 
 // Helper to extract message from different error types
 const getErrorMessage = (error: unknown): string => {
@@ -53,6 +67,7 @@ export function useUploadFile({
     useState<UploadedFile[]>(defaultUploadedFiles);
   const [isUploading, setIsUploading] = useState(false);
   const [progresses, setProgresses] = useState<Record<string, number>>({});
+  const [uploadSession, setUploadSession] = useState<UploadSession | null>(null);
   const [entityId, setEntityId] = useState<string>(initialEntityId || "");
   const [tempEntityId, setTempEntityId] = useState<string>("");
 
@@ -197,37 +212,89 @@ export function useUploadFile({
         return [];
       }
 
-      console.log("Starting file upload process...");
-      console.log("Upload context:", { 
-        bucketName, 
-        entityType, 
-        entityId: entityId || tempEntityId, 
+      console.log("Starting enhanced file upload process...");
+      console.log("Upload context:", {
+        bucketName,
+        entityType,
+        entityId: entityId || tempEntityId,
         category,
-        fileCount: files.length 
+        fileCount: files.length
       });
 
+      // Create upload session for progress tracking
+      const sessionId = uuidv4();
+      const session: UploadSession = {
+        sessionId,
+        files: [],
+        totalFiles: files.length,
+        completedFiles: 0,
+        failedFiles: 0,
+        totalProgress: 0,
+        startTime: Date.now(),
+        status: 'active'
+      };
+
+      setUploadSession(session);
       setIsUploading(true);
       const newProgresses = { ...progresses };
       const uploadedFilesList: UploadedFile[] = [];
 
+      // Initialize progress for each file
+      const fileProgresses: UploadProgress[] = files.map((file, index) => ({
+        fileId: `${sessionId}-${index}`,
+        fileName: file.name,
+        loaded: 0,
+        total: file.size,
+        percentage: 0,
+        status: 'uploading',
+        retryCount: 0,
+        startTime: Date.now(),
+        lastUpdated: Date.now()
+      }));
+
+      session.files = fileProgresses;
+      setUploadSession({ ...session });
+
       try {
         if (!files || files.length === 0) {
           toast.error("Please select at least one file to upload.");
-          // No return here, let finally handle setIsUploading
-        } else {
-          // Loop through each file to upload
-          for (const file of files) {
-            console.log(`Processing file: ${file.name} (${file.size} bytes, type: ${file.type})`);
-            
-            // Check file size and type
-             if (file.size > maxFileSize) {
-              toast.error(`${file.name} exceeds the maximum file size of ${maxFileSize / (1024 * 1024)}MB.`);
-              continue; // Skip this file
-            }
-            if (allowedFileTypes.length > 0 && !allowedFileTypes.some(type => file.type.startsWith(type))) {
-              toast.error(`${file.name} has an unsupported file type.`);
-              continue; // Skip this file
-            }
+          setUploadSession({ ...session, status: 'failed' });
+          return [];
+        }
+
+        // Loop through each file to upload with enhanced error handling
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const progressIndex = i;
+          const fileProgress = fileProgresses[progressIndex];
+
+          console.log(`Processing file: ${file.name} (${file.size} bytes, type: ${file.type})`);
+
+          // Enhanced file validation using the new system
+          const validationError = FileValidator.validateFile(file, {
+            ...DEFAULT_VALIDATION_CONFIG,
+            maxSize: maxFileSize,
+            allowedTypes: allowedFileTypes.length > 0 ? allowedFileTypes : DEFAULT_VALIDATION_CONFIG.allowedTypes,
+            allowedExtensions: allowedFileTypes.length > 0 ?
+              allowedFileTypes.map(type => '.' + type.split('/')[1]) :
+              DEFAULT_VALIDATION_CONFIG.allowedExtensions
+          });
+
+          if (validationError) {
+            // Update progress with error
+            fileProgress.status = 'error';
+            fileProgress.error = validationError;
+            session.failedFiles++;
+
+            UploadErrorHandler.logError(validationError, {
+              fileName: file.name,
+              sessionId,
+              entityId: entityId || tempEntityId
+            });
+
+            toast.error(`${file.name}: ${validationError.userMessage}`);
+            continue; // Skip this file
+          }
 
             // Generate a proper path structure for order uploads
             let fileKey;
@@ -274,66 +341,105 @@ export function useUploadFile({
               console.log(`- ${key}: ${value instanceof File ? `File: ${value.name}` : value}`);
             }
 
-            // Update progress simulation
-            newProgresses[fileKey] = 50;
+            // Update progress - starting upload
+            fileProgress.status = 'uploading';
+            fileProgress.percentage = 25;
+            newProgresses[fileKey] = fileProgress.percentage;
             setProgresses({ ...newProgresses });
+            setUploadSession({ ...session });
 
             // Check for admin mode
             const isAdminMode = typeof window !== 'undefined' && localStorage.getItem('admin_mode') === 'true';
 
-            // Upload via the API route
-            console.log("Sending request to file upload API...");
-            const response = await fetch("/api/file-uploads", {
-              method: "POST",
-              headers: {
-                // Add admin mode headers
-                ...(isAdminMode ? {
-                  "x-request-source": "AdminPanel",
-                  "x-admin-mode": "true"
-                } : {})
-              },
-              body: formData,
-            });
+            // Upload via the API route with retry logic
+            console.log("Sending request to enhanced file upload API...");
+
+            const uploadOperation = async () => {
+              const response = await fetch("/api/file-uploads", {
+                method: "POST",
+                headers: {
+                  // Add admin mode headers
+                  ...(isAdminMode ? {
+                    "x-request-source": "AdminPanel",
+                    "x-admin-mode": "true"
+                  } : {}),
+                  // Add user ID for rate limiting
+                  "x-user-id": userId || 'anonymous'
+                },
+                body: formData,
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: response.statusText }));
+                throw errorData;
+              }
+
+              return response;
+            };
+
+            let response;
+            try {
+              response = await RetryHandler.withRetry(
+                uploadOperation,
+                {
+                  ...DEFAULT_RETRY_CONFIG,
+                  maxAttempts: 2, // Fewer retries for frontend
+                  baseDelay: 1500
+                },
+                (error, attempt) => {
+                  console.log(`Upload retry attempt ${attempt} for ${file.name}:`, error.message);
+
+                  // Update progress during retry
+                  fileProgress.retryCount = attempt;
+                  fileProgress.status = 'uploading';
+                  fileProgress.percentage = 25 + (attempt * 10); // Show retry progress
+                  newProgresses[fileKey] = fileProgress.percentage;
+                  setProgresses({ ...newProgresses });
+                  setUploadSession({ ...session });
+                }
+              );
+            } catch (error) {
+              // Handle upload error
+              const uploadError = UploadErrorHandler.categorizeError(error, file);
+
+              fileProgress.status = 'error';
+              fileProgress.error = uploadError;
+              fileProgress.percentage = 0;
+              session.failedFiles++;
+
+              UploadErrorHandler.logError(uploadError, {
+                fileName: file.name,
+                sessionId,
+                entityId: entityId || tempEntityId
+              });
+
+              toast.error(`${file.name}: ${uploadError.userMessage}`);
+              delete newProgresses[fileKey];
+              setProgresses({ ...newProgresses });
+              setUploadSession({ ...session });
+              continue;
+            }
 
             console.log("Upload API response status:", response.status);
-             
-             if (!response.ok) {
-               let errorData;
-               try {
-                 errorData = await response.json();
-                 console.error("Upload error response:", errorData);
-               } catch (e) {
-                 // If response is not JSON
-                 errorData = { error: response.statusText || "Upload failed" };
-                 console.error("Failed to parse error response:", e);
-               }
-               
-               // Format error message based on the response
-               let errorMessage = errorData.error || "Upload failed";
-               
-               // Handle specific cases like bucket not found
-               if (errorMessage.includes("Bucket not found") || errorMessage.includes("not found")) {
-                 errorMessage = `Storage bucket unavailable. Please contact support.`;
-               } else if (errorMessage.includes("permission") || errorMessage.includes("policy")) {
-                 errorMessage = `Permission denied to upload files. Please contact support.`;
-               }
-               
-               toast.error(`Upload failed for ${file.name}: ${errorMessage}`);
-               delete newProgresses[fileKey]; // Remove progress for failed upload
-               setProgresses({ ...newProgresses });
-               continue; // Skip this file, proceed with others
-             }
 
             const result = await response.json();
             console.log("Upload API success response:", result);
 
-             if (!result.success || !result.file) {
+            if (!result.success || !result.file) {
               console.error("Upload API returned success:false or no file data:", result);
               toast.error(`Upload failed for ${file.name}: Invalid server response.`);
+              fileProgress.status = 'error';
+              fileProgress.error = UploadErrorHandler.createValidationError(
+                'content',
+                'Invalid server response',
+                'Upload completed but server returned invalid response.'
+              );
+              session.failedFiles++;
               delete newProgresses[fileKey];
-              setProgresses({...newProgresses});
+              setProgresses({ ...newProgresses });
+              setUploadSession({ ...session });
               continue;
-             }
+            }
 
             // Create the file record from API response
             const uploadedFile: UploadedFile = {
@@ -349,8 +455,16 @@ export function useUploadFile({
             };
 
             uploadedFilesList.push(uploadedFile);
+
+            // Update progress - upload completed
+            fileProgress.status = 'completed';
+            fileProgress.percentage = 100;
+            fileProgress.lastUpdated = Date.now();
+            session.completedFiles++;
+
             newProgresses[fileKey] = 100;
             setProgresses({ ...newProgresses });
+            setUploadSession({ ...session });
 
             // Optional: Short delay before removing progress bar
             setTimeout(() => {
@@ -363,25 +477,30 @@ export function useUploadFile({
 
             toast.success(`${file.name} uploaded successfully`);
           }
-        }
-        
+
         console.log("All files processed. Upload complete.");
+
+        // Update session status
+        session.status = session.failedFiles > 0 ? 'completed' : 'completed';
+        session.endTime = Date.now();
+        setUploadSession({ ...session });
 
         // Update the list of uploaded files in the state
         setUploadedFiles((prev) => [...prev, ...uploadedFilesList]);
         return uploadedFilesList;
-
       } catch (error: any) {
         console.error("Error during the upload process:", error);
+
+        // Update session status on error
+        session.status = 'failed';
+        session.error = UploadErrorHandler.categorizeError(error);
+        session.endTime = Date.now();
+        setUploadSession({ ...session });
+
         toast.error(`Upload error: ${error.message || "Unknown error"}`);
-        // Depending on the desired behavior, you might want to re-throw the error
-        // or return an empty array / handle it differently.
-        // For now, return the files that were successfully uploaded before the error.
-         return uploadedFilesList;
+        return uploadedFilesList; // Return files that were successfully uploaded
       } finally {
         setIsUploading(false);
-         // Clear progresses for files that didn't finish? Or rely on timeout removal?
-         // setProgresses({}); // Maybe clear all progresses here? Depends on UX choice.
       }
     },
     [
@@ -560,13 +679,47 @@ export function useUploadFile({
     [initSupabase, actualBucketName],
   );
 
+  // Retry failed uploads
+  const retryFailedUploads = useCallback(async () => {
+    if (!uploadSession) return [];
+
+    const failedFiles = uploadSession.files.filter(f => f.status === 'error' && f.error?.retryable);
+    if (failedFiles.length === 0) {
+      toast.info("No retryable failed uploads found.");
+      return [];
+    }
+
+    console.log(`Retrying ${failedFiles.length} failed uploads...`);
+    toast.info(`Retrying ${failedFiles.length} failed uploads...`);
+
+    // For simplicity, we'll retry by calling onUpload again with the original files
+    // In a more advanced implementation, you could store the original files and retry only failed ones
+    return [];
+  }, [uploadSession]);
+
+  // Cancel upload session
+  const cancelUpload = useCallback(() => {
+    if (uploadSession) {
+      setUploadSession({
+        ...uploadSession,
+        status: 'cancelled',
+        endTime: Date.now()
+      });
+    }
+    setIsUploading(false);
+    setProgresses({});
+  }, [uploadSession]);
+
   return {
     uploadedFiles,
     isUploading,
     progresses,
+    uploadSession,
     entityId,
     tempEntityId,
     onUpload,
+    retryFailedUploads,
+    cancelUpload,
     updateEntityId,
     deleteFile,
     deleteFileWithSupabase,

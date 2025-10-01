@@ -2,6 +2,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
 import { cookies } from 'next/headers';
+import { UploadSecurityManager } from '@/lib/upload-security';
 
 // File metadata type
 export interface FileMetadata {
@@ -37,7 +38,7 @@ export async function initializeStorageBuckets() {
     // Create all the necessary buckets
     for (const bucketName of Object.values(STORAGE_BUCKETS)) {
       const { data, error } = await supabase.storage.getBucket(bucketName);
-      
+
       if (error && error.message.includes('does not exist')) {
         // Create the bucket if it doesn't exist
         await supabase.storage.createBucket(bucketName, {
@@ -49,6 +50,26 @@ export async function initializeStorageBuckets() {
         console.error(`Error checking bucket ${bucketName}:`, error);
       }
     }
+
+    // Create quarantine bucket if it doesn't exist
+    try {
+      const { data: quarantineData, error: quarantineError } = await supabase.storage.getBucket('quarantined-files');
+      if (quarantineError && quarantineError.message.includes('does not exist')) {
+        await supabase.storage.createBucket('quarantined-files', {
+          public: false,
+          fileSizeLimit: 50 * 1024 * 1024, // 50MB for quarantined files
+        });
+        console.log('Created quarantine bucket');
+      }
+    } catch (quarantineError) {
+      console.error('Error with quarantine bucket:', quarantineError);
+    }
+
+    // Initialize security cleanup scheduler
+    if (typeof window === 'undefined') { // Only run on server side
+      UploadSecurityManager.startCleanupScheduler();
+    }
+
     return { success: true };
   } catch (error) {
     console.error('Error initializing storage buckets:', error);
