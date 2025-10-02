@@ -548,8 +548,13 @@ const ClientPage = async () => {
   }
 
   // Server-side session validation: Ensure user has proper role before rendering
-  const { getUserRole } = await import("@/lib/auth");
-  const userRole = await getUserRole(user.id);
+  const userRole = user.role;
+
+  // Add role detection logic for dynamic dashboard title
+  const dashboardTitle =
+    userRole?.toUpperCase() === "VENDOR"
+      ? "Vendor Dashboard"
+      : "Client Dashboard";
 
   if (!userRole) {
     console.error("No user role found for authenticated user:", user.id);
@@ -580,7 +585,7 @@ const ClientPage = async () => {
   return (
     <>
       <Breadcrumb
-        pageName="Client Dashboard"
+        pageName={dashboardTitle}
         pageDescription="Manage your account"
       />
       <div className="shadow-default dark:border-strokedark dark:bg-boxdark sm:p-7.5 rounded-sm border border-stroke bg-white p-5">
