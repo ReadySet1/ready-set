@@ -73,13 +73,22 @@ const Signin = ({
       setShowSuccessMessage(false);
     }
 
-    // If redirectTo is set in the state, we're being redirected by the server
-    if (formState?.redirectTo) {
+    // If redirectTo is set in the state, handle client-side redirect
+    if (formState?.success && formState?.redirectTo) {
       console.log(
-        "Login action is handling redirect to:",
+        "Login successful! Client-side redirecting to:",
         formState.redirectTo,
       );
-      // Let the server handle the redirect
+
+      setShowSuccessMessage(true);
+      setIsRedirecting(true);
+      setLoading(false);
+
+      // Use window.location.href instead of router.push() to ensure cookies are processed
+      // This forces a full page load, which guarantees the Set-Cookie headers are applied
+      setTimeout(() => {
+        window.location.href = formState.redirectTo || "/";
+      }, 500); // Small delay to show success message
     }
 
     // Reset states when form data changes (user starts typing again)
@@ -306,6 +315,20 @@ const Signin = ({
     }
   };
 
+  // Add timeout to prevent infinite loading in SignIn component
+  useEffect(() => {
+    if (isUserLoading) {
+      const loadingTimeout = setTimeout(() => {
+        console.log("🔥 SignIn: Loading timeout - forcing completion");
+        // Force completion by clearing the loading state
+        // This is a last resort to prevent infinite loading
+        window.location.reload();
+      }, 8000); // 8 second timeout (reduced since auth should be faster now)
+
+      return () => clearTimeout(loadingTimeout);
+    }
+  }, [isUserLoading]);
+
   if (isUserLoading) {
     return (
       <section className="bg-[#F4F7FF] py-14 dark:bg-dark lg:py-20">
@@ -315,6 +338,9 @@ const Signin = ({
               <Loader />
               <p className="mt-4 text-gray-600 dark:text-gray-400">
                 {authProgress?.message || "Loading..."}
+              </p>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">
+                If this takes too long, the page will refresh automatically.
               </p>
             </div>
           </div>

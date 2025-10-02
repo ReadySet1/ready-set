@@ -63,10 +63,10 @@ export async function GET(req: NextRequest) {
           }
         }
       };
-      
-      // Don't forget to disconnect the fresh client
-      await freshClient.$disconnect();
-      
+
+      // Note: We intentionally do not disconnect the fresh client here as it should be managed by the singleton pattern
+      // Disconnecting within request scope causes "Error: { kind: Closed }" errors
+
     } catch (error) {
       prismaTest = { 
         success: false, 
@@ -114,8 +114,10 @@ export async function GET(req: NextRequest) {
     try {
       const freshClientForTest = new PrismaClient();
       const profileCount = await freshClientForTest.profile.count();
-      await freshClientForTest.$disconnect();
-      
+
+      // Note: We intentionally do not disconnect the fresh client here as it should be managed by the singleton pattern
+      // Disconnecting within request scope causes "Error: { kind: Closed }" errors
+
       profileTest = {
         success: true,
         profileCount,

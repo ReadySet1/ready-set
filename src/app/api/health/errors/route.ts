@@ -202,9 +202,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       severity: error.severity,
       category: error.category,
       message: error.message,
-      endpoint: error.context.endpoint,
-      method: error.context.method,
-      statusCode: error.context.statusCode,
+      endpoint: error.context.request?.endpoint,
+      method: error.context.request?.method,
+      statusCode: error.context.request?.statusCode,
       fingerprint: error.fingerprint
     }));
     
@@ -334,10 +334,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         message: error.message,
         fingerprint: error.fingerprint,
         context: {
-          endpoint: error.context.endpoint,
-          method: error.context.method,
-          statusCode: error.context.statusCode,
-          userId: error.context.userId
+          endpoint: error.context.request?.endpoint,
+          method: error.context.request?.method,
+          statusCode: error.context.request?.statusCode,
+          userId: error.context.user?.id
         }
       }))
     });

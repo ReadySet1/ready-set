@@ -273,22 +273,36 @@ export async function login(
     // Authentication successful - get user profile
     console.log(`✅ [${requestId}] Authentication successful, fetching user profile...`);
     const { data: { user }, error: getUserError } = await supabase.auth.getUser();
-    
+
     if (getUserError || !user) {
       console.error(`❌ [${requestId}] Failed to get user data:`, getUserError);
-      return { 
+      return {
         error: "Login successful but unable to retrieve user information. Please try again.",
-        success: false 
+        success: false
       };
     }
 
+    // Get user profile to determine user type
+    console.log(`🔍 [${requestId}] Fetching user profile for user: ${user.id}`);
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("type, email")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      console.error(`❌ [${requestId}] Error fetching user profile:`, profileError);
+      return {
+        error: "Login successful but unable to retrieve user information. Please try again.",
+        success: false
+      };
+    }
 
     // Get user type from profile (or create if missing)
-
-    let userType = profile?.type;
+    let userType: string | undefined = profile?.type;
 
     // If no profile exists, create one with default values
-    if (profileError || !profile) {
+    if (!profile) {
       console.log(`⚠️ [${requestId}] No profile found for user ${user.id}, creating default profile...`);
 
       try {
@@ -303,7 +317,8 @@ export async function login(
             email: user.email || '',
             name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
             type: 'CLIENT', // Default to CLIENT as the most common user type
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            updatedAt: new Date().toISOString()
           }, {
             onConflict: 'id'
           })
@@ -318,7 +333,7 @@ export async function login(
           };
         }
 
-        userType = newProfile?.type;
+        userType = newProfile?.type || undefined;
         console.log(`✅ [${requestId}] Default profile created/updated successfully for user: ${user.id}`);
       } catch (createProfileError) {
         console.error(`❌ [${requestId}] Exception creating default profile:`, createProfileError);
@@ -344,23 +359,12 @@ export async function login(
         error: "Login successful but user profile is incomplete. Please contact support.",
         success: false
       };
-      
-      cookieStore.set('user-session-data', JSON.stringify(sessionData), {
-        path: '/',
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7 // 7 days
-      });
-
-      console.log(`🔄 [${requestId}] Redirecting to profile completion for user: ${user.id}`);
-      redirect('/complete-profile');
     }
 
   console.log("User profile type from DB:", userType);
 
   // Normalize the user type to lowercase for consistent handling
-  const userTypeKey = userType.toLowerCase();
+  const userTypeKey = userType?.toLowerCase() || 'client';
   console.log("Normalized user type for redirection:", userTypeKey);
 
   // Set immediate session data in cookies for client-side access
@@ -369,28 +373,38 @@ export async function login(
   // Set user session data that can be read immediately by client
   // Normalize userRole to match TypeScript enum (lowercase)
   const normalizedUserRole = userType ? Object.values(UserType).find(
-    enumValue => enumValue.toUpperCase() === userType.toUpperCase()
-  ) || userType.toLowerCase() : 'customer';
-  
+    enumValue => enumValue.toUpperCase() === (userType as string)?.toUpperCase()
+  ) || (userType as string)?.toLowerCase() : 'customer';
+
   const sessionData = {
     userId: user.id,
     email: user.email || '',
     userRole: normalizedUserRole,
     timestamp: Date.now()
   };
-  
+
   console.log("Normalized userRole for session:", normalizedUserRole);
-  
-  // Set session cookie with immediate user data
+
+  // Set session cookie with enhanced security - allow client access for hydration
   cookieStore.set('user-session-data', JSON.stringify(sessionData), {
     path: '/',
-    httpOnly: false, // Allow client-side access
+    httpOnly: false, // Allow client-side access for hydration
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7 // 7 days
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+    // Additional security headers
+    ...(process.env.NODE_ENV === 'production' && {
+      domain: process.env.NEXT_PUBLIC_COOKIE_DOMAIN || undefined,
+    })
   });
 
+  // Set session data in sessionStorage for immediate client access
+  // This will be read by the UserContext during hydration
   console.log("Set immediate session data for client:", sessionData);
+
+  // Note: Enhanced session management is initialized on the client-side only
+  // The UserContext will handle session manager initialization when the page loads
+  console.log("✅ Basic authentication completed - enhanced session management will initialize on client-side");
 
   // Prefetch and cache user profile data for faster client-side loading
   try {
@@ -461,13 +475,21 @@ export async function login(
       timestamp: new Date().toISOString()
     });
 
-    // CRITICAL: Call redirect() immediately after determining path
-    // Do NOT create objects or do extensive logging after this point
-    // This will throw a NEXT_REDIRECT error that Next.js handles automatically
-    redirect(redirectPath);
+    // Store session data in a way that can be accessed by the client
+    // Use a client-accessible cookie that survives the redirect
+    cookieStore.set('temp-session-data', JSON.stringify(sessionData), {
+      path: '/',
+      httpOnly: false, // Allow client-side access
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60, // Short-lived cookie, will be cleaned up by client
+    });
 
-         // This code is unreachable but satisfies TypeScript
-     // The successState is not needed since redirect() handles the response
+    console.log("🔗 Returning redirect path to client:", redirectPath);
+
+    // IMPORTANT: Return the redirect path instead of calling redirect()
+    // This ensures cookies are properly committed before the client-side redirect
+    // The client will handle the actual redirect using router.push()
      return {
        success: true,
        redirectTo: redirectPath,

@@ -56,6 +56,7 @@ model Profile {
   @@index([email])
   @@index([type])
   @@index([status])
+  @@index([type, deletedAt]) // Dashboard vendor counting optimization
   @@map("profiles")
 }
 
@@ -182,6 +183,8 @@ model CateringRequest {
   @@index([userId, status])
   @@index([deliveryAddressId, pickupDateTime])
   @@index([pricingTierId])
+  @@index([status, createdAt]) // Dashboard metrics optimization
+  @@index([status, createdAt, orderTotal]) // Dashboard revenue aggregation
   @@map("catering_requests")
 }
 
@@ -229,6 +232,24 @@ model FileUpload {
   @@index([jobApplicationId])
   @@index([fileType])
   @@map("file_uploads")
+}
+
+model UploadError {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  correlationId String  @unique
+  errorType    String
+  message      String
+  userMessage  String
+  details      String?
+  userId       String?  @db.Uuid
+  timestamp    DateTime @default(now()) @db.Timestamptz(6)
+  retryable    Boolean  @default(false)
+  resolved     Boolean  @default(false)
+
+  @@index([userId])
+  @@index([errorType])
+  @@index([timestamp])
+  @@map("upload_errors")
 }
 
 model OnDemand {

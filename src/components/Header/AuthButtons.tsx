@@ -8,6 +8,36 @@ import {
   AuthChangeEvent,
 } from "@supabase/supabase-js";
 import { clearAuthCookies } from "@/utils/auth/cookies";
+import { useUser } from "@/contexts/UserContext";
+import { UserType } from "@/types/user";
+
+// Map user roles to their display names and paths
+const ROLE_DISPLAY_INFO: Record<UserType, { title: string; path: string }> = {
+  [UserType.VENDOR]: {
+    title: "Vendor Dashboard",
+    path: "/vendor",
+  },
+  [UserType.CLIENT]: {
+    title: "Client Dashboard",
+    path: "/client",
+  },
+  [UserType.DRIVER]: {
+    title: "Driver Dashboard",
+    path: "/driver",
+  },
+  [UserType.ADMIN]: {
+    title: "Admin Dashboard",
+    path: "/admin",
+  },
+  [UserType.HELPDESK]: {
+    title: "Helpdesk Portal",
+    path: "/admin",
+  },
+  [UserType.SUPER_ADMIN]: {
+    title: "Super Admin",
+    path: "/admin",
+  },
+};
 
 interface AuthButtonsProps {
   sticky: boolean;
@@ -15,11 +45,10 @@ interface AuthButtonsProps {
 }
 
 const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, userRole, isLoading } = useUser();
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize Supabase client
+  // Initialize Supabase client for sign out functionality
   useEffect(() => {
     const initSupabase = async () => {
       try {
@@ -27,65 +56,45 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
         setSupabase(client);
       } catch (error) {
         console.error("Error initializing Supabase client:", error);
-        setIsLoading(false);
       }
     };
 
     initSupabase();
   }, []);
 
+  // Add debug logging to track state changes
   useEffect(() => {
-    if (!supabase) return;
+    console.log("🔍 AuthButtons state:", {
+      hasUser: !!user,
+      userRole,
+      isLoading,
+      userEmail: user?.email,
+    });
+  }, [user, userRole, isLoading]);
 
-    // Get the current user when component mounts
-    const getUser = async () => {
-      try {
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser();
-        if (error) throw error;
-        setUser(user);
-      } catch (error) {
-        console.error("Error fetching user:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    getUser();
-
-    // Set up auth state listener
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event: AuthChangeEvent, session: Session | null) => {
-        if (event === "SIGNED_IN" && session) {
-          setUser(session.user);
-        } else if (event === "SIGNED_OUT") {
-          setUser(null);
-        }
-      },
-    );
-
-    // Clean up subscription
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, [supabase]);
-
+  // Show minimal loading state - skeleton loader
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center gap-4">
+        <div className="h-10 w-32 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"></div>
+        <div className="h-10 w-24 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"></div>
+      </div>
+    );
   }
 
-  if (user) {
+  // If we have a user, we should have a role
+  // This defensive check ensures we don't show wrong buttons during state transitions
+  if (user && userRole) {
+    const roleInfo = ROLE_DISPLAY_INFO[userRole];
     return (
       <>
-        <Link href={`/user/${user.id}`}>
+        <Link href={roleInfo.path}>
           <p
             className={`loginBtn px-7 py-3 text-base font-medium ${
               !sticky && pathUrl === "/" ? "text-white" : "text-black"
             }`}
           >
-            {user.user_metadata?.name || user.email}
+            {roleInfo.title}
           </p>
         </Link>
         <SignOutButton sticky={sticky} pathUrl={pathUrl} />
@@ -93,12 +102,19 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
     );
   }
 
-  return (
-    <>
-      <SignInButton sticky={sticky} pathUrl={pathUrl} />
-      <SignUpButton sticky={sticky} pathUrl={pathUrl} />
-    </>
-  );
+  // Only show sign in/up buttons if we're definitely not authenticated
+  // and not in a loading state
+  if (!isLoading && !user) {
+    return (
+      <>
+        <SignInButton sticky={sticky} pathUrl={pathUrl} />
+        <SignUpButton sticky={sticky} pathUrl={pathUrl} />
+      </>
+    );
+  }
+
+  // Fallback - should rarely be reached
+  return null;
 };
 
 interface ButtonProps {
