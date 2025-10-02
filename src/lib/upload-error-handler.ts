@@ -347,8 +347,12 @@ export class UploadErrorHandler {
 
   static async reportError(error: UploadError, userId?: string): Promise<void> {
     try {
+      // Construct absolute URL for server-side fetch
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const apiUrl = `${baseUrl}/api/upload-errors`;
+
       // Report to error tracking service
-      await fetch('/api/upload-errors', {
+      await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

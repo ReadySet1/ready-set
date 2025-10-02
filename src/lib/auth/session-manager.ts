@@ -34,7 +34,20 @@ function generateTabId(): string {
 // Generate session fingerprint for integrity validation
 function generateFingerprint(): SessionFingerprint {
   if (typeof window === 'undefined') {
-    throw new Error('Session fingerprinting requires browser environment');
+    // Return a basic server-side fingerprint instead of throwing
+    return {
+      userAgent: 'server-side',
+      screenResolution: 'server-side',
+      timezone: 'server-side',
+      language: 'server-side',
+      platform: 'server-side',
+      canvasFingerprint: 'server-side',
+      webglFingerprint: 'server-side',
+      fonts: 'server-side',
+      plugins: 'server-side',
+      tabId: 'server-side',
+      sessionId: 'server-side'
+    };
   }
 
   const canvas = document.createElement('canvas');

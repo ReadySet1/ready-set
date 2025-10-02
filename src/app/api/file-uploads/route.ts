@@ -2,8 +2,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { STORAGE_BUCKETS } from "@/utils/file-service";
+import { STORAGE_BUCKETS, initializeStorageBuckets, diagnoseStorageIssues } from "@/utils/file-service";
 import { prisma } from "@/utils/prismaDB";
+import { v4 as uuidv4 } from 'uuid';
 import {
   UploadErrorHandler,
   RetryHandler,
@@ -85,9 +86,23 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   console.log("Enhanced file upload API endpoint called");
 
+  // Debug environment variables (without exposing sensitive data)
+  console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not set');
+  console.log("Supabase Anon Key:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Set' : 'Not set');
+  console.log("Supabase Service Key:", process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Not set');
+
   // Parse form data first to avoid issues with error handling
   const formData = await request.formData();
   console.log("Form data keys:", Array.from(formData.keys()));
+
+  // Initialize storage buckets to ensure they exist before upload
+  try {
+    await initializeStorageBuckets();
+    console.log("Storage buckets initialized successfully");
+  } catch (initError) {
+    console.error("Error initializing storage buckets:", initError);
+    // Continue anyway - bucket creation errors shouldn't prevent uploads if buckets already exist
+  }
 
   // Extract important data from the form
   const file = formData.get("file") as File;
@@ -315,34 +330,136 @@ export async function POST(request: NextRequest) {
 
     console.log(`Uploading file to storage path: ${filePath} in bucket: ${storageBucket}`);
 
-    // Instead of trying to create the bucket, we'll just check if it's accessible
+    // Robust bucket checking and creation
+    let bucketVerified = false;
+
+    // First, check if storage is available and working
+    let storageAvailable = false;
+    try {
+      const diagnostics = await diagnoseStorageIssues();
+      storageAvailable = diagnostics.success;
+
+      if (!storageAvailable) {
+        console.warn('⚠️ Storage is not available. File uploads will be disabled or use fallback methods.');
+      }
+    } catch (initError) {
+      console.error('Storage diagnostics failed:', initError);
+      storageAvailable = false;
+    }
+
+    // Try to verify the bucket exists and is accessible
     try {
       const { data, error: listError } = await supabase.storage
         .from(storageBucket)
         .list();
 
-      if (listError) {
-        console.error(`Error accessing bucket '${storageBucket}':`, listError);
-
-        if (listError.message.includes("not found")) {
-          // Try fallback to default bucket if the requested bucket is not found
-          console.log(`Bucket '${storageBucket}' not found, falling back to '${STORAGE_BUCKETS.DEFAULT}'`);
-          storageBucket = STORAGE_BUCKETS.DEFAULT;
-        }
+      if (!listError && data !== null) {
+        console.log(`Bucket '${storageBucket}' is accessible and verified`);
+        bucketVerified = true;
       } else {
-        console.log(`Bucket '${storageBucket}' is accessible`);
+        console.error(`Bucket '${storageBucket}' verification failed:`, listError);
+
+        // Try to create the bucket with admin privileges
+        try {
+          const adminClient = await import('@/utils/supabase/server').then(m => m.createAdminClient());
+          const { error: createError } = await adminClient.storage.createBucket(storageBucket, {
+            public: false,
+            fileSizeLimit: 10 * 1024 * 1024, // 10MB
+          });
+
+          if (!createError) {
+            console.log(`Successfully created bucket '${storageBucket}'`);
+            // Verify it was created successfully
+            const { error: verifyError } = await supabase.storage.from(storageBucket).list();
+            if (!verifyError) {
+              console.log(`Bucket '${storageBucket}' creation verified`);
+              bucketVerified = true;
+            } else {
+              console.error(`Bucket '${storageBucket}' creation verification failed:`, verifyError);
+            }
+          } else {
+            console.error(`Failed to create bucket '${storageBucket}':`, createError);
+          }
+        } catch (createError) {
+          console.error(`Exception creating bucket '${storageBucket}':`, createError);
+        }
+
+        // If bucket still not verified, try fallback
+        if (!bucketVerified) {
+          console.log(`Bucket '${storageBucket}' not working, trying fallback to '${STORAGE_BUCKETS.DEFAULT}'`);
+          storageBucket = STORAGE_BUCKETS.DEFAULT;
+
+          // Try to verify the default bucket
+          const { error: defaultError } = await supabase.storage.from(storageBucket).list();
+          if (!defaultError) {
+            console.log(`Default bucket '${storageBucket}' is accessible`);
+            bucketVerified = true;
+          }
+        }
       }
     } catch (bucketError) {
-      console.error("Exception checking bucket:", bucketError);
-      // Fall back to default bucket
+      console.error(`Exception during bucket verification for '${storageBucket}':`, bucketError);
+
+      // Last resort: try default bucket
       storageBucket = STORAGE_BUCKETS.DEFAULT;
+      try {
+        const { error: fallbackError } = await supabase.storage.from(storageBucket).list();
+        if (!fallbackError) {
+          console.log(`Fallback bucket '${storageBucket}' is accessible`);
+          bucketVerified = true;
+        }
+      } catch (fallbackError) {
+        console.error(`Even fallback bucket '${storageBucket}' failed:`, fallbackError);
+      }
+    }
+
+    // If no bucket works, we need to handle this gracefully
+    if (!bucketVerified) {
+      console.error(`CRITICAL: No storage buckets are accessible. This will cause upload failures.`);
+      console.error(`Attempted buckets: ${Object.values(STORAGE_BUCKETS).join(', ')}`);
+
+      // Check if storage is completely unavailable
+      if (!storageAvailable) {
+        console.error('STORAGE COMPLETELY UNAVAILABLE: Supabase storage is not configured or accessible');
+
+        // Return a clear error message to help with debugging
+        return NextResponse.json(
+          {
+            error: "File storage is currently unavailable. Please contact support if this issue persists.",
+            errorType: "STORAGE_CONFIGURATION_ERROR",
+            correlationId: uuidv4(),
+            retryable: false,
+            details: {
+              message: "Supabase storage is not properly configured or accessible.",
+              troubleshooting: [
+                "Ensure Storage is enabled in your Supabase project dashboard",
+                "Verify NEXT_PUBLIC_SUPABASE_URL points to the correct project",
+                "Check that SUPABASE_SERVICE_ROLE_KEY has storage permissions",
+                "Confirm your Supabase project has storage quotas available"
+              ],
+              environment: {
+                supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not set',
+                serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Not set',
+                anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Set' : 'Not set'
+              }
+            }
+          },
+          { status: 503 } // Service Unavailable
+        );
+      }
+
+      // For now, we'll still try the upload but it will likely fail
+      // In a production system, you might want to disable uploads or use alternative storage
     }
 
     // Upload the file with retry logic and enhanced error handling
     let storageData, storageError;
 
-    try {
-      const uploadOperation = async () => {
+    // Multiple upload strategies in case Supabase storage fails
+    const uploadStrategies = [
+      // Strategy 1: Try Supabase storage with current bucket
+      async () => {
+        console.log(`Attempting upload to bucket '${storageBucket}'`);
         const result = await supabase.storage
           .from(storageBucket)
           .upload(filePath, file, {
@@ -355,31 +472,114 @@ export async function POST(request: NextRequest) {
         }
 
         return result;
-      };
+      },
 
-      const result = await RetryHandler.withRetry(
-        uploadOperation,
-        {
-          ...DEFAULT_RETRY_CONFIG,
-          // Custom retry logic for storage operations
-          maxAttempts: 2, // Fewer retries for storage operations
-          baseDelay: 2000
-        },
-        (error, attempt) => {
-          console.log(`Storage upload retry attempt ${attempt} for file ${file.name}:`, error.message);
+      // Strategy 2: Try with default bucket if current bucket fails
+      async () => {
+        if (storageBucket !== STORAGE_BUCKETS.DEFAULT) {
+          console.log(`Retrying upload with default bucket '${STORAGE_BUCKETS.DEFAULT}'`);
+          const result = await supabase.storage
+            .from(STORAGE_BUCKETS.DEFAULT)
+            .upload(filePath, file, {
+              upsert: true,
+              contentType: file.type,
+            });
+
+          if (result.error) {
+            throw result.error;
+          }
+
+          return result;
         }
-      );
+        throw new Error('Default bucket already tried');
+      }
+    ];
 
-      storageData = result.data;
-      storageError = result.error;
-    } catch (error) {
-      storageError = error;
+    let lastError;
+
+    for (const strategy of uploadStrategies) {
+      try {
+        const result = await RetryHandler.withRetry(
+          strategy,
+          {
+            ...DEFAULT_RETRY_CONFIG,
+            maxAttempts: 2,
+            baseDelay: 1000
+          },
+          (error, attempt) => {
+            console.log(`Upload retry attempt ${attempt} for file ${file.name}:`, error.message);
+          }
+        );
+
+        storageData = result.data;
+        storageError = result.error;
+        break; // Success, exit the strategy loop
+
+      } catch (error) {
+        lastError = error;
+        console.error(`Upload strategy failed:`, error.message);
+
+        // If this is a bucket not found error, try the next strategy
+        if (error.message.includes('Bucket not found') && strategy !== uploadStrategies[uploadStrategies.length - 1]) {
+          console.log('Trying next upload strategy...');
+          continue;
+        }
+
+        // For other errors, we might want to stop trying
+        storageError = error;
+        break;
+      }
+    }
+
+    // If all strategies failed, use the last error
+    if (!storageData && lastError) {
+      storageError = lastError;
     }
 
     if (storageError) {
       console.error("Storage upload error after retries:", storageError);
 
-      // Use enhanced error categorization
+      // Check if this is a critical storage failure that should disable uploads
+      const isCriticalFailure = storageError.message.includes('Bucket not found') ||
+                               storageError.message.includes('unauthorized') ||
+                               storageError.message.includes('forbidden');
+
+      if (isCriticalFailure && !bucketVerified) {
+        console.error("CRITICAL: Storage system is not functioning properly. Consider disabling file uploads temporarily.");
+
+        // Run diagnostics to help debug the issue
+        try {
+          console.log("Running storage diagnostics...");
+          await diagnoseStorageIssues();
+        } catch (diagError) {
+          console.error("Diagnostics failed:", diagError);
+        }
+
+        // Return a more informative error to help with debugging
+        return NextResponse.json(
+          {
+            error: "File storage is currently unavailable. Please try again later or contact support if the issue persists.",
+            errorType: "STORAGE_UNAVAILABLE",
+            correlationId: uuidv4(),
+            retryable: true,
+            retryAfter: 30000, // 30 seconds
+            details: {
+              message: "Storage buckets are not accessible. This may be due to configuration issues.",
+              bucket: storageBucket,
+              fileName: file.name,
+              troubleshooting: [
+                "Check that SUPABASE_SERVICE_ROLE_KEY is correctly set",
+                "Verify that the Supabase project has storage enabled",
+                "Ensure the service role has storage permissions",
+                "Check that all required buckets exist in your Supabase project"
+              ]
+            }
+          },
+          { status: 503 } // Service Unavailable
+        );
+      }
+
+      // Use enhanced error categorization for non-critical errors
       const uploadError = UploadErrorHandler.categorizeError(storageError, file);
 
       // Log and report the error
@@ -398,7 +598,13 @@ export async function POST(request: NextRequest) {
           errorType: uploadError.type,
           correlationId: uploadError.correlationId,
           retryable: uploadError.retryable,
-          retryAfter: uploadError.retryAfter
+          retryAfter: uploadError.retryAfter,
+          details: {
+            bucket: storageBucket,
+            filePath,
+            fileName: file.name,
+            fileSize: file.size
+          }
         },
         { status: uploadError.type === UploadErrorType.PERMISSION_ERROR ? 403 : 500 },
       );

@@ -68,38 +68,9 @@ export async function middleware(request: NextRequest) {
           return response;
         }
 
-        // Enhanced session validation using session manager
-        try {
-          const sessionManager = getSessionManager();
-
-          // Initialize session from current Supabase session
-          if (user) {
-            const { data: sessionData } = await supabase.auth.getSession();
-            if (sessionData.session) {
-              // Initialize enhanced session for validation
-              await sessionManager.initializeFromSession(sessionData.session, user);
-            }
-          }
-
-          // Validate the session
-          const isValid = await sessionManager.validateSession();
-
-          if (!isValid) {
-            console.log('❌ [Middleware] Enhanced session validation failed for route:', pathname);
-
-            const redirectUrl = new URL(`/sign-in?returnTo=${pathname}&error=session_expired`, request.url);
-            const response = NextResponse.redirect(redirectUrl);
-
-            response.headers.set('x-auth-redirect', 'true');
-            response.headers.set('x-redirect-from', pathname);
-            response.headers.set('x-redirect-reason', 'session_invalid');
-
-            return response;
-          }
-        } catch (sessionError) {
-          console.warn('❌ [Middleware] Enhanced session validation error:', sessionError);
-          // Continue with basic auth check if enhanced validation fails
-        }
+        // Enhanced session validation using session manager (disabled for server-side)
+        // Note: Session fingerprinting requires browser environment, so we skip enhanced validation in middleware
+        // This prevents the "Session fingerprinting requires browser environment" error
 
         // Check for admin-only routes
         if (pathname.startsWith('/admin')) {
