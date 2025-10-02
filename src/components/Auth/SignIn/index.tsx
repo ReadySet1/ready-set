@@ -87,7 +87,7 @@ const Signin = ({
       // Use window.location.href instead of router.push() to ensure cookies are processed
       // This forces a full page load, which guarantees the Set-Cookie headers are applied
       setTimeout(() => {
-        window.location.href = formState.redirectTo;
+        window.location.href = formState.redirectTo || "/";
       }, 500); // Small delay to show success message
     }
 

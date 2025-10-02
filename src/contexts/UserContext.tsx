@@ -377,6 +377,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
             if (!cookieData && userProfileCookie) {
               try {
                 const [cookieName, cookieValue] = userProfileCookie.split("=");
+                if (!cookieValue || !cookieName) {
+                  throw new Error("Invalid cookie format");
+                }
+
                 const profileData = JSON.parse(decodeURIComponent(cookieValue));
                 // Extract user ID from cookie name (format: user-profile-{userId})
                 const userId = cookieName.replace("user-profile-", "");
@@ -417,8 +421,13 @@ function UserProviderClient({ children }: { children: ReactNode }) {
             }
 
             if (cookieData) {
+              const cookieParts = cookieData.split("=");
+              if (!cookieParts[1]) {
+                throw new Error("Invalid cookie format");
+              }
+
               const sessionData = JSON.parse(
-                decodeURIComponent(cookieData.split("=")[1]),
+                decodeURIComponent(cookieParts[1]),
               );
               console.log("🍪 Found session cookie:", sessionData);
 
