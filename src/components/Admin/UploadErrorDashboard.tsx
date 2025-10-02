@@ -41,36 +41,6 @@ export function UploadErrorDashboard() {
     dateRange?: string;
   }>({});
 
-  useEffect(() => {
-    fetchErrors();
-  }, [fetchErrors]);
-
-  const fetchErrors = useCallback(async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-
-      if (filter.errorType) params.append("errorType", filter.errorType);
-      if (filter.retryable !== undefined)
-        params.append("retryable", filter.retryable.toString());
-      if (filter.resolved !== undefined)
-        params.append("resolved", filter.resolved.toString());
-      if (filter.dateRange) params.append("dateRange", filter.dateRange);
-
-      const response = await fetch(`/api/admin/upload-errors?${params}`);
-      const data = await response.json();
-
-      if (data.success) {
-        setErrors(data.errors);
-        calculateStats(data.errors);
-      }
-    } catch (error) {
-      console.error("Failed to fetch upload errors:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, calculateStats]);
-
   const calculateStats = useCallback((errorList: UploadError[]) => {
     const stats: ErrorStats = {
       totalErrors: errorList.length,
@@ -99,6 +69,36 @@ export function UploadErrorDashboard() {
 
     setStats(stats);
   }, []);
+
+  const fetchErrors = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+
+      if (filter.errorType) params.append("errorType", filter.errorType);
+      if (filter.retryable !== undefined)
+        params.append("retryable", filter.retryable.toString());
+      if (filter.resolved !== undefined)
+        params.append("resolved", filter.resolved.toString());
+      if (filter.dateRange) params.append("dateRange", filter.dateRange);
+
+      const response = await fetch(`/api/admin/upload-errors?${params}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setErrors(data.errors);
+        calculateStats(data.errors);
+      }
+    } catch (error) {
+      console.error("Failed to fetch upload errors:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, calculateStats]);
+
+  useEffect(() => {
+    fetchErrors();
+  }, [fetchErrors]);
 
   const resolveError = async (errorId: string) => {
     try {
