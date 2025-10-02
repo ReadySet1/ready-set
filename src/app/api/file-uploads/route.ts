@@ -15,6 +15,20 @@ import {
 import { UploadSecurityManager } from "@/lib/upload-security";
 import { UploadErrorType } from "@/types/upload";
 
+// Helper function to safely extract error message from unknown error
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (error && typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string') {
+    return (error as any).message;
+  }
+  return String(error || 'Unknown error');
+}
+
 // Add a new route to get a signed URL for a file
 export async function GET(request: NextRequest) {
   try {
@@ -453,7 +467,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Upload the file with retry logic and enhanced error handling
-    let storageData, storageError;
+    let storageData: any, storageError: { message?: string } | null = null;
 
     // Multiple upload strategies in case Supabase storage fails
     const uploadStrategies = [
@@ -517,32 +531,34 @@ export async function POST(request: NextRequest) {
 
       } catch (error) {
         lastError = error;
-        console.error(`Upload strategy failed:`, error.message);
+        const errorMessage = getErrorMessage(error);
+        console.error(`Upload strategy failed:`, errorMessage);
 
         // If this is a bucket not found error, try the next strategy
-        if (error.message.includes('Bucket not found') && strategy !== uploadStrategies[uploadStrategies.length - 1]) {
+        if (errorMessage.includes('Bucket not found') && strategy !== uploadStrategies[uploadStrategies.length - 1]) {
           console.log('Trying next upload strategy...');
           continue;
         }
 
         // For other errors, we might want to stop trying
-        storageError = error;
+        storageError = { message: errorMessage };
         break;
       }
     }
 
     // If all strategies failed, use the last error
     if (!storageData && lastError) {
-      storageError = lastError;
+      storageError = { message: getErrorMessage(lastError) };
     }
 
     if (storageError) {
       console.error("Storage upload error after retries:", storageError);
 
       // Check if this is a critical storage failure that should disable uploads
-      const isCriticalFailure = storageError.message.includes('Bucket not found') ||
-                               storageError.message.includes('unauthorized') ||
-                               storageError.message.includes('forbidden');
+      const errorMessage = storageError.message || '';
+      const isCriticalFailure = errorMessage.includes('Bucket not found') ||
+                               errorMessage.includes('unauthorized') ||
+                               errorMessage.includes('forbidden');
 
       if (isCriticalFailure && !bucketVerified) {
         console.error("CRITICAL: Storage system is not functioning properly. Consider disabling file uploads temporarily.");

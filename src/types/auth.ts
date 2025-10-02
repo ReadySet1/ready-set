@@ -29,6 +29,12 @@ export interface SessionFingerprint {
   language: string;
   platform: string;
   cookiesEnabled: boolean;
+  canvasFingerprint?: string;
+  webglFingerprint?: string;
+  fonts?: string;
+  plugins?: string;
+  tabId?: string;
+  sessionId?: string;
   hash: string; // Derived hash of above properties
 }
 

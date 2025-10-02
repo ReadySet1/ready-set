@@ -35,18 +35,28 @@ function generateTabId(): string {
 function generateFingerprint(): SessionFingerprint {
   if (typeof window === 'undefined') {
     // Return a basic server-side fingerprint instead of throwing
-    return {
+    const serverFingerprint = {
       userAgent: 'server-side',
       screenResolution: 'server-side',
       timezone: 'server-side',
       language: 'server-side',
       platform: 'server-side',
+      cookiesEnabled: false,
       canvasFingerprint: 'server-side',
       webglFingerprint: 'server-side',
       fonts: 'server-side',
       plugins: 'server-side',
       tabId: 'server-side',
       sessionId: 'server-side'
+    };
+
+    // Create hash for server-side fingerprint
+    const fingerprintString = JSON.stringify(serverFingerprint);
+    const hash = btoa(fingerprintString).slice(0, 32);
+
+    return {
+      ...serverFingerprint,
+      hash
     };
   }
 
@@ -62,10 +72,11 @@ function generateFingerprint(): SessionFingerprint {
     platform: navigator.platform,
     cookiesEnabled: navigator.cookieEnabled,
     canvasFingerprint: canvas.toDataURL(),
-    colorDepth: screen.colorDepth,
-    pixelRatio: window.devicePixelRatio,
-    hardwareConcurrency: navigator.hardwareConcurrency,
-    maxTouchPoints: navigator.maxTouchPoints,
+    webglFingerprint: 'client-side',
+    fonts: 'client-side',
+    plugins: 'client-side',
+    tabId: 'client-side',
+    sessionId: 'client-side',
   };
 
   // Create hash of fingerprint data
@@ -75,7 +86,7 @@ function generateFingerprint(): SessionFingerprint {
   return {
     ...fingerprintData,
     hash,
-  };
+  } as SessionFingerprint;
 }
 
 // Compare fingerprints for validation
