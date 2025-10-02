@@ -3,7 +3,6 @@
 
 import { Session, User } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
-import { getSessionManager } from './session-manager';
 import {
   TokenRefreshConfig,
   AuthError,
@@ -34,6 +33,11 @@ class TokenRefreshQueue {
     this.isRefreshing = true;
 
     try {
+      if (typeof window === 'undefined') {
+        throw new Error('TokenRefreshService can only be used on client side');
+      }
+
+      const { getSessionManager } = await import('./session-manager');
       const sessionManager = getSessionManager();
       const enhancedSession = await sessionManager.refreshToken();
 
@@ -247,7 +251,12 @@ export class TokenRefreshService {
   // Get fresh token (used by API interceptors)
   async getFreshToken(): Promise<string> {
     try {
+      if (typeof window === 'undefined') {
+        throw new Error('TokenRefreshService can only be used on client side');
+      }
+
       // Check if current token is still valid
+      const { getSessionManager } = await import('./session-manager');
       const sessionManager = getSessionManager();
       const isValid = await sessionManager.validateSession();
 

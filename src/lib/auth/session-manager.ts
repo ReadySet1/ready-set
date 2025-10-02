@@ -366,12 +366,16 @@ export class EnhancedSessionManager implements SessionManager {
       this.currentSession.lastActivityAt = Date.now();
       // Update localStorage directly without triggering recursion
       try {
-        localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
+        }
       } catch (error) {
         authLogger.warn('EnhancedSessionManager: Failed to update last activity in localStorage', error);
       }
     } else {
-      localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
+      }
     }
   }
 
@@ -574,6 +578,11 @@ export class EnhancedSessionManager implements SessionManager {
 let sessionManager: EnhancedSessionManager | null = null;
 
 export function getSessionManager(config?: Partial<AuthContextConfig>): EnhancedSessionManager {
+  // Only initialize session manager on client side
+  if (typeof window === 'undefined') {
+    throw new Error('SessionManager can only be used on the client side');
+  }
+
   if (!sessionManager) {
     sessionManager = new EnhancedSessionManager(config);
   }

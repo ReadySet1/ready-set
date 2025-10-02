@@ -385,8 +385,7 @@ export async function login(
 
   console.log("Normalized userRole for session:", normalizedUserRole);
 
-  // Set session cookie with enhanced security - still allow client access for hydration
-  // but with improved security settings
+  // Set session cookie with enhanced security - allow client access for hydration
   cookieStore.set('user-session-data', JSON.stringify(sessionData), {
     path: '/',
     httpOnly: false, // Allow client-side access for hydration
@@ -399,24 +398,13 @@ export async function login(
     })
   });
 
+  // Set session data in sessionStorage for immediate client access
+  // This will be read by the UserContext during hydration
   console.log("Set immediate session data for client:", sessionData);
 
-  // Initialize enhanced session management if available
-  try {
-    const { getSessionManager } = await import('@/lib/auth/session-manager');
-    const sessionManager = getSessionManager();
-
-    // Get current session from Supabase
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (sessionData.session && sessionData.session.user) {
-      // Initialize enhanced session
-      await sessionManager.initializeFromSession(sessionData.session, user);
-      console.log("✅ Enhanced session initialized successfully");
-    }
-  } catch (error) {
-    console.warn("⚠️ Enhanced session initialization failed:", error);
-    // Continue with basic auth - enhanced features will work when available
-  }
+  // Note: Enhanced session management is initialized on the client-side only
+  // The UserContext will handle session manager initialization when the page loads
+  console.log("✅ Basic authentication completed - enhanced session management will initialize on client-side");
 
   // Prefetch and cache user profile data for faster client-side loading
   try {
@@ -487,13 +475,21 @@ export async function login(
       timestamp: new Date().toISOString()
     });
 
-    // CRITICAL: Call redirect() immediately after determining path
-    // Do NOT create objects or do extensive logging after this point
-    // This will throw a NEXT_REDIRECT error that Next.js handles automatically
-    redirect(redirectPath);
+    // Store session data in a way that can be accessed by the client
+    // Use a client-accessible cookie that survives the redirect
+    cookieStore.set('temp-session-data', JSON.stringify(sessionData), {
+      path: '/',
+      httpOnly: false, // Allow client-side access
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60, // Short-lived cookie, will be cleaned up by client
+    });
 
-         // This code is unreachable but satisfies TypeScript
-     // The successState is not needed since redirect() handles the response
+    console.log("🔗 Returning redirect path to client:", redirectPath);
+
+    // IMPORTANT: Return the redirect path instead of calling redirect()
+    // This ensures cookies are properly committed before the client-side redirect
+    // The client will handle the actual redirect using router.push()
      return {
        success: true,
        redirectTo: redirectPath,

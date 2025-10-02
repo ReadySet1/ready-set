@@ -3,7 +3,6 @@
 
 import { getAuthenticatedFetch, handleApiResponse } from '@/lib/auth/api-interceptor';
 import { getTokenRefreshService } from '@/lib/auth/token-refresh-service';
-import { getSessionManager } from '@/lib/auth/session-manager';
 import { AuthError, AuthErrorType } from '@/types/auth';
 import { authLogger } from '@/utils/logger';
 

@@ -2,7 +2,6 @@
 // API request interceptor with automatic token refresh and retry logic
 
 import { getTokenRefreshService } from './token-refresh-service';
-import { getSessionManager } from './session-manager';
 import { AuthError, AuthErrorType } from '@/types/auth';
 import { authLogger } from '@/utils/logger';
 
@@ -154,15 +153,17 @@ export class AuthenticatedFetch {
 
       // Handle authentication errors
       if (response.status === 401 && this.config.retryOnAuthErrors) {
-        const sessionManager = getSessionManager();
-        const isValid = await sessionManager.validateSession();
+        if (typeof window !== 'undefined') {
+          const { getSessionManager } = await import('./session-manager');
+          const sessionManager = getSessionManager();
+          const isValid = await sessionManager.validateSession();
 
-        if (!isValid) {
-          // Session is invalid, redirect to login
-          this.handleAuthenticationFailure();
-          throw new AuthError(
-            AuthErrorType.TOKEN_INVALID,
-            'Authentication failed',
+            if (!isValid) {
+              // Session is invalid, redirect to login
+              this.handleAuthenticationFailure();
+              throw new AuthError(
+                AuthErrorType.TOKEN_INVALID,
+                'Authentication failed',
             'invalid_session',
             false
           );
@@ -256,8 +257,12 @@ export class AuthenticatedFetch {
 
   public handleAuthenticationFailure(): void {
     // Clear authentication state
-    const sessionManager = getSessionManager();
-    sessionManager.clearSession();
+    if (typeof window !== 'undefined') {
+      import('./session-manager').then(({ getSessionManager }) => {
+        const sessionManager = getSessionManager();
+        sessionManager.clearSession();
+      });
+    }
 
     // Redirect to login page if in browser
     if (typeof window !== 'undefined') {

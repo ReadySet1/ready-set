@@ -13,8 +13,7 @@ import { Session, User } from "@supabase/supabase-js";
 import { UserType } from "@/types/user";
 import { authLogger } from "@/utils/logger";
 
-// Import enhanced authentication services
-import { getSessionManager } from "@/lib/auth/session-manager";
+// Import enhanced authentication services (session manager loaded dynamically)
 import { getTokenRefreshService } from "@/lib/auth/token-refresh-service";
 import { getAuthenticatedFetch } from "@/lib/auth/api-interceptor";
 import {
@@ -227,6 +226,7 @@ const fetchUserRole = async (
 
 // Create a client component wrapper
 function UserProviderClient({ children }: { children: ReactNode }) {
+  console.log("🔵 UserProviderClient mounting");
   authLogger.debug(
     "🟢 UserProviderClient MOUNTING - Enhanced version with session management!",
   );
@@ -282,6 +282,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
   // Initialize services
   useEffect(() => {
+    console.log(
+      "🔧 UserContext: initServices useEffect triggered, hasImmediateData:",
+      hasImmediateData,
+    );
     const initServices = async () => {
       try {
         setAuthProgressState({
@@ -301,7 +305,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         const client = await createClient();
         setSupabase(client);
 
-        // Initialize session manager
+        // Initialize session manager (client-side only)
+        const { getSessionManager } = await import(
+          "@/lib/auth/session-manager"
+        );
         const sm = getSessionManager();
         setSessionManager(sm);
 
@@ -328,96 +335,216 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     initServices();
   }, [hasImmediateData]);
 
-  // Hydration and immediate data loading
+  // Simplified hydration - check cookies first, then Supabase session with retry mechanism
   useEffect(() => {
-    console.log("🚀🚀🚀 ENHANCED UserContext useEffect TRIGGERED!");
-    console.log("🚀🚀🚀 ENHANCED UserContext: Starting hydration check...");
-    console.log("🚀 Window available?", typeof window !== "undefined");
+    let mounted = true;
+    let retryTimeout: NodeJS.Timeout | null = null;
 
-    // Set hydration flag to prevent server/client mismatches
-    setIsHydrated(true);
+    const checkSupabaseSession = async (retryCount = 0) => {
+      if (!mounted) return;
 
-    // Force check cookies directly as backup
-    if (typeof window !== "undefined") {
-      const cookies = document.cookie;
-      console.log("🍪 ENHANCED Cookie check - length:", cookies.length);
-      console.log("🍪 ENHANCED Cookie preview:", cookies.substring(0, 200));
+      try {
+        console.log(
+          `🔍 Checking Supabase session (attempt ${retryCount + 1})...`,
+        );
 
-      // Manual cookie parsing as backup
-      const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
-      if (sessionMatch && sessionMatch[1]) {
-        console.log("🔍 ENHANCED Found session cookie manually!");
-        try {
-          const decoded = decodeURIComponent(sessionMatch[1]);
-          const sessionData = JSON.parse(decoded);
-          console.log("📊 ENHANCED Manual session data:", sessionData);
+        // FAST PATH: Check for session cookies first (set by login action)
+        // This provides immediate hydration while we wait for Supabase session
+        if (retryCount === 0) {
+          try {
+            // Log all cookies for debugging
+            console.log("🍪 All cookies:", document.cookie);
 
-          if (sessionData.userId && sessionData.email && sessionData.userRole) {
-            console.log("✅ ENHANCED Creating user from manual parsing...");
+            const tempSessionCookie = document.cookie
+              .split("; ")
+              .find((row) => row.startsWith("temp-session-data="));
 
-            // Create user object directly from cookie data
-            const mockUser = {
-              id: sessionData.userId,
-              email: sessionData.email,
-              user_metadata: {
-                name: sessionData.email?.split("@")[0] || "User",
-              },
-            } as unknown as User;
+            const sessionCookie = document.cookie
+              .split("; ")
+              .find((row) => row.startsWith("user-session-data="));
 
-            // Normalize userRole to lowercase
-            const normalizedRole =
-              sessionData.userRole.toLowerCase() as UserType;
+            // Also check for user-profile cookie (this one is successfully set by login action)
+            const userProfileCookie = document.cookie
+              .split("; ")
+              .find((row) => row.startsWith("user-profile-"));
 
-            setTimeout(() => {
-              setUser(mockUser);
-              setUserRole(normalizedRole);
+            let cookieData = tempSessionCookie || sessionCookie;
+            console.log("🍪 Found temp session cookie?", !!tempSessionCookie);
+            console.log("🍪 Found user session cookie?", !!sessionCookie);
+            console.log("🍪 Found user profile cookie?", !!userProfileCookie);
+
+            // FALLBACK: If no session cookies, extract data from user-profile cookie
+            if (!cookieData && userProfileCookie) {
+              try {
+                const [cookieName, cookieValue] = userProfileCookie.split("=");
+                const profileData = JSON.parse(decodeURIComponent(cookieValue));
+                // Extract user ID from cookie name (format: user-profile-{userId})
+                const userId = cookieName.replace("user-profile-", "");
+
+                console.log("✅ Using user-profile cookie for hydration:", {
+                  userId,
+                  type: profileData.type,
+                });
+
+                // Create a session-like object from profile data
+                const sessionData = {
+                  userId: userId,
+                  email: profileData.email,
+                  userRole: profileData.type,
+                  timestamp: profileData.timestamp,
+                };
+
+                // Create a minimal user object from profile cookie to prevent UI flash
+                const minimalUser = {
+                  id: userId,
+                  email: profileData.email,
+                  app_metadata: {},
+                  user_metadata: {},
+                  aud: "authenticated",
+                  created_at: new Date().toISOString(),
+                } as User;
+
+                // Set basic user info immediately from profile cookie
+                setUser(minimalUser);
+                setUserRole(profileData.type);
+                setHasImmediateData(true);
+
+                // Skip the normal cookie processing since we handled it
+                return;
+              } catch (e) {
+                console.warn("Failed to parse user-profile cookie:", e);
+              }
+            }
+
+            if (cookieData) {
+              const sessionData = JSON.parse(
+                decodeURIComponent(cookieData.split("=")[1]),
+              );
+              console.log("🍪 Found session cookie:", sessionData);
+
+              if (sessionData?.userId && sessionData?.userRole) {
+                console.log(
+                  "✅ Fast hydration from cookie, fetching full user data...",
+                );
+
+                // Create a minimal user object from cookie to prevent UI flash
+                // This will be replaced with full user data from Supabase
+                const minimalUser = {
+                  id: sessionData.userId,
+                  email: sessionData.email,
+                  app_metadata: {},
+                  user_metadata: {},
+                  aud: "authenticated",
+                  created_at: new Date().toISOString(),
+                } as User;
+
+                // Set basic user info immediately from cookie
+                // This prevents the "Sign In/Sign Up" flash
+                setUser(minimalUser);
+                setUserRole(sessionData.userRole);
+                setHasImmediateData(true);
+
+                // Clean up temp cookie if it exists
+                if (tempSessionCookie) {
+                  document.cookie =
+                    "temp-session-data=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+                }
+              }
+            }
+          } catch (cookieError) {
+            console.warn("Failed to parse session cookie:", cookieError);
+            // Continue with normal flow
+          }
+        }
+
+        // Get or create supabase client
+        let client = supabase;
+        if (!client) {
+          const { createClient } = await import("@/utils/supabase/client");
+          client = await createClient();
+        }
+
+        const {
+          data: { session },
+          error: sessionError,
+        } = await client.auth.getSession();
+
+        console.log("🔍 Supabase session result:", {
+          hasSession: !!session,
+          hasUser: !!session?.user,
+          error: sessionError?.message,
+        });
+
+        if (session?.user) {
+          console.log("✅ Found Supabase session for:", session.user.email);
+
+          // Get user role from profile
+          const { data: profile } = await client
+            .from("profiles")
+            .select("type")
+            .eq("id", session.user.id)
+            .single();
+
+          if (profile?.type) {
+            const userRole = profile.type.toLowerCase() as UserType;
+            console.log("✅ Setting user role:", userRole);
+
+            if (mounted) {
+              setUser(session.user);
+              setUserRole(userRole);
+              setSession(session);
               setHasImmediateData(true);
               setIsLoading(false);
-              console.log(
-                "✅ ENHANCED Hydrated auth state successfully with manual parsing!",
-              );
-            }, 0);
-            return; // Exit early since we found the data
+            }
+            return;
           }
-        } catch (error) {
-          console.error("❌ ENHANCED Manual parsing failed:", error);
+        }
+
+        // No session found - retry up to 3 times with increasing delays
+        // This handles the race condition after login redirect where cookies are still being set
+        if (retryCount < 3) {
+          const delay = (retryCount + 1) * 200; // 200ms, 400ms, 600ms
+          console.log(`⏳ No session found, retrying in ${delay}ms...`);
+          retryTimeout = setTimeout(() => {
+            if (mounted) {
+              checkSupabaseSession(retryCount + 1);
+            }
+          }, delay);
+          return;
+        }
+
+        // After all retries, no session found
+        console.log("ℹ️ No authenticated session found after retries");
+        if (mounted) {
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error("❌ Error checking Supabase session:", error);
+
+        // On error, retry if we haven't exhausted attempts
+        if (retryCount < 3 && mounted) {
+          const delay = (retryCount + 1) * 200;
+          console.log(`⏳ Error occurred, retrying in ${delay}ms...`);
+          retryTimeout = setTimeout(() => {
+            if (mounted) {
+              checkSupabaseSession(retryCount + 1);
+            }
+          }, delay);
+        } else if (mounted) {
+          setIsLoading(false);
         }
       }
-    }
+    };
 
-    // Fallback to original method
-    const recoveredState = recoverAuthState();
-    if (recoveredState) {
-      console.log(
-        "✅ ENHANCED Recovered auth state from hydration:",
-        recoveredState,
-      );
+    checkSupabaseSession();
 
-      // Create a mock user object from recovered state
-      const mockUser = {
-        id: recoveredState.userId,
-        email: recoveredState.email,
-        user_metadata: recoveredState.profileData
-          ? {
-              name: recoveredState.profileData.name,
-            }
-          : undefined,
-      } as unknown as User;
-
-      setTimeout(() => {
-        setUser(mockUser);
-        setUserRole(recoveredState.userRole);
-        setHasImmediateData(true);
-        setIsLoading(false); // We have hydrated data, not loading anymore
-      }, 0);
-
-      console.log(
-        "✅ ENHANCED Hydrated auth state successfully - user should be visible in header",
-      );
-    } else {
-      console.log("❌ ENHANCED No auth state found during hydration check");
-    }
-  }, []);
+    return () => {
+      mounted = false;
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+    };
+  }, [supabase]);
 
   // Enhanced auth state management
   useEffect(() => {
@@ -1025,46 +1152,8 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     }));
   };
 
-  // Prevent hydration mismatches by ensuring consistent initial render
-  if (!isHydrated) {
-    return (
-      <UserContext.Provider
-        value={{
-          session: null,
-          user: null,
-          userRole: null,
-          enhancedSession: null,
-          isLoading: true,
-          error: null,
-          isAuthenticating: false,
-          authState: {
-            user: null,
-            session: null,
-            enhancedSession: null,
-            userRole: null,
-            isLoading: true,
-            isAuthenticating: false,
-            error: null,
-            lastActivity: Date.now(),
-            sessionExpiresAt: null,
-            needsRefresh: false,
-            suspiciousActivity: false,
-          },
-          authProgress: { step: "idle", message: "" },
-          refreshUserData,
-          refreshToken,
-          logout,
-          clearAuthError: () => {},
-          setAuthProgress: () => {},
-          getActiveSessions,
-          revokeSession,
-          updateActivity,
-        }}
-      >
-        {children}
-      </UserContext.Provider>
-    );
-  }
+  // Allow hydration to proceed even when not isHydrated initially
+  // The hydration useEffect will set isHydrated to true after checking for session data
 
   return (
     <UserContext.Provider

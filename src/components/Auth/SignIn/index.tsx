@@ -73,13 +73,22 @@ const Signin = ({
       setShowSuccessMessage(false);
     }
 
-    // If redirectTo is set in the state, we're being redirected by the server
-    if (formState?.redirectTo) {
+    // If redirectTo is set in the state, handle client-side redirect
+    if (formState?.success && formState?.redirectTo) {
       console.log(
-        "Login action is handling redirect to:",
+        "Login successful! Client-side redirecting to:",
         formState.redirectTo,
       );
-      // Let the server handle the redirect
+
+      setShowSuccessMessage(true);
+      setIsRedirecting(true);
+      setLoading(false);
+
+      // Use window.location.href instead of router.push() to ensure cookies are processed
+      // This forces a full page load, which guarantees the Set-Cookie headers are applied
+      setTimeout(() => {
+        window.location.href = formState.redirectTo;
+      }, 500); // Small delay to show success message
     }
 
     // Reset states when form data changes (user starts typing again)

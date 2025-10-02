@@ -2,8 +2,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
 import { logger } from "@/utils/logger";
-import { getSessionManager } from "@/lib/auth/session-manager";
-import { AuthError, AuthErrorType } from "@/types/auth";
 
 // Protected routes that require session refresh
 const PROTECTED_ROUTES = [

@@ -3,7 +3,6 @@
 
 import { AuthError, AuthErrorType } from '@/types/auth';
 import { authLogger } from '@/utils/logger';
-import { getSessionManager } from './session-manager';
 import { getTokenRefreshService } from './token-refresh-service';
 
 // Error recovery strategies
@@ -43,8 +42,11 @@ const RECOVERY_STRATEGIES: ErrorRecoveryStrategy[] = [
   {
     canRecover: (error) => error.type === AuthErrorType.SESSION_EXPIRED || error.type === AuthErrorType.SESSION_INVALID,
     recover: async (error) => {
-      const sessionManager = getSessionManager();
-      await sessionManager.refreshToken();
+      if (typeof window !== 'undefined') {
+        const { getSessionManager } = await import('./session-manager');
+        const sessionManager = getSessionManager();
+        await sessionManager.refreshToken();
+      }
     },
     priority: 9,
   },
@@ -65,10 +67,11 @@ const RECOVERY_STRATEGIES: ErrorRecoveryStrategy[] = [
     recover: async (error) => {
       // This usually requires user to re-authenticate
       // Clear session and redirect to login
-      const sessionManager = getSessionManager();
-      await sessionManager.clearSession();
-
       if (typeof window !== 'undefined') {
+        const { getSessionManager } = await import('./session-manager');
+        const sessionManager = getSessionManager();
+        await sessionManager.clearSession();
+
         window.location.href = '/sign-in?error=device_changed';
       }
     },
@@ -143,10 +146,12 @@ export class AuthErrorHandler {
   // Handle case where max recovery attempts exceeded
   private handleMaxAttemptsExceeded(error: AuthError, report: ErrorReport): void {
     // Force logout and redirect to login
-    const sessionManager = getSessionManager();
-    sessionManager.clearSession();
-
     if (typeof window !== 'undefined') {
+      import('./session-manager').then(({ getSessionManager }) => {
+        const sessionManager = getSessionManager();
+        sessionManager.clearSession();
+      });
+    }
       const params = new URLSearchParams({
         error: 'max_recovery_attempts',
         type: error.type,
