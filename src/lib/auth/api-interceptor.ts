@@ -158,15 +158,16 @@ export class AuthenticatedFetch {
           const sessionManager = getSessionManager();
           const isValid = await sessionManager.validateSession();
 
-            if (!isValid) {
-              // Session is invalid, redirect to login
-              this.handleAuthenticationFailure();
-              throw new AuthError(
-                AuthErrorType.TOKEN_INVALID,
-                'Authentication failed',
-            'invalid_session',
-            false
-          );
+          if (!isValid) {
+            // Session is invalid, redirect to login
+            this.handleAuthenticationFailure();
+            throw new AuthError(
+              AuthErrorType.TOKEN_INVALID,
+              'Authentication failed',
+              'invalid_session',
+              false
+            );
+          }
         }
 
         // Try refreshing token and retrying request

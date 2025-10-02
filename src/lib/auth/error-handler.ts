@@ -152,13 +152,12 @@ export class AuthErrorHandler {
         sessionManager.clearSession();
       });
     }
-      const params = new URLSearchParams({
-        error: 'max_recovery_attempts',
-        type: error.type,
-      });
+    const params = new URLSearchParams({
+      error: 'max_recovery_attempts',
+      type: error.type,
+    });
 
-      window.location.replace(`/sign-in?${params.toString()}`);
-    }
+    window.location.replace(`/sign-in?${params.toString()}`);
   }
 
   // Create error report for monitoring
