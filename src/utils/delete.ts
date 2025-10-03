@@ -30,8 +30,6 @@ async function deleteFakeData() {
     console.log('Fake data deleted successfully')
   } catch (error) {
     console.error('Error deleting fake data:', error)
-  } finally {
-    await prisma.$disconnect()
   }
 }
 

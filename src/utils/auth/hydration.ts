@@ -2,6 +2,7 @@
 'use client'
 
 import { UserType } from "@/types/user";
+import { authLogger } from "@/utils/logger";
 
 export interface ServerAuthState {
   userId: string;
@@ -80,7 +81,7 @@ export const getServerAuthState = (): ServerAuthState | null => {
     
     // Normalize userRole to lowercase to match TypeScript enum
     const normalizedRole = sessionData.userRole.toLowerCase();
-    console.log('🔄 Normalizing userRole from', sessionData.userRole, 'to', normalizedRole);
+    authLogger.debug('🔄 Normalizing userRole from', sessionData.userRole, 'to', normalizedRole);
     
     // Find matching enum value
     const enumValues = Object.values(UserType);
@@ -100,7 +101,7 @@ export const getServerAuthState = (): ServerAuthState | null => {
       timestamp: sessionData.timestamp
     };
     
-    console.log('✅ Successfully parsed session data:', result);
+    authLogger.debug('✅ Successfully parsed session data:', result);
     return result;
     
   } catch (error) {
@@ -159,7 +160,7 @@ export const getCachedProfileData = (userId: string): CachedProfileData | null =
       return null;
     }
     
-    console.log('✅ Successfully recovered profile data:', profileData);
+    authLogger.debug('✅ Successfully recovered profile data:', profileData);
     return profileData;
   } catch (error) {
     console.error('❌ Error in getCachedProfileData:', error);
@@ -284,7 +285,7 @@ export const recoverAuthState = () => {
     }
     
     if (serverState) {
-      console.log('✅ Auth state recovered successfully:', {
+      authLogger.debug('✅ Auth state recovered successfully:', {
         userId: serverState.userId,
         email: serverState.email,
         userRole: serverState.userRole,

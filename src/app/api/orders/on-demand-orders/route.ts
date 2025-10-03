@@ -100,7 +100,5 @@ export async function GET(req: NextRequest) {
     console.error("Error fetching on-demand orders:", error);
     const errorMessage = error instanceof Error ? error.message : "An internal server error occurred";
     return NextResponse.json({ message: "Error fetching on-demand orders", error: errorMessage }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
   }
 }

@@ -1,63 +1,63 @@
 // src/components/Auth/GoogleAuthButton.tsx
 
-'use client'
+"use client";
 
-import { createClient } from '@/utils/supabase/client'
-import { getRedirectUrl } from '@/utils/supabase/auth-helpers'
-import { useState } from 'react'
+import { createClient } from "@/utils/supabase/client";
+import { getRedirectUrl } from "@/utils/supabase/auth-helpers";
+import { useState } from "react";
 import Loader from "@/components/Common/Loader";
 
 interface GoogleAuthButtonProps {
   className?: string;
-  userType?: 'vendor' | 'client';
-  mode?: 'signup' | 'signin';
+  userType?: "vendor" | "client";
+  mode?: "signup" | "signin";
 }
 
-const GoogleAuthButton = ({ 
-  className = '', 
-  userType, 
-  mode = 'signup' 
+const GoogleAuthButton = ({
+  className = "",
+  userType,
+  mode = "signup",
 }: GoogleAuthButtonProps) => {
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleGoogleSignIn = async () => {
-    const supabase = await createClient()
+    const supabase = await createClient();
     try {
-      setIsLoading(true)
-      
+      setIsLoading(true);
+
       // Prepare redirect URL with userType parameter if provided
       let redirectUrl = getRedirectUrl();
       if (userType) {
         // Append userType as a query parameter to the redirect URL
-        redirectUrl = `${redirectUrl}${redirectUrl.includes('?') ? '&' : '?'}userType=${userType}`;
+        redirectUrl = `${redirectUrl}${redirectUrl.includes("?") ? "&" : "?"}userType=${userType}`;
       }
-      
+
       console.log("Redirecting to:", redirectUrl); // Debug log
-      
+
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
           redirectTo: redirectUrl,
-        }
-      })
-      
+        },
+      });
+
       if (error) {
         console.error("OAuth error:", error.message);
-        throw error
+        throw error;
       }
     } catch (error) {
-      console.error('Error signing in with Google:', error)
+      console.error("Error signing in with Google:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <button
       type="button"
       disabled={isLoading}
       onClick={handleGoogleSignIn}
-      className={`flex w-full items-center justify-center gap-2.5 rounded-lg border border-gray-4 p-3.5 text-dark duration-200 ease-in hover:border-gray-5 hover:bg-gray dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 disabled:cursor-not-allowed disabled:opacity-70 ${className}`}
+      className={`flex w-full items-center justify-center gap-2.5 rounded-lg border border-gray-4 p-3.5 text-dark duration-200 ease-in hover:border-gray-5 hover:bg-gray disabled:cursor-not-allowed disabled:opacity-70 dark:border-dark-3 dark:text-white dark:hover:bg-dark-3 ${className}`}
     >
       <svg
         width="23"
@@ -101,10 +101,10 @@ const GoogleAuthButton = ({
           <Loader />
         </>
       ) : (
-        <span>Sign {mode === 'signup' ? 'up' : 'in'} with Google</span>
+        <span>Sign {mode === "signup" ? "up" : "in"} with Google</span>
       )}
     </button>
-  )
-}
+  );
+};
 
-export default GoogleAuthButton
+export default GoogleAuthButton;

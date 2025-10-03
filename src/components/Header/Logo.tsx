@@ -1,5 +1,5 @@
 // Logo.tsx
-import React from 'react';
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -9,7 +9,11 @@ interface LogoProps {
   navbarToggleHandler: () => void;
 }
 
-const Logo: React.FC<LogoProps> = ({ sticky, pathUrl, navbarToggleHandler }) => (
+const Logo: React.FC<LogoProps> = ({
+  sticky,
+  pathUrl,
+  navbarToggleHandler,
+}) => (
   <div className="w-60 max-w-full px-4">
     <Link
       href="/"
@@ -19,14 +23,14 @@ const Logo: React.FC<LogoProps> = ({ sticky, pathUrl, navbarToggleHandler }) => 
       {pathUrl !== "/" ? (
         <>
           <Image
-            src="/images/logo/logo-white.png"
+            src="/images/logo/new-logo-ready-set.png"
             alt="logo"
             width={240}
             height={30}
             className="header-logo w-full dark:hidden"
           />
           <Image
-            src="/images/logo/logo-dark.png"
+            src="/images/logo/new-logo-ready-set.png"
             alt="logo"
             width={240}
             height={30}
@@ -36,14 +40,14 @@ const Logo: React.FC<LogoProps> = ({ sticky, pathUrl, navbarToggleHandler }) => 
       ) : (
         <>
           <Image
-            src={sticky ? "/images/logo/logo-white.png" : "/images/logo/logo-white.png"}
+            src="/images/logo/new-logo-ready-set.png"
             alt="logo"
             width={140}
             height={30}
             className="header-logo w-full dark:hidden"
           />
           <Image
-            src="/images/logo/logo-dark.png"
+            src="/images/logo/new-logo-ready-set.png"
             alt="logo"
             width={140}
             height={30}

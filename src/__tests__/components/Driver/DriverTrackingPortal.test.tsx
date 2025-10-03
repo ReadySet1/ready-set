@@ -9,19 +9,27 @@ import { useOfflineQueue } from '@/hooks/tracking/useOfflineQueue';
 import { DriverStatus } from '@/types/user';
 
 // Mock the tracking hooks
-jest.mock('@/hooks/tracking/useLocationTracking');
-jest.mock('@/hooks/tracking/useDriverShift');
-jest.mock('@/hooks/tracking/useDriverDeliveries');
-jest.mock('@/hooks/tracking/useOfflineQueue');
+jest.mock("@/hooks/tracking/useLocationTracking");
+jest.mock("@/hooks/tracking/useDriverShift");
+jest.mock("@/hooks/tracking/useDriverDeliveries");
+jest.mock("@/hooks/tracking/useOfflineQueue");
 
 // Mock the hooks
-const mockUseLocationTracking = useLocationTracking as jest.MockedFunction<typeof useLocationTracking>;
-const mockUseDriverShift = useDriverShift as jest.MockedFunction<typeof useDriverShift>;
-const mockUseDriverDeliveries = useDriverDeliveries as jest.MockedFunction<typeof useDriverDeliveries>;
-const mockUseOfflineQueue = useOfflineQueue as jest.MockedFunction<typeof useOfflineQueue>;
+const mockUseLocationTracking = useLocationTracking as jest.MockedFunction<
+  typeof useLocationTracking
+>;
+const mockUseDriverShift = useDriverShift as jest.MockedFunction<
+  typeof useDriverShift
+>;
+const mockUseDriverDeliveries = useDriverDeliveries as jest.MockedFunction<
+  typeof useDriverDeliveries
+>;
+const mockUseOfflineQueue = useOfflineQueue as jest.MockedFunction<
+  typeof useOfflineQueue
+>;
 
 // Mock battery API
-Object.defineProperty(navigator, 'getBattery', {
+Object.defineProperty(navigator, "getBattery", {
   writable: true,
   value: jest.fn().mockResolvedValue({
     level: 0.85,
@@ -30,7 +38,7 @@ Object.defineProperty(navigator, 'getBattery', {
 });
 
 // Mock geolocation
-Object.defineProperty(navigator, 'geolocation', {
+Object.defineProperty(navigator, "geolocation", {
   writable: true,
   value: {
     getCurrentPosition: jest.fn(),
@@ -39,10 +47,10 @@ Object.defineProperty(navigator, 'geolocation', {
   },
 });
 
-describe('DriverTrackingPortal', () => {
+describe("DriverTrackingPortal", () => {
   const defaultLocationUpdate = {
-    driverId: 'driver-123',
-    coordinates: { lat: 40.7128, lng: -74.0060 },
+    driverId: "driver-123",
+    coordinates: { lat: 40.7128, lng: -74.006 },
     accuracy: 10,
     speed: 0,
     heading: 0,
@@ -51,8 +59,8 @@ describe('DriverTrackingPortal', () => {
   };
 
   const defaultShift = {
-    id: 'shift-123',
-    driverId: 'driver-123',
+    id: "shift-123",
+    driverId: "driver-123",
     startTime: new Date(),
     startLocation: defaultLocationUpdate.coordinates,
     status: 'active' as const,
@@ -118,8 +126,8 @@ describe('DriverTrackingPortal', () => {
     });
 
     mockUseOfflineQueue.mockReturnValue({
-      offlineStatus: { 
-        isOnline: true, 
+      offlineStatus: {
+        isOnline: true,
         lastSync: new Date(),
         pendingUpdates: 0,
         syncInProgress: false,
@@ -130,15 +138,15 @@ describe('DriverTrackingPortal', () => {
     });
   });
 
-  it('renders without crashing', () => {
+  it("renders without crashing", () => {
     render(<DriverTrackingPortal />);
     expect(screen.getByText(/Online/i)).toBeInTheDocument();
   });
 
-  it('displays offline indicator when offline', () => {
+  it("displays offline indicator when offline", () => {
     mockUseOfflineQueue.mockReturnValue({
-      offlineStatus: { 
-        isOnline: false, 
+      offlineStatus: {
+        isOnline: false,
         lastSync: new Date(),
         pendingUpdates: 0,
         syncInProgress: false,
@@ -152,12 +160,14 @@ describe('DriverTrackingPortal', () => {
     expect(screen.getByText(/Offline/i)).toBeInTheDocument();
   });
 
-  it('shows shift start button when no active shift', () => {
+  it("shows shift start button when no active shift", () => {
     render(<DriverTrackingPortal />);
-    expect(screen.getByRole('button', { name: /start shift/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /start shift/i }),
+    ).toBeInTheDocument();
   });
 
-  it('shows shift end button when shift is active', () => {
+  it("shows shift end button when shift is active", () => {
     mockUseDriverShift.mockReturnValue({
       currentShift: defaultShift,
       isShiftActive: true,
@@ -171,10 +181,12 @@ describe('DriverTrackingPortal', () => {
     });
 
     render(<DriverTrackingPortal />);
-    expect(screen.getByRole('button', { name: /end shift/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /end shift/i }),
+    ).toBeInTheDocument();
   });
 
-  it('handles shift start when location is available', async () => {
+  it("handles shift start when location is available", async () => {
     const mockStartShift = jest.fn().mockResolvedValue(true);
     mockUseLocationTracking.mockReturnValue({
       currentLocation: defaultLocationUpdate,
@@ -199,8 +211,8 @@ describe('DriverTrackingPortal', () => {
     });
 
     render(<DriverTrackingPortal />);
-    
-    const startButton = screen.getByRole('button', { name: /start shift/i });
+
+    const startButton = screen.getByRole("button", { name: /start shift/i });
     await userEvent.click(startButton);
 
     await waitFor(() => {
@@ -208,15 +220,15 @@ describe('DriverTrackingPortal', () => {
     });
   });
 
-  it('shows alert when trying to start shift without location', async () => {
+  it("shows alert when trying to start shift without location", async () => {
     // The component doesn't show an alert, it just disables the button
     render(<DriverTrackingPortal />);
-    
-    const startButton = screen.getByRole('button', { name: /start shift/i });
+
+    const startButton = screen.getByRole("button", { name: /start shift/i });
     expect(startButton).toBeDisabled();
   });
 
-  it('displays active deliveries when available', () => {
+  it("displays active deliveries when available", () => {
     mockUseDriverDeliveries.mockReturnValue({
       activeDeliveries: [defaultDelivery],
       updateDeliveryStatus: jest.fn(),
@@ -229,7 +241,7 @@ describe('DriverTrackingPortal', () => {
     expect(screen.getByText(/Active Deliveries/i)).toBeInTheDocument();
   });
 
-  it('shows tracking status when location tracking is active', () => {
+  it("shows tracking status when location tracking is active", () => {
     mockUseLocationTracking.mockReturnValue({
       currentLocation: defaultLocationUpdate,
       isTracking: true,
@@ -244,7 +256,7 @@ describe('DriverTrackingPortal', () => {
     expect(screen.getByText(/Location tracking active/i)).toBeInTheDocument();
   });
 
-  it('displays location accuracy information', () => {
+  it("displays location accuracy information", () => {
     mockUseLocationTracking.mockReturnValue({
       currentLocation: defaultLocationUpdate,
       isTracking: true,
@@ -259,12 +271,12 @@ describe('DriverTrackingPortal', () => {
     expect(screen.getByText(/15m/i)).toBeInTheDocument();
   });
 
-  it('shows error message when location tracking fails', () => {
+  it("shows error message when location tracking fails", () => {
     mockUseLocationTracking.mockReturnValue({
       currentLocation: null,
       isTracking: false,
       accuracy: null,
-      error: 'Location permission denied',
+      error: "Location permission denied",
       startTracking: jest.fn(),
       stopTracking: jest.fn(),
       updateLocationManually: jest.fn(),
@@ -274,12 +286,12 @@ describe('DriverTrackingPortal', () => {
     expect(screen.getByText(/Location permission denied/i)).toBeInTheDocument();
   });
 
-  it('displays shift status section', () => {
+  it("displays shift status section", () => {
     render(<DriverTrackingPortal />);
     expect(screen.getByText(/Shift Status/i)).toBeInTheDocument();
   });
 
-  it('shows break controls when shift is active', () => {
+  it("shows break controls when shift is active", () => {
     mockUseDriverShift.mockReturnValue({
       currentShift: defaultShift,
       isShiftActive: true,
@@ -293,10 +305,10 @@ describe('DriverTrackingPortal', () => {
     });
 
     render(<DriverTrackingPortal />);
-    expect(screen.getByRole('button', { name: /break/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /break/i })).toBeInTheDocument();
   });
 
-  it('handles break start correctly', async () => {
+  it("handles break start correctly", async () => {
     const mockStartBreak = jest.fn().mockResolvedValue(true);
     mockUseDriverShift.mockReturnValue({
       currentShift: defaultShift,
@@ -311,8 +323,8 @@ describe('DriverTrackingPortal', () => {
     });
 
     render(<DriverTrackingPortal />);
-    
-    const breakButton = screen.getByRole('button', { name: /break/i });
+
+    const breakButton = screen.getByRole("button", { name: /break/i });
     await userEvent.click(breakButton);
 
     await waitFor(() => {
@@ -320,16 +332,16 @@ describe('DriverTrackingPortal', () => {
     });
   });
 
-  it('displays battery level when available', async () => {
+  it("displays battery level when available", async () => {
     render(<DriverTrackingPortal />);
-    
+
     // Wait for battery level to be set
     await waitFor(() => {
       expect(screen.getByText(/85%/i)).toBeInTheDocument();
     });
   });
 
-  it('shows loading state during shift operations', () => {
+  it("shows loading state during shift operations", () => {
     mockUseDriverShift.mockReturnValue({
       currentShift: null,
       isShiftActive: false,
@@ -347,7 +359,7 @@ describe('DriverTrackingPortal', () => {
     expect(screen.getByText(/Online/i)).toBeInTheDocument();
   });
 
-  it('handles delivery status updates', async () => {
+  it("handles delivery status updates", async () => {
     const mockUpdateDeliveryStatus = jest.fn().mockResolvedValue(true);
     mockUseDriverDeliveries.mockReturnValue({
       activeDeliveries: [defaultDelivery],
@@ -358,15 +370,15 @@ describe('DriverTrackingPortal', () => {
     });
 
     render(<DriverTrackingPortal />);
-    
+
     // The component shows deliveries but doesn't have update buttons in the current implementation
     expect(screen.getByText(/Active Deliveries/i)).toBeInTheDocument();
   });
 
-  it('displays offline queue information', () => {
+  it("displays offline queue information", () => {
     mockUseOfflineQueue.mockReturnValue({
-      offlineStatus: { 
-        isOnline: true, 
+      offlineStatus: {
+        isOnline: true,
         lastSync: new Date(),
         pendingUpdates: 0,
         syncInProgress: false,
@@ -381,7 +393,7 @@ describe('DriverTrackingPortal', () => {
     expect(screen.getByText(/Online/i)).toBeInTheDocument();
   });
 
-  it('handles manual location update', async () => {
+  it("handles manual location update", async () => {
     const mockUpdateLocationManually = jest.fn().mockResolvedValue(undefined);
     mockUseLocationTracking.mockReturnValue({
       currentLocation: defaultLocationUpdate,
@@ -394,12 +406,12 @@ describe('DriverTrackingPortal', () => {
     });
 
     render(<DriverTrackingPortal />);
-    
+
     // The component doesn't have a manual update button in the current implementation
     expect(screen.getByText(/Online/i)).toBeInTheDocument();
   });
 
-  it('shows appropriate error messages for different error types', () => {
+  it("shows appropriate error messages for different error types", () => {
     mockUseDriverShift.mockReturnValue({
       currentShift: null,
       isShiftActive: false,
@@ -408,7 +420,7 @@ describe('DriverTrackingPortal', () => {
       startBreak: jest.fn(),
       endBreak: jest.fn(),
       loading: false,
-      error: 'Failed to start shift',
+      error: "Failed to start shift",
       refreshShift: jest.fn(),
     });
 
@@ -416,14 +428,14 @@ describe('DriverTrackingPortal', () => {
     expect(screen.getByText(/Failed to start shift/i)).toBeInTheDocument();
   });
 
-  it('handles component unmounting gracefully', () => {
+  it("handles component unmounting gracefully", () => {
     const { unmount } = render(<DriverTrackingPortal />);
-    
+
     // This should not throw any errors
     expect(() => unmount()).not.toThrow();
   });
 
-  it('displays current location information when available', () => {
+  it("displays current location information when available", () => {
     mockUseLocationTracking.mockReturnValue({
       currentLocation: defaultLocationUpdate,
       isTracking: true,
@@ -440,7 +452,7 @@ describe('DriverTrackingPortal', () => {
     expect(screen.getByText(/-74.006000/i)).toBeInTheDocument();
   });
 
-  it('shows location tracking status indicator', () => {
+  it("shows location tracking status indicator", () => {
     mockUseLocationTracking.mockReturnValue({
       currentLocation: defaultLocationUpdate,
       isTracking: true,
@@ -455,19 +467,21 @@ describe('DriverTrackingPortal', () => {
     expect(screen.getByText(/Location tracking active/i)).toBeInTheDocument();
   });
 
-  it('displays signal strength indicator', () => {
+  it("displays signal strength indicator", () => {
     render(<DriverTrackingPortal />);
     expect(screen.getByText(/--/i)).toBeInTheDocument();
   });
 
-  it('shows shift status section', () => {
+  it("shows shift status section", () => {
     render(<DriverTrackingPortal />);
     expect(screen.getByText(/Shift Status/i)).toBeInTheDocument();
   });
 
-  it('displays ready to start message when no active shift', () => {
+  it("displays ready to start message when no active shift", () => {
     render(<DriverTrackingPortal />);
     expect(screen.getByText(/Ready to Start/i)).toBeInTheDocument();
-    expect(screen.getByText(/Start your shift to begin location tracking/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Start your shift to begin location tracking/i),
+    ).toBeInTheDocument();
   });
 });

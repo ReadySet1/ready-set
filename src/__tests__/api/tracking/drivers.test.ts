@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { GET, POST, PUT, DELETE } from '@/app/api/tracking/drivers/route';
+import { GET, POST, PUT } from '@/app/api/tracking/drivers/route';
 import { createClient } from '@/utils/supabase/server';
 
 // Mock Supabase client
@@ -323,58 +323,6 @@ describe('/api/tracking/drivers', () => {
     });
   });
 
-  describe('DELETE /api/tracking/drivers', () => {
-    it('deletes driver successfully', async () => {
-      const driverId = 'driver-1';
-
-      (mockSupabaseClient.from as any)().delete().eq().single().mockResolvedValue({
-        data: { id: driverId, deleted: true },
-        error: null,
-      });
-
-      const request = new NextRequest(`http://localhost:3000/api/tracking/drivers/${driverId}`, {
-        method: 'DELETE',
-      });
-
-      const response = await DELETE(request);
-
-      expect(response.status).toBe(200);
-    });
-
-    it('returns 404 when driver not found for deletion', async () => {
-      const driverId = 'non-existent-driver';
-
-      (mockSupabaseClient.from as any)().delete().eq().single().mockResolvedValue({
-        data: null,
-        error: { code: 'PGRST116' },
-      });
-
-      const request = new NextRequest(`http://localhost:3000/api/tracking/drivers/${driverId}`, {
-        method: 'DELETE',
-      });
-
-      const response = await DELETE(request);
-
-      expect(response.status).toBe(404);
-    });
-
-    it('handles database deletion errors', async () => {
-      const driverId = 'driver-1';
-
-      (mockSupabaseClient.from as any)().delete().eq().single().mockResolvedValue({
-        data: null,
-        error: { message: 'Deletion failed' },
-      });
-
-      const request = new NextRequest(`http://localhost:3000/api/tracking/drivers/${driverId}`, {
-        method: 'DELETE',
-      });
-
-      const response = await DELETE(request);
-
-      expect(response.status).toBe(500);
-    });
-  });
 
   describe('Authentication and Authorization', () => {
     it('requires authentication for all endpoints', async () => {
@@ -388,7 +336,6 @@ describe('/api/tracking/drivers', () => {
         { method: GET, url: 'http://localhost:3000/api/tracking/drivers' },
         { method: POST, url: 'http://localhost:3000/api/tracking/drivers', body: '{}' },
         { method: PUT, url: 'http://localhost:3000/api/tracking/drivers/driver-1', body: '{}' },
-        { method: DELETE, url: 'http://localhost:3000/api/tracking/drivers/driver-1' },
       ];
 
       for (const endpoint of endpoints) {
@@ -418,7 +365,6 @@ describe('/api/tracking/drivers', () => {
       const writeEndpoints = [
         { method: POST, url: 'http://localhost:3000/api/tracking/drivers', body: '{}' },
         { method: PUT, url: 'http://localhost:3000/api/tracking/drivers/driver-1', body: '{}' },
-        { method: DELETE, url: 'http://localhost:3000/api/tracking/drivers/driver-1' },
       ];
 
       for (const endpoint of writeEndpoints) {

@@ -43,12 +43,33 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
+  const connectRef = useRef<(() => void) | null>(null);
 
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 1000; // 1 second
 
+  // Schedule reconnection with exponential backoff
+  const scheduleReconnect = useCallback((): void => {
+    if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+      setError(`Connection failed after ${maxReconnectAttempts} attempts. Please refresh the page.`);
+      return;
+    }
+
+    const delay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
+    reconnectAttemptsRef.current += 1;
+
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+
+    reconnectTimeoutRef.current = setTimeout(() => {
+      console.log(`Reconnection attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts}`);
+      connectRef.current?.();
+    }, delay);
+  }, []);
+
   // Connect to SSE endpoint
-  const connect = useCallback(() => {
+  const connect = useCallback((): void => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
@@ -105,30 +126,13 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
       setIsConnected(false);
       scheduleReconnect();
     }
-  }, []);
+  }, [scheduleReconnect]);
 
-  // Schedule reconnection with exponential backoff
-  const scheduleReconnect = useCallback(() => {
-    if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-      setError(`Connection failed after ${maxReconnectAttempts} attempts. Please refresh the page.`);
-      return;
-    }
-
-    const delay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
-    reconnectAttemptsRef.current += 1;
-
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-    }
-
-    reconnectTimeoutRef.current = setTimeout(() => {
-      console.log(`Reconnection attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts}`);
-      connect();
-    }, delay);
-  }, [connect]);
+  // Update the ref whenever connect changes
+  connectRef.current = connect;
 
   // Manual reconnect function
-  const reconnect = useCallback(() => {
+  const reconnect = useCallback((): void => {
     reconnectAttemptsRef.current = 0;
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);

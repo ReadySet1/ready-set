@@ -1,6 +1,6 @@
 // src/app/api/health/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { prismaPooled } from '@/lib/db/prisma-pooled';
+import { prismaPooled, healthCheck } from '@/lib/db/prisma-pooled';
 import { addSecurityHeaders } from '@/lib/auth-middleware';
 import { getErrorMetrics } from '@/lib/error-logging';
 
@@ -47,7 +47,11 @@ async function checkDatabaseHealth(): Promise<ServiceHealth> {
     await prismaPooled.$queryRaw`SELECT 1 as test`;
     
     // Test a more complex query
-    const userCount = await prismaPooled.profile.count();
+    const userCount = Number(await prismaPooled.profile.count());
+    
+    // Get connection info and debug prepared statements
+    const connectionInfo = await healthCheck.getConnectionInfo();
+    const preparedStatements = await healthCheck.debugPreparedStatements();
     
     const responseTime = performance.now() - start;
     
@@ -58,7 +62,16 @@ async function checkDatabaseHealth(): Promise<ServiceHealth> {
       details: {
         connectionTime: `${responseTime.toFixed(2)}ms`,
         userCount,
-        poolingEnabled: true
+        poolingEnabled: true,
+        serverless: connectionInfo.serverless,
+        preparedStatementsDisabled: connectionInfo.preparedStatementsDisabled,
+        activeConnections: Number(connectionInfo.activeConnections),
+        preparedStatementsCount: preparedStatements.length,
+        environment: {
+          NODE_ENV: process.env.NODE_ENV,
+          VERCEL_ENV: process.env.VERCEL_ENV,
+          isVercel: !!process.env.VERCEL
+        }
       }
     };
   } catch (error) {
@@ -67,7 +80,13 @@ async function checkDatabaseHealth(): Promise<ServiceHealth> {
       responseTime: performance.now() - start,
       message: 'Database connection failed',
       details: {
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
+        serverless: !!process.env.VERCEL,
+        environment: {
+          NODE_ENV: process.env.NODE_ENV,
+          VERCEL_ENV: process.env.VERCEL_ENV,
+          isVercel: !!process.env.VERCEL
+        }
       }
     };
   }
@@ -303,12 +322,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Get error metrics
     const errorMetrics = getErrorMetrics();
-    
+
     // Calculate system uptime (simplified - would be better stored in a persistent way)
     const uptime = process.uptime();
-    
-    // Get memory usage
+
+    // Get memory usage and convert BigInt values to numbers
     const memoryUsage = process.memoryUsage();
+    const memoryUsageNumbers = {
+      rss: Number(memoryUsage.rss),
+      heapTotal: Number(memoryUsage.heapTotal),
+      heapUsed: Number(memoryUsage.heapUsed),
+      external: Number(memoryUsage.external),
+      arrayBuffers: Number(memoryUsage.arrayBuffers)
+    };
     
     const responseTime = performance.now() - startTime;
     
@@ -321,7 +347,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       services,
       performance: {
         responseTime,
-        memoryUsage
+        memoryUsage: memoryUsageNumbers
       },
       errors: {
         recentErrorCount: errorMetrics.recentErrors.length,

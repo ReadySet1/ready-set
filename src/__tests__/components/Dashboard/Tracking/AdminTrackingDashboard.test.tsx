@@ -6,13 +6,15 @@ import { useRealTimeTracking } from '@/hooks/tracking/useRealTimeTracking';
 import { DriverStatus } from '@/types/user';
 
 // Mock the tracking hook
-jest.mock('@/hooks/tracking/useRealTimeTracking');
+jest.mock("@/hooks/tracking/useRealTimeTracking");
 
 // Mock the hooks
-const mockUseRealTimeTracking = useRealTimeTracking as jest.MockedFunction<typeof useRealTimeTracking>;
+const mockUseRealTimeTracking = useRealTimeTracking as jest.MockedFunction<
+  typeof useRealTimeTracking
+>;
 
 // Mock map components
-jest.mock('@/components/Dashboard/Tracking/LiveDriverMap', () => {
+jest.mock("@/components/Dashboard/Tracking/LiveDriverMap", () => {
   return function MockLiveDriverMap({ drivers, deliveries }: any) {
     return (
       <div data-testid="live-driver-map">
@@ -24,7 +26,7 @@ jest.mock('@/components/Dashboard/Tracking/LiveDriverMap', () => {
   };
 });
 
-jest.mock('@/components/Dashboard/Tracking/DriverStatusList', () => {
+jest.mock("@/components/Dashboard/Tracking/DriverStatusList", () => {
   return function MockDriverStatusList({ drivers, onDriverSelect }: any) {
     return (
       <div data-testid="driver-status-list">
@@ -43,7 +45,7 @@ jest.mock('@/components/Dashboard/Tracking/DriverStatusList', () => {
   };
 });
 
-jest.mock('@/components/Dashboard/Tracking/DeliveryAssignmentPanel', () => {
+jest.mock("@/components/Dashboard/Tracking/DeliveryAssignmentPanel", () => {
   return function MockDeliveryAssignmentPanel({ deliveries, onAssign }: any) {
     return (
       <div data-testid="delivery-assignment-panel">
@@ -62,7 +64,7 @@ jest.mock('@/components/Dashboard/Tracking/DeliveryAssignmentPanel', () => {
   };
 });
 
-describe('AdminTrackingDashboard', () => {
+describe("AdminTrackingDashboard", () => {
   const mockDrivers = [
     {
       id: 'driver-1',
@@ -75,8 +77,8 @@ describe('AdminTrackingDashboard', () => {
       },
       lastLocationUpdate: new Date(),
       vehicleInfo: {
-        number: 'V001',
-        type: 'van',
+        number: "V001",
+        type: "van",
       },
       metadata: {},
       createdAt: new Date(),
@@ -91,8 +93,8 @@ describe('AdminTrackingDashboard', () => {
       lastKnownLocation: undefined,
       lastLocationUpdate: undefined,
       vehicleInfo: {
-        number: 'V002',
-        type: 'car',
+        number: "V002",
+        type: "car",
       },
       metadata: {},
       createdAt: new Date(),
@@ -143,32 +145,32 @@ describe('AdminTrackingDashboard', () => {
     });
   });
 
-  it('renders without crashing', () => {
+  it("renders without crashing", () => {
     render(<AdminTrackingDashboard />);
     expect(screen.getByText(/Driver Tracking Dashboard/i)).toBeInTheDocument();
   });
 
-  it('displays the live driver map', () => {
+  it("displays the live driver map", () => {
     render(<AdminTrackingDashboard />);
-    expect(screen.getByTestId('live-driver-map')).toBeInTheDocument();
+    expect(screen.getByTestId("live-driver-map")).toBeInTheDocument();
   });
 
-  it('displays the driver status list', () => {
+  it("displays the driver status list", () => {
     render(<AdminTrackingDashboard />);
-    expect(screen.getByTestId('driver-status-list')).toBeInTheDocument();
+    expect(screen.getByTestId("driver-status-list")).toBeInTheDocument();
   });
 
-  it('displays the delivery assignment panel', () => {
+  it("displays the delivery assignment panel", () => {
     render(<AdminTrackingDashboard />);
-    expect(screen.getByTestId('delivery-assignment-panel')).toBeInTheDocument();
+    expect(screen.getByTestId("delivery-assignment-panel")).toBeInTheDocument();
   });
 
-  it('shows real-time connection status', () => {
+  it("shows real-time connection status", () => {
     render(<AdminTrackingDashboard />);
     expect(screen.getByText(/Connected/i)).toBeInTheDocument();
   });
 
-  it('shows disconnected status when not connected', () => {
+  it("shows disconnected status when not connected", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: mockDrivers,
       activeDeliveries: mockDeliveries,
@@ -182,8 +184,8 @@ describe('AdminTrackingDashboard', () => {
     expect(screen.getByText(/Disconnected/i)).toBeInTheDocument();
   });
 
-  it('displays last update timestamp', () => {
-    const testDate = new Date('2024-01-01T12:00:00Z');
+  it("displays last update timestamp", () => {
+    const testDate = new Date("2024-01-01T12:00:00Z");
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: mockDrivers,
       activeDeliveries: mockDeliveries,
@@ -197,7 +199,7 @@ describe('AdminTrackingDashboard', () => {
     expect(screen.getByText(/Last Update:/i)).toBeInTheDocument();
   });
 
-  it('shows loading state when data is loading', () => {
+  it("shows loading state when data is loading", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
       activeDeliveries: [],
@@ -211,7 +213,7 @@ describe('AdminTrackingDashboard', () => {
     expect(screen.getByText(/Loading tracking data/i)).toBeInTheDocument();
   });
 
-  it('displays error message when there is an error', () => {
+  it("displays error message when there is an error", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
       activeDeliveries: [],
@@ -222,10 +224,12 @@ describe('AdminTrackingDashboard', () => {
     });
 
     render(<AdminTrackingDashboard />);
-    expect(screen.getByText(/Failed to connect to tracking service/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Failed to connect to tracking service/i),
+    ).toBeInTheDocument();
   });
 
-  it('shows refresh button and handles refresh', async () => {
+  it("shows refresh button and handles refresh", async () => {
     const mockRefreshData = jest.fn();
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: mockDrivers,
@@ -237,69 +241,69 @@ describe('AdminTrackingDashboard', () => {
     });
 
     render(<AdminTrackingDashboard />);
-    
-    const refreshButton = screen.getByRole('button', { name: /refresh/i });
+
+    const refreshButton = screen.getByRole("button", { name: /refresh/i });
     expect(refreshButton).toBeInTheDocument();
 
     await userEvent.click(refreshButton);
     expect(mockRefreshData).toHaveBeenCalled();
   });
 
-  it('displays driver count summary', () => {
+  it("displays driver count summary", () => {
     render(<AdminTrackingDashboard />);
     expect(screen.getByText(/2 Drivers/i)).toBeInTheDocument();
   });
 
-  it('displays delivery count summary', () => {
+  it("displays delivery count summary", () => {
     render(<AdminTrackingDashboard />);
     expect(screen.getByText(/2 Deliveries/i)).toBeInTheDocument();
   });
 
-  it('shows active drivers count', () => {
+  it("shows active drivers count", () => {
     render(<AdminTrackingDashboard />);
     const activeDrivers = mockDrivers.filter(d => d.isOnDuty === true).length;
     expect(screen.getByText(new RegExp(`${activeDrivers} Active`, 'i'))).toBeInTheDocument();
   });
 
-  it('shows offline drivers count', () => {
+  it("shows offline drivers count", () => {
     render(<AdminTrackingDashboard />);
     const offlineDrivers = mockDrivers.filter(d => d.isOnDuty === false).length;
     expect(screen.getByText(new RegExp(`${offlineDrivers} Offline`, 'i'))).toBeInTheDocument();
   });
 
-  it('displays pending deliveries count', () => {
+  it("displays pending deliveries count", () => {
     render(<AdminTrackingDashboard />);
     const pendingDeliveries = mockDeliveries.filter(d => d.status === DriverStatus.ASSIGNED).length;
     expect(screen.getByText(new RegExp(`${pendingDeliveries} Pending`, 'i'))).toBeInTheDocument();
   });
 
-  it('displays in-transit deliveries count', () => {
+  it("displays in-transit deliveries count", () => {
     render(<AdminTrackingDashboard />);
     const inTransitDeliveries = mockDeliveries.filter(d => d.status === DriverStatus.EN_ROUTE_TO_CLIENT).length;
     expect(screen.getByText(new RegExp(`${inTransitDeliveries} In Transit`, 'i'))).toBeInTheDocument();
   });
 
-  it('handles driver selection from status list', async () => {
+  it("handles driver selection from status list", async () => {
     render(<AdminTrackingDashboard />);
-    
-    const driverButton = screen.getByTestId('driver-driver-1');
+
+    const driverButton = screen.getByTestId("driver-driver-1");
     await userEvent.click(driverButton);
 
     // Verify driver selection is handled (you might need to add state management for this)
     expect(driverButton).toBeInTheDocument();
   });
 
-  it('handles delivery assignment', async () => {
+  it("handles delivery assignment", async () => {
     render(<AdminTrackingDashboard />);
-    
-    const deliveryButton = screen.getByTestId('delivery-delivery-1');
+
+    const deliveryButton = screen.getByTestId("delivery-delivery-1");
     await userEvent.click(deliveryButton);
 
     // Verify delivery assignment is handled
     expect(deliveryButton).toBeInTheDocument();
   });
 
-  it('displays empty state when no drivers', () => {
+  it("displays empty state when no drivers", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
       activeDeliveries: mockDeliveries,
@@ -313,7 +317,7 @@ describe('AdminTrackingDashboard', () => {
     expect(screen.getByText(/No drivers available/i)).toBeInTheDocument();
   });
 
-  it('displays empty state when no deliveries', () => {
+  it("displays empty state when no deliveries", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: mockDrivers,
       activeDeliveries: [],
@@ -327,7 +331,7 @@ describe('AdminTrackingDashboard', () => {
     expect(screen.getByText(/No deliveries available/i)).toBeInTheDocument();
   });
 
-  it('shows connection retry button when disconnected', () => {
+  it("shows connection retry button when disconnected", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
       activeDeliveries: [],
@@ -338,10 +342,12 @@ describe('AdminTrackingDashboard', () => {
     });
 
     render(<AdminTrackingDashboard />);
-    expect(screen.getByRole('button', { name: /retry connection/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /retry connection/i }),
+    ).toBeInTheDocument();
   });
 
-  it('handles connection retry', async () => {
+  it("handles connection retry", async () => {
     const mockRefreshData = jest.fn();
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
@@ -353,58 +359,60 @@ describe('AdminTrackingDashboard', () => {
     });
 
     render(<AdminTrackingDashboard />);
-    
-    const retryButton = screen.getByRole('button', { name: /retry connection/i });
+
+    const retryButton = screen.getByRole("button", {
+      name: /retry connection/i,
+    });
     await userEvent.click(retryButton);
 
     expect(mockRefreshData).toHaveBeenCalled();
   });
 
-  it('displays real-time update indicator', () => {
+  it("displays real-time update indicator", () => {
     render(<AdminTrackingDashboard />);
     expect(screen.getByText(/Real-time Updates/i)).toBeInTheDocument();
   });
 
-  it('shows dashboard statistics', () => {
+  it("shows dashboard statistics", () => {
     render(<AdminTrackingDashboard />);
-    
+
     // Check for various statistics
     expect(screen.getByText(/Total Drivers/i)).toBeInTheDocument();
     expect(screen.getByText(/Total Deliveries/i)).toBeInTheDocument();
     expect(screen.getByText(/Active Shifts/i)).toBeInTheDocument();
   });
 
-  it('handles component unmounting gracefully', () => {
+  it("handles component unmounting gracefully", () => {
     const { unmount } = render(<AdminTrackingDashboard />);
-    
+
     // This should not throw any errors
     expect(() => unmount()).not.toThrow();
   });
 
-  it('displays driver vehicle information', () => {
+  it("displays driver vehicle information", () => {
     render(<AdminTrackingDashboard />);
-    
+
     // Check if vehicle info is displayed in the driver list
     expect(screen.getByText(/V001/i)).toBeInTheDocument();
     expect(screen.getByText(/V002/i)).toBeInTheDocument();
   });
 
-  it('shows shift duration for active drivers', () => {
+  it("shows shift duration for active drivers", () => {
     render(<AdminTrackingDashboard />);
-    
+
     // Check if shift duration is calculated and displayed
     expect(screen.getByText(/Shift Duration/i)).toBeInTheDocument();
   });
 
-  it('displays delivery status with proper styling', () => {
+  it("displays delivery status with proper styling", () => {
     render(<AdminTrackingDashboard />);
-    
+
     // Check if delivery statuses are properly styled
     expect(screen.getByText(/pending/i)).toBeInTheDocument();
     expect(screen.getByText(/in_transit/i)).toBeInTheDocument();
   });
 
-  it('handles real-time data updates', async () => {
+  it("handles real-time data updates", async () => {
     const mockRefreshData = jest.fn();
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: mockDrivers,
@@ -416,7 +424,7 @@ describe('AdminTrackingDashboard', () => {
     });
 
     render(<AdminTrackingDashboard />);
-    
+
     // Simulate real-time update
     await waitFor(() => {
       expect(mockRefreshData).not.toHaveBeenCalled(); // Should not auto-refresh unless configured

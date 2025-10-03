@@ -3,10 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -34,7 +31,7 @@ import {
   PlusCircle,
   Filter,
   Mail,
-  Phone
+  Phone,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -43,7 +40,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Select,
@@ -67,37 +64,74 @@ import { useToast } from "@/components/ui/use-toast";
 import toast, { Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { UserType, UserStatus } from "@/types/prisma";
+import {
+  ApiTypeUtils,
+  ApiUserTypeFilter,
+  ApiUserStatusFilter,
+  UsersApiResponse,
+} from "@/types/api-shared";
 
-// --- Types ---
-type UserType = 'vendor' | 'client' | 'driver' | 'admin' | 'helpdesk' | 'super_admin';
-type UserStatus = 'active' | 'pending' | 'deleted';
-
+// --- Updated Types using shared definitions ---
 interface User {
   id: string;
   name?: string | null;
   email: string | null;
-  type: UserType;
+  type: UserType; // Now uses uppercase enum values
   contact_name?: string | null;
   contact_number?: string | null;
   companyName?: string | null;
-  status: UserStatus;
-  createdAt: string; 
+  status: UserStatus; // Now uses uppercase enum values
+  createdAt: string;
 }
 
-// --- Status and Type Configuration ---
-const userTypeConfig: Record<UserType, { className: string, icon: React.ReactNode }> = {
-  'vendor': { className: "bg-purple-100 text-purple-800 hover:bg-purple-200", icon: <User className="h-3 w-3" /> },
-  'client': { className: "bg-blue-100 text-blue-800 hover:bg-blue-200", icon: <User className="h-3 w-3" /> },
-  'driver': { className: "bg-green-100 text-green-800 hover:bg-green-200", icon: <User className="h-3 w-3" /> },
-  'admin': { className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200", icon: <User className="h-3 w-3" /> },
-  'helpdesk': { className: "bg-orange-100 text-orange-800 hover:bg-orange-200", icon: <User className="h-3 w-3" /> },
-  'super_admin': { className: "bg-red-100 text-red-800 hover:bg-red-200", icon: <User className="h-3 w-3" /> },
+// --- Status and Type Configuration using uppercase enum values ---
+const userTypeConfig: Record<
+  UserType,
+  { className: string; icon: React.ReactNode }
+> = {
+  VENDOR: {
+    className: "bg-purple-100 text-purple-800 hover:bg-purple-200",
+    icon: <User className="h-3 w-3" />,
+  },
+  CLIENT: {
+    className: "bg-blue-100 text-blue-800 hover:bg-blue-200",
+    icon: <User className="h-3 w-3" />,
+  },
+  DRIVER: {
+    className: "bg-green-100 text-green-800 hover:bg-green-200",
+    icon: <User className="h-3 w-3" />,
+  },
+  ADMIN: {
+    className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
+    icon: <User className="h-3 w-3" />,
+  },
+  HELPDESK: {
+    className: "bg-orange-100 text-orange-800 hover:bg-orange-200",
+    icon: <User className="h-3 w-3" />,
+  },
+  SUPER_ADMIN: {
+    className: "bg-red-100 text-red-800 hover:bg-red-200",
+    icon: <User className="h-3 w-3" />,
+  },
 };
 
-const statusConfig: Record<UserStatus, { className: string, icon: React.ReactNode }> = {
-  'active': { className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-200", icon: <AlertCircle className="h-3 w-3" /> },
-  'pending': { className: "bg-amber-100 text-amber-800 hover:bg-amber-200", icon: <AlertCircle className="h-3 w-3" /> },
-  'deleted': { className: "bg-red-100 text-red-800 hover:bg-red-200", icon: <AlertCircle className="h-3 w-3" /> },
+const statusConfig: Record<
+  UserStatus,
+  { className: string; icon: React.ReactNode }
+> = {
+  ACTIVE: {
+    className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-200",
+    icon: <AlertCircle className="h-3 w-3" />,
+  },
+  PENDING: {
+    className: "bg-amber-100 text-amber-800 hover:bg-amber-200",
+    icon: <AlertCircle className="h-3 w-3" />,
+  },
+  DELETED: {
+    className: "bg-red-100 text-red-800 hover:bg-red-200",
+    icon: <AlertCircle className="h-3 w-3" />,
+  },
 };
 
 // --- Loading Skeleton ---
@@ -107,16 +141,24 @@ const LoadingSkeleton = () => (
       <Skeleton className="h-10 w-[250px]" />
       <Skeleton className="h-10 w-[200px]" />
     </div>
-    <div className="rounded-lg border overflow-hidden">
+    <div className="overflow-hidden rounded-lg border">
       <div className="bg-slate-50 p-4">
         <div className="grid grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (<Skeleton key={i} className="h-8 w-full" />))}
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-8 w-full" />
+          ))}
         </div>
       </div>
       {[...Array(5)].map((_, i) => (
         <div key={i} className="border-t p-4">
           <div className="grid grid-cols-5 gap-4">
-            {[...Array(5)].map((_, j) => (<Skeleton key={j} className="h-6 w-full" style={{ animationDelay: `${i * 100 + j * 50}ms` }} />))}
+            {[...Array(5)].map((_, j) => (
+              <Skeleton
+                key={j}
+                className="h-6 w-full"
+                style={{ animationDelay: `${i * 100 + j * 50}ms` }}
+              />
+            ))}
           </div>
         </div>
       ))}
@@ -140,8 +182,8 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all');
-  const [typeFilter, setTypeFilter] = useState<UserType | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<ApiUserStatusFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<ApiUserTypeFilter>("all");
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<string>("name");
@@ -152,9 +194,11 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
   const { toast } = useToast();
   const router = useRouter();
   const supabase = createClient();
-  
-  // Check if current user can delete users (only admin and super_admin)
-  const canDeleteUsers = ["admin", "super_admin"].includes(userType);
+
+  // Check if current user can delete users (using uppercase values)
+  const normalizedUserType = ApiTypeUtils.normalizeUserType(userType);
+  const canDeleteUsers =
+    normalizedUserType === "ADMIN" || normalizedUserType === "SUPER_ADMIN";
 
   // --- Data Fetching ---
   useEffect(() => {
@@ -163,10 +207,10 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
 
     const fetchUsers = async () => {
       if (!isMounted) return;
-      
+
       try {
         // Set loading state at the beginning of the fetch attempt
-        setIsLoading(true); 
+        setIsLoading(true);
         setError(null);
 
         // Build query params
@@ -182,93 +226,191 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
         const apiUrl = `/api/users?${params.toString()}`;
 
         // Send event to Highlight for debugging
-        if (typeof window !== 'undefined' && window.H) {
-          window.H.track('admin_users_fetch_attempt', {
+        if (typeof window !== "undefined" && window.H) {
+          window.H.track("admin_users_fetch_attempt", {
             url: apiUrl,
             page,
             searchTerm,
             statusFilter,
             typeFilter,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           });
         }
-        
+
         // Get the session and ensure authentication
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session?.access_token) {
           throw new Error("No active session - please log in again");
         }
-        
+
         const response = await fetch(apiUrl, {
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
           },
-          credentials: 'include'
+          credentials: "include",
         });
 
         if (!response.ok) {
           let errorData;
           try {
-             errorData = await response.json();
+            errorData = await response.json();
           } catch (parseError) {
-             // Ignore if response body is not JSON
+            // If response body is not JSON, use default error
+            errorData = null;
           }
-          const errorMessage = errorData?.error || `API Error: ${response.status} ${response.statusText}`;
-          
-          // Track this error in Highlight with context
-          if (typeof window !== 'undefined' && window.H) {
-            window.H.track('admin_users_api_error', {
+
+          // Enhanced error handling with specific error types
+          let errorMessage = "An unexpected error occurred";
+
+          if (errorData) {
+            // Handle structured API errors
+            if (errorData.code === "VALIDATION_ERROR") {
+              errorMessage = `Invalid data: ${errorData.error}`;
+              if (errorData.field) {
+                errorMessage += ` (Field: ${errorData.field})`;
+              }
+            } else if (errorData.code === "DUPLICATE_EMAIL") {
+              errorMessage = "This email address is already in use";
+            } else if (errorData.code === "USER_NOT_FOUND") {
+              errorMessage = "User not found";
+            } else if (errorData.code === "CONSTRAINT_VIOLATION") {
+              errorMessage = "Data validation failed";
+            } else if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } else {
+            // Fallback to HTTP status messages
+            if (response.status === 403) {
+              errorMessage =
+                "You don't have permission to access this resource";
+            } else if (response.status === 401) {
+              errorMessage = "Please log in again to continue";
+            } else if (response.status === 500) {
+              errorMessage = "Server error. Please try again later.";
+            } else {
+              errorMessage = `API Error: ${response.status} ${response.statusText}`;
+            }
+          }
+
+          // Track this error in Highlight with enhanced context
+          if (typeof window !== "undefined" && window.H) {
+            window.H.track("admin_users_api_error", {
               status: response.status,
               statusText: response.statusText,
               url: apiUrl,
               errorMessage,
+              errorCode: errorData?.code,
+              errorField: errorData?.field,
               page,
               searchTerm,
               statusFilter,
-              typeFilter
+              typeFilter,
+              timestamp: new Date().toISOString(),
             });
           }
-          
+
           throw new Error(errorMessage);
         }
 
         const data = await response.json();
 
-        if (!data || !Array.isArray(data.users) || typeof data.totalPages !== 'number') {
-           console.error("Invalid data structure received from API:", data);
-           
-           // Track this validation error in Highlight with context
-           if (typeof window !== 'undefined' && window.H) {
-             window.H.track('admin_users_invalid_data', {
-               dataStructure: JSON.stringify(data),
-               url: apiUrl
-             });
-           }
-           
-           throw new Error('Invalid data structure received from API');
-        }
-        
-        if (isMounted) {
-          setUsers(data.users);
-          setTotalPages(data.totalPages);
-          
-          // Report successful fetch to Highlight
-          if (typeof window !== 'undefined' && window.H) {
-            window.H.track('admin_users_fetch_success', {
+        // Enhanced data validation with fallbacks
+        if (!data || typeof data !== "object") {
+          console.error(
+            "No data or invalid data type received from API:",
+            data,
+          );
+
+          // Track this validation error in Highlight with context
+          if (typeof window !== "undefined" && window.H) {
+            window.H.track("admin_users_invalid_data", {
+              dataType: typeof data,
+              hasData: !!data,
               url: apiUrl,
-              count: data.users.length,
-              totalPages: data.totalPages,
-              page: page
+            });
+          }
+
+          throw new Error("No valid data received from API");
+        }
+
+        // Validate and fallback for users array
+        let validatedUsers: User[] = [];
+        if (Array.isArray(data.users)) {
+          validatedUsers = data.users
+            .filter((user: any) => user && user.id && user.email) // Filter out invalid users
+            .map((user: any) => ({
+              ...user,
+              // Apply fallbacks and normalize data
+              type:
+                ApiTypeUtils.normalizeUserType(user.type) !== "all"
+                  ? (ApiTypeUtils.normalizeUserType(user.type) as UserType)
+                  : ("VENDOR" as UserType), // Default fallback
+              status:
+                ApiTypeUtils.normalizeUserStatus(user.status) !== "all"
+                  ? (ApiTypeUtils.normalizeUserStatus(
+                      user.status,
+                    ) as UserStatus)
+                  : ("PENDING" as UserStatus), // Default fallback
+              name: user.name || user.contact_name || null,
+              createdAt: user.createdAt || new Date().toISOString(),
+            }));
+        } else {
+          console.warn(
+            "Users array not found or invalid, using empty array fallback",
+          );
+          validatedUsers = [];
+        }
+
+        // Validate and fallback for pagination data
+        const validatedTotalPages =
+          typeof data.totalPages === "number" && data.totalPages > 0
+            ? data.totalPages
+            : 1; // Default fallback
+
+        // Log validation issues for debugging
+        if (data.users && !Array.isArray(data.users)) {
+          console.warn("Users data is not an array:", typeof data.users);
+        }
+        if (validatedUsers.length !== (data.users?.length || 0)) {
+          console.warn(
+            `Filtered ${(data.users?.length || 0) - validatedUsers.length} invalid users from response`,
+          );
+        }
+
+        // Track validation stats
+        if (typeof window !== "undefined" && window.H) {
+          window.H.track("admin_users_data_validation", {
+            originalCount: data.users?.length || 0,
+            validatedCount: validatedUsers.length,
+            filteredCount: (data.users?.length || 0) - validatedUsers.length,
+            totalPages: validatedTotalPages,
+            url: apiUrl,
+          });
+        }
+
+        if (isMounted) {
+          setUsers(validatedUsers);
+          setTotalPages(validatedTotalPages);
+
+          // Report successful fetch to Highlight
+          if (typeof window !== "undefined" && window.H) {
+            window.H.track("admin_users_fetch_success", {
+              url: apiUrl,
+              count: validatedUsers.length,
+              totalPages: validatedTotalPages,
+              page: page,
+              originalCount: data.users?.length || 0,
             });
           }
         }
-
       } catch (error) {
         console.error("API Fetch Error:", error);
-        
+
         // Report error to Highlight directly
-        if (typeof window !== 'undefined' && window.H) {
+        if (typeof window !== "undefined" && window.H) {
           // Ensure the error is properly formatted for Highlight
           try {
             if (error instanceof Error) {
@@ -276,9 +418,9 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
             } else {
               window.H.consumeError(new Error(String(error)));
             }
-            
+
             // Additional tracking with more context
-            window.H.track('admin_users_fetch_error', {
+            window.H.track("admin_users_fetch_error", {
               message: error instanceof Error ? error.message : String(error),
               stack: error instanceof Error ? error.stack : undefined,
               page,
@@ -287,17 +429,24 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                 status: statusFilter,
                 type: typeFilter,
                 sort: sortField,
-                direction: sortDirection
+                direction: sortDirection,
               },
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
             });
           } catch (highlightError) {
-            console.error("Failed to report error to Highlight:", highlightError);
+            console.error(
+              "Failed to report error to Highlight:",
+              highlightError,
+            );
           }
         }
-        
+
         if (isMounted) {
-          setError(error instanceof Error ? error.message : "An unknown error occurred while fetching users");
+          setError(
+            error instanceof Error
+              ? error.message
+              : "An unknown error occurred while fetching users",
+          );
           setUsers([]); // Clear users on error
           setTotalPages(1); // Reset pagination on error
         }
@@ -315,7 +464,7 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
 
     // Set a new timer to fetch users after a delay
     debounceTimer = setTimeout(() => {
-        fetchUsers();
+      fetchUsers();
     }, 300); // Debounce all fetches triggered by dependency changes
 
     // Cleanup function
@@ -324,23 +473,30 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
       if (debounceTimer) clearTimeout(debounceTimer); // Clear timer on unmount or re-run
     };
 
-  // Fetch when page, filters, search, or sort changes.
-  }, [page, statusFilter, typeFilter, searchTerm, sortField, sortDirection, supabase]); 
-
+    // Fetch when page, filters, search, or sort changes.
+  }, [
+    page,
+    statusFilter,
+    typeFilter,
+    searchTerm,
+    sortField,
+    sortDirection,
+    supabase,
+  ]);
 
   // --- Handlers ---
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > totalPages) return;
     setPage(newPage);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleStatusFilter = (status: UserStatus | 'all') => {
+  const handleStatusFilter = (status: ApiUserStatusFilter) => {
     setStatusFilter(status);
     setPage(1); // Reset to first page on filter change
   };
 
-  const handleTypeFilter = (type: UserType | 'all') => {
+  const handleTypeFilter = (type: ApiUserTypeFilter) => {
     setTypeFilter(type);
     setPage(1); // Reset to first page on filter change
   };
@@ -359,46 +515,52 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
 
   const getSortIcon = (field: string) => {
     if (field !== sortField) return null;
-    
-    return sortDirection === "asc" ? 
-      <ChevronDown className="h-4 w-4 ml-1 text-amber-600" /> : 
-      <ChevronDown className="h-4 w-4 ml-1 rotate-180 text-amber-600" />;
+
+    return sortDirection === "asc" ? (
+      <ChevronDown className="ml-1 h-4 w-4 text-amber-600" />
+    ) : (
+      <ChevronDown className="ml-1 h-4 w-4 rotate-180 text-amber-600" />
+    );
   };
 
   const handleDelete = async (userId: string) => {
     setIsDeleting(true);
     try {
       // Get session for auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       const response = await fetch(`/api/users/${userId}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': session ? `Bearer ${session.access_token}` : '',
+          "Content-Type": "application/json",
+          Authorization: session ? `Bearer ${session.access_token}` : "",
         },
-        credentials: 'include'
+        credentials: "include",
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to delete user: ${response.status}`);
+        throw new Error(
+          errorData.error || `Failed to delete user: ${response.status}`,
+        );
       }
 
       // On success, remove user from local state
-      setUsers(users.filter(user => user.id !== userId));
-      
+      setUsers(users.filter((user) => user.id !== userId));
+
       toast({
         title: "User deleted",
         description: "The user has been successfully deleted.",
         duration: 3000,
       });
-
     } catch (error) {
       console.error("Delete Error:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete user",
+        description:
+          error instanceof Error ? error.message : "Failed to delete user",
         variant: "destructive",
         duration: 3000,
       });
@@ -412,15 +574,15 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
   return (
     <div className="space-y-4">
       <Toaster position="top-center" />
-      
+
       <Card className="shadow-sm">
         <CardContent className="p-0">
           <div className="flex flex-col">
             {/* --- Header Section --- */}
-            <div className="border-b bg-slate-50 p-4 flex flex-wrap gap-3 items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-slate-50 p-4">
               <div className="flex items-center space-x-2">
-                <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                  <Users2 className="h-5 w-5 mr-2 text-amber-500" />
+                <h2 className="flex items-center text-xl font-bold text-slate-800">
+                  <Users2 className="mr-2 h-5 w-5 text-amber-500" />
                   Users
                 </h2>
 
@@ -428,69 +590,64 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="ml-2">
-                      <Filter className="h-4 w-4 mr-1" />
+                      <Filter className="mr-1 h-4 w-4" />
                       Status
-                      {statusFilter !== 'all' && <Badge variant="outline" className="ml-2 capitalize">{statusFilter}</Badge>}
+                      {statusFilter !== "all" && (
+                        <Badge variant="outline" className="ml-2">
+                          {ApiTypeUtils.getUserStatusDisplayLabel(
+                            statusFilter as UserStatus,
+                          )}
+                        </Badge>
+                      )}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={() => handleStatusFilter('all')}>
-                      All Statuses
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleStatusFilter('active')}>
-                      Active
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleStatusFilter('pending')}>
-                      Pending
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleStatusFilter('deleted')}>
-                      Deleted
-                    </DropdownMenuItem>
+                    {ApiTypeUtils.getUserStatusOptions().map((option) => (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => handleStatusFilter(option.value)}
+                      >
+                        {option.label}
+                      </DropdownMenuItem>
+                    ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm">
-                      <Filter className="h-4 w-4 mr-1" />
+                      <Filter className="mr-1 h-4 w-4" />
                       Type
-                      {typeFilter !== 'all' && <Badge variant="outline" className="ml-2 capitalize">{typeFilter}</Badge>}
+                      {typeFilter !== "all" && (
+                        <Badge variant="outline" className="ml-2">
+                          {ApiTypeUtils.getUserTypeDisplayLabel(
+                            typeFilter as UserType,
+                          )}
+                        </Badge>
+                      )}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={() => handleTypeFilter('all')}>
-                      All Types
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleTypeFilter('vendor')}>
-                      Vendor
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleTypeFilter('client')}>
-                      Client
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleTypeFilter('driver')}>
-                      Driver
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleTypeFilter('admin')}>
-                      Admin
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleTypeFilter('helpdesk')}>
-                      Helpdesk
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleTypeFilter('super_admin')}>
-                      Super Admin
-                    </DropdownMenuItem>
+                    {ApiTypeUtils.getUserTypeOptions().map((option) => (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => handleTypeFilter(option.value)}
+                      >
+                        {option.label}
+                      </DropdownMenuItem>
+                    ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
 
-              <div className="flex items-center space-x-2 ml-auto">
+              <div className="ml-auto flex items-center space-x-2">
                 {/* --- Search Bar --- */}
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
                   <Input
                     type="text"
                     placeholder="Search users..."
-                    className="pl-9 w-[200px] md:w-[300px]"
+                    className="w-[200px] pl-9 md:w-[300px]"
                     value={searchTerm}
                     onChange={(e) => {
                       setSearchTerm(e.target.value);
@@ -498,11 +655,11 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                     }}
                   />
                 </div>
-                
+
                 {/* --- Add User Button --- */}
                 <Link href="/admin/users/new">
                   <Button size="sm" className="whitespace-nowrap">
-                    <PlusCircle className="h-4 w-4 mr-1" />
+                    <PlusCircle className="mr-1 h-4 w-4" />
                     Add User
                   </Button>
                 </Link>
@@ -515,9 +672,7 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>
-                    {error}
-                  </AlertDescription>
+                  <AlertDescription>{error}</AlertDescription>
                 </Alert>
               </div>
             )}
@@ -530,31 +685,46 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                 <Table className="min-w-[800px]">
                   <TableHeader className="bg-slate-50">
                     <TableRow>
-                      <TableHead className="min-w-[200px] cursor-pointer" onClick={() => handleSort("name")}>
+                      <TableHead
+                        className="min-w-[200px] cursor-pointer"
+                        onClick={() => handleSort("name")}
+                      >
                         <div className="flex items-center">
                           <span>Name / Email</span>
                           {getSortIcon("name")}
                         </div>
                       </TableHead>
-                      <TableHead className="min-w-[100px] cursor-pointer" onClick={() => handleSort("type")}>
+                      <TableHead
+                        className="min-w-[100px] cursor-pointer"
+                        onClick={() => handleSort("type")}
+                      >
                         <div className="flex items-center">
                           <span>Type</span>
                           {getSortIcon("type")}
                         </div>
                       </TableHead>
-                      <TableHead className="min-w-[140px] cursor-pointer" onClick={() => handleSort("contact_number")}>
+                      <TableHead
+                        className="min-w-[140px] cursor-pointer"
+                        onClick={() => handleSort("contact_number")}
+                      >
                         <div className="flex items-center">
                           <span>Phone</span>
                           {getSortIcon("contact_number")}
                         </div>
                       </TableHead>
-                      <TableHead className="min-w-[100px] cursor-pointer" onClick={() => handleSort("status")}>
+                      <TableHead
+                        className="min-w-[100px] cursor-pointer"
+                        onClick={() => handleSort("status")}
+                      >
                         <div className="flex items-center">
                           <span>Status</span>
                           {getSortIcon("status")}
                         </div>
                       </TableHead>
-                      <TableHead className="text-right min-w-[140px] cursor-pointer" onClick={() => handleSort("createdAt")}>
+                      <TableHead
+                        className="min-w-[140px] cursor-pointer text-right"
+                        onClick={() => handleSort("createdAt")}
+                      >
                         <div className="flex items-center justify-end">
                           <span>Created</span>
                           {getSortIcon("createdAt")}
@@ -566,15 +736,24 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                     <AnimatePresence>
                       {users.map((user) => {
                         // Safely get type configuration with fallback
-                        const typeInfo = userTypeConfig[user.type] || { className: "bg-gray-100 text-gray-800", icon: null };
-                        const statusInfo = statusConfig[user.status] || { className: "bg-gray-100 text-gray-800", icon: null };
-                        
+                        const typeInfo = userTypeConfig[user.type] || {
+                          className: "bg-gray-100 text-gray-800",
+                          icon: null,
+                        };
+                        const statusInfo = statusConfig[user.status] || {
+                          className: "bg-gray-100 text-gray-800",
+                          icon: null,
+                        };
+
                         // Check if created_at is a valid date
                         const createdAtDate = new Date(user.createdAt);
                         const isValidDate = !isNaN(createdAtDate.getTime());
 
                         if (!isValidDate) {
-                          console.error(`Invalid date for user ${user.id}:`, user.createdAt);
+                          console.error(
+                            `Invalid date for user ${user.id}:`,
+                            user.createdAt,
+                          );
                         }
 
                         return (
@@ -589,57 +768,78 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                             <TableCell>
                               <Link
                                 href={`/admin/users/${user.id}`}
-                                className="font-medium text-slate-800 hover:text-amber-600 transition-colors group-hover:underline"
+                                className="font-medium text-slate-800 transition-colors hover:text-amber-600 group-hover:underline"
                               >
-                                <div>{user.name || user.contact_name || 'Unnamed User'}</div>
-                                <div className="text-sm text-slate-500">{user.email}</div>
-                                {user.type === 'vendor' && user.companyName && (
-                                  <div className="text-xs text-amber-600 font-medium mt-1">
+                                <div>
+                                  {user.name ||
+                                    user.contact_name ||
+                                    "Unnamed User"}
+                                </div>
+                                <div className="text-sm text-slate-500">
+                                  {user.email}
+                                </div>
+                                {user.type === "VENDOR" && user.companyName && (
+                                  <div className="mt-1 text-xs font-medium text-amber-600">
                                     🏢 {user.companyName}
                                   </div>
                                 )}
                               </Link>
                             </TableCell>
                             <TableCell>
-                              <Badge className={`${typeInfo.className} flex items-center w-fit gap-1 px-2 py-0.5 font-semibold text-xs capitalize`}>
+                              <Badge
+                                className={`${typeInfo.className} flex w-fit items-center gap-1 px-2 py-0.5 text-xs font-semibold`}
+                              >
                                 {typeInfo.icon}
-                                {user.type.replace('_', ' ')}
+                                {ApiTypeUtils.getUserTypeDisplayLabel(
+                                  user.type,
+                                )}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-sm text-slate-600">
                               <div className="flex items-center gap-1">
                                 <Phone className="h-3 w-3 text-slate-400" />
-                                {user.contact_number || <span className="text-slate-400 italic">No phone</span>}
+                                {user.contact_number || (
+                                  <span className="italic text-slate-400">
+                                    No phone
+                                  </span>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge className={`${statusInfo.className} flex items-center w-fit gap-1 px-2 py-0.5 font-semibold text-xs capitalize`}>
+                              <Badge
+                                className={`${statusInfo.className} flex w-fit items-center gap-1 px-2 py-0.5 text-xs font-semibold`}
+                              >
                                 {statusInfo.icon}
-                                {user.status}
+                                {ApiTypeUtils.getUserStatusDisplayLabel(
+                                  user.status,
+                                )}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right font-medium text-slate-600">
                               <div className="flex items-center justify-end gap-2">
                                 <span>
                                   {isValidDate
-                                    ? createdAtDate.toLocaleDateString(undefined, {
-                                        year: 'numeric',
-                                        month: 'short',
-                                        day: 'numeric',
-                                        timeZone: 'UTC',
-                                      })
-                                    : 'Invalid Date'}
+                                    ? createdAtDate.toLocaleDateString(
+                                        undefined,
+                                        {
+                                          year: "numeric",
+                                          month: "short",
+                                          day: "numeric",
+                                          timeZone: "UTC",
+                                        },
+                                      )
+                                    : "Invalid Date"}
                                 </span>
                                 {canDeleteUsers && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="text-red-600 hover:bg-red-50 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="text-red-600 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-700 group-hover:opacity-100"
                                     onClick={() => {
                                       setUserToDelete(user);
                                       setShowDeleteDialog(true);
                                     }}
-                                    disabled={user.type === 'super_admin'}
+                                    disabled={user.type === "SUPER_ADMIN"}
                                   >
                                     <AlertCircle className="h-4 w-4" />
                                     <span className="sr-only">Delete</span>
@@ -657,15 +857,35 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
             ) : (
               // --- Empty State ---
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-100">
                   <Users2 className="h-8 w-8 text-slate-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-800">No Users Found</h3>
-                <p className="text-slate-500 max-w-md mt-1">
-                  No {statusFilter !== 'all' ? <span className="capitalize font-medium">{statusFilter}</span> : ''} 
-                  {typeFilter !== 'all' && statusFilter !== 'all' ? ' ' : ''}
-                  {typeFilter !== 'all' ? <span className="capitalize font-medium">{typeFilter}</span> : ''} 
-                  users match your current filters. Try adjusting your search or filters.
+                <h3 className="text-lg font-semibold text-slate-800">
+                  No Users Found
+                </h3>
+                <p className="mt-1 max-w-md text-slate-500">
+                  No{" "}
+                  {statusFilter !== "all" ? (
+                    <span className="font-medium">
+                      {ApiTypeUtils.getUserStatusDisplayLabel(
+                        statusFilter as UserStatus,
+                      )}
+                    </span>
+                  ) : (
+                    ""
+                  )}
+                  {typeFilter !== "all" && statusFilter !== "all" ? " " : ""}
+                  {typeFilter !== "all" ? (
+                    <span className="font-medium">
+                      {ApiTypeUtils.getUserTypeDisplayLabel(
+                        typeFilter as UserType,
+                      )}
+                    </span>
+                  ) : (
+                    ""
+                  )}
+                  users match your current filters. Try adjusting your search or
+                  filters.
                 </p>
                 <Link href="/admin/users/new" className="mt-4">
                   <Button variant="outline" className="mt-2">
@@ -678,13 +898,17 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
 
             {/* --- Pagination Section --- */}
             {!isLoading && totalPages > 1 && (
-              <div className="p-4 border-t bg-slate-50">
+              <div className="border-t bg-slate-50 p-4">
                 <Pagination>
                   <PaginationContent>
                     <PaginationItem>
                       <PaginationPrevious
                         onClick={() => handlePageChange(page - 1)}
-                        className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"}
+                        className={
+                          page === 1
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer hover:bg-slate-200"
+                        }
                         aria-disabled={page === 1}
                       />
                     </PaginationItem>
@@ -693,8 +917,8 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                         <PaginationLink
                           onClick={() => handlePageChange(i + 1)}
                           isActive={page === i + 1}
-                          className={`cursor-pointer ${page === i + 1 ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 font-bold' : 'hover:bg-slate-200'}`}
-                          aria-current={page === i + 1 ? 'page' : undefined}
+                          className={`cursor-pointer ${page === i + 1 ? "bg-amber-100 font-bold text-amber-800 hover:bg-amber-200" : "hover:bg-slate-200"}`}
+                          aria-current={page === i + 1 ? "page" : undefined}
                         >
                           {i + 1}
                         </PaginationLink>
@@ -703,7 +927,11 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                     <PaginationItem>
                       <PaginationNext
                         onClick={() => handlePageChange(page + 1)}
-                        className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"}
+                        className={
+                          page === totalPages
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer hover:bg-slate-200"
+                        }
                         aria-disabled={page === totalPages}
                       />
                     </PaginationItem>
@@ -721,8 +949,9 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action will delete the user &quot;{userToDelete?.name || userToDelete?.email || 'Selected user'}&quot;. 
-              This action cannot be undone.
+              This action will delete the user &quot;
+              {userToDelete?.name || userToDelete?.email || "Selected user"}
+              &quot;. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -731,7 +960,7 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
               <AlertDialogAction
                 onClick={() => userToDelete && handleDelete(userToDelete.id)}
                 disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700 text-white"
+                className="bg-red-600 text-white hover:bg-red-700"
               >
                 {isDeleting ? "Deleting..." : "Delete"}
               </AlertDialogAction>
@@ -743,4 +972,4 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
   );
 };
 
-export default UsersClient; 
+export default UsersClient;

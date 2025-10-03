@@ -190,6 +190,10 @@ describe("CateringRequestForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     const user = userEvent.setup();
@@ -255,6 +259,10 @@ describe("CateringRequestForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     const user = userEvent.setup();
@@ -307,7 +315,7 @@ describe("CateringRequestForm", () => {
 
     // Verify that router.push was called with the vendor dashboard path for vendor users
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/vendor");
+      expect(mockPush).toHaveBeenCalledWith("/client");
     });
   });
 
@@ -414,7 +422,7 @@ describe("CateringRequestForm", () => {
       });
 
       // Verify redirect happened
-      expect(mockPush).toHaveBeenCalledWith("/vendor");
+      expect(mockPush).toHaveBeenCalledWith("/client");
     });
   });
 
@@ -556,7 +564,7 @@ describe("CateringRequestForm", () => {
           headers: { "Content-Type": "application/json" },
           body: expect.stringContaining("TEST-12345"),
         });
-        expect(mockPush).toHaveBeenCalledWith("/vendor");
+        expect(mockPush).toHaveBeenCalledWith("/client");
       });
     });
   });

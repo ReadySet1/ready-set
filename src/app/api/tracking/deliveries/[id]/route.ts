@@ -12,7 +12,7 @@ export async function GET(
     const { id } = await params;
     
     const authResult = await withAuth(request, {
-      allowedRoles: ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
+      allowedRoles: ['DRIVER', 'ADMIN', 'SUPER_ADMIN'],
       requireAuth: true
     });
 

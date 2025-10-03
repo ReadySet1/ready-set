@@ -389,7 +389,7 @@ describe("ClientOrdersPage", () => {
         const orderLink = screen.getByText("CAT001");
         expect(orderLink.closest("a")).toHaveAttribute(
           "href",
-          "/client/deliveries/CAT001",
+          "/order-status/CAT001",
         );
       });
     });

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import type { Prisma } from '@prisma/client'
+import { prismaLogger } from '../../utils/logger'
 
 /**
  * Optimized Prisma Client with Connection Pooling
@@ -12,10 +13,11 @@ declare global {
   var prismaPooled: PrismaClient | undefined;
 }
 
-// Environment configuration
-const isDevelopment = process.env.NODE_ENV === 'development'
-const isProduction = process.env.NODE_ENV === 'production'
+// Environment configuration - Use VERCEL_ENV for more accurate environment detection
+const isDevelopment = process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'development'
+const isProduction = process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'production'
 const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build'
+const isVercelServerless = !!process.env.VERCEL
 const databaseUrl = process.env.DATABASE_URL
 const directUrl = process.env.DIRECT_URL
 
@@ -42,7 +44,7 @@ const LOG_CONFIG: any[] = isDevelopment
 
 // Create a mock Prisma client for build-time
 const createMockPrismaClient = (): PrismaClient => {
-  console.log('⚠️ Creating mock Prisma client for build-time analysis (pooled)')
+  prismaLogger.debug('⚠️ Creating mock Prisma client for build-time analysis (pooled)')
   
   // Create a mock client with all the necessary methods
   const mockClient = {
@@ -54,15 +56,18 @@ const createMockPrismaClient = (): PrismaClient => {
       create: async () => ({}),
       update: async () => ({}),
       delete: async () => ({}),
+      deleteMany: async () => ({}),
       groupBy: async () => [],
     },
     profile: {
       count: async () => 0,
       findMany: async () => [],
       findUnique: async () => null,
+      findFirst: async () => null,
       create: async () => ({}),
       update: async () => ({}),
       delete: async () => ({}),
+      deleteMany: async () => ({}),
     },
     order: {
       count: async () => 0,
@@ -71,6 +76,7 @@ const createMockPrismaClient = (): PrismaClient => {
       create: async () => ({}),
       update: async () => ({}),
       delete: async () => ({}),
+      deleteMany: async () => ({}),
     },
     cateringRequest: {
       count: async () => 0,
@@ -79,6 +85,7 @@ const createMockPrismaClient = (): PrismaClient => {
       create: async () => ({}),
       update: async () => ({}),
       delete: async () => ({}),
+      deleteMany: async () => ({}),
     },
     fileUpload: {
       count: async () => 0,
@@ -87,6 +94,48 @@ const createMockPrismaClient = (): PrismaClient => {
       create: async () => ({}),
       update: async () => ({}),
       delete: async () => ({}),
+      deleteMany: async () => ({}),
+    },
+    // Calculator system models
+    calculatorTemplate: {
+      count: async () => 0,
+      findMany: async () => [],
+      findUnique: async () => null,
+      findFirst: async () => null,
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+      deleteMany: async () => ({}),
+    },
+    pricingRule: {
+      count: async () => 0,
+      findMany: async () => [],
+      findUnique: async () => null,
+      findFirst: async () => null,
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+      deleteMany: async () => ({}),
+    },
+    clientConfiguration: {
+      count: async () => 0,
+      findMany: async () => [],
+      findUnique: async () => null,
+      findFirst: async () => null,
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+      deleteMany: async () => ({}),
+    },
+    calculationHistory: {
+      count: async () => 0,
+      findMany: async () => [],
+      findUnique: async () => null,
+      findFirst: async () => null,
+      create: async () => ({}),
+      update: async () => ({}),
+      delete: async () => ({}),
+      deleteMany: async () => ({}),
     },
     // Add other models as needed
     $connect: async () => {},
@@ -100,7 +149,7 @@ const createMockPrismaClient = (): PrismaClient => {
 
 // Create optimized Prisma client with connection pooling
 const createOptimizedPrismaClient = (): PrismaClient => {
-  console.log('🔄 Creating optimized Prisma client with connection pooling...')
+  prismaLogger.debug('🔄 Creating optimized Prisma client with connection pooling...')
   
   // During build time, we might not have a database connection
   if (isBuildTime) {
@@ -112,44 +161,118 @@ const createOptimizedPrismaClient = (): PrismaClient => {
     throw new Error('DATABASE_URL is not defined. Please check your environment variables.')
   }
 
-  // Build connection string with pooling parameters
-  const pooledUrl = new URL(databaseUrl)
+  // Build connection string with serverless optimizations
+  let connectionUrl = databaseUrl
   
-  // Add connection pooling parameters
-  pooledUrl.searchParams.set('connection_limit', POOL_CONFIG.connectionLimit.toString())
-  pooledUrl.searchParams.set('pool_timeout', '30')
-  pooledUrl.searchParams.set('pgbouncer', 'true')
-  pooledUrl.searchParams.set('statement_cache_size', '0')
-  
-  // Add performance optimizations
-  pooledUrl.searchParams.set('connect_timeout', '10')
-  pooledUrl.searchParams.set('socket_timeout', '30')
+  // For Supabase in serverless environments, optimize connection string
+  if (databaseUrl.includes('supabase.co')) {
+    const url = new URL(databaseUrl)
+    
+    if (isVercelServerless) {
+      // Serverless environment optimizations for Supabase
+      console.log('🔧 Configuring Supabase connection for Vercel serverless environment')
+      
+      // Use pgbouncer for connection pooling and disable prepared statements
+      url.searchParams.set('pgbouncer', 'true')
+      url.searchParams.set('statement_cache_size', '0')
+      
+      // Connection timeouts optimized for serverless
+      url.searchParams.set('connect_timeout', '10')
+      url.searchParams.set('socket_timeout', '30')
+      
+      // Pool configuration for serverless
+      url.searchParams.set('pool_timeout', '10')
+      
+      connectionUrl = url.toString()
+      
+      console.log('✅ Applied serverless optimizations for Supabase')
+    } else {
+      // Local development - use pooled connection since direct port (5432) is not accessible
+      console.log('🔧 Using pooled Supabase connection for local development')
+      const url = new URL(databaseUrl)
+      
+      // Since we're using a pooled connection (port 6543), disable prepared statements
+      // to avoid "prepared statement does not exist" errors with pgbouncer
+      url.searchParams.set('pgbouncer', 'true')
+      url.searchParams.set('statement_cache_size', '0')
+      
+      // Connection timeouts for local development
+      url.searchParams.set('connect_timeout', '10')
+      url.searchParams.set('socket_timeout', '30')
+      url.searchParams.set('pool_timeout', '10')
+      
+      connectionUrl = url.toString()
+      console.log('✅ Applied pooled connection optimizations for local development')
+    }
+  } else {
+    // Non-Supabase PostgreSQL - apply standard pooling
+    const pooledUrl = new URL(databaseUrl)
+    pooledUrl.searchParams.set('connection_limit', POOL_CONFIG.connectionLimit.toString())
+    pooledUrl.searchParams.set('pool_timeout', '30')
+    pooledUrl.searchParams.set('connect_timeout', '10')
+    pooledUrl.searchParams.set('socket_timeout', '30')
+    pooledUrl.searchParams.set('statement_cache_size', '0')
+    connectionUrl = pooledUrl.toString()
+  }
 
   const client = new PrismaClient({
     log: LOG_CONFIG,
     datasources: {
       db: {
-        url: pooledUrl.toString()
+        url: connectionUrl
       }
     },
     errorFormat: isDevelopment ? 'pretty' : 'minimal',
     transactionOptions: {
-      maxWait: POOL_CONFIG.acquireTimeout,
-      timeout: POOL_CONFIG.transactionTimeout,
+      // Serverless-optimized timeouts
+      maxWait: isVercelServerless ? 20000 : POOL_CONFIG.acquireTimeout, // 20s for serverless vs 60s
+      timeout: isVercelServerless ? 30000 : POOL_CONFIG.transactionTimeout, // 30s for serverless vs 60s
       isolationLevel: 'ReadCommitted'
     }
   });
+
+  // Add connection retry logic with exponential backoff
+  const originalConnect = client.$connect.bind(client);
+  client.$connect = async () => {
+    let retries = 0;
+    const maxRetries = 3;
+    
+    while (retries < maxRetries) {
+      try {
+        await originalConnect();
+        if (retries > 0) {
+          console.log(`✅ Database reconnected after ${retries} retries`);
+        }
+        return;
+      } catch (error) {
+        retries++;
+        const delay = Math.min(1000 * Math.pow(2, retries), 5000); // Exponential backoff, max 5s
+        
+        if (retries < maxRetries) {
+          console.warn(`⚠️ Database connection attempt ${retries} failed, retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          console.error(`❌ Database connection failed after ${maxRetries} attempts:`, error);
+          throw error;
+        }
+      }
+    }
+  };
 
   // Enhanced error handling and query monitoring
   // Note: Event listeners temporarily disabled due to TypeScript compatibility
   // TODO: Implement proper event monitoring after Prisma client type fixes
 
   // Connection management
-  console.log('✅ Optimized Prisma client created with configuration:', {
+  prismaLogger.debug('✅ Optimized Prisma client created with configuration:', {
     connectionLimit: POOL_CONFIG.connectionLimit,
     environment: process.env.NODE_ENV,
+    serverless: isVercelServerless,
+    vercelEnv: process.env.VERCEL_ENV,
     pooling: 'enabled',
-    directConnection: !!directUrl
+    directConnection: !!directUrl,
+    supabase: databaseUrl.includes('supabase.co'),
+    preparedStatements: isVercelServerless && databaseUrl.includes('supabase.co') ? 'disabled' : 'enabled'
   })
 
   return client
@@ -162,14 +285,14 @@ try {
   // Use global instance if available (for development hot reload)
   if (globalThis.prismaPooled) {
     prismaPooled = globalThis.prismaPooled
-    console.log('🔄 Using existing global Prisma pooled client')
+    prismaLogger.debug('🔄 Using existing global Prisma pooled client')
   } else {
     prismaPooled = createOptimizedPrismaClient()
     
     // Store in global for development hot reload
     if (isDevelopment && !isBuildTime) {
       globalThis.prismaPooled = prismaPooled
-      console.log('💾 Stored Prisma pooled client in global for development')
+      prismaLogger.debug('💾 Stored Prisma pooled client in global for development')
     }
   }
 } catch (error) {
@@ -177,7 +300,7 @@ try {
   
   // In production build, create a mock client for build-time analysis
   if (isBuildTime) {
-    console.log('⚠️ Creating mock Prisma pooled client for build-time analysis')
+    prismaLogger.debug('⚠️ Creating mock Prisma pooled client for build-time analysis')
     prismaPooled = createMockPrismaClient()
   } else {
     throw error
@@ -186,9 +309,9 @@ try {
 
 // Graceful shutdown handling
 const handleShutdown = async () => {
-  console.log('🔄 Gracefully disconnecting Prisma client...')
+  prismaLogger.debug('🔄 Gracefully disconnecting Prisma client...')
   await prismaPooled.$disconnect()
-  console.log('✅ Prisma client disconnected')
+  prismaLogger.debug('✅ Prisma client disconnected')
 }
 
 // Register shutdown handlers
@@ -247,15 +370,35 @@ export const healthCheck = {
       return {
         activeConnections: result[0]?.count || 0,
         maxConnections: POOL_CONFIG.maxConnections,
+        serverless: isVercelServerless,
+        preparedStatementsDisabled: isVercelServerless && (databaseUrl?.includes('supabase.co') ?? false),
         healthy: true
       }
     } catch (error) {
       return {
         activeConnections: 0,
         maxConnections: POOL_CONFIG.maxConnections,
+        serverless: isVercelServerless,
+        preparedStatementsDisabled: isVercelServerless && (databaseUrl?.includes('supabase.co') ?? false),
         healthy: false,
         error: error instanceof Error ? error.message : 'Unknown error'
       }
+    }
+  },
+
+  /**
+   * Debug prepared statement issues
+   */
+  async debugPreparedStatements() {
+    try {
+      const result = await prismaPooled.$queryRaw<Array<{ name: string; statement: string; from_sql: boolean }>>`
+        SELECT name, statement, from_sql FROM pg_prepared_statements LIMIT 10
+      `
+      console.log('🔍 Current prepared statements:', result)
+      return result
+    } catch (error) {
+      console.warn('⚠️ Could not fetch prepared statements (expected in serverless):', error)
+      return []
     }
   }
 }

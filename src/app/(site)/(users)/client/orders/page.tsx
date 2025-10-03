@@ -326,7 +326,7 @@ const ClientOrdersPage = () => {
                             <TableRow key={order.id}>
                               <TableCell>
                                 <Link
-                                  href={`/client/deliveries/${order.orderNumber}`}
+                                  href={`/order-status/${order.orderNumber}`}
                                   className="font-medium hover:underline"
                                 >
                                   {order.orderNumber}

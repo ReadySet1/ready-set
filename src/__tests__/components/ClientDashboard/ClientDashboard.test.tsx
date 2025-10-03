@@ -19,10 +19,12 @@ jest.mock("@/lib/auth", () => ({
     email: "test@example.com",
     name: "Test User",
   }),
+  getUserRole: jest.fn().mockResolvedValue("client"),
 }));
 
-// Mock Prisma with correct data
+// Mock withDatabaseRetry function
 jest.mock("@/lib/db/prisma", () => ({
+  withDatabaseRetry: jest.fn((fn) => fn()),
   prisma: {
     cateringRequest: {
       findMany: jest.fn().mockResolvedValue([

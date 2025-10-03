@@ -10,7 +10,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import page from "./page";
+import { TestimonialResponse } from "@/app/api/testimonials/route";
 
 const Testimonials = () => {
   interface Testimonial {
@@ -20,6 +20,11 @@ const Testimonials = () => {
     text: string;
     image?: string;
   }
+
+  // State for API data
+  const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // State to control which testimonial is active in each category
   const [activeIndices, setActiveIndices] = useState({
@@ -57,6 +62,32 @@ const Testimonials = () => {
     DRIVERS: [],
   });
 
+  // Fetch testimonials from API
+  useEffect(() => {
+    const fetchTestimonials = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch('/api/testimonials');
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch testimonials');
+        }
+        
+        setTestimonials(data.testimonials || []);
+      } catch (err) {
+        console.error('Error fetching testimonials:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load testimonials');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTestimonials();
+  }, []);
+
   // Add this effect after declaring all your states
   useEffect(() => {
     // This code only runs on the client
@@ -82,18 +113,24 @@ const Testimonials = () => {
   // Cache for preloaded images
   const preloadedImages = useRef<Set<string>>(new Set());
 
-  // Now the useMemo to group testimonials will only recalculate if the testimonials reference changes
+  // Group testimonials by category from API data
   const groupedTestimonials = useMemo(() => {
-    return page.reduce(
-      (acc, page) => {
-        const category = page.category as keyof typeof acc;
+    return testimonials.reduce(
+      (acc, testimonial) => {
+        const category = testimonial.category as keyof typeof acc;
         acc[category] = acc[category] || [];
-        acc[category].push(page as Testimonial);
+        acc[category].push({
+          category: testimonial.category,
+          name: testimonial.name,
+          role: testimonial.role || '',
+          text: testimonial.content,
+          image: testimonial.image,
+        } as Testimonial);
         return acc;
       },
       {} as Record<Testimonial["category"], Testimonial[]>,
     );
-  }, []); // This dependency now comes from the import
+  }, [testimonials]);
 
   const checkContentOverflow = useCallback(() => {
     // Limit the frequency of state updates to avoid excessive re-renders
@@ -505,12 +542,127 @@ const Testimonials = () => {
     </div>
   ));
 
-  // If we're not in the browser, render an empty container
-  if (!isBrowser) {
+  // Loading state
+  if (!isBrowser || loading) {
     return (
-      <div className="rounded-lg border border-black bg-white px-4 py-10">
-        Loading Testimonials...
-      </div>
+      <section
+        id="testimonials"
+        className="w-full rounded-none border-x-0 border-b-0 border-t border-black bg-white px-0 py-10 sm:py-16"
+      >
+        <div className="mx-auto max-w-7xl">
+          <div className="relative mb-8 text-center sm:mb-12">
+            <h2 className="mb-4 text-3xl font-bold text-black sm:text-4xl">
+              What People Say About Us
+            </h2>
+            <div className="mb-6 flex items-center justify-center sm:mb-8">
+              <div className="relative flex w-full items-center justify-center">
+                <div className="absolute right-1/2 mr-4 w-1/4 border-t-2 border-dashed border-black sm:w-1/2"></div>
+                <p className="relative z-10 bg-white px-4 text-lg text-black sm:text-xl">
+                  Real Stories. Real Impact
+                </p>
+                <div className="absolute left-1/2 ml-4 w-1/4 border-t-2 border-dashed border-black sm:w-1/2"></div>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-center items-center min-h-[300px]">
+            <div className="text-center">
+              <div className="animate-spin h-8 w-8 border-4 border-black border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-black">Loading testimonials...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <section
+        id="testimonials"
+        className="w-full rounded-none border-x-0 border-b-0 border-t border-black bg-white px-0 py-10 sm:py-16"
+      >
+        <div className="mx-auto max-w-7xl">
+          <div className="relative mb-8 text-center sm:mb-12">
+            <h2 className="mb-4 text-3xl font-bold text-black sm:text-4xl">
+              What People Say About Us
+            </h2>
+            <div className="mb-6 flex items-center justify-center sm:mb-8">
+              <div className="relative flex w-full items-center justify-center">
+                <div className="absolute right-1/2 mr-4 w-1/4 border-t-2 border-dashed border-black sm:w-1/2"></div>
+                <p className="relative z-10 bg-white px-4 text-lg text-black sm:text-xl">
+                  Real Stories. Real Impact
+                </p>
+                <div className="absolute left-1/2 ml-4 w-1/4 border-t-2 border-dashed border-black sm:w-1/2"></div>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-center items-center min-h-[300px]">
+            <div className="text-center max-w-md">
+              <div className="text-red-500 text-4xl mb-4">⚠️</div>
+              <h3 className="text-xl font-semibold text-black mb-2">Error Loading Testimonials</h3>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Empty state
+  if (testimonials.length === 0) {
+    return (
+      <section
+        id="testimonials"
+        className="w-full rounded-none border-x-0 border-b-0 border-t border-black bg-white px-0 py-10 sm:py-16"
+      >
+        <div className="mx-auto max-w-7xl">
+          <div className="relative mb-8 text-center sm:mb-12">
+            <h2 className="mb-4 text-3xl font-bold text-black sm:text-4xl">
+              What People Say About Us
+            </h2>
+            <div className="mb-6 flex items-center justify-center sm:mb-8">
+              <div className="relative flex w-full items-center justify-center">
+                <div className="absolute right-1/2 mr-4 w-1/4 border-t-2 border-dashed border-black sm:w-1/2"></div>
+                <p className="relative z-10 bg-white px-4 text-lg text-black sm:text-xl">
+                  Real Stories. Real Impact
+                </p>
+                <div className="absolute left-1/2 ml-4 w-1/4 border-t-2 border-dashed border-black sm:w-1/2"></div>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-center items-center min-h-[300px]">
+            <div className="text-center max-w-md">
+              <div className="text-6xl mb-6">💬</div>
+              <h3 className="text-2xl font-semibold text-black mb-4">No Testimonials Yet</h3>
+              <p className="text-gray-600 mb-6">
+                We're just getting started! Check back soon to see what our amazing clients, 
+                vendors, and drivers have to say about working with Ready Set.
+              </p>
+              <div className="grid grid-cols-3 gap-4 text-sm text-gray-500">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  <div className="font-semibold">CLIENTS</div>
+                  <div className="text-xs mt-1">Coming Soon</div>
+                </div>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  <div className="font-semibold">VENDORS</div>
+                  <div className="text-xs mt-1">Coming Soon</div>
+                </div>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  <div className="font-semibold">DRIVERS</div>
+                  <div className="text-xs mt-1">Coming Soon</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     );
   }
   return (

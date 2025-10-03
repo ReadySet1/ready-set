@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from '@prisma/client';
 import { UserStatus, UserType, PrismaClientKnownRequestError, PrismaClientInitializationError, PrismaClientValidationError } from '@/types/prisma';
+import { randomUUID } from 'crypto';
 
 // Map between our form input types and the Prisma enum values
 const userTypeMap: Record<string, string> = {
@@ -208,6 +209,15 @@ export async function POST(request: Request) {
         status: authError.status,
         name: authError.name
       });
+
+      // Check if user already exists
+      if (authError.message?.includes('User already registered') || authError.status === 422) {
+        return NextResponse.json(
+          { error: "Account found", details: "An account with this email already exists. Please try signing in instead." },
+          { status: 400 }
+        );
+      }
+
       return NextResponse.json(
         { error: "Failed to create user in authentication system", details: authError.message },
         { status: 500 }
@@ -297,9 +307,11 @@ export async function POST(request: Request) {
       data: userData,
     });
 
-    // Create default address
+    // Create default address with explicit ID to avoid null constraint violation
+    const addressId = randomUUID();
     const address = await prisma.address.create({
       data: {
+        id: addressId,
         name: "Main Address",
         street1: body.street1,
         street2: body.street2,
@@ -363,7 +375,5 @@ export async function POST(request: Request) {
       { error: "An unexpected error occurred", details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

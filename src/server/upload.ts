@@ -105,7 +105,5 @@ export async function handleUploadComplete({
   } catch (error) {
     console.error("Error saving file to database:", error);
     throw error;
-  } finally {
-    await prisma.$disconnect();
   }
 }

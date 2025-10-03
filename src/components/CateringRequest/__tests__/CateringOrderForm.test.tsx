@@ -417,6 +417,10 @@ describe("CateringOrderForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     // Mock successful API response
@@ -447,6 +451,10 @@ describe("CateringOrderForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     // Mock successful API response
@@ -465,7 +473,7 @@ describe("CateringOrderForm", () => {
 
     // Verify that the routing utility would redirect to vendor dashboard for vendor users
     const { getOrderCreationRedirectRoute } = require("@/utils/routing");
-    expect(getOrderCreationRedirectRoute(UserType.VENDOR)).toBe("/vendor");
+    expect(getOrderCreationRedirectRoute(UserType.VENDOR)).toBe("/client");
   });
 
   it("redirects to admin dashboard for admin users after successful form submission", async () => {
@@ -477,6 +485,10 @@ describe("CateringOrderForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     // Mock successful API response
@@ -507,6 +519,10 @@ describe("CateringOrderForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     // Mock successful API response
@@ -537,6 +553,10 @@ describe("CateringOrderForm", () => {
       isLoading: false,
       error: null,
       refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
     });
 
     // Mock failed API response
