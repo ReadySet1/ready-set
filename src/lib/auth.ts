@@ -172,5 +172,25 @@ export async function getUserRole(userId: string): Promise<string | null> {
 export async function getCurrentUser() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  return user;
+
+  if (!user?.id) {
+    return null;
+  }
+
+  // Fetch profile data including role information
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("type")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = Row not found
+    console.error("Error fetching user profile:", profileError);
+  }
+
+  // Return user object with role information
+  return {
+    ...user,
+    role: profile?.type || null, // Include role from profile, fallback to null if not found
+  };
 }

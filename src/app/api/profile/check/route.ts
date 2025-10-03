@@ -50,7 +50,7 @@ export async function GET(request: Request) {
       .from("profiles")
       .select("id, type")
       .eq("id", userId)
-      .single();
+      .maybeSingle();
       
     if (!profileError && profileData && profileData.type) {
       console.log(`API: User found in profiles table: ${profileData.id}`);

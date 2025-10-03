@@ -473,7 +473,7 @@ describe("CateringOrderForm", () => {
 
     // Verify that the routing utility would redirect to vendor dashboard for vendor users
     const { getOrderCreationRedirectRoute } = require("@/utils/routing");
-    expect(getOrderCreationRedirectRoute(UserType.VENDOR)).toBe("/vendor");
+    expect(getOrderCreationRedirectRoute(UserType.VENDOR)).toBe("/client");
   });
 
   it("redirects to admin dashboard for admin users after successful form submission", async () => {

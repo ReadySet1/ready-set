@@ -19,7 +19,7 @@ const ROLE_MENU_ITEMS: Record<UserType, MenuItem> = {
   [UserType.VENDOR]: {
     id: 5,
     title: "Vendor Dashboard",
-    path: "/vendor",
+    path: "/client",
   },
   [UserType.CLIENT]: {
     id: 6,

@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
 import { CarrierService } from '@/lib/services/carrierService';
 import { DriverStatus } from '@/types/prisma';
+import { invalidateVendorCacheOnStatusUpdate } from '@/lib/cache/cache-invalidation';
 
 // Validation schema for status update request
 const StatusUpdateSchema = z.object({
@@ -167,7 +168,10 @@ export async function PATCH(
     // 7. Log status change
     console.log(`Order ${order.orderNumber} status updated: ${order.driverStatus || 'NO_STATUS'} -> ${validatedData.driverStatus}`);
 
-    // 8. Return success response
+    // 8. Invalidate vendor cache since order status affects metrics and order lists
+    invalidateVendorCacheOnStatusUpdate(order.userId, orderId);
+
+    // 9. Return success response
     const response: StatusUpdateResponse = {
       success: true,
       order: {

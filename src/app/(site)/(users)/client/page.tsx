@@ -22,7 +22,7 @@ import {
 } from "@/types/order-status";
 import { CombinedOrder } from "@/types/models";
 import { Prisma } from "@prisma/client";
-import { CateringRequest, OnDemand, Decimal } from "@/types/prisma";
+import { CateringRequest, OnDemand, Decimal, UserType } from "@/types/prisma";
 import {
   DashboardCardSkeleton,
   OrderCardSkeleton,
@@ -548,18 +548,27 @@ const ClientPage = async () => {
   }
 
   // Server-side session validation: Ensure user has proper role before rendering
-  const { getUserRole } = await import("@/lib/auth");
-  const userRole = await getUserRole(user.id);
+  const userRole = user.role;
+
+  // Add role detection logic for dynamic dashboard title
+  const dashboardTitle =
+    userRole?.toUpperCase() === "VENDOR"
+      ? "Vendor Dashboard"
+      : "Client Dashboard";
 
   if (!userRole) {
     console.error("No user role found for authenticated user:", user.id);
     redirect("/sign-in?error=Profile+not+found");
   }
 
-  // Validate user has client access
-  if (userRole.toLowerCase() !== "client") {
+  // Validate user has CLIENT or VENDOR role for unified dashboard access
+  const isAllowedRole =
+    userRole.toUpperCase() === UserType.CLIENT ||
+    userRole.toUpperCase() === UserType.VENDOR;
+
+  if (!isAllowedRole) {
     console.log(
-      "User does not have client role, redirecting to appropriate dashboard",
+      "User does not have CLIENT or VENDOR role, redirecting away from unified dashboard",
     );
     // Redirect to their appropriate dashboard based on role
     const roleRoutes: Record<string, string> = {
@@ -567,10 +576,9 @@ const ClientPage = async () => {
       super_admin: "/admin",
       driver: "/driver",
       helpdesk: "/helpdesk",
-      vendor: "/vendor",
     };
 
-    const redirectPath = roleRoutes[userRole.toLowerCase()] || "/";
+    const redirectPath = roleRoutes[userRole.toLowerCase()] || "/sign-in";
     redirect(redirectPath);
   }
 
@@ -580,7 +588,7 @@ const ClientPage = async () => {
   return (
     <>
       <Breadcrumb
-        pageName="Client Dashboard"
+        pageName={dashboardTitle}
         pageDescription="Manage your account"
       />
       <div className="shadow-default dark:border-strokedark dark:bg-boxdark sm:p-7.5 rounded-sm border border-stroke bg-white p-5">

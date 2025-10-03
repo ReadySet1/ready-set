@@ -18,7 +18,7 @@ jest.mock("next/navigation", () => ({
   useSearchParams: () => ({
     get: jest.fn(),
   }),
-  usePathname: () => "/vendor",
+  usePathname: () => "/client",
 }));
 
 // Mock components

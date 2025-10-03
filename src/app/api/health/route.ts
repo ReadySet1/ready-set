@@ -47,7 +47,7 @@ async function checkDatabaseHealth(): Promise<ServiceHealth> {
     await prismaPooled.$queryRaw`SELECT 1 as test`;
     
     // Test a more complex query
-    const userCount = await prismaPooled.profile.count();
+    const userCount = Number(await prismaPooled.profile.count());
     
     // Get connection info and debug prepared statements
     const connectionInfo = await healthCheck.getConnectionInfo();
@@ -65,7 +65,7 @@ async function checkDatabaseHealth(): Promise<ServiceHealth> {
         poolingEnabled: true,
         serverless: connectionInfo.serverless,
         preparedStatementsDisabled: connectionInfo.preparedStatementsDisabled,
-        activeConnections: connectionInfo.activeConnections,
+        activeConnections: Number(connectionInfo.activeConnections),
         preparedStatementsCount: preparedStatements.length,
         environment: {
           NODE_ENV: process.env.NODE_ENV,
@@ -322,12 +322,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Get error metrics
     const errorMetrics = getErrorMetrics();
-    
+
     // Calculate system uptime (simplified - would be better stored in a persistent way)
     const uptime = process.uptime();
-    
-    // Get memory usage
+
+    // Get memory usage and convert BigInt values to numbers
     const memoryUsage = process.memoryUsage();
+    const memoryUsageNumbers = {
+      rss: Number(memoryUsage.rss),
+      heapTotal: Number(memoryUsage.heapTotal),
+      heapUsed: Number(memoryUsage.heapUsed),
+      external: Number(memoryUsage.external),
+      arrayBuffers: Number(memoryUsage.arrayBuffers)
+    };
     
     const responseTime = performance.now() - startTime;
     
@@ -340,7 +347,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       services,
       performance: {
         responseTime,
-        memoryUsage
+        memoryUsage: memoryUsageNumbers
       },
       errors: {
         recentErrorCount: errorMetrics.recentErrors.length,

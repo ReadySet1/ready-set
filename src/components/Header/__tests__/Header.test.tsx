@@ -227,7 +227,7 @@ describe("Header Component", () => {
 
     it("should have correct dashboard links for each role", () => {
       const roles = [
-        { type: UserType.VENDOR, path: "/vendor" },
+        { type: UserType.VENDOR, path: "/client" },
         { type: UserType.CLIENT, path: "/client" },
         { type: UserType.ADMIN, path: "/admin" },
         { type: UserType.DRIVER, path: "/driver" },

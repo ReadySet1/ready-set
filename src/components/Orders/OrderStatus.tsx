@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { CheckCircle, Clock, XCircle, Truck } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
-import { OrderStatus, OrderType } from '@/types/order';
+import { OrderStatus, OrderType } from "@/types/order";
 
 interface StatusBadgeProps {
   status: OrderStatus;
@@ -70,6 +70,8 @@ interface OrderStatusProps {
   initialStatus: OrderStatus;
   orderId: string | number | bigint;
   onStatusChange?: (newStatus: OrderStatus) => void;
+  // Role-based access control for status changes
+  canChangeStatus?: boolean;
 }
 
 export const OrderStatusCard: React.FC<OrderStatusProps> = ({
@@ -77,6 +79,7 @@ export const OrderStatusCard: React.FC<OrderStatusProps> = ({
   initialStatus,
   orderId,
   onStatusChange,
+  canChangeStatus = false,
 }) => {
   const [status, setStatus] = useState<OrderStatus>(initialStatus);
 
@@ -99,6 +102,14 @@ export const OrderStatusCard: React.FC<OrderStatusProps> = ({
     return type === "catering" ? "Catering Request" : "On-Demand Order";
   };
 
+  // Get all available order statuses
+  const availableStatuses: OrderStatus[] = [
+    OrderStatus.ACTIVE,
+    OrderStatus.ASSIGNED,
+    OrderStatus.COMPLETED,
+    OrderStatus.CANCELLED,
+  ];
+
   return (
     <div className="w-full">
       <div>
@@ -106,24 +117,50 @@ export const OrderStatusCard: React.FC<OrderStatusProps> = ({
           <span className="text-sm font-medium">Current Status:</span>
           <StatusBadge status={status} />
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Change Status:</span>
-          <Select
-            onValueChange={(value) => handleStatusChange(value as OrderStatus)}
-            value={status}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select new status" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.values(OrderStatus).map((statusValue) => (
-                <SelectItem key={statusValue} value={statusValue}>
-                  {statusValue.charAt(0).toUpperCase() + statusValue.slice(1).toLowerCase()}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+
+        {/* Change Status dropdown - only visible to admin and super admin */}
+        {canChangeStatus && onStatusChange && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Change Status:</span>
+              <Select
+                value={status}
+                onValueChange={(newStatus) => {
+                  if (newStatus && newStatus !== status) {
+                    handleStatusChange(newStatus as OrderStatus);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableStatuses.map((statusOption) => (
+                    <SelectItem key={statusOption} value={statusOption}>
+                      <div className="flex items-center gap-2">
+                        {statusOption === OrderStatus.ACTIVE && (
+                          <Clock className="h-4 w-4" />
+                        )}
+                        {statusOption === OrderStatus.ASSIGNED && (
+                          <Truck className="h-4 w-4" />
+                        )}
+                        {statusOption === OrderStatus.COMPLETED && (
+                          <CheckCircle className="h-4 w-4" />
+                        )}
+                        {statusOption === OrderStatus.CANCELLED && (
+                          <XCircle className="h-4 w-4" />
+                        )}
+                        <span className="capitalize">
+                          {statusOption.replace("_", " ").toLowerCase()}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

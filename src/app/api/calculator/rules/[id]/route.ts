@@ -7,9 +7,9 @@ import { CreateRuleSchema, ConfigurationError } from '@/types/calculator';
 import { createClient } from '@/utils/supabase/server';
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
@@ -25,10 +25,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     // Extract the token
     const token = authHeader.split(' ')[1];
-    
+
     // Initialize Supabase client
     const supabase = await createClient();
-    
+
     // Verify the token by getting the user
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
 
@@ -44,11 +44,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     // Currently allowing authenticated users to update rules for development
 
     const body = await request.json();
-    
+
     // Validate input (partial update allowed)
     const validatedInput = CreateRuleSchema.partial().parse(body);
-    
-    const rule = await CalculatorService.updateRule(params.id, validatedInput);
+
+    const rule = await CalculatorService.updateRule((await params).id, validatedInput);
     
     return NextResponse.json({
       success: true,
@@ -85,10 +85,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     // Extract the token
     const token = authHeader.split(' ')[1];
-    
+
     // Initialize Supabase client
     const supabase = await createClient();
-    
+
     // Verify the token by getting the user
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
 
@@ -103,7 +103,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     // For deleting rules, just ensure authenticated user (admin check can be added later)
     // Currently allowing authenticated users to delete rules for development
 
-    await CalculatorService.deleteRule(params.id);
+    await CalculatorService.deleteRule((await params).id);
     
     return NextResponse.json({
       success: true,

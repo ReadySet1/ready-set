@@ -53,7 +53,7 @@ async function fixRLSPermissions() {
       try {
         await client.query(`DROP POLICY IF EXISTS "${policyName}" ON public.profiles;`);
         console.log(`✅ Dropped policy: ${policyName}`);
-      } catch (error) {
+      } catch (error: any) {
         console.log(`ℹ️ Policy ${policyName} didn't exist or couldn't be dropped:`, error.message);
       }
     }
@@ -93,7 +93,7 @@ async function fixRLSPermissions() {
       try {
         await client.query(policy.sql);
         console.log(`✅ Created policy: ${policy.name}`);
-      } catch (error) {
+      } catch (error: any) {
         console.error(`❌ Error creating policy "${policy.name}":`, error.message);
       }
     }
@@ -107,13 +107,13 @@ async function fixRLSPermissions() {
         GRANT ALL ON public.profiles TO anon;
       `);
       console.log('✅ Permissions granted');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error granting permissions:', error.message);
     }
 
     console.log('🎉 RLS permissions fix completed!');
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error fixing RLS permissions:', error);
     throw error;
   } finally {

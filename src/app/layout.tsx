@@ -8,6 +8,7 @@ import "../styles/prism-vsc-dark-plus.css";
 import GlobalErrorBoundary from "@/components/ErrorBoundary/GlobalErrorBoundary";
 import CookieConsentBanner from "../components/Cookies/Banner";
 import { UserProvider } from "@/contexts/UserContext";
+import { SessionTimeoutWarning } from "@/components/Auth/SessionTimeoutWarning";
 import { Toaster } from "@/components/ui/toaster";
 import { CONSTANTS } from "@/constants";
 import UmamiAnalytics from "@/components/Analytics/UmamiAnalytics";
@@ -85,6 +86,7 @@ export default function RootLayout({
           <QueryProvider>
             <UserProvider>
               <ClientLayout>{children}</ClientLayout>
+              <SessionTimeoutWarning />
             </UserProvider>
           </QueryProvider>
         </GlobalErrorBoundary>

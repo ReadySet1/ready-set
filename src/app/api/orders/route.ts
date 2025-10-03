@@ -15,6 +15,7 @@ import { generateOrderNumber } from '@/utils/order-number';
 import { getCenterCoordinate, calculateDistance } from '@/utils/distance';
 import { getAddressInfo } from '@/utils/addresses';
 import { sendDeliveryNotifications } from '@/app/actions/email';
+import { invalidateVendorCacheOnOrderCreate } from '@/lib/cache/cache-invalidation';
 
 import { prisma as prismaClient } from "@/utils/prismaDB";
 
@@ -356,6 +357,9 @@ export async function POST(req: NextRequest) {
         throw new Error('Invalid order type');
       }
     });
+
+    // Invalidate vendor cache since new order affects metrics and order lists
+    invalidateVendorCacheOnOrderCreate(authValidation.user!.id, result.order.id);
 
     return NextResponse.json({
       success: true,
