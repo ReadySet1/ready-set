@@ -4,12 +4,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Loader from "@/components/Common/Loader";
 import { login, FormState } from "@/app/actions/login";
 import GoogleAuthButton from "@/components/Auth/GoogleAuthButton";
 import { useUser } from "@/contexts/UserContext";
 import { useRouter } from "next/navigation";
+import { toast } from "@/components/ui/use-toast";
 
 const Signin = ({
   searchParams,
@@ -56,6 +57,9 @@ const Signin = ({
   // Get returnTo from URL parameters
   const [returnTo, setReturnTo] = useState<string>("/");
 
+  // Ref to prevent multiple submissions
+  const isSubmittingRef = useRef(false);
+
   useEffect(() => {
     // Get returnTo from URL parameters
     const params = new URLSearchParams(window.location.search);
@@ -71,18 +75,26 @@ const Signin = ({
       setLoading(false);
       setIsRedirecting(false);
       setShowSuccessMessage(false);
+
+      // Show error toast
+      toast({
+        title: "Sign in failed",
+        description: formState.error,
+        variant: "destructive",
+      });
     }
 
     // If redirectTo is set in the state, handle client-side redirect
     if (formState?.success && formState?.redirectTo) {
-      console.log(
-        "Login successful! Client-side redirecting to:",
-        formState.redirectTo,
-      );
-
       setShowSuccessMessage(true);
       setIsRedirecting(true);
       setLoading(false);
+
+      // Show success toast
+      toast({
+        title: "Welcome back!",
+        description: formState.message || "Redirecting to your dashboard...",
+      });
 
       // Use window.location.href instead of router.push() to ensure cookies are processed
       // This forces a full page load, which guarantees the Set-Cookie headers are applied
@@ -102,6 +114,21 @@ const Signin = ({
   useEffect(() => {
     if (searchParams?.error) {
       setErrors((prev) => ({ ...prev, general: searchParams.error || "" }));
+
+      // Show error toast for URL parameter errors
+      toast({
+        title: "Authentication Error",
+        description: searchParams.error,
+        variant: "destructive",
+      });
+    }
+
+    if (searchParams?.message) {
+      // Show info toast for URL parameter messages
+      toast({
+        title: "Notice",
+        description: searchParams.message,
+      });
     }
   }, [searchParams]);
 
@@ -154,8 +181,15 @@ const Signin = ({
   }, [authProgress]);
 
   // Manual form submission handler to replace formAction
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Prevent multiple submissions
+    if (isSubmittingRef.current) {
+      return;
+    }
+
+    isSubmittingRef.current = true;
     setLoading(true);
     setErrors((prev) => ({ ...prev, general: "" }));
     setIsRedirecting(false);
@@ -166,20 +200,41 @@ const Signin = ({
 
     // Validate form data
     if (!loginData.email) {
-      setErrors((prev) => ({ ...prev, email: "Email is required" }));
+      const errorMsg = "Email is required";
+      setErrors((prev) => ({ ...prev, email: errorMsg }));
+      toast({
+        title: "Validation Error",
+        description: errorMsg,
+        variant: "destructive",
+      });
       setLoading(false);
+      isSubmittingRef.current = false;
       return;
     }
 
     if (!/\S+@\S+\.\S+/.test(loginData.email)) {
-      setErrors((prev) => ({ ...prev, email: "Please enter a valid email" }));
+      const errorMsg = "Please enter a valid email";
+      setErrors((prev) => ({ ...prev, email: errorMsg }));
+      toast({
+        title: "Invalid Email",
+        description: errorMsg,
+        variant: "destructive",
+      });
       setLoading(false);
+      isSubmittingRef.current = false;
       return;
     }
 
     if (!loginData.password) {
-      setErrors((prev) => ({ ...prev, password: "Password is required" }));
+      const errorMsg = "Password is required";
+      setErrors((prev) => ({ ...prev, password: errorMsg }));
+      toast({
+        title: "Validation Error",
+        description: errorMsg,
+        variant: "destructive",
+      });
       setLoading(false);
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -231,8 +286,12 @@ const Signin = ({
       setLoading(false);
       setIsRedirecting(false);
       setShowSuccessMessage(false);
+      isSubmittingRef.current = false;
+    } finally {
+      // Always reset the submission flag
+      isSubmittingRef.current = false;
     }
-  };
+  }, [loginData.email, loginData.password, returnTo, clearAuthError]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -270,15 +329,27 @@ const Signin = ({
     e.preventDefault();
 
     if (!magicLinkEmail) {
-      setErrors((prev) => ({ ...prev, magicLinkEmail: "Email is required" }));
+      const errorMsg = "Email is required";
+      setErrors((prev) => ({ ...prev, magicLinkEmail: errorMsg }));
+      toast({
+        title: "Validation Error",
+        description: errorMsg,
+        variant: "destructive",
+      });
       return;
     }
 
     if (!/\S+@\S+\.\S+/.test(magicLinkEmail)) {
+      const errorMsg = "Please enter a valid email";
       setErrors((prev) => ({
         ...prev,
-        magicLinkEmail: "Please enter a valid email",
+        magicLinkEmail: errorMsg,
       }));
+      toast({
+        title: "Invalid Email",
+        description: errorMsg,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -299,6 +370,12 @@ const Signin = ({
       if (error) throw error;
 
       setMagicLinkSent(true);
+
+      // Show success toast
+      toast({
+        title: "Magic Link Sent!",
+        description: `Check your email at ${magicLinkEmail} for your sign-in link.`,
+      });
     } catch (error: any) {
       console.error("Magic link error:", error);
       let errorMessage =
@@ -310,6 +387,13 @@ const Signin = ({
         ...prev,
         magicLinkEmail: errorMessage,
       }));
+
+      // Show error toast
+      toast({
+        title: "Magic Link Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setMagicLinkLoading(false);
     }
@@ -319,7 +403,6 @@ const Signin = ({
   useEffect(() => {
     if (isUserLoading) {
       const loadingTimeout = setTimeout(() => {
-        console.log("🔥 SignIn: Loading timeout - forcing completion");
         // Force completion by clearing the loading state
         // This is a last resort to prevent infinite loading
         window.location.reload();

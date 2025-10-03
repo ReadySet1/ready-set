@@ -20,10 +20,12 @@ export async function createClient() {
         set(name: string, value: string, options: CookieOptions) {
           try {
             cookieStore.set(name, value, options)
-          } catch {
+          } catch (error) {
+            // Log errors during cookie setting for debugging
+            console.error(`Failed to set cookie "${name}":`, error)
             // The `set` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
-            // user sessions.
+            // user sessions. However, during login this IS critical.
           }
         },
         remove(name: string, options: CookieOptions) {
@@ -61,10 +63,12 @@ export async function createAdminClient() {
         set(name: string, value: string, options: CookieOptions) {
           try {
             cookieStore.set(name, value, options)
-          } catch {
+          } catch (error) {
+            // Log errors during cookie setting for debugging
+            console.error(`Failed to set cookie "${name}":`, error)
             // The `set` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
-            // user sessions.
+            // user sessions. However, during login this IS critical.
           }
         },
         remove(name: string, options: CookieOptions) {

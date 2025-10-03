@@ -41,7 +41,7 @@ export async function login(
 ): Promise<FormState> {
   const startTime = Date.now();
   const requestId = `login_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
+
   if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
     console.log(`🚀 [${requestId}] Login attempt started`);
   }
@@ -127,7 +127,7 @@ export async function login(
       if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
         console.log(`❌ [${requestId}] Authentication failed: ${authError.message}`);
       }
-      
+
       // Enhanced error handling with specific messages
       if (authError.message.includes('Invalid login credentials')) {
         // Check if user exists in profiles table for more specific error
@@ -138,7 +138,7 @@ export async function login(
             .eq("email", email)
             .maybeSingle();
 
-          if (profileError) {
+          if (profileError && process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
             console.error(`❌ [${requestId}] Profile lookup error:`, profileError);
           }
 
@@ -146,17 +146,17 @@ export async function login(
             if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
               console.log(`❌ [${requestId}] User exists but password is incorrect`);
             }
-            return { 
+            return {
               error: "Incorrect password. Please check your password and try again, or use Magic Link for password-free sign in.",
-              success: false 
+              success: false
             };
           } else {
             if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
               console.log(`❌ [${requestId}] User account not found`);
             }
-            return { 
+            return {
               error: "Account not found. Please check your email address or sign up for a new account.",
-              success: false 
+              success: false
             };
           }
         } catch (profileLookupError) {
@@ -381,11 +381,16 @@ export async function login(
       };
     }
 
-  console.log("User profile type from DB:", userType);
+  if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+    console.log("User profile type from DB:", userType);
+  }
 
   // Normalize the user type to lowercase for consistent handling
   const userTypeKey = userType?.toLowerCase() || 'client';
-  console.log("Normalized user type for redirection:", userTypeKey);
+
+  if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+    console.log("Normalized user type for redirection:", userTypeKey);
+  }
 
   // Set immediate session data in cookies for client-side access
   const cookieStore = await cookies();
@@ -403,7 +408,9 @@ export async function login(
     timestamp: Date.now()
   };
 
-  console.log("Normalized userRole for session:", normalizedUserRole);
+  if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+    console.log("Normalized userRole for session:", normalizedUserRole);
+  }
 
   // Set session cookie with enhanced security - allow client access for hydration
   cookieStore.set('user-session-data', JSON.stringify(sessionData), {
@@ -417,14 +424,6 @@ export async function login(
       domain: process.env.NEXT_PUBLIC_COOKIE_DOMAIN || undefined,
     })
   });
-
-  // Set session data in sessionStorage for immediate client access
-  // This will be read by the UserContext during hydration
-  console.log("Set immediate session data for client:", sessionData);
-
-  // Note: Enhanced session management is initialized on the client-side only
-  // The UserContext will handle session manager initialization when the page loads
-  console.log("✅ Basic authentication completed - enhanced session management will initialize on client-side");
 
   // Prefetch and cache user profile data for faster client-side loading
   try {
@@ -445,8 +444,6 @@ export async function login(
       sameSite: 'lax',
       maxAge: 60 * 10 // 10 minutes
     });
-    
-    console.log("Prefetched user profile data for client:", profileData);
   } catch (error) {
     console.error("Error prefetching user profile data:", error);
     // Don't fail login if prefetch fails
@@ -504,8 +501,6 @@ export async function login(
       sameSite: 'lax',
       maxAge: 60, // Short-lived cookie, will be cleaned up by client
     });
-
-    console.log("🔗 Returning redirect path to client:", redirectPath);
 
     // IMPORTANT: Return the redirect path instead of calling redirect()
     // This ensures cookies are properly committed before the client-side redirect
