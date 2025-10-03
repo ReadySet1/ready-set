@@ -8,5 +8,4 @@ export { default as UserStatusCard } from './UserStatusCard';
 export * from './UserView/BreadCrumbNavigation';
 export * from './UserView/UserFilter';
 export * from './UserView/UserTable';
-export { default as VendorClientDetailsCard } from './VendorClientDetailsCard';
 export * from './DashboardErrorBoundary';
