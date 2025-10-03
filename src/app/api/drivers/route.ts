@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       console.error('Driver API access denied:', authResult.response);
       console.error('❌ [Driver API] Access denied for user role:', {
         status: authResult.response?.status,
-        error: authResult.response?.body ? JSON.parse(await authResult.response.text()) : 'Unknown error'
+        error: 'Insufficient permissions'
       });
       return authResult.response;
     }

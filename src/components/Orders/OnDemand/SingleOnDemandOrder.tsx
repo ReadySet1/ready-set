@@ -170,10 +170,16 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
     isAdmin: boolean;
     isSuperAdmin: boolean;
     isHelpdesk: boolean;
+    isVendor: boolean;
+    isClient: boolean;
+    isDriver: boolean;
   }>({
     isAdmin: false,
     isSuperAdmin: false,
     isHelpdesk: false,
+    isVendor: false,
+    isClient: false,
+    isDriver: false,
   });
 
   // Check for bucket existence but don't try to create it (requires admin privileges)
@@ -406,9 +412,17 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
     ensureStorageBucketExists(); // Add this line to check the bucket on mount
   }, [fetchOrderDetails, ensureStorageBucketExists]);
 
-  // Fetch drivers on mount
+  // Fetch drivers on mount - only for non-VENDOR users
   useEffect(() => {
     const fetchDrivers = async () => {
+      // Skip driver fetching for VENDOR users since they don't have access to driver data
+      if (userRoles.isVendor) {
+        console.log(
+          "ℹ️ [SingleOnDemandOrder] Skipping driver fetch for VENDOR user",
+        );
+        return;
+      }
+
       try {
         const {
           data: { session },
@@ -438,6 +452,13 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
             router.push("/auth/login");
             return;
           }
+          if (response.status === 403) {
+            console.log(
+              "ℹ️ [SingleOnDemandOrder] Access denied to drivers (403) - user lacks permission",
+            );
+            // For 403 errors, silently skip driver loading instead of showing an error
+            return;
+          }
           console.error("Failed to fetch drivers");
           toast.error("Failed to load available drivers");
         }
@@ -448,7 +469,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
     };
 
     fetchDrivers();
-  }, [setDrivers, supabase.auth, router]);
+  }, [setDrivers, supabase.auth, router, userRoles.isVendor]);
 
   const handleOpenDriverDialog = () => {
     setIsDriverDialogOpen(true);
@@ -702,6 +723,9 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
           isAdmin: profile.type === UserType.ADMIN,
           isSuperAdmin: profile.type === UserType.SUPER_ADMIN,
           isHelpdesk: profile.type === UserType.HELPDESK,
+          isVendor: profile.type === UserType.VENDOR,
+          isClient: profile.type === UserType.CLIENT,
+          isDriver: profile.type === UserType.DRIVER,
         });
       }
     } catch (error) {
@@ -815,7 +839,11 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
                   }}
                   driverInfo={driverInfo}
                   updateDriverStatus={updateDriverStatus}
-                  canAssignDriver={userRoles.isAdmin || userRoles.isSuperAdmin}
+                  canAssignDriver={
+                    userRoles.isAdmin ||
+                    userRoles.isSuperAdmin ||
+                    userRoles.isHelpdesk
+                  }
                   canUpdateDriverStatus={
                     userRoles.isAdmin || userRoles.isSuperAdmin
                   }
