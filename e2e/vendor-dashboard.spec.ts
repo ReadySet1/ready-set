@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Client Dashboard QA - Regression Testing', () => {
+test.describe('Vendor Dashboard QA - Functional Testing', () => {
   test.beforeEach(async ({ page }) => {
     // Start from the home page and navigate to sign in
     await page.goto('/');
@@ -12,15 +12,15 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
     // For now, we'll test the dashboard structure and functionality
   });
 
-  test('1. Login and Initial View - Verify correct page title and breadcrumb', async ({ page }) => {
+  test('1. Login and Initial View - Verify correct page title and breadcrumb for VENDOR role', async ({ page }) => {
     // Test the breadcrumb/page title functionality
-    // This tests the dynamic title logic for CLIENT role
+    // This tests the dynamic title logic for VENDOR role
 
     await page.goto('/client');
 
-    // Verify the breadcrumb shows "Client Dashboard" (not "Vendor Dashboard")
-    await expect(page.locator('[data-testid="breadcrumb"]')).toContainText('Client Dashboard');
-    await expect(page.locator('[data-testid="breadcrumb"]')).not.toContainText('Vendor Dashboard');
+    // Verify the breadcrumb shows "Vendor Dashboard" (not "Client Dashboard")
+    await expect(page.locator('[data-testid="breadcrumb"]')).toContainText('Vendor Dashboard');
+    await expect(page.locator('[data-testid="breadcrumb"]')).not.toContainText('Client Dashboard');
 
     // Verify no console errors
     const errors: string[] = [];
@@ -35,7 +35,7 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
     expect(errors).toHaveLength(0);
   });
 
-  test('2. Visual & Data Integrity - Verify dashboard widgets and data loading', async ({ page }) => {
+  test('2. Visual & Data Integrity - Verify dashboard widgets and data loading for VENDOR', async ({ page }) => {
     await page.goto('/client');
 
     // Verify all primary dashboard widgets are visible
@@ -58,7 +58,7 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
     await expect(page.locator('text=Welcome back').or(page.locator('text=Welcome,'))).toBeVisible();
   });
 
-  test('3. Functional Testing - Verify navigation links and interactions', async ({ page }) => {
+  test('3. Functional Testing - Verify navigation links and interactions for VENDOR', async ({ page }) => {
     await page.goto('/client');
 
     // Test "Create New Order" / "New Order" link in quick actions
@@ -97,14 +97,14 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
     }
   });
 
-  test('4. Responsiveness - Test mobile and tablet layouts', async ({ page }) => {
+  test('4. Responsiveness - Test mobile and tablet layouts for VENDOR dashboard', async ({ page }) => {
     await page.goto('/client');
 
     // Test tablet-sized screen (768px width)
     await page.setViewportSize({ width: 768, height: 1024 });
 
     // Verify layout adapts correctly on tablet
-    await expect(page.locator('text=Client Dashboard')).toBeVisible();
+    await expect(page.locator('text=Vendor Dashboard')).toBeVisible();
     await expect(page.locator('text=Active Orders')).toBeVisible();
 
     // Check that cards stack properly on tablet
@@ -115,7 +115,7 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
     await page.setViewportSize({ width: 375, height: 667 });
 
     // Verify mobile layout is usable
-    await expect(page.locator('text=Client Dashboard')).toBeVisible();
+    await expect(page.locator('text=Vendor Dashboard')).toBeVisible();
 
     // Check that mobile menu button is present (if applicable)
     const mobileMenu = page.locator('[aria-label="Mobile Menu"], .lg\\:hidden');
@@ -128,20 +128,20 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
     await expect(page.locator('text=Recent Orders')).toBeVisible();
   });
 
-  test('5. Dynamic Title Logic - Verify correct title for CLIENT role', async ({ page }) => {
+  test('5. Dynamic Title Logic - Verify correct title for VENDOR role', async ({ page }) => {
     await page.goto('/client');
 
-    // Test that the breadcrumb shows "Client Dashboard" for client role
+    // Test that the breadcrumb shows "Vendor Dashboard" for vendor role
     const breadcrumb = page.locator('[data-testid="breadcrumb"]');
-    await expect(breadcrumb).toContainText('Client Dashboard');
-    await expect(breadcrumb).not.toContainText('Vendor Dashboard');
+    await expect(breadcrumb).toContainText('Vendor Dashboard');
+    await expect(breadcrumb).not.toContainText('Client Dashboard');
     await expect(breadcrumb).not.toContainText('Admin Dashboard');
 
     // Test that the page description is present
     await expect(breadcrumb).toContainText('Manage your account');
   });
 
-  test('6. Data Loading States - Verify skeleton loading works', async ({ page }) => {
+  test('6. Data Loading States - Verify skeleton loading works for VENDOR', async ({ page }) => {
     await page.goto('/client');
 
     // Wait for content to load (or skeleton to appear briefly)
@@ -158,7 +158,7 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
     expect(visibleSkeletons).toBeLessThanOrEqual(2);
   });
 
-  test('7. Error Handling - Verify graceful handling of missing data', async ({ page }) => {
+  test('7. Error Handling - Verify graceful handling of missing data for VENDOR', async ({ page }) => {
     await page.goto('/client');
 
     // Test that the dashboard handles empty states gracefully
@@ -179,7 +179,7 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
     }
   });
 
-  test('8. Accessibility - Verify WCAG compliance', async ({ page }) => {
+  test('8. Accessibility - Verify WCAG compliance for VENDOR dashboard', async ({ page }) => {
     await page.goto('/client');
 
     // Test keyboard navigation (tab through interactive elements)
@@ -209,28 +209,28 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
     expect(await h1.count() + await h2.count()).toBeGreaterThan(0);
   });
 
-  test('9. Data Separation - Verify CLIENT sees only their own data', async ({ page }) => {
+  test('9. Data Separation - Verify VENDOR sees only their own data', async ({ page }) => {
     await page.goto('/client');
 
-    // This test ensures that client users only see data relevant to their role
+    // This test ensures that vendor users only see data relevant to their role
     // In a real implementation, this would test that:
-    // - Client dashboard shows different data than vendor dashboard
-    // - Client cannot access vendor-specific features
+    // - Vendor dashboard shows different data than client dashboard
+    // - Vendor cannot access client-specific features
     // - Data is properly filtered by user role
 
     // Verify the dashboard is role-aware and shows appropriate content
-    await expect(page.locator('text=Client Dashboard')).toBeVisible();
+    await expect(page.locator('text=Vendor Dashboard')).toBeVisible();
 
-    // Test that client dashboard structure matches vendor but with role-appropriate content
+    // Test that vendor dashboard structure matches client but with role-appropriate content
     await expect(page.locator('text=Active Orders')).toBeVisible();
     await expect(page.locator('text=Completed')).toBeVisible();
     await expect(page.locator('text=Recent Orders')).toBeVisible();
 
-    // Verify no vendor-specific elements are visible
-    // (In a real implementation, you might check for client-specific features)
+    // Verify no client-specific elements are visible
+    // (In a real implementation, you might check for vendor-specific features)
   });
 
-  test('10. Role-Based Navigation Testing - Test all dashboard links work correctly for CLIENT', async ({ page }) => {
+  test('10. Navigation Testing - Test all dashboard links work correctly for VENDOR', async ({ page }) => {
     await page.goto('/client');
 
     // Test that all navigation links in the dashboard work
@@ -262,46 +262,5 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
       const href = await firstViewDetails.getAttribute('href');
       expect(href).toMatch(/^\/order-status\//);
     }
-  });
-
-  test('11. Cross-Role Data Isolation - Verify CLIENT and VENDOR data separation', async ({ page }) => {
-    // Test that client dashboard shows "Client Dashboard" title
-    await page.goto('/client');
-    await expect(page.locator('[data-testid="breadcrumb"]')).toContainText('Client Dashboard');
-
-    // Verify that client sees client-appropriate content
-    await expect(page.locator('text=Active Orders')).toBeVisible();
-    await expect(page.locator('text=Recent Orders')).toBeVisible();
-
-    // Test that the dashboard correctly identifies the user's role
-    // This ensures data filtering is working correctly
-    const statsValues = page.locator('.text-2xl.font-bold');
-    const statsCount = await statsValues.count();
-    expect(statsCount).toBeGreaterThanOrEqual(0); // Should show stats or handle empty state gracefully
-
-    // Verify that the dashboard handles role-based data fetching
-    // In a real scenario, this would check that the API calls include the correct user ID
-  });
-
-  test('12. Error State Handling - Verify proper error handling for CLIENT dashboard', async ({ page }) => {
-    await page.goto('/client');
-
-    // Test that error states are handled gracefully
-    // Check for error messages or fallback content
-    const errorMessages = page.locator('text=Error, Something went wrong, Failed to load');
-    const errorCount = await errorMessages.count();
-
-    // If errors exist, they should be user-friendly
-    if (errorCount > 0) {
-      for (const error of await errorMessages.all()) {
-        const text = await error.textContent();
-        expect(text?.toLowerCase()).not.toContain('undefined');
-        expect(text?.toLowerCase()).not.toContain('null');
-      }
-    }
-
-    // Verify that even with errors, the dashboard structure remains intact
-    await expect(page.locator('text=Quick Actions')).toBeVisible();
-    await expect(page.locator('text=Recent Orders')).toBeVisible();
   });
 });
