@@ -23,10 +23,10 @@ const VendorOrderPage = () => {
   useEffect(() => {
     // Get the order number from the URL params
     if (params?.order_number) {
-      const rawOrderNumber = Array.isArray(params.order_number) 
-        ? params.order_number[0] 
+      const rawOrderNumber = Array.isArray(params.order_number)
+        ? params.order_number[0]
         : params.order_number;
-      
+
       if (rawOrderNumber) {
         setOrderNumber(decodeURIComponent(rawOrderNumber));
       }
@@ -34,14 +34,14 @@ const VendorOrderPage = () => {
   }, [params]);
 
   const handleDeleteSuccess = () => {
-    router.push("/vendor");
+    router.push("/client");
   };
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-slate-50">
       <div className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white px-6 shadow-sm">
         <Button
-          onClick={() => router.push("/vendor")}
+          onClick={() => router.push("/client")}
           variant="ghost"
           size="icon"
           className="mr-2 h-9 w-9 text-slate-500 hover:text-blue-600"
@@ -53,7 +53,7 @@ const VendorOrderPage = () => {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link href="/vendor" className="flex items-center">
+                <Link href="/client" className="flex items-center">
                   <Home className="mr-1 h-4 w-4" />
                   Vendor Dashboard
                 </Link>
@@ -62,10 +62,7 @@ const VendorOrderPage = () => {
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link
-                  href="/vendor"
-                  className="flex items-center"
-                >
+                <Link href="/client" className="flex items-center">
                   <Package className="mr-1 h-4 w-4" />
                   Deliveries
                 </Link>
@@ -82,8 +79,8 @@ const VendorOrderPage = () => {
       </div>
 
       <div className="flex-1">
-        <SingleOrder 
-          onDeleteSuccess={handleDeleteSuccess} 
+        <SingleOrder
+          onDeleteSuccess={handleDeleteSuccess}
           showHeader={false}
           canAssignDriver={false}
           canUpdateDriverStatus={false}

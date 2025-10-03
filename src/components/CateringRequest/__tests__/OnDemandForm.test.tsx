@@ -220,7 +220,7 @@ describe("OnDemandOrderForm", () => {
 
     // Verify that router.push was called with the vendor dashboard path for vendor users
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/vendor");
+      expect(mockPush).toHaveBeenCalledWith("/client");
     });
   });
 
@@ -309,7 +309,7 @@ describe("OnDemandOrderForm", () => {
       });
 
       // Verify redirect happened
-      expect(mockPush).toHaveBeenCalledWith("/vendor");
+      expect(mockPush).toHaveBeenCalledWith("/client");
     });
   });
 

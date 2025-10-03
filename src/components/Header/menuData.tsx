@@ -36,7 +36,7 @@ export const adminMenuItem: MenuItem = {
 export const vendorMenuItem: MenuItem = {
   id: 31, // Changed from 7 to avoid conflict
   title: "Vendor",
-  path: "/vendor",
+  path: "/client",
   newTab: false,
 };
 

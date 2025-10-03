@@ -15,7 +15,7 @@ import { UserType } from "@/types/user";
 const ROLE_DISPLAY_INFO: Record<UserType, { title: string; path: string }> = {
   [UserType.VENDOR]: {
     title: "Vendor Dashboard",
-    path: "/vendor",
+    path: "/client",
   },
   [UserType.CLIENT]: {
     title: "Client Dashboard",

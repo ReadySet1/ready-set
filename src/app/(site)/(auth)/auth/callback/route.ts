@@ -8,7 +8,7 @@ const USER_HOME_ROUTES: Record<string, string> = {
   super_admin: "/admin",
   driver: "/driver",
   helpdesk: "/helpdesk",
-  vendor: "/vendor",
+  vendor: "/client",
   client: "/client"
 };
 

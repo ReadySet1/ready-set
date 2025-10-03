@@ -22,7 +22,7 @@ import {
 } from "@/types/order-status";
 import { CombinedOrder } from "@/types/models";
 import { Prisma } from "@prisma/client";
-import { CateringRequest, OnDemand, Decimal } from "@/types/prisma";
+import { CateringRequest, OnDemand, Decimal, UserType } from "@/types/prisma";
 import {
   DashboardCardSkeleton,
   OrderCardSkeleton,
@@ -561,10 +561,14 @@ const ClientPage = async () => {
     redirect("/sign-in?error=Profile+not+found");
   }
 
-  // Validate user has client access
-  if (userRole.toLowerCase() !== "client") {
+  // Validate user has CLIENT or VENDOR role for unified dashboard access
+  const isAllowedRole =
+    userRole.toUpperCase() === UserType.CLIENT ||
+    userRole.toUpperCase() === UserType.VENDOR;
+
+  if (!isAllowedRole) {
     console.log(
-      "User does not have client role, redirecting to appropriate dashboard",
+      "User does not have CLIENT or VENDOR role, redirecting away from unified dashboard",
     );
     // Redirect to their appropriate dashboard based on role
     const roleRoutes: Record<string, string> = {
@@ -572,10 +576,9 @@ const ClientPage = async () => {
       super_admin: "/admin",
       driver: "/driver",
       helpdesk: "/helpdesk",
-      vendor: "/vendor",
     };
 
-    const redirectPath = roleRoutes[userRole.toLowerCase()] || "/";
+    const redirectPath = roleRoutes[userRole.toLowerCase()] || "/sign-in";
     redirect(redirectPath);
   }
 

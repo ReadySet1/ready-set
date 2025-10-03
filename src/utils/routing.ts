@@ -15,7 +15,7 @@ export function getDashboardRouteByRole(userRole: UserType | null): string {
     case UserType.CLIENT:
       return '/client';
     case UserType.VENDOR:
-      return '/vendor';
+      return '/client';
     case UserType.DRIVER:
       return '/driver';
     case UserType.ADMIN:
