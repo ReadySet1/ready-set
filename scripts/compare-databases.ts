@@ -99,7 +99,14 @@ async function getTableInfo(client: SupabaseClient): Promise<TableInfo[]> {
       .eq('table_schema', 'public');
 
     if (queryError) throw queryError;
-    return data?.map((t: any) => ({ name: t.table_name })) || [];
+    return data?.map((t: any) => ({
+      schema: 'public',
+      name: t.table_name,
+      columns: [],
+      rowCount: 0,
+      rlsEnabled: false,
+      primaryKeys: []
+    } as TableInfo)) || [];
   }
 
   return tables || [];

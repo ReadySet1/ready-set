@@ -257,6 +257,137 @@ export type Database = {
           },
         ]
       }
+      calculator_templates: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          name: string
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      client_configurations: {
+        Row: {
+          id: string
+          client_id: string | null
+          template_id: string
+          client_name: string
+          rule_overrides: Json
+          area_rules: Json
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          client_id?: string | null
+          template_id: string
+          client_name: string
+          rule_overrides?: Json
+          area_rules?: Json
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string | null
+          template_id?: string
+          client_name?: string
+          rule_overrides?: Json
+          area_rules?: Json
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_configurations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_configurations_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "calculator_templates"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      pricing_rules: {
+        Row: {
+          id: string
+          template_id: string
+          rule_type: string
+          rule_name: string
+          base_amount: number | null
+          per_unit_amount: number | null
+          threshold_value: number | null
+          threshold_type: string | null
+          applies_when: string | null
+          priority: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          template_id: string
+          rule_type: string
+          rule_name: string
+          base_amount?: number | null
+          per_unit_amount?: number | null
+          threshold_value?: number | null
+          threshold_type?: string | null
+          applies_when?: string | null
+          priority?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          template_id?: string
+          rule_type?: string
+          rule_name?: string
+          base_amount?: number | null
+          per_unit_amount?: number | null
+          threshold_value?: number | null
+          threshold_type?: string | null
+          applies_when?: string | null
+          priority?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_rules_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "calculator_templates"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       dispatches: {
         Row: {
           cateringRequestId: string | null
