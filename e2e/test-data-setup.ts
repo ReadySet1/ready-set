@@ -106,7 +106,7 @@ async function createTestUsers() {
   for (const userData of testUsers) {
     try {
       // Check if user already exists
-      const existingUser = await prisma.user.findUnique({
+      const existingUser = await prisma.profile.findUnique({
         where: { email: userData.email },
       });
 
@@ -119,15 +119,13 @@ async function createTestUsers() {
       const hashedPassword = await hash(userData.password, 12);
 
       // Create user
-      const user = await prisma.user.create({
+      const user = await prisma.profile.create({
         data: {
           email: userData.email,
-          password: hashedPassword,
-          role: userData.role,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          phone: userData.phone,
-          emailVerified: new Date(), // Mark as verified for testing
+          type: userData.role as any,
+          name: `${userData.firstName} ${userData.lastName}`,
+          contactNumber: userData.phone,
+          status: 'ACTIVE' as any, // Set as active for testing
         },
       });
 
@@ -151,14 +149,23 @@ async function createTestAddress(userId: string, userEmail: string) {
   if (!addressData) return;
 
   try {
+    // Create address first
+    const address = await prisma.address.create({
+      data: {
+        street1: addressData.street,
+        city: addressData.city,
+        state: addressData.state,
+        zip: addressData.zipCode,
+        createdBy: userId,
+      },
+    });
+
+    // Then create userAddress relation
     await prisma.userAddress.create({
       data: {
         userId,
-        label: addressData.label,
-        street: addressData.street,
-        city: addressData.city,
-        state: addressData.state,
-        zipCode: addressData.zipCode,
+        addressId: address.id,
+        alias: addressData.label,
         isDefault: addressData.isDefault,
       },
     });
@@ -172,6 +179,25 @@ async function createTestAddress(userId: string, userEmail: string) {
 async function createTestOrders(userId: string, userEmail: string) {
   const userOrders = testOrders.filter(order => order.userEmail === userEmail);
 
+  // Create pickup and delivery addresses first
+  const pickupAddress = await prisma.address.create({
+    data: {
+      street1: '123 Default Pickup St',
+      city: 'Pickup City',
+      state: 'CA',
+      zip: '12345',
+    },
+  });
+
+  const deliveryAddress = await prisma.address.create({
+    data: {
+      street1: '456 Default Delivery Ave',
+      city: 'Delivery City',
+      state: 'CA',
+      zip: '67890',
+    },
+  });
+
   for (const orderData of userOrders) {
     try {
       if (orderData.orderType === 'catering') {
@@ -183,10 +209,9 @@ async function createTestOrders(userId: string, userEmail: string) {
             orderTotal: orderData.orderTotal,
             pickupDateTime: orderData.pickupDateTime,
             arrivalDateTime: orderData.arrivalDateTime,
-            // Add other required fields with default values
-            pickupAddress: 'Default Pickup Address',
-            deliveryAddress: 'Default Delivery Address',
-            specialInstructions: 'Test order',
+            pickupAddressId: pickupAddress.id,
+            deliveryAddressId: deliveryAddress.id,
+            specialNotes: 'Test order',
           },
         });
       } else {
@@ -198,9 +223,9 @@ async function createTestOrders(userId: string, userEmail: string) {
             orderTotal: orderData.orderTotal,
             pickupDateTime: orderData.pickupDateTime,
             arrivalDateTime: orderData.arrivalDateTime,
-            // Add other required fields with default values
-            pickupAddress: 'Default Pickup Address',
-            deliveryAddress: 'Default Delivery Address',
+            pickupAddressId: pickupAddress.id,
+            deliveryAddressId: deliveryAddress.id,
+            clientAttention: 'Test Client',
           },
         });
       }
@@ -229,16 +254,37 @@ async function cleanupTestData() {
       }
     }
 
-    // Delete test addresses
+    // Delete test addresses used by orders
+    await prisma.address.deleteMany({
+      where: {
+        OR: [
+          { street1: '123 Default Pickup St' },
+          { street1: '456 Default Delivery Ave' },
+        ],
+      },
+    });
+
+    // Delete test addresses and userAddresses
     for (const address of testAddresses) {
+      // First delete userAddresses by alias
       await prisma.userAddress.deleteMany({
-        where: { label: address.label },
+        where: { alias: address.label },
+      });
+
+      // Then delete the addresses themselves
+      await prisma.address.deleteMany({
+        where: {
+          street1: address.street,
+          city: address.city,
+          state: address.state,
+          zip: address.zipCode,
+        },
       });
     }
 
     // Delete test users
     for (const user of testUsers) {
-      await prisma.user.deleteMany({
+      await prisma.profile.deleteMany({
         where: { email: user.email },
       });
     }
