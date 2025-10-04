@@ -413,6 +413,7 @@ const OnDemandOrderForm: React.FC = () => {
                 });
               }
             }}
+            disableCountyFiltering={true}
           />
         </div>
       </div>
@@ -441,6 +442,7 @@ const OnDemandOrderForm: React.FC = () => {
             }}
             showFilters={false}
             showManagementButtons={false}
+            disableCountyFiltering={true}
           />
         </div>
       </div>

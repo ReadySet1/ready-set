@@ -40,6 +40,8 @@ interface AddressManagerProps {
   showFilters?: boolean;
   showManagementButtons?: boolean;
   onRefresh?: (refreshFn: () => void) => void;
+  allowedCounties?: string[];
+  disableCountyFiltering?: boolean;
 }
 
 interface PaginationData {
@@ -59,6 +61,8 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   showFilters = true,
   showManagementButtons = true,
   onRefresh,
+  allowedCounties,
+  disableCountyFiltering = false,
 }) => {
   const addressFormRef = useRef<HTMLDivElement>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -674,6 +678,8 @@ const AddressManager: React.FC<AddressManagerProps> = ({
               isShared: false,
               isRestaurant: false,
             }}
+            allowedCounties={allowedCounties}
+            disableCountyFiltering={disableCountyFiltering}
           />
         </div>
       )}

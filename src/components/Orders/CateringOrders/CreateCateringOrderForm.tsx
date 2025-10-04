@@ -85,6 +85,7 @@ interface AddressManagerWrapperProps {
   onSwitchToManual: () => void;
   onAddNewAddress: () => void;
   onRefresh?: (refreshFn: () => void) => void;
+  disableCountyFiltering?: boolean;
 }
 
 const AddressManagerWrapper: React.FC<AddressManagerWrapperProps> = ({
@@ -96,6 +97,7 @@ const AddressManagerWrapper: React.FC<AddressManagerWrapperProps> = ({
   onSwitchToManual,
   onAddNewAddress,
   onRefresh,
+  disableCountyFiltering = false,
 }) => {
   // Maintain a local error state to avoid unnecessary re-renders
   const [localErrorState, setLocalErrorState] = useState<string | null>(
@@ -155,6 +157,7 @@ const AddressManagerWrapper: React.FC<AddressManagerWrapperProps> = ({
         showFilters={true}
         showManagementButtons={false}
         onRefresh={onRefresh}
+        disableCountyFiltering={disableCountyFiltering}
       />
 
       {localErrorState && (
@@ -1713,6 +1716,7 @@ export const CreateCateringOrderForm: React.FC<
                 onSwitchToManual={() => setShowManualPickupEntry(true)}
                 onAddNewAddress={() => handleAddNewAddress("pickup")}
                 onRefresh={handlePickupAddressRefresh}
+                disableCountyFiltering={true}
               />
             ) : (
               <>
@@ -1753,6 +1757,7 @@ export const CreateCateringOrderForm: React.FC<
                 onSwitchToManual={() => setShowManualDeliveryEntry(true)}
                 onAddNewAddress={() => handleAddNewAddress("delivery")}
                 onRefresh={handleDeliveryAddressRefresh}
+                disableCountyFiltering={true}
               />
             ) : (
               <>

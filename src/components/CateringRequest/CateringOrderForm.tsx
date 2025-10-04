@@ -334,6 +334,7 @@ const CateringOrderForm: React.FC = () => {
           onAddressSelected={handleAddressSelect}
           onAddressesLoaded={handleAddressesLoaded}
           defaultFilter="all"
+          disableCountyFiltering={true}
         />
         {errors.addressId && (
           <p className="mt-1 text-sm text-red-500">

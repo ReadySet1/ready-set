@@ -46,6 +46,7 @@ interface AddAddressFormProps {
   onClose: () => void;
   initialValues?: Partial<AddressFormData>;
   allowedCounties?: string[];
+  disableCountyFiltering?: boolean;
 }
 
 const AddAddressForm: React.FC<AddAddressFormProps> = ({
@@ -53,6 +54,7 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
   onClose,
   initialValues = {},
   allowedCounties,
+  disableCountyFiltering = false,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -91,6 +93,12 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
     const fetchCounties = async () => {
       // Always ensure we have counties available
       let countiesToUse = [...COUNTIES]; // Default to all counties
+
+      // If county filtering is disabled, use all counties
+      if (disableCountyFiltering) {
+        setAvailableCounties([...COUNTIES]);
+        return;
+      }
 
       if (allowedCounties && allowedCounties.length > 0) {
         // Filter counties based on allowedCounties prop
@@ -135,7 +143,7 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
     };
 
     fetchCounties();
-  }, [allowedCounties]);
+  }, [allowedCounties, disableCountyFiltering]);
 
   const submitHandler: SubmitHandler<z.infer<typeof addressSchema>> = async (
     data,

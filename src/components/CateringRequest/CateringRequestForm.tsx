@@ -607,6 +607,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           }}
           showFilters={true}
           showManagementButtons={true}
+          disableCountyFiltering={true}
         />
       </div>
 
@@ -740,6 +741,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           }}
           showFilters={true}
           showManagementButtons={true}
+          disableCountyFiltering={true}
         />
       </div>
 
