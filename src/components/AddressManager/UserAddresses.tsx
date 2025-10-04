@@ -2,17 +2,10 @@
 
 import React, { useState, useCallback } from "react";
 import { User } from "@supabase/supabase-js";
-import { Address } from "@/types/address";
+import { Address, AddressFilter } from "@/types/address";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  useAddresses,
-  useCreateAddress,
-  useUpdateAddress,
-  useDeleteAddress,
-} from "@/hooks/useAddresses";
+import { useAddresses, useDeleteAddress } from "@/hooks/useAddresses";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +15,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Pagination,
@@ -33,6 +25,10 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import AddressModal from "./AddressModal";
+import AddressCard from "./AddressCard";
+import AddressCardSkeleton from "./AddressCardSkeleton";
+import EmptyAddressState from "./EmptyAddressState";
+import { Plus, MapPin, RefreshCw } from "lucide-react";
 
 interface PaginationData {
   currentPage: number;
@@ -47,9 +43,7 @@ const UserAddresses: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [addressToEdit, setAddressToEdit] = useState<Address | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [filterType, setFilterType] = useState<"all" | "shared" | "private">(
-    "all",
-  );
+  const [filterType, setFilterType] = useState<AddressFilter>("all");
   const [deleteConfirmAddress, setDeleteConfirmAddress] =
     useState<Address | null>(null);
   const [pagination, setPagination] = useState<PaginationData>({
@@ -58,7 +52,7 @@ const UserAddresses: React.FC = () => {
     totalCount: 0,
     hasNextPage: false,
     hasPrevPage: false,
-    limit: 5,
+    limit: 9, // 3x3 grid
   });
 
   // Get user from parent component's session
@@ -103,8 +97,6 @@ const UserAddresses: React.FC = () => {
   const paginationData = data?.pagination || pagination;
 
   // React Query mutations
-  const createAddressMutation = useCreateAddress();
-  const updateAddressMutation = useUpdateAddress();
   const deleteAddressMutation = useDeleteAddress();
 
   // Handle delete address using React Query mutation
@@ -116,7 +108,6 @@ const UserAddresses: React.FC = () => {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       console.error("Error deleting address:", errorMessage);
-      // React Query will handle the error state
     }
   };
 
@@ -130,24 +121,27 @@ const UserAddresses: React.FC = () => {
     setIsModalOpen(false);
   }, [user, refetch]);
 
-  const handleEditAddress = (address: Address) => {
+  const handleEditAddress = useCallback((address: Address) => {
     setAddressToEdit(address);
     setIsModalOpen(true);
-  };
+  }, []);
 
-  const handleAddNewAddress = () => {
+  const handleAddNewAddress = useCallback(() => {
     setAddressToEdit(null);
     setIsModalOpen(true);
-  };
+  }, []);
 
   // Function to check if the current user is the address owner
-  const isAddressOwner = (address: Address) => {
-    return address.createdBy === user?.id;
-  };
+  const isAddressOwner = useCallback(
+    (address: Address) => {
+      return address.createdBy === user?.id;
+    },
+    [user],
+  );
 
   // Memoize the filter change handler to prevent unnecessary re-renders
-  const handleFilterChange = useCallback((value: string) => {
-    setFilterType(value as "all" | "shared" | "private");
+  const handleFilterChange = useCallback((value: AddressFilter) => {
+    setFilterType(value);
     // Reset to first page when filter changes
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
   }, []);
@@ -170,6 +164,18 @@ const UserAddresses: React.FC = () => {
       currentPage: Math.min(prev.totalPages, prev.currentPage + 1),
     }));
   }, []);
+
+  // Get counts for each filter type (simplified - you might want to fetch these separately)
+  const getFilterCounts = () => {
+    const totalCount = paginationData.totalCount;
+    return {
+      all: totalCount,
+      shared: addresses.filter((a) => a.isShared).length,
+      private: addresses.filter((a) => !a.isShared).length,
+    };
+  };
+
+  const counts = getFilterCounts();
 
   if (isLoading && !user) {
     return (
@@ -197,183 +203,120 @@ const UserAddresses: React.FC = () => {
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full space-y-6">
       {/* Header Section */}
-      <div className="mb-6 rounded-lg bg-gray-50 p-4 dark:bg-gray-800 sm:p-6">
-        <h2 className="text-center text-xl font-semibold leading-none tracking-tight sm:text-2xl">
-          Your Addresses
-        </h2>
-        <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
-          Manage your saved addresses for deliveries and pickups
-        </p>
+      <div className="rounded-lg border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-6 shadow-sm dark:border-gray-700 dark:from-gray-800 dark:to-gray-900">
+        <div className="mb-6 text-center">
+          <div className="mb-2 flex items-center justify-center gap-2">
+            <MapPin className="h-8 w-8 text-primary" />
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+              Your Addresses
+            </h1>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Manage your saved addresses for deliveries and pickups
+          </p>
+        </div>
 
-        {/* Tabs and Add Button - Stack on mobile */}
-        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs
-            defaultValue={filterType}
-            onValueChange={handleFilterChange}
-            className="w-full sm:w-auto"
+        {/* Filter Tabs and Add Button */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {/* Custom Pill Filters */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => handleFilterChange("all")}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ease-out ${
+                filterType === "all"
+                  ? "bg-primary text-black shadow-md"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              }`}
+            >
+              All {counts.all > 0 && `(${counts.all})`}
+            </button>
+            <button
+              onClick={() => handleFilterChange("private")}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ease-out ${
+                filterType === "private"
+                  ? "bg-primary text-black shadow-md"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              }`}
+            >
+              Private {counts.private > 0 && `(${counts.private})`}
+            </button>
+            <button
+              onClick={() => handleFilterChange("shared")}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ease-out ${
+                filterType === "shared"
+                  ? "bg-primary text-black shadow-md"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              }`}
+            >
+              Shared {counts.shared > 0 && `(${counts.shared})`}
+            </button>
+          </div>
+
+          {/* Add New Button */}
+          <Button
+            onClick={handleAddNewAddress}
+            className="gap-2 shadow-sm transition-all hover:scale-105"
+            size="lg"
           >
-            <TabsList className="grid w-full grid-cols-3 gap-1 sm:w-auto">
-              <TabsTrigger value="all" className="text-xs sm:text-sm">
-                All
-              </TabsTrigger>
-              <TabsTrigger value="private" className="text-xs sm:text-sm">
-                Private
-              </TabsTrigger>
-              <TabsTrigger value="shared" className="text-xs sm:text-sm">
-                Shared
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <Button onClick={handleAddNewAddress} className="w-full sm:w-auto">
-            + Add New Address
+            <Plus className="h-5 w-5" />
+            Add New Address
           </Button>
         </div>
       </div>
 
       {/* Error Display */}
-      {/* React Query error handling */}
       {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-500">
-          {error.message || "An error occurred while loading addresses"}
+        <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+          <span>
+            {error.message || "An error occurred while loading addresses"}
+          </span>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => refetch()}
-            className="ml-2 h-auto p-1 text-red-700"
+            className="gap-2 text-red-700 hover:text-red-800"
           >
+            <RefreshCw className="h-4 w-4" />
             Retry
           </Button>
         </div>
       )}
 
       {/* Content Area */}
-      <div data-testid="addresses-content">
+      <div data-testid="addresses-content" className="min-h-[400px]">
         {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Spinner />
+          /* Loading State with Skeleton Cards */
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <AddressCardSkeleton key={i} />
+            ))}
           </div>
         ) : addresses.length === 0 ? (
-          <div className="py-8 text-center">
-            <p className="mb-4 text-gray-500">No addresses found</p>
-            <Button onClick={handleAddNewAddress}>
-              Add Your First Address
-            </Button>
-          </div>
+          /* Empty State */
+          <EmptyAddressState
+            onAddAddress={handleAddNewAddress}
+            filterType={filterType}
+          />
         ) : (
-          /* Mobile-friendly card layout instead of table */
-          <div className="space-y-4">
+          /* Address Cards Grid */
+          <div className="grid grid-cols-1 gap-6 transition-all duration-300 md:grid-cols-2 lg:grid-cols-3">
             {addresses.map((address) => (
               <div
                 key={address.id}
-                className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+                className="animate-in fade-in-50 duration-300"
               >
-                {/* Address Header */}
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                      {address.name || "Unnamed Location"}
-                    </h3>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {address.isShared && (
-                        <Badge className="bg-blue-500 text-xs">Shared</Badge>
-                      )}
-                      {isAddressOwner(address) && (
-                        <Badge className="bg-green-500 text-xs">Owner</Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Action Buttons - Stack on mobile */}
-                  <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditAddress(address)}
-                      disabled={!isAddressOwner(address)}
-                      className="w-full sm:w-auto"
-                    >
-                      Edit
-                    </Button>
-
-                    <AlertDialog
-                      open={deleteConfirmAddress?.id === address.id}
-                      onOpenChange={(open) => {
-                        if (!open) setDeleteConfirmAddress(null);
-                      }}
-                    >
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => setDeleteConfirmAddress(address)}
-                          disabled={
-                            !isAddressOwner(address) || address.isShared
-                          }
-                          className="w-full sm:w-auto"
-                        >
-                          Delete
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete this address? This
-                            action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-red-500 hover:bg-red-600"
-                            onClick={() => handleDeleteAddress(address.id)}
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-
-                {/* Address Details */}
-                <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                  <div>
-                    <span className="font-medium">Address:</span>
-                    <div className="mt-1">
-                      {address.street1}
-                      {address.street2 && <div>{address.street2}</div>}
-                      <div>
-                        {address.city}, {address.state} {address.zip}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
-                    <div>
-                      <span className="font-medium">County:</span>
-                      <span className="ml-2">{address.county || "N/A"}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium">Type:</span>
-                      <span className="ml-2">
-                        {address.isRestaurant
-                          ? "Restaurant"
-                          : "Standard Address"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {address.locationNumber && (
-                    <div>
-                      <span className="font-medium">Phone:</span>
-                      <span className="ml-2">{address.locationNumber}</span>
-                    </div>
-                  )}
-                </div>
+                <AddressCard
+                  address={address}
+                  isOwner={isAddressOwner(address)}
+                  onEdit={handleEditAddress}
+                  onDelete={(addr) => setDeleteConfirmAddress(addr)}
+                  isDeleting={
+                    deleteAddressMutation.isPending &&
+                    deleteConfirmAddress?.id === address.id
+                  }
+                />
               </div>
             ))}
           </div>
@@ -381,42 +324,86 @@ const UserAddresses: React.FC = () => {
       </div>
 
       {/* Pagination Section */}
-      {!isLoading && pagination.totalPages > 1 && (
-        <div
-          className="mt-6 flex items-center justify-between border-t bg-slate-50 p-4"
-          data-testid="pagination"
-        >
+      {!isLoading && addresses.length > 0 && paginationData.totalPages > 1 && (
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+          {/* Page Info */}
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Showing{" "}
+            {(paginationData.currentPage - 1) * paginationData.limit + 1} to{" "}
+            {Math.min(
+              paginationData.currentPage * paginationData.limit,
+              paginationData.totalCount,
+            )}{" "}
+            of {paginationData.totalCount} addresses
+          </p>
+
+          {/* Pagination Controls */}
           <Pagination>
             <PaginationContent className="flex-wrap gap-1">
               <PaginationItem>
                 <PaginationPrevious
                   onClick={handlePrevPage}
-                  className={`${!pagination.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
+                  className={`${
+                    !paginationData.hasPrevPage
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
+                  } text-sm`}
                   data-testid="pagination-previous"
                 />
               </PaginationItem>
-              {/* Basic Pagination - Consider a more advanced version for many pages */}
-              {[...Array(pagination.totalPages)].map((_, i) => (
-                <PaginationItem key={i} className="hidden sm:block">
-                  <PaginationLink
-                    onClick={() => handlePageChange(i + 1)}
-                    isActive={pagination.currentPage === i + 1}
-                    className={`cursor-pointer text-sm ${pagination.currentPage === i + 1 ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "hover:bg-slate-200"}`}
-                  >
-                    {i + 1}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
+
+              {/* Page Numbers */}
+              {[...Array(paginationData.totalPages)].map((_, i) => {
+                const pageNum = i + 1;
+                // Show first, last, current, and adjacent pages
+                if (
+                  pageNum === 1 ||
+                  pageNum === paginationData.totalPages ||
+                  Math.abs(pageNum - paginationData.currentPage) <= 1
+                ) {
+                  return (
+                    <PaginationItem key={i} className="hidden sm:block">
+                      <PaginationLink
+                        onClick={() => handlePageChange(pageNum)}
+                        isActive={paginationData.currentPage === pageNum}
+                        className={`cursor-pointer text-sm transition-all ${
+                          paginationData.currentPage === pageNum
+                            ? "bg-primary text-black hover:bg-primary/90"
+                            : "hover:bg-gray-200 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                } else if (
+                  pageNum === paginationData.currentPage - 2 ||
+                  pageNum === paginationData.currentPage + 2
+                ) {
+                  return (
+                    <PaginationItem key={i} className="hidden sm:block">
+                      <span className="px-2 text-gray-400">...</span>
+                    </PaginationItem>
+                  );
+                }
+                return null;
+              })}
+
               {/* Mobile: Show current page info */}
               <PaginationItem className="sm:hidden">
-                <span className="px-3 py-2 text-sm text-slate-600">
-                  {pagination.currentPage} of {pagination.totalPages}
+                <span className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">
+                  {paginationData.currentPage} of {paginationData.totalPages}
                 </span>
               </PaginationItem>
+
               <PaginationItem>
                 <PaginationNext
                   onClick={handleNextPage}
-                  className={`${!pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
+                  className={`${
+                    !paginationData.hasNextPage
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
+                  } text-sm`}
                   data-testid="pagination-next"
                 />
               </PaginationItem>
@@ -434,6 +421,47 @@ const UserAddresses: React.FC = () => {
           onClose={() => setIsModalOpen(false)}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!deleteConfirmAddress}
+        onOpenChange={(open) => {
+          if (!open) setDeleteConfirmAddress(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-semibold">
+                {deleteConfirmAddress?.name || "this address"}
+              </span>
+              ? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600"
+              onClick={() => {
+                if (deleteConfirmAddress) {
+                  handleDeleteAddress(deleteConfirmAddress.id);
+                }
+              }}
+            >
+              {deleteAddressMutation.isPending ? (
+                <div className="flex items-center gap-2">
+                  <Spinner className="h-4 w-4" />
+                  Deleting...
+                </div>
+              ) : (
+                "Delete Address"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -52,14 +52,44 @@ export interface Address {
     address: Address;
   }
   
-  /**
-   * Address filter options for API queries
-   */
-  export interface AddressFilterOptions {
-    includePrivate?: boolean;
-    includeShared?: boolean;
-    isRestaurant?: boolean;
-    county?: string;
-  }
+/**
+ * Address filter options for API queries
+ */
+export interface AddressFilterOptions {
+  includePrivate?: boolean;
+  includeShared?: boolean;
+  isRestaurant?: boolean;
+  county?: string;
+}
+
+/**
+ * Filter type for better type safety in UI components
+ */
+export type AddressFilter = 'all' | 'shared' | 'private';
+
+/**
+ * Enhanced Address type with computed properties for UI display
+ */
+export interface EnhancedAddress extends Address {
+  displayName: string;
+  fullAddress: string;
+  isOwner: boolean;
+}
+
+/**
+ * Form validation errors for address forms
+ */
+export interface AddressFormErrors {
+  county?: string;
+  name?: string;
+  street1?: string;
+  street2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  locationNumber?: string;
+  parkingLoading?: string;
+  [key: string]: string | undefined;
+}
 
   
