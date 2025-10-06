@@ -343,18 +343,19 @@ const UserAddresses: React.FC = () => {
       </AlertDialog>
 
       {/* Pagination Section */}
-      {!isLoading && pagination.totalPages > 1 && (
+      {!isLoading && paginationData.totalPages > 1 && (
         <div
           className="mt-8 flex flex-col items-center justify-between gap-4 border-t pt-6 sm:flex-row"
           data-testid="pagination"
         >
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {(pagination.currentPage - 1) * pagination.limit + 1} -{" "}
+            Showing{" "}
+            {(paginationData.currentPage - 1) * paginationData.limit + 1} -{" "}
             {Math.min(
-              pagination.currentPage * pagination.limit,
-              pagination.totalCount,
+              paginationData.currentPage * paginationData.limit,
+              paginationData.totalCount,
             )}{" "}
-            of {pagination.totalCount} addresses
+            of {paginationData.totalCount} addresses
           </div>
 
           <Pagination className="transition-opacity duration-200">
@@ -362,19 +363,19 @@ const UserAddresses: React.FC = () => {
               <PaginationItem>
                 <PaginationPrevious
                   onClick={handlePrevPage}
-                  className={`${!pagination.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer transition-colors duration-150 hover:bg-slate-200"} text-sm`}
+                  className={`${!paginationData.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer transition-colors duration-150 hover:bg-slate-200"} text-sm`}
                   data-testid="pagination-previous"
                 />
               </PaginationItem>
 
               {/* Show page numbers on larger screens */}
-              {[...Array(pagination.totalPages)].map((_, i) => (
+              {[...Array(paginationData.totalPages)].map((_, i) => (
                 <PaginationItem key={i} className="hidden sm:block">
                   <PaginationLink
                     onClick={() => handlePageChange(i + 1)}
-                    isActive={pagination.currentPage === i + 1}
+                    isActive={paginationData.currentPage === i + 1}
                     className={`cursor-pointer text-sm transition-colors duration-150 ${
-                      pagination.currentPage === i + 1
+                      paginationData.currentPage === i + 1
                         ? "bg-primary text-black hover:bg-primary/90"
                         : "hover:bg-slate-200 dark:hover:bg-slate-700"
                     }`}
@@ -387,14 +388,14 @@ const UserAddresses: React.FC = () => {
               {/* Mobile: Show current page info */}
               <PaginationItem className="sm:hidden">
                 <span className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400">
-                  {pagination.currentPage} of {pagination.totalPages}
+                  {paginationData.currentPage} of {paginationData.totalPages}
                 </span>
               </PaginationItem>
 
               <PaginationItem>
                 <PaginationNext
                   onClick={handleNextPage}
-                  className={`${!pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer transition-colors duration-150 hover:bg-slate-200"} text-sm`}
+                  className={`${!paginationData.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer transition-colors duration-150 hover:bg-slate-200"} text-sm`}
                   data-testid="pagination-next"
                 />
               </PaginationItem>
