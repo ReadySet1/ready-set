@@ -209,7 +209,7 @@ const UserAddresses: React.FC = () => {
     <div className="w-full">
       {/* Header Section */}
       <div className="mb-8 space-y-4">
-        <div className="flex items-center justify-center gap-2">
+        <div className="mb-6 mt-8 flex items-center justify-center gap-2">
           <MapPin className="h-8 w-8 text-primary" />
           <h2 className="text-center text-3xl font-semibold leading-none tracking-tight">
             Your Addresses
@@ -332,7 +332,8 @@ const UserAddresses: React.FC = () => {
             <AlertDialogAction
               className="bg-red-500 hover:bg-red-600"
               onClick={() =>
-                deleteConfirmAddress && handleDeleteAddress(deleteConfirmAddress.id)
+                deleteConfirmAddress &&
+                handleDeleteAddress(deleteConfirmAddress.id)
               }
             >
               Delete
@@ -348,9 +349,11 @@ const UserAddresses: React.FC = () => {
           data-testid="pagination"
         >
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            Showing{" "}
-            {(pagination.currentPage - 1) * pagination.limit + 1} -{" "}
-            {Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)}{" "}
+            Showing {(pagination.currentPage - 1) * pagination.limit + 1} -{" "}
+            {Math.min(
+              pagination.currentPage * pagination.limit,
+              pagination.totalCount,
+            )}{" "}
             of {pagination.totalCount} addresses
           </div>
 
