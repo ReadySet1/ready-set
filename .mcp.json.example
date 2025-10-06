@@ -1,0 +1,60 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "pnpm",
+      "args": [
+        "dlx",
+        "@supabase/mcp-server-supabase",
+        "--read-only",
+        "--project-ref=khvteminrbghoeuqajzm"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "$SUPABASE_ACCESS_TOKEN"
+      }
+    },
+    "github": {
+      "command": "pnpm",
+      "args": [
+        "dlx",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_PERSONAL_ACCESS_TOKEN"
+      }
+    },
+    "linear": {
+      "command": "pnpm",
+      "args": [
+        "dlx",
+        "mcp-remote",
+        "https://mcp.linear.app/sse"
+      ],
+      "oauth": {
+        "provider": "linear"
+      }
+    },
+    "Context7": {
+      "command": "pnpm",
+      "args": [
+        "dlx",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "desktop-commander": {
+      "command": "pnpm",
+      "args": [
+        "dlx",
+        "@wonderwhy-er/desktop-commander"
+      ]
+    },
+    "filesystem": {
+      "command": "pnpm",
+      "args": [
+        "dlx",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/YOUR_USERNAME/Desktop",
+        "/Users/YOUR_USERNAME/Downloads"
+      ]
+    }
+  }
+}
