@@ -260,6 +260,334 @@ const PricingLandingPage = () => {
           </div>
         </div>
       </footer>
+
+      {/* Catering Hosting Pricing Section */}
+      <section className="relative bg-black px-8 py-16">
+        {/* Decorative Yellow Circles in Corners */}
+        <div className="pointer-events-none absolute left-0 top-0 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#FFD700] opacity-90"></div>
+        <div className="pointer-events-none absolute right-0 top-0 h-80 w-80 -translate-y-1/2 translate-x-1/2 rounded-full bg-[#FFD700] opacity-90"></div>
+        <div className="pointer-events-none absolute bottom-0 left-0 h-56 w-56 -translate-x-1/2 translate-y-1/2 rounded-full bg-[#FFD700] opacity-90"></div>
+        <div className="pointer-events-none absolute bottom-0 right-0 h-72 w-72 translate-x-1/2 translate-y-1/2 rounded-full bg-[#FFD700] opacity-90"></div>
+
+        <div className="relative z-10 mx-auto max-w-4xl">
+          {/* Logo */}
+          <div className="mb-8 flex justify-center">
+            <div className="flex h-44 w-44 items-center justify-center rounded-full border-4 border-[#FFD700] bg-white shadow-2xl">
+              <Image
+                src="/images/logo/logo.png"
+                alt="Ready Set Logo"
+                width={180}
+                height={180}
+                className="object-contain p-5"
+              />
+            </div>
+          </div>
+
+          {/* Title */}
+          <h1 className="mb-12 text-center text-5xl font-black text-[#FFD700]">
+            Catering Hosting Pricing
+          </h1>
+
+          {/* Pricing Options */}
+          <div className="space-y-8">
+            {/* Option A */}
+            <div className="overflow-hidden rounded-lg shadow-2xl">
+              <div className="bg-[#FFD700] px-6 py-4">
+                <h2 className="text-center text-2xl font-black text-black">
+                  Option A - Starting at $90 + Delivery Fee
+                </h2>
+              </div>
+              <div className="bg-white p-8">
+                <h3 className="mb-4 text-center text-xl font-bold text-black">
+                  50 Headcount Max (Recommended &lt;35 if serving)
+                </h3>
+                <div className="space-y-3">
+                  <p className="font-bold text-black">
+                    - 1 Contractor Delivery + Hosting
+                  </p>
+                  <ul className="ml-8 space-y-2 text-black">
+                    <li className="flex items-start">
+                      <span className="mr-3 font-bold">•</span>
+                      <span>Delivery Fee = $45/hr</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="mr-3 font-bold">•</span>
+                      <span>Hosting 2 hours minimum</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="mr-3 font-bold">•</span>
+                      <span>Full Set Up, Refill, & Clean Up</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="mr-3 font-bold">•</span>
+                      <span>Serving +$10/hr</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Option B */}
+            <div className="overflow-hidden rounded-lg shadow-2xl">
+              <div className="bg-[#FFD700] px-6 py-4">
+                <h2 className="text-center text-2xl font-black text-black">
+                  Option B - Starting at $190 + Delivery Fee
+                </h2>
+              </div>
+              <div className="bg-white p-8">
+                <h3 className="mb-6 text-center text-xl font-bold text-black">
+                  100 Headcount Max (Optional 3rd Contractor &gt;80 Headcount)
+                </h3>
+                <div className="space-y-4">
+                  {/* Contractor 1 */}
+                  <div>
+                    <p className="font-bold text-black">- Contractor 1</p>
+                    <ul className="ml-8 mt-2 space-y-2 text-black">
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Pick Up & Set Up</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Refill trays</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Delivery Fee = $45/hr</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Hosting 2 hours minimum</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Contractor 2 */}
+                  <div>
+                    <p className="font-bold text-black">- Contractor 2</p>
+                    <ul className="ml-8 mt-2 space-y-2 text-black">
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>
+                          Arrive 15-30 min before to clean and prep area
+                        </span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Serve proteins</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Clean up duties</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Hosting 2 hours minimum @$50/hr</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Contractor 3 */}
+                  <div>
+                    <p className="font-bold text-black">
+                      - Contractor 3 (Optional)
+                    </p>
+                    <ul className="ml-8 mt-2 space-y-2 text-black">
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>150 Headcount Max</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>
+                          Arrive 15-30 min before to clean and prep area
+                        </span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Additional Severer</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Clean up duties</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Hosting 2 hours minimum @$50/hr</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Option C */}
+            <div className="overflow-hidden rounded-lg shadow-2xl">
+              <div className="bg-[#FFD700] px-6 py-4">
+                <h2 className="text-center text-2xl font-black text-black">
+                  Option C - Starting at $90 + Delivery Fees (2)
+                </h2>
+              </div>
+              <div className="bg-white p-8">
+                <h3 className="mb-6 text-center text-xl font-bold text-black">
+                  100 Headcount Max (Optional 3rd Contractor &gt;80 Headcount)
+                </h3>
+                <div className="space-y-4">
+                  {/* Contractor 1 */}
+                  <div>
+                    <p className="font-bold text-black">- Contractor 1</p>
+                    <ul className="ml-8 mt-2 space-y-2 text-black">
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Vendor 1 Pick Up & Set Up</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Serve proteins</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Delivery Fee = $45/hr</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Hosting 2 hours minimum</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Clean up duties</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Contractor 2 */}
+                  <div>
+                    <p className="font-bold text-black">- Contractor 2</p>
+                    <ul className="ml-8 mt-2 space-y-2 text-black">
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Vendor 2 Pick Up & Set Up</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Refill trays</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Clean up duties</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Delivery Fee = $45/hr</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Hosting 2 hours minimum (optional)</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Serving +$10/hr (optional)</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Contractor 3 */}
+                  <div>
+                    <p className="font-bold text-black">
+                      - Contractor 3 (Optional)
+                    </p>
+                    <ul className="ml-8 mt-2 space-y-2 text-black">
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>150 Headcount Max</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Vendor 3 Pick Up & Set Up ( or )</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>
+                          Arrive 15-30 min before to clean and prep area
+                        </span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Refill trays</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Clean up duties</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Delivery Fee = $45/hr</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Hosting 2 hours minimum</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-3 font-bold">•</span>
+                        <span>Serving +$10/hr (optional)</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Option D */}
+            <div className="overflow-hidden rounded-lg shadow-2xl">
+              <div className="bg-[#FFD700] px-6 py-4">
+                <h2 className="text-center text-2xl font-black text-black">
+                  Option D - Hosting Only Starting at $110
+                </h2>
+              </div>
+              <div className="bg-white p-8">
+                <h3 className="mb-6 text-center text-xl font-bold text-black">
+                  50 Headcount Maximum / Contractor
+                </h3>
+                <div className="space-y-3">
+                  <p className="font-bold text-black">- Contractor 1-3</p>
+                  <ul className="ml-8 space-y-2 text-black">
+                    <li className="flex items-start">
+                      <span className="mr-3 font-bold">•</span>
+                      <span>
+                        Arrive 15-30 min before to clean and prep area
+                      </span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="mr-3 font-bold">•</span>
+                      <span>Serving Food</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="mr-3 font-bold">•</span>
+                      <span>Clean up duties</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="mr-3 font-bold">•</span>
+                      <span>Hosting 3 hours minimum @$55/hr</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="mr-3 font-bold">•</span>
+                      <span>
+                        3+ Contractors is a $5/hr discount per contractor
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+                <div className="mt-6 border-t-2 border-gray-200 pt-6">
+                  <p className="text-center text-sm italic text-black">
+                    *Bar Tenders, Brand Ambassadors, and Event Coordinators are
+                    also available per request, Rates vary depending on event.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };
