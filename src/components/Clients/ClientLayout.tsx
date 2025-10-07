@@ -26,6 +26,7 @@ export default function ClientLayout({
   const isHomePage = pathname === "/";
   const isProfilePage = pathname === "/profile";
   const isDriverRoute = pathname?.startsWith("/driver");
+  const isPricingInfoPage = pathname === "/pricing-info";
 
   // Create a unique key for Header component that changes when auth state changes
   const headerKey = `header-${user?.id || "anonymous"}-${userRole || "no-role"}-${isLoading ? "loading" : "loaded"}`;
@@ -38,7 +39,11 @@ export default function ClientLayout({
   useEffect(() => {
     console.log("🎯 ClientLayout: Header should be rendered?", {
       shouldRenderHeader:
-        !isBackendAdminRoute && !isStudioRoute && !isHomePage && !isProfilePage,
+        !isBackendAdminRoute &&
+        !isStudioRoute &&
+        !isHomePage &&
+        !isProfilePage &&
+        !isPricingInfoPage,
       pathname,
       headerKey,
       hasUser: !!user,
@@ -55,6 +60,7 @@ export default function ClientLayout({
     isStudioRoute,
     isHomePage,
     isProfilePage,
+    isPricingInfoPage,
   ]);
 
   return (
@@ -64,9 +70,13 @@ export default function ClientLayout({
         !isStudioRoute &&
         !isHomePage &&
         !isProfilePage &&
-        !isDriverRoute && <Header key={headerKey} />}
+        !isDriverRoute &&
+        !isPricingInfoPage && <Header key={headerKey} />}
       <main className="flex-grow">{children}</main>
-      {!isBackendAdminRoute && !isStudioRoute && !isDriverRoute && <Footer />}
+      {!isBackendAdminRoute &&
+        !isStudioRoute &&
+        !isDriverRoute &&
+        !isPricingInfoPage && <Footer />}
       <ScrollToTop />
     </ThemeProvider>
   );

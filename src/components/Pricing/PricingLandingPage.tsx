@@ -5,375 +5,260 @@ import Image from "next/image";
 
 const PricingLandingPage = () => {
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="bg-black py-6 text-center">
-        <div className="mx-auto max-w-7xl px-4">
-          <Image
-            src="/images/logo/logo.svg"
-            alt="Ready Set Logo"
-            width={180}
-            height={60}
-            className="mx-auto"
-          />
-        </div>
-      </header>
+    <div className="relative min-h-screen overflow-hidden bg-white">
+      {/* Yellow Section with Table */}
+      <section className="relative bg-[#FFD700] px-8 py-16">
+        {/* Decorative White Circles in Corners */}
+        <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 -translate-y-1/3 translate-x-1/3 rounded-full bg-white opacity-90"></div>
+        <div className="pointer-events-none absolute bottom-0 left-0 h-48 w-48 -translate-x-1/3 translate-y-1/3 rounded-full bg-white opacity-90"></div>
 
-      {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 py-12">
-        {/* Hero Section */}
-        <div className="mb-12 text-center">
-          <h1 className="mb-4 text-4xl font-bold text-black md:text-5xl">
-            Package Delivery Terms & Pricing
-          </h1>
-          <p className="text-xl text-gray-700">
-            Professional catering delivery services for your business
-          </p>
-        </div>
-
-        {/* Terms & Pricing Section */}
-        <div className="mb-16 rounded-xl bg-gray-50 p-8 shadow-lg">
-          <h2 className="mb-8 border-b-4 border-[#FFD700] pb-3 text-3xl font-bold text-black">
-            Terms & Pricing Chart
-          </h2>
-
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-            {/* Left Column */}
-            <div className="space-y-6">
-              <div>
-                <h3 className="mb-3 text-xl font-bold text-black">
-                  Headcount vs Food Cost
-                </h3>
-                <ul className="list-disc space-y-2 pl-5 text-gray-700">
-                  <li>
-                    Delivery cost is based on the lesser, please make sure to
-                    update your order sheet weekly by end of day Friday.
-                  </li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="mb-3 text-xl font-bold text-black">
-                  Mileage Rate
-                </h3>
-                <ul className="list-disc space-y-2 pl-5 text-gray-700">
-                  <li>$3.00 per mile after 10 miles</li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="mb-3 text-xl font-bold text-black">
-                  Daily Drive Discount
-                </h3>
-                <ul className="list-disc space-y-2 pl-5 text-gray-700">
-                  <li>2 Drives/Day - $5/drive</li>
-                  <li>3 Drives/Day - $10/drive</li>
-                  <li>4+ Drives/Day - $15/drive</li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Right Column */}
-            <div className="space-y-6">
-              <h3 className="mb-3 text-xl font-bold text-black">
-                Additional Terms
-              </h3>
-              <ol className="list-decimal space-y-3 pl-5 text-gray-700">
-                <li>
-                  If the drive is batched together with the same driver, we only
-                  charge tolls/mileage once for the total trip.
-                </li>
-                <li>
-                  Hosting events requires advanced notice and is based on
-                  availability.
-                </li>
-                <li>
-                  Default terms are to be paid on a NET 7; this can vary based
-                  on volume.
-                </li>
-                <li>
-                  Late payments are the greater amount to an interest rate of
-                  2.5% of the invoice or $25 per month after 30 days.
-                </li>
-              </ol>
+        <div className="relative z-10 mx-auto max-w-4xl">
+          {/* Logo */}
+          <div className="mb-8 flex justify-center">
+            <div className="flex h-52 w-52 items-center justify-center rounded-full bg-white shadow-xl">
+              <Image
+                src="/images/logo/logo.png"
+                alt="Ready Set Logo"
+                width={200}
+                height={200}
+                className="object-contain p-6"
+              />
             </div>
           </div>
+
+          {/* Title */}
+          <h1 className="mb-8 text-center text-5xl font-black text-black">
+            Terms & Pricing Chart
+          </h1>
 
           {/* Pricing Table */}
-          <div className="mt-10">
-            <h3 className="mb-6 text-2xl font-bold text-black">
-              Headcount Pricing Tiers
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse rounded-lg bg-white shadow-md">
-                <thead>
-                  <tr className="bg-[#FFD700]">
-                    <th className="border border-gray-300 px-6 py-4 text-left font-bold text-black">
-                      Headcount Range
-                    </th>
-                    <th className="border border-gray-300 px-6 py-4 text-left font-bold text-black">
-                      Food Cost Range
-                    </th>
-                    <th className="border border-gray-300 px-6 py-4 text-left font-bold text-black">
-                      Price with Tip
-                    </th>
-                    <th className="border border-gray-300 px-6 py-4 text-left font-bold text-black">
-                      Price without Tip
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="hover:bg-gray-50">
-                    <td className="border border-gray-300 px-6 py-3">
-                      1-24 people
+          <div className="overflow-hidden rounded-lg border-4 border-black shadow-2xl">
+            <table className="w-full border-collapse bg-white">
+              <thead>
+                <tr className="bg-black text-white">
+                  <th className="border-r-2 border-white px-8 py-4 text-left text-lg font-bold">
+                    Headcount
+                  </th>
+                  <th className="border-r-2 border-white bg-gray-600 px-8 py-4 text-left text-lg font-bold">
+                    Food Cost
+                  </th>
+                  <th className="px-8 py-4 text-left text-lg font-bold">
+                    Delivery Cost
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { headcount: "0-24", foodCost: "<$300", delivery: "$60" },
+                  {
+                    headcount: "25-49",
+                    foodCost: "$300-$599",
+                    delivery: "$70",
+                  },
+                  {
+                    headcount: "50-74",
+                    foodCost: "$600-$899",
+                    delivery: "$90",
+                  },
+                  {
+                    headcount: "75-99",
+                    foodCost: "$900-$1199",
+                    delivery: "$100",
+                  },
+                  {
+                    headcount: "100-124",
+                    foodCost: "$1200-$1499",
+                    delivery: "$120",
+                  },
+                  {
+                    headcount: "125-149",
+                    foodCost: "$1500-$1699",
+                    delivery: "$150",
+                  },
+                  {
+                    headcount: "150-174",
+                    foodCost: "$1700-$1899",
+                    delivery: "$180",
+                  },
+                  {
+                    headcount: "175-199",
+                    foodCost: "$1900-$2099",
+                    delivery: "$210",
+                  },
+                  {
+                    headcount: "200-249",
+                    foodCost: "$2100-$2299",
+                    delivery: "$280",
+                  },
+                  {
+                    headcount: "250-299",
+                    foodCost: "$2300-$2499",
+                    delivery: "$310",
+                  },
+                  { headcount: "300+", foodCost: "TBD", delivery: "TBD" },
+                ].map((row, index) => (
+                  <tr key={index} className="border-t-2 border-gray-300">
+                    <td className="border-r-2 border-gray-300 bg-white px-8 py-4 text-base font-semibold text-black">
+                      {row.headcount}
                     </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $0 - $299.99
+                    <td className="border-r-2 border-gray-300 bg-gray-500 px-8 py-4 text-base font-semibold text-white">
+                      {row.foodCost}
                     </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $35.00
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $42.50
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-gray-50">
-                    <td className="border border-gray-300 px-6 py-3">
-                      25-49 people
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $300 - $599.99
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $45.00
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $52.50
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-gray-50">
-                    <td className="border border-gray-300 px-6 py-3">
-                      50-74 people
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $600 - $899.99
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $55.00
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $62.50
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-gray-50">
-                    <td className="border border-gray-300 px-6 py-3">
-                      75-99 people
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $900 - $1,199.99
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $65.00
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $72.50
+                    <td className="bg-white px-8 py-4 text-base font-semibold text-black">
+                      {row.delivery}
                     </td>
                   </tr>
-                  <tr className="hover:bg-gray-50">
-                    <td className="border border-gray-300 px-6 py-3">
-                      100+ people
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      $1,200+
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      9% of food cost
-                    </td>
-                    <td className="border border-gray-300 px-6 py-3">
-                      10% of food cost
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Rate Banner */}
+            <div className="bg-black px-8 py-4 text-center">
+              <p className="text-lg font-bold text-white">
+                Rate within 10 miles
+              </p>
             </div>
           </div>
         </div>
+      </section>
 
-        {/* Catering Hosting Options */}
-        <div className="mb-16 rounded-xl bg-gray-50 p-8 shadow-lg">
-          <h2 className="mb-8 border-b-4 border-[#FFD700] pb-3 text-3xl font-bold text-black">
-            Catering Hosting Options
-          </h2>
-
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {/* Option A */}
-            <div className="rounded-lg border-2 border-[#FFD700] bg-white p-6 shadow-md">
-              <div className="mb-4 text-center">
-                <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[#FFD700] text-2xl font-bold text-black">
-                  A
-                </div>
-                <h3 className="text-xl font-bold text-black">
-                  Basic Delivery
-                </h3>
-              </div>
-              <ul className="space-y-2 text-gray-700">
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Arrive 5 minutes early</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Confirm item list with restaurant</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Deliver within timeframe</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Send confirmations</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Option B */}
-            <div className="rounded-lg border-2 border-[#FFD700] bg-white p-6 shadow-md">
-              <div className="mb-4 text-center">
-                <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[#FFD700] text-2xl font-bold text-black">
-                  B
-                </div>
-                <h3 className="text-xl font-bold text-black">
-                  Setup Service
-                </h3>
-              </div>
-              <ul className="space-y-2 text-gray-700">
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Everything in Option A</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Sanitize setup area</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Wash hands & wear gloves</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Professional food setup</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Photo/video for caterer</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Option C */}
-            <div className="rounded-lg border-2 border-[#FFD700] bg-white p-6 shadow-md">
-              <div className="mb-4 text-center">
-                <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[#FFD700] text-2xl font-bold text-black">
-                  C
-                </div>
-                <h3 className="text-xl font-bold text-black">
-                  Hosting Service
-                </h3>
-              </div>
-              <ul className="space-y-2 text-gray-700">
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Everything in Option B</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Refill trays during event</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Monitor food presentation</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Maintain cleanliness</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Option D */}
-            <div className="rounded-lg border-2 border-[#FFD700] bg-white p-6 shadow-md">
-              <div className="mb-4 text-center">
-                <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[#FFD700] text-2xl font-bold text-black">
-                  D
-                </div>
-                <h3 className="text-xl font-bold text-black">
-                  Full Service
-                </h3>
-              </div>
-              <ul className="space-y-2 text-gray-700">
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Everything in Option C</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Complete cleanup duties</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Remove all materials</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-[#FFD700]">•</span>
-                  <span>Final area sanitization</span>
-                </li>
-              </ul>
-            </div>
+      {/* Dark Gray Section with Terms */}
+      <section className="bg-[#3d3d3d] px-8 py-12 text-white">
+        <div className="mx-auto max-w-4xl space-y-6">
+          {/* Headcount vs Food Cost */}
+          <div>
+            <h2 className="mb-3 text-xl font-bold text-white">
+              Headcount vs Food Cost
+            </h2>
+            <ul className="ml-6 list-disc space-y-2 text-white">
+              <li>
+                Delivery Cost is based on the lesser, please make sure to update
+                your Order Sheet weekly by end of day Friday
+              </li>
+            </ul>
           </div>
 
-          {/* Food Safety Note */}
-          <div className="mt-8 rounded-lg bg-white p-6 shadow-md">
-            <p className="text-center text-gray-700">
-              <span className="font-semibold">Food Safety Certified:</span> All
-              Ready Set drivers hold California Food Handler Certificates and
-              adhere to strict food safety protocols. We treat your business
-              like an extension of our own, with professional dress code,
-              disposable gloves, and proper food handling equipment.
-            </p>
+          {/* Mileage Rate */}
+          <div>
+            <h2 className="mb-3 text-xl font-bold text-white">Mileage Rate</h2>
+            <ul className="ml-6 list-disc space-y-2 text-white">
+              <li>$3.00 per mile after 10 miles</li>
+            </ul>
+          </div>
+
+          {/* Daily Drive Discount */}
+          <div>
+            <h2 className="mb-3 text-xl font-bold text-white">
+              Daily Drive Discount - Separate from the Discounted Promo
+            </h2>
+            <ul className="ml-6 list-disc space-y-2 text-white">
+              <li>2 Drives/Day-$5/drive</li>
+              <li>3 Drives/Day-$10/drive</li>
+              <li>4 Drives/Day-$15/drive</li>
+            </ul>
+          </div>
+
+          {/* Numbered Terms */}
+          <div>
+            <ol className="ml-6 list-decimal space-y-3 text-white">
+              <li>
+                If the drive is batched together with the same driver, we only
+                charge tolls/mileage once for total trip.
+              </li>
+              <li>
+                Hosting events requires advanced noticed and is based on
+                availability.
+              </li>
+              <li>
+                Default terms are to be paid on a NET 7, this can vary based on
+                volume.
+              </li>
+              <li>
+                Late payments are the greater amount of an interest rate of 2.5%
+                of the invoice or $25 per month after 30 days.
+              </li>
+            </ol>
           </div>
         </div>
+      </section>
 
-        {/* Contact Section */}
-        <div className="rounded-xl bg-black p-8 text-center text-white shadow-lg">
-          <h2 className="mb-4 text-3xl font-bold">Ready to Get Started?</h2>
-          <p className="mb-6 text-lg">
-            Contact us today to discuss your catering delivery needs
-          </p>
-          <div className="flex flex-col items-center justify-center gap-4 md:flex-row">
+      {/* Contact Footer */}
+      <footer className="bg-[#2d2d2d] px-8 py-8">
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-6">
+          <div className="flex items-center space-x-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FFD700]">
+              <svg
+                className="h-5 w-5 text-black"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
             <a
               href="mailto:info@readysetllc.com"
-              className="rounded-lg bg-[#FFD700] px-8 py-3 font-bold text-black transition-all duration-200 hover:bg-yellow-400"
+              className="text-sm font-semibold text-white hover:text-[#FFD700]"
             >
-              Email Us
+              Contact Us: info@readysetllc.com
             </a>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FFD700]">
+              <svg
+                className="h-5 w-5 text-black"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                />
+              </svg>
+            </div>
             <a
-              href="tel:+1234567890"
-              className="rounded-lg border-2 border-[#FFD700] bg-transparent px-8 py-3 font-bold text-[#FFD700] transition-all duration-200 hover:bg-[#FFD700] hover:text-black"
+              href="tel:+14152266872"
+              className="text-sm font-semibold text-white hover:text-[#FFD700]"
             >
-              Call Us
+              Call Us: (415) 226-6872
+            </a>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FFD700]">
+              <svg
+                className="h-5 w-5 text-black"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
+                />
+              </svg>
+            </div>
+            <a
+              href="https://readysetllc.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-semibold text-white hover:text-[#FFD700]"
+            >
+              Website: Readysetllc.com
             </a>
           </div>
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-gray-100 py-6 text-center text-gray-600">
-        <p className="text-sm">
-          © {new Date().getFullYear()} Ready Set LLC. All rights reserved.
-        </p>
-        <p className="mt-2 text-xs text-gray-500">
-          This page is unlisted and intended for authorized viewers only.
-        </p>
       </footer>
     </div>
   );
