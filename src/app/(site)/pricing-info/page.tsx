@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import PricingLandingPage from "@/components/Pricing/PricingLandingPage";
+import ModernPricingLandingPage from "@/components/Pricing/ModernPricingLandingPage";
 
 export const metadata: Metadata = {
   title: "Pricing Information | Ready Set",
@@ -16,5 +16,5 @@ export const metadata: Metadata = {
 };
 
 export default function PricingInfoPage() {
-  return <PricingLandingPage />;
+  return <ModernPricingLandingPage />;
 }
