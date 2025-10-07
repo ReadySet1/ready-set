@@ -1,6 +1,6 @@
 // src/components/AddressManager/UserAddresses.tsx
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
 import { Address, AddressFilter } from "@/types/address";
 import { Button } from "@/components/ui/button";
@@ -29,11 +29,14 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { MapPin, Plus } from "lucide-react";
+import { MapPin, Plus, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import AddressModal from "./AddressModal";
 import AddressCard from "./AddressCard";
 import AddressCardSkeleton from "./AddressCardSkeleton";
 import EmptyAddressState from "./EmptyAddressState";
+import { getDashboardRouteByRole } from "@/utils/routing";
+import { UserType } from "@/types/user";
 
 interface PaginationData {
   currentPage: number;
@@ -46,6 +49,7 @@ interface PaginationData {
 
 const UserAddresses: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<UserType | null>(null);
   const [addressToEdit, setAddressToEdit] = useState<Address | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterType, setFilterType] = useState<AddressFilter>("all");
@@ -75,6 +79,26 @@ const UserAddresses: React.FC = () => {
         if (error) throw error;
 
         setUser(user);
+
+        // Fetch user role from metadata or profile
+        if (user?.id) {
+          // Try to get role from user metadata first
+          const roleFromMetadata = user.user_metadata?.role;
+          if (roleFromMetadata) {
+            setUserRole(roleFromMetadata.toLowerCase() as UserType);
+          } else {
+            // Fallback: fetch from profiles table
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("type")
+              .eq("id", user.id)
+              .single();
+
+            if (profile?.type) {
+              setUserRole(profile.type.toLowerCase() as UserType);
+            }
+          }
+        }
       } catch (error) {
         console.error("Error getting user:", error);
         setUser(null);
@@ -205,10 +229,26 @@ const UserAddresses: React.FC = () => {
 
   const filterCounts = getFilterCounts();
 
+  // Get the dashboard route based on user role
+  const dashboardRoute = getDashboardRouteByRole(userRole);
+
   return (
     <div className="w-full">
       {/* Header Section */}
       <div className="mb-8 space-y-4">
+        {/* Back to Dashboard Button */}
+        <div className="mt-6 flex justify-start">
+          <Link href={dashboardRoute}>
+            <Button
+              variant="outline"
+              className="group flex items-center gap-2 transition-all duration-200 hover:bg-primary hover:text-black"
+            >
+              <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+              Back to Dashboard
+            </Button>
+          </Link>
+        </div>
+
         <div className="mb-6 mt-8 flex items-center justify-center gap-2">
           <MapPin className="h-8 w-8 text-primary" />
           <h2 className="text-center text-3xl font-semibold leading-none tracking-tight">
