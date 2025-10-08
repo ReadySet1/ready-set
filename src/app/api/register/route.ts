@@ -4,6 +4,7 @@ import { prisma } from "@/utils/prismaDB";
 import { Prisma } from '@prisma/client';
 import { UserStatus, UserType, PrismaClientKnownRequestError, PrismaClientInitializationError, PrismaClientValidationError } from '@/types/prisma';
 import { randomUUID } from 'crypto';
+import { Resend } from "resend";
 
 // Map between our form input types and the Prisma enum values
 const userTypeMap: Record<string, string> = {
@@ -60,6 +61,78 @@ interface HelpDeskFormData extends BaseFormData {
 }
 
 type RequestBody = VendorFormData | ClientFormData | DriverFormData | HelpDeskFormData;
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+const sendWelcomeEmail = async (
+  email: string,
+  name: string,
+  userType: string,
+) => {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
+  const userTypeLabel = userType.charAt(0).toUpperCase() + userType.slice(1);
+
+  const body = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Ready Set!</h1>
+        </div>
+
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <h2 style="color: #667eea; margin-top: 0;">Hello ${name}! 👋</h2>
+
+          <p style="font-size: 16px;">Thank you for registering as a <strong>${userTypeLabel}</strong> with Ready Set Platform.</p>
+
+          <div style="background: white; padding: 20px; border-left: 4px solid #667eea; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #333;">Your account has been created successfully!</h3>
+            <p style="margin: 10px 0;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 10px 0;"><strong>Account Type:</strong> ${userTypeLabel}</p>
+          </div>
+
+          <h3 style="color: #333;">Next Steps:</h3>
+          <ol style="padding-left: 20px;">
+            <li style="margin-bottom: 10px;">Check your email for the confirmation link from Supabase</li>
+            <li style="margin-bottom: 10px;">Click the confirmation link to verify your email address</li>
+            <li style="margin-bottom: 10px;">Once verified, you can log in to your account</li>
+          </ol>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${siteUrl}/sign-in" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Go to Login Page</a>
+          </div>
+
+          <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 5px; margin-top: 20px;">
+            <p style="margin: 0; color: #856404;"><strong>⚠️ Important:</strong> If you didn't create this account, please ignore this email or contact our support team.</p>
+          </div>
+
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 14px;">
+            <p>Need help? Contact us at <a href="mailto:support@readysetllc.com" style="color: #667eea;">support@readysetllc.com</a></p>
+            <p style="margin: 10px 0;">&copy; ${new Date().getFullYear()} Ready Set LLC. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  try {
+    await resend.emails.send({
+      to: email,
+      from: process.env.EMAIL_FROM || "solutions@updates.readysetllc.com",
+      subject: `Welcome to Ready Set - Your ${userTypeLabel} Account is Ready!`,
+      html: body,
+    });
+    console.log(`✅ Welcome email sent successfully to ${email}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error sending welcome email:", error);
+    return false;
+  }
+};
 
 export async function POST(request: Request) {
   try {
@@ -345,10 +418,24 @@ export async function POST(request: Request) {
 
     // No need to update user metadata here since we included it in the signUp options
 
+    // Send welcome email to the new user
+    const userName = userType === "driver" || userType === "helpdesk"
+      ? (body as DriverFormData | HelpDeskFormData).name
+      : (body as VendorFormData | ClientFormData).contact_name;
+
+    const emailSent = await sendWelcomeEmail(
+      email.toLowerCase(),
+      userName,
+      userType
+    );
+
+    console.log(`📧 User registration complete. Email sent: ${emailSent}`);
+
     return NextResponse.json(
       {
-        message: "User created successfully!",
+        message: "User created successfully! Please check your email for next steps.",
         userId: newUser.id,
+        emailSent: emailSent,
       },
       { status: 200 }
     );
