@@ -93,8 +93,6 @@ const sendOrderConfirmationEmail = async (
     content,
     ctaUrl: `${siteUrl}/order-status/${orderDetails.orderNumber}`,
     ctaText: 'View Order Details',
-    infoMessage: '<strong>📧 Questions?</strong> Our team is here to help! If you have any questions about your order, please don\'t hesitate to contact us at support@readysetllc.com',
-    infoType: 'info',
   });
 
   try {

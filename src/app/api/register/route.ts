@@ -100,8 +100,6 @@ const sendWelcomeEmail = async (
     content,
     ctaUrl: `${siteUrl}/sign-in`,
     ctaText: 'Go to Login Page',
-    infoMessage: '<strong>⚠️ Important:</strong> If you didn\'t create this account, please ignore this email or contact our support team.',
-    infoType: 'warning',
   });
 
   try {

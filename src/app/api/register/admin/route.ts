@@ -64,8 +64,6 @@ const sendRegistrationEmail = async (
     content,
     ctaUrl: `${siteUrl}/sign-in`,
     ctaText: 'Login to Your Account',
-    infoMessage: '<strong>⚠️ Important:</strong> If you didn\'t expect this account, please contact our support team immediately.',
-    infoType: 'warning',
   });
 
   try {

@@ -49,8 +49,8 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-            <CheckCircle2 className="h-10 w-10 text-green-600" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#FBD113]">
+            <CheckCircle2 className="h-10 w-10 text-[#1A1A1A]" />
           </div>
           <DialogTitle className="text-center text-2xl">
             Order Confirmed!
@@ -86,13 +86,11 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
           </div>
 
           {emailSent ? (
-            <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950">
-              <Mail className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+            <div className="flex items-start gap-3 rounded-lg border border-[#FFC61A] bg-[#FBD113] p-4 dark:border-[#E5BE00] dark:bg-[#FBD113]">
+              <Mail className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#1A1A1A]" />
               <div className="text-sm">
-                <p className="font-medium text-blue-900 dark:text-blue-100">
-                  Check Your Email
-                </p>
-                <p className="mt-1 text-blue-700 dark:text-blue-300">
+                <p className="font-medium text-[#1A1A1A]">Check Your Email</p>
+                <p className="mt-1 text-[#1A1A1A]">
                   We've sent a confirmation email to{" "}
                   <strong>{customerEmail}</strong> with your order details and
                   delivery information.
@@ -108,8 +106,8 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
                 </p>
                 <p className="mt-1 text-amber-700 dark:text-amber-300">
                   Your order has been created successfully, but we couldn't send
-                  the confirmation email. You can view your order details in your
-                  dashboard.
+                  the confirmation email. You can view your order details in
+                  your dashboard.
                 </p>
               </div>
             </div>
@@ -131,7 +129,7 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
         <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-center">
           <Button
             onClick={handleViewOrder}
-            className="w-full bg-gradient-to-r from-[#667eea] to-[#764ba2] hover:from-[#5568d3] hover:to-[#653a8b] sm:w-auto"
+            className="w-full bg-gradient-to-r from-[#FBD113] to-[#FFC61A] font-semibold text-[#1A1A1A] hover:from-[#E5BE00] hover:to-[#F0B610] sm:w-auto"
             size="lg"
           >
             View Order Details

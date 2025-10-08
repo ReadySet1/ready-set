@@ -26,6 +26,7 @@ export const BRAND_COLORS = {
  */
 export const generateEmailHeader = (title: string) => `
   <div style="background: linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.secondary} 100%); padding: 40px 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <img src="https://www.readysetllc.com/images/logo/full-logo-dark.png" alt="Ready Set Logo" style="max-width: 200px; height: auto; margin-bottom: 20px; display: inline-block;" />
     <h1 style="color: ${BRAND_COLORS.dark}; margin: 0; font-size: 28px; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">${title}</h1>
   </div>
 `;
@@ -58,16 +59,38 @@ export const generateCTAButton = (url: string, text: string) => `
  */
 export const generateInfoBox = (content: string, type: 'info' | 'success' | 'warning' = 'info') => {
   const colors = {
-    info: { bg: '#E8F4FD', border: '#90CDF4', text: '#2C5282' },
-    success: { bg: '#D1FAE5', border: '#6EE7B7', text: '#065F46' },
-    warning: { bg: '#FFF3CD', border: '#FFC107', text: '#856404' },
+    info: { bg: '#1E3A4C', border: '#2A5570', text: '#FFFFFF', link: '#FBD113' },
+    success: { bg: '#D1FAE5', border: '#6EE7B7', text: '#065F46', link: '#047857' },
+    warning: { bg: '#FFF3CD', border: '#FFC107', text: '#856404', link: '#92400E' },
   };
 
   const style = colors[type];
+  
+  // Replace link colors in content to match the info box type
+  // This handles both cases: links with existing color styles and links without styles
+  let styledContent = content.replace(
+    /(<a[^>]*style="[^"]*?)color:\s*[^;"]+(;[^"]*")/gi,
+    `$1color: ${style.link}$2`
+  );
+  
+  // For links without a color in their style or without a style attribute
+  styledContent = styledContent.replace(
+    /<a\s+([^>]*?)(?:style="([^"]*)")?([^>]*?)>/gi,
+    (match, before, existingStyle, after) => {
+      const hasColorStyle = existingStyle && /color:/i.test(existingStyle);
+      if (hasColorStyle) {
+        return match; // Already handled by previous replace
+      }
+      const newStyle = existingStyle 
+        ? `${existingStyle} color: ${style.link}; text-decoration: none; font-weight: 600;`
+        : `color: ${style.link}; text-decoration: none; font-weight: 600;`;
+      return `<a ${before}style="${newStyle}"${after}>`;
+    }
+  );
 
   return `
     <div style="background: ${style.bg}; border: 1px solid ${style.border}; padding: 15px; border-radius: 6px; margin: 20px 0;">
-      <p style="margin: 0; color: ${style.text};">${content}</p>
+      <p style="margin: 0; color: ${style.text};">${styledContent}</p>
     </div>
   `;
 };
