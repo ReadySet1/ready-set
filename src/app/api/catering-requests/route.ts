@@ -7,6 +7,7 @@ import { CateringNeedHost } from "@/types/order";
 import { localTimeToUtc } from "@/lib/utils/timezone";
 import { randomUUID } from "crypto";
 import { Resend } from "resend";
+import { generateUnifiedEmailTemplate, generateDetailsTable, BRAND_COLORS } from "@/utils/email-templates";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -47,76 +48,54 @@ const sendOrderConfirmationEmail = async (
     hour12: true,
   });
 
-  const body = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Order Confirmed!</h1>
-          <p style="color: white; margin: 10px 0 0 0; font-size: 16px;">Thank you for your order</p>
-        </div>
+  // Generate order details table
+  const orderDetailsTable = generateDetailsTable([
+    { label: 'Order Number', value: orderDetails.orderNumber },
+    { label: 'Order Date', value: orderDateStr },
+    { label: 'Headcount', value: `${orderDetails.headcount} people` },
+    { label: 'Order Total', value: `$${orderDetails.orderTotal}` },
+  ]);
 
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <h2 style="color: #667eea; margin-top: 0;">Hello ${customerName}! 👋</h2>
+  // Generate content
+  const content = `
+    <p style="font-size: 16px; color: ${BRAND_COLORS.dark};">Your catering order has been successfully created and is being processed by our team.</p>
 
-          <p style="font-size: 16px;">Your catering order has been successfully created and is being processed.</p>
+    <h3 style="color: ${BRAND_COLORS.dark}; font-size: 18px; margin-top: 25px;">Order Details</h3>
+    ${orderDetailsTable}
 
-          <div style="background: white; padding: 20px; border-left: 4px solid #667eea; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #333;">Order Details</h3>
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold; color: #666;">Order Number:</td>
-                <td style="padding: 8px 0; color: #333;">${orderDetails.orderNumber}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold; color: #666;">Order Date:</td>
-                <td style="padding: 8px 0; color: #333;">${orderDateStr}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold; color: #666;">Headcount:</td>
-                <td style="padding: 8px 0; color: #333;">${orderDetails.headcount} people</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; font-weight: bold; color: #666;">Order Total:</td>
-                <td style="padding: 8px 0; color: #333; font-size: 18px; font-weight: bold;">$${orderDetails.orderTotal}</td>
-              </tr>
-            </table>
-          </div>
+    <h3 style="color: ${BRAND_COLORS.dark}; font-size: 18px; margin-top: 25px;">Pickup & Delivery Schedule</h3>
 
-          <div style="background: white; padding: 20px; border-left: 4px solid #667eea; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #333;">Pickup & Delivery Schedule</h3>
-            <div style="margin-bottom: 15px;">
-              <p style="margin: 5px 0; font-weight: bold; color: #666;">📍 Pickup Location:</p>
-              <p style="margin: 5px 0; color: #333;">${orderDetails.pickupAddress}</p>
-              <p style="margin: 5px 0; color: #667eea; font-weight: bold;">Pickup Time: ${pickupTimeStr}</p>
-            </div>
-            <div>
-              <p style="margin: 5px 0; font-weight: bold; color: #666;">📍 Delivery Location:</p>
-              <p style="margin: 5px 0; color: #333;">${orderDetails.deliveryAddress}</p>
-              <p style="margin: 5px 0; color: #667eea; font-weight: bold;">Arrival Time: ${arrivalTimeStr}</p>
-            </div>
-          </div>
+    <div style="background: ${BRAND_COLORS.lightGray}; padding: 20px; border-left: 4px solid ${BRAND_COLORS.primary}; border-radius: 6px; margin: 20px 0;">
+      <div style="margin-bottom: 20px;">
+        <p style="margin: 5px 0; font-weight: bold; color: ${BRAND_COLORS.mediumGray};">📍 Pickup Location:</p>
+        <p style="margin: 5px 0; color: ${BRAND_COLORS.dark};">${orderDetails.pickupAddress}</p>
+        <p style="margin: 10px 0 0 0; color: ${BRAND_COLORS.dark}; font-weight: bold; background: ${BRAND_COLORS.primary}; display: inline-block; padding: 5px 12px; border-radius: 4px;">⏰ Pickup Time: ${pickupTimeStr}</p>
+      </div>
+      <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid ${BRAND_COLORS.mediumGray}40;">
+        <p style="margin: 5px 0; font-weight: bold; color: ${BRAND_COLORS.mediumGray};">📍 Delivery Location:</p>
+        <p style="margin: 5px 0; color: ${BRAND_COLORS.dark};">${orderDetails.deliveryAddress}</p>
+        <p style="margin: 10px 0 0 0; color: ${BRAND_COLORS.dark}; font-weight: bold; background: ${BRAND_COLORS.primary}; display: inline-block; padding: 5px 12px; border-radius: 4px;">⏰ Arrival Time: ${arrivalTimeStr}</p>
+      </div>
+    </div>
 
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${siteUrl}/client/orders/${orderDetails.orderNumber}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; font-size: 16px;">View Order Details</a>
-          </div>
-
-          <div style="background: #e8f4fd; border: 1px solid #90cdf4; padding: 15px; border-radius: 5px; margin-top: 20px;">
-            <p style="margin: 0; color: #2c5282;"><strong>📧 Questions?</strong> Our team is here to help! If you have any questions about your order, please don't hesitate to contact us.</p>
-          </div>
-
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 14px;">
-            <p>Need help? Contact us at <a href="mailto:support@readysetllc.com" style="color: #667eea;">support@readysetllc.com</a></p>
-            <p style="margin: 10px 0;">&copy; ${new Date().getFullYear()} Ready Set LLC. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-    </html>
+    <h3 style="color: ${BRAND_COLORS.dark}; font-size: 18px; margin-top: 25px;">What Happens Next?</h3>
+    <ol style="padding-left: 20px; color: ${BRAND_COLORS.dark};">
+      <li style="margin-bottom: 10px;">Our team will confirm your order and finalize delivery details</li>
+      <li style="margin-bottom: 10px;">You'll receive updates on your order status via email</li>
+      <li style="margin-bottom: 10px;">Your order will be picked up and delivered on schedule</li>
+      <li style="margin-bottom: 10px;">You can track your order anytime in your dashboard</li>
+    </ol>
   `;
+
+  const body = generateUnifiedEmailTemplate({
+    title: 'Order Confirmed!',
+    greeting: `Hello ${customerName}! 👋`,
+    content,
+    ctaUrl: `${siteUrl}/order-status/${orderDetails.orderNumber}`,
+    ctaText: 'View Order Details',
+    infoMessage: '<strong>📧 Questions?</strong> Our team is here to help! If you have any questions about your order, please don\'t hesitate to contact us at support@readysetllc.com',
+    infoType: 'info',
+  });
 
   try {
     await resend.emails.send({

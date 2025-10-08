@@ -7,6 +7,7 @@ import { createClient, createAdminClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from '@prisma/client';
 import { UserStatus, UserType, PrismaClientKnownRequestError } from '@/types/prisma';
+import { generateUnifiedEmailTemplate, generateDetailsTable, BRAND_COLORS } from "@/utils/email-templates";
 
 interface AdminRegistrationRequest {
   name: string;
@@ -29,27 +30,54 @@ const sendRegistrationEmail = async (
   email: string,
   temporaryPassword: string,
 ) => {
-  const body = `
-      <h1>Welcome to Ready Set Platform</h1>
-      <p>Your account has been successfully created. Here are your login details:</p>
-      <p><strong>Email:</strong> ${email}</p>
-      <p><strong>Temporary Password:</strong> ${temporaryPassword}</p>
-      <p>For security reasons, you will be required to change your password upon your first login.</p>
-      <p>Please click on the following link to log in:</p>
-      <a href="${process.env.NEXT_PUBLIC_SITE_URL}/login">Login</a>
-      <p>If you did not request this account, please ignore this email.</p>
-    `;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
+
+  // Generate login credentials table
+  const loginDetails = generateDetailsTable([
+    { label: 'Email', value: email },
+    { label: 'Temporary Password', value: temporaryPassword },
+  ]);
+
+  // Generate content
+  const content = `
+    <p style="font-size: 16px; color: ${BRAND_COLORS.dark};">Welcome to Ready Set Platform! Your account has been successfully created by an administrator.</p>
+
+    <h3 style="color: ${BRAND_COLORS.dark}; font-size: 18px; margin-top: 25px;">Your Login Credentials:</h3>
+    ${loginDetails}
+
+    <div style="background: ${BRAND_COLORS.warning}20; border: 1px solid ${BRAND_COLORS.warning}; padding: 15px; border-radius: 6px; margin: 20px 0;">
+      <p style="margin: 0; color: ${BRAND_COLORS.dark};"><strong>🔒 Security Notice:</strong> For security reasons, you will be required to change your password upon your first login.</p>
+    </div>
+
+    <h3 style="color: ${BRAND_COLORS.dark}; font-size: 18px; margin-top: 25px;">Next Steps:</h3>
+    <ol style="padding-left: 20px; color: ${BRAND_COLORS.dark};">
+      <li style="margin-bottom: 10px;">Click the login button below to access your account</li>
+      <li style="margin-bottom: 10px;">Use the credentials provided above</li>
+      <li style="margin-bottom: 10px;">You'll be prompted to create a new, secure password</li>
+      <li style="margin-bottom: 10px;">After changing your password, you can start using the platform</li>
+    </ol>
+  `;
+
+  const body = generateUnifiedEmailTemplate({
+    title: 'Welcome to Ready Set!',
+    greeting: `Hello! 👋`,
+    content,
+    ctaUrl: `${siteUrl}/sign-in`,
+    ctaText: 'Login to Your Account',
+    infoMessage: '<strong>⚠️ Important:</strong> If you didn\'t expect this account, please contact our support team immediately.',
+    infoType: 'warning',
+  });
 
   try {
     await resend.emails.send({
       to: email,
       from: process.env.EMAIL_FROM || "solutions@updates.readysetllc.com",
-      subject: "Welcome to Our Platform - Account Created",
+      subject: "Welcome to Ready Set - Your Account is Ready!",
       html: body,
     });
-    console.log("Registration email sent successfully");
+    console.log("✅ Registration email sent successfully to", email);
   } catch (error) {
-    console.error("Error sending registration email:", error);
+    console.error("❌ Error sending registration email:", error);
     throw new Error("Failed to send registration email");
   }
 };
