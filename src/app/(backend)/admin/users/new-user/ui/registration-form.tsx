@@ -114,10 +114,42 @@ const DriverHelpdeskRegistrationForm: React.FC = () => {
         );
       }
 
-      toast.success(
-        "Successfully registered. Check email for login instructions."
-      );
-      router.push("/admin/users");
+      const result = await response.json();
+
+      // Show detailed success message with user's name and email
+      if (result.emailSent) {
+        toast.success(
+          `Success! The user '${formData.name}' has been created and an activation email has been sent to ${formData.email}.`,
+          {
+            duration: 6000, // Show for 6 seconds
+            style: {
+              maxWidth: '600px',
+            },
+          }
+        );
+      } else {
+        // User created but email failed
+        toast.success(
+          `User '${formData.name}' has been created successfully.`,
+          {
+            duration: 4000,
+          }
+        );
+        toast.error(
+          `However, the activation email could not be sent to ${formData.email}. Please contact the user manually.`,
+          {
+            duration: 8000,
+            style: {
+              maxWidth: '600px',
+            },
+          }
+        );
+      }
+
+      // Small delay before redirect to ensure user sees the message
+      setTimeout(() => {
+        router.push("/admin/users");
+      }, 1500);
     } catch (err) {
       console.error("Registration error:", err);
       setGeneralError(err instanceof Error ? err.message : "An unknown error occurred");

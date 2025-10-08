@@ -179,17 +179,32 @@ export async function POST(request: Request) {
     }
 
     // Check if email exists before sending registration email
+    let emailSent = false;
     if (newUser.email && body.generateTemporaryPassword) {
       // Only send email with password if using temporary password
-      await sendRegistrationEmail(
-        newUser.email,
-        password as string
-      );
+      try {
+        await sendRegistrationEmail(
+          newUser.email,
+          password as string
+        );
+        emailSent = true;
+      } catch (emailError) {
+        console.error("Failed to send activation email:", emailError);
+        // Don't fail the request if email fails, but log it
+        emailSent = false;
+      }
     }
 
     return NextResponse.json(
       {
         message: "User created successfully! Login instructions sent via email.",
+        user: {
+          id: newUser.id,
+          name: newUser.name,
+          email: newUser.email,
+          type: newUser.type,
+        },
+        emailSent: emailSent,
       },
       { status: 200 }
     );
