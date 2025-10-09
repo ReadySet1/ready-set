@@ -110,7 +110,7 @@ const ModernPricingLandingPage = () => {
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-gray-50 via-white to-yellow-50">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-yellow-400 via-yellow-500 to-amber-500 px-6 py-20 md:px-12">
+      <section className="relative overflow-hidden bg-gradient-to-br from-yellow-400 via-yellow-500 to-amber-500 px-6 pb-20 pt-32 md:px-12">
         {/* Decorative Circles */}
         <div className="pointer-events-none absolute -right-20 -top-20 h-80 w-80 rounded-full bg-white/20 blur-3xl"></div>
         <div className="pointer-events-none absolute -bottom-20 -left-20 h-80 w-80 rounded-full bg-white/20 blur-3xl"></div>
@@ -403,13 +403,13 @@ const ModernPricingLandingPage = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.6 }}
-              className="mt-12 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 p-8 text-center shadow-lg"
+              className="mt-12 rounded-xl bg-white p-8 text-center shadow-lg"
             >
-              <Info className="mx-auto mb-4 h-12 w-12 text-indigo-600" />
-              <h3 className="mb-3 text-xl font-bold text-gray-900">
+              <Info className="mx-auto mb-4 h-12 w-12 text-yellow-500" />
+              <h3 className="mb-3 text-xl font-bold text-black">
                 Additional Services Available
               </h3>
-              <p className="text-gray-700">
+              <p className="text-black">
                 <strong>
                   Bartenders, Brand Ambassadors, and Event Coordinators
                 </strong>{" "}
@@ -489,18 +489,6 @@ const ModernPricingLandingPage = () => {
               </div>
             </motion.a>
           </div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.6 }}
-            className="mt-12 border-t border-white/20 pt-8 text-center text-sm text-gray-400"
-          >
-            <p>
-              &copy; {new Date().getFullYear()} Ready Set LLC. All rights
-              reserved.
-            </p>
-          </motion.div>
         </div>
       </footer>
     </div>
