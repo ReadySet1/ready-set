@@ -15,7 +15,7 @@ interface LoggerConfig {
 const DEFAULT_CONFIG: LoggerConfig = {
   enabledInProduction: false,
   enabledInBuild: false,
-  enabledInDevelopment: true,
+  enabledInDevelopment: false, // Temporarily disabled for troubleshooting
   enabledInTest: false,
 };
 
@@ -72,21 +72,21 @@ class Logger {
 export const prismaLogger = new Logger({
   enabledInProduction: false,
   enabledInBuild: false,
-  enabledInDevelopment: true,
+  enabledInDevelopment: false, // Temporarily disabled for troubleshooting
   enabledInTest: false,
 });
 
 export const authLogger = new Logger({
   enabledInProduction: false,
   enabledInBuild: false,
-  enabledInDevelopment: true,
+  enabledInDevelopment: false, // Temporarily disabled for troubleshooting
   enabledInTest: false,
 });
 
 export const uiLogger = new Logger({
   enabledInProduction: false,
   enabledInBuild: false,
-  enabledInDevelopment: false, // Disable even in dev for UI components
+  enabledInDevelopment: false,
   enabledInTest: false,
 });
 

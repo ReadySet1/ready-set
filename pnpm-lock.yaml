@@ -401,9 +401,6 @@ importers:
       '@types/react':
         specifier: 18.3.12
         version: 18.3.12
-      '@types/react-dom':
-        specifier: 18.3.1
-        version: 18.3.1
       '@types/webpack':
         specifier: ^5.28.5
         version: 5.28.5(@swc/core@1.13.0)(esbuild@0.25.6)

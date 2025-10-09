@@ -90,24 +90,26 @@ export const CalculationInputSchema = z.object({
   deliveryType: z.string().optional(),
   headcount: z.number().min(0).default(0),
   foodCost: z.number().min(0).default(0),
-  
+
   // Distance & location
   mileage: z.number().min(0).default(0),
   requiresBridge: z.boolean().default(false),
   deliveryArea: z.string().optional(),
-  
+
   // Additional services
   numberOfStops: z.number().min(1).default(1),
+  numberOfDrives: z.number().min(1).default(1).optional(),
   tips: z.number().min(0).default(0),
   adjustments: z.number().default(0),
-  
+  bridgeToll: z.number().optional(),
+
   // Driver specific
   driverBaseRate: z.number().optional(),
   mileageRate: z.number().default(0.70),
-  
+
   // Client specific
   clientConfigId: z.string().optional(),
-  
+
   // Custom fields for flexible pricing
   customFields: z.record(z.any()).optional()
 });
@@ -116,15 +118,19 @@ export type CalculationInput = z.infer<typeof CalculationInputSchema>;
 
 // Customer charges breakdown
 export interface CustomerCharges {
-  baseFee: number;
-  longDistanceCharge: number;
+  baseFee?: number;
+  baseDeliveryFee?: number;
+  longDistanceCharge?: number;
+  mileageCharges?: number;
   bridgeToll: number;
-  extraStopsCharge: number;
-  headcountCharge: number;
-  foodCost: number;
-  customCharges: Record<string, number>;
-  subtotal: number;
+  dailyDriveDiscount?: number;
+  extraStopsCharge?: number;
+  headcountCharge?: number;
+  foodCost?: number;
+  customCharges?: Record<string, number>;
+  subtotal?: number;
   total: number;
+  breakdown?: Array<{ label: string; amount: number }>;
 }
 
 // Driver payments breakdown
@@ -134,26 +140,32 @@ export interface DriverPayments {
    * ⚠️ IMPORTANT: Set to 0 when tips > 0 (tip exclusivity rule)
    */
   basePay: number;
-  
+
   /**
    * Mileage compensation ($0.35/mile for miles > 10)
    * Applied regardless of tip presence
    */
   mileagePay: number;
-  
+
+  /**
+   * Driver bonus pay (included in total)
+   */
+  bonus?: number;
+
   bridgeToll: number;
-  extraStopsBonus: number;
-  
+  extraStopsBonus?: number;
+
   /**
    * Direct tips (100% pass-through to driver)
    * When present, excludes base pay (mutually exclusive)
    */
-  tips: number;
-  
-  adjustments: number;
-  customPayments: Record<string, number>;
-  subtotal: number;
+  tips?: number;
+
+  adjustments?: number;
+  customPayments?: Record<string, number>;
+  subtotal?: number;
   total: number;
+  breakdown?: Array<{ label: string; amount: number }>;
 }
 
 // Complete calculation result
@@ -161,10 +173,11 @@ export interface CalculationResult {
   customerCharges: CustomerCharges;
   driverPayments: DriverPayments;
   profit: number;
-  profitMargin: number;
-  calculatedAt: Date;
+  profitMargin?: number;
+  calculatedAt: Date | string;
   templateUsed: string;
   configUsed?: string;
+  metadata?: Record<string, any>;
 }
 
 // Calculation history schema
