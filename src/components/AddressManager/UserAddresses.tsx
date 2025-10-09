@@ -1,6 +1,6 @@
 // src/components/AddressManager/UserAddresses.tsx
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
 import { Address, AddressFilter } from "@/types/address";
 import { Button } from "@/components/ui/button";
@@ -29,11 +29,14 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { MapPin, Plus } from "lucide-react";
+import { MapPin, Plus, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import AddressModal from "./AddressModal";
 import AddressCard from "./AddressCard";
 import AddressCardSkeleton from "./AddressCardSkeleton";
 import EmptyAddressState from "./EmptyAddressState";
+import { getDashboardRouteByRole } from "@/utils/routing";
+import { UserType } from "@/types/user";
 
 interface PaginationData {
   currentPage: number;
@@ -46,6 +49,7 @@ interface PaginationData {
 
 const UserAddresses: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<UserType | null>(null);
   const [addressToEdit, setAddressToEdit] = useState<Address | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterType, setFilterType] = useState<AddressFilter>("all");
@@ -75,6 +79,26 @@ const UserAddresses: React.FC = () => {
         if (error) throw error;
 
         setUser(user);
+
+        // Fetch user role from metadata or profile
+        if (user?.id) {
+          // Try to get role from user metadata first
+          const roleFromMetadata = user.user_metadata?.role;
+          if (roleFromMetadata) {
+            setUserRole(roleFromMetadata.toLowerCase() as UserType);
+          } else {
+            // Fallback: fetch from profiles table
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("type")
+              .eq("id", user.id)
+              .single();
+
+            if (profile?.type) {
+              setUserRole(profile.type.toLowerCase() as UserType);
+            }
+          }
+        }
       } catch (error) {
         console.error("Error getting user:", error);
         setUser(null);
@@ -205,11 +229,27 @@ const UserAddresses: React.FC = () => {
 
   const filterCounts = getFilterCounts();
 
+  // Get the dashboard route based on user role
+  const dashboardRoute = getDashboardRouteByRole(userRole);
+
   return (
     <div className="w-full">
       {/* Header Section */}
       <div className="mb-8 space-y-4">
-        <div className="flex items-center justify-center gap-2">
+        {/* Back to Dashboard Button */}
+        <div className="mt-6 flex justify-start">
+          <Link href={dashboardRoute}>
+            <Button
+              variant="outline"
+              className="group flex items-center gap-2 transition-all duration-200 hover:bg-primary hover:text-black"
+            >
+              <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+              Back to Dashboard
+            </Button>
+          </Link>
+        </div>
+
+        <div className="mb-6 mt-8 flex items-center justify-center gap-2">
           <MapPin className="h-8 w-8 text-primary" />
           <h2 className="text-center text-3xl font-semibold leading-none tracking-tight">
             Your Addresses
@@ -332,7 +372,8 @@ const UserAddresses: React.FC = () => {
             <AlertDialogAction
               className="bg-red-500 hover:bg-red-600"
               onClick={() =>
-                deleteConfirmAddress && handleDeleteAddress(deleteConfirmAddress.id)
+                deleteConfirmAddress &&
+                handleDeleteAddress(deleteConfirmAddress.id)
               }
             >
               Delete
@@ -342,16 +383,19 @@ const UserAddresses: React.FC = () => {
       </AlertDialog>
 
       {/* Pagination Section */}
-      {!isLoading && pagination.totalPages > 1 && (
+      {!isLoading && paginationData.totalPages > 1 && (
         <div
           className="mt-8 flex flex-col items-center justify-between gap-4 border-t pt-6 sm:flex-row"
           data-testid="pagination"
         >
           <div className="text-sm text-gray-600 dark:text-gray-400">
             Showing{" "}
-            {(pagination.currentPage - 1) * pagination.limit + 1} -{" "}
-            {Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)}{" "}
-            of {pagination.totalCount} addresses
+            {(paginationData.currentPage - 1) * paginationData.limit + 1} -{" "}
+            {Math.min(
+              paginationData.currentPage * paginationData.limit,
+              paginationData.totalCount,
+            )}{" "}
+            of {paginationData.totalCount} addresses
           </div>
 
           <Pagination className="transition-opacity duration-200">
@@ -359,19 +403,19 @@ const UserAddresses: React.FC = () => {
               <PaginationItem>
                 <PaginationPrevious
                   onClick={handlePrevPage}
-                  className={`${!pagination.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer transition-colors duration-150 hover:bg-slate-200"} text-sm`}
+                  className={`${!paginationData.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer transition-colors duration-150 hover:bg-slate-200"} text-sm`}
                   data-testid="pagination-previous"
                 />
               </PaginationItem>
 
               {/* Show page numbers on larger screens */}
-              {[...Array(pagination.totalPages)].map((_, i) => (
+              {[...Array(paginationData.totalPages)].map((_, i) => (
                 <PaginationItem key={i} className="hidden sm:block">
                   <PaginationLink
                     onClick={() => handlePageChange(i + 1)}
-                    isActive={pagination.currentPage === i + 1}
+                    isActive={paginationData.currentPage === i + 1}
                     className={`cursor-pointer text-sm transition-colors duration-150 ${
-                      pagination.currentPage === i + 1
+                      paginationData.currentPage === i + 1
                         ? "bg-primary text-black hover:bg-primary/90"
                         : "hover:bg-slate-200 dark:hover:bg-slate-700"
                     }`}
@@ -384,14 +428,14 @@ const UserAddresses: React.FC = () => {
               {/* Mobile: Show current page info */}
               <PaginationItem className="sm:hidden">
                 <span className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400">
-                  {pagination.currentPage} of {pagination.totalPages}
+                  {paginationData.currentPage} of {paginationData.totalPages}
                 </span>
               </PaginationItem>
 
               <PaginationItem>
                 <PaginationNext
                   onClick={handleNextPage}
-                  className={`${!pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer transition-colors duration-150 hover:bg-slate-200"} text-sm`}
+                  className={`${!paginationData.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer transition-colors duration-150 hover:bg-slate-200"} text-sm`}
                   data-testid="pagination-next"
                 />
               </PaginationItem>

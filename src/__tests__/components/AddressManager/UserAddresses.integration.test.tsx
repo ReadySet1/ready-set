@@ -143,7 +143,7 @@ describe("UserAddresses Integration Tests", () => {
 
         // Check that the title has the correct classes
         expect(title.className).toContain("text-center");
-        expect(title.className).toContain("text-2xl");
+        expect(title.className).toContain("text-3xl");
         expect(title.className).toContain("font-semibold");
       });
     });
@@ -164,7 +164,7 @@ describe("UserAddresses Integration Tests", () => {
       });
     });
 
-    it("should have proper container styling with padding and background", async () => {
+    it("should have proper container styling with bottom padding", async () => {
       render(<UserAddresses />);
 
       await waitFor(() => {
@@ -172,10 +172,10 @@ describe("UserAddresses Integration Tests", () => {
         const container = title.closest("div");
 
         expect(container).toBeInTheDocument();
-        expect(container?.className).toContain("mb-6");
-        expect(container?.className).toContain("rounded-lg");
-        expect(container?.className).toContain("bg-gray-50");
-        expect(container?.className).toContain("p-6");
+        expect(container?.className).toContain("mb-4");
+        expect(container?.className).toContain("flex");
+        expect(container?.className).toContain("items-center");
+        expect(container?.className).toContain("justify-center");
       });
     });
 
@@ -264,8 +264,8 @@ describe("UserAddresses Integration Tests", () => {
         const title = screen.getByText("Your Addresses");
         const container = title.closest("div");
 
-        // Check that the container has the p-6 class for padding
-        expect(container?.className).toContain("p-6");
+        // Check that the container has the mb-4 class for bottom padding
+        expect(container?.className).toContain("mb-4");
       });
     });
   });
