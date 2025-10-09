@@ -63,21 +63,21 @@ export function useCalculatorConfig(options: UseCalculatorConfigOptions = {}): U
     try {
       setIsLoading(true);
       setError(null);
-      
+
       // Get authentication session
       const supabase = createClient();
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
+
       if (sessionError || !session) {
         throw new Error('Authentication required. Please sign in again.');
       }
-      
+
       const url = new URL('/api/calculator/config', window.location.origin);
       url.searchParams.set('templateId', templateId);
       if (clientConfigId) {
         url.searchParams.set('clientConfigId', clientConfigId);
       }
-      
+
       const response = await fetch(url.toString(), {
         headers: {
           'Content-Type': 'application/json',
@@ -85,20 +85,19 @@ export function useCalculatorConfig(options: UseCalculatorConfigOptions = {}): U
         },
         credentials: 'include',
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to load calculator configuration');
       }
-      
+
       const { data: calculatorConfig } = await response.json();
       setConfig(calculatorConfig);
     } catch (err) {
-      const errorMessage = err instanceof Error 
-        ? err.message 
+      const errorMessage = err instanceof Error
+        ? err.message
         : 'Failed to load calculator configuration';
       setError(errorMessage);
-      console.error('Failed to load calculator config:', err);
     } finally {
       setIsLoading(false);
     }
@@ -128,11 +127,10 @@ export function useCalculatorConfig(options: UseCalculatorConfigOptions = {}): U
       const { data: templatesData } = await response.json();
       setTemplates(templatesData || []);
     } catch (err) {
-      const errorMessage = err instanceof Error 
-        ? err.message 
+      const errorMessage = err instanceof Error
+        ? err.message
         : 'Failed to load calculator templates';
       setError(errorMessage);
-      console.error('Failed to load templates:', err);
     } finally {
       setIsLoadingTemplates(false);
     }
@@ -157,20 +155,17 @@ export function useCalculatorConfig(options: UseCalculatorConfigOptions = {}): U
         },
         credentials: 'include',
       });
-      
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to load client configurations');
+        setClientConfigs([]);
+        return;
       }
-      
+
       const { data: configs } = await response.json();
       setClientConfigs(configs || []);
     } catch (err) {
-      const errorMessage = err instanceof Error 
-        ? err.message 
-        : 'Failed to load client configurations';
-      setError(errorMessage);
-      console.error('Failed to load client configs:', err);
+      // Don't set error, just use empty array as fallback
+      setClientConfigs([]);
     }
   }, []);
 
@@ -218,11 +213,10 @@ export function useCalculatorConfig(options: UseCalculatorConfigOptions = {}): U
       const { data: result } = await response.json();
       return result;
     } catch (err) {
-      const errorMessage = err instanceof Error 
-        ? err.message 
+      const errorMessage = err instanceof Error
+        ? err.message
         : 'Failed to perform calculation';
       setError(errorMessage);
-      console.error('Failed to calculate:', err);
       return null;
     } finally {
       setIsCalculating(false);
@@ -354,20 +348,13 @@ export function useCalculatorHistory(options: UseCalculatorHistoryOptions = {}):
       }
       
       const responseData = await response.json();
-      console.log('📊 Frontend History Debug:', {
-        responseData,
-        historyData: responseData.data,
-        historyLength: responseData.data?.length || 0
-      });
-      
       const historyData = responseData.data;
       setHistory(historyData || []);
     } catch (err) {
-      const errorMessage = err instanceof Error 
-        ? err.message 
+      const errorMessage = err instanceof Error
+        ? err.message
         : 'Failed to load calculation history';
       setError(errorMessage);
-      console.error('Failed to load history:', err);
     } finally {
       setIsLoading(false);
     }
@@ -411,33 +398,22 @@ export function useCalculator(config: CalculatorConfig | null): UseCalculatorRet
 
   const calculate = useCallback(async (input: CalculationInput) => {
     if (!config?.template?.id) {
-      console.error('🚫 Calculate failed: No calculator configuration available');
       setError('No calculator configuration available');
       return;
     }
 
-    console.log('🔐 Starting calculation with auth check...');
-
     try {
       setIsCalculating(true);
       setError(null);
-      
+
       // Get authentication session
       const supabase = createClient();
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      console.log('🔐 Auth session status:', {
-        hasSession: !!session,
-        hasAccessToken: !!session?.access_token,
-        sessionError: sessionError?.message,
-        userEmail: session?.user?.email
-      });
-      
+
       if (sessionError || !session) {
-        console.error('🚫 Authentication failed:', sessionError);
         throw new Error('Authentication required. Please sign in again.');
       }
-      
+
       const requestBody = {
         templateId: config.template.id,
         clientConfigId: config.clientConfig?.id,
@@ -445,12 +421,6 @@ export function useCalculator(config: CalculatorConfig | null): UseCalculatorRet
         ...input
       };
 
-      console.log('📡 Making API request:', {
-        url: '/api/calculator/calculate',
-        templateId: config.template.id,
-        hasAuth: !!session.access_token
-      });
-      
       const response = await fetch('/api/calculator/calculate', {
         method: 'POST',
         headers: {
@@ -460,27 +430,18 @@ export function useCalculator(config: CalculatorConfig | null): UseCalculatorRet
         credentials: 'include',
         body: JSON.stringify(requestBody),
       });
-      
-      console.log('📡 API Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('❌ API Error Response:', errorData);
         throw new Error(errorData.error || 'Failed to perform calculation');
       }
-      
+
       const { data: calculationResult } = await response.json();
-      console.log('✅ Calculation successful:', calculationResult);
       setResult(calculationResult);
     } catch (err) {
-      const errorMessage = err instanceof Error 
-        ? err.message 
+      const errorMessage = err instanceof Error
+        ? err.message
         : 'Failed to perform calculation';
-      console.error('❌ Calculate error:', err);
       setError(errorMessage);
     } finally {
       setIsCalculating(false);

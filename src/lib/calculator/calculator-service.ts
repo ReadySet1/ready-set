@@ -1,9 +1,9 @@
 // Calculator Service - Business logic for calculator system operations
 // Handles CRUD operations for templates, rules, configurations, and calculations
 
-import type { 
-  CalculatorTemplate, 
-  PricingRule, 
+import type {
+  CalculatorTemplate,
+  PricingRule,
   ClientConfiguration,
   CreateClientConfigInput,
   CalculationInput,
@@ -12,7 +12,12 @@ import type {
   DriverPayments,
   ConfigurationError
 } from '@/types/calculator';
-import { CalculatorEngine } from './calculator-engine';
+import {
+  calculateDeliveryCost,
+  calculateDriverPay,
+  type DeliveryCostInput,
+  type DriverPayInput
+} from './delivery-cost-calculator';
 
 export class CalculatorService {
 
@@ -44,27 +49,14 @@ export class CalculatorService {
    */
   static async getTemplateWithRules(supabase: any, templateId: string): Promise<CalculatorTemplate | null> {
     try {
-      console.log('🔍 Fetching template:', templateId);
-      
       const { data: template, error: templateError } = await supabase
         .from('calculator_templates')
         .select('*')
         .eq('id', templateId)
         .single();
 
-      console.log('📋 Template query result:', { template, templateError });
-
       if (templateError || !template) {
-        console.error('❌ Error fetching template:', templateError);
-        
-        // Try to fetch all templates to see what's available
-        const { data: allTemplates, error: allError } = await supabase
-          .from('calculator_templates')
-          .select('id, name, description, is_active');
-          
-        console.log('📋 All available templates:', allTemplates);
-        console.log('🔍 Template fetch error details:', allError);
-        
+        console.error('Error fetching template:', templateError);
         return null;
       }
 
@@ -74,18 +66,15 @@ export class CalculatorService {
         .eq('template_id', templateId)
         .order('priority', { ascending: false });
 
-      console.log('📏 Rules query result:', { rulesCount: rules?.length || 0, rulesError });
-      console.log('🔍 Raw rules data:', rules);
-
       if (rulesError) {
-        console.error('❌ Error fetching rules:', rulesError);
+        console.error('Error fetching rules:', rulesError);
         throw new Error('Failed to fetch pricing rules');
       }
 
       // Map database fields to interface fields
       const mappedRules = (rules || []).map((rule: any) => ({
         id: rule.id,
-        templateId: rule.template_id, // Map database field to interface field
+        templateId: rule.template_id,
         ruleType: rule.rule_type,
         ruleName: rule.rule_name,
         baseAmount: rule.base_amount ? parseFloat(rule.base_amount.toString()) : undefined,
@@ -96,21 +85,12 @@ export class CalculatorService {
         priority: rule.priority
       }));
 
-      console.log('🔄 Mapped rules for CalculatorEngine:', mappedRules);
-
-      const finalTemplate = {
+      return {
         ...template,
         pricingRules: mappedRules
       };
-      
-      console.log('✅ Final template with rules:', {
-        name: finalTemplate.name,
-        rulesCount: finalTemplate.pricingRules?.length || 0
-      });
-
-      return finalTemplate;
     } catch (error) {
-      console.error('❌ Error in getTemplateWithRules:', error);
+      console.error('Error in getTemplateWithRules:', error);
       throw error;
     }
   }
@@ -210,7 +190,8 @@ export class CalculatorService {
   }
 
   /**
-   * Perform calculation using template and optional client configuration
+   * Perform calculation using updated Coolfire formulas
+   * Uses delivery-cost-calculator.ts with correct mileage rates and driver pay logic
    */
   static async calculate(
     supabase: any,
@@ -220,43 +201,84 @@ export class CalculatorService {
     userId?: string
   ): Promise<CalculationResult> {
     try {
-      // Get template and rules
+      // Get template for name/metadata (rules are now in delivery-cost-calculator.ts)
       const template = await this.getTemplateWithRules(supabase, templateId);
       if (!template) {
         throw new Error('Calculator template not found');
       }
 
-      // Get client configuration if specified
-      let clientConfig: ClientConfiguration | null = null;
-      if (clientConfigId) {
-        const { data, error } = await supabase
-          .from('client_configurations')
-          .select('*')
-          .eq('id', clientConfigId)
-          .single();
+      // Prepare input for delivery cost calculator
+      const deliveryInput: DeliveryCostInput = {
+        headcount: input.headcount || 0,
+        foodCost: input.foodCost || 0,
+        totalMileage: input.mileage || 0,
+        numberOfDrives: input.numberOfDrives || 1,
+        requiresBridge: input.requiresBridge || false,
+        bridgeToll: input.bridgeToll,
+        clientConfigId: clientConfigId || 'ready-set-food-standard'
+      };
 
-        if (error) {
-          console.error('Error fetching client configuration:', error);
-        } else {
-          clientConfig = data;
+      // Prepare input for driver pay calculator
+      // Use tips field as bonus amount - if tips > 0, bonus is qualified
+      const driverInput: DriverPayInput = {
+        ...deliveryInput,
+        bonusQualified: (input.tips ?? 0) > 0
+      };
+
+      // Calculate using updated formulas
+      const deliveryCostBreakdown = calculateDeliveryCost(deliveryInput);
+      const driverPayBreakdown = calculateDriverPay(driverInput);
+
+      // Build result in CalculationResult format
+      const customerCharges: CustomerCharges = {
+        baseDeliveryFee: deliveryCostBreakdown.deliveryCost,
+        mileageCharges: deliveryCostBreakdown.totalMileagePay,
+        bridgeToll: deliveryCostBreakdown.bridgeToll,
+        dailyDriveDiscount: -deliveryCostBreakdown.dailyDriveDiscount,
+        total: deliveryCostBreakdown.deliveryFee,
+        breakdown: [
+          { label: 'Base Delivery Fee', amount: deliveryCostBreakdown.deliveryCost },
+          { label: 'Mileage Charges', amount: deliveryCostBreakdown.totalMileagePay },
+          { label: 'Bridge Toll', amount: deliveryCostBreakdown.bridgeToll },
+          { label: 'Daily Drive Discount', amount: -deliveryCostBreakdown.dailyDriveDiscount }
+        ]
+      };
+
+      const driverPayments: DriverPayments = {
+        basePay: driverPayBreakdown.driverBasePayPerDrop,
+        mileagePay: driverPayBreakdown.totalMileagePay,
+        bonus: driverPayBreakdown.driverBonusPay,
+        bridgeToll: driverPayBreakdown.bridgeToll,
+        total: driverPayBreakdown.totalDriverPay,
+        breakdown: [
+          { label: 'Base Pay', amount: driverPayBreakdown.driverBasePayPerDrop },
+          { label: `Mileage (${driverPayBreakdown.totalMileage} mi × $${driverPayBreakdown.mileageRate}/mi)`, amount: driverPayBreakdown.totalMileagePay },
+          { label: 'Bonus', amount: driverPayBreakdown.driverBonusPay },
+          { label: 'Bridge Toll', amount: driverPayBreakdown.bridgeToll }
+        ]
+      };
+
+      const result: CalculationResult = {
+        customerCharges,
+        driverPayments,
+        profit: customerCharges.total - driverPayments.total - driverPayBreakdown.readySetTotalFee,
+        templateUsed: template.name,
+        calculatedAt: new Date().toISOString(),
+        metadata: {
+          headcount: input.headcount,
+          foodCost: input.foodCost,
+          mileage: input.mileage,
+          numberOfDrives: input.numberOfDrives || 1,
+          bonusQualified: driverPayBreakdown.bonusQualified,
+          vendorMileageRate: 3.0,
+          readySetMileageRate: 3.0,
+          driverMileageRate: driverPayBreakdown.mileageRate,
+          driverMileageMinimum: 7.0,
+          readySetFee: driverPayBreakdown.readySetFee,
+          readySetAddonFee: driverPayBreakdown.readySetAddonFee,
+          readySetTotalFee: driverPayBreakdown.readySetTotalFee
         }
-      }
-
-      // Create CalculatorEngine with the template's pricing rules
-      const calculatorEngine = new CalculatorEngine(template.pricingRules || [], clientConfig || undefined);
-
-      // Perform the calculation using the engine
-      const result = calculatorEngine.calculate(input);
-
-      // Override templateUsed with the actual template name
-      result.templateUsed = template.name;
-
-      console.log('🎯 Final calculation result:', {
-        templateName: result.templateUsed,
-        customerTotal: result.customerCharges.total,
-        driverTotal: result.driverPayments.total,
-        profit: result.profit
-      });
+      };
 
       return result;
     } catch (error) {
@@ -335,13 +357,6 @@ export class CalculatorService {
       }
 
       const { data, error } = await query;
-
-      console.log('📊 CalculatorService.getCalculationHistory Debug:', {
-        options,
-        dataCount: data?.length || 0,
-        error,
-        firstItem: data?.[0] || 'none'
-      });
 
       if (error) {
         console.error('Error fetching calculation history:', error);
