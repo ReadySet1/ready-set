@@ -44,14 +44,14 @@ interface OrderNotificationData {
   orderType: 'catering' | 'on_demand';
   customerName: string;
   customerEmail: string;
-  brokerage?: string;
+  brokerage?: string | null;
   date: Date | null;
   pickupTime: Date | null;
   arrivalTime: Date | null;
   completeTime?: Date | null;
   orderTotal: number | string;
   clientAttention: string | null;
-  status: string | null;
+  status?: string | null;
   driverStatus?: string | null;
   pickupAddress: AddressData;
   deliveryAddress: AddressData;

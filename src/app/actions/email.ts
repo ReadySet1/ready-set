@@ -175,7 +175,7 @@ export async function sendDeliveryNotifications(
 
     // Fetch order details from database
     // Try catering first
-    let order = await prisma.cateringRequest.findUnique({
+    const cateringOrder = await prisma.cateringRequest.findUnique({
       where: { id: data.orderId },
       include: {
         user: true,
@@ -184,48 +184,69 @@ export async function sendDeliveryNotifications(
       },
     });
 
-    let orderType: 'catering' | 'on_demand' = 'catering';
+    if (cateringOrder && cateringOrder.user) {
+      // Send catering order confirmation
+      const emailSuccess = await sendOrderConfirmationToCustomer({
+        orderNumber: cateringOrder.orderNumber,
+        orderType: 'catering',
+        customerName: cateringOrder.user.name || 'Valued Customer',
+        customerEmail: data.customerEmail || cateringOrder.user.email || '',
+        pickupTime: cateringOrder.pickupDateTime,
+        arrivalTime: cateringOrder.arrivalDateTime,
+        orderTotal: cateringOrder.orderTotal?.toString() || '0',
+        pickupAddress: cateringOrder.pickupAddress,
+        deliveryAddress: cateringOrder.deliveryAddress,
+      });
+
+      if (!emailSuccess) {
+        return {
+          success: false,
+          error: 'Failed to send confirmation email'
+        };
+      }
+
+      console.log('✅ Catering order notification sent successfully');
+      return { success: true };
+    }
 
     // If not found in catering, try on-demand
-    if (!order) {
-      order = await prisma.onDemand.findUnique({
-        where: { id: data.orderId },
-        include: {
-          user: true,
-          pickupAddress: true,
-          deliveryAddress: true,
-        },
-      });
-      orderType = 'on_demand';
-    }
-
-    if (!order || !order.user) {
-      console.error('Order or user not found for ID:', data.orderId);
-      return { success: false, error: 'Order not found' };
-    }
-
-    // Send confirmation email to customer
-    const emailSuccess = await sendOrderConfirmationToCustomer({
-      orderNumber: order.orderNumber,
-      orderType,
-      customerName: order.user.name || 'Valued Customer',
-      customerEmail: data.customerEmail || order.user.email || '',
-      pickupTime: order.pickupDateTime,
-      arrivalTime: order.arrivalDateTime,
-      orderTotal: order.orderTotal?.toString() || '0',
-      pickupAddress: order.pickupAddress,
-      deliveryAddress: order.deliveryAddress,
+    const onDemandOrder = await prisma.onDemand.findUnique({
+      where: { id: data.orderId },
+      include: {
+        user: true,
+        pickupAddress: true,
+        deliveryAddress: true,
+      },
     });
 
-    if (!emailSuccess) {
-      return {
-        success: false,
-        error: 'Failed to send confirmation email'
-      };
+    if (onDemandOrder && onDemandOrder.user) {
+      // Send on-demand order confirmation
+      const emailSuccess = await sendOrderConfirmationToCustomer({
+        orderNumber: onDemandOrder.orderNumber,
+        orderType: 'on_demand',
+        customerName: onDemandOrder.user.name || 'Valued Customer',
+        customerEmail: data.customerEmail || onDemandOrder.user.email || '',
+        pickupTime: onDemandOrder.pickupDateTime,
+        arrivalTime: onDemandOrder.arrivalDateTime,
+        orderTotal: onDemandOrder.orderTotal?.toString() || '0',
+        pickupAddress: onDemandOrder.pickupAddress,
+        deliveryAddress: onDemandOrder.deliveryAddress,
+      });
+
+      if (!emailSuccess) {
+        return {
+          success: false,
+          error: 'Failed to send confirmation email'
+        };
+      }
+
+      console.log('✅ On-demand order notification sent successfully');
+      return { success: true };
     }
 
-    console.log('✅ Delivery notification sent successfully');
-    return { success: true };
+    // Order not found in either table
+    console.error('Order not found for ID:', data.orderId);
+    return { success: false, error: 'Order not found' };
   } catch (error) {
     console.error('Error sending delivery notification:', error);
     return {
