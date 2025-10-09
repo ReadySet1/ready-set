@@ -6,19 +6,92 @@ import {
 } from "../types/email";
 
 /**
- * Ready Set Brand Colors - Unified across all email templates
+ * Ready Set Brand Colors - Comprehensive Design System
+ * Unified across all email templates with full color palette
  */
 export const BRAND_COLORS = {
+  // Primary Brand Colors
   primary: '#FBD113',        // Ready Set Yellow (primary brand color)
   primaryDark: '#E5BE00',    // Darker yellow for hover states
-  secondary: '#FFC61A',      // Custom yellow
-  dark: '#1A1A1A',           // Dark text
-  lightGray: '#F5F5F5',      // Light background
-  mediumGray: '#666666',     // Medium text
-  white: '#FFFFFF',          // White
-  success: '#10B981',        // Green for success messages
-  warning: '#F59E0B',        // Orange for warnings
-  info: '#3B82F6',           // Blue for info
+  primaryLight: '#FDE68A',   // Lighter yellow for backgrounds
+  secondary: '#FFC61A',      // Custom yellow (secondary brand)
+  secondaryDark: '#F59E0B',  // Darker orange-yellow
+  accent: '#FF6B35',         // Accent orange for highlights
+
+  // Text Colors
+  text: {
+    primary: '#1A1A1A',      // Main text color (dark)
+    secondary: '#4B5563',    // Secondary text (medium gray)
+    muted: '#9CA3AF',        // Muted text (light gray)
+    inverse: '#FFFFFF',      // White text for dark backgrounds
+  },
+
+  // Background Colors
+  background: {
+    primary: '#FFFFFF',      // White background
+    secondary: '#F9FAFB',    // Light gray background
+    tertiary: '#F5F5F5',     // Slightly darker gray
+    dark: '#1F2937',         // Dark background
+  },
+
+  // Button Styles
+  button: {
+    primary: {
+      bg: '#FBD113',         // Yellow background
+      text: '#1A1A1A',       // Dark text
+      hover: '#E5BE00',      // Darker yellow on hover
+      border: '#E5BE00',     // Border color
+    },
+    secondary: {
+      bg: '#FFFFFF',         // White background
+      text: '#1A1A1A',       // Dark text
+      hover: '#F9FAFB',      // Light gray on hover
+      border: '#E5E7EB',     // Border color
+    },
+    tertiary: {
+      bg: 'transparent',     // Transparent background
+      text: '#FBD113',       // Yellow text
+      hover: '#FEF3C7',      // Very light yellow on hover
+      border: '#FBD113',     // Yellow border
+    },
+  },
+
+  // Status Colors
+  status: {
+    success: '#10B981',      // Green for success
+    successBg: '#D1FAE5',    // Light green background
+    successBorder: '#6EE7B7', // Green border
+    error: '#EF4444',        // Red for errors
+    errorBg: '#FEE2E2',      // Light red background
+    errorBorder: '#FCA5A5',  // Red border
+    warning: '#F59E0B',      // Orange for warnings
+    warningBg: '#FEF3C7',    // Light yellow background
+    warningBorder: '#FCD34D', // Yellow border
+    info: '#3B82F6',         // Blue for info
+    infoBg: '#DBEAFE',       // Light blue background
+    infoBorder: '#93C5FD',   // Blue border
+  },
+
+  // Border Colors
+  border: {
+    light: '#E5E7EB',        // Light border
+    medium: '#D1D5DB',       // Medium border
+    dark: '#9CA3AF',         // Dark border
+    primary: '#FBD113',      // Yellow border
+  },
+
+  // Utility Colors
+  white: '#FFFFFF',
+  black: '#000000',
+  transparent: 'transparent',
+
+  // Legacy aliases (for backward compatibility)
+  dark: '#1A1A1A',
+  lightGray: '#F5F5F5',
+  mediumGray: '#666666',
+  success: '#10B981',
+  warning: '#F59E0B',
+  info: '#3B82F6',
 };
 
 /**
@@ -62,22 +135,63 @@ export const generateEmailFooter = () => {
 };
 
 /**
- * Generate call-to-action button
+ * Generate call-to-action button with multiple style variants
+ * @param url - Button destination URL
+ * @param text - Button text
+ * @param variant - Button style variant: 'primary' | 'secondary' | 'tertiary'
  */
-export const generateCTAButton = (url: string, text: string) => `
+export const generateCTAButton = (
+  url: string,
+  text: string,
+  variant: 'primary' | 'secondary' | 'tertiary' = 'primary'
+) => {
+  const styles = {
+    primary: `background: linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.secondary} 100%); color: ${BRAND_COLORS.button.primary.text}; border: 2px solid ${BRAND_COLORS.button.primary.border};`,
+    secondary: `background: ${BRAND_COLORS.button.secondary.bg}; color: ${BRAND_COLORS.button.secondary.text}; border: 2px solid ${BRAND_COLORS.button.secondary.border};`,
+    tertiary: `background: ${BRAND_COLORS.button.tertiary.bg}; color: ${BRAND_COLORS.button.tertiary.text}; border: 2px solid ${BRAND_COLORS.button.tertiary.border};`,
+  };
+
+  return `
   <div style="text-align: center; margin: 30px 0;">
-    <a href="${url}" style="background: linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.secondary} 100%); color: ${BRAND_COLORS.dark}; padding: 14px 32px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${text}</a>
+    <a href="${url}" style="${styles[variant]} padding: 14px 32px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s ease;">${text}</a>
   </div>
 `;
+};
 
 /**
- * Generate info box
+ * Generate info box with standardized status colors
+ * @param content - HTML content to display in the box
+ * @param type - Box type: 'info' | 'success' | 'warning' | 'error'
  */
-export const generateInfoBox = (content: string, type: 'info' | 'success' | 'warning' = 'info') => {
+export const generateInfoBox = (
+  content: string,
+  type: 'info' | 'success' | 'warning' | 'error' = 'info'
+) => {
   const colors = {
-    info: { bg: '#1E3A4C', border: '#2A5570', text: '#FFFFFF', link: '#FBD113' },
-    success: { bg: '#D1FAE5', border: '#6EE7B7', text: '#065F46', link: '#047857' },
-    warning: { bg: '#FFF3CD', border: '#FFC107', text: '#856404', link: '#92400E' },
+    info: {
+      bg: BRAND_COLORS.status.infoBg,
+      border: BRAND_COLORS.status.infoBorder,
+      text: BRAND_COLORS.text.primary,
+      link: BRAND_COLORS.status.info,
+    },
+    success: {
+      bg: BRAND_COLORS.status.successBg,
+      border: BRAND_COLORS.status.successBorder,
+      text: BRAND_COLORS.text.primary,
+      link: BRAND_COLORS.status.success,
+    },
+    warning: {
+      bg: BRAND_COLORS.status.warningBg,
+      border: BRAND_COLORS.status.warningBorder,
+      text: BRAND_COLORS.text.primary,
+      link: BRAND_COLORS.status.warning,
+    },
+    error: {
+      bg: BRAND_COLORS.status.errorBg,
+      border: BRAND_COLORS.status.errorBorder,
+      text: BRAND_COLORS.text.primary,
+      link: BRAND_COLORS.status.error,
+    },
   };
 
   const style = colors[type];
@@ -128,6 +242,145 @@ export const generateDetailsTable = (details: Array<{ label: string; value: stri
         ${rows}
       </table>
     </div>
+  `;
+};
+
+/**
+ * Generate a divider line for visual separation
+ * @param color - Optional color override (defaults to border.light)
+ */
+export const generateDivider = (color?: string) => `
+  <div style="border-top: 1px solid ${color || BRAND_COLORS.border.light}; margin: 20px 0;"></div>
+`;
+
+/**
+ * Generate a spacer for vertical spacing
+ * @param height - Height in pixels (default: 20)
+ */
+export const generateSpacer = (height: number = 20) => `
+  <div style="height: ${height}px;"></div>
+`;
+
+/**
+ * Generate a hero section for important announcements
+ * @param title - Hero title
+ * @param subtitle - Optional subtitle
+ * @param imageUrl - Optional hero image URL
+ */
+export const generateHeroSection = (params: {
+  title: string;
+  subtitle?: string;
+  imageUrl?: string;
+}) => {
+  const { title, subtitle, imageUrl } = params;
+
+  return `
+    <div style="text-align: center; padding: 40px 20px; background: linear-gradient(135deg, ${BRAND_COLORS.primaryLight} 0%, ${BRAND_COLORS.background.secondary} 100%); border-radius: 10px; margin: 20px 0;">
+      ${imageUrl ? `<img src="${imageUrl}" alt="${title}" style="max-width: 100%; height: auto; border-radius: 6px; margin-bottom: 20px;" />` : ''}
+      <h2 style="color: ${BRAND_COLORS.text.primary}; font-size: 32px; margin: 0 0 10px 0; font-weight: bold;">${title}</h2>
+      ${subtitle ? `<p style="color: ${BRAND_COLORS.text.secondary}; font-size: 18px; margin: 0;">${subtitle}</p>` : ''}
+    </div>
+  `;
+};
+
+/**
+ * Generate an ordered list component
+ * @param items - Array of list item strings
+ * @param title - Optional section title
+ */
+export const generateOrderedList = (items: string[], title?: string) => {
+  const listItems = items.map(item => `
+    <li style="margin-bottom: 10px; color: ${BRAND_COLORS.text.primary};">${item}</li>
+  `).join('');
+
+  return `
+    ${title ? `<h3 style="color: ${BRAND_COLORS.text.primary}; font-size: 18px; margin-top: 25px;">${title}</h3>` : ''}
+    <ol style="padding-left: 20px; color: ${BRAND_COLORS.text.primary}; line-height: 1.6;">
+      ${listItems}
+    </ol>
+  `;
+};
+
+/**
+ * Generate an unordered list component
+ * @param items - Array of list item strings
+ * @param title - Optional section title
+ */
+export const generateUnorderedList = (items: string[], title?: string) => {
+  const listItems = items.map(item => `
+    <li style="margin-bottom: 10px; color: ${BRAND_COLORS.text.primary};">${item}</li>
+  `).join('');
+
+  return `
+    ${title ? `<h3 style="color: ${BRAND_COLORS.text.primary}; font-size: 18px; margin-top: 25px;">${title}</h3>` : ''}
+    <ul style="padding-left: 20px; color: ${BRAND_COLORS.text.primary}; line-height: 1.6;">
+      ${listItems}
+    </ul>
+  `;
+};
+
+/**
+ * Generate a text content block with optional styling
+ * @param content - HTML content
+ * @param variant - Text variant: 'body' | 'large' | 'small'
+ */
+export const generateContentBlock = (
+  content: string,
+  variant: 'body' | 'large' | 'small' = 'body'
+) => {
+  const sizes = {
+    body: '16px',
+    large: '18px',
+    small: '14px',
+  };
+
+  return `
+    <p style="font-size: ${sizes[variant]}; color: ${BRAND_COLORS.text.primary}; line-height: 1.6; margin: 15px 0;">
+      ${content}
+    </p>
+  `;
+};
+
+/**
+ * Generate a two-column layout (for desktop)
+ * @param leftContent - HTML content for left column
+ * @param rightContent - HTML content for right column
+ */
+export const generateTwoColumnLayout = (leftContent: string, rightContent: string) => `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
+    <tr>
+      <td width="48%" style="vertical-align: top; padding-right: 2%;">
+        ${leftContent}
+      </td>
+      <td width="48%" style="vertical-align: top; padding-left: 2%;">
+        ${rightContent}
+      </td>
+    </tr>
+  </table>
+`;
+
+/**
+ * Generate a status badge
+ * @param text - Badge text
+ * @param status - Badge status: 'success' | 'warning' | 'error' | 'info'
+ */
+export const generateStatusBadge = (
+  text: string,
+  status: 'success' | 'warning' | 'error' | 'info' = 'info'
+) => {
+  const colors = {
+    success: { bg: BRAND_COLORS.status.success, text: BRAND_COLORS.text.inverse },
+    warning: { bg: BRAND_COLORS.status.warning, text: BRAND_COLORS.text.primary },
+    error: { bg: BRAND_COLORS.status.error, text: BRAND_COLORS.text.inverse },
+    info: { bg: BRAND_COLORS.status.info, text: BRAND_COLORS.text.inverse },
+  };
+
+  const style = colors[status];
+
+  return `
+    <span style="display: inline-block; background: ${style.bg}; color: ${style.text}; padding: 4px 12px; border-radius: 4px; font-size: 14px; font-weight: 600; margin: 5px 0;">
+      ${text}
+    </span>
   `;
 };
 

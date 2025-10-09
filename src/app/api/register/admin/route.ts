@@ -2,12 +2,11 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { validateAdminRole } from "@/middleware/authMiddleware";
-import { Resend } from "resend";
 import { createClient, createAdminClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from '@prisma/client';
 import { UserStatus, UserType, PrismaClientKnownRequestError } from '@/types/prisma';
-import { generateUnifiedEmailTemplate, generateDetailsTable, BRAND_COLORS } from "@/utils/email-templates";
+import { sendUserWelcomeEmail } from "@/services/email-notification";
 
 interface AdminRegistrationRequest {
   name: string;
@@ -24,61 +23,7 @@ interface AdminRegistrationRequest {
   generateTemporaryPassword: boolean;
 }
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const sendRegistrationEmail = async (
-  email: string,
-  temporaryPassword: string,
-) => {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
-
-  // Generate login credentials table
-  const loginDetails = generateDetailsTable([
-    { label: 'Email', value: email },
-    { label: 'Temporary Password', value: temporaryPassword },
-  ]);
-
-  // Generate content
-  const content = `
-    <p style="font-size: 16px; color: ${BRAND_COLORS.dark};">Welcome to Ready Set Platform! Your account has been successfully created by an administrator.</p>
-
-    <h3 style="color: ${BRAND_COLORS.dark}; font-size: 18px; margin-top: 25px;">Your Login Credentials:</h3>
-    ${loginDetails}
-
-    <div style="background: ${BRAND_COLORS.warning}20; border: 1px solid ${BRAND_COLORS.warning}; padding: 15px; border-radius: 6px; margin: 20px 0;">
-      <p style="margin: 0; color: ${BRAND_COLORS.dark};"><strong>🔒 Security Notice:</strong> For security reasons, you will be required to change your password upon your first login.</p>
-    </div>
-
-    <h3 style="color: ${BRAND_COLORS.dark}; font-size: 18px; margin-top: 25px;">Next Steps:</h3>
-    <ol style="padding-left: 20px; color: ${BRAND_COLORS.dark};">
-      <li style="margin-bottom: 10px;">Click the login button below to access your account</li>
-      <li style="margin-bottom: 10px;">Use the credentials provided above</li>
-      <li style="margin-bottom: 10px;">You'll be prompted to create a new, secure password</li>
-      <li style="margin-bottom: 10px;">After changing your password, you can start using the platform</li>
-    </ol>
-  `;
-
-  const body = generateUnifiedEmailTemplate({
-    title: 'Welcome to Ready Set!',
-    greeting: `Hello! 👋`,
-    content,
-    ctaUrl: `${siteUrl}/sign-in`,
-    ctaText: 'Login to Your Account',
-  });
-
-  try {
-    await resend.emails.send({
-      to: email,
-      from: process.env.EMAIL_FROM || "solutions@updates.readysetllc.com",
-      subject: "Welcome to Ready Set - Your Account is Ready!",
-      html: body,
-    });
-    console.log("✅ Registration email sent successfully to", email);
-  } catch (error) {
-    console.error("❌ Error sending registration email:", error);
-    throw new Error("Failed to send registration email");
-  }
-};
+// Email sending is now handled by the unified notification service
 
 export async function POST(request: Request) {
   try {
@@ -204,16 +149,18 @@ export async function POST(request: Request) {
       });
     }
 
-    // Check if email exists before sending registration email
+    // Send registration email with temporary password if applicable
     let emailSent = false;
     if (newUser.email && body.generateTemporaryPassword) {
       // Only send email with password if using temporary password
       try {
-        await sendRegistrationEmail(
-          newUser.email,
-          password as string
-        );
-        emailSent = true;
+        emailSent = await sendUserWelcomeEmail({
+          email: newUser.email,
+          name: body.name,
+          userType: body.userType as 'driver' | 'helpdesk' | 'admin' | 'super_admin',
+          temporaryPassword: password as string,
+          isAdminCreated: true,
+        });
       } catch (emailError) {
         console.error("Failed to send activation email:", emailError);
         // Don't fail the request if email fails, but log it

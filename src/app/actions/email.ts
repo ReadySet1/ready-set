@@ -3,6 +3,8 @@
 
 import { Resend } from "resend";
 import * as cheerio from "cheerio";
+import { sendOrderConfirmationToCustomer } from "@/services/email-notification";
+import { prisma } from "@/utils/prismaDB";
 
 interface FormInputs {
   name: string;
@@ -156,22 +158,79 @@ const createGeneralHTML = (data: FormInputs) => `
 // Delivery notification functionality
 interface DeliveryNotificationData {
   orderId: string;
-  customerEmail: string;
+  customerEmail: string | null;
   driverName?: string;
   estimatedDelivery?: Date;
 }
 
+/**
+ * Send delivery/order notifications to customer
+ * This function fetches the order details and sends a confirmation email
+ */
 export async function sendDeliveryNotifications(
   data: DeliveryNotificationData
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Implement your email service logic here
-    console.log('Sending delivery notification:', data);
+    console.log('Sending delivery notification for order:', data.orderId);
+
+    // Fetch order details from database
+    // Try catering first
+    let order = await prisma.cateringRequest.findUnique({
+      where: { id: data.orderId },
+      include: {
+        user: true,
+        pickupAddress: true,
+        deliveryAddress: true,
+      },
+    });
+
+    let orderType: 'catering' | 'on_demand' = 'catering';
+
+    // If not found in catering, try on-demand
+    if (!order) {
+      order = await prisma.onDemand.findUnique({
+        where: { id: data.orderId },
+        include: {
+          user: true,
+          pickupAddress: true,
+          deliveryAddress: true,
+        },
+      });
+      orderType = 'on_demand';
+    }
+
+    if (!order || !order.user) {
+      console.error('Order or user not found for ID:', data.orderId);
+      return { success: false, error: 'Order not found' };
+    }
+
+    // Send confirmation email to customer
+    const emailSuccess = await sendOrderConfirmationToCustomer({
+      orderNumber: order.orderNumber,
+      orderType,
+      customerName: order.user.name || 'Valued Customer',
+      customerEmail: data.customerEmail || order.user.email || '',
+      pickupTime: order.pickupDateTime,
+      arrivalTime: order.arrivalDateTime,
+      orderTotal: order.orderTotal?.toString() || '0',
+      pickupAddress: order.pickupAddress,
+      deliveryAddress: order.deliveryAddress,
+    });
+
+    if (!emailSuccess) {
+      return {
+        success: false,
+        error: 'Failed to send confirmation email'
+      };
+    }
+
+    console.log('✅ Delivery notification sent successfully');
     return { success: true };
   } catch (error) {
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    console.error('Error sending delivery notification:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 }

@@ -4,8 +4,7 @@ import { prisma } from "@/utils/prismaDB";
 import { Prisma } from '@prisma/client';
 import { UserStatus, UserType, PrismaClientKnownRequestError, PrismaClientInitializationError, PrismaClientValidationError } from '@/types/prisma';
 import { randomUUID } from 'crypto';
-import { Resend } from "resend";
-import { generateUnifiedEmailTemplate, generateDetailsTable, BRAND_COLORS } from "@/utils/email-templates";
+import { sendUserWelcomeEmail } from "@/services/email-notification";
 
 // Map between our form input types and the Prisma enum values
 const userTypeMap: Record<string, string> = {
@@ -63,59 +62,7 @@ interface HelpDeskFormData extends BaseFormData {
 
 type RequestBody = VendorFormData | ClientFormData | DriverFormData | HelpDeskFormData;
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const sendWelcomeEmail = async (
-  email: string,
-  name: string,
-  userType: string,
-) => {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
-  const userTypeLabel = userType.charAt(0).toUpperCase() + userType.slice(1);
-
-  // Generate account details table
-  const accountDetails = generateDetailsTable([
-    { label: 'Email', value: email },
-    { label: 'Account Type', value: userTypeLabel },
-  ]);
-
-  // Generate content
-  const content = `
-    <p style="font-size: 16px; color: ${BRAND_COLORS.dark};">Thank you for registering as a <strong>${userTypeLabel}</strong> with Ready Set Platform.</p>
-
-    <h3 style="color: ${BRAND_COLORS.dark}; font-size: 18px; margin-top: 25px;">Your account has been created successfully!</h3>
-    ${accountDetails}
-
-    <h3 style="color: ${BRAND_COLORS.dark}; font-size: 18px; margin-top: 25px;">Next Steps:</h3>
-    <ol style="padding-left: 20px; color: ${BRAND_COLORS.dark};">
-      <li style="margin-bottom: 10px;">Check your email for the confirmation link from Supabase</li>
-      <li style="margin-bottom: 10px;">Click the confirmation link to verify your email address</li>
-      <li style="margin-bottom: 10px;">Once verified, you can log in to your account</li>
-    </ol>
-  `;
-
-  const body = generateUnifiedEmailTemplate({
-    title: 'Welcome to Ready Set!',
-    greeting: `Hello ${name}! 👋`,
-    content,
-    ctaUrl: `${siteUrl}/sign-in`,
-    ctaText: 'Go to Login Page',
-  });
-
-  try {
-    await resend.emails.send({
-      to: email,
-      from: process.env.EMAIL_FROM || "solutions@updates.readysetllc.com",
-      subject: `Welcome to Ready Set - Your ${userTypeLabel} Account is Ready!`,
-      html: body,
-    });
-    console.log(`✅ Welcome email sent successfully to ${email}`);
-    return true;
-  } catch (error) {
-    console.error("❌ Error sending welcome email:", error);
-    return false;
-  }
-};
+// Email sending is now handled by the unified notification service
 
 export async function POST(request: Request) {
   try {
@@ -406,11 +353,12 @@ export async function POST(request: Request) {
       ? (body as DriverFormData | HelpDeskFormData).name
       : (body as VendorFormData | ClientFormData).contact_name;
 
-    const emailSent = await sendWelcomeEmail(
-      email.toLowerCase(),
-      userName,
-      userType
-    );
+    const emailSent = await sendUserWelcomeEmail({
+      email: email.toLowerCase(),
+      name: userName,
+      userType: userType as 'vendor' | 'client' | 'driver' | 'helpdesk' | 'admin' | 'super_admin',
+      isAdminCreated: false,
+    });
 
     console.log(`📧 User registration complete. Email sent: ${emailSent}`);
 
