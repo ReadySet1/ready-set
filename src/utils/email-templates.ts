@@ -24,12 +24,28 @@ export const BRAND_COLORS = {
 /**
  * Generate email header with Ready Set branding
  */
-export const generateEmailHeader = (title: string) => `
+export const generateEmailHeader = (title: string) => {
+  // Use hardcoded public URL for maximum email client compatibility
+  // Email clients often block images from variable URLs or localhost
+  const logoUrl = 'https://www.readysetllc.com/images/logo/full-logo-dark.png';
+
+  return `
   <div style="background: linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.secondary} 100%); padding: 40px 30px; text-align: center; border-radius: 10px 10px 0 0;">
-    <img src="https://www.readysetllc.com/images/logo/full-logo-dark.png" alt="Ready Set Logo" style="max-width: 200px; height: auto; margin-bottom: 20px; display: inline-block;" />
-    <h1 style="color: ${BRAND_COLORS.dark}; margin: 0; font-size: 28px; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">${title}</h1>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td align="center" style="padding-bottom: 20px;">
+          <img src="${logoUrl}" alt="Ready Set Logo" width="200" height="auto" style="max-width: 200px; height: auto; display: block; border: 0; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic;" />
+        </td>
+      </tr>
+      <tr>
+        <td align="center">
+          <h1 style="color: ${BRAND_COLORS.dark}; margin: 0; font-size: 28px; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.1); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">${title}</h1>
+        </td>
+      </tr>
+    </table>
   </div>
 `;
+};
 
 /**
  * Generate email footer with company information
