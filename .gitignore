@@ -75,8 +75,6 @@ prisma/migrations/migration_lock.toml
 *.swp
 *.swo
 *~
-.claude/
-CLAUDE.md
 
 # OS generated files
 .DS_Store?
