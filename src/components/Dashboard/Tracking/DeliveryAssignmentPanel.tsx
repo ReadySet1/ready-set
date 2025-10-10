@@ -80,8 +80,7 @@ export default function DeliveryAssignmentPanel({
       if (result.success) {
         setSelectedDelivery(null);
         // Show success notification
-        console.log('Delivery assigned successfully');
-      } else {
+              } else {
         console.error('Failed to assign delivery:', result.error);
       }
     } catch (error) {

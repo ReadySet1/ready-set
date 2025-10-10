@@ -380,8 +380,7 @@ function ClientDetails({ control, isUserProfile }: ClientDetailsProps) {
                 const max = parts[1] || min;
                 return numValue >= min && numValue <= max;
               });
-              console.log('[ClientDetails Headcount Render] field.value:', field.value, ' | Calculated displayValue:', displayValue);
-            }
+                          }
             
             return (
               <RadioGroup
@@ -393,8 +392,7 @@ function ClientDetails({ control, isUserProfile }: ClientDetailsProps) {
                     const [min] = value.split('-').map(Number);
                     numValue = min;
                   }
-                  console.log('Setting headcount to:', numValue);
-                  field.onChange(numValue);
+                                    field.onChange(numValue);
                 }}
                 value={displayValue}
                 className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4"

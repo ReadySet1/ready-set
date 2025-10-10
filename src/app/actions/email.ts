@@ -166,8 +166,7 @@ export async function sendDeliveryNotifications(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // Implement your email service logic here
-    console.log('Sending delivery notification:', data);
-    return { success: true };
+        return { success: true };
   } catch (error) {
     return { 
       success: false, 

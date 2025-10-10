@@ -67,8 +67,7 @@ export function withAuthErrorHandler<P extends object>(
       const timeoutId = setTimeout(() => {
         const detected = checkForError();
         if (detected) {
-          console.log('Auth cookie error detected, showing recovery UI');
-          
+                    
           // Update the URL to include the error parameter
           // This ensures the error state persists on page refresh
           const url = new URL(window.location.href);

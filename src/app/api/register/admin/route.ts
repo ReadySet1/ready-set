@@ -47,8 +47,7 @@ const sendRegistrationEmail = async (
       subject: "Welcome to Our Platform - Account Created",
       html: body,
     });
-    console.log("Registration email sent successfully");
-  } catch (error) {
+      } catch (error) {
     console.error("Error sending registration email:", error);
     throw new Error("Failed to send registration email");
   }

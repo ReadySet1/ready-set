@@ -434,16 +434,10 @@ export const CreateCateringOrderForm: React.FC<
       if (uploadedFileKeys.length > 0 && !isSubmitting) {
         const cleanup = async () => {
           try {
-            console.log(
-              "Cleaning up uploaded files on unmount:",
-              uploadedFileKeys,
-            );
-            console.log("Using tempEntityId for cleanup:", tempEntityId);
-
+                        
             // Don't attempt cleanup if we don't have the IDs we need
             if (!uploadedFileKeys.length || !tempEntityId) {
-              console.log("Skipping cleanup - missing keys or tempEntityId");
-              return;
+                            return;
             }
 
             const response = await fetch("/api/file-uploads/cleanup", {
@@ -465,8 +459,7 @@ export const CreateCateringOrderForm: React.FC<
               );
               // Don't throw - just log the error
             } else {
-              console.log("File cleanup completed successfully");
-            }
+                          }
           } catch (error) {
             console.error("Error cleaning up files:", error);
             // Error already logged, no need to re-throw
@@ -492,10 +485,7 @@ export const CreateCateringOrderForm: React.FC<
       // Include the tempEntityId in the submitted data if available
       if (tempEntityId) {
         data.tempEntityId = tempEntityId;
-        console.log(
-          `Including tempEntityId in form submission: ${tempEntityId}`,
-        );
-      }
+              }
 
       const result = await createCateringOrder(data);
 
@@ -579,28 +569,20 @@ export const CreateCateringOrderForm: React.FC<
   };
 
   const handleAddressFormSubmit = async (addressData: AddressFormData) => {
-    console.log("🏠 Starting address form submission", {
-      addressData,
-      addressDialogType,
-      isDialogOpen: addressDialogOpen,
-    });
-
+    
     try {
       // Check authentication before submitting
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      console.log("🔐 Session check result", { hasSession: !!session });
-
+      
       if (!session) {
-        console.log("❌ No session - throwing auth error");
-        throw new Error(
+                throw new Error(
           "Please log in to add an address. You can continue with manual entry if needed.",
         );
       }
 
-      console.log("📤 Making API request to create address");
-      const response = await fetch("/api/addresses", {
+            const response = await fetch("/api/addresses", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -609,15 +591,10 @@ export const CreateCateringOrderForm: React.FC<
         body: JSON.stringify(addressData),
       });
 
-      console.log("📥 API response", {
-        status: response.status,
-        ok: response.ok,
-      });
-
+      
       if (!response.ok) {
         if (response.status === 401) {
-          console.log("❌ 401 Unauthorized - session may be expired");
-          setIsAuthenticated(false); // Trigger auth dialog
+                    setIsAuthenticated(false); // Trigger auth dialog
           throw new Error(
             "Your session has expired. Please log in again to add addresses.",
           );
@@ -631,52 +608,42 @@ export const CreateCateringOrderForm: React.FC<
             errorMessage = errorData.error;
           }
         } catch (e) {
-          console.log("Could not parse error response");
-        }
+                  }
 
-        console.log("❌ API error", { status: response.status, errorMessage });
-        throw new Error(`Failed to add address: ${errorMessage}`);
+                throw new Error(`Failed to add address: ${errorMessage}`);
       }
 
       const addedAddress = await response.json();
-      console.log("✅ Address created successfully", { addedAddress });
-
+      
       if (addressDialogType === "pickup") {
-        console.log("🚚 Setting up pickup address");
-        // Update local state with new address
+                // Update local state with new address
         setPickupAddresses((prev) => [...prev, addedAddress]);
 
         // Refresh the AddressManager to show the new address
         if (pickupAddressRefreshRef.current) {
-          console.log("🔄 Refreshing pickup address manager");
-          pickupAddressRefreshRef.current();
+                    pickupAddressRefreshRef.current();
         }
 
         // Select the new address after a short delay to ensure it's loaded
         setTimeout(() => {
-          console.log("🎯 Selecting new pickup address", addedAddress.id);
-          handlePickupAddressSelected(addedAddress.id);
+                    handlePickupAddressSelected(addedAddress.id);
         }, 300);
       } else {
-        console.log("🏠 Setting up delivery address");
-        // Update local state with new address
+                // Update local state with new address
         setDeliveryAddresses((prev) => [...prev, addedAddress]);
 
         // Refresh the AddressManager to show the new address
         if (deliveryAddressRefreshRef.current) {
-          console.log("🔄 Refreshing delivery address manager");
-          deliveryAddressRefreshRef.current();
+                    deliveryAddressRefreshRef.current();
         }
 
         // Select the new address after a short delay to ensure it's loaded
         setTimeout(() => {
-          console.log("🎯 Selecting new delivery address", addedAddress.id);
-          handleDeliveryAddressSelected(addedAddress.id);
+                    handleDeliveryAddressSelected(addedAddress.id);
         }, 300);
       }
 
-      console.log("✅ Address setup complete, closing dialog");
-      setAddressDialogOpen(false);
+            setAddressDialogOpen(false);
     } catch (error) {
       console.error("💥 Exception in address submission", error);
       // Throw the error so AddAddressForm can display it in the dialog
@@ -797,10 +764,8 @@ export const CreateCateringOrderForm: React.FC<
 
     const files = Array.from(event.target.files) as FileWithPath[];
     try {
-      console.log("Starting upload of", files.length, "files");
-      const result = await onUpload(files);
-      console.log("Upload completed successfully:", result);
-
+            const result = await onUpload(files);
+      
       // Set uploaded files to form state
       // setValue("attachments", result); // We'd need to add this to the schema
 
@@ -820,8 +785,7 @@ export const CreateCateringOrderForm: React.FC<
   // Remove file handler
   const removeFile = async (fileToRemove: UploadedFile) => {
     try {
-      console.log("Removing file:", fileToRemove);
-
+      
       // Remove from UI immediately
       const updatedFiles = uploadedFiles.filter(
         (file) => file.key !== fileToRemove.key,
@@ -835,8 +799,7 @@ export const CreateCateringOrderForm: React.FC<
 
       // Delete the file
       await deleteFile(fileToRemove.key);
-      console.log("File removed successfully");
-    } catch (error) {
+          } catch (error) {
       console.error("Error removing file:", error);
       setGeneralError("Failed to remove file. Please try again.");
     }
@@ -860,14 +823,12 @@ export const CreateCateringOrderForm: React.FC<
   // Direct manual submit that bypasses the form's validation
   const manualDirectSubmit = async () => {
     try {
-      console.log("Manual direct submit clicked");
-      setIsSubmitting(true);
+            setIsSubmitting(true);
       setGeneralError(null);
 
       // Get form data
       const formData = form.getValues();
-      console.log("Submitting with data:", formData);
-
+      
       // Ensure required fields are present
       if (!formData.userId) {
         alert("Please select a client");
@@ -904,22 +865,15 @@ export const CreateCateringOrderForm: React.FC<
       // Include the tempEntityId in the submitted data if available
       if (tempEntityId) {
         formData.tempEntityId = tempEntityId;
-        console.log(
-          `Including tempEntityId in manual submission: ${tempEntityId}`,
-        );
-      }
+              }
 
       // Call server action directly
       const result = await createCateringOrder(formData);
-      console.log("Server action result:", result);
-
+      
       if (result.success) {
         // If we have uploaded files, update their entity ID
         if (uploadedFiles.length > 0 && result.orderId) {
-          console.log(
-            `Updating file entities from temp ID to actual order ID: ${result.orderId}`,
-          );
-          await updateEntityId(result.orderId);
+                    await updateEntityId(result.orderId);
         }
 
         alert("Order created successfully!");
@@ -946,8 +900,7 @@ export const CreateCateringOrderForm: React.FC<
   const debugSubmit = () => {
     // Log the current form state
     const formData = form.getValues();
-    console.log("Current form state:", formData);
-
+    
     // Handle needHost validation manually
     if (formData.needHost === "NO") {
       // If needHost is NO, ensure hoursNeeded and numberOfHosts are set to null
@@ -961,24 +914,20 @@ export const CreateCateringOrderForm: React.FC<
 
     // Try to manually trigger validation
     form.trigger().then((isValid) => {
-      console.log("Manual validation result:", isValid);
-
+      
       if (!isValid) {
         // Alert about validation errors
         alert("Form validation failed. Please check the form for errors.");
-        console.log("Validation errors:", form.formState.errors);
-      } else {
+              } else {
         // If valid, try to manually submit
-        console.log("Attempting manual submission with data:", formData);
-
+        
         // Show submission in progress
         setIsSubmitting(true);
 
         // Directly call the server action
         createCateringOrder(formData)
           .then((result) => {
-            console.log("Server action result:", result);
-            if (result.success) {
+                        if (result.success) {
               alert("Order created successfully!");
               if (result.orderNumber) {
                 router.push(

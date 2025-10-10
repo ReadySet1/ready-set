@@ -5,8 +5,7 @@ export async function GET() {
   try {
     const supabase = await createClient();
     
-    console.log("🔍 Testing Supabase connection...");
-    
+        
     // Test the profiles table with different column combinations
     const tests = [
       { name: "profiles with email,type", query: "email, type" },
@@ -18,8 +17,7 @@ export async function GET() {
     
     for (const test of tests) {
       try {
-        console.log(`🔍 Testing: ${test.name}`);
-        const { data, error } = await supabase
+                const { data, error } = await supabase
           .from("profiles")
           .select(test.query)
           .limit(5);
@@ -31,12 +29,10 @@ export async function GET() {
           sample: data?.slice(0, 2) || []
         };
         
-        console.log(`📊 ${test.name}: ${error ? `ERROR - ${error.message}` : `SUCCESS - ${data?.length || 0} records`}`);
-        
+                
         // If this test was successful and found data, break
         if (!error && data && data.length > 0) {
-          console.log("✅ Found working query:", test.name);
-          break;
+                    break;
         }
         
       } catch (err) {

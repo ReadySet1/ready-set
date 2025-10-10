@@ -23,12 +23,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { context } = authResult;
-    console.log('✅ [Driver API] Access granted to user:', {
-      role: context.user?.type,
-      email: context.user?.email,
-      id: context.user?.id
-    });
-
+    
     // Fetch all drivers - only authorized personnel can see this sensitive data
     const drivers = await prisma.profile.findMany({
       where: {

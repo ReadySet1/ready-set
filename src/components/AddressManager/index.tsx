@@ -190,20 +190,15 @@ const AddressManager: React.FC<AddressManagerProps> = ({
 
   const fetchAddresses = useCallback(async () => {
     if (isRequestPending.current) {
-      console.log("Request already pending, skipping fetchAddresses call");
-      return;
+            return;
     }
 
     if (!user) {
-      console.log("No user available, skipping fetchAddresses call");
-      return;
+            return;
     }
 
     fetchAttempts.current += 1;
-    console.log(
-      `Fetch attempt ${fetchAttempts.current} of ${MAX_FETCH_ATTEMPTS}`,
-    );
-
+    
     if (fetchAttempts.current > MAX_FETCH_ATTEMPTS) {
       console.warn(
         `Maximum fetch attempts (${MAX_FETCH_ATTEMPTS}) reached. Stopping.`,
@@ -243,10 +238,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       const currentPage = currentPageRef.current;
       const limit = limitRef.current;
 
-      console.log(
-        `Fetching addresses with filter=${filterType}, page=${currentPage}`,
-      );
-      const response = await fetch(
+            const response = await fetch(
         `/api/addresses?filter=${filterType}&page=${currentPage}&limit=${limit}`,
         {
           headers: {
@@ -304,15 +296,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
         validAddresses = [];
       }
 
-      console.log("✅ Addresses fetched successfully", {
-        count: validAddresses.length,
-        addresses: validAddresses.map((a) => ({
-          id: a.id,
-          name: a.name || "Unnamed Address",
-          street1: a.street1,
-        })),
-      });
-
+      
       // Set addresses first, then call callback in next tick to avoid render phase issues
       setAddresses(validAddresses);
 
@@ -342,12 +326,7 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   // Main effect for fetching addresses
   useEffect(() => {
     if (user && !hasInitialFetch.current) {
-      console.log("🔄 Initial address fetch triggered", {
-        user: !!user,
-        filterType,
-        currentPage: currentPageRef.current,
-      });
-      hasInitialFetch.current = true;
+            hasInitialFetch.current = true;
       debouncedFetch(fetchAddresses);
     }
   }, [user, filterType, debouncedFetch, fetchAddresses]);
@@ -355,22 +334,14 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   // Separate effect for filter changes
   useEffect(() => {
     if (user && hasInitialFetch.current) {
-      console.log("🔄 Filter changed, refetching addresses", {
-        filterType,
-        currentPage: currentPageRef.current,
-      });
-      debouncedFetch(fetchAddresses);
+            debouncedFetch(fetchAddresses);
     }
   }, [filterType, user, debouncedFetch, fetchAddresses]);
 
   // Separate effect for pagination changes (only when manually changed)
   useEffect(() => {
     if (user && hasInitialFetch.current && currentPageRef.current > 1) {
-      console.log(
-        "🔄 Pagination changed, fetching addresses for page",
-        currentPageRef.current,
-      );
-      debouncedFetch(fetchAddresses);
+            debouncedFetch(fetchAddresses);
     }
   }, [pagination.currentPage, user, debouncedFetch, fetchAddresses]);
 

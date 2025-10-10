@@ -155,10 +155,8 @@ async function getGuide(slug: string): Promise<GuideDocument | null> {
     // Only log during development, not during build
     if (process.env.NODE_ENV === 'development') {
       if (guide) {
-        console.log(`✅ [Direct Sanity] Successfully fetched guide: ${slug}`);
-      } else {
-        console.log(`❌ [Direct Sanity] No guide found for slug: ${slug}`);
-      }
+              } else {
+              }
     }
     
     return guide;
@@ -448,8 +446,7 @@ export async function generateStaticParams() {
     }
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`📄 Found ${guides.length} guides for static generation`);
-    }
+          }
     
     return guides.map((guide: { slug: string }) => ({
       slug: guide.slug,
@@ -474,8 +471,7 @@ export async function generateStaticParams() {
     ];
     
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`🔄 Using ${staticGuideSlugs.length} fallback guide slugs`);
-    }
+          }
     
     return staticGuideSlugs.map((slug) => ({
       slug: slug,

@@ -43,8 +43,7 @@ export async function login(
   const requestId = `login_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-    console.log(`🚀 [${requestId}] Login attempt started`);
-  }
+      }
   
   // Use cookies() to opt out of caching
   await cookies();
@@ -55,8 +54,7 @@ export async function login(
     const returnTo = formData.get("returnTo")?.toString();
 
     if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-      console.log(`🔍 [${requestId}] Login attempt for email: ${email}, returnTo: ${returnTo || 'default'}`);
-    }
+          }
 
     // Enhanced input validation with specific error messages
     if (!email || !password) {
@@ -65,8 +63,7 @@ export async function login(
       if (!password) missingFields.push('password');
       
       if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-        console.log(`❌ [${requestId}] Validation failed: Missing ${missingFields.join(', ')}`);
-      }
+              }
       return { 
         error: `Please provide ${missingFields.join(' and ')} to continue.`,
         success: false 
@@ -77,8 +74,7 @@ export async function login(
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-        console.log(`❌ [${requestId}] Validation failed: Invalid email format`);
-      }
+              }
       return { 
         error: "Please enter a valid email address.",
         success: false 
@@ -87,8 +83,7 @@ export async function login(
 
     // Test connection to Supabase first
     if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-      console.log(`🔌 [${requestId}] Testing Supabase connection...`);
-    }
+          }
     try {
       const { data: connectionTest, error: connectionError } = await supabase
         .from("profiles")
@@ -104,8 +99,7 @@ export async function login(
       }
       
       if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-        console.log(`✅ [${requestId}] Supabase connection test: SUCCESS`);
-      }
+              }
     } catch (testError) {
       console.error(`❌ [${requestId}] Supabase connection test failed:`, testError);
       return { 
@@ -116,8 +110,7 @@ export async function login(
 
     // Attempt authentication
     if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-      console.log(`🔐 [${requestId}] Attempting authentication...`);
-    }
+          }
     const { error: authError, data: authData } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -125,8 +118,7 @@ export async function login(
 
     if (authError) {
       if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-        console.log(`❌ [${requestId}] Authentication failed: ${authError.message}`);
-      }
+              }
 
       // Enhanced error handling with specific messages
       if (authError.message.includes('Invalid login credentials')) {
@@ -144,16 +136,14 @@ export async function login(
 
           if (userData) {
             if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-              console.log(`❌ [${requestId}] User exists but password is incorrect`);
-            }
+                          }
             return {
               error: "Incorrect password. Please check your password and try again, or use Magic Link for password-free sign in.",
               success: false
             };
           } else {
             if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-              console.log(`❌ [${requestId}] User account not found`);
-            }
+                          }
             return {
               error: "Account not found. Please check your email address or sign up for a new account.",
               success: false
@@ -169,8 +159,7 @@ export async function login(
       } else if (authError.message.includes('Email not confirmed')) {
         // Check if this user exists and if email confirmation is actually required
         try {
-          console.log(`⚠️ [${requestId}] Email not confirmed error - checking if user exists in profiles`);
-          const { data: profileData, error: profileError } = await supabase
+                    const { data: profileData, error: profileError } = await supabase
             .from("profiles")
             .select("id, email, type")
             .eq("email", email)
@@ -178,13 +167,10 @@ export async function login(
 
           // If user exists in profiles, they might be a legacy user from before confirmation was disabled
           if (profileData && !profileError) {
-            console.log(`ℹ️ [${requestId}] User exists in profiles - this appears to be a legacy unconfirmed user`);
-            console.log(`🔧 [${requestId}] Since email confirmation is disabled in config, attempting automatic fix...`);
-            
+                                    
             // Try to sign up the user again with the same credentials
             // This should work since email confirmation is disabled and will create a confirmed account
-            console.log(`🔄 [${requestId}] Attempting to re-register user with confirmed status...`);
-            
+                        
             let signupData, signupError;
             try {
               const result = await supabase.auth.signUp({
@@ -196,13 +182,7 @@ export async function login(
               });
               signupData = result.data;
               signupError = result.error;
-              console.log(`📊 [${requestId}] Signup result:`, { 
-                hasData: !!signupData, 
-                hasUser: !!signupData?.user, 
-                hasSession: !!signupData?.session,
-                errorMessage: signupError?.message 
-              });
-            } catch (signupException) {
+                          } catch (signupException) {
               console.error(`💥 [${requestId}] Signup exception:`, signupException);
               signupError = signupException as any;
             }
@@ -212,8 +192,7 @@ export async function login(
               
               // If signup fails because user already exists, that's actually good!
               if (signupError.message.includes('User already registered')) {
-                console.log(`✅ [${requestId}] User already exists, trying direct auth bypass...`);
-                return { 
+                                return { 
                   error: "Your account needs activation. Please try logging in again, or contact support if the issue persists.",
                   success: false 
                 };
@@ -227,8 +206,7 @@ export async function login(
 
             // If signup succeeded, the user should now be confirmed and logged in
             if (signupData && signupData.user && signupData.session) {
-              console.log(`✅ [${requestId}] User successfully re-registered with confirmed status`);
-              
+                            
               // Continue with the normal login flow since the user is now authenticated
               const user = signupData.user;
               
@@ -251,19 +229,16 @@ export async function login(
               // If returnTo is just "/" (root), prioritize the user's home route
               const redirectPath = (returnTo && returnTo !== "/") ? returnTo : USER_HOME_ROUTES[userType] || "/";
               
-              console.log(`✅ [${requestId}] Login successful after re-registration. User type: ${userType}, redirecting to: ${redirectPath}`);
-              
+                            
               redirect(redirectPath);
             } else {
-              console.log(`❌ [${requestId}] Re-registration completed but no session created`);
-              return { 
+                            return { 
                 error: "Account activation incomplete. Please try logging in again.",
                 success: false 
               };
             }
           } else {
-            console.log(`❌ [${requestId}] User not found in profiles`);
-            return { 
+                        return { 
               error: "Please check your email and click the confirmation link before signing in.",
               success: false 
             };
@@ -291,8 +266,7 @@ export async function login(
     }
 
     // Authentication successful - get user profile
-    console.log(`✅ [${requestId}] Authentication successful, fetching user profile...`);
-    const { data: { user }, error: getUserError } = await supabase.auth.getUser();
+        const { data: { user }, error: getUserError } = await supabase.auth.getUser();
 
     if (getUserError || !user) {
       console.error(`❌ [${requestId}] Failed to get user data:`, getUserError);
@@ -303,8 +277,7 @@ export async function login(
     }
 
     // Get user profile to determine user type
-    console.log(`🔍 [${requestId}] Fetching user profile for user: ${user.id}`);
-    const { data: profile, error: profileError } = await supabase
+        const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("type, email")
       .eq("id", user.id)
@@ -323,8 +296,7 @@ export async function login(
 
     // If no profile exists, create one with default values
     if (!profile) {
-      console.log(`⚠️ [${requestId}] No profile found for user ${user.id}, creating default profile...`);
-
+      
       try {
         // Use admin client to bypass RLS policies for profile creation
         const adminSupabase = await createAdminClient();
@@ -354,8 +326,7 @@ export async function login(
         }
 
         userType = newProfile?.type || undefined;
-        console.log(`✅ [${requestId}] Default profile created/updated successfully for user: ${user.id}`);
-      } catch (createProfileError) {
+              } catch (createProfileError) {
         console.error(`❌ [${requestId}] Exception creating default profile:`, createProfileError);
         return {
           error: "Login successful but unable to set up user account. Please contact support.",
@@ -382,15 +353,13 @@ export async function login(
     }
 
   if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-    console.log("User profile type from DB:", userType);
-  }
+      }
 
   // Normalize the user type to lowercase for consistent handling
   const userTypeKey = userType?.toLowerCase() || 'client';
 
   if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-    console.log("Normalized user type for redirection:", userTypeKey);
-  }
+      }
 
   // Set immediate session data in cookies for client-side access
   const cookieStore = await cookies();
@@ -409,8 +378,7 @@ export async function login(
   };
 
   if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-    console.log("Normalized userRole for session:", normalizedUserRole);
-  }
+      }
 
   // Set session cookie with enhanced security - allow client access for hydration
   cookieStore.set('user-session-data', JSON.stringify(sessionData), {
@@ -458,23 +426,19 @@ export async function login(
       const hasAccess = PROTECTED_ROUTES[userTypeKey]?.test(returnTo);
       
       if (hasAccess) {
-        console.log(`🔄 [${requestId}] Redirecting user to returnTo path: ${returnTo}`);
-        redirectPath = returnTo;
+                redirectPath = returnTo;
       } else {
         // If user doesn't have access to returnTo path, use their default home route
         redirectPath = USER_HOME_ROUTES[userTypeKey] || "/";
-        console.log(`⚠️ [${requestId}] User doesn't have access to returnTo path ${returnTo}, redirecting to default home: ${redirectPath}`);
-      }
+              }
     } else {
       // Use the default home route for this user type
       redirectPath = USER_HOME_ROUTES[userTypeKey] || "/";
-      console.log(`🏠 [${requestId}] No valid returnTo path provided, redirecting to default home: ${redirectPath}`);
-    }
+          }
 
     // Calculate execution time
     const executionTime = Date.now() - startTime;
-    console.log(`✅ [${requestId}] Login successful! Redirecting to: ${redirectPath} (took ${executionTime}ms)`);
-
+    
     // Return success state before redirect
     const successState: FormState = {
       success: true,
@@ -484,14 +448,7 @@ export async function login(
     };
 
     // Log success metrics for monitoring BEFORE redirect
-    console.log(`📊 [${requestId}] Login metrics:`, {
-      email: email,
-      userType: userType || 'unknown',
-      redirectPath: redirectPath,
-      executionTime: `${executionTime}ms`,
-      timestamp: new Date().toISOString()
-    });
-
+    
     // Store session data in a way that can be accessed by the client
     // Use a client-accessible cookie that survives the redirect
     cookieStore.set('temp-session-data', JSON.stringify(sessionData), {

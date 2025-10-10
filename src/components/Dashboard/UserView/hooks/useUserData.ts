@@ -70,8 +70,7 @@ export const useUserData = (
         // Check if we got redirected to sign-in page
         if (response.redirected && response.url.includes('sign-in')) {
           if (isAdminMode) {
-            console.log("Admin mode active but got redirected to sign-in. Attempting to recover...");
-            // Try to reload the page while preserving admin mode
+                        // Try to reload the page while preserving admin mode
             window.location.reload();
             return null;
           }
@@ -88,8 +87,7 @@ export const useUserData = (
       }
 
       const data = await response.json();
-      console.log("API Response:", data);
-      
+            
       // Transform the API data to match form structure
       const formData: UserFormValues = {
         id: data.id,
@@ -128,8 +126,7 @@ export const useUserData = (
         sideNotes: data.sideNotes
       };
       
-      console.log("[useUserData] fetchUser returning transformed data:", JSON.stringify(formData, null, 2));
-      
+            
       return formData;
     } catch (error) {
       console.error("Error fetching user:", error);

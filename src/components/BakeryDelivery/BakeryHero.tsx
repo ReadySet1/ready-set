@@ -43,8 +43,7 @@ const BakeryHero: React.FC<BakeryHeroProps> = ({ onRequestQuote }) => {
   }, []);
 
   const handleQuoteClick = () => {
-    console.log("BakeryHero - Get a quote clicked");
-    openForm("bakery");
+        openForm("bakery");
   };
 
   // Dynamic classes based on screen size

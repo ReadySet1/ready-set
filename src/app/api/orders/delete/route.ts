@@ -117,22 +117,18 @@ export async function DELETE(req: NextRequest) {
 
     // After transaction completes successfully, attempt to delete files from storage
     if (result.fileUploads && result.fileUploads.length > 0) {
-      console.log(`Found ${result.fileUploads.length} file(s) to delete from storage`);
-      
+            
       // Check specifically for nested structure based on the screenshot
       try {
         // First check if we have folder structure like catering_order/[orderId]
-        console.log(`Checking for specific folder structure: catering_order/${orderId}`);
-        const { data: orderFolder, error: orderFolderError } = await supabase.storage
+                const { data: orderFolder, error: orderFolderError } = await supabase.storage
           .from('fileUploader')
           .list(`catering_order/${orderId}`);
         
         if (orderFolderError) {
-          console.log(`No direct folder found at catering_order/${orderId}: ${orderFolderError.message}`);
-        } else if (orderFolder && orderFolder.length > 0) {
+                  } else if (orderFolder && orderFolder.length > 0) {
           // Found files in the expected structure
-          console.log(`Found ${orderFolder.length} files in catering_order/${orderId}`);
-          
+                    
           // Create paths to delete all these files
           const orderFilesToDelete = orderFolder.map(file => `catering_order/${orderId}/${file.name}`);
           
@@ -144,21 +140,17 @@ export async function DELETE(req: NextRequest) {
           if (orderDeleteError) {
             console.error(`Error deleting files from catering_order/${orderId}:`, orderDeleteError);
           } else {
-            console.log(`Successfully deleted ${orderDeleteData?.length || 0} files from catering_order/${orderId}`);
-          }
+                      }
         } else {
-          console.log(`No files found in catering_order/${orderId}`);
-        }
+                  }
         
         // Also check the root catering_order folder for any files matching this order
-        console.log(`Checking root catering_order folder for order-related files`);
-        const { data: rootCateringFiles, error: rootCateringError } = await supabase.storage
+                const { data: rootCateringFiles, error: rootCateringError } = await supabase.storage
           .from('fileUploader')
           .list('catering_order');
         
         if (rootCateringError) {
-          console.log(`Error checking root catering_order folder: ${rootCateringError.message}`);
-        } else if (rootCateringFiles && rootCateringFiles.length > 0) {
+                  } else if (rootCateringFiles && rootCateringFiles.length > 0) {
           // Look for directories with matching order ID
           const orderDirs = rootCateringFiles.filter(item => 
             item.id === orderId || 
@@ -167,13 +159,11 @@ export async function DELETE(req: NextRequest) {
           );
           
           if (orderDirs.length > 0) {
-            console.log(`Found ${orderDirs.length} matching directories in catering_order for order ${orderId}`);
-            
+                        
             // Process each directory
             for (const dir of orderDirs) {
               const dirPath = `catering_order/${dir.name}`;
-              console.log(`Processing directory: ${dirPath}`);
-              
+                            
               // List files in this directory
               const { data: dirFiles, error: dirError } = await supabase.storage
                 .from('fileUploader')
@@ -192,8 +182,7 @@ export async function DELETE(req: NextRequest) {
                 if (dirDeleteError) {
                   console.error(`Error deleting files from ${dirPath}:`, dirDeleteError);
                 } else {
-                  console.log(`Successfully deleted ${dirDeleteData?.length || 0} files from ${dirPath}`);
-                }
+                                  }
               }
             }
           }
@@ -218,8 +207,7 @@ export async function DELETE(req: NextRequest) {
           );
           
           if (tempFolders.length > 0) {
-            console.log(`Found ${tempFolders.length} temporary folders to check`);
-            
+                        
             // Check each temp folder to see if we can find files belonging to this order
             for (const tempFolder of tempFolders) {
               try {
@@ -237,8 +225,7 @@ export async function DELETE(req: NextRequest) {
                   // Create paths to delete all files in this temp folder
                   const tempFilesToDelete = tempFiles.map(file => `${tempFolder.name}/${file.name}`);
                   
-                  console.log(`Attempting to delete ${tempFilesToDelete.length} files from temp folder ${tempFolder.name}`);
-                  
+                                    
                   // Delete all files in the temp folder
                   const { data: tempDeleteData, error: tempDeleteError } = await supabase.storage
                     .from('fileUploader')
@@ -247,8 +234,7 @@ export async function DELETE(req: NextRequest) {
                   if (tempDeleteError) {
                     console.error(`Error deleting files from temp folder ${tempFolder.name}:`, tempDeleteError);
                   } else {
-                    console.log(`Successfully deleted ${tempDeleteData?.length || 0} files from temp folder ${tempFolder.name}`);
-                  }
+                                      }
                 }
               } catch (tempFolderError) {
                 console.error(`Error processing temp folder ${tempFolder.name}:`, tempFolderError);
@@ -263,13 +249,11 @@ export async function DELETE(req: NextRequest) {
       // Also try individual file deletions based on fileUrl in case paths are different
       try {
         if (result.fileUploads && result.fileUploads.length > 0) {
-          console.log(`Processing ${result.fileUploads.length} file URLs from database records`);
-          
+                    
           for (const file of result.fileUploads) {
             try {
               if (file.fileUrl) {
-                console.log(`Processing file URL for deletion: ${file.fileUrl}`);
-                
+                                
                 // Try to extract the path from the URL
                 let filePath = "";
                 try {
@@ -286,8 +270,7 @@ export async function DELETE(req: NextRequest) {
                         const filePathWithQuery = rest.join('/');
                         filePath = filePathWithQuery.split('?')[0] || ""; // Remove query params
                         
-                        console.log(`Extracted path from URL: bucket=${bucket}, path=${filePath}`);
-                        
+                                                
                         if (filePath) {
                           const { error: fileDeleteError } = await supabase.storage
                             .from('fileUploader')
@@ -296,8 +279,7 @@ export async function DELETE(req: NextRequest) {
                           if (fileDeleteError) {
                             console.error(`Error deleting individual file ${filePath}:`, fileDeleteError);
                           } else {
-                            console.log(`Successfully deleted individual file: ${filePath}`);
-                          }
+                                                      }
                         }
                       }
                     }

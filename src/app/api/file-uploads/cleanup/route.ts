@@ -6,13 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const { fileKeys, entityId, entityType, userId } = await request.json();
 
-    console.log("Cleanup request received:", {
-      fileKeys: Array.isArray(fileKeys) ? fileKeys.length : "none",
-      entityId,
-      entityType,
-      userId
-    });
-
+    
     if (!fileKeys && !entityId) {
       return NextResponse.json(
         { error: "File keys or entity ID is required" },
@@ -49,18 +43,14 @@ export async function POST(request: NextRequest) {
           });
 
           if (existingOrder) {
-            console.log(
-              `Cleanup canceled: entityId ${entityId} belongs to an existing order`,
-            );
-            return NextResponse.json({
+                        return NextResponse.json({
               success: false,
               message: "Cleanup canceled: Files belong to an existing order",
               deletedCount: 0,
             });
           }
         } else {
-          console.log(`Skipping existing order check for temporary ID: ${entityId}`);
-        }
+                  }
       }
 
       // Check if this is an on-demand request
@@ -78,18 +68,14 @@ export async function POST(request: NextRequest) {
           });
 
           if (existingOrder) {
-            console.log(
-              `Cleanup canceled: entityId ${entityId} belongs to an existing order`,
-            );
-            return NextResponse.json({
+                        return NextResponse.json({
               success: false,
               message: "Cleanup canceled: Files belong to an existing order",
               deletedCount: 0,
             });
           }
         } else {
-          console.log(`Skipping existing order check for temporary ID: ${entityId}`);
-        }
+                  }
       }
     }
 
@@ -115,14 +101,10 @@ export async function POST(request: NextRequest) {
       const safeToDeleteIds = safeToDeleteFiles.map((file: any) => file.id);
 
       if (safeToDeleteIds.length < fileKeys.length) {
-        console.log(
-          `Safety check: ${fileKeys.length - safeToDeleteIds.length} files skipped because they're linked to orders`,
-        );
-      }
+              }
 
       if (safeToDeleteIds.length === 0) {
-        console.log("No files safe to delete - they may be linked to orders");
-        return NextResponse.json({
+                return NextResponse.json({
           success: false,
           message: "No files were deleted - they may be linked to orders",
           deletedCount: 0,
@@ -138,8 +120,7 @@ export async function POST(request: NextRequest) {
         })
         .filter((path: any): path is string => path !== null);
 
-      console.log("Files to delete from storage:", filePaths);
-
+      
       // Step 2: Delete files from Supabase storage
       if (filePaths.length > 0) {
         const { error } = await supabase.storage
@@ -200,11 +181,9 @@ export async function POST(request: NextRequest) {
           { category: { contains: `${entityId}` } }
         ];
         
-        console.log(`Searching for files with category related to ${categoryName} and entity ID ${entityId}`);
-      }
+              }
       
-      console.log('File cleanup query:', whereClause);
-
+      
       // Step 1: Get file records for the entity
       const fileRecords = await prisma.fileUpload.findMany({
         where: whereClause,
@@ -224,11 +203,7 @@ export async function POST(request: NextRequest) {
         })
         .filter((path: any): path is string => path !== null);
 
-      console.log(
-        `Found ${fileRecords.length} files to clean up for entity ${entityId}`,
-        fileRecords.map((f: any) => ({ id: f.id, category: f.category }))
-      );
-
+      
       if (fileRecords.length === 0) {
         return NextResponse.json({
           success: true,

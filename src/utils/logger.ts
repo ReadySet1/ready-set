@@ -46,8 +46,7 @@ class Logger {
 
   debug(message: string, ...args: any[]): void {
     if (this.shouldLog()) {
-      console.log(message, ...args);
-    }
+          }
   }
 
   info(message: string, ...args: any[]): void {

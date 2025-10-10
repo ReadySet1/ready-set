@@ -107,22 +107,15 @@ export async function withAuth(
       }
 
       // If auth is not required and user is not found, return success with empty context
-      console.log('ℹ️ [Auth Middleware] No authentication required, proceeding without user context');
-      return {
+            return {
         success: true,
         context: {} as AuthContext
       };
     }
 
-    console.log('✅ [Auth Middleware] User authenticated:', {
-      id: user.id,
-      email: user.email,
-      authMethod: authHeader ? 'Bearer token' : 'Session cookie'
-    });
-
+    
     // Get the user's role from the profiles table
-    console.log('🔍 [Auth Middleware] Getting user role for user ID:', user.id);
-    const userRole = await getUserRole(user.id);
+        const userRole = await getUserRole(user.id);
 
     if (!userRole && requireAuth) {
       console.error('❌ [Auth Middleware] User role not found for user ID:', user.id);
@@ -138,8 +131,7 @@ export async function withAuth(
 
     const userType = userRole as 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT';
 
-    console.log('🔍 [Auth Middleware] User role:', userType, 'Allowed roles:', allowedRoles);
-
+    
     // Check role permissions
     if (allowedRoles.length > 0 && userType && !allowedRoles.includes(userType)) {
       console.error('❌ [Auth Middleware] Insufficient permissions for user type:', userType, 'Allowed roles:', allowedRoles);
@@ -153,8 +145,7 @@ export async function withAuth(
       };
     }
 
-    console.log('✅ [Auth Middleware] Access granted for user type:', userType);
-
+    
     // Create auth context with real user data
     const authUser = {
       id: user.id,

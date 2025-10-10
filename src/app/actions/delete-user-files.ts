@@ -14,8 +14,7 @@ type DeleteUserFilesResult = {
 };
 
 export const deleteUserFiles = async (userId: string): Promise<DeleteUserFilesResult> => {
-  console.log(`Attempting to delete all files for user: ${userId}`);
-
+  
   let deletedCount = 0;
   const errors: string[] = [];
 
@@ -30,8 +29,7 @@ export const deleteUserFiles = async (userId: string): Promise<DeleteUserFilesRe
       },
     });
 
-    console.log(`Found ${userFiles.length} files for user ${userId}`);
-
+    
     for (const file of userFiles) {
       try {
         // Extract the file path from the URL using regex
@@ -45,8 +43,7 @@ export const deleteUserFiles = async (userId: string): Promise<DeleteUserFilesRe
         } else {
           // Delete file from Supabase Storage
           try {
-            console.log(`Attempting to delete file from Supabase Storage: ${filePath}`);
-            const { data, error } = await supabase.storage
+                        const { data, error } = await supabase.storage
               .from("fileUploader")
               .remove([filePath]);
 
@@ -55,8 +52,7 @@ export const deleteUserFiles = async (userId: string): Promise<DeleteUserFilesRe
               errors.push(`Failed to delete file ${file.id} from storage: ${error.message}`);
               // Continue with database deletion anyway
             } else {
-              console.log(`Supabase Storage delete result for ${file.id}:`, data);
-            }
+                          }
           } catch (storageError) {
             console.error(`Error calling Supabase Storage API for file ${file.id}:`, storageError);
             errors.push(`Failed to delete file ${file.id} from storage: ${storageError instanceof Error ? storageError.message : String(storageError)}`);
@@ -70,8 +66,7 @@ export const deleteUserFiles = async (userId: string): Promise<DeleteUserFilesRe
             id: file.id,
           },
         });
-        console.log(`File record deleted from database: ${file.id}`);
-
+        
         deletedCount++;
       } catch (fileError) {
         console.error(`Error processing file ${file.id}:`, fileError);

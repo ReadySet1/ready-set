@@ -93,11 +93,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
       }
 
       const updatedAddress = await response.json();
-      console.log(
-        `Address ${addressToEdit ? "updated" : "added"}:`,
-        updatedAddress,
-      );
-
+      
       reset();
       onAddressUpdated();
       onClose();
