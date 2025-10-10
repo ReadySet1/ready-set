@@ -12,8 +12,6 @@ export function trackAuthRedirect(
   details?: Record<string, any>
 ) {
   // Log authentication redirect for debugging
-  console.log('Auth redirect:', {
-    from,
     to,
     reason,
     timestamp: new Date().toISOString(),

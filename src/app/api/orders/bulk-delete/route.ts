@@ -114,8 +114,6 @@ export async function POST(req: NextRequest) {
         // Step 3: Start a transaction for atomic database operations
         await prisma.$transaction(async (tx: PrismaTransaction) => {
           // Step 4: Delete associated files from Supabase Storage
-          console.log(
-            `Processing files for order ${orderNumber}. Found ${fileUploads.length} files.`,
           );
           for (const file of fileUploads) {
             let filePath = ""; // The path within the bucket
@@ -142,8 +140,6 @@ export async function POST(req: NextRequest) {
               ) {
                 // Join all parts *after* the bucket name
                 filePath = pathParts.slice(bucketNameIndex + 1).join("/");
-                console.log(
-                  `Extracted path: ${filePath} from URL: ${file.fileUrl}`,
                 );
               } else {
                 // Fallback: Maybe the stored URL *is* just the path, or only the filename?
@@ -173,8 +169,6 @@ export async function POST(req: NextRequest) {
             if (filePath) {
               // Delete from Supabase Storage using the new utility
               try {
-                console.log(
-                  `Attempting to delete file from storage: ${filePath}`,
                 );
                 // *** Use the imported storage utility ***
                 // Note: This uses the request's user context. Storage Policies MUST allow deletion.
@@ -191,8 +185,6 @@ export async function POST(req: NextRequest) {
                   // For now, we log it and continue deleting DB records, leaving the file potentially orphaned.
                   // throw new Error(`Failed to delete file ${filePath} from storage: ${storageError.message}`);
                 } else {
-                  console.log(
-                    `Successfully deleted file ${filePath} from storage (Order ${orderNumber}).`,
                   );
                 }
               } catch (err) {
@@ -212,8 +204,6 @@ export async function POST(req: NextRequest) {
           } // End loop through files
 
           // Step 5: Delete all dispatches related to the order
-          console.log(
-            `Deleting dispatches for order ${orderNumber} (ID: ${orderId}, Type: ${orderType})`,
           );
           await tx.dispatch.deleteMany({
             where:
@@ -223,7 +213,6 @@ export async function POST(req: NextRequest) {
           });
 
           // Step 6: Delete all file upload records from the database
-          console.log(`Deleting fileUpload records for order ${orderNumber}`);
           await tx.fileUpload.deleteMany({
             where:
               orderType === "catering"
@@ -232,7 +221,6 @@ export async function POST(req: NextRequest) {
           });
 
           // Step 7: Delete the order itself
-          console.log(`Deleting order record for ${orderNumber}`);
           if (orderType === "catering") {
             await tx.cateringRequest.delete({
               where: { id: orderId },
@@ -244,15 +232,11 @@ export async function POST(req: NextRequest) {
             });
           }
 
-          console.log(
-            `Successfully processed database deletions within transaction for order ${orderNumber}.`,
           );
         }); // End Prisma transaction
 
         // If transaction was successful
         results.deleted.push(orderNumber);
-        console.log(
-          `Order ${orderNumber} and associated data/files marked for deletion successfully.`,
         );
       } catch (error) {
         // Catch errors during processing of a single order (including transaction failures)
@@ -266,7 +250,6 @@ export async function POST(req: NextRequest) {
       }
     } // End loop through orderNumbers
 
-    console.log("Bulk deletion process completed.", results);
     return NextResponse.json({
       message: `Bulk deletion attempted. ${results.deleted.length} orders processed for deletion, ${results.failed.length} failed. Check logs and results for details.`,
       results,

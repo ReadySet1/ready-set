@@ -196,7 +196,6 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    console.log("API: Fetched applications with corrected fileUploads:", processedApplications.map((app: any) => ({
       id: app.id,
       hasFileUploads: app.hasFileUploads,
       fileUploadCount: app.fileUploadCount,

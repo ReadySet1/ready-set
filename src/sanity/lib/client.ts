@@ -284,7 +284,6 @@ const createFallbackGuide = (slug: string): Guide => ({
 // Helper function to get a guide by slug 
 export async function getGuideBySlug(slug: string): Promise<Guide> {
   try {
-    console.log(`[getGuideBySlug] Fetching guide: ${slug}`);
     
     const guide = await client.fetch(
       `*[_type == "guide" && slug.current == $slug][0]{

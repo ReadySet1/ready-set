@@ -46,9 +46,7 @@ const createPrismaClient = (): PrismaClient => {
 export async function connectPrisma(retries = 3): Promise<void> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      console.log(`🔌 Attempting to connect to database (attempt ${attempt}/${retries})...`);
       await prismaPooled.$connect();
-      console.log('✅ Database connected successfully');
       return;
     } catch (error) {
       console.error(`❌ Database connection failed on attempt ${attempt}:`, error);
@@ -59,7 +57,6 @@ export async function connectPrisma(retries = 3): Promise<void> {
       
       // Wait before retrying (exponential backoff)
       const delay = Math.pow(2, attempt) * 1000;
-      console.log(`⏳ Waiting ${delay}ms before retry...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -67,9 +64,7 @@ export async function connectPrisma(retries = 3): Promise<void> {
 
 export async function disconnectPrisma(): Promise<void> {
   try {
-    console.log('🔌 Disconnecting from database...');
     await prismaPooled.$disconnect();
-    console.log('✅ Database disconnected successfully');
   } catch (error) {
     console.error('❌ Database disconnection failed:', error);
   }
@@ -79,19 +74,16 @@ export async function disconnectPrisma(): Promise<void> {
 export async function checkDatabaseHealth(autoReconnect = true): Promise<boolean> {
   try {
     await prismaPooled.$queryRaw`SELECT 1`;
-    console.log('💚 Database health check passed');
     return true;
   } catch (error) {
     console.error('💔 Database health check failed:', error);
     
     if (autoReconnect) {
-      console.log('🔄 Attempting to reconnect...');
       try {
         await disconnectPrisma();
         await connectPrisma();
         // Test again after reconnection
         await prismaPooled.$queryRaw`SELECT 1`;
-        console.log('✅ Database reconnected successfully');
         return true;
       } catch (reconnectError) {
         console.error('❌ Failed to reconnect:', reconnectError);
@@ -220,7 +212,6 @@ export async function withDatabaseRetry<T>(
       });
       
       if ((isConnectionError || isPreparedStmtError) && attempt <= maxRetries) {
-        console.log(`🔄 Database ${isPreparedStmtError ? 'prepared statement' : 'connection'} error on attempt ${attempt}, retrying...`);
         
         // For prepared statement errors, reset the connection
         if (isPreparedStmtError) {
@@ -243,7 +234,6 @@ export async function withDatabaseRetry<T>(
         
         // Exponential backoff with jitter
         const delay = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 1000, 5000);
-        console.log(`⏳ Waiting ${Math.round(delay)}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
@@ -259,7 +249,6 @@ export async function withDatabaseRetry<T>(
 
 // Graceful shutdown for serverless
 process.on('beforeExit', async () => {
-  console.log('🔄 Gracefully shutting down Prisma client...');
   await disconnectPrisma();
 });
 // Types for better TypeScript support

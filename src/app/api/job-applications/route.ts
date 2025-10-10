@@ -12,7 +12,6 @@ export async function POST(request: Request) {
     const data = await request.json();
     
     // Debug log received data
-    console.log("Received application data:", JSON.stringify(data, null, 2));
 
     // --- Step 1: Identify and Fetch FileUpload Records ---
     const fileIdsToProcess = [
@@ -29,7 +28,6 @@ export async function POST(request: Request) {
 
     let temporaryFileUploads: any[] = [];
     if (fileIdsToProcess.length > 0) {
-        console.log("Fetching FileUpload records for IDs:", fileIdsToProcess);
         temporaryFileUploads = await prisma.fileUpload.findMany({
             where: {
                 id: { in: fileIdsToProcess },
@@ -37,7 +35,6 @@ export async function POST(request: Request) {
                 // but we still want to process them
             }
         });
-        console.log("Fetched file uploads:", temporaryFileUploads.map(f => ({ 
           id: f.id, 
           url: f.fileUrl, 
           name: f.fileName,
@@ -51,7 +48,6 @@ export async function POST(request: Request) {
             // Decide if this should be a hard error or just a warning
         }
     } else {
-      console.log("No file IDs provided in the request.");
     }
 
 
@@ -88,19 +84,16 @@ export async function POST(request: Request) {
       status: "PENDING" as const,
     };
 
-    console.log("Creating application with initial data:", JSON.stringify(applicationData, null, 2));
 
     // --- Step 3: Create the JobApplication Record ---
     const application = await prisma.jobApplication.create({
       data: applicationData,
     });
-    console.log("JobApplication created with ID:", application.id);
 
 
     // --- Step 4: Move Files and Update FileUpload Records ---
     const processedFilesInfo: { id: string; newPath: string; newUrl: string }[] = [];
     if (temporaryFileUploads.length > 0) {
-      console.log(`Processing ${temporaryFileUploads.length} files for application ${application.id}...`);
       
       for (const file of temporaryFileUploads) {
         // Ensure fileUrl and fileName exist before proceeding
@@ -143,7 +136,6 @@ export async function POST(request: Request) {
         
         const newPath = `job-applications/${application.id}/${uniqueFileName}`;
         
-        console.log(`Attempting to move file: ${oldPath} -> ${newPath}`);
 
         try {
           // Move the file in Supabase Storage
@@ -158,14 +150,12 @@ export async function POST(request: Request) {
             continue; // Skip updating this file record if move failed
           }
 
-          console.log(`Successfully moved file to ${newPath}`, moveData);
 
           // Construct the new public URL
           const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(newPath);
           const newPublicUrl = urlData?.publicUrl || ''; // Fallback to empty string if URL generation fails
 
           // Update the FileUpload record in Prisma
-          console.log(`Updating FileUpload record ID ${file.id} with new path and URL...`);
           await prisma.fileUpload.update({
             where: { id: file.id },
             data: {
@@ -174,7 +164,6 @@ export async function POST(request: Request) {
               fileUrl: newPublicUrl, // Store the new public URL
             },
           });
-          console.log(`FileUpload record ID ${file.id} updated successfully.`);
           processedFilesInfo.push({ id: file.id, newPath: newPath, newUrl: newPublicUrl });
 
         } catch (processingError: any) {
@@ -186,11 +175,9 @@ export async function POST(request: Request) {
         }
       } // End for loop
       
-      console.log(`Finished processing ${temporaryFileUploads.length} files.`);
       
       // Update the JobApplication record with the final permanent paths
       if (processedFilesInfo.length > 0) {
-        console.log("Updating JobApplication with file paths...");
         
         // Map file categories to the corresponding file path fields in the JobApplication model
         const filePathUpdates: Record<string, string> = {};
@@ -242,7 +229,6 @@ export async function POST(request: Request) {
         
         // Update the application with file paths
         if (Object.keys(filePathUpdates).length > 0) {
-          console.log("Updating JobApplication with file paths:", filePathUpdates);
           try {
             await prisma.jobApplication.update({
               where: { id: application.id },
@@ -251,7 +237,6 @@ export async function POST(request: Request) {
                 fileUploads: true  // Include file uploads in the returned data
               }
             });
-            console.log("JobApplication updated with file paths successfully");
           } catch (updateError: any) {
             console.error("Error updating JobApplication with file paths:", {
               error: updateError.message,
@@ -260,12 +245,10 @@ export async function POST(request: Request) {
             });
           }
         } else {
-          console.log("No file paths to update for JobApplication");
         }
       }
 
     } else {
-      console.log("No temporary files to process for JobApplication ID:", application.id);
     }
 
     // --- Step 5: Send Notification Email (Adjust to use final paths/URLs) ---
@@ -318,7 +301,6 @@ export async function POST(request: Request) {
             subject: subject,
             html: htmlBody,
           });
-          console.log("Notification email sent successfully to:", recipient);
         } catch (emailError: any) {
           console.error("Error sending notification email:", {
             message: emailError.message, recipient, jobApplicationId: application.id, stack: emailError.stack

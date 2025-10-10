@@ -122,7 +122,6 @@ export class UploadSecurityManager {
           scanResults
         };
 
-        console.log('File quarantined:', quarantineRecord);
 
         return quarantinePath;
       } catch (storageError) {
@@ -368,7 +367,6 @@ export class UploadSecurityManager {
         return 0;
       }
 
-      console.log(`Cleaned up ${oldFiles.length} quarantined files older than ${olderThanDays} days`);
       return oldFiles.length;
     } catch (error) {
       console.error('Error during quarantine cleanup:', error);
@@ -383,6 +381,5 @@ export class UploadSecurityManager {
       this.cleanupQuarantinedFiles();
     }, this.CLEANUP_INTERVAL);
 
-    console.log('Upload security cleanup scheduler started');
   }
 }

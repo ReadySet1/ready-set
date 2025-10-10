@@ -3,7 +3,6 @@ import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
 
 export async function POST(request: NextRequest) {
-  console.log("Catering file upload API endpoint called");
   
   try {
     // Get the Supabase client for auth and storage
@@ -11,13 +10,11 @@ export async function POST(request: NextRequest) {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
-      console.log("Unauthorized - No session found");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
     // Get form data from the request
     const formData = await request.formData();
-    console.log("Form data keys:", Array.from(formData.keys()));
     
     // Extract important data from the form
     const file = formData.get('file') as File;
@@ -40,13 +37,11 @@ export async function POST(request: NextRequest) {
         
         userType = userProfile?.type || 'client'; // Default to 'client' if no type found
       } catch (err) {
-        console.log("Error fetching user role, defaulting to 'client':", err);
         userType = 'client';
       }
     }
     
     // Log parameters for debugging
-    console.log("Upload parameters:", {
       userId,
       entityId,
       entityType,
@@ -58,7 +53,6 @@ export async function POST(request: NextRequest) {
     });
     
     if (!file || !entityId) {
-      console.log("Missing required fields");
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -74,7 +68,6 @@ export async function POST(request: NextRequest) {
     // Create a structured path with userType/userId/fileName
     const filePath = `${userType}/${userId}/${fileName}`;
     
-    console.log("Uploading file to storage path:", filePath);
     
     // Upload the file to catering-files bucket
     const { data: storageData, error: storageError } = await supabase
@@ -99,11 +92,9 @@ export async function POST(request: NextRequest) {
       .from('catering-files')
       .getPublicUrl(filePath);
     
-    console.log("Generated public URL:", publicUrl);
     
     // Create record in the file_upload table
     try {
-      console.log("Creating database record with fields:", {
         userId,
         fileName: file.name,
         fileType: file.type,
@@ -135,7 +126,6 @@ export async function POST(request: NextRequest) {
         }
       });
       
-      console.log("Database record created successfully:", fileUpload.id);
       
       return NextResponse.json({
         success: true,

@@ -42,8 +42,6 @@ export default function UserDocumentsCard({
     [] as any[],
   );
 
-  console.log("Upload Hooks:", uploadHooks);
-  console.log("All Uploaded Files:", allUploadedFiles);
 
   const handleDelete = async (fileId: string) => {
     try {

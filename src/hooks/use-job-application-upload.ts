@@ -97,7 +97,6 @@ export function useJobApplicationUpload({
           let uploadEntityId = entityId;
           if (entityType === 'job_application' && uploadEntityId && uploadEntityId.startsWith('temp_')) {
             // Keep the ID as-is, don't modify it - the file-uploads handler will handle it
-            console.log(`Using temporary job application ID: ${uploadEntityId}`);
           }
           
           formData.append('entityId', uploadEntityId || '');
@@ -129,7 +128,6 @@ export function useJobApplicationUpload({
           }
 
           const result = await response.json();
-          console.log("File upload successful:", {
             id: result.file.id,
             name: result.file.name,
             category: result.file.category,
@@ -182,8 +180,6 @@ export function useJobApplicationUpload({
   const updateEntityId = useCallback(
     async (newEntityId: string) => {
       try {
-        console.log(
-          `Updating entity ID from ${entityId} to ${newEntityId}`,
         );
 
         // Make an API call to update the entity IDs

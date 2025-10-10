@@ -432,7 +432,6 @@ export function applySecurityPreset(preset?: keyof typeof SecurityPresets) {
   const presetConfig = SecurityPresets[presetName as keyof typeof SecurityPresets];
   if (presetConfig) {
     securityConfigManager.updateConfig(presetConfig);
-    console.log(`✅ Applied security preset: ${presetName}`);
   } else {
     console.warn(`⚠️ Security preset '${presetName}' not found, using default configuration`);
   }
@@ -448,7 +447,6 @@ export function initializeSecurity() {
     const { securityLogger } = require('./security-logging');
     const cleaned = securityLogger.cleanup(90);
     if (cleaned > 0) {
-      console.log(`🧹 Cleaned up ${cleaned} old security events`);
     }
   }, 24 * 60 * 60 * 1000); // Daily cleanup
 
@@ -457,11 +455,9 @@ export function initializeSecurity() {
     const { ThreatIntelligence } = require('./ip-management');
     const cleaned = ThreatIntelligence.cleanup(30);
     if (cleaned > 0) {
-      console.log(`🧹 Cleaned up ${cleaned} old threat intelligence entries`);
     }
   }, 7 * 24 * 60 * 60 * 1000); // Weekly cleanup
 
-  console.log('🔒 Security system initialized');
 }
 
 // Export types and interfaces for use in API routes

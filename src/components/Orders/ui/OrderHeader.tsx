@@ -106,7 +106,6 @@ const OrderHeader: React.FC<OrderHeaderProps> = ({
       const apiOrderType = getApiOrderType(order_type);
       
       // For debugging - remove in production
-      console.log(`Deleting order: ${orderId}, type: ${order_type}, apiType: ${apiOrderType}`);
       
       const deletePromise = fetch(
         `/api/orders/delete?orderId=${orderId.toString()}&orderType=${apiOrderType}`,

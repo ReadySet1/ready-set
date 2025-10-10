@@ -239,8 +239,6 @@ export async function GET(request: NextRequest) {
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
 
-    console.log(
-      `Found ${addresses.length} addresses for user ${currentUser.id} (page ${page} of ${totalPages})`,
     );
 
     // Return paginated response with cache headers
@@ -293,8 +291,6 @@ export async function POST(request: NextRequest) {
     }
 
     const formData: AddressFormData = await request.json();
-    console.log("POST /api/addresses: Received form data:", { 
-      userId: currentUser.id, 
       formData: { ...formData, createdBy: currentUser.id } 
     });
 
@@ -348,14 +344,11 @@ export async function POST(request: NextRequest) {
         name: formData.name?.trim() || null,
       };
 
-      console.log("POST /api/addresses: Creating address with normalized data:", newAddress);
 
       const createdAddress = await tx.address.create({
         data: newAddress,
       });
 
-      console.log("POST /api/addresses: Address created successfully:", { 
-        addressId: createdAddress.id, 
         userId: currentUser.id 
       });
 
@@ -368,15 +361,12 @@ export async function POST(request: NextRequest) {
             isDefault: false, // Could be set based on user preferences
           },
         });
-        console.log("POST /api/addresses: UserAddress relation created");
       }
 
       return createdAddress;
       });
     });
 
-    console.log("POST /api/addresses: Transaction completed successfully:", { 
-      addressId: result.id, 
       userId: currentUser.id 
     });
 

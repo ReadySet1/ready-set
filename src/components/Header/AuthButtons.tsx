@@ -64,7 +64,6 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
 
   // Add debug logging to track state changes
   useEffect(() => {
-    console.log("🔍 AuthButtons state:", {
       hasUser: !!user,
       userRole,
       isLoading,

@@ -52,7 +52,6 @@ function BookingFormContent() {
     setIsSubmitting(true);
     
     try {
-      console.log('Form submitted:', formData);
     } catch (error) {
       console.error('Error submitting form:', error);
     } finally {

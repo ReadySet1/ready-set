@@ -129,10 +129,6 @@ export async function POST(request: NextRequest) {
     // Ignore parsing errors for status endpoint
   }
 
-  console.log('=== CaterValley Status Endpoint - POST Request ===');
-  console.log('Headers:', headers);
-  console.log('Body:', body);
-  console.log('=== End Debug Info ===');
 
   // Return the same status information as GET
   return GET(request);

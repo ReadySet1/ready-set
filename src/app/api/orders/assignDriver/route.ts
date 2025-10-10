@@ -39,7 +39,6 @@ export async function POST(request: Request) {
 
     
     const body = await request.json();
-    console.log("Request body:", body);
     
     const { orderId, driverId, orderType } = body;
 
@@ -56,7 +55,6 @@ export async function POST(request: Request) {
         let order;
         let dispatch;
 
-        console.log(`Fetching ${orderType} order with ID: ${orderId}`);
 
         // Fetch the order based on orderType
         if (orderType === "catering") {

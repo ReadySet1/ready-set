@@ -30,13 +30,10 @@ const DeliveryOptionCard: React.FC<DeliveryOptionCardProps> = ({
   onLearnMoreClick,
 }) => {
   const handleQuoteClick = () => {
-    console.log(`${title} - Get a quote clicked`);
     onGetQuoteClick(formType);
   };
 
   const handleLearnMoreClick = () => {
-    console.log(
-      `${title} - Learn more clicked, navigating to: ${learnMoreRoute}`,
     );
     onLearnMoreClick(learnMoreRoute);
   };
@@ -141,13 +138,11 @@ const DeliveryOptions: React.FC = () => {
 
   // Centralized handler for opening forms
   const handleGetQuoteClick = (formType: FormType) => {
-    console.log(`Opening form for: ${formType}`);
     openForm(formType);
   };
 
   // Handler for Learn More navigation
   const handleLearnMoreClick = (route: string) => {
-    console.log(`Navigating to: ${route}`);
     router.push(route);
   };
 

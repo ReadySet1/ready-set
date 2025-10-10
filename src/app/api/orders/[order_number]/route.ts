@@ -104,7 +104,6 @@ export async function GET(
   try {
     // Await params before accessing its properties
     const resolvedParams = await params;
-    console.log(`GET request for order: ${resolvedParams.order_number}`);
     
     // Initialize Supabase client
     const supabase = await createClient();
@@ -118,7 +117,6 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log(`Authenticated user: ${user.id}`);
     
     // Extract order_number from params and decode it properly
     const { order_number: encodedOrderNumber } = resolvedParams;
@@ -216,7 +214,6 @@ export async function PATCH(
   try {
     // Await params before accessing its properties
     const resolvedParams = await params;
-    console.log(`PATCH request for order: ${resolvedParams.order_number}`);
     
     // Initialize Supabase client
     const supabase = await createClient();
@@ -230,7 +227,6 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log(`Authenticated user: ${user.id}`);
     
     // Extract order_number from params and decode it properly
     const { order_number: encodedOrderNumber } = resolvedParams;

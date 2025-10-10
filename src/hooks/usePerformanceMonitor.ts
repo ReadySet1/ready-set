@@ -91,7 +91,6 @@ export function usePerformanceMonitor() {
 
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
-      console.log('📊 API Call Logged:', {
         url: apiCall.url,
         method: apiCall.method,
         responseTime: `${apiCall.responseTime}ms`,

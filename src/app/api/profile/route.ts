@@ -107,7 +107,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized to create profile for another user" }, { status: 403 });
     }
 
-    console.log("Creating profile using server-side operations");
     
     // Begin transaction for all database operations
     const result = await prisma.$transaction(async (tx: PrismaTransaction) => {
@@ -123,7 +122,6 @@ export async function POST(request: NextRequest) {
           throw new Error(`Profile creation failed: ${profileError.message}`);
         }
         
-        console.log("Profile created successfully in Supabase");
         
         // 2. Insert user data into profiles table
         const { data: userTableResult, error: userTableError } = await supabase
@@ -135,7 +133,6 @@ export async function POST(request: NextRequest) {
           console.error('User record creation error:', userTableError);
           // Continue anyway since profile was created
         } else {
-          console.log("User record created successfully in Supabase");
         }
         
         // 3. Update user metadata with role
@@ -147,7 +144,6 @@ export async function POST(request: NextRequest) {
           console.error('Error updating user metadata:', updateError);
           // Continue anyway since critical operations succeeded
         } else {
-          console.log("User metadata updated successfully");
         }
         
         return { success: true, profileId: profileData.auth_user_id };

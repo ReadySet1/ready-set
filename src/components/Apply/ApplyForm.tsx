@@ -390,7 +390,6 @@ const JobApplicationForm = () => {
   };
 
   const onSubmit = async (formData: FormData) => {
-    console.log("Form submission started", { formData });
 
     // Validate required files based on role
     const fileValidationErrors = validateFiles(formData.role);
@@ -482,14 +481,7 @@ const JobApplicationForm = () => {
       };
 
       // Print out the uploaded files from each hook for debugging
-      console.log("Resume Files:", resumeUpload.uploadedFiles);
-      console.log("License Files:", licenseUpload.uploadedFiles);
-      console.log("Insurance Files:", insuranceUpload.uploadedFiles);
-      console.log("Registration Files:", registrationUpload.uploadedFiles);
-      console.log("Driver Photo Files:", driverPhotoUpload.uploadedFiles);
-      console.log("Car Photo Files:", carPhotoUpload.uploadedFiles);
 
-      console.log("Submitting application data:", submissionData);
 
       const response = await fetch("/api/job-applications", {
         method: "POST",
@@ -508,7 +500,6 @@ const JobApplicationForm = () => {
       }
 
       const responseData = await response.json();
-      console.log("API response:", responseData);
 
       toast({
         title: "Application Received",

@@ -14,9 +14,6 @@ async function checkAuthorization(requestedUserId: string) {
     const { data, error } = await supabase.auth.getUser();
     
     // Log authentication details for debugging
-    console.log("Auth check - User data:", data?.user?.id ? `User ID: ${data.user.id}` : "No user found");
-    console.log("Auth check - Requested user ID:", requestedUserId);
-    console.log("Auth check - Session exists:", sessionData?.session ? "Yes" : "No");
     
     // SECURITY FIX: Remove dangerous UUID length bypass
     // All requests must be properly authenticated
@@ -27,14 +24,12 @@ async function checkAuthorization(requestedUserId: string) {
     
     // Allow access if the user is requesting their own profile
     if (data.user.id === requestedUserId) {
-      console.log("Auth check - User is accessing their own profile");
       return null; // Authorized
     }
     
     // Check if the user has an admin role in the Supabase auth metadata
     const userRole = data.user.app_metadata?.role || data.user.role;
     if (userRole === 'admin' || userRole === 'super_admin') {
-      console.log("Auth check - User has admin role in auth metadata");
       return null; // Authorized for admins by auth metadata
     }
     
@@ -46,12 +41,10 @@ async function checkAuthorization(requestedUserId: string) {
     
     // Allow access if the user is an admin, super_admin, or helpdesk user in database profile
     if (userData?.type === UserType.ADMIN || userData?.type === UserType.SUPER_ADMIN || userData?.type === UserType.HELPDESK) {
-      console.log("Auth check - User has admin or helpdesk type in profile");
       return null; // Authorized for admins and helpdesk by profile
     }
     
     // Deny access for all other cases
-    console.log("Auth check - Access denied: insufficient permissions");
     return NextResponse.json({ error: "Forbidden - Insufficient permissions" }, { status: 403 });
   }
   catch (error) {
@@ -68,13 +61,11 @@ export async function GET(
   try {
     const params = await context.params;
     const userId = params.userId;
-    console.log("User files API called with userId:", userId);
     
     // Check authorization
     const authResponse = await checkAuthorization(userId);
     if (authResponse) return authResponse;
     
-    console.log("Authorization passed, fetching files for user:", userId);
     
     // Fetch files for this user from the database
     const files = await prisma.fileUpload.findMany({
@@ -86,7 +77,6 @@ export async function GET(
       }
     });
     
-    console.log(`Found ${files.length} files for user ${userId}`);
     
     // Map the files to a more user-friendly format
     const formattedFiles = files.map((file: any) => ({

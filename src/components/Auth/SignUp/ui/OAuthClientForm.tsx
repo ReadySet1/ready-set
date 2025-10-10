@@ -71,7 +71,6 @@ const OAuthClientForm: React.FC<OAuthClientFormProps> = ({
 
   const onSubmitWrapper = async (data: OAuthClientFormData) => {
     Object.entries(data).forEach(([key, value]) => {
-      console.log(`${key}:`, value);
     });
 
     try {

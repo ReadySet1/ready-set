@@ -81,13 +81,9 @@ export default function ModernUserProfile({
   // Effect to fetch initial data only
   useEffect(() => {
     if (!isUserLoading && userId) {
-      console.log(
-        "[AdminProfileView] useEffect triggered. Fetching initial user...",
       );
       fetchUser();
     } else {
-      console.log("[AdminProfileView] useEffect skipped. Conditions not met:", {
-        isUserLoading,
         userId,
       });
     }

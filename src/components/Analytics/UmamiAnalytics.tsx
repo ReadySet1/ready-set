@@ -75,10 +75,8 @@ export default function UmamiAnalytics() {
       data-do-not-track="true"
       data-cache="false"
       onLoad={() => {
-        console.log("✅ Umami analytics script loaded successfully from self-hosted instance");
         // Test if Umami is working
         if (typeof window !== 'undefined' && window.umami) {
-          console.log("🎯 Umami is ready for tracking");
         }
       }}
       onError={(error) => {

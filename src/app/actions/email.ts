@@ -44,7 +44,6 @@ const sendEmail = async (data: FormInputs) => {
 
     return "Your message was sent successfully.";
   } catch (error) {
-    console.error("Email sending error:", error);
     throw new Error("Error trying to send the message.");
   }
 };
@@ -166,7 +165,6 @@ export async function sendDeliveryNotifications(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // Implement your email service logic here
-    console.log('Sending delivery notification:', data);
     return { success: true };
   } catch (error) {
     return { 

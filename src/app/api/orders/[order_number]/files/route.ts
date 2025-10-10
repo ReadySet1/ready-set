@@ -11,7 +11,6 @@ export async function GET(
   { params }: { params: Promise<{ order_number: string }> }
 ) {
   // Add debug logging to see what parameters we're receiving
-  console.log("Order files API endpoint called with params:", params);
   
   // Await params before accessing its properties and decode the order number
   const { order_number: encodedOrderNumber } = await params;
@@ -19,7 +18,6 @@ export async function GET(
   
   // Check if order_number exists
   if (!order_number) {
-    console.log("Missing order number in params");
     return NextResponse.json(
       { error: "Missing order number parameter" },
       { status: 400 }
@@ -27,7 +25,6 @@ export async function GET(
   }
   
   const orderNumber = order_number;
-  console.log("Processing files request for order:", orderNumber);
   
   try {
     // Initialize Supabase client for auth check
@@ -38,7 +35,6 @@ export async function GET(
 
     // Check if user is authenticated
     if (!user || !user.id) {
-      console.log("Unauthorized access attempt to files API");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -49,7 +45,6 @@ export async function GET(
     });
 
     if (!userProfile) {
-      console.log("User profile not found");
       return NextResponse.json({ error: "User profile not found" }, { status: 401 });
     }
 
@@ -58,7 +53,6 @@ export async function GET(
     const hasAccess = allowedRoles.includes(userProfile.type as typeof allowedRoles[number]);
     
     // Try to fetch the catering request
-    console.log("Fetching catering request for", orderNumber);
     const cateringRequest = await prisma.cateringRequest.findFirst({
       where: { 
         orderNumber: {
@@ -80,7 +74,6 @@ export async function GET(
       orderUserId = cateringRequest.userId;
     } else {
       // Try to fetch the on-demand request if catering request not found
-      console.log("Catering request not found, trying on_demand");
       const onDemandRequest = await prisma.onDemand.findFirst({
         where: { 
           orderNumber: {
@@ -101,7 +94,6 @@ export async function GET(
     }
 
     if (!orderId) {
-      console.log("Order not found:", orderNumber);
       return NextResponse.json(
         { error: "Order not found" },
         { status: 404 }
@@ -110,7 +102,6 @@ export async function GET(
 
     // Check if user has access to the files
     if (!hasAccess && user.id !== orderUserId) {
-      console.log("User does not have permission to access these files");
       return NextResponse.json(
         { error: "You do not have permission to access these files" },
         { status: 403 }
@@ -142,7 +133,6 @@ export async function GET(
       }
     });
     
-    console.log(`Found ${files.length} files for order ${orderNumber}`);
     return NextResponse.json(files);
 
   } catch (error) {

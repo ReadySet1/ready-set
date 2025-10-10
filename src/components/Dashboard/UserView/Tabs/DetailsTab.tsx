@@ -380,7 +380,6 @@ function ClientDetails({ control, isUserProfile }: ClientDetailsProps) {
                 const max = parts[1] || min;
                 return numValue >= min && numValue <= max;
               });
-              console.log('[ClientDetails Headcount Render] field.value:', field.value, ' | Calculated displayValue:', displayValue);
             }
             
             return (
@@ -393,7 +392,6 @@ function ClientDetails({ control, isUserProfile }: ClientDetailsProps) {
                     const [min] = value.split('-').map(Number);
                     numValue = min;
                   }
-                  console.log('Setting headcount to:', numValue);
                   field.onChange(numValue);
                 }}
                 value={displayValue}

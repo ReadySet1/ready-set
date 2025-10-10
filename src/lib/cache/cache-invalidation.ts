@@ -14,7 +14,6 @@ export function invalidateVendorCacheOnOrderUpdate(userId: string): void {
   try {
     // Invalidate both metrics and orders cache for this vendor
     invalidateAllVendorCache(userId);
-    console.log(`Invalidated vendor cache for user ${userId}`);
   } catch (error) {
     console.error(`Failed to invalidate vendor cache for user ${userId}:`, error);
   }
@@ -29,9 +28,7 @@ export function invalidateVendorCacheOnStatusUpdate(userId: string, orderId?: st
     invalidateAllVendorCache(userId);
 
     if (orderId) {
-      console.log(`Invalidated vendor cache for user ${userId} after order ${orderId} status update`);
     } else {
-      console.log(`Invalidated vendor cache for user ${userId} after status update`);
     }
   } catch (error) {
     console.error(`Failed to invalidate vendor cache for user ${userId}:`, error);
@@ -45,7 +42,6 @@ export function invalidateVendorCacheOnOrderCreate(userId: string, orderId: stri
   try {
     // Invalidate vendor cache - new orders affect both metrics and orders lists
     invalidateAllVendorCache(userId);
-    console.log(`Invalidated vendor cache for user ${userId} after creating order ${orderId}`);
   } catch (error) {
     console.error(`Failed to invalidate vendor cache for user ${userId}:`, error);
   }
@@ -60,9 +56,7 @@ export function invalidateVendorCacheOnOrderDelete(userId: string, orderId?: str
     invalidateAllVendorCache(userId);
 
     if (orderId) {
-      console.log(`Invalidated vendor cache for user ${userId} after deleting order ${orderId}`);
     } else {
-      console.log(`Invalidated vendor cache for user ${userId} after order deletion`);
     }
   } catch (error) {
     console.error(`Failed to invalidate vendor cache for user ${userId}:`, error);
@@ -77,7 +71,6 @@ export function invalidateVendorCachesBatch(userIds: string[]): void {
     userIds.forEach(userId => {
       invalidateAllVendorCache(userId);
     });
-    console.log(`Invalidated vendor cache for ${userIds.length} users`);
   } catch (error) {
     console.error(`Failed to invalidate vendor caches for multiple users:`, error);
   }

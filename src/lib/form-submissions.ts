@@ -27,8 +27,6 @@ export class FormSubmissionService {
     }
 
     try {
-      console.log(
-        "Processing submission with data:",
         JSON.stringify(data, null, 2),
       );
 
@@ -69,7 +67,6 @@ export class FormSubmissionService {
         },
       });
 
-      console.log("Created submission:", {
         id: submission.id,
         formType: submission.formType,
         specifications:

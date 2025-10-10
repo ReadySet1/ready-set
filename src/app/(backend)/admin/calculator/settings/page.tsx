@@ -40,7 +40,6 @@ export default function CalculatorSettingsPage() {
           currentConfigId={currentConfigId}
           onConfigurationChange={(config) => {
             setCurrentConfigId(config.id);
-            console.log('Configuration changed:', config);
           }}
         />
       </div>

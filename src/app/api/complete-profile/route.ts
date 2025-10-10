@@ -29,7 +29,6 @@ export async function POST(request: NextRequest) {
     // Parse request body
     const formData = await request.json();
     
-    console.log("Creating profile for user:", user.id, formData);
 
     // Map form data to database structure
     const userTypeMap: Record<string, UserType> = {

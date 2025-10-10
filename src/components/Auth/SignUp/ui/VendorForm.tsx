@@ -44,7 +44,6 @@ const VendorForm: React.FC<VendorFormProps> = ({ onSubmit, isLoading = false }) 
   const onSubmitWrapper = async (data: VendorFormData) => {
     // Log form data (optional, for debugging)
     Object.entries(data).forEach(([key, value]) => {
-      console.log(`${key}:`, value);
     });
   
     try {

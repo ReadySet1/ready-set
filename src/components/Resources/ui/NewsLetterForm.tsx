@@ -41,7 +41,6 @@ export default function NewsletterForm() {
       }
 
       const result = await response.json();
-      console.log("Success:", result);
       toast.success("Successfully registered.");
       reset();
     } catch (error) {

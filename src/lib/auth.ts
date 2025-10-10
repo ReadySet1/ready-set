@@ -47,7 +47,6 @@ export async function syncOAuthProfile(userId: string, metadata: any) {
 
   // --- Create the profile ---
   // For OAuth users, auto-create a basic profile.
-  console.log(`Attempting to create profile for user ID: ${userId}`);
   const { error } = await supabase.from("profiles").insert({
     id: userId,               // Changed: Use 'id' as the primary key matching the Supabase Auth ID
     email: userEmail,         // Changed: Added email field
@@ -69,7 +68,6 @@ export async function syncOAuthProfile(userId: string, metadata: any) {
     return { success: false, error };
   }
 
-  console.log(`Successfully created profile for user ID: ${userId}`);
   // Fetch the newly created profile to return it (optional but good practice)
    const { data: newProfileData } = await supabase
     .from("profiles")
@@ -87,7 +85,6 @@ export async function updateUserRole(userId: string, role: 'VENDOR' | 'CLIENT' |
   let authError: any = null;
 
   // Changed: Update the 'type' field in the 'profiles' table first
-  console.log(`Updating profile type for user ${userId} to ${role}`);
   const { error: updateProfileError } = await supabase
       .from("profiles")
       .update({ type: role }) // Use the role value directly (ensure correct case)
@@ -99,12 +96,10 @@ export async function updateUserRole(userId: string, role: 'VENDOR' | 'CLIENT' |
       // Depending on requirements, you might want to stop here
       // return { success: false, error: profileError, message: "Failed to update profile type." };
   } else {
-      console.log(`Successfully updated profile type for user ${userId}`);
   }
 
   // Changed: Also update user metadata in Auth (can be redundant or serve other purposes)
   // Useful if other parts of the system rely solely on auth metadata.
-  console.log(`Updating auth metadata role for user ${userId} to ${role}`);
   const { error: updateAuthError } = await supabase.auth.updateUser({
       // Note: Supabase admin actions might be needed for this if RLS restricts user self-updating metadata
       data: { role: role }, // Keep metadata in sync
@@ -114,7 +109,6 @@ export async function updateUserRole(userId: string, role: 'VENDOR' | 'CLIENT' |
       console.error("Error updating auth metadata role:", updateAuthError);
       authError = updateAuthError;
   } else {
-     console.log(`Successfully updated auth metadata role for user ${userId}`);
   }
 
   // Return success only if the primary update (profile) succeeded.
@@ -161,11 +155,9 @@ export async function getUserRole(userId: string): Promise<string | null> {
    // Explicitly check user_metadata exists before accessing role
    const roleFromMetadata = authData?.user?.user_metadata?.role;
    if (roleFromMetadata) {
-       console.log(`Role found in auth metadata for user ${userId}: ${roleFromMetadata}`);
        return roleFromMetadata;
    }
 
-  console.log(`Role not found in profile or auth metadata for user ${userId}.`);
   return null; // Return null if role is not found in either location
 }
 

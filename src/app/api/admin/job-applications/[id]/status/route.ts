@@ -16,14 +16,11 @@ export async function PATCH(
     const params = await props.params;
     const id = params.id;
     
-    console.log('Request headers:', Object.fromEntries(request.headers.entries()));
     
         let requestBody;
     try {
       requestBody = await request.json();
-      console.log('Parsed request body:', requestBody);
     } catch (error) {
-      console.log('Error parsing request body:', error);
       return NextResponse.json(
         { error: "Invalid JSON in request body" },
         { status: 400 }
@@ -92,9 +89,6 @@ export async function PATCH(
     }
 
     // Validate the input
-    console.log('Status received:', status);
-    console.log('ApplicationStatus values:', Object.values(ApplicationStatus));
-    console.log('Is status valid:', Object.values(ApplicationStatus).includes(status as ApplicationStatus));
     
     if (!Object.values(ApplicationStatus).includes(status as ApplicationStatus)) {
       return NextResponse.json(

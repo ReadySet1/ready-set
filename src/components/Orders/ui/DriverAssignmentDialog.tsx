@@ -144,8 +144,6 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
 
   // Debug logging
   useEffect(() => {
-    console.log("🔍 DialogFooter state:", {
-      selectedDriver,
       isAssigning,
       isDriverAssigned,
     });

@@ -64,7 +64,6 @@ export class CaterValleyWebhookService {
       const caterValleyStatus = this.mapDriverStatusToCaterValley(driverStatus);
       
       if (!caterValleyStatus) {
-        console.log(`No CaterValley status mapping for driver status: ${driverStatus}`);
         return {
           success: true,
           attempts: 0,
@@ -79,7 +78,6 @@ export class CaterValleyWebhookService {
         status: caterValleyStatus,
       };
 
-      console.log(`Sending CaterValley webhook for order ${cleanOrderNumber}: ${driverStatus} -> ${caterValleyStatus}`);
 
       // Attempt webhook delivery with retries
       let lastError: string | undefined;
@@ -90,7 +88,6 @@ export class CaterValleyWebhookService {
           const result = await this.makeWebhookRequest(payload, timeoutMs);
           
           if (result.result) {
-            console.log(`CaterValley webhook successful for order ${cleanOrderNumber} (attempt ${attempt}/${maxRetries})`);
             return {
               success: true,
               attempts: attempt,

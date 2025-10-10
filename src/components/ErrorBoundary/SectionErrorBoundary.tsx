@@ -103,8 +103,6 @@ class SectionErrorBoundary extends Component<Props, State> {
 
   handleRetry = (): void => {
     if (this.state.retryCount >= (this.props.maxRetries || 3)) {
-      console.log(
-        `Max retries (${this.props.maxRetries}) exceeded for section: ${this.props.sectionName}`,
       );
       return;
     }

@@ -164,12 +164,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Check if user has admin privileges using the helper function
     if (!dbUser.type || !hasAdminPrivileges(dbUser.type)) {
-      console.log('❌ [Users API] Authorization failed - User type not allowed:', dbUser.type);
       const response = NextResponse.json({ error: "Forbidden" }, { status: 403 });
       return addSecurityHeaders(response);
     }
 
-    console.log('✅ [Users API] Authorization successful for user type:', dbUser.type);
 
     // --- Parse Query Parameters ---
     const { searchParams } = new URL(request.url);
@@ -183,7 +181,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     sortField = searchParams.get("sort") || "createdAt";
     sortOrder = searchParams.get("sortOrder") || "desc";
 
-    console.log(`🔍 [Users API] Filter transformations: type "${rawTypeFilter}" -> "${typeFilter}", status "${rawStatusFilter}" -> "${statusFilter}"`);
 
     // --- Build WHERE Clause ---
     const where: any = {};
@@ -348,7 +345,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return addSecurityHeaders(response);
     }
 
-    console.log(`🔍 [Users API] POST type normalization: "${data.type}" -> "${normalizedType}"`);
 
     // Check if email already exists (with better error handling)
     const existingUser = await prisma.profile.findUnique({ where: { email: data.email } });

@@ -53,7 +53,6 @@ export async function middleware(request: NextRequest) {
 
         // Only log authentication failures for debugging
         if (!user || error) {
-          console.log('❌ [Middleware] Auth failed for protected route:', pathname, error?.message);
 
           const redirectUrl = new URL(`/sign-in?returnTo=${pathname}`, request.url);
           const response = NextResponse.redirect(redirectUrl);

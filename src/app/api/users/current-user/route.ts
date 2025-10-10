@@ -17,7 +17,6 @@ export async function GET(request: Request) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      console.log(`[${requestId}] No authenticated user found`);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -30,7 +29,6 @@ export async function GET(request: Request) {
 
     if (profile) {
       if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-        console.log(`[${requestId}] Found user in profiles table:`, profile);
       }
       
       // Return the user info directly from Supabase
@@ -45,7 +43,6 @@ export async function GET(request: Request) {
     // If we still can't find a role, check user metadata
     if (user.user_metadata && (user.user_metadata.type || user.user_metadata.role)) {
       if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-        console.log(`[${requestId}] Using role from user metadata:`, user.user_metadata);
       }
       
       // Return the user with metadata info
@@ -57,7 +54,6 @@ export async function GET(request: Request) {
     }
 
     // If we got here, we couldn't determine the user's role
-    console.log(`[${requestId}] User profile not found for ID: ${user.id}`);
     return NextResponse.json({ 
       error: "User profile data not found in any source.",
       details: `Checked profiles table and user metadata for user ID ${user.id}.`,

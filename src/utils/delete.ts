@@ -4,7 +4,6 @@ import { prisma } from "@/utils/prismaDB";
 async function deleteModelData(prisma: PrismaClient, modelName: string) {
   try {
     const deleteResult = await (prisma as any)[modelName].deleteMany()
-    console.log(`Deleted ${deleteResult.count} ${modelName} records`)
     return deleteResult.count
   } catch (error) {
     console.error(`Error deleting ${modelName}:`, error)
@@ -27,7 +26,6 @@ async function deleteFakeData() {
     // Finally, delete users
     const deletedUsers = await deleteModelData(prisma, 'user')
     
-    console.log('Fake data deleted successfully')
   } catch (error) {
     console.error('Error deleting fake data:', error)
   }

@@ -105,7 +105,6 @@ export class EmailService {
         html: htmlContent,
         text: htmlContent.replace(/<[^>]*>/g, ""), // Strip HTML for plain text version
       });
-      console.log("Notification email sent successfully");
     } catch (error) {
       console.error("Error sending notification email:", error);
       throw error;

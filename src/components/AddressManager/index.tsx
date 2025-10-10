@@ -190,18 +190,14 @@ const AddressManager: React.FC<AddressManagerProps> = ({
 
   const fetchAddresses = useCallback(async () => {
     if (isRequestPending.current) {
-      console.log("Request already pending, skipping fetchAddresses call");
       return;
     }
 
     if (!user) {
-      console.log("No user available, skipping fetchAddresses call");
       return;
     }
 
     fetchAttempts.current += 1;
-    console.log(
-      `Fetch attempt ${fetchAttempts.current} of ${MAX_FETCH_ATTEMPTS}`,
     );
 
     if (fetchAttempts.current > MAX_FETCH_ATTEMPTS) {
@@ -243,8 +239,6 @@ const AddressManager: React.FC<AddressManagerProps> = ({
       const currentPage = currentPageRef.current;
       const limit = limitRef.current;
 
-      console.log(
-        `Fetching addresses with filter=${filterType}, page=${currentPage}`,
       );
       const response = await fetch(
         `/api/addresses?filter=${filterType}&page=${currentPage}&limit=${limit}`,
@@ -304,8 +298,6 @@ const AddressManager: React.FC<AddressManagerProps> = ({
         validAddresses = [];
       }
 
-      console.log("✅ Addresses fetched successfully", {
-        count: validAddresses.length,
         addresses: validAddresses.map((a) => ({
           id: a.id,
           name: a.name || "Unnamed Address",
@@ -342,8 +334,6 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   // Main effect for fetching addresses
   useEffect(() => {
     if (user && !hasInitialFetch.current) {
-      console.log("🔄 Initial address fetch triggered", {
-        user: !!user,
         filterType,
         currentPage: currentPageRef.current,
       });
@@ -355,8 +345,6 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   // Separate effect for filter changes
   useEffect(() => {
     if (user && hasInitialFetch.current) {
-      console.log("🔄 Filter changed, refetching addresses", {
-        filterType,
         currentPage: currentPageRef.current,
       });
       debouncedFetch(fetchAddresses);
@@ -366,8 +354,6 @@ const AddressManager: React.FC<AddressManagerProps> = ({
   // Separate effect for pagination changes (only when manually changed)
   useEffect(() => {
     if (user && hasInitialFetch.current && currentPageRef.current > 1) {
-      console.log(
-        "🔄 Pagination changed, fetching addresses for page",
         currentPageRef.current,
       );
       debouncedFetch(fetchAddresses);

@@ -43,7 +43,6 @@ const BakeryHero: React.FC<BakeryHeroProps> = ({ onRequestQuote }) => {
   }, []);
 
   const handleQuoteClick = () => {
-    console.log("BakeryHero - Get a quote clicked");
     openForm("bakery");
   };
 

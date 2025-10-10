@@ -27,42 +27,32 @@ export interface CachedProfileData {
  * Simple, bulletproof cookie extraction
  */
 export const getServerAuthState = (): ServerAuthState | null => {
-  console.log('🔍 NEW getServerAuthState() called');
   
   if (typeof window === 'undefined') {
-    console.log('❌ Server-side rendering detected');
     return null;
   }
   
   try {
     // Find the session cookie directly
     const cookieString = document.cookie;
-    console.log('🍪 Full cookie string length:', cookieString.length);
     
     const sessionMatch = cookieString.match(/user-session-data=([^;]+)/);
     if (!sessionMatch) {
-      console.log('❌ No user-session-data cookie found in:', cookieString.substring(0, 200) + '...');
       return null;
     }
     
     const encodedValue = sessionMatch[1];
     if (!encodedValue) {
-      console.log('❌ No encoded value found in session match');
       return null;
     }
     
-    console.log('📄 Encoded cookie value:', encodedValue.substring(0, 100) + '...');
     
     const decodedValue = decodeURIComponent(encodedValue);
-    console.log('🔓 Decoded value:', decodedValue);
     
     const sessionData = JSON.parse(decodedValue);
-    console.log('📊 Parsed session data:', sessionData);
     
     // Validate required fields
     if (!sessionData.userId || !sessionData.email || !sessionData.userRole) {
-      console.log('❌ Missing required fields:', {
-        userId: !!sessionData.userId,
         email: !!sessionData.email,
         userRole: !!sessionData.userRole
       });
@@ -71,10 +61,8 @@ export const getServerAuthState = (): ServerAuthState | null => {
     
     // Check age (10 minutes max)
     const ageMinutes = (Date.now() - sessionData.timestamp) / (1000 * 60);
-    console.log(`⏰ Session age: ${ageMinutes.toFixed(2)} minutes`);
     
     if (ageMinutes > 10) {
-      console.log('❌ Session too old, clearing...');
       clearServerAuthState();
       return null;
     }
@@ -117,44 +105,34 @@ export const getCachedProfileData = (userId: string): CachedProfileData | null =
   if (typeof window === 'undefined') return null;
   
   try {
-    console.log(`🔍 NEW getCachedProfileData for user: ${userId}`);
     
     const cookieString = document.cookie;
     const profileMatch = cookieString.match(new RegExp(`user-profile-${userId}=([^;]+)`));
     
     if (!profileMatch) {
-      console.log(`❌ No user-profile-${userId} cookie found`);
       return null;
     }
     
     const encodedValue = profileMatch[1];
     if (!encodedValue) {
-      console.log('❌ No encoded value found in profile match');
       return null;
     }
     
-    console.log('📄 Encoded profile value:', encodedValue.substring(0, 100) + '...');
     
     const decodedValue = decodeURIComponent(encodedValue);
-    console.log('🔓 Decoded profile value:', decodedValue);
     
     const profileData = JSON.parse(decodedValue);
-    console.log('📊 Parsed profile data:', profileData);
     
     // Check age (10 minutes max)
     const ageMinutes = (Date.now() - profileData.timestamp) / (1000 * 60);
-    console.log(`⏰ Profile age: ${ageMinutes.toFixed(2)} minutes`);
     
     if (ageMinutes > 10) {
-      console.log('❌ Profile data too old, clearing...');
       clearCachedProfileData(userId);
       return null;
     }
     
     // Validate structure
     if (!profileData.type || !profileData.email) {
-      console.log('❌ Invalid profile structure:', {
-        type: !!profileData.type,
         email: !!profileData.email
       });
       return null;
@@ -190,7 +168,6 @@ export const clearServerAuthState = () => {
   
   try {
     document.cookie = 'user-session-data=; path=/; max-age=0; samesite=lax';
-    console.log('Cleared server auth state');
   } catch (error) {
     console.error('Error clearing server auth state:', error);
   }
@@ -204,7 +181,6 @@ export const clearCachedProfileData = (userId: string) => {
   
   try {
     document.cookie = `user-profile-${userId}=; path=/; max-age=0; samesite=lax`;
-    console.log(`Cleared cached profile data for user ${userId}`);
   } catch (error) {
     console.error('Error clearing cached profile data:', error);
   }
@@ -227,7 +203,6 @@ export const clearAllHydrationData = () => {
     });
   }
   
-  console.log('Cleared all auth hydration data');
 };
 
 /**
@@ -262,20 +237,16 @@ export const validateHydrationData = (serverState: ServerAuthState | null, profi
  * Auth state recovery mechanism
  */
 export const recoverAuthState = () => {
-  console.log('🔍 NEW recoverAuthState starting...');
   
   // Check if we're on the client side
   if (typeof window === 'undefined') {
-    console.log('❌ Server-side rendering, skipping recovery');
     return null;
   }
   
   try {
     const serverState = getServerAuthState();
-    console.log('📦 Server state result:', serverState);
     
     const profileData = serverState ? getCachedProfileData(serverState.userId) : null;
-    console.log('👤 Profile data result:', profileData);
     
     const validation = validateHydrationData(serverState, profileData);
     if (!validation.isValid) {
@@ -300,7 +271,6 @@ export const recoverAuthState = () => {
       };
     }
     
-    console.log('❌ No auth state to recover');
     return null;
   } catch (error) {
     console.error('❌ Critical error in recoverAuthState:', error);

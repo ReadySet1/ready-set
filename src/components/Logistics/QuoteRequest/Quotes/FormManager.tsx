@@ -57,7 +57,6 @@ export const FormManager = () => {
   const [activeFormType, setActiveFormType] = useState<FormType>(null);
 
   const openForm = (formType: FormType) => {
-    console.log("FormManager - Opening form with type:", formType);
     setActiveFormType(formType);
     setIsDialogOpen(true);
   };
@@ -150,7 +149,6 @@ export const FormManager = () => {
         }
       }
 
-      console.log("Submitting form data:", baseSubmission);
 
       const response = await fetch("/api/form-submissions", {
         method: "POST",

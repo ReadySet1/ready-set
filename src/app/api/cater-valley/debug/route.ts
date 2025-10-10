@@ -10,11 +10,6 @@ export async function GET(request: NextRequest) {
   const url = request.url;
   const searchParams = Object.fromEntries(request.nextUrl.searchParams.entries());
 
-  console.log('=== CaterValley Debug - GET Request ===');
-  console.log('URL:', url);
-  console.log('Headers:', headers);
-  console.log('Search Params:', searchParams);
-  console.log('=== End Debug Info ===');
 
   return NextResponse.json({
     method: 'GET',
@@ -43,12 +38,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  console.log('=== CaterValley Debug - POST Request ===');
-  console.log('URL:', url);
-  console.log('Headers:', headers);
-  console.log('Search Params:', searchParams);
-  console.log('Body:', body);
-  console.log('=== End Debug Info ===');
 
   return NextResponse.json({
     method: 'POST',
@@ -77,11 +66,6 @@ export async function PUT(request: NextRequest) {
     }
   }
 
-  console.log('=== CaterValley Debug - PUT Request ===');
-  console.log('URL:', url);
-  console.log('Headers:', headers);
-  console.log('Body:', body);
-  console.log('=== End Debug Info ===');
 
   return NextResponse.json({
     method: 'PUT',
@@ -109,11 +93,6 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
-  console.log('=== CaterValley Debug - PATCH Request ===');
-  console.log('URL:', url);
-  console.log('Headers:', headers);
-  console.log('Body:', body);
-  console.log('=== End Debug Info ===');
 
   return NextResponse.json({
     method: 'PATCH',

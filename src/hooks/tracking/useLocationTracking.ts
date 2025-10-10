@@ -97,7 +97,6 @@ export function useLocationTracking(): UseLocationTrackingReturn {
         return battery.level * 100;
       }
     } catch (error) {
-      console.log('Battery API not available');
     }
     return undefined;
   };
@@ -208,7 +207,6 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       }
     }, TRACKING_INTERVAL);
 
-    console.log('Location tracking started');
   }, [handlePositionUpdate, handleGeolocationError, getCurrentPosition]);
 
   // Stop location tracking
@@ -225,7 +223,6 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       intervalIdRef.current = null;
     }
 
-    console.log('Location tracking stopped');
   }, []);
 
   // Manually update location once

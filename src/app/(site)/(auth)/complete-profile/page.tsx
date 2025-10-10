@@ -53,7 +53,6 @@ export default function CompleteProfile() {
 
     if (loading) {
       loadingTimeout = setTimeout(() => {
-        console.log("Loading timeout reached, resetting loading state");
         setLoading(false);
         setError("Operation timed out. Please try again.");
       }, 30000); // 30 second timeout
@@ -70,7 +69,6 @@ export default function CompleteProfile() {
       if (!supabase) return; // Wait until supabase is initialized
 
       try {
-        console.log("Fetching user data...");
 
         // Simple user fetch with no custom timeouts
         const { data, error } = await supabase.auth.getUser();
@@ -83,21 +81,15 @@ export default function CompleteProfile() {
         }
 
         if (!data.user) {
-          console.log("No user found, redirecting to sign-in");
           router.push("/sign-in");
           return;
         }
 
         const userId = data.user.id;
-        console.log("User found:", userId);
-        console.log("User metadata:", data.user.user_metadata);
-        console.log("App metadata:", data.user.app_metadata);
         setUser(data.user);
 
         // Check if userType exists in metadata and use it
         if (data.user.user_metadata?.userType) {
-          console.log(
-            "User type found in metadata:",
             data.user.user_metadata.userType,
           );
           setUserType(data.user.user_metadata.userType as UserType);
@@ -111,11 +103,8 @@ export default function CompleteProfile() {
             { user_id: userId },
           );
 
-          console.log("Raw user query result:", rawUserData, rawUserError);
 
           if (!rawUserError && rawUserData) {
-            console.log(
-              "User found in public.user table via RPC, redirecting to home",
             );
             router.push("/");
             return;
@@ -132,14 +121,11 @@ export default function CompleteProfile() {
           .eq("id", userId)
           .limit(1);
 
-        console.log(
-          "Public user table search result:",
           publicUserData,
           publicUserError,
         );
 
         if (!publicUserError && publicUserData && publicUserData.length > 0) {
-          console.log("User found in public.user table, redirecting to home");
           router.push("/");
           return;
         }
@@ -151,21 +137,16 @@ export default function CompleteProfile() {
           .eq("auth_user_id", userId)
           .limit(1);
 
-        console.log(
-          "Profiles table search result:",
           profilesData,
           profilesError,
         );
 
         if (!profilesError && profilesData && profilesData.length > 0) {
-          console.log("User already has a profile, redirecting to home");
           router.push("/");
           return;
         }
 
         // Special debug: Log user data from Supabase to see what's going on
-        console.log("User not found in public.user or profiles tables!");
-        console.log("This user needs to complete their profile");
 
         // Allow profile completion
         setLoading(false);
@@ -182,7 +163,6 @@ export default function CompleteProfile() {
   }, [router, supabase]);
 
   const handleUserTypeSelection = (type: UserType) => {
-    console.log("User type selected:", type);
     setUserType(type);
     setStep(2);
   };
@@ -193,7 +173,6 @@ export default function CompleteProfile() {
       return;
     }
 
-    console.log("Form submission started:", formData);
     setLoading(true);
     setError(null);
 
@@ -205,7 +184,6 @@ export default function CompleteProfile() {
     }
 
     try {
-      console.log("Creating profile for user:", user.id);
 
       // Prepare profile data
       const profileData = {
@@ -251,7 +229,6 @@ export default function CompleteProfile() {
         is_temporary_password: false,
       };
 
-      console.log("Profile data to insert:", profileData);
 
       // Prepare user table data
       const userTableData = {
@@ -284,7 +261,6 @@ export default function CompleteProfile() {
       };
 
       // Use the dedicated profile completion API endpoint
-      console.log("Using dedicated profile completion endpoint...");
 
       const response = await fetch("/api/complete-profile", {
         method: "POST",
@@ -319,7 +295,6 @@ export default function CompleteProfile() {
       }
 
       // Success - show toast and redirect
-      console.log("Profile created successfully via API");
       toast.success("Profile completed successfully");
 
       // Short timeout to allow the toast to display before redirecting
@@ -339,7 +314,6 @@ export default function CompleteProfile() {
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
-      console.log("Form submission process completed");
       setLoading(false);
     }
   };
@@ -365,7 +339,6 @@ export default function CompleteProfile() {
   );
 
   const renderForm = () => {
-    console.log("Rendering form for user type:", userType);
     switch (userType) {
       case "vendor":
         interface UserMetadata {
@@ -471,13 +444,11 @@ export default function CompleteProfile() {
 
   // Debug function to manually redirect user
   const debugRedirectHome = () => {
-    console.log("Manual redirect triggered by user");
     router.push("/");
   };
 
   // Debug function to manually clear state and retry
   const debugRetry = () => {
-    console.log("Manual retry triggered by user");
     setLoading(false);
     setError(null);
   };
