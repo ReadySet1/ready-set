@@ -17,6 +17,7 @@ export type UserFile = {
 export async function getUserFiles(entityId: string) {
   'use server'
 
+  console.log('Server action - getUserFiles called with entityId:', entityId);
 
   try {
     // Verify that entityId exists and is not empty
@@ -26,6 +27,7 @@ export async function getUserFiles(entityId: string) {
     }
 
     // Log the query parameters
+    console.log('Query parameters:', { entityId, entityType: 'user' });
 
     // Try to find files with both entityId and entityType
     const userFiles = await prisma.fileUpload.findMany({
@@ -44,6 +46,8 @@ export async function getUserFiles(entityId: string) {
       },
     });
 
+    console.log(`Found ${userFiles.length} files for entity ${entityId}`);
+    console.log('Files:', userFiles);
 
     return userFiles;
   } catch (error) {

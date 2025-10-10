@@ -12,6 +12,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const searchParams = Object.fromEntries(request.nextUrl.searchParams.entries());
   const slug = resolvedParams.slug;
 
+  console.log('=== CaterValley Catch-All Debug - GET Request ===');
+  console.log('URL:', url);
+  console.log('Slug:', slug);
+  console.log('Headers:', headers);
+  console.log('Search Params:', searchParams);
+  console.log('=== End Debug Info ===');
 
   return NextResponse.json({
     method: 'GET',
@@ -48,6 +54,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   }
 
+  console.log('=== CaterValley Catch-All Debug - POST Request ===');
+  console.log('URL:', url);
+  console.log('Slug:', slug);
+  console.log('Headers:', headers);
+  console.log('Search Params:', searchParams);
+  console.log('Body:', body);
+  console.log('=== End Debug Info ===');
 
   return NextResponse.json({
     method: 'POST',
@@ -84,6 +97,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
   }
 
+  console.log('=== CaterValley Catch-All Debug - PUT Request ===');
+  console.log('URL:', url);
+  console.log('Slug:', slug);
+  console.log('Headers:', headers);
+  console.log('Body:', body);
+  console.log('=== End Debug Info ===');
 
   return NextResponse.json({
     method: 'PUT',
@@ -119,6 +138,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
   }
 
+  console.log('=== CaterValley Catch-All Debug - PATCH Request ===');
+  console.log('URL:', url);
+  console.log('Slug:', slug);
+  console.log('Headers:', headers);
+  console.log('Body:', body);
+  console.log('=== End Debug Info ===');
 
   return NextResponse.json({
     method: 'PATCH',
@@ -142,6 +167,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const url = request.url;
   const slug = resolvedParams.slug;
 
+  console.log('=== CaterValley Catch-All Debug - DELETE Request ===');
+  console.log('URL:', url);
+  console.log('Slug:', slug);
+  console.log('Headers:', headers);
+  console.log('=== End Debug Info ===');
 
   return NextResponse.json({
     method: 'DELETE',

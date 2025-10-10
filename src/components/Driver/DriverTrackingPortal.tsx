@@ -82,6 +82,7 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
             setBatteryLevel(battery.level * 100);
           });
         } catch (error) {
+          console.log('Battery API not supported');
         }
       }
     };

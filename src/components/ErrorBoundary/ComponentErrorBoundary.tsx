@@ -105,6 +105,8 @@ class ComponentErrorBoundary extends Component<Props, State> {
 
   handleRetry = (): void => {
     if (this.state.retryCount >= (this.props.maxRetries || 2)) {
+      console.log(
+        `Max retries (${this.props.maxRetries}) exceeded for component: ${this.props.componentName}`,
       );
       return;
     }

@@ -40,6 +40,7 @@ const VendorForm: React.FC<ClientFormProps> = ({ onSubmit, isLoading = false }) 
   // Add this wrapper function
   const onSubmitWrapper = async (data: ClientFormData) => {
     Object.entries(data).forEach(([key, value]) => {
+      console.log(`${key}:`, value);
     });
   
     try {

@@ -32,6 +32,8 @@ export const CateringOrdersTable: React.FC<CateringOrdersTableProps> = ({
   userRoles,
   onOrderDeleted,
 }) => {
+  console.log("CateringOrdersTable rendered with:", {
+    orders,
     isLoading,
     statusFilter,
   });

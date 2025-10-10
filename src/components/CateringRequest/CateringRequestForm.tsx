@@ -241,6 +241,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         const client = await createClient();
         setSupabase(client);
       } catch (error) {
+        console.error("Error initializing Supabase client:", error);
         toast.error("Error connecting to the service. Please try again.");
         setIsInitializing(false);
       }
@@ -306,6 +307,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         if (error) throw error;
         setSession(data.session);
       } catch (error) {
+        console.error("Error fetching session:", error);
       } finally {
         setIsInitializing(false);
       }
@@ -326,6 +328,15 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   }, [supabase]);
 
   const handleAddressesLoaded = useCallback((loadedAddresses: Address[]) => {
+    console.log("📥 handleAddressesLoaded called in CateringRequestForm", {
+      count: loadedAddresses.length,
+      addresses: loadedAddresses.map((a) => ({
+        id: a.id,
+        street1: a.street1,
+        city: a.city,
+        state: a.state,
+      })),
+    });
     setAddresses(loadedAddresses);
   }, []);
 
@@ -363,6 +374,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
       if (!fileKeys.length) return;
 
       try {
+        console.log("Cleaning up uploaded files:", fileKeys);
         const response = await fetch("/api/file-uploads/cleanup", {
           method: "POST",
           headers: {
@@ -377,11 +389,14 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
+          console.error("Error response from cleanup API:", errorData);
           throw new Error(errorData.error || "Failed to clean up files");
         }
 
         const result = await response.json();
+        console.log("Cleanup result:", result);
       } catch (error) {
+        console.error("Error cleaning up files:", error);
       }
     },
     [tempEntityId],
@@ -420,7 +435,9 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
 
     const files = Array.from(event.target.files) as FileWithPath[];
     try {
+      console.log("Starting upload of", files.length, "files");
       const result = await onUpload(files);
+      console.log("Upload completed successfully:", result);
 
       // Set uploaded files to form data
       setValue("attachments", result);
@@ -429,6 +446,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
       const newFileKeys = result.map((file) => file.key);
       setUploadedFileKeys((prev) => [...prev, ...newFileKeys]);
     } catch (error) {
+      console.error("Upload error:", error);
       toast.error(
         error instanceof Error
           ? `Upload failed: ${error.message}`
@@ -440,6 +458,8 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   // Remove file handler
   const removeFile = async (fileToRemove: UploadedFile) => {
     try {
+      console.log("Removing file:", fileToRemove);
+
       // Remove from UI immediately
       const updatedFiles = uploadedFiles.filter(
         (file) => file.key !== fileToRemove.key,
@@ -453,12 +473,18 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
 
       // Delete the file
       await deleteFile(fileToRemove.key);
+      console.log("File removed successfully");
     } catch (error) {
+      console.error("Error removing file:", error);
       toast.error("Failed to remove file. Please try again.");
     }
   };
 
   const onSubmit = async (data: ExtendedCateringFormData) => {
+    console.log("Starting catering form submission:", {
+      formData: { ...data, attachments: data.attachments?.length },
+    });
+
     // In admin mode, require a client prop
     if (isAdminMode && !client) {
       toast.error("A client must be selected for admin submission.");
@@ -496,6 +522,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
       if (!response.ok) {
         if (response.status === 400) {
           const errorMessage = responseData.message || "Invalid request data";
+          console.error("API validation error:", responseData);
           setErrorMessage(errorMessage);
           return;
         } else if (response.status === 401) {
@@ -505,16 +532,27 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           setErrorMessage("This order number already exists");
           return;
         } else {
+          console.error("API error response:", responseData);
           setErrorMessage(responseData.message || "Failed to submit order");
           return;
         }
       }
 
+      console.log("Order submitted successfully:", responseData);
+
       // IMPORTANT FIX: Update the file entity IDs to link them to the catering request
       if (responseData.orderId && uploadedFiles.length > 0) {
+        console.log(
+          `Updating file entity IDs to associate with catering request ID: ${responseData.orderId}`,
+        );
         try {
           await updateEntityId(responseData.orderId);
+          console.log("Files successfully linked to catering request");
         } catch (fileUpdateError) {
+          console.error(
+            "Error linking files to catering request:",
+            fileUpdateError,
+          );
           // Don't fail the whole submission, just log the error
         }
       }
@@ -525,9 +563,13 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
 
       // --- Redirect based on user role instead of hardcoded vendor dashboard ---
       const redirectRoute = getOrderCreationRedirectRoute(userRole);
+      console.log(
+        `Redirecting user to ${redirectRoute} based on role: ${userRole}`,
+      );
       router.push(redirectRoute);
       // --- End Redirect Logic ---
     } catch (error) {
+      console.error("Error submitting order:", error);
       setErrorMessage(
         error instanceof Error ? error.message : "An unexpected error occurred",
       );

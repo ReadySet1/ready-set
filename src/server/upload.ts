@@ -58,6 +58,8 @@ export async function handleUploadComplete({
   metadata,
   file,
 }: UploadCompleteParams) {
+  console.log("Upload complete for userId:", metadata.userId);
+  console.log("file url", file.url);
 
   try {
     const existingFile = await prisma.fileUpload.findFirst({
@@ -69,6 +71,7 @@ export async function handleUploadComplete({
     });
 
     if (existingFile) {
+      console.log("File already exists in database:", existingFile);
       return {
         uploadedBy: metadata.userId,
         fileType: existingFile.fileType,
@@ -91,6 +94,7 @@ export async function handleUploadComplete({
       },
     });
 
+    console.log("File registered in database:", newFileUpload);
 
     return {
       uploadedBy: metadata.userId,

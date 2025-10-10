@@ -20,6 +20,10 @@ export async function POST(request: NextRequest) {
 
     // Parse the request body
     const data = await request.json();
+    console.log("Received catering request:", {
+      ...data,
+      attachments: data.attachments?.length || 0,
+    });
 
     // Use the client ID from the request if in admin mode, otherwise use the authenticated user's ID
     const userId = data.clientId || user.id;
@@ -157,6 +161,8 @@ export async function POST(request: NextRequest) {
 
     // Process file attachments if present
     if (data.attachments?.length > 0) {
+      console.log(`Processing ${data.attachments.length} file attachments`);
+      
       // Create file upload records for each attachment
       for (const attachment of data.attachments) {
         await prisma.fileUpload.create({
@@ -176,10 +182,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       message: "Catering request created successfully", 
-      orderId: cateringRequest.id
+      orderId: cateringRequest.id 
     }, { status: 201 });
-
+    
   } catch (error) {
+    console.error("Error processing catering request:", error);
+    
     return NextResponse.json(
       { message: error instanceof Error ? error.message : "Failed to process catering request" },
       { status: 500 }

@@ -288,6 +288,7 @@ export async function POST(request: NextRequest) {
       breakdown: pricingResult.breakdown,
     };
 
+    console.log(`Updated CaterValley order ${updatedOrder.orderNumber} - new total: ${validatedData.priceTotal} + ${pricingResult.deliveryPrice} delivery`);
 
     return NextResponse.json(response, { status: 200 });
 

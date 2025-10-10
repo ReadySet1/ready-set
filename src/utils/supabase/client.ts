@@ -36,6 +36,7 @@ const setStorageCookie = (name: string, value: string, options: CookieOptions = 
     if (options.sameSite) cookieString += `; samesite=${options.sameSite}`
     document.cookie = cookieString
   } catch (e) {
+    console.error('Error setting cookie:', e)
   }
 }
 
@@ -43,6 +44,7 @@ const removeStorageCookie = (name: string, options: CookieOptions = {}) => {
   try {
     setStorageCookie(name, '', { ...options, maxAge: -1 })
   } catch (e) {
+    console.error('Error removing cookie:', e)
   }
 }
 
@@ -68,6 +70,7 @@ export const createClient = (): SupabaseClient => {
         }
       });
     } catch (error) {
+      console.error('Error creating Supabase client:', error);
       throw error;
     }
   }
@@ -106,8 +109,12 @@ export const clearSupabaseCookies = () => {
     try {
       localStorage.clear();
     } catch (e) {
+      console.error('Failed to clear localStorage:', e);
     }
+
+    console.log('Cleared Supabase cookies and storage for auth recovery');
   } catch (error) {
+    console.error('Error clearing cookies:', error);
   }
 };
 
@@ -120,13 +127,15 @@ export const retryAuth = async () => {
     supabaseInstance = null;
     const supabase = createClient();
     const { data, error } = await supabase.auth.refreshSession();
-
+    
     if (error) {
+      console.error('Session refresh error during retry:', error);
       return { success: false, error };
     }
-
+    
     return { success: !!data.session, session: data.session };
   } catch (error) {
+    console.error('Retry auth error:', error);
     return { success: false, error };
   }
 };
@@ -143,7 +152,9 @@ export const setImmediateSessionData = (sessionData: {
   try {
     const cookieString = JSON.stringify(sessionData);
     document.cookie = `user-session-data=${encodeURIComponent(cookieString)}; path=/; max-age=300; samesite=lax${process.env.NODE_ENV === 'production' ? '; secure' : ''}`;
+    console.log('Set immediate session data:', sessionData);
   } catch (error) {
+    console.error('Error setting immediate session data:', error);
   }
 };
 
@@ -165,9 +176,10 @@ export const getImmediateSessionData = () => {
       clearImmediateSessionData();
       return null;
     }
-
+    
     return sessionData;
   } catch (error) {
+    console.error('Error getting immediate session data:', error);
     return null;
   }
 };
@@ -175,7 +187,9 @@ export const getImmediateSessionData = () => {
 export const clearImmediateSessionData = () => {
   try {
     document.cookie = 'user-session-data=; path=/; max-age=0; samesite=lax';
+    console.log('Cleared immediate session data');
   } catch (error) {
+    console.error('Error clearing immediate session data:', error);
   }
 };
 
@@ -190,11 +204,12 @@ export const prefetchUserProfile = async (userId: string) => {
       .select('type, email, name')
       .eq('id', userId)
       .single();
-
+    
     if (error) {
+      console.error('Error prefetching user profile:', error);
       return null;
     }
-
+    
     // Cache in sessionStorage for the session duration
     if (typeof window !== 'undefined') {
       sessionStorage.setItem(`user-profile-${userId}`, JSON.stringify({
@@ -202,9 +217,10 @@ export const prefetchUserProfile = async (userId: string) => {
         timestamp: Date.now()
       }));
     }
-
+    
     return profile;
   } catch (error) {
+    console.error('Error in prefetchUserProfile:', error);
     return null;
   }
 };
@@ -245,9 +261,10 @@ export const getCachedUserProfile = (userId: string) => {
     if (!isSessionStorage) {
       sessionStorage.setItem(`user-profile-${userId}`, cached);
     }
-
+    
     return profileData;
   } catch (error) {
+    console.error('Error getting cached user profile:', error);
     return null;
   }
 };
@@ -273,7 +290,10 @@ export const setCachedUserProfile = (userId: string, profileData: any, persisten
     if (persistent) {
       localStorage.setItem(`user-profile-${userId}`, dataStr);
     }
+    
+    console.log(`Cached user profile for ${userId}`, { persistent, data: profileData });
   } catch (error) {
+    console.error('Error caching user profile:', error);
   }
 };
 
@@ -318,27 +338,35 @@ export const retryAuthOperation = async <T>(
   } = options;
 
   let lastError: any;
-
+  
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
+      console.log(`Auth operation attempt ${attempt}/${maxAttempts}`);
       const result = await operation();
-
+      
+      if (attempt > 1) {
+        console.log(`Auth operation succeeded on attempt ${attempt}`);
+      }
+      
       return result;
     } catch (error) {
       lastError = error;
+      console.error(`Auth operation failed on attempt ${attempt}:`, error);
       
       // Don't retry on the last attempt or if error is not retryable
       if (attempt === maxAttempts || !retryCondition(error)) {
         break;
       }
-
+      
       // Calculate delay with exponential backoff
       const delay = Math.min(baseDelay * Math.pow(backoffFactor, attempt - 1), maxDelay);
-
+      console.log(`Retrying in ${delay}ms...`);
+      
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-
+  
+  console.error(`Auth operation failed after ${maxAttempts} attempts`);
   throw lastError;
 };
 
@@ -364,7 +392,10 @@ export const persistAuthState = (authState: {
     const stateStr = JSON.stringify(persistentState);
     sessionStorage.setItem('auth-state', stateStr);
     localStorage.setItem('auth-state-backup', stateStr);
+    
+    console.log('Persisted auth state across storages');
   } catch (error) {
+    console.error('Error persisting auth state:', error);
   }
 };
 
@@ -388,9 +419,10 @@ export const getPersistedAuthState = () => {
       clearPersistedAuthState();
       return null;
     }
-
+    
     return authState;
   } catch (error) {
+    console.error('Error getting persisted auth state:', error);
     return null;
   }
 };
@@ -398,10 +430,13 @@ export const getPersistedAuthState = () => {
 export const clearPersistedAuthState = () => {
   try {
     if (typeof window === 'undefined') return;
-
+    
     sessionStorage.removeItem('auth-state');
     localStorage.removeItem('auth-state-backup');
+    
+    console.log('Cleared persisted auth state');
   } catch (error) {
+    console.error('Error clearing persisted auth state:', error);
   }
 };
 
@@ -411,6 +446,8 @@ export const clearPersistedAuthState = () => {
 export const recoverAuthStateWithRetry = async () => {
   return retryAuthOperation(
     async () => {
+      console.log('Attempting auth state recovery...');
+      
       // Try multiple recovery methods in order of reliability
       const recoveryMethods = [
         () => getPersistedAuthState(),
@@ -426,9 +463,11 @@ export const recoverAuthStateWithRetry = async () => {
         try {
           const result = await method();
           if (result) {
+            console.log('Auth state recovered successfully');
             return result;
           }
         } catch (error) {
+          console.warn('Recovery method failed:', error);
           continue;
         }
       }

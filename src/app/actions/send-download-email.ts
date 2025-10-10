@@ -59,6 +59,7 @@ export const sendDownloadEmail = async (
       throw new Error("Invalid email format");
     }
 
+    console.log("Attempting to send email:", {
       apiKeyExists: !!RESEND_API_KEY,
       apiKeyLength: RESEND_API_KEY?.length,
       fromEmail: FROM_EMAIL,
@@ -91,6 +92,7 @@ export const sendDownloadEmail = async (
       throw new Error(`Resend API error: ${error.message}`);
     }
 
+    console.log('Resend API Response:', data);
     return true;
 
   } catch (error) {

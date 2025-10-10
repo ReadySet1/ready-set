@@ -31,12 +31,14 @@ export async function syncOrderStatusWithBroker(order: Order, newStatus: OrderSt
   // Adapt this based on how brokers are identified in your data
   if (isCateringRequest(order) && order.brokerage) {
       brokerIdentifier = order.brokerage;
+      console.log(`Order ${order.orderNumber} has brokerage: ${brokerIdentifier}`);
 
       // Configure sync based on broker
       if (brokerIdentifier === 'CaterValley') { // Use the specific identifier from your DB
           requiresSync = true;
           syncFunction = updateCaterValleyOrderStatus;
           statusMap = caterValleyStatusMap;
+          console.log(`Configured sync for CaterValley.`);
       }
       // --- Add else if blocks for other brokers ---
       // else if (brokerIdentifier === 'BrokerB_Identifier') {
@@ -46,9 +48,11 @@ export async function syncOrderStatusWithBroker(order: Order, newStatus: OrderSt
       //     console.log(`Configured sync for BrokerB.`);
       // }
        else {
+         console.log(`No specific sync configuration found for broker: ${brokerIdentifier}`);
        }
 
   } else {
+      console.log(`Order ${order.orderNumber} is not a CateringRequest with a brokerage or has no broker identifier. Skipping sync.`);
       // Handle OnDemand orders here if they can also have brokers/sync requirements
   }
   // --- End Broker Identification ---
@@ -58,12 +62,14 @@ export async function syncOrderStatusWithBroker(order: Order, newStatus: OrderSt
     const brokerStatus = statusMap[newStatus];
 
     if (brokerStatus) {
+      console.log(`Syncing status ${newStatus} -> ${brokerStatus} with ${brokerIdentifier} for order ${order.orderNumber}`);
       
       // Handle CaterValley sync with enhanced error handling
       if (brokerIdentifier === 'CaterValley') {
         const result: CaterValleyUpdateResult = await updateCaterValleyOrderStatus(order.orderNumber, brokerStatus);
         
         if (result.success) {
+          console.log(`${brokerIdentifier} status update successful for order ${order.orderNumber}`);
           // Optional success toast: toast.success(`Status synced with ${brokerIdentifier}.`);
         } else {
           // Handle different types of failures
@@ -87,6 +93,7 @@ export async function syncOrderStatusWithBroker(order: Order, newStatus: OrderSt
           // Handle response generically (assuming a 'result' field, adapt if needed)
           if (brokerResponse && typeof brokerResponse.result === 'boolean') {
               if (brokerResponse.result) {
+                  console.log(`${brokerIdentifier} status update successful for order ${order.orderNumber}`);
                   // Optional success toast: toast.success(`Status synced with ${brokerIdentifier}.`);
               } else {
                   const message = brokerResponse.message || 'Reason unknown.';
@@ -106,6 +113,7 @@ export async function syncOrderStatusWithBroker(order: Order, newStatus: OrderSt
         }
       }
     } else {
+      console.log(`No status mapping found for broker ${brokerIdentifier} and internal status ${newStatus}. Skipping sync.`);
     }
   } else if (requiresSync) {
       console.warn(`Sync was required for broker ${brokerIdentifier} but configuration (syncFunction or statusMap) was missing.`);

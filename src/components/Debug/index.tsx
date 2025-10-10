@@ -25,6 +25,7 @@ export function DebugUserRole() {
         let profile = null;
         let profileError = null;
         if (user) {
+          console.log("Found user:", user.id);
           // Try first with auth_user_id
           let { data, error } = await supabase
             .from("profiles")
@@ -33,6 +34,7 @@ export function DebugUserRole() {
             .single();
 
           if (error) {
+            console.log("First query failed, trying with id field");
             // Try with id field as fallback
             const result = await supabase
               .from("profiles")
@@ -49,6 +51,7 @@ export function DebugUserRole() {
         }
 
         setDebugInfo({ user, profile, profileError });
+        console.log("Debug Info:", { user, profile, profileError });
       } catch (error) {
         console.error("Error in debug component:", error);
         setDebugInfo({ error: String(error) });

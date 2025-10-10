@@ -13,6 +13,7 @@ interface BakeryDeliverySectionProps {
 }
 
 const handleClick = (onRequestQuote?: (formType: FormType) => void) => {
+  console.log("Button clicked, onRequestQuote:", !!onRequestQuote);
   if (onRequestQuote) {
     onRequestQuote("bakery");
   }

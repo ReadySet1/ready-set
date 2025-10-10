@@ -39,6 +39,7 @@ export async function GET(request: Request) {
     }
     
     const userId = user.id;
+    console.log(`API: Checking profile completion for user ${userId}`);
     
     // Determine if user was authenticated via OAuth
     const isOAuth = user.app_metadata?.provider && 
@@ -52,6 +53,7 @@ export async function GET(request: Request) {
       .maybeSingle();
       
     if (!profileError && profileData && profileData.type) {
+      console.log(`API: User found in profiles table: ${profileData.id}`);
       return NextResponse.json({
         needsProfileCompletion: false,
         userType: profileData.type,
@@ -73,6 +75,7 @@ export async function GET(request: Request) {
         );
         
       if (shouldBypass) {
+        console.log(`API: Manual user with bypass criteria, auto-creating profile`);
         
         // Create basic profile for the user
         await createUserProfile(supabase, userId, user);
@@ -86,6 +89,7 @@ export async function GET(request: Request) {
     }
     
     // If we reach here, user needs to complete their profile
+    console.log(`API: User needs to complete profile: ${userId}, isOAuth: ${isOAuth}`);
     return NextResponse.json({
       needsProfileCompletion: true,
       userType: user.user_metadata?.userType || null,

@@ -390,6 +390,8 @@ export function runMonitoringChecks(): void {
     monitorMemoryUsage();
     
     // Log monitoring run
+    console.log('🔍 Monitoring checks completed', {
+      timestamp: new Date().toISOString(),
       activeAlerts: alertStore.getActiveAlerts().length
     });
   } catch (error) {

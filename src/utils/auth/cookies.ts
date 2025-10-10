@@ -23,6 +23,7 @@ export const clearAuthCookies = (): void => {
     document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${window.location.hostname};`;
   });
 
+  console.log("🧹 Auth cookies cleared successfully");
 };
 
 /**

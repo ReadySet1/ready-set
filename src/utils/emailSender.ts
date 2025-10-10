@@ -150,7 +150,9 @@ export async function sendOrderEmail(order: CateringOrder | OnDemandOrder) {
       subject: `New ${order.order_type.charAt(0).toUpperCase() + order.order_type.slice(1)} Order - ${order.order_number}`,
       html: body,
     });
+    console.log("Order notification email sent successfully");
   } catch (error) {
+    console.error("Error sending order notification email:", error);
     throw error;
   }
 }

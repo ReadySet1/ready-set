@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
       }
     );
     
+    console.log('📊 History API Debug:', {
       effectiveUserId,
       templateId,
       limit: validatedLimit,

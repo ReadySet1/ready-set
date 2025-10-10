@@ -181,6 +181,8 @@ const CateringOrderForm: React.FC = () => {
 
         // Redirect based on user role instead of hardcoded vendor dashboard
         const redirectRoute = getOrderCreationRedirectRoute(userRole);
+        console.log(
+          `Redirecting user to ${redirectRoute} based on role: ${userRole}`,
         );
         router.push(redirectRoute);
       } else {

@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
     // The catering request ID
     const cateringRequestId = '0e228663-a3c1-44cf-9c80-bcfe4d96e200';
     
+    console.log(`Attempting to update file ${fileId} with cateringRequestId ${cateringRequestId}...`);
     
     // Update the file record
     const updatedFile = await prisma.fileUpload.update({
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
       }
     });
     
+    console.log('File record updated successfully:', updatedFile);
     
     // Try to fetch files with the updated record to confirm
     const files = await prisma.fileUpload.findMany({
@@ -28,6 +30,7 @@ export async function GET(request: NextRequest) {
       }
     });
     
+    console.log(`Found ${files.length} files for catering request ID ${cateringRequestId}`);
     
     return NextResponse.json({
       success: true,

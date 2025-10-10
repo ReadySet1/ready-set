@@ -26,6 +26,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
     if ('serviceWorker' in navigator) {
       try {
         const registration = await navigator.serviceWorker.register('/service-worker.js');
+        console.log('Service Worker registered:', registration);
 
         // Listen for updates
         registration.addEventListener('updatefound', () => {
@@ -34,6 +35,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 // New service worker is available
+                console.log('New service worker available');
               }
             });
           }
@@ -41,6 +43,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
 
         // Enable background sync if supported
         if ('sync' in window.ServiceWorkerRegistration.prototype) {
+          console.log('Background Sync is supported');
         }
 
       } catch (error) {
@@ -84,6 +87,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
         const registration = await navigator.serviceWorker.ready;
         await (registration as any).sync.register('location-sync');
         
+        console.log('Background sync registered');
         
         // Update sync time
         setOfflineStatus(prev => ({ 

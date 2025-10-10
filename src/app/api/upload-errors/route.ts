@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    console.log(`Upload error reported: ${correlationId} (${errorType})`);
 
     return NextResponse.json({
       success: true,

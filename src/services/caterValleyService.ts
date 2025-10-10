@@ -65,6 +65,7 @@ export async function updateCaterValleyOrderStatus(
     // Ensure status is always uppercase as expected by the API
     const normalizedStatus = status.toUpperCase() as OrderStatus;
     
+    console.log(`Attempting to update CaterValley status for order ${orderNumber} to ${normalizedStatus}`);
 
     try {
       const response = await fetch(CATER_VALLEY_API_URL, {
@@ -83,6 +84,7 @@ export async function updateCaterValleyOrderStatus(
   
       // Log raw response details for debugging
       const responseText = await response.text(); 
+      console.log(`CaterValley API response for ${orderNumber} (${normalizedStatus}): Status ${response.status}, Body: ${responseText}`);
 
       if (!response.ok) {
         // Handle specific HTTP status codes
@@ -161,6 +163,7 @@ export async function updateCaterValleyOrderStatus(
           statusCode: 200,
         };
       } else {
+        console.log(`CaterValley status update successful for order ${orderNumber} to ${normalizedStatus}.`);
       }
   
       // Success case

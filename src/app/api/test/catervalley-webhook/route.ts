@@ -46,6 +46,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   };
 
   // Test 1: Basic connectivity with OPTIONS request
+  console.log(`Testing CaterValley webhook connectivity to: ${webhookUrl}`);
   
   try {
     const startTime = Date.now();
@@ -81,6 +82,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         // Ignore if we can't read the body
       }
 
+      console.log(`OPTIONS request successful: ${optionsResponse.status} in ${latencyMs}ms`);
     } catch (error) {
       clearTimeout(timeoutId);
       result.connectivity = {
@@ -97,6 +99,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // Test 2: Actual POST request with test payload
+  console.log('Testing POST request with test payload...');
   
   try {
     const testPayload = {
@@ -130,6 +133,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         responseBody,
       };
 
+      console.log(`POST request result: ${postResponse.status}, Body: ${responseBody}`);
     } catch (error) {
       clearTimeout(timeoutId);
       result.postTest = {
@@ -168,6 +172,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    console.log(`Testing real webhook for order ${orderNumber} with status ${status}`);
 
     const webhookUrl = process.env.CATERVALLEY_WEBHOOK_URL || 'https://api.catervalley.com/api/operation/order/update-order-status';
     const apiKey = process.env.CATERVALLEY_API_KEY;
@@ -216,6 +221,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         webhookUrl,
       };
 
+      console.log('Real webhook test result:', result);
 
       return NextResponse.json(result);
     } catch (error) {

@@ -52,7 +52,9 @@ async function createBackup(): Promise<void> {
       `> "${backupPath}"`
     ].join(' ');
 
+    console.log('Starting backup...');
     await execAsync(command);
+    console.log(`✅ Backup created successfully at: ${backupPath}`);
 
     // Keep only last 7 backups
     const backupFiles = fs.readdirSync(backupDir)
@@ -62,6 +64,7 @@ async function createBackup(): Promise<void> {
     if (backupFiles.length > 7 && backupFiles[0]) {
       const oldestFile = backupFiles[0];
       fs.unlinkSync(path.join(backupDir, oldestFile));
+      console.log(`🗑️  Removed old backup: ${oldestFile}`);
     }
 
     return;
@@ -80,16 +83,22 @@ const command = args[0];
 
 switch (command) {
   case 'schedule':
+    console.log('🕒 Starting scheduled backup service...');
+    console.log('Backups will run every Sunday at 00:00');
+    console.log('Press Ctrl+C to stop the service');
     
     // Schedule weekly backup (runs every Sunday at 00:00)
     cron.schedule('0 0 * * 0', () => {
+      console.log('🔄 Running scheduled backup...');
       createBackup();
     });
     break;
 
   default:
     // Run single backup and exit
+    console.log('📦 Running one-time backup...');
     createBackup().then(() => {
+      console.log('✨ Backup process completed');
       process.exit(0);
     });
     break;

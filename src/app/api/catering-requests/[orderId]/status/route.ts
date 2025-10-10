@@ -166,6 +166,7 @@ export async function PATCH(
     }
 
     // 7. Log status change
+    console.log(`Order ${order.orderNumber} status updated: ${order.driverStatus || 'NO_STATUS'} -> ${validatedData.driverStatus}`);
 
     // 8. Invalidate vendor cache since order status affects metrics and order lists
     invalidateVendorCacheOnStatusUpdate(order.userId, orderId);

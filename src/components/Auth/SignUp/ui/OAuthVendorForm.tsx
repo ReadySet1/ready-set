@@ -68,6 +68,7 @@ const OAuthVendorForm: React.FC<OAuthVendorFormProps> = ({
   const onSubmitWrapper = async (data: OAuthVendorFormData) => {
     // Log form data (optional, for debugging)
     Object.entries(data).forEach(([key, value]) => {
+      console.log(`${key}:`, value);
     });
   
     try {

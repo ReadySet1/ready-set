@@ -34,6 +34,7 @@ export const STORAGE_BUCKETS = {
 export async function initializeStorageBuckets() {
   try {
     const supabase = await createAdminClient();
+    console.log('Using admin client for bucket initialization');
 
     // Create all the necessary buckets
     for (const bucketName of Object.values(STORAGE_BUCKETS)) {
@@ -50,10 +51,12 @@ export async function initializeStorageBuckets() {
           if (createError) {
             console.error(`Failed to create bucket ${bucketName}:`, createError);
           } else {
+            console.log(`Created bucket: ${bucketName}`);
           }
         } else if (error) {
           console.error(`Error checking bucket ${bucketName}:`, error);
         } else {
+          console.log(`Bucket ${bucketName} already exists`);
         }
       } catch (bucketError) {
         console.error(`Exception handling bucket ${bucketName}:`, bucketError);
@@ -72,10 +75,12 @@ export async function initializeStorageBuckets() {
         if (createError) {
           console.error('Failed to create quarantine bucket:', createError);
         } else {
+          console.log('Created quarantine bucket');
         }
       } else if (quarantineError) {
         console.error('Error checking quarantine bucket:', quarantineError);
       } else {
+        console.log('Quarantine bucket already exists');
       }
     } catch (quarantineError) {
       console.error('Exception with quarantine bucket:', quarantineError);
@@ -86,6 +91,7 @@ export async function initializeStorageBuckets() {
       UploadSecurityManager.startCleanupScheduler();
     }
 
+    console.log('Storage buckets initialization completed');
     return { success: true };
   } catch (error) {
     console.error('Error initializing storage buckets (falling back to anon client):', error);
@@ -101,6 +107,7 @@ export async function initializeStorageBuckets() {
           if (error) {
             console.error(`Bucket ${bucketName} not accessible:`, error.message);
           } else {
+            console.log(`Bucket ${bucketName} is accessible`);
           }
         } catch (bucketError) {
           console.error(`Exception checking bucket ${bucketName}:`, bucketError);
@@ -116,23 +123,34 @@ export async function initializeStorageBuckets() {
 
 // Diagnostic function to check Supabase storage configuration
 export async function diagnoseStorageIssues() {
+  console.log('=== SUPABASE STORAGE DIAGNOSTICS ===');
 
   try {
     // Test admin client
+    console.log('1. Testing admin client...');
     const adminClient = await createAdminClient();
+    console.log('   Admin client created successfully');
 
     // Check if we can list buckets
+    console.log('2. Checking bucket access...');
     const { data: buckets, error: bucketsError } = await adminClient.storage.listBuckets();
 
     if (bucketsError) {
       console.error('   ❌ Failed to list buckets:', bucketsError);
+      console.log('   💡 This usually means:');
+      console.log('      - Storage is not enabled in your Supabase project');
+      console.log('      - Service role key does not have storage permissions');
+      console.log('      - Project URL is incorrect');
       return { success: false, errors: [bucketsError], storageEnabled: false };
     } else {
+      console.log(`   ✅ Found ${buckets?.length || 0} buckets`);
       buckets?.forEach(bucket => {
+        console.log(`      - ${bucket.name} (${bucket.public ? 'public' : 'private'})`);
       });
     }
 
     // Test each required bucket
+    console.log('3. Testing required buckets...');
     const requiredBuckets = Object.values(STORAGE_BUCKETS);
     let allBucketsExist = true;
 
@@ -141,6 +159,7 @@ export async function diagnoseStorageIssues() {
         const { data, error } = await adminClient.storage.getBucket(bucketName);
 
         if (error && error.message.includes('does not exist')) {
+          console.log(`   ❌ Bucket '${bucketName}' does not exist`);
           allBucketsExist = false;
 
           // Try to create it
@@ -152,11 +171,13 @@ export async function diagnoseStorageIssues() {
           if (createError) {
             console.error(`   ❌ Failed to create bucket '${bucketName}':`, createError);
           } else {
+            console.log(`   ✅ Created bucket '${bucketName}'`);
           }
         } else if (error) {
           console.error(`   ❌ Error accessing bucket '${bucketName}':`, error);
           allBucketsExist = false;
         } else {
+          console.log(`   ✅ Bucket '${bucketName}' exists and is accessible`);
         }
       } catch (bucketError) {
         console.error(`   ❌ Exception testing bucket '${bucketName}':`, bucketError);
@@ -165,9 +186,11 @@ export async function diagnoseStorageIssues() {
     }
 
     // Test quarantine bucket specifically
+    console.log('4. Testing quarantine bucket...');
     try {
       const { data, error } = await adminClient.storage.getBucket('quarantined-files');
       if (error && error.message.includes('does not exist')) {
+        console.log('   ❌ Quarantine bucket does not exist');
         const { error: createError } = await adminClient.storage.createBucket('quarantined-files', {
           public: false,
           fileSizeLimit: 50 * 1024 * 1024,
@@ -175,24 +198,33 @@ export async function diagnoseStorageIssues() {
         if (createError) {
           console.error('   ❌ Failed to create quarantine bucket:', createError);
         } else {
+          console.log('   ✅ Created quarantine bucket');
         }
       } else if (error) {
         console.error('   ❌ Error accessing quarantine bucket:', error);
       } else {
+        console.log('   ✅ Quarantine bucket exists');
       }
     } catch (quarantineError) {
       console.error('   ❌ Exception testing quarantine bucket:', quarantineError);
     }
 
     // Test regular client
+    console.log('5. Testing regular client...');
     const regularClient = await createClient();
+    console.log('   Regular client created successfully');
 
     const storageWorking = allBucketsExist && !bucketsError;
+    console.log(`6. Overall storage status: ${storageWorking ? '✅ WORKING' : '❌ NOT WORKING'}`);
 
     return { success: storageWorking, storageEnabled: true };
 
   } catch (error) {
     console.error('❌ Storage diagnostics failed:', error);
+    console.log('   💡 This usually indicates:');
+    console.log('      - Environment variables are not set correctly');
+    console.log('      - Network connectivity issues');
+    console.log('      - Supabase project is not accessible');
     return { success: false, errors: [error], storageEnabled: false };
   }
 }
@@ -348,6 +380,7 @@ export async function cleanupOrphanedFiles(timeThreshold = 24) {
       return { success: true, deleted: 0 };
     }
     
+    console.log(`Found ${orphanedFiles.length} orphaned files to clean up`);
     
     // Define a type for the orphaned file records
     interface OrphanedFile {
@@ -437,6 +470,7 @@ export async function cleanupOrphanedFiles(timeThreshold = 24) {
       }
     }
     
+    console.log('Files to delete by bucket:', Object.entries(filesByBucket).map(
       ([bucket, paths]) => `${bucket}: ${paths.length} files`
     ));
     
@@ -447,6 +481,7 @@ export async function cleanupOrphanedFiles(timeThreshold = 24) {
         if (error) {
           console.error(`Error deleting files from bucket ${bucket}:`, error);
         } else {
+          console.log(`Successfully deleted ${paths.length} files from bucket ${bucket}`);
         }
       }
     }
@@ -459,6 +494,7 @@ export async function cleanupOrphanedFiles(timeThreshold = 24) {
     
     if (deleteError) throw deleteError;
     
+    console.log(`Successfully deleted ${orphanedFiles.length} file metadata records`);
     
     return { success: true, deleted: orphanedFiles.length };
   } catch (error) {

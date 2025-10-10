@@ -151,31 +151,37 @@ export const ErrorTesting = {
    * Test all error boundary types
    */
   testAllBoundaries: async () => {
+    console.log("🧪 Testing all error boundary types...");
 
     // Test component errors
     try {
       ErrorSimulator.simulateComponentError(TestErrors.REACT_ERROR);
     } catch (error) {
+      console.log("✅ Component error boundary test passed");
     }
 
     // Test network errors
     try {
       ErrorSimulator.simulateNetworkError(TestErrors.NETWORK_ERROR);
     } catch (error) {
+      console.log("✅ Network error boundary test passed");
     }
 
     // Test chunk errors
     try {
       ErrorSimulator.simulateChunkError(TestErrors.CHUNK_LOAD_ERROR);
     } catch (error) {
+      console.log("✅ Chunk load error boundary test passed");
     }
 
+    console.log("🎉 All error boundary tests completed");
   },
 
   /**
    * Test error recovery mechanisms
    */
   testErrorRecovery: async () => {
+    console.log("🔄 Testing error recovery mechanisms...");
 
     // This would test the retry mechanisms
     const { RetryManager } = await import("./error-recovery");
@@ -197,6 +203,7 @@ export const ErrorTesting = {
         return "success";
       });
     } catch (error) {
+      console.log("Recovery test completed");
     }
   },
 
@@ -242,6 +249,7 @@ export const ErrorTesting = {
    * Stress test error boundaries
    */
   stressTest: async (iterations: number = 10) => {
+    console.log(`🚀 Starting stress test with ${iterations} iterations...`);
 
     for (let i = 0; i < iterations; i++) {
       const errors = Object.values(TestErrors);
@@ -250,6 +258,8 @@ export const ErrorTesting = {
       try {
         ErrorSimulator.simulateComponentError(randomError);
       } catch (error) {
+        console.log(
+          `Stress test iteration ${i + 1}: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
 
@@ -257,6 +267,7 @@ export const ErrorTesting = {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
+    console.log("🎯 Stress test completed");
   },
 };
 
@@ -275,6 +286,7 @@ export class ErrorBoundaryTestSuite {
    * Run complete error boundary test suite
    */
   async runFullTestSuite(): Promise<void> {
+    console.log("🧪 Running complete error boundary test suite...");
 
     const startTime = Date.now();
 
@@ -294,6 +306,7 @@ export class ErrorBoundaryTestSuite {
     await this.testNetworkErrorHandling();
 
     const duration = Date.now() - startTime;
+    console.log(`✅ Test suite completed in ${duration}ms`);
 
     this.printResults();
   }
@@ -409,6 +422,7 @@ export class ErrorBoundaryTestSuite {
   }
 
   private printResults(): void {
+    console.log("\n📊 Error Boundary Test Results:");
     console.table(
       this.results.map((result) => ({
         Test: result.testName,
@@ -420,6 +434,8 @@ export class ErrorBoundaryTestSuite {
 
     const passed = this.results.filter((r) => r.passed).length;
     const total = this.results.length;
+    console.log(
+      `\n🎯 Summary: ${passed}/${total} tests passed (${Math.round((passed / total) * 100)}%)`,
     );
   }
 }

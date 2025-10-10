@@ -7,6 +7,7 @@ const PricingBox = ({ product }: { product: Price }) => {
 
   // POST request
   const handleSubscription = async (e: any) => {
+   console.log("testing")
   };
 
   return (

@@ -17,6 +17,7 @@ import { UserType } from '@/types/prisma';
 import { PrismaTransaction } from '@/types/prisma-types';
 
 export async function GET(request: NextRequest) {
+  console.log(`[GET /api/users/[userId]] Request received for URL: ${request.url}`);
   try {
     // Get userId from URL path
     const url = new URL(request.url);
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
       );
     }
     
+    console.log(`[GET /api/users/[userId]] Authenticated user ID: ${user.id}`);
 
     // Check permissions for all requests
     let requesterProfile;
@@ -51,6 +53,7 @@ export async function GET(request: NextRequest) {
         where: { id: user.id },
         select: { type: true }
       });
+      console.log(`[GET /api/users/[userId]] Requester profile fetched:`, requesterProfile);
       
       isAdminOrHelpdesk =
         requesterProfile?.type === UserType.ADMIN ||
@@ -60,8 +63,10 @@ export async function GET(request: NextRequest) {
       // Only allow if requesting own profile or admin/super_admin
       const isSelf = user.id === userId;
 
+      console.log(`[GET /api/users/[userId]] Authorization check: isSelf=${isSelf}, isAdminOrHelpdesk=${isAdminOrHelpdesk}, requesterType=${requesterProfile?.type}`);
 
       if (!isSelf && !isAdminOrHelpdesk) {
+        console.log(`[GET /api/users/[userId]] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to access profile ${userId}.`);
         return NextResponse.json(
           { error: 'Forbidden: Insufficient permissions' },
           { status: 403 }
@@ -102,18 +107,21 @@ export async function GET(request: NextRequest) {
           contactName: true,
         }
       });
+      console.log(`[GET /api/users/[userId]] Target profile fetched (ID: ${userId}):`, profile ? 'Found' : 'Not Found');
     } catch (targetProfileError) {
       console.error(`[GET /api/users/[userId]] Error fetching target profile (ID: ${userId}):`, targetProfileError);
       return NextResponse.json({ error: 'Failed to fetch target user profile' }, { status: 500 });
     }
 
     if (!profile) {
+      console.log(`[GET /api/users/[userId]] User not found: ID ${userId}`);
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       );
     }
 
+    console.log(`[GET /api/users/[userId]] Successfully fetched profile for user ID: ${userId}`);
     
     // Helper to parse comma-separated strings, potentially with extra quotes
     const parseCommaSeparatedString = (value: unknown): string[] => {
@@ -193,6 +201,7 @@ export async function PUT(
       );
     }
     
+    console.log(`[PUT /api/users/[userId]] Authenticated user ID: ${user.id}`);
 
     // Check permissions for all requests
     let requesterProfile;
@@ -202,6 +211,7 @@ export async function PUT(
         where: { id: user.id },
         select: { type: true }
       });
+      console.log(`[PUT /api/users/[userId]] Requester profile fetched:`, requesterProfile);
       
       const isAdminOrHelpdesk =
         requesterProfile?.type === UserType.ADMIN ||
@@ -211,8 +221,10 @@ export async function PUT(
       // Only allow if requesting own profile or admin/super_admin
       const isSelf = user.id === userId;
 
+      console.log(`[PUT /api/users/[userId]] Authorization check: isSelf=${isSelf}, isAdminOrHelpdesk=${isAdminOrHelpdesk}, requesterType=${requesterProfile?.type}`);
 
       if (!isSelf && !isAdminOrHelpdesk) {
+        console.log(`[PUT /api/users/[userId]] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to update profile ${userId}.`);
         return NextResponse.json(
           { error: 'Forbidden: Insufficient permissions' },
           { status: 403 }
@@ -225,6 +237,7 @@ export async function PUT(
     
     // Parse request body
     const requestBody = await request.json();
+    console.log('[PUT /api/users/[userId]] Request body:', requestBody);
     
     // Validate required fields
     if (!requestBody) {
@@ -241,10 +254,13 @@ export async function PUT(
     if (requestBody.type) {
       try {
         const typeKey = requestBody.type.toUpperCase();
+        console.log(`[PUT /api/users/[userId]] Converting user type: '${requestBody.type}' to enum. Available UserType keys:`, Object.keys(UserType));
         
         if (Object.keys(UserType).includes(typeKey)) {
           userTypeEnum = UserType[typeKey as keyof typeof UserType];
+          console.log(`[PUT /api/users/[userId]] Successfully converted '${requestBody.type}' to UserType enum: ${userTypeEnum}`);
         } else {
+          console.log(`[PUT /api/users/[userId]] Invalid user type: '${requestBody.type}'. Valid types are:`, Object.keys(UserType));
           return NextResponse.json(
             { error: `Invalid user type: ${requestBody.type}. Valid types are: ${Object.keys(UserType).map(k => k.toLowerCase()).join(', ')}` },
             { status: 400 }
@@ -312,6 +328,7 @@ export async function PUT(
       }
     });
     
+    console.log('[PUT /api/users/[userId]] Update data:', updateData);
 
     // Update user profile
     const updatedProfile = await prisma.profile.update({
@@ -319,6 +336,7 @@ export async function PUT(
       data: updateData,
     });
     
+    console.log('[PUT /api/users/[userId]] Profile updated successfully');
 
     // Transform the response to match frontend expectations (snake_case)
     const transformedProfile = {
@@ -401,6 +419,7 @@ export async function PATCH(
       );
     }
     
+    console.log(`[PATCH /api/users/[userId]] Authenticated user ID: ${user.id}`);
 
     // Check permissions for all requests
     let requesterProfile;
@@ -410,6 +429,7 @@ export async function PATCH(
         where: { id: user.id },
         select: { type: true }
       });
+      console.log(`[PATCH /api/users/[userId]] Requester profile fetched:`, requesterProfile);
       
       const isAdminOrHelpdesk =
         requesterProfile?.type === UserType.ADMIN ||
@@ -419,8 +439,10 @@ export async function PATCH(
       // Only allow if requesting own profile or admin/super_admin
       const isSelf = user.id === userId;
 
+      console.log(`[PATCH /api/users/[userId]] Authorization check: isSelf=${isSelf}, isAdminOrHelpdesk=${isAdminOrHelpdesk}, requesterType=${requesterProfile?.type}`);
 
       if (!isSelf && !isAdminOrHelpdesk) {
+        console.log(`[PATCH /api/users/[userId]] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to update profile ${userId}.`);
         return NextResponse.json(
           { error: 'Forbidden: Insufficient permissions' },
           { status: 403 }
@@ -433,6 +455,7 @@ export async function PATCH(
     
     // Parse request body
     const requestBody = await request.json();
+    console.log('[PATCH /api/users/[userId]] Request body:', requestBody);
     
     // Validate required fields
     if (!requestBody) {
@@ -449,10 +472,13 @@ export async function PATCH(
     if (requestBody.type) {
       try {
         const typeKey = requestBody.type.toUpperCase();
+        console.log(`[PATCH /api/users/[userId]] Converting user type: '${requestBody.type}' to enum. Available UserType keys:`, Object.keys(UserType));
         
         if (Object.keys(UserType).includes(typeKey)) {
           userTypeEnum = UserType[typeKey as keyof typeof UserType];
+          console.log(`[PATCH /api/users/[userId]] Successfully converted '${requestBody.type}' to UserType enum: ${userTypeEnum}`);
         } else {
+          console.log(`[PATCH /api/users/[userId]] Invalid user type: '${requestBody.type}'. Valid types are:`, Object.keys(UserType));
           return NextResponse.json(
             { error: `Invalid user type: ${requestBody.type}. Valid types are: ${Object.keys(UserType).map(k => k.toLowerCase()).join(', ')}` },
             { status: 400 }
@@ -520,6 +546,7 @@ export async function PATCH(
       }
     });
     
+    console.log('[PATCH /api/users/[userId]] Update data:', updateData);
 
     // Update user profile
     const updatedProfile = await prisma.profile.update({
@@ -527,6 +554,7 @@ export async function PATCH(
       data: updateData,
     });
     
+    console.log('[PATCH /api/users/[userId]] Profile updated successfully');
 
     // Transform the response to match frontend expectations (snake_case)
     const transformedProfile = {
@@ -651,8 +679,11 @@ export async function DELETE(
       );
     }
     
+    console.log(`[DELETE /api/users/[userId]] Starting user deletion process for user: ${userId}`);
+    console.log(`[DELETE] Requester: ${user.id} (Type: ${requesterProfile?.type})`);
     
     // Step 1: Pre-deletion validation - Check for active orders
+    console.log(`[DELETE] Step 1: Validating active orders...`);
     const activeOrders = await Promise.all([
       prisma.cateringRequest.count({
         where: { 
@@ -669,6 +700,7 @@ export async function DELETE(
     ]);
     
     const totalActiveOrders = activeOrders[0] + activeOrders[1];
+    console.log(`[DELETE] Found ${totalActiveOrders} active orders (${activeOrders[0]} catering, ${activeOrders[1]} on-demand)`);
     
     if (totalActiveOrders > 0) {
       return NextResponse.json(
@@ -685,21 +717,27 @@ export async function DELETE(
     }
     
     // Step 2: Execute deletion transaction
+    console.log(`[DELETE] Step 2: Beginning deletion transaction...`);
     const transactionResult = await prisma.$transaction(async (tx: PrismaTransaction) => {
       // Step 2a: Delete Dispatch records (no CASCADE defined)
+      console.log(`[DELETE] Step 2a: Deleting dispatch records...`);
       const deletedDispatches = await tx.dispatch.deleteMany({
         where: {
           OR: [{ driverId: userId }, { userId }],
         },
       });
+      console.log(`[DELETE] Deleted ${deletedDispatches.count} dispatch records`);
       
       // Step 2b: Update FileUpload records to null out userId (preserve files)
+      console.log(`[DELETE] Step 2b: Updating file upload records...`);
       const updatedFileUploads = await tx.fileUpload.updateMany({
         where: { userId },
         data: { userId: null },
       });
+      console.log(`[DELETE] Updated ${updatedFileUploads.count} file upload records`);
       
       // Step 2c: Handle Address ownership logic
+      console.log(`[DELETE] Step 2c: Processing address relationships...`);
       const createdAddresses = await tx.address.findMany({
         where: { createdBy: userId },
         include: {
@@ -738,11 +776,14 @@ export async function DELETE(
         }
       }
       
+      console.log(`[DELETE] Processed ${createdAddresses.length} addresses: ${deletedAddresses} deleted, ${updatedAddresses} updated`);
       
       // Step 2d: Delete the Profile (triggers CASCADE deletes)
+      console.log(`[DELETE] Step 2d: Deleting user profile...`);
       const deletedProfile = await tx.profile.delete({
         where: { id: userId },
       });
+      console.log(`[DELETE] Profile deleted successfully: ${deletedProfile.id}`);
       
       return {
         deletedProfile,
@@ -757,6 +798,7 @@ export async function DELETE(
     });
     
     const duration = Date.now() - startTime;
+    console.log(`[DELETE] Transaction completed successfully in ${duration}ms`);
     
     // Step 3: Create audit log entry
     const auditEntry = {
@@ -779,6 +821,7 @@ export async function DELETE(
       duration: `${duration}ms`
     };
     
+    console.log(`[AUDIT] User deletion completed:`, JSON.stringify(auditEntry));
     
     return NextResponse.json({
       message: 'User and associated data deleted successfully',
@@ -817,6 +860,7 @@ export async function DELETE(
       duration: `${duration}ms`
     };
     
+    console.log(`[AUDIT] User deletion failed:`, JSON.stringify(failureAuditEntry));
     
     // Handle Prisma-specific errors
     if (error instanceof Prisma.PrismaClientKnownRequestError) {

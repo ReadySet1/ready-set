@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
     }
 
     const { context } = authResult;
+    console.log('✅ [Driver API] Access granted to user:', {
+      role: context.user?.type,
       email: context.user?.email,
       id: context.user?.id
     });

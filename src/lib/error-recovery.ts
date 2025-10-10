@@ -59,6 +59,7 @@ export class RetryManager {
 
         if (this.state.attempt > 1) {
           this.options.onRecoverySuccess?.();
+          console.log(`✅ Operation recovered successfully after ${this.state.attempt} attempts${context ? ` (${context})` : ''}`);
         }
 
         return result;
@@ -106,6 +107,7 @@ export class RetryManager {
     this.state.isRetrying = true;
     this.state.nextRetryAt = Date.now() + delay;
 
+    console.log(`⏳ Waiting ${delay}ms before retry ${this.state.attempt + 1}...`);
 
     await new Promise(resolve => setTimeout(resolve, delay));
     this.state.isRetrying = false;
@@ -167,6 +169,7 @@ export class NetworkRecoveryManager extends RetryManager {
     } catch (error) {
       // For network errors, try one more time with a longer delay
       if (this.isRecoverableError(error as Error) && this.getState().attempt < 4) {
+        console.log('🔄 Attempting final network recovery...');
         await new Promise(resolve => setTimeout(resolve, 3000));
         return await operation();
       }

@@ -62,6 +62,8 @@ export async function getClients(): Promise<ClientListItem[] | ActionError> {
  * Creates a new CateringRequest order.
  */
 export async function createCateringOrder(formData: CreateCateringOrderInput): Promise<CreateOrderResult> {
+  console.log("=== SERVER ACTION: createCateringOrder called ===");
+  console.log("Received data:", JSON.stringify(formData, null, 2));
   
   // 1. Validate the input data
   const validationResult = createCateringOrderSchema.safeParse(formData);
@@ -74,10 +76,12 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
     };
   }
 
+  console.log("Validation passed successfully");
   const data = validationResult.data;
 
   // Generate a unique order number using UUID
   const orderNumber = data.orderNumber || `CATER-${uuidv4()}`;
+  console.log(`Attempting to create order with orderNumber: ${orderNumber}`);
 
   // Get Supabase client for session information and file operations
   const supabase = await createClient();
@@ -89,8 +93,10 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
   
   try {
     // 2. Perform database operations within a transaction
+    console.log("Starting database transaction");
     const newOrder = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Create pickup address
+      console.log("Creating pickup address");
       const pickupAddress = await tx.address.create({
         data: {
           street1: data.pickupAddress.street1,
@@ -101,8 +107,10 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
           county: data.pickupAddress.county ?? null,
         },
       });
+      console.log("Pickup address created:", pickupAddress.id);
       
       // Create delivery address
+      console.log("Creating delivery address");
       const deliveryAddress = await tx.address.create({
         data: {
           street1: data.deliveryAddress.street1,
@@ -113,8 +121,10 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
           county: data.deliveryAddress.county ?? null,
         },
       });
+      console.log("Delivery address created:", deliveryAddress.id);
 
       // Create the CateringRequest
+      console.log("Creating catering request record");
       const order = await tx.cateringRequest.create({
         data: {
           userId: data.userId,
@@ -137,23 +147,28 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
           deliveryAddressId: deliveryAddress.id,
         },
       });
+      console.log("Catering request created:", order.id);
       return order;
     });
 
+    console.log("Transaction completed successfully");
     
     // 3. Update any temporary file associations
     if (tempEntityId && user) {
       try {
+        console.log(`Attempting to update file associations from temp ID ${tempEntityId} to order ID ${newOrder.id}`);
         
         // Call the API to update file associations
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://ready-set.vercel.app';
         const updateUrl = `${baseUrl}/api/file-uploads/update-entity`;
+        console.log(`Calling update-entity API at: ${updateUrl}`);
         
         const updateData = {
           oldEntityId: tempEntityId,
           newEntityId: newOrder.id,
           entityType: 'catering_request',
         };
+        console.log('Update file entity request data:', JSON.stringify(updateData));
         
         const response = await fetch(updateUrl, {
           method: 'PUT',
@@ -165,11 +180,13 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
         
         if (response.ok) {
           const result = await response.json();
+          console.log('File associations update successful:', result);
         } else {
           const errorText = await response.text();
           console.error(`Failed to update file associations: ${response.status} - ${errorText}`);
           
           // Add retry logic in case of failure
+          console.log('Retrying file association update with a slight delay...');
           await new Promise(resolve => setTimeout(resolve, 1000));
           
           const retryResponse = await fetch(updateUrl, {
@@ -182,6 +199,7 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
           
           if (retryResponse.ok) {
             const retryResult = await retryResponse.json();
+            console.log('File associations update retry successful:', retryResult);
           } else {
             console.error('Retry failed to update file associations:', await retryResponse.text());
           }
@@ -198,12 +216,14 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
 
       // Also try to update storage paths for any temporary files
       try {
+        console.log(`Attempting to update storage paths for temp files`);
         
         // Format the tempEntityId to ensure consistency
         const formattedTempId = tempEntityId.startsWith('temp-') 
           ? tempEntityId 
           : `temp-${tempEntityId}`;
           
+        console.log(`Checking for files with formatted temp ID: ${formattedTempId}`);
         
         const supabase = await createClient();
         
@@ -219,16 +239,19 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
         
         // First check for files in the possible temp paths
         for (const tempPath of possibleTempPaths) {
+          console.log(`Checking for files in path: ${tempPath}`);
           
           const { data: tempFiles, error: listError } = await supabase.storage
             .from('fileUploader')
             .list(tempPath);
           
           if (listError) {
+            console.log(`Error listing files in ${tempPath}:`, listError);
             continue; // Try next path
           }
           
           if (tempFiles && tempFiles.length > 0) {
+            console.log(`Found ${tempFiles.length} temp files in ${tempPath} to move to permanent location`);
             foundFiles = true;
             
             // Move each file to the new path
@@ -236,6 +259,7 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
               const oldPath = `${tempPath}/${file.name}`;
               const newPath = `catering_order/${newOrder.id}/${file.name}`;
               
+              console.log(`Moving file from ${oldPath} to ${newPath}`);
               
               try {
                 const { error: moveError } = await supabase.storage
@@ -245,6 +269,7 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
                 if (moveError) {
                   console.error(`Error moving file ${oldPath} to ${newPath}:`, moveError);
                 } else {
+                  console.log(`Successfully moved file from ${oldPath} to ${newPath}`);
                   
                   // Update file URL in database if needed
                   const { data: { publicUrl } } = supabase.storage
@@ -267,6 +292,7 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
                       }
                     });
                     
+                    console.log(`Updated file URL in database for ${oldPath} to ${publicUrl}`);
                   } catch (dbError) {
                     console.error('Error updating file URL in database:', dbError);
                   }
@@ -276,11 +302,13 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
               }
             }
           } else {
+            console.log(`No temp files found in ${tempPath}`);
           }
         }
         
         // If we didn't find any files by path, check the database for files with encoded category
         if (!foundFiles) {
+          console.log("Checking database for files with encoded category");
           
           // Look for files with the temp ID encoded in the category field
           const encodedTempFiles = await prisma.fileUpload.findMany({
@@ -294,6 +322,7 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
           });
           
           if (encodedTempFiles.length > 0) {
+            console.log(`Found ${encodedTempFiles.length} files with encoded temp ID in category`);
             
             // Update them to use the new order ID
             for (const file of encodedTempFiles) {
@@ -307,6 +336,7 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
                   }
                 });
                 
+                console.log(`Updated file record ${file.id} with new order ID ${newOrder.id}`);
                 
                 // If the file has a URL that contains the temp ID, try to move it
                 if (file.fileUrl && (file.fileUrl.includes(formattedTempId) || file.fileUrl.includes(tempEntityId))) {
@@ -327,6 +357,7 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
                       const oldPath = `${tempPath}/${fileName}`;
                       const newPath = `catering_order/${newOrder.id}/${fileName}`;
                       
+                      console.log(`Moving file from ${oldPath} to ${newPath}`);
                       
                       try {
                         const { error: moveError } = await supabase.storage
@@ -344,6 +375,7 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
                             data: { fileUrl: publicUrl }
                           });
                           
+                          console.log(`Updated file URL for ${file.id} to ${publicUrl}`);
                         } else {
                           console.error(`Error moving file: ${moveError.message}`);
                         }
@@ -358,6 +390,7 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
               }
             }
           } else {
+            console.log("No files found with encoded temp ID in category");
           }
         }
       } catch (storageError) {
@@ -419,6 +452,8 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
  * Only ADMIN and SUPER_ADMIN users can delete orders.
  */
 export async function deleteCateringOrder(orderId: string): Promise<DeleteOrderResult> {
+  console.log("=== SERVER ACTION: deleteCateringOrder called ===");
+  console.log(`Attempting to delete order with ID: ${orderId}`);
 
   try {
     // Get authenticated user from Supabase
@@ -482,6 +517,7 @@ export async function deleteCateringOrder(orderId: string): Promise<DeleteOrderR
       for (const file of fileUploads) {
         if (file.fileUrl) {
           try {
+            console.log(`Processing file URL for deletion: ${file.fileUrl}`);
             
             // Extract the storage URL parts
             let bucketName = "fileUploader"; // Default bucket name
@@ -501,6 +537,7 @@ export async function deleteCateringOrder(orderId: string): Promise<DeleteOrderR
               // Standard URL format
               bucketName = standardMatch?.[1] || "fileUploader";
               filePath = standardMatch?.[2] || "";
+              console.log(`Standard URL pattern detected: bucket=${bucketName}, path=${filePath}`);
 
               // Attempt to delete from standard path
               if (filePath) {
@@ -508,6 +545,7 @@ export async function deleteCateringOrder(orderId: string): Promise<DeleteOrderR
                 if (error) {
                   console.error(`Error deleting file from standard path:`, error);
                 } else {
+                  console.log(`Successfully deleted file from standard path`);
                 }
               }
             } 
@@ -516,6 +554,7 @@ export async function deleteCateringOrder(orderId: string): Promise<DeleteOrderR
               tempFolderPath = tempFolderMatch?.[1] || "";
               bucketName = "fileUploader"; // Most likely bucket for temp uploads
               
+              console.log(`Temp folder detected: ${tempFolderPath}`);
 
               // Try several possible path structures
               const pathAttempts = [];
@@ -545,12 +584,15 @@ export async function deleteCateringOrder(orderId: string): Promise<DeleteOrderR
               for (const attemptPath of pathAttempts) {
                 if (!attemptPath) continue;
                 
+                console.log(`Attempting to delete: bucket=${bucketName}, path=${attemptPath}`);
                 const { error } = await supabase.storage.from(bucketName).remove([attemptPath]);
                 
                 if (!error) {
+                  console.log(`Successfully deleted file using path: ${attemptPath}`);
                   deleteSuccess = true;
                   break;
                 } else {
+                  console.log(`Failed with path ${attemptPath}: ${error.message}`);
                 }
               }
               
@@ -560,14 +602,17 @@ export async function deleteCateringOrder(orderId: string): Promise<DeleteOrderR
             } 
             else {
               // Fallback method
+              console.log(`No recognized pattern, using fallback method`);
               try {
                 const url = new URL(file.fileUrl);
                 filePath = url.pathname.split('/').slice(1).join('/');
+                console.log(`Fallback: bucket=${bucketName}, path=${filePath}`);
                 
                 const { error } = await supabase.storage.from(bucketName).remove([filePath]);
                 if (error) {
                   console.error(`Error with fallback path:`, error);
                 } else {
+                  console.log(`Successfully deleted file using fallback path`);
                 }
               } catch (e) {
                 console.error(`Fallback method failed:`, e);

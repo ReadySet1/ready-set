@@ -31,6 +31,7 @@ export default function UserFilesDisplay({
 
   useEffect(() => {
     const fetchUserFiles = async () => {
+      console.log("Fetching files for userId:", userId);
       try {
         setLoading(true);
         setError(null);
@@ -42,6 +43,7 @@ export default function UserFilesDisplay({
           },
         });
 
+        console.log("API Response status:", response.status);
 
         if (!response.ok) {
           throw new Error(
@@ -50,8 +52,10 @@ export default function UserFilesDisplay({
         }
 
         const data = await response.json();
+        console.log("API Response data:", data);
 
         if (Array.isArray(data)) {
+          console.log("Setting files:", data);
           setFiles(data);
         } else {
           console.warn("Unexpected response format:", data);
@@ -62,13 +66,16 @@ export default function UserFilesDisplay({
         setError(err instanceof Error ? err.message : "Failed to load files");
         setFiles([]);
       } finally {
+        console.log("Setting loading to false");
         setLoading(false);
       }
     };
 
     if (userId) {
+      console.log("Starting fetch for userId:", userId);
       fetchUserFiles();
     } else {
+      console.log("No userId provided, skipping fetch");
       setLoading(false);
     }
   }, [userId, refreshTrigger]);

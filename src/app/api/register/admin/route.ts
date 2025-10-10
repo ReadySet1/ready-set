@@ -47,7 +47,9 @@ const sendRegistrationEmail = async (
       subject: "Welcome to Our Platform - Account Created",
       html: body,
     });
+    console.log("Registration email sent successfully");
   } catch (error) {
+    console.error("Error sending registration email:", error);
     throw new Error("Failed to send registration email");
   }
 };
@@ -107,6 +109,7 @@ export async function POST(request: Request) {
     });
 
     if (supabaseError) {
+      console.error("Error creating user in Supabase:", supabaseError);
       return NextResponse.json(
         { error: "Failed to create user account", details: supabaseError.message },
         { status: 500 }
@@ -191,6 +194,7 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error) {
+    console.error("Admin registration error:", error);
     if (error instanceof PrismaClientKnownRequestError) {
       return NextResponse.json(
         { error: "Database error" },

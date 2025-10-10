@@ -34,6 +34,7 @@ export async function GET(request: Request) {
       }
       
       // Log the successful authentication
+      console.log('Authentication successful:', session ? 'Session created' : 'No session created');
       
       // If we have a session, determine the correct dashboard based on user role
       if (session) {
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
 
           // If no profile exists, create one with default values
           if (profileError || !profile) {
+            console.log(`⚠️ No profile found for user ${session.user.id}, creating default profile...`);
 
             try {
               // Create a default profile for the user
@@ -71,6 +73,7 @@ export async function GET(request: Request) {
               }
 
               userType = newProfile?.type;
+              console.log(`✅ Default profile created successfully for user: ${session.user.id}`);
             } catch (createProfileError) {
               console.error('Exception creating default profile:', createProfileError);
               return NextResponse.redirect(new URL(next, requestUrl.origin));
@@ -84,9 +87,11 @@ export async function GET(request: Request) {
 
           // Normalize the user type to lowercase for consistent handling
           const userTypeKey = userType.toLowerCase();
+          console.log('User role for redirection:', userTypeKey);
 
           // Get the appropriate home route for this user type, fallback to next param
           const homeRoute = USER_HOME_ROUTES[userTypeKey] || next;
+          console.log('Redirecting to user dashboard:', homeRoute);
 
           // Redirect to the appropriate dashboard
           return NextResponse.redirect(new URL(homeRoute, requestUrl.origin));

@@ -18,12 +18,14 @@ const useCateringOrders = () => {
       const apiUrl = `/api/orders/catering-orders?page=${page}&limit=${limit}${
         statusFilter !== "all" ? `&status=${statusFilter}` : ""
       }`;
+      console.log("Fetching orders from:", apiUrl);
       try {
         const response = await fetch(apiUrl);
         if (!response.ok) {
           throw new Error("Failed to fetch catering orders");
         }
         const data = await response.json();
+        console.log("Received data:", data);
         
         if (Array.isArray(data)) {
           setOrders(data);
@@ -47,10 +49,12 @@ const useCateringOrders = () => {
   }, [page, limit, statusFilter]);
 
   const handlePageChange = useCallback((newPage: number) => {
+    console.log("Page changed to:", newPage);
     setPage(newPage);
   }, []);
 
   const handleStatusFilter = useCallback((status: StatusFilter) => {
+    console.log("Status filter changed to:", status);
     setStatusFilter(status);
     setPage(1);
   }, []);
@@ -66,6 +70,7 @@ const useCateringOrders = () => {
     handleStatusFilter,
   }), [orders, isLoading, error, page, totalPages, statusFilter, handlePageChange, handleStatusFilter]);
 
+  console.log("useCateringOrders hook result:", result);
 
   return result;
 };

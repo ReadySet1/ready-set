@@ -193,6 +193,7 @@ export async function GET(request: NextRequest) {
       },
 
       cancel() {
+        console.log('SSE stream cancelled');
       }
     });
 

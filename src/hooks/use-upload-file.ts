@@ -75,6 +75,7 @@ export function useUploadFile({
   useEffect(() => {
     if (!entityId && !tempEntityId) {
       const newTempId = `temp-${uuidv4()}`;
+      console.log("Initializing temporary entity ID:", newTempId);
       setTempEntityId(newTempId);
     }
   }, [entityId, tempEntityId]);
@@ -108,10 +109,14 @@ export function useUploadFile({
         params.append("category", category);
       }
 
+      console.log('Fetching files with params:', params.toString());
       const response = await fetch(`/api/file-uploads/get?${params}`);
       
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
       
       const data = await response.json();
+      console.log('Response data:', data);
       
       if (!response.ok) {
         console.error('Error details:', {
@@ -127,6 +132,7 @@ export function useUploadFile({
       }
 
       if (data.success && data.files) {
+        console.log('Setting uploaded files:', data.files);
         setUploadedFiles(data.files);
       } else {
         console.warn('Unexpected response format:', data);
@@ -206,6 +212,8 @@ export function useUploadFile({
         return [];
       }
 
+      console.log("Starting enhanced file upload process...");
+      console.log("Upload context:", {
         bucketName,
         entityType,
         entityId: entityId || tempEntityId,
@@ -263,6 +271,7 @@ export function useUploadFile({
           const fileProgress = fileProgresses[progressIndex];
           if (!fileProgress) continue; // Skip if fileProgress is undefined
 
+          console.log(`Processing file: ${file.name} (${file.size} bytes, type: ${file.type})`);
 
           // Enhanced file validation using the new system
           const validationError = FileValidator.validateFile(file, {
@@ -298,6 +307,7 @@ export function useUploadFile({
               // Ensure consistent format for temporary entity IDs in storage paths
               const pathEntityId = currentId.startsWith('temp-') ? currentId : `temp-${currentId}`;
               fileKey = `catering_order/${pathEntityId}/${Date.now()}-${uuidv4().substring(0, 8)}`;
+              console.log(`Generated catering file path: ${fileKey}`);
             } else {
               fileKey = `${userId || 'anonymous'}/${entityType || 'general'}/${category || 'uncategorized'}/${uuidv4().substring(0, 8)}-${file.name}`;
             }
@@ -310,6 +320,7 @@ export function useUploadFile({
             
             // Use entityId state, fallback to tempEntityId if entity doesn't exist yet
             const currentEntityId = entityId || tempEntityId;
+            console.log("Using entity ID:", currentEntityId);
             
             if (currentEntityId) {
               formData.append('entityId', currentEntityId);
@@ -328,7 +339,9 @@ export function useUploadFile({
             }
 
             // Log form data entries
+            console.log("FormData entries:");
             for (const [key, value] of formData.entries()) {
+              console.log(`- ${key}: ${value instanceof File ? `File: ${value.name}` : value}`);
             }
 
             // Update progress - starting upload
@@ -342,6 +355,7 @@ export function useUploadFile({
             const isAdminMode = typeof window !== 'undefined' && localStorage.getItem('admin_mode') === 'true';
 
             // Upload via the API route with retry logic
+            console.log("Sending request to enhanced file upload API...");
 
             const uploadOperation = async () => {
               const response = await fetch("/api/file-uploads", {
@@ -376,6 +390,7 @@ export function useUploadFile({
                   baseDelay: 1500
                 },
                 (error, attempt) => {
+                  console.log(`Upload retry attempt ${attempt} for ${file.name}:`, error.message);
 
                   // Update progress during retry
                   fileProgress.retryCount = attempt;
@@ -408,8 +423,10 @@ export function useUploadFile({
               continue;
             }
 
+            console.log("Upload API response status:", response.status);
 
             const result = await response.json();
+            console.log("Upload API success response:", result);
 
             if (!result.success || !result.file) {
               console.error("Upload API returned success:false or no file data:", result);
@@ -464,6 +481,7 @@ export function useUploadFile({
             toast.success(`${file.name} uploaded successfully`);
           }
 
+        console.log("All files processed. Upload complete.");
 
         // Update session status
         session.status = session.failedFiles > 0 ? 'completed' : 'completed';
@@ -509,6 +527,7 @@ export function useUploadFile({
   const ensureTempEntityId = useCallback(() => {
     if (!entityId && !tempEntityId) {
       const newTempId = uuidv4();
+      console.log("Generating temporary entity ID:", newTempId);
       setTempEntityId(newTempId);
       return newTempId;
     }
@@ -519,6 +538,8 @@ export function useUploadFile({
   const updateEntityId = useCallback(
     async (newEntityId: string) => {
       try {
+        console.log(
+          `Updating entity ID from ${entityId} to ${newEntityId}`,
         );
 
         // Make an API call to update the entity IDs
@@ -562,6 +583,7 @@ export function useUploadFile({
   const deleteFile = useCallback(
     async (fileKey: string) => {
       try {
+        console.log(`Deleting file with key: ${fileKey}`);
 
         // We'll use our API route to delete the file
         const response = await fetch(`/api/file-uploads?fileId=${encodeURIComponent(fileKey)}`, {
@@ -591,6 +613,7 @@ export function useUploadFile({
   const deleteFileWithSupabase = useCallback(
     async (fileKey: string) => {
       try {
+        console.log(`Deleting file with key: ${fileKey} using Supabase client`);
 
         // First get the file information from the API
         const infoResponse = await fetch(
@@ -669,6 +692,7 @@ export function useUploadFile({
       return [];
     }
 
+    console.log(`Retrying ${failedFiles.length} failed uploads...`);
     toast(`Retrying ${failedFiles.length} failed uploads...`, { icon: "ℹ️" });
 
     // For simplicity, we'll retry by calling onUpload again with the original files

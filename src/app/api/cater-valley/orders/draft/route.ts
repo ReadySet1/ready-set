@@ -269,6 +269,7 @@ export async function POST(request: NextRequest) {
       breakdown: pricingResult.breakdown,
     };
 
+    console.log(`Created CaterValley draft order ${draftOrder.orderNumber} for ${validatedData.priceTotal} + ${pricingResult.deliveryPrice} delivery`);
 
     return NextResponse.json(response, { status: 201 });
 
