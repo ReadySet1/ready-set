@@ -1,140 +1,189 @@
-// Client Configurations API - CRUD operations for client-specific calculator configurations
-// GET: List configurations, POST: Create new configuration
+/**
+ * API Route: Calculator Configurations
+ * Handles CRUD operations for client delivery configurations
+ */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { CalculatorService } from '@/lib/calculator/calculator-service';
-import { CreateClientConfigSchema, ConfigurationError } from '@/types/calculator';
 import { createClient } from '@/utils/supabase/server';
+import { prisma } from '@/lib/prisma';
+import {
+  ClientDeliveryConfiguration,
+  validateConfiguration,
+  getActiveConfigurations,
+  getConfiguration
+} from '@/lib/calculator/client-configurations';
 
+// Helper function to convert DB record to ClientDeliveryConfiguration
+function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
+  return {
+    id: dbConfig.configId,
+    clientName: dbConfig.clientName,
+    vendorName: dbConfig.vendorName,
+    description: dbConfig.description || undefined,
+    isActive: dbConfig.isActive,
+    pricingTiers: dbConfig.pricingTiers as any,
+    mileageRate: parseFloat(dbConfig.mileageRate.toString()),
+    distanceThreshold: parseFloat(dbConfig.distanceThreshold.toString()),
+    dailyDriveDiscounts: dbConfig.dailyDriveDiscounts as any,
+    driverPaySettings: dbConfig.driverPaySettings as any,
+    bridgeTollSettings: dbConfig.bridgeTollSettings as any,
+    customSettings: dbConfig.customSettings as any,
+    createdAt: dbConfig.createdAt,
+    updatedAt: dbConfig.updatedAt,
+    createdBy: dbConfig.createdBy || undefined,
+    notes: dbConfig.notes || undefined
+  };
+}
+
+// Helper function to convert ClientDeliveryConfiguration to DB format
+function configToDb(config: ClientDeliveryConfiguration, userId?: string) {
+  return {
+    configId: config.id,
+    clientName: config.clientName,
+    vendorName: config.vendorName,
+    description: config.description,
+    isActive: config.isActive,
+    pricingTiers: config.pricingTiers as any,
+    mileageRate: config.mileageRate,
+    distanceThreshold: config.distanceThreshold,
+    dailyDriveDiscounts: config.dailyDriveDiscounts as any,
+    driverPaySettings: config.driverPaySettings as any,
+    bridgeTollSettings: config.bridgeTollSettings as any,
+    customSettings: config.customSettings as any,
+    createdBy: userId,
+    notes: config.notes,
+    updatedAt: new Date()
+  };
+}
+
+// GET: Fetch all configurations or a specific one
 export async function GET(request: NextRequest) {
   try {
-    // Use session-based authentication (consistent with other endpoints)
-    const supabase = await createClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !authUser) {
-      console.error('Auth error:', authError);
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Get user profile from Supabase to check type
-    const { data: userProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, type')
-      .eq('email', authUser.email!)
-      .single();
-
-    if (profileError || !userProfile) {
-      console.error('Profile fetch error:', profileError);
-      return NextResponse.json(
-        { success: false, error: 'User profile not found' },
-        { status: 404 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
-    const clientId = searchParams.get('clientId') || undefined;
+    const configId = searchParams.get('id');
 
-    // Non-admin users can only see their own configurations
-    const effectiveClientId = ['ADMIN', 'SUPER_ADMIN'].includes(userProfile.type) 
-      ? clientId 
-      : userProfile.id;
+    if (configId) {
+      try {
+        // Try to fetch from database first
+        const dbConfig = await prisma.deliveryConfiguration.findUnique({
+          where: { configId }
+        });
 
-    const configurations = await CalculatorService.getClientConfigurations(supabase, effectiveClientId);
-    
-    return NextResponse.json({
-      success: true,
-      data: configurations,
-      total: configurations.length,
-      timestamp: new Date().toISOString()
-    });
+        if (dbConfig) {
+          return NextResponse.json({ success: true, data: dbToConfig(dbConfig) });
+        }
+      } catch (dbError) {
+        console.warn('Database query failed, falling back to in-memory configs:', dbError);
+      }
+
+      // Fallback to in-memory configurations
+      const config = getConfiguration(configId);
+      if (!config) {
+        return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, data: config });
+    } else {
+      try {
+        // Try to fetch all from database
+        const dbConfigs = await prisma.deliveryConfiguration.findMany({
+          where: { isActive: true },
+          orderBy: { updatedAt: 'desc' }
+        });
+
+        // If DB has configs, return them
+        if (dbConfigs.length > 0) {
+          const configurations = dbConfigs.map(dbToConfig);
+          return NextResponse.json({ success: true, data: configurations });
+        }
+      } catch (dbError) {
+        console.warn('Database query failed, falling back to in-memory configs:', dbError);
+      }
+
+      // Fallback to in-memory defaults
+      const configurations = getActiveConfigurations();
+      return NextResponse.json({ success: true, data: configurations });
+    }
   } catch (error) {
-    console.error('Failed to fetch client configurations:', error);
-    
-    if (error instanceof ConfigurationError) {
+    console.error('Error fetching configurations:', error);
+    // Even on error, try to return in-memory defaults
+    try {
+      const configurations = getActiveConfigurations();
+      return NextResponse.json({ success: true, data: configurations });
+    } catch (fallbackError) {
       return NextResponse.json(
-        { success: false, error: error.message },
+        { error: 'Failed to fetch configurations' },
+        { status: 500 }
+      );
+    }
+  }
+}
+
+// POST: Create/Update configuration
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const body = await request.json();
+    const config: ClientDeliveryConfiguration = body;
+
+    // Validate configuration
+    const validation = validateConfiguration(config);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: 'Invalid configuration', details: validation.errors },
         { status: 400 }
       );
     }
-    
+
+    // Save to database
+    const dbData = configToDb(config, user?.id);
+
+    const savedConfig = await prisma.deliveryConfiguration.upsert({
+      where: { configId: config.id },
+      update: dbData,
+      create: dbData
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: dbToConfig(savedConfig),
+      message: 'Configuration saved successfully'
+    });
+  } catch (error) {
+    console.error('Error saving configuration:', error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
+      { error: 'Failed to save configuration' },
       { status: 500 }
     );
   }
 }
 
-export async function POST(request: NextRequest) {
+// DELETE: Delete a configuration
+export async function DELETE(request: NextRequest) {
   try {
-    // Use session-based authentication (consistent with other endpoints)
-    const supabase = await createClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !authUser) {
-      console.error('Auth error:', authError);
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const { searchParams } = new URL(request.url);
+    const configId = searchParams.get('id');
 
-    // Get user profile from Supabase to check type
-    const { data: userProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, type')
-      .eq('email', authUser.email!)
-      .single();
-
-    if (profileError || !userProfile) {
-      console.error('Profile fetch error:', profileError);
+    if (!configId) {
       return NextResponse.json(
-        { success: false, error: 'User profile not found' },
-        { status: 404 }
-      );
-    }
-
-    // Check if user has admin privileges or is creating for themselves
-    const body = await request.json();
-    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(userProfile.type);
-    
-    if (!isAdmin && body.clientId && body.clientId !== userProfile.id) {
-      return NextResponse.json(
-        { success: false, error: 'Cannot create configuration for other users' },
-        { status: 403 }
-      );
-    }
-
-    // If not admin and no clientId specified, use current user
-    if (!isAdmin && !body.clientId) {
-      body.clientId = userProfile.id;
-    }
-    
-    // Validate input
-    const validatedInput = CreateClientConfigSchema.parse(body);
-    
-    const configuration = await CalculatorService.createClientConfig(supabase, validatedInput);
-    
-    return NextResponse.json({
-      success: true,
-      data: configuration,
-      timestamp: new Date().toISOString()
-    }, { status: 201 });
-  } catch (error) {
-    console.error('Failed to create client configuration:', error);
-    
-    if (error instanceof ConfigurationError) {
-      return NextResponse.json(
-        { success: false, error: error.message },
+        { error: 'Configuration ID is required' },
         { status: 400 }
       );
     }
-    
+
+    await prisma.deliveryConfiguration.delete({
+      where: { configId }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Configuration deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting configuration:', error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
+      { error: 'Failed to delete configuration' },
       { status: 500 }
     );
   }

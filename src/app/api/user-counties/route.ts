@@ -23,6 +23,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * Returns the list of allowed counties for a user.
+ * Currently returns all available Bay Area counties.
+ * Can be extended to filter based on user profile's countiesServed field.
+ */
 async function fetchAllowedCountiesForUser(userId: string): Promise<string[]> {
-  return ['San Mateo', 'Contra Costa', 'Alameda'];
+  // Return all available Bay Area counties including San Francisco and Santa Clara
+  return [
+    'Alameda',
+    'Contra Costa',
+    'San Francisco',
+    'San Mateo',
+    'Santa Clara'
+  ];
 }

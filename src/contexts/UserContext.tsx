@@ -13,28 +13,6 @@ import { Session, User } from "@supabase/supabase-js";
 import { UserType } from "@/types/user";
 import { authLogger } from "@/utils/logger";
 
-// Helper function to conditionally log during development only
-const devLog = (...args: any[]) => {
-  if (process.env.NODE_ENV === "development") {
-    console.log(...args);
-  }
-};
-
-const devError = (...args: any[]) => {
-  // Always log errors, but in development add extra context
-  if (process.env.NODE_ENV === "development") {
-    console.error(...args);
-  } else {
-    console.error(...args);
-  }
-};
-
-const devWarn = (...args: any[]) => {
-  if (process.env.NODE_ENV === "development") {
-    console.warn(...args);
-  }
-};
-
 // Import enhanced authentication services (session manager loaded dynamically)
 import { getTokenRefreshService } from "@/lib/auth/token-refresh-service";
 import { getAuthenticatedFetch } from "@/lib/auth/api-interceptor";
@@ -151,7 +129,6 @@ const fetchUserRole = async (
     // Check cache first
     const cachedProfile = getCachedUserProfile(user.id);
     if (cachedProfile && cachedProfile.type) {
-      devLog("Using cached user profile:", cachedProfile);
       setUserRole(cachedProfile.type);
       return cachedProfile.type;
     }
@@ -227,8 +204,6 @@ const fetchUserRole = async (
     setUserRole(role);
     return role;
   } catch (err) {
-    devError("Error fetching user role:", err);
-
     // Try to use any persisted auth state as fallback
     const persistedState = getPersistedAuthState();
     if (
@@ -236,7 +211,6 @@ const fetchUserRole = async (
       persistedState.userId === user.id &&
       persistedState.userRole
     ) {
-      devLog("Using persisted auth state as fallback:", persistedState);
       const fallbackRole = persistedState.userRole as UserType;
       setUserRole(fallbackRole);
       return fallbackRole;
@@ -248,7 +222,6 @@ const fetchUserRole = async (
 
 // Create a client component wrapper
 function UserProviderClient({ children }: { children: ReactNode }) {
-  devLog("🔵 UserProviderClient mounting");
   authLogger.debug(
     "🟢 UserProviderClient MOUNTING - Enhanced version with session management!",
   );
@@ -304,10 +277,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
   // Initialize services
   useEffect(() => {
-    devLog(
-      "🔧 UserContext: initServices useEffect triggered, hasImmediateData:",
-      hasImmediateData,
-    );
     const initServices = async () => {
       try {
         setAuthProgressState({
@@ -317,7 +286,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
         // Add timeout for service initialization
         const initTimeout = setTimeout(() => {
-          devLog("🔥 UserProviderClient: Service initialization timeout");
           setAuthProgressState({ step: "idle", message: "" });
           if (!hasImmediateData) {
             setIsLoading(false);
@@ -343,7 +311,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           "UserProviderClient: Services initialized successfully",
         );
       } catch (err) {
-        devError("UserProviderClient: Failed to initialize services:", err);
         setError("Authentication initialization failed");
         if (!hasImmediateData) {
           setIsLoading(false);
@@ -363,15 +330,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       if (!mounted) return;
 
       try {
-        devLog(`🔍 Checking Supabase session (attempt ${retryCount + 1})...`);
-
         // FAST PATH: Check for session cookies first (set by login action)
         // This provides immediate hydration while we wait for Supabase session
         if (retryCount === 0) {
           try {
-            // Log all cookies for debugging
-            devLog("🍪 All cookies:", document.cookie);
-
             const tempSessionCookie = document.cookie
               .split("; ")
               .find((row) => row.startsWith("temp-session-data="));
@@ -386,9 +348,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               .find((row) => row.startsWith("user-profile-"));
 
             let cookieData = tempSessionCookie || sessionCookie;
-            devLog("🍪 Found temp session cookie?", !!tempSessionCookie);
-            devLog("🍪 Found user session cookie?", !!sessionCookie);
-            devLog("🍪 Found user profile cookie?", !!userProfileCookie);
 
             // FALLBACK: If no session cookies, extract data from user-profile cookie
             if (!cookieData && userProfileCookie) {
@@ -401,11 +360,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                 const profileData = JSON.parse(decodeURIComponent(cookieValue));
                 // Extract user ID from cookie name (format: user-profile-{userId})
                 const userId = cookieName.replace("user-profile-", "");
-
-                devLog("✅ Using user-profile cookie for hydration:", {
-                  userId,
-                  type: profileData.type,
-                });
 
                 // Create a session-like object from profile data
                 const sessionData = {
@@ -433,7 +387,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                 // Skip the normal cookie processing since we handled it
                 return;
               } catch (e) {
-                devWarn("Failed to parse user-profile cookie:", e);
+                // Failed to parse user-profile cookie
               }
             }
 
@@ -446,13 +400,8 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               const sessionData = JSON.parse(
                 decodeURIComponent(cookieParts[1]),
               );
-              devLog("🍪 Found session cookie:", sessionData);
 
               if (sessionData?.userId && sessionData?.userRole) {
-                devLog(
-                  "✅ Fast hydration from cookie, fetching full user data...",
-                );
-
                 // Create a minimal user object from cookie to prevent UI flash
                 // This will be replaced with full user data from Supabase
                 const minimalUser = {
@@ -478,7 +427,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               }
             }
           } catch (cookieError) {
-            devWarn("Failed to parse session cookie:", cookieError);
             // Continue with normal flow
           }
         }
@@ -495,14 +443,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           error: sessionError,
         } = await client.auth.getSession();
 
-        devLog("🔍 Supabase session result:", {
-          hasSession: !!session,
-          hasUser: !!session?.user,
-          error: sessionError?.message,
-        });
-
         if (session?.user) {
-          devLog("✅ Found Supabase session for:", session.user.email);
 
           // Get user role from profile
           const { data: profile } = await client
@@ -513,7 +454,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
           if (profile?.type) {
             const userRole = profile.type.toLowerCase() as UserType;
-            devLog("✅ Setting user role:", userRole);
 
             if (mounted) {
               setUser(session.user);
@@ -530,7 +470,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         // This handles the race condition after login redirect where cookies are still being set
         if (retryCount < 3) {
           const delay = (retryCount + 1) * 200; // 200ms, 400ms, 600ms
-          devLog(`⏳ No session found, retrying in ${delay}ms...`);
           retryTimeout = setTimeout(() => {
             if (mounted) {
               checkSupabaseSession(retryCount + 1);
@@ -540,17 +479,13 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         }
 
         // After all retries, no session found
-        devLog("ℹ️ No authenticated session found after retries");
         if (mounted) {
           setIsLoading(false);
         }
       } catch (error) {
-        devError("❌ Error checking Supabase session:", error);
-
         // On error, retry if we haven't exhausted attempts
         if (retryCount < 3 && mounted) {
           const delay = (retryCount + 1) * 200;
-          devLog(`⏳ Error occurred, retrying in ${delay}ms...`);
           retryTimeout = setTimeout(() => {
             if (mounted) {
               checkSupabaseSession(retryCount + 1);
@@ -575,11 +510,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   // Enhanced auth state management
   useEffect(() => {
     if (!supabase || !sessionManager) {
-      devLog("⏳ UserProviderClient: Waiting for services...");
       return;
     }
 
-    devLog("Setting up enhanced auth state...");
     let mounted = true;
     let authListener: any = null;
 
@@ -587,16 +520,11 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       let authTimeout: NodeJS.Timeout | null = null;
 
       try {
-        devLog("UserProviderClient: Getting initial user data...");
-
         // First, quickly check if there's any session data available
         const { data: sessionData } = await supabase.auth.getSession();
 
         // If no session exists, immediately set loading to false - no need to authenticate
         if (!sessionData?.session) {
-          devLog(
-            "ℹ️ No session found - user not authenticated, setting loading to false immediately",
-          );
           setIsLoading(false);
           setAuthProgressState({ step: "idle", message: "" });
           setAuthState((prev) => ({
@@ -616,9 +544,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         // Add a timeout to prevent infinite loading
         authTimeout = setTimeout(() => {
           if (mounted) {
-            devLog(
-              "🔥 UserProviderClient: Auth setup timeout - forcing completion",
-            );
             setIsLoading(false);
             setAuthProgressState({ step: "idle", message: "" });
           }
@@ -657,14 +582,10 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         }
 
         if (getUserError) {
-          devError("❌ Error getting user:", getUserError);
           clearTimeout(authTimeout);
 
           // Handle "Auth session missing" error - this is expected for non-authenticated users
           if (getUserError.message?.includes("Auth session missing")) {
-            devLog(
-              "ℹ️ Auth session missing - user not authenticated, this is expected",
-            );
 
             // Clear any existing auth progress
             setAuthProgressState({ step: "idle", message: "" });
@@ -696,9 +617,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
           // If we have immediate data, verify it matches current user
           if (hasImmediateData) {
-            devLog(
-              "UserProviderClient: Verifying immediate data with current user...",
-            );
             // Update user object with full Supabase user data
             setUser(currentUser);
 
@@ -720,15 +638,12 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                 tokenRefreshService.startAutoRefresh(sessionData.data.session);
               }
             } catch (sessionError) {
-              devError("Error initializing enhanced session:", sessionError);
+              // Error initializing enhanced session
             }
 
             // Only fetch role from DB if hydrated data doesn't match current user ID
             const recoveredState = recoverAuthState();
             if (!recoveredState || recoveredState.userId !== currentUser.id) {
-              devLog(
-                "UserProviderClient: Hydrated data mismatch, fetching fresh role...",
-              );
               currentUserRole = await fetchUserRole(
                 supabase,
                 currentUser,
@@ -759,10 +674,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                 tokenRefreshService.startAutoRefresh(sessionData.data.session);
               }
             } catch (sessionError) {
-              devError("Error initializing enhanced session:", sessionError);
+              // Error initializing enhanced session
             }
 
-            devLog("UserProviderClient: User found. Fetching user role...");
             currentUserRole = await fetchUserRole(
               supabase,
               currentUser,
@@ -787,9 +701,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               : null,
           }));
         } else {
-          devLog(
-            "ℹ️ UserProviderClient: No user found. Setting loading to false.",
-          );
           clearTimeout(authTimeout);
           setUser(null);
           setUserRole(null);
@@ -818,7 +729,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           async (event: string, session: Session | null) => {
             if (!mounted) return;
 
-            devLog("Enhanced Auth state changed:", event);
             setSession(session);
 
             const newUser = session?.user || null;
@@ -886,10 +796,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                     : null,
                 }));
               } catch (sessionError) {
-                devError(
-                  "Error initializing enhanced session on sign-in:",
-                  sessionError,
-                );
+                // Error initializing enhanced session on sign-in
               }
             }
 
@@ -900,7 +807,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               event === "TOKEN_REFRESHED"
             ) {
               if (newUser?.id !== currentUser?.id) {
-                devLog("Auth state change: fetching fresh user role...");
                 setHasImmediateData(false);
                 setIsLoading(true);
                 const newUserRole = await fetchUserRole(
@@ -916,6 +822,18 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                   user: newUser,
                   userRole: newUserRole, // Use the locally captured value
                   lastActivity: Date.now(),
+                  sessionExpiresAt: session?.expires_at
+                    ? session.expires_at * 1000
+                    : null,
+                }));
+              } else if (event === "TOKEN_REFRESHED" && session) {
+                // Same user, just update session expiry and activity
+                setAuthState((prev) => ({
+                  ...prev,
+                  lastActivity: Date.now(),
+                  sessionExpiresAt: session.expires_at
+                    ? session.expires_at * 1000
+                    : null,
                 }));
               }
             }
@@ -924,7 +842,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
         authListener = listener;
       } catch (error) {
-        devError("💥 UserProviderClient: Error in auth setup:", error);
         if (authTimeout) {
           clearTimeout(authTimeout);
         }
@@ -1018,14 +935,12 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         }));
       }
     } catch (err) {
-      devError("Error refreshing user data:", err);
       setError("Failed to refresh user data. Please try again.");
 
       // Try to recover from persisted state as last resort
       try {
         const persistedState = getPersistedAuthState();
         if (persistedState) {
-          devLog("Attempting recovery from persisted state...");
           const mockUser = {
             id: persistedState.userId,
             email: persistedState.email,
@@ -1034,7 +949,6 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           setUser(mockUser);
           setUserRole(persistedState.userRole as UserType);
           setError(null); // Clear error if recovery succeeds
-          devLog("Successfully recovered from persisted state");
 
           // Update auth state
           setAuthState((prev) => ({
@@ -1045,7 +959,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
           }));
         }
       } catch (recoveryError) {
-        devError("Failed to recover from persisted state:", recoveryError);
+        // Failed to recover from persisted state
       }
     } finally {
       setIsLoading(false);
@@ -1067,29 +981,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
 
     try {
       await sessionManager.refreshToken();
-      devLog("Token refreshed successfully");
-
-      // Get the updated session from Supabase
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData?.session) {
-        // Update auth state with new session expiry time
-        setAuthState((prev) => ({
-          ...prev,
-          session: sessionData.session,
-          sessionExpiresAt: sessionData.session.expires_at
-            ? sessionData.session.expires_at * 1000
-            : null,
-          lastActivity: Date.now(),
-          needsRefresh: false,
-        }));
-
-        // Update the session state as well
-        setSession(sessionData.session);
-
-        devLog("Session expiry updated:", new Date(sessionData.session.expires_at! * 1000));
-      }
     } catch (error) {
-      devError("Token refresh failed:", error);
       setError("Failed to refresh authentication token");
 
       // Update auth state
@@ -1147,10 +1039,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         needsRefresh: false,
         suspiciousActivity: false,
       });
-
-      devLog("Logout completed successfully");
     } catch (error) {
-      devError("Logout error:", error);
       setError("Failed to sign out properly");
 
       // Update auth state
@@ -1222,14 +1111,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
   return (
     <AuthErrorBoundary
       onError={(error, errorInfo) => {
-        // Log auth errors for monitoring
-        devError("🚨 Auth Error Boundary triggered:", {
-          error: error.message,
-          stack: error.stack,
-          componentStack: errorInfo.componentStack,
-          timestamp: new Date().toISOString(),
-        });
-
         // You can add error reporting service here
         // e.g., Sentry, LogRocket, etc.
       }}

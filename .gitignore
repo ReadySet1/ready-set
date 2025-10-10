@@ -59,6 +59,7 @@ backups/*
 /backups
 
 .cursor/
+.claude/
 
 # Prisma
 .prisma-initialized
@@ -71,6 +72,7 @@ prisma/migrations/migration_lock.toml
 
 # IDE and Editor files
 .idea/
+.claude/
 *.swp
 *.swo
 *~

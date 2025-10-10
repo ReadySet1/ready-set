@@ -31,6 +31,21 @@ interface DeliveryCalculatorProps {
   className?: string;
 }
 
+// Helper function for safe number formatting
+const formatCurrency = (value: number | undefined | null): string => {
+  if (typeof value !== 'number' || isNaN(value)) {
+    return '0.00';
+  }
+  return value.toFixed(2);
+};
+
+const formatPercent = (value: number | undefined | null): string => {
+  if (typeof value !== 'number' || isNaN(value)) {
+    return '0.0';
+  }
+  return value.toFixed(1);
+};
+
 export function DeliveryCalculator({
   templateId,
   clientConfigId,
@@ -100,19 +115,8 @@ export function DeliveryCalculator({
 
   // Auto-calculate when input changes and config is loaded
   useEffect(() => {
-    console.log('🔍 Calculator Debug:', {
-      hasConfig: !!config,
-      configTemplate: config?.template?.name,
-      configId: config?.template?.id,
-      inputValues: input,
-      hasNonZeroInput: Object.values(input).some(val => val !== 0 && val !== ''),
-      willCalculate: config && Object.values(input).some(val => val !== 0 && val !== '')
-    });
-
     if (config && Object.values(input).some(val => val !== 0 && val !== '')) {
-      console.log('⏰ Starting calculation with 300ms delay...');
       const timer = setTimeout(() => {
-        console.log('🧮 Triggering calculation...');
         calculate(input);
       }, 300); // Debounce calculations
 
@@ -133,6 +137,16 @@ export function DeliveryCalculator({
       loadClientConfigs();
     }
   }, [templates, loadClientConfigs]);
+
+  // Auto-select Ready Set Food - Standard when configs load
+  useEffect(() => {
+    if (clientConfigs.length > 0 && !config?.clientConfig && config?.template) {
+      const readySetConfig = clientConfigs.find(c => c.clientName === 'Ready Set Food - Standard');
+      if (readySetConfig) {
+        setActiveClientConfig(readySetConfig.id);
+      }
+    }
+  }, [clientConfigs, config?.clientConfig, config?.template, setActiveClientConfig]);
 
   const handleInputChange = (field: keyof CalculationInput, value: any) => {
     setInput(prev => ({ ...prev, [field]: value }));
@@ -181,15 +195,13 @@ export function DeliveryCalculator({
 
       // Reload history from database to show the new calculation
       await reloadHistory();
-      
+
       // Show success feedback
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000); // Hide after 3 seconds
-      
-      console.log('✅ Calculation saved successfully and history reloaded');
-      
+
     } catch (error) {
-      console.error('❌ Failed to save calculation:', error);
+      console.error('Failed to save calculation:', error);
       // You could add proper error handling here
     } finally {
       setIsSaving(false);
@@ -210,21 +222,37 @@ export function DeliveryCalculator({
     });
   };
 
-  // Memoized profit analysis
-  const profitAnalysis = useMemo(() => {
-    if (!result) return null;
+  // Memoized Ready Set earnings breakdown
+  const readySetEarnings = useMemo(() => {
+    if (!result || !result.metadata) return null;
 
-    const { profit, profitMargin } = result;
-    const isHealthy = profitMargin >= 20;
-    const isWarning = profitMargin >= 10 && profitMargin < 20;
-    const isDangerous = profitMargin < 10;
+    const readySetFee = result.metadata.readySetFee || 0;
+    const mileageRate = result.metadata.readySetMileageRate || result.metadata.vendorMileageRate || 3.0;
+    const mileage = result.metadata.mileage || 0;
+    const bridgeToll = result.driverPayments?.bridgeToll || 0;
+    const distanceThreshold = 10;
+    const extraMiles = Math.max(0, mileage - distanceThreshold);
+    const readySetMileageFee = extraMiles * mileageRate;
+    const totalReadySetFee = readySetFee + readySetMileageFee + bridgeToll;
+
+    const breakdown = [
+      { label: 'Base Fee', amount: readySetFee },
+      { label: `Add-on Fee (${extraMiles.toFixed(1)} mi × $${mileageRate})`, amount: readySetMileageFee }
+    ];
+
+    if (bridgeToll > 0) {
+      breakdown.push({ label: 'Bridge Toll', amount: bridgeToll });
+    }
 
     return {
-      profit,
-      profitMargin,
-      status: isHealthy ? 'healthy' : isWarning ? 'warning' : 'danger',
-      color: isHealthy ? 'text-green-600' : isWarning ? 'text-yellow-600' : 'text-red-600',
-      bgColor: isHealthy ? 'bg-green-50' : isWarning ? 'bg-yellow-50' : 'bg-red-50'
+      baseFee: readySetFee,
+      addonFee: readySetMileageFee,
+      mileageFee: readySetMileageFee,
+      bridgeToll,
+      mileage,
+      mileageRate,
+      totalFee: totalReadySetFee,
+      breakdown
     };
   }, [result]);
 
@@ -317,15 +345,14 @@ export function DeliveryCalculator({
                   <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                   Client Configuration <span className="text-slate-500 font-normal">(Optional)</span>
                 </Label>
-                <Select 
-                  value={config?.clientConfig?.id || 'default'} 
-                  onValueChange={(value) => handleClientConfigChange(value === 'default' ? undefined : value)}
+                <Select
+                  value={config?.clientConfig?.id}
+                  onValueChange={handleClientConfigChange}
                 >
                   <SelectTrigger className="h-10 border-slate-200 focus:border-purple-400 focus:ring-purple-200 bg-white shadow-sm transition-all duration-200 hover:border-slate-300">
-                    <SelectValue placeholder="Select client configuration" />
+                    <SelectValue placeholder="No customization (use template defaults)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="default">Default Configuration</SelectItem>
                     {clientConfigs.map(clientConfig => (
                       <SelectItem key={clientConfig.id} value={clientConfig.id}>
                         {clientConfig.clientName}
@@ -536,7 +563,7 @@ export function DeliveryCalculator({
 
                 <div className="space-y-2">
                   <Label htmlFor="tips" className="text-slate-700 font-medium text-sm">
-                    Tips ($)
+                    Driver Bonus Pay ($)
                   </Label>
                   <Input
                     id="tips"
@@ -548,6 +575,9 @@ export function DeliveryCalculator({
                     placeholder="0.00"
                     className="h-9 border-slate-200 focus:border-slate-400 focus:ring-slate-200 bg-white/80"
                   />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Additional bonus pay for driver (e.g., $10)
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -618,76 +648,35 @@ export function DeliveryCalculator({
 
           {result && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Customer Charges */}
-              <Card className="border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                    <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg shadow-sm">
-                      <DollarSign className="h-4 w-4 text-white" />
-                    </div>
-                    <span className="text-emerald-700">Customer Charges</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {result.customerCharges.baseFee > 0 && (
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-slate-600 font-medium">Base Fee:</span>
-                        <span className="font-semibold text-slate-900">${result.customerCharges.baseFee.toFixed(2)}</span>
+              {/* Ready Set Earnings */}
+              {readySetEarnings && (
+                <Card className="border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                      <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg shadow-sm">
+                        <DollarSign className="h-4 w-4 text-white" />
                       </div>
-                    )}
-                    
-                    {result.customerCharges.longDistanceCharge > 0 && (
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-slate-600 font-medium">Long Distance:</span>
-                        <span className="font-semibold text-slate-900">${result.customerCharges.longDistanceCharge.toFixed(2)}</span>
-                      </div>
-                    )}
-                    
-                    {result.customerCharges.bridgeToll > 0 && (
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-slate-600 font-medium">Bridge Toll:</span>
-                        <span className="font-semibold text-slate-900">${result.customerCharges.bridgeToll.toFixed(2)}</span>
-                      </div>
-                    )}
-                    
-                    {result.customerCharges.extraStopsCharge > 0 && (
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-slate-600 font-medium">Extra Stops:</span>
-                        <span className="font-semibold text-slate-900">${result.customerCharges.extraStopsCharge.toFixed(2)}</span>
-                      </div>
-                    )}
-                    
-                    {result.customerCharges.headcountCharge > 0 && (
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-slate-600 font-medium">Headcount Charge:</span>
-                        <span className="font-semibold text-slate-900">${result.customerCharges.headcountCharge.toFixed(2)}</span>
-                      </div>
-                    )}
-                    
-                    {result.customerCharges.foodCost > 0 && (
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-slate-600 font-medium">Food Cost:</span>
-                        <span className="font-semibold text-slate-900">${result.customerCharges.foodCost.toFixed(2)}</span>
-                      </div>
-                    )}
+                      <span className="text-emerald-700">Ready Set Earnings</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {readySetEarnings.breakdown.map((item, index) => (
+                        <div key={index} className="flex justify-between items-center py-2">
+                          <span className="text-slate-600 font-medium">{item.label}:</span>
+                          <span className="font-semibold text-slate-900">${formatCurrency(item.amount)}</span>
+                        </div>
+                      ))}
 
-                    {/* Custom charges */}
-                    {Object.entries(result.customerCharges.customCharges).map(([key, value]) => (
-                      <div key={key} className="flex justify-between items-center py-2">
-                        <span className="text-slate-600 font-medium">{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</span>
-                        <span className="font-semibold text-slate-900">${value.toFixed(2)}</span>
+                      <Separator className="my-4" />
+                      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-200">
+                        <span className="text-lg font-bold text-emerald-800">Total Ready Set Fee:</span>
+                        <span className="text-2xl font-bold text-emerald-900">${formatCurrency(readySetEarnings.totalFee)}</span>
                       </div>
-                    ))}
-                    
-                    <Separator className="my-4" />
-                    <div className="flex justify-between items-center p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-200">
-                      <span className="text-lg font-bold text-emerald-800">Total:</span>
-                      <span className="text-2xl font-bold text-emerald-900">${result.customerCharges.total.toFixed(2)}</span>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Driver Payments */}
               <Card className="border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm">
@@ -701,129 +690,66 @@ export function DeliveryCalculator({
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {result.driverPayments.basePay > 0 && (
+                    {(result.driverPayments.basePay ?? 0) > 0 && (
                       <div className="flex justify-between items-center py-2">
                         <span className="text-slate-600 font-medium">Base Pay:</span>
-                        <span className="font-semibold text-slate-900">${result.driverPayments.basePay.toFixed(2)}</span>
+                        <span className="font-semibold text-slate-900">${formatCurrency(result.driverPayments.basePay)}</span>
                       </div>
                     )}
-                    
+
                     <div className="flex justify-between items-center py-2">
                       <span className="text-slate-600 font-medium">Mileage ({input.mileage} × ${input.mileageRate}):</span>
-                      <span className="font-semibold text-slate-900">${result.driverPayments.mileagePay.toFixed(2)}</span>
+                      <span className="font-semibold text-slate-900">${formatCurrency(result.driverPayments.mileagePay)}</span>
                     </div>
-                    
-                    {result.driverPayments.bridgeToll > 0 && (
+
+                    {(result.driverPayments.bonus ?? 0) > 0 && (
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-slate-600 font-medium">Driver Bonus Pay:</span>
+                        <span className="font-semibold text-emerald-600">${formatCurrency(result.driverPayments.bonus)}</span>
+                      </div>
+                    )}
+
+                    {(result.driverPayments.bridgeToll ?? 0) > 0 && (
                       <div className="flex justify-between items-center py-2">
                         <span className="text-slate-600 font-medium">Bridge Toll:</span>
-                        <span className="font-semibold text-slate-900">${result.driverPayments.bridgeToll.toFixed(2)}</span>
+                        <span className="font-semibold text-slate-900">${formatCurrency(result.driverPayments.bridgeToll)}</span>
                       </div>
                     )}
-                    
-                    {result.driverPayments.extraStopsBonus > 0 && (
+
+                    {(result.driverPayments.extraStopsBonus ?? 0) > 0 && (
                       <div className="flex justify-between items-center py-2">
                         <span className="text-slate-600 font-medium">Extra Stops Bonus:</span>
-                        <span className="font-semibold text-slate-900">${result.driverPayments.extraStopsBonus.toFixed(2)}</span>
+                        <span className="font-semibold text-slate-900">${formatCurrency(result.driverPayments.extraStopsBonus)}</span>
                       </div>
                     )}
-                    
-                    {result.driverPayments.tips > 0 && (
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-slate-600 font-medium">Tips:</span>
-                        <span className="font-semibold text-slate-900">${result.driverPayments.tips.toFixed(2)}</span>
-                      </div>
-                    )}
-                    
-                    {result.driverPayments.adjustments !== 0 && (
+
+
+                    {(result.driverPayments.adjustments ?? 0) !== 0 && (
                       <div className="flex justify-between items-center py-2">
                         <span className="text-slate-600 font-medium">Adjustments:</span>
-                        <span className={`font-semibold ${result.driverPayments.adjustments >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          ${result.driverPayments.adjustments.toFixed(2)}
+                        <span className={`font-semibold ${(result.driverPayments.adjustments ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          ${formatCurrency(result.driverPayments.adjustments)}
                         </span>
                       </div>
                     )}
 
                     {/* Custom payments */}
-                    {Object.entries(result.driverPayments.customPayments).map(([key, value]) => (
+                    {result.driverPayments.customPayments && typeof result.driverPayments.customPayments === 'object' &&
+                     Object.entries(result.driverPayments.customPayments).map(([key, value]) => (
                       <div key={key} className="flex justify-between items-center py-2">
                         <span className="text-slate-600 font-medium">{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</span>
-                        <span className="font-semibold text-slate-900">${value.toFixed(2)}</span>
+                        <span className="font-semibold text-slate-900">${formatCurrency(value)}</span>
                       </div>
                     ))}
-                    
+
                     <Separator className="my-4" />
                     <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
                       <span className="text-lg font-bold text-blue-800">Total:</span>
-                      <span className="text-2xl font-bold text-blue-900">${result.driverPayments.total.toFixed(2)}</span>
+                      <span className="text-2xl font-bold text-blue-900">${formatCurrency(result.driverPayments.total)}</span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Profit Analysis */}
-              {profitAnalysis && (
-                <Card className="lg:col-span-2 border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-xl font-semibold text-slate-800">
-                      <div className="p-1.5 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg shadow-sm">
-                        <DollarSign className="h-5 w-5 text-white" />
-                      </div>
-                      Profit Analysis
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className={`p-4 rounded-xl ${
-                      profitAnalysis.status === 'healthy' ? 'bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200' :
-                      profitAnalysis.status === 'warning' ? 'bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200' :
-                      'bg-gradient-to-br from-red-50 to-rose-50 border border-red-200'
-                    }`}>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="text-center space-y-2">
-                          <div className="text-3xl font-bold text-slate-900">
-                            ${profitAnalysis.profit.toFixed(2)}
-                          </div>
-                          <div className="text-sm font-medium text-slate-600 bg-white/60 px-3 py-1 rounded-full">Gross Profit</div>
-                        </div>
-                        
-                        <div className="text-center space-y-2">
-                          <div className={`text-3xl font-bold ${
-                            profitAnalysis.status === 'healthy' ? 'text-emerald-600' :
-                            profitAnalysis.status === 'warning' ? 'text-amber-600' :
-                            'text-red-600'
-                          }`}>
-                            {profitAnalysis.profitMargin.toFixed(1)}%
-                          </div>
-                          <div className="text-sm font-medium text-slate-600 bg-white/60 px-3 py-1 rounded-full">Profit Margin</div>
-                        </div>
-                        
-                        <div className="text-center space-y-2">
-                          <Badge 
-                            className={`text-sm px-4 py-2 font-medium ${
-                              profitAnalysis.status === 'healthy' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                              profitAnalysis.status === 'warning' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                              'bg-red-100 text-red-700 border-red-200'
-                            }`}
-                          >
-                            {profitAnalysis.status === 'healthy' ? 'Healthy' : 
-                             profitAnalysis.status === 'warning' ? 'Fair' : 'Poor'}
-                          </Badge>
-                          <div className="text-sm font-medium text-slate-600 bg-white/60 px-3 py-1 rounded-full">Status</div>
-                        </div>
-                      </div>
-                      
-                      <div className={`mt-6 p-4 rounded-xl text-center font-medium ${
-                        profitAnalysis.status === 'healthy' ? 'bg-emerald-100 text-emerald-800' :
-                        profitAnalysis.status === 'warning' ? 'bg-amber-100 text-amber-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {profitAnalysis.status === 'healthy' && '🎉 Excellent profit margin! This delivery is very profitable.'}
-                        {profitAnalysis.status === 'warning' && '⚠️ Decent profit margin, but consider optimizing costs.'}
-                        {profitAnalysis.status === 'danger' && '⚠️ Low profit margin. Review pricing or reduce costs.'}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
             </div>
           )}
 
@@ -868,19 +794,21 @@ export function DeliveryCalculator({
               ) : savedResults.length > 0 ? (
                 <div className="space-y-4">
                   {savedResults.map((savedResult, index) => {
-                    const profit = Number(savedResult.customer_total) - Number(savedResult.driver_total);
+                    const customerTotal = Number(savedResult.customer_total) || 0;
+                    const driverTotal = Number(savedResult.driver_total) || 0;
+                    const profit = customerTotal - driverTotal;
                     return (
                       <div key={savedResult.id || index} className="border border-slate-200 rounded-2xl p-6 bg-gradient-to-r from-white to-slate-50 shadow-sm hover:shadow-md transition-shadow duration-200">
                         <div className="flex justify-between items-center">
                           <div className="flex gap-6">
                             <span className="font-semibold text-slate-900">
-                              Customer: <span className="text-emerald-600">${Number(savedResult.customer_total).toFixed(2)}</span>
+                              Customer: <span className="text-emerald-600">${formatCurrency(customerTotal)}</span>
                             </span>
                             <span className="font-semibold text-slate-900">
-                              Driver: <span className="text-blue-600">${Number(savedResult.driver_total).toFixed(2)}</span>
+                              Driver: <span className="text-blue-600">${formatCurrency(driverTotal)}</span>
                             </span>
                             <span className={`font-semibold ${profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                              Profit: ${profit.toFixed(2)}
+                              Profit: ${formatCurrency(profit)}
                             </span>
                           </div>
                           <span className="text-sm text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
