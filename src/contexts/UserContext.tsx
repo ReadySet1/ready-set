@@ -886,7 +886,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
                     : null,
                 }));
               } catch (sessionError) {
-                console.error(
+                devError(
                   "Error initializing enhanced session on sign-in:",
                   sessionError,
                 );
@@ -1058,7 +1058,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   };
 
   const refreshToken = async () => {
-    if (!sessionManager) return;
+    if (!sessionManager || !supabase) return;
 
     setAuthProgressState({
       step: "authenticating",
@@ -1068,6 +1068,26 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     try {
       await sessionManager.refreshToken();
       devLog("Token refreshed successfully");
+
+      // Get the updated session from Supabase
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session) {
+        // Update auth state with new session expiry time
+        setAuthState((prev) => ({
+          ...prev,
+          session: sessionData.session,
+          sessionExpiresAt: sessionData.session.expires_at
+            ? sessionData.session.expires_at * 1000
+            : null,
+          lastActivity: Date.now(),
+          needsRefresh: false,
+        }));
+
+        // Update the session state as well
+        setSession(sessionData.session);
+
+        devLog("Session expiry updated:", new Date(sessionData.session.expires_at! * 1000));
+      }
     } catch (error) {
       devError("Token refresh failed:", error);
       setError("Failed to refresh authentication token");
