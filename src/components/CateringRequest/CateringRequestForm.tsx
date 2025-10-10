@@ -9,7 +9,7 @@ import { Session, SupabaseClient } from "@supabase/supabase-js";
 import { CateringFormData, Address } from "@/types/catering";
 import { CateringNeedHost } from "@/types/order";
 import { createClient } from "@/utils/supabase/client";
-import AddressManager from "../AddressManager";
+import { AddressSelector } from "@/components/AddressSelector";
 import {
   Loader2,
   AlertCircle,
@@ -230,7 +230,6 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   const [session, setSession] = useState<Session | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [addresses, setAddresses] = useState<Address[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadedFileKeys, setUploadedFileKeys] = useState<string[]>([]);
 
@@ -326,19 +325,6 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
       subscription.unsubscribe();
     };
   }, [supabase]);
-
-  const handleAddressesLoaded = useCallback((loadedAddresses: Address[]) => {
-    console.log("📥 handleAddressesLoaded called in CateringRequestForm", {
-      count: loadedAddresses.length,
-      addresses: loadedAddresses.map((a) => ({
-        id: a.id,
-        street1: a.street1,
-        city: a.city,
-        state: a.state,
-      })),
-    });
-    setAddresses(loadedAddresses);
-  }, []);
 
   const needHost = watch("needHost");
 
@@ -595,18 +581,16 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         <h3 className="mb-4 border-b border-gray-200 pb-2 text-lg font-medium text-gray-800">
           Pickup Location
         </h3>
-        <AddressManager
-          onAddressesLoaded={handleAddressesLoaded}
-          onAddressSelected={(addressId) => {
-            const selectedAddress = addresses.find(
-              (addr) => addr.id === addressId,
-            );
-            if (selectedAddress) {
-              setValue("pickupAddress", selectedAddress);
-            }
+        <AddressSelector
+          mode="client"
+          type="pickup"
+          onSelect={(address) => {
+            setValue("pickupAddress", address);
           }}
-          showFilters={true}
-          showManagementButtons={true}
+          selectedAddressId={watch("pickupAddress")?.id}
+          showFavorites
+          showRecents
+          allowAddNew
         />
       </div>
 
@@ -728,18 +712,16 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         <h3 className="mb-5 border-b border-gray-200 pb-3 text-lg font-medium text-gray-800">
           Delivery Details
         </h3>
-        <AddressManager
-          onAddressesLoaded={handleAddressesLoaded}
-          onAddressSelected={(addressId) => {
-            const selectedAddress = addresses.find(
-              (addr) => addr.id === addressId,
-            );
-            if (selectedAddress) {
-              setValue("deliveryAddress", selectedAddress);
-            }
+        <AddressSelector
+          mode="client"
+          type="delivery"
+          onSelect={(address) => {
+            setValue("deliveryAddress", address);
           }}
-          showFilters={true}
-          showManagementButtons={true}
+          selectedAddressId={watch("deliveryAddress")?.id}
+          showFavorites
+          showRecents
+          allowAddNew
         />
       </div>
 
