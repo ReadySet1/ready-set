@@ -27,8 +27,6 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    console.log('🔍 Fetching template:', templateId);
     
     // Get template with rules using Supabase directly (consistent with templates API)
     const { data: template, error: templateError } = await supabase
@@ -37,19 +35,7 @@ export async function GET(request: NextRequest) {
       .eq('id', templateId)
       .single();
 
-    console.log('📋 Template query result:', { template, templateError });
-
     if (templateError || !template) {
-      console.error('❌ Error fetching template:', templateError);
-      
-      // Try to fetch all templates to see what's available for debugging
-      const { data: allTemplates, error: allError } = await supabase
-        .from('calculator_templates')
-        .select('id, name, description, is_active');
-        
-      console.log('📋 All available templates:', allTemplates);
-      console.log('🔍 Template fetch error details:', allError);
-      
       return NextResponse.json(
         { success: false, error: 'Calculator template not found' },
         { status: 404 }
@@ -63,10 +49,7 @@ export async function GET(request: NextRequest) {
       .eq('template_id', templateId)
       .order('priority', { ascending: false });
 
-    console.log('📏 Rules query result:', { rulesCount: rules?.length || 0, rulesError });
-
     if (rulesError) {
-      console.error('❌ Error fetching rules:', rulesError);
       return NextResponse.json(
         { success: false, error: 'Failed to fetch pricing rules' },
         { status: 500 }
@@ -110,7 +93,7 @@ export async function GET(request: NextRequest) {
         clientConfig = {
           id: configs.id,
           clientId: configs.client_id,
-          templateId: configs.template_id,
+          templateId: configs.template_id || template.id,
           clientName: configs.client_name,
           ruleOverrides: configs.rule_overrides || {},
           areaRules: configs.area_rules || [],
@@ -127,13 +110,7 @@ export async function GET(request: NextRequest) {
       clientConfig,
       areaRules: clientConfig?.areaRules || []
     };
-    
-    console.log('✅ Successfully fetched calculator configuration:', {
-      templateName: templateWithRules.name,
-      rulesCount: config.rules.length,
-      hasClientConfig: !!clientConfig
-    });
-    
+
     return NextResponse.json({
       success: true,
       data: config,
