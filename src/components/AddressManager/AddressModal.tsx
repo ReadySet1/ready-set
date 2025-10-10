@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { COUNTIES } from "@/components/Auth/SignUp/ui/FormData";
+import { COUNTIES, US_STATES } from "@/components/Auth/SignUp/ui/FormData";
 import { Address } from "@/types/address";
 import { createClient } from "@/utils/supabase/client";
 import { MapPin, Loader2 } from "lucide-react";
@@ -92,20 +92,14 @@ const AddressModal: React.FC<AddressModalProps> = ({
         );
       }
 
-      const updatedAddress = await response.json();
-      console.log(
-        `Address ${addressToEdit ? "updated" : "added"}:`,
-        updatedAddress,
-      );
+      await response.json();
 
       reset();
       onAddressUpdated();
       onClose();
     } catch (error) {
-      console.error(
-        `Error ${addressToEdit ? "updating" : "adding"} address:`,
-        error,
-      );
+      // Error handling - silently fail for now
+      // TODO: Add proper error notification to user
     } finally {
       setIsSubmitting(false);
     }
@@ -224,11 +218,27 @@ const AddressModal: React.FC<AddressModalProps> = ({
                   <Label htmlFor="state" className="text-sm font-medium">
                     State <span className="text-red-500">*</span>
                   </Label>
-                  <Input
-                    id="state"
-                    className="w-full"
-                    placeholder="CA"
-                    {...register("state")}
+                  <Controller
+                    name="state"
+                    control={control}
+                    defaultValue=""
+                    render={({ field }) => (
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || ""}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[1002] max-h-[300px]">
+                          {US_STATES.map((state) => (
+                            <SelectItem key={state.value} value={state.value}>
+                              {state.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   />
                 </div>
 
