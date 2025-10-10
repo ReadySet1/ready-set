@@ -59,6 +59,7 @@ backups/*
 /backups
 
 .cursor/
+.claude/
 
 # Prisma
 .prisma-initialized
