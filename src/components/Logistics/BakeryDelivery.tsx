@@ -1,57 +1,42 @@
 "use client";
-
 import { Button } from "../ui/button";
 import { FormType } from "./QuoteRequest/types";
-
 interface ServiceItem {
-  title: string;
-  description: string;
+    title: string;
+    description: string;
 }
-
 interface BakeryDeliverySectionProps {
-  onRequestQuote?: (formType: FormType) => void;
+    onRequestQuote?: (formType: FormType) => void;
 }
-
 const handleClick = (onRequestQuote?: (formType: FormType) => void) => {
-  console.log("Button clicked, onRequestQuote:", !!onRequestQuote);
-  if (onRequestQuote) {
-    onRequestQuote("bakery");
-  }
+    if (onRequestQuote) {
+        onRequestQuote("bakery");
+    }
 };
-
-const BakeryDeliverySection: React.FC<BakeryDeliverySectionProps> = ({
-  onRequestQuote,
-}) => {
-  const services: ServiceItem[] = [
-    {
-      title: "Wedding Cakes: ",
-      description:
-        "Ensuring that stunning centerpiece cakes arrive in pristine condition for the big day.",
-    },
-    {
-      title: "Birthday Cakes & Desserts: ",
-      description:
-        "Keeping every celebration sweet, memorable, and hassle-free.",
-    },
-    {
-      title: "Holiday Orders: ",
-      description:
-        "Delivering festive treats like cookies, pies, and specialty breads to spread seasonal cheer.",
-    },
-    {
-      title: "Corporate Events & Catering: ",
-      description:
-        "Providing seamless logistics for bulk orders and large gatherings.",
-    },
-    {
-      title: "Everyday Bread Deliveries: ",
-      description:
-        "Because fresh bread and baked goods are always in demand, we make sure they reach your customers daily, ensuring freshness with every bite.",
-    },
-  ];
-
-  return (
-    <section className="bg-amber-300 p-8 md:p-12">
+const BakeryDeliverySection: React.FC<BakeryDeliverySectionProps> = ({ onRequestQuote, }) => {
+    const services: ServiceItem[] = [
+        {
+            title: "Wedding Cakes: ",
+            description: "Ensuring that stunning centerpiece cakes arrive in pristine condition for the big day.",
+        },
+        {
+            title: "Birthday Cakes & Desserts: ",
+            description: "Keeping every celebration sweet, memorable, and hassle-free.",
+        },
+        {
+            title: "Holiday Orders: ",
+            description: "Delivering festive treats like cookies, pies, and specialty breads to spread seasonal cheer.",
+        },
+        {
+            title: "Corporate Events & Catering: ",
+            description: "Providing seamless logistics for bulk orders and large gatherings.",
+        },
+        {
+            title: "Everyday Bread Deliveries: ",
+            description: "Because fresh bread and baked goods are always in demand, we make sure they reach your customers daily, ensuring freshness with every bite.",
+        },
+    ];
+    return (<section className="bg-amber-300 p-8 md:p-12">
       <div className="mx-auto grid max-w-7xl items-start gap-8 md:grid-cols-2">
         <div className="space-y-6">
           <h1 className="mb-6 text-4xl font-bold text-white md:text-5xl">
@@ -78,8 +63,7 @@ const BakeryDeliverySection: React.FC<BakeryDeliverySectionProps> = ({
               Our services are perfect for key moments such as:
             </p>
             <ul className="list-none space-y-6">
-              {services.map((service, index) => (
-                <li key={index} className="flex gap-3">
+              {services.map((service, index) => (<li key={index} className="flex gap-3">
                   <span className="text-2xl leading-none text-gray-800">•</span>
                   <div className="flex-1">
                     <span className="font-semibold text-gray-800">
@@ -87,8 +71,7 @@ const BakeryDeliverySection: React.FC<BakeryDeliverySectionProps> = ({
                     </span>
                     <span className="text-gray-700">{service.description}</span>
                   </div>
-                </li>
-              ))}
+                </li>))}
             </ul>
           </div>
 
@@ -97,10 +80,7 @@ const BakeryDeliverySection: React.FC<BakeryDeliverySectionProps> = ({
             partner for dependable and timely service.
           </p>
 
-          <Button
-            onClick={() => handleClick(onRequestQuote)}
-            className="rounded-md bg-white px-6 py-3 font-bold text-gray-800 transition-colors hover:bg-gray-100"
-          >
+          <Button onClick={() => handleClick(onRequestQuote)} className="rounded-md bg-white px-6 py-3 font-bold text-gray-800 transition-colors hover:bg-gray-100">
             Request a Quote
           </Button>
         </div>
@@ -109,25 +89,15 @@ const BakeryDeliverySection: React.FC<BakeryDeliverySectionProps> = ({
             <div className="aspect-w-16 aspect-h-9 md:aspect-h-10 lg:aspect-h-7">
               <div className="h-full w-full overflow-hidden rounded-3xl">
                 <picture>
-                  <source
-                    srcSet="/images/logistics/bakerypic.webp"
-                    type="image/webp"
-                  />
-                  <img
-                    src="/images/logistics/bakerypic.png"
-                    alt="A container showing delicious breads"
-                    className="h-full w-full object-cover object-center"
-                  />
+                  <source srcSet="/images/logistics/bakerypic.webp" type="image/webp"/>
+                  <img src="/images/logistics/bakerypic.png" alt="A container showing delicious breads" className="h-full w-full object-cover object-center"/>
                 </picture>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>);
 };
-
 BakeryDeliverySection.displayName = "BakeryDeliverySection";
-
 export default BakeryDeliverySection;

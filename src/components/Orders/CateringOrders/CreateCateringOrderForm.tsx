@@ -1,1095 +1,739 @@
 // Admin Side
-
 "use client";
-
-import React, {
-  useState,
-  useTransition,
-  useEffect,
-  useCallback,
-  useRef,
-} from "react";
+import React, { useState, useTransition, useEffect, useCallback, useRef, } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { createCateringOrder } from "@/app/(backend)/admin/catering-orders/_actions/catering-orders"; // Import only action
 // Import schema and types from the new schemas file
-import {
-  createCateringOrderSchema,
-  CreateCateringOrderInput,
-  ClientListItem,
-} from "@/app/(backend)/admin/catering-orders/_actions/schemas";
+import { createCateringOrderSchema, CreateCateringOrderInput, ClientListItem, } from "@/app/(backend)/admin/catering-orders/_actions/schemas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  CalendarIcon,
-  Loader2,
-  Check,
-  ChevronsUpDown,
-  Plus,
-  X,
-  AlertCircle,
-} from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger, } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, } from "@/components/ui/command";
+import { CalendarIcon, Loader2, Check, ChevronsUpDown, Plus, X, AlertCircle, } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils"; // For conditional classes
 import AddressManager from "@/components/AddressManager";
 import { Address, AddressFormData } from "@/types/address";
 import AddAddressForm from "@/components/AddressManager/AddAddressForm";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger, } from "@/components/ui/dialog";
 import { createClient } from "@/utils/supabase/client";
 import { useUploadFile, UploadedFile } from "@/hooks/use-upload-file"; // Import the upload hook
 import { FileWithPath } from "react-dropzone"; // Import FileWithPath type
 import { useToast } from "@/components/ui/use-toast";
-
 interface CreateCateringOrderFormProps {
-  clients: ClientListItem[];
+    clients: ClientListItem[];
 }
-
 // Custom AddressManager Wrapper component with better error handling
 interface AddressManagerWrapperProps {
-  onAddressesLoaded: (addresses: Address[]) => void;
-  onAddressSelected: (addressId: string) => void;
-  onError: (error: string) => void;
-  errorState: string | null;
-  setErrorState: (error: string | null) => void;
-  onSwitchToManual: () => void;
-  onAddNewAddress: () => void;
-  onRefresh?: (refreshFn: () => void) => void;
+    onAddressesLoaded: (addresses: Address[]) => void;
+    onAddressSelected: (addressId: string) => void;
+    onError: (error: string) => void;
+    errorState: string | null;
+    setErrorState: (error: string | null) => void;
+    onSwitchToManual: () => void;
+    onAddNewAddress: () => void;
+    onRefresh?: (refreshFn: () => void) => void;
 }
-
-const AddressManagerWrapper: React.FC<AddressManagerWrapperProps> = ({
-  onAddressesLoaded,
-  onAddressSelected,
-  onError,
-  errorState,
-  setErrorState,
-  onSwitchToManual,
-  onAddNewAddress,
-  onRefresh,
-}) => {
-  // Maintain a local error state to avoid unnecessary re-renders
-  const [localErrorState, setLocalErrorState] = useState<string | null>(
-    errorState,
-  );
-
-  // Use an effect to sync parent error state with local error state only when parent changes
-  useEffect(() => {
-    setLocalErrorState(errorState);
-  }, [errorState]);
-
-  // Create a custom onAddressesLoaded handler
-  const handleAddressesLoaded = useCallback(
-    (addresses: Address[]) => {
-      if (addresses.length === 0) {
-        setErrorState("No saved addresses found.");
-      } else {
-        setErrorState(null);
-      }
-      onAddressesLoaded(addresses);
-    },
-    [onAddressesLoaded, setErrorState],
-  );
-
-  // Custom onError handler to update local state
-  const handleAddressManagerError = useCallback(
-    (errorMessage: string) => {
-      setLocalErrorState(errorMessage);
-      setErrorState(errorMessage);
-      onError(errorMessage);
-    },
-    [onError, setErrorState],
-  );
-
-  return (
-    <>
+const AddressManagerWrapper: React.FC<AddressManagerWrapperProps> = ({ onAddressesLoaded, onAddressSelected, onError, errorState, setErrorState, onSwitchToManual, onAddNewAddress, onRefresh, }) => {
+    // Maintain a local error state to avoid unnecessary re-renders
+    const [localErrorState, setLocalErrorState] = useState<string | null>(errorState);
+    // Use an effect to sync parent error state with local error state only when parent changes
+    useEffect(() => {
+        setLocalErrorState(errorState);
+    }, [errorState]);
+    // Create a custom onAddressesLoaded handler
+    const handleAddressesLoaded = useCallback((addresses: Address[]) => {
+        if (addresses.length === 0) {
+            setErrorState("No saved addresses found.");
+        }
+        else {
+            setErrorState(null);
+        }
+        onAddressesLoaded(addresses);
+    }, [onAddressesLoaded, setErrorState]);
+    // Custom onError handler to update local state
+    const handleAddressManagerError = useCallback((errorMessage: string) => {
+        setLocalErrorState(errorMessage);
+        setErrorState(errorMessage);
+        onError(errorMessage);
+    }, [onError, setErrorState]);
+    return (<>
       <div className="mb-4 flex items-center justify-between">
         <span className="text-muted-foreground text-sm">
           Select an existing address or add a new one
         </span>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={onAddNewAddress}
-          className="gap-1"
-        >
-          <Plus className="h-4 w-4" /> Add Address
+        <Button type="button" size="sm" variant="outline" onClick={onAddNewAddress} className="gap-1">
+          <Plus className="h-4 w-4"/> Add Address
         </Button>
       </div>
 
-      <AddressManager
-        onAddressesLoaded={handleAddressesLoaded}
-        onAddressSelected={onAddressSelected}
-        onError={handleAddressManagerError}
-        defaultFilter="all"
-        showFilters={true}
-        showManagementButtons={false}
-        onRefresh={onRefresh}
-      />
+      <AddressManager onAddressesLoaded={handleAddressesLoaded} onAddressSelected={onAddressSelected} onError={handleAddressManagerError} defaultFilter="all" showFilters={true} showManagementButtons={false} onRefresh={onRefresh}/>
 
-      {localErrorState && (
-        <div className="mt-4">
+      {localErrorState && (<div className="mt-4">
           <p className="mb-2 text-amber-600">{localErrorState}</p>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onSwitchToManual}
-            size="sm"
-          >
+          <Button type="button" variant="outline" onClick={onSwitchToManual} size="sm">
             Enter Address Manually
           </Button>
-        </div>
-      )}
-    </>
-  );
+        </div>)}
+    </>);
 };
-
 // Define Bay Area counties
 const bayAreaCountyValues = [
-  "Alameda",
-  "Contra Costa",
-  "Marin",
-  "Napa",
-  "San Francisco",
-  "San Mateo",
-  "Santa Clara",
-  "Solano",
-  "Sonoma",
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma",
 ];
-
 // Define brokerage options to match user form
 const BROKERAGE_OPTIONS = [
-  { value: "Foodee", label: "Foodee" },
-  { value: "Ez Cater", label: "Ez Cater" },
-  { value: "Grubhub", label: "Grubhub" },
-  { value: "Cater Cow", label: "Cater Cow" },
-  { value: "Cater2me", label: "Cater2me" },
-  { value: "Zero Cater", label: "Zero Cater" },
-  { value: "Platterz", label: "Platterz" },
-  { value: "Direct Delivery", label: "Direct Delivery" },
-  { value: "CaterValley", label: "CaterValley ⚡ (Integrated)" },
-  { value: "Other", label: "Other" },
+    { value: "Foodee", label: "Foodee" },
+    { value: "Ez Cater", label: "Ez Cater" },
+    { value: "Grubhub", label: "Grubhub" },
+    { value: "Cater Cow", label: "Cater Cow" },
+    { value: "Cater2me", label: "Cater2me" },
+    { value: "Zero Cater", label: "Zero Cater" },
+    { value: "Platterz", label: "Platterz" },
+    { value: "Direct Delivery", label: "Direct Delivery" },
+    { value: "CaterValley", label: "CaterValley ⚡ (Integrated)" },
+    { value: "Other", label: "Other" },
 ];
-
-export const CreateCateringOrderForm: React.FC<
-  CreateCateringOrderFormProps
-> = ({ clients }) => {
-  const router = useRouter();
-  const { toast } = useToast();
-  const [generalError, setGeneralError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [clientComboboxOpen, setClientComboboxOpen] = useState(false);
-  const [selectedClientName, setSelectedClientName] = useState<string>("");
-  const [pickupAddresses, setPickupAddresses] = useState<Address[]>([]);
-  const [deliveryAddresses, setDeliveryAddresses] = useState<Address[]>([]);
-  const [pickupAddressError, setPickupAddressError] = useState<string | null>(
-    null,
-  );
-  const [deliveryAddressError, setDeliveryAddressError] = useState<
-    string | null
-  >(null);
-  const [showManualPickupEntry, setShowManualPickupEntry] = useState(false);
-  const [showManualDeliveryEntry, setShowManualDeliveryEntry] = useState(false);
-
-  // State for address dialog
-  const [addressDialogOpen, setAddressDialogOpen] = useState(false);
-  const [addressDialogType, setAddressDialogType] = useState<
-    "pickup" | "delivery"
-  >("pickup");
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-
-  // Refs to store refresh functions from AddressManager components
-  const pickupAddressRefreshRef = useRef<(() => void) | null>(null);
-  const deliveryAddressRefreshRef = useRef<(() => void) | null>(null);
-
-  // File upload state
-  const [uploadedFileKeys, setUploadedFileKeys] = useState<string[]>([]);
-
-  // Initialize Supabase client
-  const supabase = createClient();
-
-  // Get and store the session for userId in useUploadFile
-  const [session, setSession] = useState<any>(null);
-
-  // Development mode flag for debugging tools
-  const isDevelopment = process.env.NODE_ENV !== "production";
-
-  useEffect(() => {
-    const getSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      setSession(data.session);
-    };
-    getSession();
-  }, [supabase.auth]);
-
-  // Initialize file upload hook
-  const {
-    onUpload,
-    uploadedFiles,
-    progresses,
-    isUploading,
-    tempEntityId,
-    updateEntityId,
-    deleteFile,
-  } = useUploadFile({
-    bucketName: "fileUploader",
-    maxFileCount: 5,
-    maxFileSize: 10 * 1024 * 1024,
-    allowedFileTypes: [
-      "application/pdf",
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ],
-    category: "catering",
-    entityType: "catering_order",
-    userId: session?.user?.id,
-  });
-
-  const form = useForm<CreateCateringOrderInput>({
-    resolver: zodResolver(createCateringOrderSchema),
-    defaultValues: {
-      needHost: "NO", // Default value
-      pickupAddress: { street1: "", city: "", state: "", zip: "" },
-      deliveryAddress: { street1: "", city: "", state: "", zip: "" },
-      pickupDateTime: undefined,
-      arrivalDateTime: undefined,
-      orderNumber: "", // Add order number
-      brokerage: "", // Add brokerage field
-      userId: undefined, // Initialize userId
-      hoursNeeded: null, // Initialize host-related fields
-      numberOfHosts: null,
-      headcount: null,
-      orderTotal: null,
-      tip: null,
-      clientAttention: "",
-      pickupNotes: "",
-      specialNotes: "",
-    },
-    mode: "onTouched", // Show validation errors as soon as a field is touched
-  });
-
-  const {
-    register,
-    handleSubmit,
-    control,
-    formState: { errors },
-    setValue,
-    watch,
-  } = form;
-
-  // Watch needHost to conditionally show host-related fields
-  const needHostValue = watch("needHost");
-  const currentUserId = watch("userId");
-
-  // Effect to handle needHost changes
-  useEffect(() => {
-    if (needHostValue === "NO") {
-      // When NO, set host fields to null and clear any validation errors
-      form.setValue("hoursNeeded", null, { shouldValidate: true });
-      form.setValue("numberOfHosts", null, { shouldValidate: true });
-      form.clearErrors(["hoursNeeded", "numberOfHosts"]);
-    }
-  }, [needHostValue, form]);
-
-  // Wrap prop handlers in useCallback
-  const handlePickupAddressesLoaded = useCallback((addresses: Address[]) => {
-    setPickupAddresses(addresses);
-    if (addresses.length === 0) {
-      setPickupAddressError("No saved addresses found.");
-    } else {
-      setPickupAddressError(null); // Clear error if addresses are found
-    }
-  }, []); // Empty dependency array means this function reference is stable
-
-  const handleDeliveryAddressesLoaded = useCallback((addresses: Address[]) => {
-    setDeliveryAddresses(addresses);
-    if (addresses.length === 0) {
-      setDeliveryAddressError("No saved addresses found.");
-    } else {
-      setDeliveryAddressError(null); // Clear error if addresses are found
-    }
-  }, []); // Empty dependency array
-
-  const handlePickupAddressSelected = useCallback(
-    (addressId: string) => {
-      const selectedAddress = pickupAddresses.find(
-        (addr) => addr.id === addressId,
-      );
-      if (selectedAddress) {
-        const addressData = {
-          street1: selectedAddress.street1,
-          street2: selectedAddress.street2 || undefined,
-          city: selectedAddress.city,
-          state: selectedAddress.state,
-          zip: selectedAddress.zip,
-          county: selectedAddress.county || undefined,
+export const CreateCateringOrderForm: React.FC<CreateCateringOrderFormProps> = ({ clients }) => {
+    const router = useRouter();
+    const { toast } = useToast();
+    const [generalError, setGeneralError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [clientComboboxOpen, setClientComboboxOpen] = useState(false);
+    const [selectedClientName, setSelectedClientName] = useState<string>("");
+    const [pickupAddresses, setPickupAddresses] = useState<Address[]>([]);
+    const [deliveryAddresses, setDeliveryAddresses] = useState<Address[]>([]);
+    const [pickupAddressError, setPickupAddressError] = useState<string | null>(null);
+    const [deliveryAddressError, setDeliveryAddressError] = useState<string | null>(null);
+    const [showManualPickupEntry, setShowManualPickupEntry] = useState(false);
+    const [showManualDeliveryEntry, setShowManualDeliveryEntry] = useState(false);
+    // State for address dialog
+    const [addressDialogOpen, setAddressDialogOpen] = useState(false);
+    const [addressDialogType, setAddressDialogType] = useState<"pickup" | "delivery">("pickup");
+    const [isAuthenticated, setIsAuthenticated] = useState(true);
+    // Refs to store refresh functions from AddressManager components
+    const pickupAddressRefreshRef = useRef<(() => void) | null>(null);
+    const deliveryAddressRefreshRef = useRef<(() => void) | null>(null);
+    // File upload state
+    const [uploadedFileKeys, setUploadedFileKeys] = useState<string[]>([]);
+    // Initialize Supabase client
+    const supabase = createClient();
+    // Get and store the session for userId in useUploadFile
+    const [session, setSession] = useState<any>(null);
+    // Development mode flag for debugging tools
+    const isDevelopment = process.env.NODE_ENV !== "production";
+    useEffect(() => {
+        const getSession = async () => {
+            const { data } = await supabase.auth.getSession();
+            setSession(data.session);
         };
-
-        setValue("pickupAddress", addressData, { shouldValidate: true });
-
-        // Clear form validation errors for pickup address
-        form.clearErrors("pickupAddress");
-
-        setPickupAddressError(null); // Clear error on selection
-        setShowManualPickupEntry(false); // Switch back from manual if selection is made
-      }
-    },
-    [pickupAddresses, setValue, form],
-  ); // Depends on pickupAddresses, setValue, and form
-
-  const handleDeliveryAddressSelected = useCallback(
-    (addressId: string) => {
-      const selectedAddress = deliveryAddresses.find(
-        (addr) => addr.id === addressId,
-      );
-      if (selectedAddress) {
-        const addressData = {
-          street1: selectedAddress.street1,
-          street2: selectedAddress.street2 || undefined,
-          city: selectedAddress.city,
-          state: selectedAddress.state,
-          zip: selectedAddress.zip,
-          county: selectedAddress.county || undefined,
-        };
-
-        setValue("deliveryAddress", addressData, { shouldValidate: true });
-
-        // Clear form validation errors for delivery address
-        form.clearErrors("deliveryAddress");
-
-        setDeliveryAddressError(null); // Clear error on selection
-        setShowManualDeliveryEntry(false); // Switch back from manual if selection is made
-      }
-    },
-    [deliveryAddresses, setValue, form],
-  ); // Depends on deliveryAddresses, setValue, and form
-
-  const handleAddressError = useCallback((error: string) => {
-    // If the error is auth-related, trigger the auth dialog
-    // Note: The AddressManager component itself now handles setting its internal error state
-    // and clearing the user state if it detects a 401.
-    // This handler in the form is now mostly for logging or additional UI reactions if needed.
-    if (
-      error.includes("Unauthorized") ||
-      error.includes("Authentication required")
-    ) {
-      setIsAuthenticated(false);
-      // Let AddressManager handle its own error state, but ensure manual mode is triggered
-      // by the auth dialog closing or the error propogating.
-      // We might not need to explicitly set manual entry here anymore if the auth dialog flow works.
-      // setShowManualPickupEntry(true);
-      // setShowManualDeliveryEntry(true);
-    }
-    // We don't need to call setPickupAddressError/setDeliveryAddressError here
-    // as the AddressManagerWrapper now uses its own internal state managed via setErrorState prop
-  }, []); // Empty dependency array is likely okay, as it only logs and sets auth state
-
-  // Handle refresh function storage for pickup addresses
-  const handlePickupAddressRefresh = useCallback((refreshFn: () => void) => {
-    pickupAddressRefreshRef.current = refreshFn;
-  }, []);
-
-  // Handle refresh function storage for delivery addresses
-  const handleDeliveryAddressRefresh = useCallback((refreshFn: () => void) => {
-    deliveryAddressRefreshRef.current = refreshFn;
-  }, []);
-
-  // Use useEffect for cleanup on unmount
-  useEffect(() => {
-    // Cleanup uploaded files on unmount if not submitted
-    return () => {
-      if (uploadedFileKeys.length > 0 && !isSubmitting) {
-        const cleanup = async () => {
-          try {
-            console.log(
-              "Cleaning up uploaded files on unmount:",
-              uploadedFileKeys,
-            );
-            console.log("Using tempEntityId for cleanup:", tempEntityId);
-
-            // Don't attempt cleanup if we don't have the IDs we need
-            if (!uploadedFileKeys.length || !tempEntityId) {
-              console.log("Skipping cleanup - missing keys or tempEntityId");
-              return;
-            }
-
-            const response = await fetch("/api/file-uploads/cleanup", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                fileKeys: uploadedFileKeys,
-                entityId: tempEntityId,
-                entityType: "catering_order",
-              }),
-            });
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error(
-                `Failed to clean up files: ${response.status} - ${errorText}`,
-              );
-              // Don't throw - just log the error
-            } else {
-              console.log("File cleanup completed successfully");
-            }
-          } catch (error) {
-            console.error("Error cleaning up files:", error);
-            // Error already logged, no need to re-throw
-          }
-        };
-
-        // Execute but don't wait for it since this is in cleanup function
-        cleanup().catch((err) => {
-          console.error("Unhandled promise rejection in cleanup:", err);
-        });
-      }
-    };
-  }, [uploadedFileKeys, isSubmitting, tempEntityId]);
-
-  // Add the scrollToTop utility function
-  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
-
-  const handleFormSubmit = async (data: CreateCateringOrderInput) => {
-    setIsSubmitting(true);
-    setGeneralError(null);
-
-    try {
-      // Include the tempEntityId in the submitted data if available
-      if (tempEntityId) {
-        data.tempEntityId = tempEntityId;
-        console.log(
-          `Including tempEntityId in form submission: ${tempEntityId}`,
-        );
-      }
-
-      const result = await createCateringOrder(data);
-
-      if (result.error) {
-        setGeneralError(result.error);
-        scrollToTop();
-        return;
-      }
-
-      router.push("/admin/catering-orders");
-    } catch (err) {
-      console.error("Form submission error:", err);
-      setGeneralError("An unexpected error occurred. Please try again.");
-      scrollToTop();
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Check authentication status on mount and set up auth state listener
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-        setIsAuthenticated(!!session);
-        if (!session) {
-          setPickupAddressError("Please log in to access your addresses.");
-          setDeliveryAddressError("Please log in to access your addresses.");
-          setShowManualPickupEntry(true);
-          setShowManualDeliveryEntry(true);
-        }
-      } catch (error) {
-        console.error("Auth check failed:", error);
-        setIsAuthenticated(false);
-      }
-    };
-
-    checkAuth();
-
-    // Set up auth state change listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session);
-      if (!session) {
-        setPickupAddressError("Please log in to access your addresses.");
-        setDeliveryAddressError("Please log in to access your addresses.");
-        setShowManualPickupEntry(true);
-        setShowManualDeliveryEntry(true);
-      } else {
-        // Refresh addresses when user logs in
-        setShowManualPickupEntry(false);
-        setShowManualDeliveryEntry(false);
-        setPickupAddressError(null);
-        setDeliveryAddressError(null);
-      }
+        getSession();
+    }, [supabase.auth]);
+    // Initialize file upload hook
+    const { onUpload, uploadedFiles, progresses, isUploading, tempEntityId, updateEntityId, deleteFile, } = useUploadFile({
+        bucketName: "fileUploader",
+        maxFileCount: 5,
+        maxFileSize: 10 * 1024 * 1024,
+        allowedFileTypes: [
+            "application/pdf",
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ],
+        category: "catering",
+        entityType: "catering_order",
+        userId: session?.user?.id,
     });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [supabase.auth]);
-
-  const handleAddNewAddress = async (type: "pickup" | "delivery") => {
-    // Check authentication before opening dialog
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      // Show auth dialog
-      setIsAuthenticated(false);
-      return;
-    }
-
-    setAddressDialogType(type);
-    setAddressDialogOpen(true);
-  };
-
-  const handleAddressFormSubmit = async (addressData: AddressFormData) => {
-    console.log("🏠 Starting address form submission", {
-      addressData,
-      addressDialogType,
-      isDialogOpen: addressDialogOpen,
-    });
-
-    try {
-      // Check authentication before submitting
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      console.log("🔐 Session check result", { hasSession: !!session });
-
-      if (!session) {
-        console.log("❌ No session - throwing auth error");
-        throw new Error(
-          "Please log in to add an address. You can continue with manual entry if needed.",
-        );
-      }
-
-      console.log("📤 Making API request to create address");
-      const response = await fetch("/api/addresses", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
+    const form = useForm<CreateCateringOrderInput>({
+        resolver: zodResolver(createCateringOrderSchema),
+        defaultValues: {
+            needHost: "NO", // Default value
+            pickupAddress: { street1: "", city: "", state: "", zip: "" },
+            deliveryAddress: { street1: "", city: "", state: "", zip: "" },
+            pickupDateTime: undefined,
+            arrivalDateTime: undefined,
+            orderNumber: "", // Add order number
+            brokerage: "", // Add brokerage field
+            userId: undefined, // Initialize userId
+            hoursNeeded: null, // Initialize host-related fields
+            numberOfHosts: null,
+            headcount: null,
+            orderTotal: null,
+            tip: null,
+            clientAttention: "",
+            pickupNotes: "",
+            specialNotes: "",
         },
-        body: JSON.stringify(addressData),
-      });
-
-      console.log("📥 API response", {
-        status: response.status,
-        ok: response.ok,
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          console.log("❌ 401 Unauthorized - session may be expired");
-          setIsAuthenticated(false); // Trigger auth dialog
-          throw new Error(
-            "Your session has expired. Please log in again to add addresses.",
-          );
+        mode: "onTouched", // Show validation errors as soon as a field is touched
+    });
+    const { register, handleSubmit, control, formState: { errors }, setValue, watch, } = form;
+    // Watch needHost to conditionally show host-related fields
+    const needHostValue = watch("needHost");
+    const currentUserId = watch("userId");
+    // Effect to handle needHost changes
+    useEffect(() => {
+        if (needHostValue === "NO") {
+            // When NO, set host fields to null and clear any validation errors
+            form.setValue("hoursNeeded", null, { shouldValidate: true });
+            form.setValue("numberOfHosts", null, { shouldValidate: true });
+            form.clearErrors(["hoursNeeded", "numberOfHosts"]);
         }
-
-        // Try to get error details from response
-        let errorMessage = `Error ${response.status}: ${response.statusText}`;
+    }, [needHostValue, form]);
+    // Wrap prop handlers in useCallback
+    const handlePickupAddressesLoaded = useCallback((addresses: Address[]) => {
+        setPickupAddresses(addresses);
+        if (addresses.length === 0) {
+            setPickupAddressError("No saved addresses found.");
+        }
+        else {
+            setPickupAddressError(null); // Clear error if addresses are found
+        }
+    }, []); // Empty dependency array means this function reference is stable
+    const handleDeliveryAddressesLoaded = useCallback((addresses: Address[]) => {
+        setDeliveryAddresses(addresses);
+        if (addresses.length === 0) {
+            setDeliveryAddressError("No saved addresses found.");
+        }
+        else {
+            setDeliveryAddressError(null); // Clear error if addresses are found
+        }
+    }, []); // Empty dependency array
+    const handlePickupAddressSelected = useCallback((addressId: string) => {
+        const selectedAddress = pickupAddresses.find((addr) => addr.id === addressId);
+        if (selectedAddress) {
+            const addressData = {
+                street1: selectedAddress.street1,
+                street2: selectedAddress.street2 || undefined,
+                city: selectedAddress.city,
+                state: selectedAddress.state,
+                zip: selectedAddress.zip,
+                county: selectedAddress.county || undefined,
+            };
+            setValue("pickupAddress", addressData, { shouldValidate: true });
+            // Clear form validation errors for pickup address
+            form.clearErrors("pickupAddress");
+            setPickupAddressError(null); // Clear error on selection
+            setShowManualPickupEntry(false); // Switch back from manual if selection is made
+        }
+    }, [pickupAddresses, setValue, form]); // Depends on pickupAddresses, setValue, and form
+    const handleDeliveryAddressSelected = useCallback((addressId: string) => {
+        const selectedAddress = deliveryAddresses.find((addr) => addr.id === addressId);
+        if (selectedAddress) {
+            const addressData = {
+                street1: selectedAddress.street1,
+                street2: selectedAddress.street2 || undefined,
+                city: selectedAddress.city,
+                state: selectedAddress.state,
+                zip: selectedAddress.zip,
+                county: selectedAddress.county || undefined,
+            };
+            setValue("deliveryAddress", addressData, { shouldValidate: true });
+            // Clear form validation errors for delivery address
+            form.clearErrors("deliveryAddress");
+            setDeliveryAddressError(null); // Clear error on selection
+            setShowManualDeliveryEntry(false); // Switch back from manual if selection is made
+        }
+    }, [deliveryAddresses, setValue, form]); // Depends on deliveryAddresses, setValue, and form
+    const handleAddressError = useCallback((error: string) => {
+        // If the error is auth-related, trigger the auth dialog
+        // Note: The AddressManager component itself now handles setting its internal error state
+        // and clearing the user state if it detects a 401.
+        // This handler in the form is now mostly for logging or additional UI reactions if needed.
+        if (error.includes("Unauthorized") ||
+            error.includes("Authentication required")) {
+            setIsAuthenticated(false);
+            // Let AddressManager handle its own error state, but ensure manual mode is triggered
+            // by the auth dialog closing or the error propogating.
+            // We might not need to explicitly set manual entry here anymore if the auth dialog flow works.
+            // setShowManualPickupEntry(true);
+            // setShowManualDeliveryEntry(true);
+        }
+        // We don't need to call setPickupAddressError/setDeliveryAddressError here
+        // as the AddressManagerWrapper now uses its own internal state managed via setErrorState prop
+    }, []); // Empty dependency array is likely okay, as it only logs and sets auth state
+    // Handle refresh function storage for pickup addresses
+    const handlePickupAddressRefresh = useCallback((refreshFn: () => void) => {
+        pickupAddressRefreshRef.current = refreshFn;
+    }, []);
+    // Handle refresh function storage for delivery addresses
+    const handleDeliveryAddressRefresh = useCallback((refreshFn: () => void) => {
+        deliveryAddressRefreshRef.current = refreshFn;
+    }, []);
+    // Use useEffect for cleanup on unmount
+    useEffect(() => {
+        // Cleanup uploaded files on unmount if not submitted
+        return () => {
+            if (uploadedFileKeys.length > 0 && !isSubmitting) {
+                const cleanup = async () => {
+                    try {
+                        // Don't attempt cleanup if we don't have the IDs we need
+                        if (!uploadedFileKeys.length || !tempEntityId) {
+                            return;
+                        }
+                        const response = await fetch("/api/file-uploads/cleanup", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                                fileKeys: uploadedFileKeys,
+                                entityId: tempEntityId,
+                                entityType: "catering_order",
+                            }),
+                        });
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            console.error(`Failed to clean up files: ${response.status} - ${errorText}`);
+                            // Don't throw - just log the error
+                        }
+                        else {
+                        }
+                    }
+                    catch (error) {
+                        console.error("Error cleaning up files:", error);
+                        // Error already logged, no need to re-throw
+                    }
+                };
+                // Execute but don't wait for it since this is in cleanup function
+                cleanup().catch((err) => {
+                    console.error("Unhandled promise rejection in cleanup:", err);
+                });
+            }
+        };
+    }, [uploadedFileKeys, isSubmitting, tempEntityId]);
+    // Add the scrollToTop utility function
+    const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+    const handleFormSubmit = async (data: CreateCateringOrderInput) => {
+        setIsSubmitting(true);
+        setGeneralError(null);
         try {
-          const errorData = await response.json();
-          if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch (e) {
-          console.log("Could not parse error response");
+            // Include the tempEntityId in the submitted data if available
+            if (tempEntityId) {
+                data.tempEntityId = tempEntityId;
+            }
+            const result = await createCateringOrder(data);
+            if (result.error) {
+                setGeneralError(result.error);
+                scrollToTop();
+                return;
+            }
+            router.push("/admin/catering-orders");
         }
-
-        console.log("❌ API error", { status: response.status, errorMessage });
-        throw new Error(`Failed to add address: ${errorMessage}`);
-      }
-
-      const addedAddress = await response.json();
-      console.log("✅ Address created successfully", { addedAddress });
-
-      if (addressDialogType === "pickup") {
-        console.log("🚚 Setting up pickup address");
-        // Update local state with new address
-        setPickupAddresses((prev) => [...prev, addedAddress]);
-
-        // Refresh the AddressManager to show the new address
-        if (pickupAddressRefreshRef.current) {
-          console.log("🔄 Refreshing pickup address manager");
-          pickupAddressRefreshRef.current();
+        catch (err) {
+            console.error("Form submission error:", err);
+            setGeneralError("An unexpected error occurred. Please try again.");
+            scrollToTop();
         }
-
-        // Select the new address after a short delay to ensure it's loaded
-        setTimeout(() => {
-          console.log("🎯 Selecting new pickup address", addedAddress.id);
-          handlePickupAddressSelected(addedAddress.id);
-        }, 300);
-      } else {
-        console.log("🏠 Setting up delivery address");
-        // Update local state with new address
-        setDeliveryAddresses((prev) => [...prev, addedAddress]);
-
-        // Refresh the AddressManager to show the new address
-        if (deliveryAddressRefreshRef.current) {
-          console.log("🔄 Refreshing delivery address manager");
-          deliveryAddressRefreshRef.current();
+        finally {
+            setIsSubmitting(false);
         }
-
-        // Select the new address after a short delay to ensure it's loaded
-        setTimeout(() => {
-          console.log("🎯 Selecting new delivery address", addedAddress.id);
-          handleDeliveryAddressSelected(addedAddress.id);
-        }, 300);
-      }
-
-      console.log("✅ Address setup complete, closing dialog");
-      setAddressDialogOpen(false);
-    } catch (error) {
-      console.error("💥 Exception in address submission", error);
-      // Throw the error so AddAddressForm can display it in the dialog
-      // This prevents the form from resetting and keeps the dialog open
-      throw error;
-    }
-  };
-
-  const handleLogin = () => {
-    // Store the current URL to redirect back after login
-    const currentPath = window.location.pathname + window.location.search;
-    localStorage.setItem("returnTo", currentPath);
-
-    // Redirect to login page
-    router.push("/auth/login");
-  };
-
-  // Helper component for Manual Address Fields
-  const ManualAddressFields: React.FC<{
-    fieldName: "pickupAddress" | "deliveryAddress";
-  }> = ({ fieldName }) => (
-    <div className="space-y-4">
+    };
+    // Check authentication status on mount and set up auth state listener
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const { data: { session }, error, } = await supabase.auth.getSession();
+                setIsAuthenticated(!!session);
+                if (!session) {
+                    setPickupAddressError("Please log in to access your addresses.");
+                    setDeliveryAddressError("Please log in to access your addresses.");
+                    setShowManualPickupEntry(true);
+                    setShowManualDeliveryEntry(true);
+                }
+            }
+            catch (error) {
+                console.error("Auth check failed:", error);
+                setIsAuthenticated(false);
+            }
+        };
+        checkAuth();
+        // Set up auth state change listener
+        const { data: { subscription }, } = supabase.auth.onAuthStateChange((event, session) => {
+            setIsAuthenticated(!!session);
+            if (!session) {
+                setPickupAddressError("Please log in to access your addresses.");
+                setDeliveryAddressError("Please log in to access your addresses.");
+                setShowManualPickupEntry(true);
+                setShowManualDeliveryEntry(true);
+            }
+            else {
+                // Refresh addresses when user logs in
+                setShowManualPickupEntry(false);
+                setShowManualDeliveryEntry(false);
+                setPickupAddressError(null);
+                setDeliveryAddressError(null);
+            }
+        });
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [supabase.auth]);
+    const handleAddNewAddress = async (type: "pickup" | "delivery") => {
+        // Check authentication before opening dialog
+        const { data: { session }, } = await supabase.auth.getSession();
+        if (!session) {
+            // Show auth dialog
+            setIsAuthenticated(false);
+            return;
+        }
+        setAddressDialogType(type);
+        setAddressDialogOpen(true);
+    };
+    const handleAddressFormSubmit = async (addressData: AddressFormData) => {
+        try {
+            // Check authentication before submitting
+            const { data: { session }, } = await supabase.auth.getSession();
+            if (!session) {
+                throw new Error("Please log in to add an address. You can continue with manual entry if needed.");
+            }
+            const response = await fetch("/api/addresses", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify(addressData),
+            });
+            if (!response.ok) {
+                if (response.status === 401) {
+                    setIsAuthenticated(false); // Trigger auth dialog
+                    throw new Error("Your session has expired. Please log in again to add addresses.");
+                }
+                // Try to get error details from response
+                let errorMessage = `Error ${response.status}: ${response.statusText}`;
+                try {
+                    const errorData = await response.json();
+                    if (errorData.error) {
+                        errorMessage = errorData.error;
+                    }
+                }
+                catch (e) {
+                }
+                throw new Error(`Failed to add address: ${errorMessage}`);
+            }
+            const addedAddress = await response.json();
+            if (addressDialogType === "pickup") {
+                // Update local state with new address
+                setPickupAddresses((prev) => [...prev, addedAddress]);
+                // Refresh the AddressManager to show the new address
+                if (pickupAddressRefreshRef.current) {
+                    pickupAddressRefreshRef.current();
+                }
+                // Select the new address after a short delay to ensure it's loaded
+                setTimeout(() => {
+                    handlePickupAddressSelected(addedAddress.id);
+                }, 300);
+            }
+            else {
+                // Update local state with new address
+                setDeliveryAddresses((prev) => [...prev, addedAddress]);
+                // Refresh the AddressManager to show the new address
+                if (deliveryAddressRefreshRef.current) {
+                    deliveryAddressRefreshRef.current();
+                }
+                // Select the new address after a short delay to ensure it's loaded
+                setTimeout(() => {
+                    handleDeliveryAddressSelected(addedAddress.id);
+                }, 300);
+            }
+            setAddressDialogOpen(false);
+        }
+        catch (error) {
+            console.error("💥 Exception in address submission", error);
+            // Throw the error so AddAddressForm can display it in the dialog
+            // This prevents the form from resetting and keeps the dialog open
+            throw error;
+        }
+    };
+    const handleLogin = () => {
+        // Store the current URL to redirect back after login
+        const currentPath = window.location.pathname + window.location.search;
+        localStorage.setItem("returnTo", currentPath);
+        // Redirect to login page
+        router.push("/auth/login");
+    };
+    // Helper component for Manual Address Fields
+    const ManualAddressFields: React.FC<{
+        fieldName: "pickupAddress" | "deliveryAddress";
+    }> = ({ fieldName }) => (<div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="space-y-1">
           <Label htmlFor={`${fieldName}.street1`}>Street Address 1</Label>
-          <Input
-            id={`${fieldName}.street1`}
-            {...register(`${fieldName}.street1`)}
-            placeholder="123 Main St"
-          />
-          {errors[fieldName]?.street1 && (
-            <p className="text-sm text-red-500">
+          <Input id={`${fieldName}.street1`} {...register(`${fieldName}.street1`)} placeholder="123 Main St"/>
+          {errors[fieldName]?.street1 && (<p className="text-sm text-red-500">
               {errors[fieldName]?.street1?.message}
-            </p>
-          )}
+            </p>)}
         </div>
         <div className="space-y-1">
           <Label htmlFor={`${fieldName}.street2`}>
             Street Address 2 (Optional)
           </Label>
-          <Input
-            id={`${fieldName}.street2`}
-            {...register(`${fieldName}.street2`)}
-            placeholder="Apt, Suite, etc."
-          />
+          <Input id={`${fieldName}.street2`} {...register(`${fieldName}.street2`)} placeholder="Apt, Suite, etc."/>
         </div>
         <div className="space-y-1">
           <Label htmlFor={`${fieldName}.city`}>City</Label>
-          <Input
-            id={`${fieldName}.city`}
-            {...register(`${fieldName}.city`)}
-            placeholder="Anytown"
-          />
-          {errors[fieldName]?.city && (
-            <p className="text-sm text-red-500">
+          <Input id={`${fieldName}.city`} {...register(`${fieldName}.city`)} placeholder="Anytown"/>
+          {errors[fieldName]?.city && (<p className="text-sm text-red-500">
               {errors[fieldName]?.city?.message}
-            </p>
-          )}
+            </p>)}
         </div>
         <div className="space-y-1">
           <Label htmlFor={`${fieldName}.state`}>State</Label>
-          <Input
-            id={`${fieldName}.state`}
-            {...register(`${fieldName}.state`)}
-            placeholder="CA"
-            maxLength={2}
-          />
-          {errors[fieldName]?.state && (
-            <p className="text-sm text-red-500">
+          <Input id={`${fieldName}.state`} {...register(`${fieldName}.state`)} placeholder="CA" maxLength={2}/>
+          {errors[fieldName]?.state && (<p className="text-sm text-red-500">
               {errors[fieldName]?.state?.message}
-            </p>
-          )}
+            </p>)}
         </div>
         <div className="space-y-1">
           <Label htmlFor={`${fieldName}.zip`}>Zip Code</Label>
-          <Input
-            id={`${fieldName}.zip`}
-            {...register(`${fieldName}.zip`)}
-            placeholder="90210"
-          />
-          {errors[fieldName]?.zip && (
-            <p className="text-sm text-red-500">
+          <Input id={`${fieldName}.zip`} {...register(`${fieldName}.zip`)} placeholder="90210"/>
+          {errors[fieldName]?.zip && (<p className="text-sm text-red-500">
               {errors[fieldName]?.zip?.message}
-            </p>
-          )}
+            </p>)}
         </div>
         <div className="space-y-1">
           <Label htmlFor={`${fieldName}.county`}>County (Optional)</Label>
-          <Controller
-            name={`${fieldName}.county`}
-            control={control}
-            render={({ field }) => (
-              <Select value={field.value || ""} onValueChange={field.onChange}>
+          <Controller name={`${fieldName}.county`} control={control} render={({ field }) => (<Select value={field.value || ""} onValueChange={field.onChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Bay Area county" />
+                  <SelectValue placeholder="Select Bay Area county"/>
                 </SelectTrigger>
                 <SelectContent>
-                  {bayAreaCountyValues.map((county) => (
-                    <SelectItem key={county} value={county}>
+                  {bayAreaCountyValues.map((county) => (<SelectItem key={county} value={county}>
                       {county}
-                    </SelectItem>
-                  ))}
+                    </SelectItem>))}
                 </SelectContent>
-              </Select>
-            )}
-          />
+              </Select>)}/>
           <p className="text-xs text-gray-500">Bay Area counties only</p>
         </div>
       </div>
-    </div>
-  );
-
-  // Handle file upload
-  const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    if (!event.target.files?.length) return;
-
-    const files = Array.from(event.target.files) as FileWithPath[];
-    try {
-      console.log("Starting upload of", files.length, "files");
-      const result = await onUpload(files);
-      console.log("Upload completed successfully:", result);
-
-      // Set uploaded files to form state
-      // setValue("attachments", result); // We'd need to add this to the schema
-
-      // Track file keys for potential cleanup
-      const newFileKeys = result.map((file) => file.key);
-      setUploadedFileKeys((prev) => [...prev, ...newFileKeys]);
-    } catch (error) {
-      console.error("Upload error:", error);
-      setGeneralError(
-        error instanceof Error
-          ? `Upload failed: ${error.message}`
-          : "Failed to upload files. Please try again.",
-      );
-    }
-  };
-
-  // Remove file handler
-  const removeFile = async (fileToRemove: UploadedFile) => {
-    try {
-      console.log("Removing file:", fileToRemove);
-
-      // Remove from UI immediately
-      const updatedFiles = uploadedFiles.filter(
-        (file) => file.key !== fileToRemove.key,
-      );
-      // setValue("attachments", updatedFiles); // We'd need to add this to the schema
-
-      // Remove from tracked keys
-      setUploadedFileKeys((prev) =>
-        prev.filter((key) => key !== fileToRemove.key),
-      );
-
-      // Delete the file
-      await deleteFile(fileToRemove.key);
-      console.log("File removed successfully");
-    } catch (error) {
-      console.error("Error removing file:", error);
-      setGeneralError("Failed to remove file. Please try again.");
-    }
-  };
-
-  // Clear form state only on mount, not on every form change
-  useEffect(() => {
-    // Only clear errors on mount, not on every form change
-    if (generalError === null) {
-      form.clearErrors();
-    }
-  }, [form, generalError]);
-
-  // Keep the cleanup function separate
-  useEffect(() => {
-    return () => {
-      setGeneralError(null);
+    </div>);
+    // Handle file upload
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (!event.target.files?.length)
+            return;
+        const files = Array.from(event.target.files) as FileWithPath[];
+        try {
+            const result = await onUpload(files);
+            // Set uploaded files to form state
+            // setValue("attachments", result); // We'd need to add this to the schema
+            // Track file keys for potential cleanup
+            const newFileKeys = result.map((file) => file.key);
+            setUploadedFileKeys((prev) => [...prev, ...newFileKeys]);
+        }
+        catch (error) {
+            console.error("Upload error:", error);
+            setGeneralError(error instanceof Error
+                ? `Upload failed: ${error.message}`
+                : "Failed to upload files. Please try again.");
+        }
     };
-  }, []);
-
-  // Direct manual submit that bypasses the form's validation
-  const manualDirectSubmit = async () => {
-    try {
-      console.log("Manual direct submit clicked");
-      setIsSubmitting(true);
-      setGeneralError(null);
-
-      // Get form data
-      const formData = form.getValues();
-      console.log("Submitting with data:", formData);
-
-      // Ensure required fields are present
-      if (!formData.userId) {
-        alert("Please select a client");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (!formData.pickupDateTime || !formData.arrivalDateTime) {
-        alert("Please select pickup and arrival dates");
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Handle needHost validation explicitly
-      if (formData.needHost === "NO") {
-        // If needHost is NO, ensure hoursNeeded and numberOfHosts are null
-        formData.hoursNeeded = null;
-        formData.numberOfHosts = null;
-
-        // Update the form values too
-        form.setValue("hoursNeeded", null);
-        form.setValue("numberOfHosts", null);
-      } else if (formData.needHost === "YES") {
-        // If needHost is YES, make sure hoursNeeded and numberOfHosts are provided
-        if (!formData.hoursNeeded || !formData.numberOfHosts) {
-          alert(
-            "Hours needed and number of hosts are required when Need Host is Yes",
-          );
-          setIsSubmitting(false);
-          return;
+    // Remove file handler
+    const removeFile = async (fileToRemove: UploadedFile) => {
+        try {
+            // Remove from UI immediately
+            const updatedFiles = uploadedFiles.filter((file) => file.key !== fileToRemove.key);
+            // setValue("attachments", updatedFiles); // We'd need to add this to the schema
+            // Remove from tracked keys
+            setUploadedFileKeys((prev) => prev.filter((key) => key !== fileToRemove.key));
+            // Delete the file
+            await deleteFile(fileToRemove.key);
         }
-      }
-
-      // Include the tempEntityId in the submitted data if available
-      if (tempEntityId) {
-        formData.tempEntityId = tempEntityId;
-        console.log(
-          `Including tempEntityId in manual submission: ${tempEntityId}`,
-        );
-      }
-
-      // Call server action directly
-      const result = await createCateringOrder(formData);
-      console.log("Server action result:", result);
-
-      if (result.success) {
-        // If we have uploaded files, update their entity ID
-        if (uploadedFiles.length > 0 && result.orderId) {
-          console.log(
-            `Updating file entities from temp ID to actual order ID: ${result.orderId}`,
-          );
-          await updateEntityId(result.orderId);
+        catch (error) {
+            console.error("Error removing file:", error);
+            setGeneralError("Failed to remove file. Please try again.");
         }
-
-        alert("Order created successfully!");
-        if (result.orderNumber) {
-          router.push(
-            `/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`,
-          );
+    };
+    // Clear form state only on mount, not on every form change
+    useEffect(() => {
+        // Only clear errors on mount, not on every form change
+        if (generalError === null) {
+            form.clearErrors();
         }
-      } else {
-        alert("Failed to create order: " + (result.error || "Unknown error"));
-        setGeneralError(result.error || "Unknown error");
-        setIsSubmitting(false);
-      }
-    } catch (error) {
-      console.error("Error in manual submit:", error);
-      setGeneralError(
-        "Error: " + (error instanceof Error ? error.message : String(error)),
-      );
-      setIsSubmitting(false);
-    }
-  };
-
-  // Add a direct debug submit function
-  const debugSubmit = () => {
-    // Log the current form state
-    const formData = form.getValues();
-    console.log("Current form state:", formData);
-
-    // Handle needHost validation manually
-    if (formData.needHost === "NO") {
-      // If needHost is NO, ensure hoursNeeded and numberOfHosts are set to null
-      formData.hoursNeeded = null;
-      formData.numberOfHosts = null;
-
-      // Update the form values
-      form.setValue("hoursNeeded", null);
-      form.setValue("numberOfHosts", null);
-    }
-
-    // Try to manually trigger validation
-    form.trigger().then((isValid) => {
-      console.log("Manual validation result:", isValid);
-
-      if (!isValid) {
-        // Alert about validation errors
-        alert("Form validation failed. Please check the form for errors.");
-        console.log("Validation errors:", form.formState.errors);
-      } else {
-        // If valid, try to manually submit
-        console.log("Attempting manual submission with data:", formData);
-
-        // Show submission in progress
-        setIsSubmitting(true);
-
-        // Directly call the server action
-        createCateringOrder(formData)
-          .then((result) => {
-            console.log("Server action result:", result);
-            if (result.success) {
-              alert("Order created successfully!");
-              if (result.orderNumber) {
-                router.push(
-                  `/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`,
-                );
-              }
-            } else {
-              alert(
-                "Order creation failed: " + (result.error || "Unknown error"),
-              );
-              setGeneralError(result.error || "Unknown error");
-              setIsSubmitting(false);
+    }, [form, generalError]);
+    // Keep the cleanup function separate
+    useEffect(() => {
+        return () => {
+            setGeneralError(null);
+        };
+    }, []);
+    // Direct manual submit that bypasses the form's validation
+    const manualDirectSubmit = async () => {
+        try {
+            setIsSubmitting(true);
+            setGeneralError(null);
+            // Get form data
+            const formData = form.getValues();
+            // Ensure required fields are present
+            if (!formData.userId) {
+                alert("Please select a client");
+                setIsSubmitting(false);
+                return;
             }
-          })
-          .catch((error) => {
-            console.error("Manual submission error:", error);
-            alert("Error submitting: " + error.message);
-            setGeneralError("Error: " + error.message);
+            if (!formData.pickupDateTime || !formData.arrivalDateTime) {
+                alert("Please select pickup and arrival dates");
+                setIsSubmitting(false);
+                return;
+            }
+            // Handle needHost validation explicitly
+            if (formData.needHost === "NO") {
+                // If needHost is NO, ensure hoursNeeded and numberOfHosts are null
+                formData.hoursNeeded = null;
+                formData.numberOfHosts = null;
+                // Update the form values too
+                form.setValue("hoursNeeded", null);
+                form.setValue("numberOfHosts", null);
+            }
+            else if (formData.needHost === "YES") {
+                // If needHost is YES, make sure hoursNeeded and numberOfHosts are provided
+                if (!formData.hoursNeeded || !formData.numberOfHosts) {
+                    alert("Hours needed and number of hosts are required when Need Host is Yes");
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+            // Include the tempEntityId in the submitted data if available
+            if (tempEntityId) {
+                formData.tempEntityId = tempEntityId;
+            }
+            // Call server action directly
+            const result = await createCateringOrder(formData);
+            if (result.success) {
+                // If we have uploaded files, update their entity ID
+                if (uploadedFiles.length > 0 && result.orderId) {
+                    await updateEntityId(result.orderId);
+                }
+                alert("Order created successfully!");
+                if (result.orderNumber) {
+                    router.push(`/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`);
+                }
+            }
+            else {
+                alert("Failed to create order: " + (result.error || "Unknown error"));
+                setGeneralError(result.error || "Unknown error");
+                setIsSubmitting(false);
+            }
+        }
+        catch (error) {
+            console.error("Error in manual submit:", error);
+            setGeneralError("Error: " + (error instanceof Error ? error.message : String(error)));
             setIsSubmitting(false);
-          });
-      }
-    });
-  };
-
-  return (
-    <>
+        }
+    };
+    // Add a direct debug submit function
+    const debugSubmit = () => {
+        // Log the current form state
+        const formData = form.getValues();
+        // Handle needHost validation manually
+        if (formData.needHost === "NO") {
+            // If needHost is NO, ensure hoursNeeded and numberOfHosts are set to null
+            formData.hoursNeeded = null;
+            formData.numberOfHosts = null;
+            // Update the form values
+            form.setValue("hoursNeeded", null);
+            form.setValue("numberOfHosts", null);
+        }
+        // Try to manually trigger validation
+        form.trigger().then((isValid) => {
+            if (!isValid) {
+                // Alert about validation errors
+                alert("Form validation failed. Please check the form for errors.");
+            }
+            else {
+                // Show submission in progress
+                setIsSubmitting(true);
+                // Directly call the server action
+                createCateringOrder(formData)
+                    .then((result) => {
+                    if (result.success) {
+                        alert("Order created successfully!");
+                        if (result.orderNumber) {
+                            router.push(`/admin/catering-orders/${encodeURIComponent(result.orderNumber)}`);
+                        }
+                    }
+                    else {
+                        alert("Order creation failed: " + (result.error || "Unknown error"));
+                        setGeneralError(result.error || "Unknown error");
+                        setIsSubmitting(false);
+                    }
+                })
+                    .catch((error) => {
+                    console.error("Manual submission error:", error);
+                    alert("Error submitting: " + error.message);
+                    setGeneralError("Error: " + error.message);
+                    setIsSubmitting(false);
+                });
+            }
+        });
+    };
+    return (<>
       {/* Display General Errors */}
-      {generalError && (
-        <div className="sticky top-0 z-10 mb-4 flex items-center justify-between rounded border border-red-400 bg-red-100 p-4 text-red-700">
+      {generalError && (<div className="sticky top-0 z-10 mb-4 flex items-center justify-between rounded border border-red-400 bg-red-100 p-4 text-red-700">
           <div className="flex items-center">
-            <AlertCircle className="mr-2 h-5 w-5" />
+            <AlertCircle className="mr-2 h-5 w-5"/>
             <p className="font-medium">{generalError}</p>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setGeneralError(null)}
-            className="text-red-700 hover:bg-red-200"
-          >
-            <X className="h-4 w-4" />
+          <Button type="button" variant="ghost" size="sm" onClick={() => setGeneralError(null)} className="text-red-700 hover:bg-red-200">
+            <X className="h-4 w-4"/>
           </Button>
-        </div>
-      )}
+        </div>)}
 
-      <form
-        onSubmit={form.handleSubmit(handleFormSubmit)}
-        className="space-y-8"
-      >
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8">
         {/* Client Selection Combobox */}
         <div className="space-y-2">
           <Label htmlFor="userId">Client</Label>
-          <Popover
-            open={clientComboboxOpen}
-            onOpenChange={setClientComboboxOpen}
-          >
+          <Popover open={clientComboboxOpen} onOpenChange={setClientComboboxOpen}>
             <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={clientComboboxOpen}
-                className="w-full justify-between font-normal"
-              >
+              <Button variant="outline" role="combobox" aria-expanded={clientComboboxOpen} className="w-full justify-between font-normal">
                 {currentUserId
-                  ? clients.find((client) => client.id === currentUserId)?.name
-                  : "Select client..."}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            ? clients.find((client) => client.id === currentUserId)?.name
+            : "Select client..."}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
               <Command>
-                <CommandInput placeholder="Search clients..." />
+                <CommandInput placeholder="Search clients..."/>
                 <CommandList>
                   <CommandEmpty>No client found.</CommandEmpty>
                   <CommandGroup>
-                    {clients.map((client) => (
-                      <CommandItem
-                        key={client.id}
-                        value={client.name} // Use name for filtering in CommandInput
-                        onSelect={(currentValue: string) => {
-                          const selectedClientId = clients.find(
-                            (c) =>
-                              c.name.toLowerCase() ===
-                              currentValue.toLowerCase(),
-                          )?.id;
-                          if (selectedClientId) {
-                            form.setValue("userId", selectedClientId);
-                            setSelectedClientName(client.name);
-                          }
-                          setClientComboboxOpen(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            currentUserId === client.id
-                              ? "opacity-100"
-                              : "opacity-0",
-                          )}
-                        />
+                    {clients.map((client) => (<CommandItem key={client.id} value={client.name} // Use name for filtering in CommandInput
+         onSelect={(currentValue: string) => {
+                const selectedClientId = clients.find((c) => c.name.toLowerCase() ===
+                    currentValue.toLowerCase())?.id;
+                if (selectedClientId) {
+                    form.setValue("userId", selectedClientId);
+                    setSelectedClientName(client.name);
+                }
+                setClientComboboxOpen(false);
+            }}>
+                        <Check className={cn("mr-2 h-4 w-4", currentUserId === client.id
+                ? "opacity-100"
+                : "opacity-0")}/>
                         {client.name}
-                      </CommandItem>
-                    ))}
+                      </CommandItem>))}
                   </CommandGroup>
                 </CommandList>
               </Command>
             </PopoverContent>
           </Popover>
-          {errors.userId && (
-            <p className="text-sm text-red-500">{errors.userId.message}</p>
-          )}
+          {errors.userId && (<p className="text-sm text-red-500">{errors.userId.message}</p>)}
         </div>
 
         {/* Order Details Section - Brokerage and Order Number */}
@@ -1097,43 +741,28 @@ export const CreateCateringOrderForm: React.FC<
           {/* Brokerage Dropdown */}
           <div className="space-y-2">
             <Label htmlFor="brokerage">Brokerage / Direct</Label>
-            <Select
-              onValueChange={(value) => form.setValue("brokerage", value)}
-              defaultValue={
-                form.getValues("brokerage") === null
-                  ? undefined
-                  : form.getValues("brokerage") || ""
-              }
-            >
+            <Select onValueChange={(value) => form.setValue("brokerage", value)} defaultValue={form.getValues("brokerage") === null
+            ? undefined
+            : form.getValues("brokerage") || ""}>
               <SelectTrigger id="brokerage">
-                <SelectValue placeholder="Select brokerage" />
+                <SelectValue placeholder="Select brokerage"/>
               </SelectTrigger>
               <SelectContent>
-                {BROKERAGE_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
+                {BROKERAGE_OPTIONS.map((option) => (<SelectItem key={option.value} value={option.value}>
                     {option.label}
-                  </SelectItem>
-                ))}
+                  </SelectItem>))}
               </SelectContent>
             </Select>
-            {errors.brokerage && (
-              <p className="text-sm text-red-500">{errors.brokerage.message}</p>
-            )}
+            {errors.brokerage && (<p className="text-sm text-red-500">{errors.brokerage.message}</p>)}
           </div>
 
           {/* Order Number */}
           <div className="space-y-2">
             <Label htmlFor="orderNumber">Order Number</Label>
-            <Input
-              id="orderNumber"
-              {...register("orderNumber")}
-              placeholder="e.g., ORD-12345"
-            />
-            {errors.orderNumber && (
-              <p className="text-sm text-red-500">
+            <Input id="orderNumber" {...register("orderNumber")} placeholder="e.g., ORD-12345"/>
+            {errors.orderNumber && (<p className="text-sm text-red-500">
                 {errors.orderNumber.message}
-              </p>
-            )}
+              </p>)}
           </div>
         </div>
 
@@ -1144,124 +773,81 @@ export const CreateCateringOrderForm: React.FC<
             <Label htmlFor="pickupDateTime">Pickup Date & Time</Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !watch("pickupDateTime") && "text-muted-foreground",
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {watch("pickupDateTime") ? (
-                    format(watch("pickupDateTime"), "PPPp")
-                  ) : (
-                    <span>Pick a date and time</span>
-                  )}
+                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !watch("pickupDateTime") && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4"/>
+                  {watch("pickupDateTime") ? (format(watch("pickupDateTime"), "PPPp")) : (<span>Pick a date and time</span>)}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={watch("pickupDateTime")}
-                  onSelect={(date) => {
-                    if (!date) {
-                      form.setValue(
-                        "pickupDateTime",
-                        undefined as unknown as Date,
-                      );
-                      return;
-                    }
-
-                    // Preserve current time if date already exists
-                    const currentDateTime = watch("pickupDateTime");
-                    if (currentDateTime) {
-                      const newDate = new Date(date);
-                      newDate.setHours(
-                        currentDateTime.getHours(),
-                        currentDateTime.getMinutes(),
-                        0,
-                        0,
-                      );
-                      form.setValue("pickupDateTime", newDate);
-                    } else {
-                      // Set default time (noon) if no previous time
-                      const newDate = new Date(date);
-                      newDate.setHours(12, 0, 0, 0);
-                      form.setValue("pickupDateTime", newDate);
-                    }
-                  }}
-                  disabled={(date) =>
-                    date < new Date(new Date().setHours(0, 0, 0, 0))
-                  } // Disable past dates
-                  classNames={{
-                    head_row: "flex w-full",
-                    head_cell:
-                      "text-muted-foreground rounded-md w-10 font-medium text-sm",
-                    day_selected:
-                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                    day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                    day_disabled:
-                      "rdp-day_disabled text-red-300 line-through bg-gray-100",
-                    cell: "text-center text-sm relative [&:has([aria-selected])]:bg-accent focus-within:relative focus-within:z-20",
-                    nav: "absolute top-1 right-1 flex items-center space-x-1",
-                  }}
-                />
+                <Calendar mode="single" selected={watch("pickupDateTime")} onSelect={(date) => {
+            if (!date) {
+                form.setValue("pickupDateTime", undefined as unknown as Date);
+                return;
+            }
+            // Preserve current time if date already exists
+            const currentDateTime = watch("pickupDateTime");
+            if (currentDateTime) {
+                const newDate = new Date(date);
+                newDate.setHours(currentDateTime.getHours(), currentDateTime.getMinutes(), 0, 0);
+                form.setValue("pickupDateTime", newDate);
+            }
+            else {
+                // Set default time (noon) if no previous time
+                const newDate = new Date(date);
+                newDate.setHours(12, 0, 0, 0);
+                form.setValue("pickupDateTime", newDate);
+            }
+        }} disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))} // Disable past dates
+     classNames={{
+            head_row: "flex w-full",
+            head_cell: "text-muted-foreground rounded-md w-10 font-medium text-sm",
+            day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+            day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+            day_disabled: "rdp-day_disabled text-red-300 line-through bg-gray-100",
+            cell: "text-center text-sm relative [&:has([aria-selected])]:bg-accent focus-within:relative focus-within:z-20",
+            nav: "absolute top-1 right-1 flex items-center space-x-1",
+        }}/>
                 {/* Time Input */}
                 <div className="border-border border-t p-3">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="pickupTime">Time</Label>
-                    <Input
-                      id="pickupTime"
-                      type="time"
-                      className="w-32"
-                      value={
-                        watch("pickupDateTime")
-                          ? format(watch("pickupDateTime"), "HH:mm")
-                          : ""
-                      }
-                      onChange={(e) => {
-                        const timeValue = e.target.value;
-                        if (!timeValue) return;
-
-                        const [hoursStr = "0", minutesStr = "0"] =
-                          timeValue.split(":");
-                        const hours = parseInt(hoursStr, 10);
-                        const minutes = parseInt(minutesStr, 10);
-
-                        if (
-                          isNaN(hours) ||
-                          isNaN(minutes) ||
-                          hours < 0 ||
-                          hours > 23 ||
-                          minutes < 0 ||
-                          minutes > 59
-                        )
-                          return;
-
-                        const currentDate = watch("pickupDateTime");
-
-                        // If we have a date, update it with the new time
-                        if (currentDate) {
-                          const newDate = new Date(currentDate);
-                          newDate.setHours(hours, minutes, 0, 0);
-                          form.setValue("pickupDateTime", newDate);
-                        } else {
-                          // If no date selected, use today with the selected time
-                          const newDate = new Date();
-                          newDate.setHours(hours, minutes, 0, 0);
-                          form.setValue("pickupDateTime", newDate);
-                        }
-                      }}
-                    />
+                    <Input id="pickupTime" type="time" className="w-32" value={watch("pickupDateTime")
+            ? format(watch("pickupDateTime"), "HH:mm")
+            : ""} onChange={(e) => {
+            const timeValue = e.target.value;
+            if (!timeValue)
+                return;
+            const [hoursStr = "0", minutesStr = "0"] = timeValue.split(":");
+            const hours = parseInt(hoursStr, 10);
+            const minutes = parseInt(minutesStr, 10);
+            if (isNaN(hours) ||
+                isNaN(minutes) ||
+                hours < 0 ||
+                hours > 23 ||
+                minutes < 0 ||
+                minutes > 59)
+                return;
+            const currentDate = watch("pickupDateTime");
+            // If we have a date, update it with the new time
+            if (currentDate) {
+                const newDate = new Date(currentDate);
+                newDate.setHours(hours, minutes, 0, 0);
+                form.setValue("pickupDateTime", newDate);
+            }
+            else {
+                // If no date selected, use today with the selected time
+                const newDate = new Date();
+                newDate.setHours(hours, minutes, 0, 0);
+                form.setValue("pickupDateTime", newDate);
+            }
+        }}/>
                   </div>
                 </div>
               </PopoverContent>
             </Popover>
-            {errors.pickupDateTime && (
-              <p className="text-sm text-red-500">
+            {errors.pickupDateTime && (<p className="text-sm text-red-500">
                 {errors.pickupDateTime.message}
-              </p>
-            )}
+              </p>)}
           </div>
 
           {/* Arrival Date & Time */}
@@ -1269,124 +855,81 @@ export const CreateCateringOrderForm: React.FC<
             <Label htmlFor="arrivalDateTime">Arrival Date & Time</Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !watch("arrivalDateTime") && "text-muted-foreground",
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {watch("arrivalDateTime") ? (
-                    format(watch("arrivalDateTime"), "PPPp")
-                  ) : (
-                    <span>Pick a date and time</span>
-                  )}
+                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !watch("arrivalDateTime") && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4"/>
+                  {watch("arrivalDateTime") ? (format(watch("arrivalDateTime"), "PPPp")) : (<span>Pick a date and time</span>)}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={watch("arrivalDateTime")}
-                  onSelect={(date) => {
-                    if (!date) {
-                      form.setValue(
-                        "arrivalDateTime",
-                        undefined as unknown as Date,
-                      );
-                      return;
-                    }
-
-                    // Preserve current time if date already exists
-                    const currentDateTime = watch("arrivalDateTime");
-                    if (currentDateTime) {
-                      const newDate = new Date(date);
-                      newDate.setHours(
-                        currentDateTime.getHours(),
-                        currentDateTime.getMinutes(),
-                        0,
-                        0,
-                      );
-                      form.setValue("arrivalDateTime", newDate);
-                    } else {
-                      // Set default time (noon) if no previous time
-                      const newDate = new Date(date);
-                      newDate.setHours(12, 0, 0, 0);
-                      form.setValue("arrivalDateTime", newDate);
-                    }
-                  }}
-                  disabled={(date) =>
-                    date < new Date(new Date().setHours(0, 0, 0, 0))
-                  } // Disable past dates
-                  classNames={{
-                    head_row: "flex w-full",
-                    head_cell:
-                      "text-muted-foreground rounded-md w-10 font-medium text-sm",
-                    day_selected:
-                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                    day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                    day_disabled:
-                      "rdp-day_disabled text-red-300 line-through bg-gray-100",
-                    cell: "text-center text-sm relative [&:has([aria-selected])]:bg-accent focus-within:relative focus-within:z-20",
-                    nav: "absolute top-1 right-1 flex items-center space-x-1",
-                  }}
-                />
+                <Calendar mode="single" selected={watch("arrivalDateTime")} onSelect={(date) => {
+            if (!date) {
+                form.setValue("arrivalDateTime", undefined as unknown as Date);
+                return;
+            }
+            // Preserve current time if date already exists
+            const currentDateTime = watch("arrivalDateTime");
+            if (currentDateTime) {
+                const newDate = new Date(date);
+                newDate.setHours(currentDateTime.getHours(), currentDateTime.getMinutes(), 0, 0);
+                form.setValue("arrivalDateTime", newDate);
+            }
+            else {
+                // Set default time (noon) if no previous time
+                const newDate = new Date(date);
+                newDate.setHours(12, 0, 0, 0);
+                form.setValue("arrivalDateTime", newDate);
+            }
+        }} disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))} // Disable past dates
+     classNames={{
+            head_row: "flex w-full",
+            head_cell: "text-muted-foreground rounded-md w-10 font-medium text-sm",
+            day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+            day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+            day_disabled: "rdp-day_disabled text-red-300 line-through bg-gray-100",
+            cell: "text-center text-sm relative [&:has([aria-selected])]:bg-accent focus-within:relative focus-within:z-20",
+            nav: "absolute top-1 right-1 flex items-center space-x-1",
+        }}/>
                 {/* Time Input */}
                 <div className="border-border border-t p-3">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="arrivalTime">Time</Label>
-                    <Input
-                      id="arrivalTime"
-                      type="time"
-                      className="w-32"
-                      value={
-                        watch("arrivalDateTime")
-                          ? format(watch("arrivalDateTime"), "HH:mm")
-                          : ""
-                      }
-                      onChange={(e) => {
-                        const timeValue = e.target.value;
-                        if (!timeValue) return;
-
-                        const [hoursStr = "0", minutesStr = "0"] =
-                          timeValue.split(":");
-                        const hours = parseInt(hoursStr, 10);
-                        const minutes = parseInt(minutesStr, 10);
-
-                        if (
-                          isNaN(hours) ||
-                          isNaN(minutes) ||
-                          hours < 0 ||
-                          hours > 23 ||
-                          minutes < 0 ||
-                          minutes > 59
-                        )
-                          return;
-
-                        const currentDate = watch("arrivalDateTime");
-
-                        // If we have a date, update it with the new time
-                        if (currentDate) {
-                          const newDate = new Date(currentDate);
-                          newDate.setHours(hours, minutes, 0, 0);
-                          form.setValue("arrivalDateTime", newDate);
-                        } else {
-                          // If no date selected, use today with the selected time
-                          const newDate = new Date();
-                          newDate.setHours(hours, minutes, 0, 0);
-                          form.setValue("arrivalDateTime", newDate);
-                        }
-                      }}
-                    />
+                    <Input id="arrivalTime" type="time" className="w-32" value={watch("arrivalDateTime")
+            ? format(watch("arrivalDateTime"), "HH:mm")
+            : ""} onChange={(e) => {
+            const timeValue = e.target.value;
+            if (!timeValue)
+                return;
+            const [hoursStr = "0", minutesStr = "0"] = timeValue.split(":");
+            const hours = parseInt(hoursStr, 10);
+            const minutes = parseInt(minutesStr, 10);
+            if (isNaN(hours) ||
+                isNaN(minutes) ||
+                hours < 0 ||
+                hours > 23 ||
+                minutes < 0 ||
+                minutes > 59)
+                return;
+            const currentDate = watch("arrivalDateTime");
+            // If we have a date, update it with the new time
+            if (currentDate) {
+                const newDate = new Date(currentDate);
+                newDate.setHours(hours, minutes, 0, 0);
+                form.setValue("arrivalDateTime", newDate);
+            }
+            else {
+                // If no date selected, use today with the selected time
+                const newDate = new Date();
+                newDate.setHours(hours, minutes, 0, 0);
+                form.setValue("arrivalDateTime", newDate);
+            }
+        }}/>
                   </div>
                 </div>
               </PopoverContent>
             </Popover>
-            {errors.arrivalDateTime && (
-              <p className="text-sm text-red-500">
+            {errors.arrivalDateTime && (<p className="text-sm text-red-500">
                 {errors.arrivalDateTime.message}
-              </p>
-            )}
+              </p>)}
           </div>
 
           {/* Complete Date & Time (Optional) */}
@@ -1397,204 +940,113 @@ export const CreateCateringOrderForm: React.FC<
             </Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !watch("completeDateTime") && "text-muted-foreground",
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {watch("completeDateTime") ? (
-                    format(watch("completeDateTime") as Date, "PPPp")
-                  ) : (
-                    <span>Pick a date and time</span>
-                  )}
+                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !watch("completeDateTime") && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4"/>
+                  {watch("completeDateTime") ? (format(watch("completeDateTime") as Date, "PPPp")) : (<span>Pick a date and time</span>)}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={watch("completeDateTime") as Date | undefined}
-                  onSelect={(date) => {
-                    if (!date) {
-                      form.setValue("completeDateTime", undefined);
-                      return;
-                    }
-
-                    // Preserve current time if date already exists
-                    const currentDateTime = watch("completeDateTime") as
-                      | Date
-                      | undefined;
-                    if (currentDateTime) {
-                      const newDate = new Date(date);
-                      newDate.setHours(
-                        currentDateTime.getHours(),
-                        currentDateTime.getMinutes(),
-                        0,
-                        0,
-                      );
-                      form.setValue("completeDateTime", newDate);
-                    } else {
-                      // Set default time (noon) if no previous time
-                      const newDate = new Date(date);
-                      newDate.setHours(12, 0, 0, 0);
-                      form.setValue("completeDateTime", newDate);
-                    }
-                  }}
-                  disabled={(date) =>
-                    date < new Date(new Date().setHours(0, 0, 0, 0))
-                  } // Disable past dates
-                  classNames={{
-                    head_row: "flex w-full",
-                    head_cell:
-                      "text-muted-foreground rounded-md w-10 font-medium text-sm",
-                    day_selected:
-                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                    day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                    day_disabled:
-                      "rdp-day_disabled text-red-300 line-through bg-gray-100",
-                    cell: "text-center text-sm relative [&:has([aria-selected])]:bg-accent focus-within:relative focus-within:z-20",
-                    nav: "absolute top-1 right-1 flex items-center space-x-1",
-                  }}
-                />
+                <Calendar mode="single" selected={watch("completeDateTime") as Date | undefined} onSelect={(date) => {
+            if (!date) {
+                form.setValue("completeDateTime", undefined);
+                return;
+            }
+            // Preserve current time if date already exists
+            const currentDateTime = watch("completeDateTime") as Date | undefined;
+            if (currentDateTime) {
+                const newDate = new Date(date);
+                newDate.setHours(currentDateTime.getHours(), currentDateTime.getMinutes(), 0, 0);
+                form.setValue("completeDateTime", newDate);
+            }
+            else {
+                // Set default time (noon) if no previous time
+                const newDate = new Date(date);
+                newDate.setHours(12, 0, 0, 0);
+                form.setValue("completeDateTime", newDate);
+            }
+        }} disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))} // Disable past dates
+     classNames={{
+            head_row: "flex w-full",
+            head_cell: "text-muted-foreground rounded-md w-10 font-medium text-sm",
+            day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+            day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+            day_disabled: "rdp-day_disabled text-red-300 line-through bg-gray-100",
+            cell: "text-center text-sm relative [&:has([aria-selected])]:bg-accent focus-within:relative focus-within:z-20",
+            nav: "absolute top-1 right-1 flex items-center space-x-1",
+        }}/>
                 {/* Time Input */}
                 <div className="border-border border-t p-3">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="completeTime">Time</Label>
-                    <Input
-                      id="completeTime"
-                      type="time"
-                      className="w-32"
-                      value={
-                        watch("completeDateTime")
-                          ? format(watch("completeDateTime") as Date, "HH:mm")
-                          : ""
-                      }
-                      onChange={(e) => {
-                        const timeValue = e.target.value;
-                        if (!timeValue) return;
-
-                        const [hoursStr = "0", minutesStr = "0"] =
-                          timeValue.split(":");
-                        const hours = parseInt(hoursStr, 10);
-                        const minutes = parseInt(minutesStr, 10);
-
-                        if (
-                          isNaN(hours) ||
-                          isNaN(minutes) ||
-                          hours < 0 ||
-                          hours > 23 ||
-                          minutes < 0 ||
-                          minutes > 59
-                        )
-                          return;
-
-                        const currentDate = watch("completeDateTime") as
-                          | Date
-                          | undefined;
-
-                        // If we have a date, update it with the new time
-                        if (currentDate) {
-                          const newDate = new Date(currentDate);
-                          newDate.setHours(hours, minutes, 0, 0);
-                          form.setValue("completeDateTime", newDate);
-                        } else {
-                          // If no date selected, use today with the selected time
-                          const newDate = new Date();
-                          newDate.setHours(hours, minutes, 0, 0);
-                          form.setValue("completeDateTime", newDate);
-                        }
-                      }}
-                    />
+                    <Input id="completeTime" type="time" className="w-32" value={watch("completeDateTime")
+            ? format(watch("completeDateTime") as Date, "HH:mm")
+            : ""} onChange={(e) => {
+            const timeValue = e.target.value;
+            if (!timeValue)
+                return;
+            const [hoursStr = "0", minutesStr = "0"] = timeValue.split(":");
+            const hours = parseInt(hoursStr, 10);
+            const minutes = parseInt(minutesStr, 10);
+            if (isNaN(hours) ||
+                isNaN(minutes) ||
+                hours < 0 ||
+                hours > 23 ||
+                minutes < 0 ||
+                minutes > 59)
+                return;
+            const currentDate = watch("completeDateTime") as Date | undefined;
+            // If we have a date, update it with the new time
+            if (currentDate) {
+                const newDate = new Date(currentDate);
+                newDate.setHours(hours, minutes, 0, 0);
+                form.setValue("completeDateTime", newDate);
+            }
+            else {
+                // If no date selected, use today with the selected time
+                const newDate = new Date();
+                newDate.setHours(hours, minutes, 0, 0);
+                form.setValue("completeDateTime", newDate);
+            }
+        }}/>
                   </div>
                 </div>
               </PopoverContent>
             </Popover>
-            {errors.completeDateTime && (
-              <p className="text-sm text-red-500">
+            {errors.completeDateTime && (<p className="text-sm text-red-500">
                 {errors.completeDateTime.message}
-              </p>
-            )}
+              </p>)}
           </div>
 
           {/* Headcount */}
           <div className="space-y-2">
             <Label htmlFor="headcount">Headcount (Optional)</Label>
-            <Controller
-              name="headcount"
-              control={control}
-              render={({ field: { onChange, value, ...field } }) => (
-                <Input
-                  {...field}
-                  id="headcount"
-                  type="number"
-                  value={value === null ? "" : value}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    onChange(val === "" ? null : Number(val));
-                  }}
-                  placeholder="e.g., 50"
-                />
-              )}
-            />
-            {errors.headcount && (
-              <p className="text-sm text-red-500">{errors.headcount.message}</p>
-            )}
+            <Controller name="headcount" control={control} render={({ field: { onChange, value, ...field } }) => (<Input {...field} id="headcount" type="number" value={value === null ? "" : value} onChange={(e) => {
+                const val = e.target.value;
+                onChange(val === "" ? null : Number(val));
+            }} placeholder="e.g., 50"/>)}/>
+            {errors.headcount && (<p className="text-sm text-red-500">{errors.headcount.message}</p>)}
           </div>
 
           {/* Order Total */}
           <div className="space-y-2">
             <Label htmlFor="orderTotal">Order Total (Optional)</Label>
-            <Controller
-              name="orderTotal"
-              control={control}
-              render={({ field: { onChange, value, ...field } }) => (
-                <Input
-                  {...field}
-                  id="orderTotal"
-                  type="number"
-                  step="0.01"
-                  value={value === null ? "" : value}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    onChange(val === "" ? null : Number(val));
-                  }}
-                  placeholder="e.g., 1250.50"
-                />
-              )}
-            />
-            {errors.orderTotal && (
-              <p className="text-sm text-red-500">
+            <Controller name="orderTotal" control={control} render={({ field: { onChange, value, ...field } }) => (<Input {...field} id="orderTotal" type="number" step="0.01" value={value === null ? "" : value} onChange={(e) => {
+                const val = e.target.value;
+                onChange(val === "" ? null : Number(val));
+            }} placeholder="e.g., 1250.50"/>)}/>
+            {errors.orderTotal && (<p className="text-sm text-red-500">
                 {errors.orderTotal.message}
-              </p>
-            )}
+              </p>)}
           </div>
 
           {/* Tip */}
           <div className="space-y-2">
             <Label htmlFor="tip">Tip (Optional)</Label>
-            <Controller
-              name="tip"
-              control={control}
-              render={({ field: { onChange, value, ...field } }) => (
-                <Input
-                  {...field}
-                  id="tip"
-                  type="number"
-                  step="0.01"
-                  value={value === null ? "" : value}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    onChange(val === "" ? null : Number(val));
-                  }}
-                  placeholder="e.g., 100.00"
-                />
-              )}
-            />
-            {errors.tip && (
-              <p className="text-sm text-red-500">{errors.tip.message}</p>
-            )}
+            <Controller name="tip" control={control} render={({ field: { onChange, value, ...field } }) => (<Input {...field} id="tip" type="number" step="0.01" value={value === null ? "" : value} onChange={(e) => {
+                const val = e.target.value;
+                onChange(val === "" ? null : Number(val));
+            }} placeholder="e.g., 100.00"/>)}/>
+            {errors.tip && (<p className="text-sm text-red-500">{errors.tip.message}</p>)}
           </div>
         </div>
 
@@ -1604,97 +1056,57 @@ export const CreateCateringOrderForm: React.FC<
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="needHost">Need Host?</Label>
-              <Select
-                onValueChange={(value) => {
-                  const newValue = value as "YES" | "NO";
-                  form.setValue("needHost", newValue, { shouldValidate: true });
-
-                  // Clear any existing validation errors
-                  form.clearErrors(["hoursNeeded", "numberOfHosts"]);
-
-                  if (newValue === "NO") {
-                    // When NO, set host fields to null
-                    form.setValue("hoursNeeded", null, {
-                      shouldValidate: true,
-                    });
-                    form.setValue("numberOfHosts", null, {
-                      shouldValidate: true,
-                    });
-                  }
-                }}
-                defaultValue={form.getValues("needHost")}
-              >
+              <Select onValueChange={(value) => {
+            const newValue = value as "YES" | "NO";
+            form.setValue("needHost", newValue, { shouldValidate: true });
+            // Clear any existing validation errors
+            form.clearErrors(["hoursNeeded", "numberOfHosts"]);
+            if (newValue === "NO") {
+                // When NO, set host fields to null
+                form.setValue("hoursNeeded", null, {
+                    shouldValidate: true,
+                });
+                form.setValue("numberOfHosts", null, {
+                    shouldValidate: true,
+                });
+            }
+        }} defaultValue={form.getValues("needHost")}>
                 <SelectTrigger id="needHost">
-                  <SelectValue placeholder="Select option" />
+                  <SelectValue placeholder="Select option"/>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="NO">No</SelectItem>
                   <SelectItem value="YES">Yes</SelectItem>
                 </SelectContent>
               </Select>
-              {errors.needHost && (
-                <p className="text-sm text-red-500">
+              {errors.needHost && (<p className="text-sm text-red-500">
                   {errors.needHost.message}
-                </p>
-              )}
+                </p>)}
             </div>
 
             {/* Conditionally render Hours Needed and Number of Hosts */}
-            {needHostValue === "YES" && (
-              <>
+            {needHostValue === "YES" && (<>
                 <div className="space-y-2">
                   <Label htmlFor="hoursNeeded">Hours Needed</Label>
-                  <Controller
-                    name="hoursNeeded"
-                    control={control}
-                    render={({ field: { onChange, value, ...field } }) => (
-                      <Input
-                        {...field}
-                        id="hoursNeeded"
-                        type="number"
-                        step="0.1"
-                        value={value === null ? "" : value}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          onChange(val === "" ? null : parseFloat(val));
-                        }}
-                        placeholder="e.g., 4.5"
-                      />
-                    )}
-                  />
-                  {errors.hoursNeeded && (
-                    <p className="text-sm text-red-500">
+                  <Controller name="hoursNeeded" control={control} render={({ field: { onChange, value, ...field } }) => (<Input {...field} id="hoursNeeded" type="number" step="0.1" value={value === null ? "" : value} onChange={(e) => {
+                    const val = e.target.value;
+                    onChange(val === "" ? null : parseFloat(val));
+                }} placeholder="e.g., 4.5"/>)}/>
+                  {errors.hoursNeeded && (<p className="text-sm text-red-500">
                       {errors.hoursNeeded.message}
-                    </p>
-                  )}
+                    </p>)}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="numberOfHosts">Number of Hosts</Label>
-                  <Controller
-                    name="numberOfHosts"
-                    control={control}
-                    render={({ field: { onChange, value, ...field } }) => (
-                      <Input
-                        {...field}
-                        id="numberOfHosts"
-                        type="number"
-                        value={value === null ? "" : value}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          onChange(val === "" ? null : parseInt(val, 10));
-                        }}
-                        placeholder="e.g., 2"
-                      />
-                    )}
-                  />
-                  {errors.numberOfHosts && (
-                    <p className="text-sm text-red-500">
+                  <Controller name="numberOfHosts" control={control} render={({ field: { onChange, value, ...field } }) => (<Input {...field} id="numberOfHosts" type="number" value={value === null ? "" : value} onChange={(e) => {
+                    const val = e.target.value;
+                    onChange(val === "" ? null : parseInt(val, 10));
+                }} placeholder="e.g., 2"/>)}/>
+                  {errors.numberOfHosts && (<p className="text-sm text-red-500">
                       {errors.numberOfHosts.message}
-                    </p>
-                  )}
+                    </p>)}
                 </div>
-              </>
-            )}
+              </>)}
           </div>
         </div>
 
@@ -1703,81 +1115,41 @@ export const CreateCateringOrderForm: React.FC<
           <div className="space-y-4 rounded-md border bg-slate-50/50 p-4">
             <h4 className="text-md mb-3 font-semibold">Pickup Address</h4>
 
-            {!showManualPickupEntry ? (
-              <AddressManagerWrapper
-                onAddressesLoaded={handlePickupAddressesLoaded}
-                onAddressSelected={handlePickupAddressSelected}
-                onError={handleAddressError}
-                errorState={pickupAddressError}
-                setErrorState={setPickupAddressError}
-                onSwitchToManual={() => setShowManualPickupEntry(true)}
-                onAddNewAddress={() => handleAddNewAddress("pickup")}
-                onRefresh={handlePickupAddressRefresh}
-              />
-            ) : (
-              <>
-                <ManualAddressFields fieldName="pickupAddress" />
+            {!showManualPickupEntry ? (<AddressManagerWrapper onAddressesLoaded={handlePickupAddressesLoaded} onAddressSelected={handlePickupAddressSelected} onError={handleAddressError} errorState={pickupAddressError} setErrorState={setPickupAddressError} onSwitchToManual={() => setShowManualPickupEntry(true)} onAddNewAddress={() => handleAddNewAddress("pickup")} onRefresh={handlePickupAddressRefresh}/>) : (<>
+                <ManualAddressFields fieldName="pickupAddress"/>
                 <div className="mt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowManualPickupEntry(false)}
-                    size="sm"
-                  >
+                  <Button type="button" variant="outline" onClick={() => setShowManualPickupEntry(false)} size="sm">
                     Use Address Manager
                   </Button>
                 </div>
-              </>
-            )}
+              </>)}
 
-            {errors.pickupAddress && !showManualPickupEntry && (
-              <div className="mt-2 text-sm text-red-500">
+            {errors.pickupAddress && !showManualPickupEntry && (<div className="mt-2 text-sm text-red-500">
                 {errors.pickupAddress.street1?.message ||
-                  errors.pickupAddress.city?.message ||
-                  errors.pickupAddress.state?.message ||
-                  errors.pickupAddress.zip?.message}
-              </div>
-            )}
+                errors.pickupAddress.city?.message ||
+                errors.pickupAddress.state?.message ||
+                errors.pickupAddress.zip?.message}
+              </div>)}
           </div>
 
           <div className="space-y-4 rounded-md border bg-slate-50/50 p-4">
             <h4 className="text-md mb-3 font-semibold">Delivery Address</h4>
 
-            {!showManualDeliveryEntry ? (
-              <AddressManagerWrapper
-                onAddressesLoaded={handleDeliveryAddressesLoaded}
-                onAddressSelected={handleDeliveryAddressSelected}
-                onError={handleAddressError}
-                errorState={deliveryAddressError}
-                setErrorState={setDeliveryAddressError}
-                onSwitchToManual={() => setShowManualDeliveryEntry(true)}
-                onAddNewAddress={() => handleAddNewAddress("delivery")}
-                onRefresh={handleDeliveryAddressRefresh}
-              />
-            ) : (
-              <>
-                <ManualAddressFields fieldName="deliveryAddress" />
+            {!showManualDeliveryEntry ? (<AddressManagerWrapper onAddressesLoaded={handleDeliveryAddressesLoaded} onAddressSelected={handleDeliveryAddressSelected} onError={handleAddressError} errorState={deliveryAddressError} setErrorState={setDeliveryAddressError} onSwitchToManual={() => setShowManualDeliveryEntry(true)} onAddNewAddress={() => handleAddNewAddress("delivery")} onRefresh={handleDeliveryAddressRefresh}/>) : (<>
+                <ManualAddressFields fieldName="deliveryAddress"/>
                 <div className="mt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowManualDeliveryEntry(false)}
-                    size="sm"
-                  >
+                  <Button type="button" variant="outline" onClick={() => setShowManualDeliveryEntry(false)} size="sm">
                     Use Address Manager
                   </Button>
                 </div>
-              </>
-            )}
+              </>)}
 
-            {errors.deliveryAddress && !showManualDeliveryEntry && (
-              <div className="mt-2 text-sm text-red-500">
+            {errors.deliveryAddress && !showManualDeliveryEntry && (<div className="mt-2 text-sm text-red-500">
                 {errors.deliveryAddress.street1?.message ||
-                  errors.deliveryAddress.city?.message ||
-                  errors.deliveryAddress.state?.message ||
-                  errors.deliveryAddress.zip?.message}
-              </div>
-            )}
+                errors.deliveryAddress.city?.message ||
+                errors.deliveryAddress.state?.message ||
+                errors.deliveryAddress.zip?.message}
+              </div>)}
           </div>
         </div>
 
@@ -1785,27 +1157,15 @@ export const CreateCateringOrderForm: React.FC<
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <div className="space-y-2 md:col-span-1">
             <Label htmlFor="clientAttention">Client Attention (Optional)</Label>
-            <Textarea
-              id="clientAttention"
-              {...register("clientAttention")}
-              placeholder="Specific person or department"
-            />
+            <Textarea id="clientAttention" {...register("clientAttention")} placeholder="Specific person or department"/>
           </div>
           <div className="space-y-2 md:col-span-1">
             <Label htmlFor="pickupNotes">Pickup Notes (Optional)</Label>
-            <Textarea
-              id="pickupNotes"
-              {...register("pickupNotes")}
-              placeholder="e.g., Call upon arrival, specific instructions"
-            />
+            <Textarea id="pickupNotes" {...register("pickupNotes")} placeholder="e.g., Call upon arrival, specific instructions"/>
           </div>
           <div className="space-y-2 md:col-span-1">
             <Label htmlFor="specialNotes">Special Notes (Optional)</Label>
-            <Textarea
-              id="specialNotes"
-              {...register("specialNotes")}
-              placeholder="e.g., Allergies, dietary restrictions, setup requirements"
-            />
+            <Textarea id="specialNotes" {...register("specialNotes")} placeholder="e.g., Allergies, dietary restrictions, setup requirements"/>
           </div>
         </div>
 
@@ -1817,15 +1177,7 @@ export const CreateCateringOrderForm: React.FC<
               <Label htmlFor="file-upload" className="mb-2 block">
                 Upload Files
               </Label>
-              <input
-                id="file-upload"
-                type="file"
-                onChange={handleFileUpload}
-                multiple
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
-                className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isUploading || isSubmitting}
-              />
+              <input id="file-upload" type="file" onChange={handleFileUpload} multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp" className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" disabled={isUploading || isSubmitting}/>
               <p className="mt-1 text-xs text-gray-500">
                 Maximum 5 files. Supported formats: PDF, Word, JPEG, PNG, WebP.
                 Max size: 10MB per file.
@@ -1835,69 +1187,40 @@ export const CreateCateringOrderForm: React.FC<
 
           {/* File list */}
           <div className="space-y-2">
-            {uploadedFiles?.map((file: UploadedFile) => (
-              <div
-                key={file.key}
-                className="flex items-center justify-between rounded-md border border-gray-200 p-2"
-              >
+            {uploadedFiles?.map((file: UploadedFile) => (<div key={file.key} className="flex items-center justify-between rounded-md border border-gray-200 p-2">
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-700">{file.name}</span>
                   {progresses &&
-                    typeof file.name === "string" &&
-                    typeof progresses === "object" &&
-                    progresses !== null &&
-                    file.name in progresses && (
-                      <span className="text-xs text-gray-500">
-                        {Math.round(
-                          progresses[file.name as keyof typeof progresses] || 0,
-                        )}
+                typeof file.name === "string" &&
+                typeof progresses === "object" &&
+                progresses !== null &&
+                file.name in progresses && (<span className="text-xs text-gray-500">
+                        {Math.round(progresses[file.name as keyof typeof progresses] || 0)}
                         %
-                      </span>
-                    )}
+                      </span>)}
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeFile(file)}
-                  disabled={isUploading || isSubmitting}
-                >
-                  <X className="h-4 w-4" />
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(file)} disabled={isUploading || isSubmitting}>
+                  <X className="h-4 w-4"/>
                 </Button>
-              </div>
-            ))}
+              </div>))}
           </div>
         </div>
 
         {/* Submit Button */}
         <div className="flex justify-end gap-2">
-          {generalError && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
+          {generalError && (<Button type="button" variant="outline" onClick={() => {
                 form.reset();
                 setGeneralError(null);
                 // Reset any other form state
                 setUploadedFileKeys([]);
-              }}
-            >
+            }}>
               Reset Form
-            </Button>
-          )}
+            </Button>)}
 
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="min-w-[120px]"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...
-              </>
-            ) : (
-              "Create Order"
-            )}
+          <Button type="submit" disabled={isSubmitting} className="min-w-[120px]">
+            {isSubmitting ? (<>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Creating...
+              </>) : ("Create Order")}
           </Button>
         </div>
       </form>
@@ -1907,34 +1230,27 @@ export const CreateCateringOrderForm: React.FC<
         <DialogContent className="max-w-3xl">
           <DialogTitle>
             {addressDialogType === "pickup"
-              ? "Add New Pickup Address"
-              : "Add New Delivery Address"}
+            ? "Add New Pickup Address"
+            : "Add New Delivery Address"}
           </DialogTitle>
           <DialogDescription>
             Fill in the address details below. This address will be saved for
             future use.
           </DialogDescription>
           <div className="pt-2">
-            <AddAddressForm
-              onSubmit={handleAddressFormSubmit}
-              onClose={() => setAddressDialogOpen(false)}
-              allowedCounties={bayAreaCountyValues}
-            />
+            <AddAddressForm onSubmit={handleAddressFormSubmit} onClose={() => setAddressDialogOpen(false)} allowedCounties={bayAreaCountyValues}/>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Auth Dialog */}
-      <Dialog
-        open={!isAuthenticated}
-        onOpenChange={(open) => {
-          if (!open) {
-            // If closing the dialog, switch to manual entry
-            setShowManualPickupEntry(true);
-            setShowManualDeliveryEntry(true);
-          }
-        }}
-      >
+      <Dialog open={!isAuthenticated} onOpenChange={(open) => {
+            if (!open) {
+                // If closing the dialog, switch to manual entry
+                setShowManualPickupEntry(true);
+                setShowManualDeliveryEntry(true);
+            }
+        }}>
         <DialogContent>
           <DialogTitle>Authentication Required</DialogTitle>
           <DialogDescription>
@@ -1942,20 +1258,16 @@ export const CreateCateringOrderForm: React.FC<
             manual address entry or log in to access your saved addresses.
           </DialogDescription>
           <div className="mt-4 flex justify-end space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowManualPickupEntry(true);
-                setShowManualDeliveryEntry(true);
-                setIsAuthenticated(true); // Close the dialog
-              }}
-            >
+            <Button variant="outline" onClick={() => {
+            setShowManualPickupEntry(true);
+            setShowManualDeliveryEntry(true);
+            setIsAuthenticated(true); // Close the dialog
+        }}>
               Continue with Manual Entry
             </Button>
             <Button onClick={handleLogin}>Log In</Button>
           </div>
         </DialogContent>
       </Dialog>
-    </>
-  );
+    </>);
 };
