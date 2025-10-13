@@ -43,11 +43,7 @@ const BookingCalendar = () => {
   const handleBooking = () => {
     if (date && selectedTime) {
       // Here you would typically make an API call to your backend
-      console.log('Booking requested for:', {
-        date: date.toISOString().split('T')[0],
-        time: selectedTime,
-      });
-    }
+          }
   };
 
   return (

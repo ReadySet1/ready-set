@@ -62,4 +62,29 @@ export interface Address {
     county?: string;
   }
 
-  
+  /**
+   * Filter type for better type safety
+   */
+  export type AddressFilter = 'all' | 'shared' | 'private';
+
+  /**
+   * Enhanced Address type with computed properties
+   */
+  export interface EnhancedAddress extends Address {
+    displayName: string;
+    fullAddress: string;
+    isOwner: boolean;
+  }
+
+  /**
+   * Form validation errors
+   */
+  export interface AddressFormErrors {
+    county?: string;
+    name?: string;
+    street1?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    [key: string]: string | undefined;
+  }

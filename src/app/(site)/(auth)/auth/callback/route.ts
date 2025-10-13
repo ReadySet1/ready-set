@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient as createSupabaseServerClient } from '@/utils/supabase/server';
-import { loggers } from '@/utils/logger';
 
 // Define default home routes for each user type
 const USER_HOME_ROUTES: Record<string, string> = {
@@ -9,7 +8,7 @@ const USER_HOME_ROUTES: Record<string, string> = {
   super_admin: "/admin",
   driver: "/driver",
   helpdesk: "/helpdesk",
-  vendor: "/vendor",
+  vendor: "/client",
   client: "/client"
 };
 
@@ -35,30 +34,59 @@ export async function GET(request: Request) {
       }
       
       // Log the successful authentication
-      loggers.app.debug('Authentication successful:', session ? 'Session created' : 'No session created');
-      
+            
       // If we have a session, determine the correct dashboard based on user role
       if (session) {
         try {
-          // Get user's role from profiles table
+          // Get user's role from profiles table (or create if missing)
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('type')
             .eq('id', session.user.id)
-            .single();
+            .maybeSingle();
 
-          if (profileError || !profile?.type) {
-            console.error('Error fetching user role:', profileError);
+          let userType = profile?.type;
+
+          // If no profile exists, create one with default values
+          if (profileError || !profile) {
+            
+            try {
+              // Create a default profile for the user
+              const { data: newProfile, error: createError } = await supabase
+                .from('profiles')
+                .insert({
+                  id: session.user.id,
+                  email: session.user.email || '',
+                  name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
+                  type: 'CLIENT', // Default to CLIENT as the most common user type
+                  status: 'ACTIVE',
+                  updatedAt: new Date().toISOString()
+                })
+                .select('type')
+                .single();
+
+              if (createError) {
+                console.error('Error creating default profile:', createError);
+                return NextResponse.redirect(new URL(next, requestUrl.origin));
+              }
+
+              userType = newProfile?.type;
+                          } catch (createProfileError) {
+              console.error('Exception creating default profile:', createProfileError);
+              return NextResponse.redirect(new URL(next, requestUrl.origin));
+            }
+          }
+
+          if (!userType) {
+            console.error('No user type found after profile creation');
             return NextResponse.redirect(new URL(next, requestUrl.origin));
           }
 
           // Normalize the user type to lowercase for consistent handling
-          const userTypeKey = profile.type.toLowerCase();
-          loggers.app.debug('User role for redirection:', userTypeKey);
+          const userTypeKey = userType.toLowerCase();
           
           // Get the appropriate home route for this user type, fallback to next param
           const homeRoute = USER_HOME_ROUTES[userTypeKey] || next;
-          loggers.app.debug('Redirecting to user dashboard:', homeRoute);
           
           // Redirect to the appropriate dashboard
           return NextResponse.redirect(new URL(homeRoute, requestUrl.origin));

@@ -1,7 +1,7 @@
 // src/app/api/users/route.ts
 
 import { NextResponse, NextRequest } from "next/server";
-import { prisma } from "@/utils/prismaDB";
+import { prisma, withDatabaseRetry } from "@/utils/prismaDB";
 import { createClient } from "@/utils/supabase/server";
 import { Prisma } from '@prisma/client';
 import { UserStatus, UserType, PrismaClientKnownRequestError, PrismaClientValidationError } from '@/types/prisma';
@@ -110,7 +110,7 @@ function handlePrismaError(error: unknown): { error: ApiError; status: number } 
 }
 
 // GET: Fetch users with pagination, search, sort, filter
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   // Declare variables in broader scope for error handling
   let page = 1;
   let limit = 10;
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Apply rate limiting for admin operations
-    const rateLimitResponse = adminRateLimit(request);
+    const rateLimitResponse = await adminRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
@@ -149,8 +149,6 @@ export async function GET(request: NextRequest) {
       return addSecurityHeaders(response);
     }
 
-    console.log('🔍 [Users API] Authenticated user ID:', authUser.id);
-
     // Get user profile from Supabase (same approach as current-user route)
     const { data: dbUser, error: profileError } = await supabase
       .from('profiles')
@@ -164,26 +162,13 @@ export async function GET(request: NextRequest) {
       return addSecurityHeaders(response);
     }
 
-    console.log('🔍 [Users API] Database user type:', dbUser.type);
-    console.log('🔍 [Users API] Expected types:', UserType.ADMIN, UserType.SUPER_ADMIN, UserType.HELPDESK);
-    console.log('🔍 [Users API] Type comparison:', {
-      isAdmin: dbUser.type === UserType.ADMIN,
-      isSuperAdmin: dbUser.type === UserType.SUPER_ADMIN,
-      isHelpdesk: dbUser.type === UserType.HELPDESK,
-      hasType: !!dbUser.type,
-      normalizedType: dbUser.type?.toUpperCase(),
-      hasAdminPrivileges: hasAdminPrivileges(dbUser.type || '')
-    });
-
     // Check if user has admin privileges using the helper function
     if (!dbUser.type || !hasAdminPrivileges(dbUser.type)) {
-      console.log('❌ [Users API] Authorization failed - User type not allowed:', dbUser.type);
-      const response = NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            const response = NextResponse.json({ error: "Forbidden" }, { status: 403 });
       return addSecurityHeaders(response);
     }
 
-    console.log('✅ [Users API] Authorization successful for user type:', dbUser.type);
-
+    
     // --- Parse Query Parameters ---
     const { searchParams } = new URL(request.url);
     page = parseInt(searchParams.get("page") || "1", 10);
@@ -196,8 +181,7 @@ export async function GET(request: NextRequest) {
     sortField = searchParams.get("sort") || "createdAt";
     sortOrder = searchParams.get("sortOrder") || "desc";
 
-    console.log(`🔍 [Users API] Filter transformations: type "${rawTypeFilter}" -> "${typeFilter}", status "${rawStatusFilter}" -> "${statusFilter}"`);
-
+    
     // --- Build WHERE Clause ---
     const where: any = {};
 
@@ -227,28 +211,30 @@ export async function GET(request: NextRequest) {
       (orderBy as any)[sortField] = sortOrder;
     }
 
-    // --- Execute Query ---
-    const [users, totalCount] = await Promise.all([
-      prisma.profile.findMany({
-        where,
-        orderBy,
-        skip: (page - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          type: true,
-          status: true,
-          contactNumber: true,
-          companyName: true,
-          contactName: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      }),
-      prisma.profile.count({ where }),
-    ]);
+    // --- Execute Query with retry logic ---
+    const [users, totalCount] = await withDatabaseRetry(async () => {
+      return Promise.all([
+        prisma.profile.findMany({
+          where,
+          orderBy,
+          skip: (page - 1) * limit,
+          take: limit,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            type: true,
+            status: true,
+            contactNumber: true,
+            companyName: true,
+            contactName: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        prisma.profile.count({ where }),
+      ]);
+    });
 
     // --- Calculate Pagination ---
     const totalPages = Math.ceil(totalCount / limit);
@@ -289,13 +275,13 @@ export async function GET(request: NextRequest) {
 }
 
 // POST: Create a new user
-export async function POST(request: Request) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   // Declare data variable in broader scope for error handling
   let data: any = {};
 
   try {
     // Apply rate limiting for admin operations
-    const rateLimitResponse = adminRateLimit(request as NextRequest);
+    const rateLimitResponse = await adminRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
@@ -362,8 +348,7 @@ export async function POST(request: Request) {
         return addSecurityHeaders(response);
     }
 
-    console.log(`🔍 [Users API] POST type normalization: "${data.type}" -> "${normalizedType}"`);
-
+    
     // Check if email already exists (with better error handling)
     const existingUser = await prisma.profile.findUnique({ where: { email: data.email } });
     if (existingUser) {

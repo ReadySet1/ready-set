@@ -2,24 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
 import { validateUserNotSoftDeleted } from '@/lib/soft-delete-handlers';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: NextRequest) {
-  console.log("Catering file upload API endpoint called");
-  
+    
   try {
     // Get the Supabase client for auth and storage
     const supabase = await createClient();
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
-      console.log("Unauthorized - No session found");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
     // Get form data from the request
     const formData = await request.formData();
-    console.log("Form data keys:", Array.from(formData.keys()));
-    
+        
     // Extract important data from the form
     const file = formData.get('file') as File;
     const entityId = formData.get('entityId') as string;
@@ -41,26 +39,14 @@ export async function POST(request: NextRequest) {
         
         userType = userProfile?.type || 'client'; // Default to 'client' if no type found
       } catch (err) {
-        console.log("Error fetching user role, defaulting to 'client':", err);
-        userType = 'client';
+                userType = 'client';
       }
     }
     
     // Log parameters for debugging
-    console.log("Upload parameters:", {
-      userId,
-      entityId,
-      entityType,
-      category,
-      userType,
-      fileName: file?.name,
-      fileSize: file?.size,
-      fileType: file?.type
-    });
-    
+        
     if (!file || !entityId) {
-      console.log("Missing required fields");
-      return NextResponse.json(
+            return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
@@ -78,14 +64,13 @@ export async function POST(request: NextRequest) {
     // Upload file to Supabase Storage
     const fileExt = file.name.split('.').pop();
     const timestamp = Date.now();
-    const randomId = Math.random().toString(36).substring(2, 9);
+    const randomId = uuidv4().substring(0, 8);
     const fileName = `${timestamp}-${randomId}.${fileExt}`;
     
     // Create a structured path with userType/userId/fileName
     const filePath = `${userType}/${userId}/${fileName}`;
     
-    console.log("Uploading file to storage path:", filePath);
-    
+        
     // Upload the file to catering-files bucket
     const { data: storageData, error: storageError } = await supabase
       .storage
@@ -109,22 +94,10 @@ export async function POST(request: NextRequest) {
       .from('catering-files')
       .getPublicUrl(filePath);
     
-    console.log("Generated public URL:", publicUrl);
-    
+        
     // Create record in the file_upload table
     try {
-      console.log("Creating database record with fields:", {
-        userId,
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        fileUrl: publicUrl,
-        entityType,
-        entityId,
-        category,
-        storagePath: filePath // Log the storage path for debugging
-      });
-      
+            
       // Prepare specific entity type IDs
       let cateringRequestId = null;
       
@@ -145,8 +118,7 @@ export async function POST(request: NextRequest) {
         }
       });
       
-      console.log("Database record created successfully:", fileUpload.id);
-      
+            
       return NextResponse.json({
         success: true,
         file: {

@@ -311,7 +311,7 @@ export async function GET(req: NextRequest) {
 
   try {
     // Apply rate limiting
-    const rateLimitResponse = apiRateLimit(req);
+    const rateLimitResponse = await apiRateLimit(req);
     if (rateLimitResponse) {
       return addSecurityHeaders(rateLimitResponse);
     }

@@ -1,11 +1,9 @@
 // src/components/AddressManager/UserAddresses.tsx
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
-import { Address } from "@/types/address";
+import { Address, AddressFilter } from "@/types/address";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Spinner } from "@/components/ui/spinner";
 import {
   useAddresses,
@@ -22,7 +20,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Pagination,
@@ -32,7 +29,14 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { MapPin, Plus, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import AddressModal from "./AddressModal";
+import AddressCard from "./AddressCard";
+import AddressCardSkeleton from "./AddressCardSkeleton";
+import EmptyAddressState from "./EmptyAddressState";
+import { getDashboardRouteByRole } from "@/utils/routing";
+import { UserType } from "@/types/user";
 
 interface PaginationData {
   currentPage: number;
@@ -45,11 +49,10 @@ interface PaginationData {
 
 const UserAddresses: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<UserType | null>(null);
   const [addressToEdit, setAddressToEdit] = useState<Address | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [filterType, setFilterType] = useState<"all" | "shared" | "private">(
-    "all",
-  );
+  const [filterType, setFilterType] = useState<AddressFilter>("all");
   const [deleteConfirmAddress, setDeleteConfirmAddress] =
     useState<Address | null>(null);
   const [pagination, setPagination] = useState<PaginationData>({
@@ -58,7 +61,7 @@ const UserAddresses: React.FC = () => {
     totalCount: 0,
     hasNextPage: false,
     hasPrevPage: false,
-    limit: 5,
+    limit: 9, // Changed to 9 for better grid layout (3x3)
   });
 
   // Get user from parent component's session
@@ -76,6 +79,26 @@ const UserAddresses: React.FC = () => {
         if (error) throw error;
 
         setUser(user);
+
+        // Fetch user role from metadata or profile
+        if (user?.id) {
+          // Try to get role from user metadata first
+          const roleFromMetadata = user.user_metadata?.role;
+          if (roleFromMetadata) {
+            setUserRole(roleFromMetadata.toLowerCase() as UserType);
+          } else {
+            // Fallback: fetch from profiles table
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("type")
+              .eq("id", user.id)
+              .single();
+
+            if (profile?.type) {
+              setUserRole(profile.type.toLowerCase() as UserType);
+            }
+          }
+        }
       } catch (error) {
         console.error("Error getting user:", error);
         setUser(null);
@@ -146,8 +169,8 @@ const UserAddresses: React.FC = () => {
   };
 
   // Memoize the filter change handler to prevent unnecessary re-renders
-  const handleFilterChange = useCallback((value: string) => {
-    setFilterType(value as "all" | "shared" | "private");
+  const handleFilterChange = useCallback((value: AddressFilter) => {
+    setFilterType(value);
     // Reset to first page when filter changes
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
   }, []);
@@ -196,39 +219,91 @@ const UserAddresses: React.FC = () => {
     );
   }
 
+  // Get filter counts
+  const getFilterCounts = () => {
+    const all = data?.pagination?.totalCount || 0;
+    const shared = addresses.filter((a) => a.isShared).length;
+    const private_ = addresses.filter((a) => !a.isShared).length;
+    return { all, shared, private: private_ };
+  };
+
+  const filterCounts = getFilterCounts();
+
+  // Get the dashboard route based on user role
+  const dashboardRoute = getDashboardRouteByRole(userRole);
+
   return (
     <div className="w-full">
       {/* Header Section */}
-      <div className="mb-6 rounded-lg bg-gray-50 p-4 dark:bg-gray-800 sm:p-6">
-        <h2 className="text-center text-xl font-semibold leading-none tracking-tight sm:text-2xl">
-          Your Addresses
-        </h2>
-        <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
+      <div className="mb-8 space-y-4">
+        {/* Back to Dashboard Button */}
+        <div className="mt-6 flex justify-start">
+          <Link href={dashboardRoute}>
+            <Button
+              variant="outline"
+              className="group flex items-center gap-2 transition-all duration-200 hover:bg-primary hover:text-black"
+            >
+              <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+              Back to Dashboard
+            </Button>
+          </Link>
+        </div>
+
+        <div className="mb-6 mt-8 flex items-center justify-center gap-2">
+          <MapPin className="h-8 w-8 text-primary" />
+          <h2 className="text-center text-3xl font-semibold leading-none tracking-tight">
+            Your Addresses
+          </h2>
+        </div>
+        <p className="text-center text-sm text-slate-500 dark:text-slate-400">
           Manage your saved addresses for deliveries and pickups
         </p>
 
-        {/* Tabs and Add Button - Stack on mobile */}
-        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs
-            defaultValue={filterType}
-            onValueChange={handleFilterChange}
-            className="w-full sm:w-auto"
-          >
-            <TabsList className="grid w-full grid-cols-3 gap-1 sm:w-auto">
-              <TabsTrigger value="all" className="text-xs sm:text-sm">
-                All
-              </TabsTrigger>
-              <TabsTrigger value="private" className="text-xs sm:text-sm">
-                Private
-              </TabsTrigger>
-              <TabsTrigger value="shared" className="text-xs sm:text-sm">
-                Shared
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+        {/* Filter Pills and Add Button */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={filterType === "all" ? "default" : "outline"}
+              onClick={() => handleFilterChange("all")}
+              className={`transition-all duration-200 ease-out ${
+                filterType === "all"
+                  ? "bg-primary text-black hover:bg-primary/90"
+                  : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+              }`}
+            >
+              All ({filterCounts.all})
+            </Button>
+            <Button
+              variant={filterType === "private" ? "default" : "outline"}
+              onClick={() => handleFilterChange("private")}
+              className={`transition-all duration-200 ease-out ${
+                filterType === "private"
+                  ? "bg-primary text-black hover:bg-primary/90"
+                  : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+              }`}
+            >
+              Private ({filterCounts.private})
+            </Button>
+            <Button
+              variant={filterType === "shared" ? "default" : "outline"}
+              onClick={() => handleFilterChange("shared")}
+              className={`transition-all duration-200 ease-out ${
+                filterType === "shared"
+                  ? "bg-primary text-black hover:bg-primary/90"
+                  : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+              }`}
+            >
+              Shared ({filterCounts.shared})
+            </Button>
+          </div>
 
-          <Button onClick={handleAddNewAddress} className="w-full sm:w-auto">
-            + Add New Address
+          <Button
+            onClick={handleAddNewAddress}
+            className="w-full transition-all duration-200 hover:scale-105 sm:w-auto"
+            size="lg"
+          >
+            <Plus className="mr-2 h-5 w-5" />
+            Add New Address
           </Button>
         </div>
       </div>
@@ -252,171 +327,115 @@ const UserAddresses: React.FC = () => {
       {/* Content Area */}
       <div data-testid="addresses-content">
         {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Spinner />
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <AddressCardSkeleton key={i} />
+            ))}
           </div>
         ) : addresses.length === 0 ? (
-          <div className="py-8 text-center">
-            <p className="mb-4 text-gray-500">No addresses found</p>
-            <Button onClick={handleAddNewAddress}>
-              Add Your First Address
-            </Button>
-          </div>
+          <EmptyAddressState
+            onAddAddress={handleAddNewAddress}
+            filterType={filterType}
+          />
         ) : (
-          /* Mobile-friendly card layout instead of table */
-          <div className="space-y-4">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {addresses.map((address) => (
-              <div
+              <AddressCard
                 key={address.id}
-                className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
-              >
-                {/* Address Header */}
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                      {address.name || "Unnamed Location"}
-                    </h3>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {address.isShared && (
-                        <Badge className="bg-blue-500 text-xs">Shared</Badge>
-                      )}
-                      {isAddressOwner(address) && (
-                        <Badge className="bg-green-500 text-xs">Owner</Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Action Buttons - Stack on mobile */}
-                  <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditAddress(address)}
-                      disabled={!isAddressOwner(address)}
-                      className="w-full sm:w-auto"
-                    >
-                      Edit
-                    </Button>
-
-                    <AlertDialog
-                      open={deleteConfirmAddress?.id === address.id}
-                      onOpenChange={(open) => {
-                        if (!open) setDeleteConfirmAddress(null);
-                      }}
-                    >
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => setDeleteConfirmAddress(address)}
-                          disabled={
-                            !isAddressOwner(address) || address.isShared
-                          }
-                          className="w-full sm:w-auto"
-                        >
-                          Delete
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete this address? This
-                            action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-red-500 hover:bg-red-600"
-                            onClick={() => handleDeleteAddress(address.id)}
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-
-                {/* Address Details */}
-                <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                  <div>
-                    <span className="font-medium">Address:</span>
-                    <div className="mt-1">
-                      {address.street1}
-                      {address.street2 && <div>{address.street2}</div>}
-                      <div>
-                        {address.city}, {address.state} {address.zip}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
-                    <div>
-                      <span className="font-medium">County:</span>
-                      <span className="ml-2">{address.county || "N/A"}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium">Type:</span>
-                      <span className="ml-2">
-                        {address.isRestaurant
-                          ? "Restaurant"
-                          : "Standard Address"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {address.locationNumber && (
-                    <div>
-                      <span className="font-medium">Phone:</span>
-                      <span className="ml-2">{address.locationNumber}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+                address={address}
+                isOwner={isAddressOwner(address)}
+                onEdit={handleEditAddress}
+                onDelete={(addr) => setDeleteConfirmAddress(addr)}
+              />
             ))}
           </div>
         )}
       </div>
 
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!deleteConfirmAddress}
+        onOpenChange={(open) => {
+          if (!open) setDeleteConfirmAddress(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this address? This action cannot
+              be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600"
+              onClick={() =>
+                deleteConfirmAddress &&
+                handleDeleteAddress(deleteConfirmAddress.id)
+              }
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Pagination Section */}
-      {!isLoading && pagination.totalPages > 1 && (
+      {!isLoading && paginationData.totalPages > 1 && (
         <div
-          className="mt-6 flex items-center justify-between border-t bg-slate-50 p-4"
+          className="mt-8 flex flex-col items-center justify-between gap-4 border-t pt-6 sm:flex-row"
           data-testid="pagination"
         >
-          <Pagination>
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Showing{" "}
+            {(paginationData.currentPage - 1) * paginationData.limit + 1} -{" "}
+            {Math.min(
+              paginationData.currentPage * paginationData.limit,
+              paginationData.totalCount,
+            )}{" "}
+            of {paginationData.totalCount} addresses
+          </div>
+
+          <Pagination className="transition-opacity duration-200">
             <PaginationContent className="flex-wrap gap-1">
               <PaginationItem>
                 <PaginationPrevious
                   onClick={handlePrevPage}
-                  className={`${!pagination.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
+                  className={`${!paginationData.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer transition-colors duration-150 hover:bg-slate-200"} text-sm`}
                   data-testid="pagination-previous"
                 />
               </PaginationItem>
-              {/* Basic Pagination - Consider a more advanced version for many pages */}
-              {[...Array(pagination.totalPages)].map((_, i) => (
+
+              {/* Show page numbers on larger screens */}
+              {[...Array(paginationData.totalPages)].map((_, i) => (
                 <PaginationItem key={i} className="hidden sm:block">
                   <PaginationLink
                     onClick={() => handlePageChange(i + 1)}
-                    isActive={pagination.currentPage === i + 1}
-                    className={`cursor-pointer text-sm ${pagination.currentPage === i + 1 ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "hover:bg-slate-200"}`}
+                    isActive={paginationData.currentPage === i + 1}
+                    className={`cursor-pointer text-sm transition-colors duration-150 ${
+                      paginationData.currentPage === i + 1
+                        ? "bg-primary text-black hover:bg-primary/90"
+                        : "hover:bg-slate-200 dark:hover:bg-slate-700"
+                    }`}
                   >
                     {i + 1}
                   </PaginationLink>
                 </PaginationItem>
               ))}
+
               {/* Mobile: Show current page info */}
               <PaginationItem className="sm:hidden">
-                <span className="px-3 py-2 text-sm text-slate-600">
-                  {pagination.currentPage} of {pagination.totalPages}
+                <span className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400">
+                  {paginationData.currentPage} of {paginationData.totalPages}
                 </span>
               </PaginationItem>
+
               <PaginationItem>
                 <PaginationNext
                   onClick={handleNextPage}
-                  className={`${!pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"} text-sm`}
+                  className={`${!paginationData.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer transition-colors duration-150 hover:bg-slate-200"} text-sm`}
                   data-testid="pagination-next"
                 />
               </PaginationItem>

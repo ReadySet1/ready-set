@@ -1,8 +1,10 @@
 import dotenv from 'dotenv';
-import { prisma } from '../src/utils/prismaDB';
 
-// Load environment variables
+// Load environment variables FIRST
 dotenv.config({ path: '.env.local' });
+
+// Import prisma AFTER environment variables are loaded
+import { prisma } from '../src/utils/prismaDB';
 
 // Set NODE_ENV if not set - use a different approach to avoid read-only property error
 const nodeEnv = process.env.NODE_ENV || 'development';

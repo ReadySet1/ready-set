@@ -84,13 +84,7 @@ export function FileUploader({
       if (selectedFiles.length === 0) return;
       
       // Debug log to see parameters
-      console.log("FileUploader handleUpload - Parameters:", {
-        entityType,
-        entityId,
-        category,
-        files: selectedFiles.map(f => ({name: f.name, size: f.size, type: f.type}))
-      });
-      
+            
       setError(null);
       await onUpload(selectedFiles);
       // Only clear selected files if upload was successful

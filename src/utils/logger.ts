@@ -1,126 +1,96 @@
 /**
- * Centralized Logging Utility
- * Provides consistent, environment-aware logging across the application
+ * Environment-aware logging utility
+ * Prevents console spam in production builds while maintaining useful logs in development
  */
 
-import { isDev, isProd, isTest, isBuildTime, isRuntime } from './env-config';
+type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-interface LogConfig {
-  development: boolean;
-  production: boolean;
-  test: boolean;
+interface LoggerConfig {
+  enabledInProduction: boolean;
+  enabledInBuild: boolean;
+  enabledInDevelopment: boolean;
+  enabledInTest: boolean;
 }
 
-interface Logger {
-  debug: (message: string, data?: any) => void;
-  info: (message: string, data?: any) => void;
-  warn: (message: string, data?: any) => void;
-  error: (message: string, data?: any) => void;
-}
-
-/**
- * Creates a logger instance for a specific category
- * @param category - The category/component name for the logger
- * @param config - Configuration for which environments should log
- * @returns Logger instance with categorized logging methods
- */
-const createLogger = (category: string, config: LogConfig): Logger => {
-  const shouldLog = config[process.env.NODE_ENV as keyof LogConfig];
-  
-  return {
-    debug: (message: string, data?: any) => {
-      if (shouldLog) {
-        console.debug(`[${category}]`, message, data);
-      }
-    },
-    info: (message: string, data?: any) => {
-      if (shouldLog) {
-        console.info(`[${category}]`, message, data);
-      }
-    },
-    warn: (message: string, data?: any) => {
-      // Warnings should always be shown in all environments
-      console.warn(`[${category}]`, message, data);
-    },
-    error: (message: string, data?: any) => {
-      // Errors should always be shown in all environments
-      console.error(`[${category}]`, message, data);
-    },
-  };
+const DEFAULT_CONFIG: LoggerConfig = {
+  enabledInProduction: false,
+  enabledInBuild: false,
+  enabledInDevelopment: false, // Temporarily disabled for troubleshooting
+  enabledInTest: false,
 };
 
-/**
- * Pre-configured logger instances for common categories
- */
-export const loggers = {
-  // Database/Prisma logging - only in development and test
-  prisma: createLogger('PRISMA', {
-    development: true,
-    production: false,
-    test: true,
-  }),
-  
-  // Authentication logging - only in development
-  auth: createLogger('AUTH', {
-    development: true,
-    production: false,
-    test: false,
-  }),
-  
-  // User context logging - only in development
-  userContext: createLogger('USER_CONTEXT', {
-    development: true,
-    production: false,
-    test: false,
-  }),
-  
-  // Header component logging - only in development
-  header: createLogger('HEADER', {
-    development: true,
-    production: false,
-    test: false,
-  }),
-  
-  // Real-time tracking logging - only in development
-  tracking: createLogger('TRACKING', {
-    development: true,
-    production: false,
-    test: true,
-  }),
-  
-  // Service worker logging - only in development
-  serviceWorker: createLogger('SERVICE_WORKER', {
-    development: true,
-    production: false,
-    test: false,
-  }),
-  
-  // General application logging - always enabled
-  app: createLogger('APP', {
-    development: true,
-    production: true,
-    test: true,
-  }),
-};
+class Logger {
+  private config: LoggerConfig;
 
-/**
- * Environment-based debug logging utility
- * Provides a simple way to create conditional debug logs
- */
-export const debugLog = isDev ? console.log : () => {};
+  constructor(config: Partial<LoggerConfig> = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+  }
 
-/**
- * Performance logging utility
- * Only logs in development for performance monitoring
- */
-export const perfLog = isDev 
-  ? (label: string, fn: () => void) => {
-      console.time(label);
-      fn();
-      console.timeEnd(label);
+  private shouldLog(): boolean {
+    const env = process.env.NODE_ENV;
+    const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build';
+    
+    if (isBuildTime) return this.config.enabledInBuild;
+    
+    switch (env) {
+      case 'production':
+        return this.config.enabledInProduction;
+      case 'development':
+        return this.config.enabledInDevelopment;
+      case 'test':
+        return this.config.enabledInTest;
+      default:
+        return false;
     }
-  : (label: string, fn: () => void) => fn();
+  }
 
-// Export the main createLogger function for custom loggers
-export { createLogger };
-export type { Logger, LogConfig };
+  debug(message: string, ...args: any[]): void {
+    if (this.shouldLog()) {
+          }
+  }
+
+  info(message: string, ...args: any[]): void {
+    if (this.shouldLog()) {
+      console.info(message, ...args);
+    }
+  }
+
+  warn(message: string, ...args: any[]): void {
+    if (this.shouldLog()) {
+      console.warn(message, ...args);
+    }
+  }
+
+  error(message: string, ...args: any[]): void {
+    // Always log errors regardless of environment
+    console.error(message, ...args);
+  }
+}
+
+// Pre-configured loggers for different components
+export const prismaLogger = new Logger({
+  enabledInProduction: false,
+  enabledInBuild: false,
+  enabledInDevelopment: false, // Temporarily disabled for troubleshooting
+  enabledInTest: false,
+});
+
+export const authLogger = new Logger({
+  enabledInProduction: false,
+  enabledInBuild: false,
+  enabledInDevelopment: false, // Temporarily disabled for troubleshooting
+  enabledInTest: false,
+});
+
+export const uiLogger = new Logger({
+  enabledInProduction: false,
+  enabledInBuild: false,
+  enabledInDevelopment: false,
+  enabledInTest: false,
+});
+
+// General logger
+export const logger = new Logger();
+
+// Export default logger
+export default logger;

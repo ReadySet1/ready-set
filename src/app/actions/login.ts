@@ -3,8 +3,7 @@
 "use server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createClient } from "@/utils/supabase/server";
-import { softDeleteHelpers } from "@/utils/prismaDB";
+import { createClient, createAdminClient } from "@/utils/supabase/server";
 
 import { UserType } from "@/types/user";
 
@@ -14,7 +13,7 @@ const PROTECTED_ROUTES: Record<string, RegExp> = {
   super_admin: /^\/admin(\/.*)?$/,
   driver: /^\/driver(\/.*)?$/,
   helpdesk: /^\/helpdesk(\/.*)?$|^\/admin(\/.*)?$/,
-  vendor: /^\/vendor(\/.*)?$/,
+  vendor: /^\/client(\/.*)?$/,
   client: /^\/client(\/.*)?$/
 };
 
@@ -24,7 +23,7 @@ const USER_HOME_ROUTES: Record<string, string> = {
   super_admin: "/admin",
   driver: "/driver",
   helpdesk: "/helpdesk",
-  vendor: "/vendor",
+  vendor: "/client",
   client: "/client"
 };
 
@@ -42,8 +41,9 @@ export async function login(
 ): Promise<FormState> {
   const startTime = Date.now();
   const requestId = `login_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  console.log(`🚀 [${requestId}] Login attempt started`);
+
+  if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+      }
   
   // Use cookies() to opt out of caching
   await cookies();
@@ -53,7 +53,8 @@ export async function login(
     const password = formData.get("password")?.toString() || "";
     const returnTo = formData.get("returnTo")?.toString();
 
-    console.log(`🔍 [${requestId}] Login attempt for email: ${email}, returnTo: ${returnTo || 'default'}`);
+    if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+          }
 
     // Enhanced input validation with specific error messages
     if (!email || !password) {
@@ -61,7 +62,8 @@ export async function login(
       if (!email) missingFields.push('email');
       if (!password) missingFields.push('password');
       
-      console.log(`❌ [${requestId}] Validation failed: Missing ${missingFields.join(', ')}`);
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+              }
       return { 
         error: `Please provide ${missingFields.join(' and ')} to continue.`,
         success: false 
@@ -71,7 +73,8 @@ export async function login(
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      console.log(`❌ [${requestId}] Validation failed: Invalid email format`);
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+              }
       return { 
         error: "Please enter a valid email address.",
         success: false 
@@ -79,7 +82,8 @@ export async function login(
     }
 
     // Test connection to Supabase first
-    console.log(`🔌 [${requestId}] Testing Supabase connection...`);
+    if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+          }
     try {
       const { data: connectionTest, error: connectionError } = await supabase
         .from("profiles")
@@ -94,7 +98,8 @@ export async function login(
         };
       }
       
-      console.log(`✅ [${requestId}] Supabase connection test: SUCCESS`);
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+              }
     } catch (testError) {
       console.error(`❌ [${requestId}] Supabase connection test failed:`, testError);
       return { 
@@ -104,15 +109,17 @@ export async function login(
     }
 
     // Attempt authentication
-    console.log(`🔐 [${requestId}] Attempting authentication...`);
+    if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+          }
     const { error: authError, data: authData } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (authError) {
-      console.log(`❌ [${requestId}] Authentication failed: ${authError.message}`);
-      
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+              }
+
       // Enhanced error handling with specific messages
       if (authError.message.includes('Invalid login credentials')) {
         // Check if user exists in profiles table for more specific error
@@ -123,21 +130,23 @@ export async function login(
             .eq("email", email)
             .maybeSingle();
 
-          if (profileError) {
+          if (profileError && process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
             console.error(`❌ [${requestId}] Profile lookup error:`, profileError);
           }
 
           if (userData) {
-            console.log(`❌ [${requestId}] User exists but password is incorrect`);
-            return { 
+            if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+                          }
+            return {
               error: "Incorrect password. Please check your password and try again, or use Magic Link for password-free sign in.",
-              success: false 
+              success: false
             };
           } else {
-            console.log(`❌ [${requestId}] User account not found`);
-            return { 
+            if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+                          }
+            return {
               error: "Account not found. Please check your email address or sign up for a new account.",
-              success: false 
+              success: false
             };
           }
         } catch (profileLookupError) {
@@ -148,10 +157,99 @@ export async function login(
           };
         }
       } else if (authError.message.includes('Email not confirmed')) {
-        return { 
-          error: "Please check your email and click the confirmation link before signing in.",
-          success: false 
-        };
+        // Check if this user exists and if email confirmation is actually required
+        try {
+                    const { data: profileData, error: profileError } = await supabase
+            .from("profiles")
+            .select("id, email, type")
+            .eq("email", email)
+            .maybeSingle();
+
+          // If user exists in profiles, they might be a legacy user from before confirmation was disabled
+          if (profileData && !profileError) {
+                                    
+            // Try to sign up the user again with the same credentials
+            // This should work since email confirmation is disabled and will create a confirmed account
+                        
+            let signupData, signupError;
+            try {
+              const result = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                  emailRedirectTo: undefined // Disable email confirmation since it's disabled in config
+                }
+              });
+              signupData = result.data;
+              signupError = result.error;
+                          } catch (signupException) {
+              console.error(`💥 [${requestId}] Signup exception:`, signupException);
+              signupError = signupException as any;
+            }
+
+            if (signupError) {
+              console.error(`❌ [${requestId}] Re-registration failed:`, signupError);
+              
+              // If signup fails because user already exists, that's actually good!
+              if (signupError.message.includes('User already registered')) {
+                                return { 
+                  error: "Your account needs activation. Please try logging in again, or contact support if the issue persists.",
+                  success: false 
+                };
+              }
+              
+              return { 
+                error: "Account activation failed. Please contact support or try signing up again.",
+                success: false 
+              };
+            }
+
+            // If signup succeeded, the user should now be confirmed and logged in
+            if (signupData && signupData.user && signupData.session) {
+                            
+              // Continue with the normal login flow since the user is now authenticated
+              const user = signupData.user;
+              
+              // Get user profile to determine redirect
+              const { data: profile, error: newProfileError } = await supabase
+                .from("profiles")
+                .select("type, email")
+                .eq("id", user.id)
+                .single();
+
+              if (newProfileError || !profile?.type) {
+                console.error(`❌ [${requestId}] Error fetching user profile after re-registration:`, newProfileError);
+                return {
+                  error: "Account activated but unable to determine user role. Please contact support.",
+                  success: false
+                };
+              }
+
+              const userType = profile.type!.toLowerCase(); // profile.type is guaranteed to be non-null here
+              // If returnTo is just "/" (root), prioritize the user's home route
+              const redirectPath = (returnTo && returnTo !== "/") ? returnTo : USER_HOME_ROUTES[userType] || "/";
+              
+                            
+              redirect(redirectPath);
+            } else {
+                            return { 
+                error: "Account activation incomplete. Please try logging in again.",
+                success: false 
+              };
+            }
+          } else {
+                        return { 
+              error: "Please check your email and click the confirmation link before signing in.",
+              success: false 
+            };
+          }
+        } catch (checkError) {
+          console.error(`❌ [${requestId}] Error checking user profile:`, checkError);
+          return { 
+            error: "Please check your email and click the confirmation link before signing in.",
+            success: false 
+          };
+        }
       } else if (authError.message.includes('Too many requests')) {
         return { 
           error: "Too many login attempts. Please wait a few minutes before trying again.",
@@ -168,83 +266,132 @@ export async function login(
     }
 
     // Authentication successful - get user profile
-    console.log(`✅ [${requestId}] Authentication successful, fetching user profile...`);
-    const { data: { user }, error: getUserError } = await supabase.auth.getUser();
-    
+        const { data: { user }, error: getUserError } = await supabase.auth.getUser();
+
     if (getUserError || !user) {
       console.error(`❌ [${requestId}] Failed to get user data:`, getUserError);
-      return { 
+      return {
         error: "Login successful but unable to retrieve user information. Please try again.",
-        success: false 
+        success: false
       };
     }
 
-    // Get user type from profile
-    const { data: profile, error: profileError } = await supabase
+    // Get user profile to determine user type
+        const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("type, email, deletedAt")
+      .select("type, email")
       .eq("id", user.id)
       .single();
 
-    if (profileError) {
+    if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows returned
       console.error(`❌ [${requestId}] Error fetching user profile:`, profileError);
-      return { 
-        error: "Login successful but unable to determine user role. Please contact support.",
-        success: false 
+      return {
+        error: "Login successful but unable to retrieve user information. Please try again.",
+        success: false
       };
     }
 
-    if (!profile || !profile.type) {
-      console.error(`❌ [${requestId}] No profile or profile type found for user: ${user.id}`);
-      return { 
+    // Get user type from profile (or create if missing)
+    let userType: string | undefined = profile?.type;
+
+    // If no profile exists, create one with default values
+    if (!profile) {
+      
+      try {
+        // Use admin client to bypass RLS policies for profile creation
+        const adminSupabase = await createAdminClient();
+
+        // Use upsert to handle existing profiles gracefully
+        const { data: newProfile, error: createError } = await adminSupabase
+          .from("profiles")
+          .upsert({
+            id: user.id,
+            email: user.email || '',
+            name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+            type: 'CLIENT', // Default to CLIENT as the most common user type
+            status: 'ACTIVE',
+            updatedAt: new Date().toISOString()
+          }, {
+            onConflict: 'id'
+          })
+          .select("type, email")
+          .single();
+
+        if (createError) {
+          console.error(`❌ [${requestId}] Error creating default profile:`, createError);
+          return {
+            error: "Login successful but unable to create user profile. Please contact support.",
+            success: false
+          };
+        }
+
+        userType = newProfile?.type || undefined;
+              } catch (createProfileError) {
+        console.error(`❌ [${requestId}] Exception creating default profile:`, createProfileError);
+        return {
+          error: "Login successful but unable to set up user account. Please contact support.",
+          success: false
+        };
+      }
+    }
+
+    // Double-check that we have a valid profile and userType
+    if (!profile && !userType) {
+      console.error(`❌ [${requestId}] Profile creation failed and no existing profile found for user: ${user.id}`);
+      return {
+        error: "Login successful but unable to access user profile. Please contact support.",
+        success: false
+      };
+    }
+
+    if (!userType) {
+      console.error(`❌ [${requestId}] No profile type found for user: ${user.id}`);
+      return {
         error: "Login successful but user profile is incomplete. Please contact support.",
-        success: false 
+        success: false
       };
     }
 
-    // Check if user account has been soft-deleted
-    if (profile.deletedAt) {
-      console.log(`❌ [${requestId}] Login attempt by soft-deleted user: ${user.id}`);
-      return { 
-        error: "Account has been deactivated. Please contact support for assistance.",
-        success: false 
-      };
-    }
+  if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+      }
 
-  console.log("User profile type from DB:", profile.type);
-  
   // Normalize the user type to lowercase for consistent handling
-  const userTypeKey = profile.type.toLowerCase();
-  console.log("Normalized user type for redirection:", userTypeKey);
+  const userTypeKey = userType?.toLowerCase() || 'client';
+
+  if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+      }
 
   // Set immediate session data in cookies for client-side access
   const cookieStore = await cookies();
-  
+
   // Set user session data that can be read immediately by client
   // Normalize userRole to match TypeScript enum (lowercase)
-  const normalizedUserRole = profile.type ? Object.values(UserType).find(
-    enumValue => enumValue.toUpperCase() === profile.type!.toUpperCase()
-  ) || profile.type.toLowerCase() : 'customer';
-  
+  const normalizedUserRole = userType ? Object.values(UserType).find(
+    enumValue => enumValue.toUpperCase() === (userType as string)?.toUpperCase()
+  ) || (userType as string)?.toLowerCase() : 'customer';
+
   const sessionData = {
     userId: user.id,
     email: user.email || '',
     userRole: normalizedUserRole,
     timestamp: Date.now()
   };
-  
-  console.log("Normalized userRole for session:", normalizedUserRole);
-  
-  // Set session cookie with immediate user data
+
+  if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+      }
+
+  // Set session cookie with enhanced security - allow client access for hydration
   cookieStore.set('user-session-data', JSON.stringify(sessionData), {
     path: '/',
-    httpOnly: false, // Allow client-side access
+    httpOnly: false, // Allow client-side access for hydration
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7 // 7 days
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+    // Additional security headers
+    ...(process.env.NODE_ENV === 'production' && {
+      domain: process.env.NEXT_PUBLIC_COOKIE_DOMAIN || undefined,
+    })
   });
-
-  console.log("Set immediate session data for client:", sessionData);
 
   // Prefetch and cache user profile data for faster client-side loading
   try {
@@ -265,8 +412,6 @@ export async function login(
       sameSite: 'lax',
       maxAge: 60 * 10 // 10 minutes
     });
-    
-    console.log("Prefetched user profile data for client:", profileData);
   } catch (error) {
     console.error("Error prefetching user profile data:", error);
     // Don't fail login if prefetch fails
@@ -281,51 +426,46 @@ export async function login(
       const hasAccess = PROTECTED_ROUTES[userTypeKey]?.test(returnTo);
       
       if (hasAccess) {
-        console.log(`🔄 [${requestId}] Redirecting user to returnTo path: ${returnTo}`);
-        redirectPath = returnTo;
+                redirectPath = returnTo;
       } else {
         // If user doesn't have access to returnTo path, use their default home route
         redirectPath = USER_HOME_ROUTES[userTypeKey] || "/";
-        console.log(`⚠️ [${requestId}] User doesn't have access to returnTo path ${returnTo}, redirecting to default home: ${redirectPath}`);
-      }
+              }
     } else {
       // Use the default home route for this user type
       redirectPath = USER_HOME_ROUTES[userTypeKey] || "/";
-      console.log(`🏠 [${requestId}] No valid returnTo path provided, redirecting to default home: ${redirectPath}`);
-    }
+          }
 
     // Calculate execution time
     const executionTime = Date.now() - startTime;
-    console.log(`✅ [${requestId}] Login successful! Redirecting to: ${redirectPath} (took ${executionTime}ms)`);
-
+    
     // Return success state before redirect
     const successState: FormState = {
       success: true,
       redirectTo: redirectPath,
-      userType: profile.type,
+      userType: userType,
       message: `Welcome back! Redirecting to your dashboard...`
     };
 
     // Log success metrics for monitoring BEFORE redirect
-    console.log(`📊 [${requestId}] Login metrics:`, {
-      email: email,
-      userType: profile.type || 'unknown',
-      redirectPath: redirectPath,
-      executionTime: `${executionTime}ms`,
-      timestamp: new Date().toISOString()
+    
+    // Store session data in a way that can be accessed by the client
+    // Use a client-accessible cookie that survives the redirect
+    cookieStore.set('temp-session-data', JSON.stringify(sessionData), {
+      path: '/',
+      httpOnly: false, // Allow client-side access
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60, // Short-lived cookie, will be cleaned up by client
     });
 
-    // CRITICAL: Call redirect() immediately after determining path
-    // Do NOT create objects or do extensive logging after this point
-    // This will throw a NEXT_REDIRECT error that Next.js handles automatically
-    redirect(redirectPath);
-
-         // This code is unreachable but satisfies TypeScript
-     // The successState is not needed since redirect() handles the response
+    // IMPORTANT: Return the redirect path instead of calling redirect()
+    // This ensures cookies are properly committed before the client-side redirect
+    // The client will handle the actual redirect using router.push()
      return {
        success: true,
        redirectTo: redirectPath,
-       userType: profile?.type || 'unknown',
+       userType: userType || 'unknown',
        message: `Welcome back! Redirecting to your dashboard...`
      };
 }

@@ -48,14 +48,14 @@ export async function syncOAuthProfile(userId: string, metadata: any) {
 
   // --- Create the profile ---
   // For OAuth users, auto-create a basic profile.
-  console.log(`Attempting to create profile for user ID: ${userId}`);
-  const { error } = await supabase.from("profiles").insert({
+    const { error } = await supabase.from("profiles").insert({
     id: userId,               // Changed: Use 'id' as the primary key matching the Supabase Auth ID
     email: userEmail,         // Changed: Added email field
     name: userName,
     image: userImage,
     type: "CLIENT",           // Changed: Match enum case 'CLIENT'
     status: "PENDING",        // Changed: Match enum case 'PENDING'
+    updatedAt: new Date().toISOString(), // Add required updatedAt field
     // Add default values for other *required* fields from your Prisma schema if necessary
     // e.g., companyName: null, contactName: null, etc. if they are NOT NULL without defaults
   });
@@ -69,8 +69,7 @@ export async function syncOAuthProfile(userId: string, metadata: any) {
     return { success: false, error };
   }
 
-  console.log(`Successfully created profile for user ID: ${userId}`);
-  // Fetch the newly created profile to return it (optional but good practice)
+    // Fetch the newly created profile to return it (optional but good practice)
    const { data: newProfileData } = await supabase
     .from("profiles")
     .select("*")
@@ -81,14 +80,13 @@ export async function syncOAuthProfile(userId: string, metadata: any) {
 }
 
 // IMPORTANT: Ensure the 'role' string passed here matches the UserType enum case (e.g., "VENDOR", "CLIENT")
-export async function updateUserRole(userId: string, role: string) {
+export async function updateUserRole(userId: string, role: 'VENDOR' | 'CLIENT' | 'DRIVER' | 'ADMIN' | 'HELPDESK' | 'SUPER_ADMIN') {
   const supabase = await createClient();
   let profileError: any = null;
   let authError: any = null;
 
   // Changed: Update the 'type' field in the 'profiles' table first
-  console.log(`Updating profile type for user ${userId} to ${role}`);
-  const { error: updateProfileError } = await supabase
+    const { error: updateProfileError } = await supabase
       .from("profiles")
       .update({ type: role as Database['public']['Enums']['UserType'] }) // Use the role value directly (ensure correct case)
       .eq("id", userId);     // Changed: Use 'id' instead of 'auth_user_id'
@@ -99,13 +97,11 @@ export async function updateUserRole(userId: string, role: string) {
       // Depending on requirements, you might want to stop here
       // return { success: false, error: profileError, message: "Failed to update profile type." };
   } else {
-      console.log(`Successfully updated profile type for user ${userId}`);
-  }
+        }
 
   // Changed: Also update user metadata in Auth (can be redundant or serve other purposes)
   // Useful if other parts of the system rely solely on auth metadata.
-  console.log(`Updating auth metadata role for user ${userId} to ${role}`);
-  const { error: updateAuthError } = await supabase.auth.updateUser({
+    const { error: updateAuthError } = await supabase.auth.updateUser({
       // Note: Supabase admin actions might be needed for this if RLS restricts user self-updating metadata
       data: { role: role }, // Keep metadata in sync
   });
@@ -114,8 +110,7 @@ export async function updateUserRole(userId: string, role: string) {
       console.error("Error updating auth metadata role:", updateAuthError);
       authError = updateAuthError;
   } else {
-     console.log(`Successfully updated auth metadata role for user ${userId}`);
-  }
+       }
 
   // Return success only if the primary update (profile) succeeded.
   // Adjust error reporting based on which update is considered critical.
@@ -161,16 +156,34 @@ export async function getUserRole(userId: string): Promise<string | null> {
    // Explicitly check user_metadata exists before accessing role
    const roleFromMetadata = authData?.user?.user_metadata?.role;
    if (roleFromMetadata) {
-       console.log(`Role found in auth metadata for user ${userId}: ${roleFromMetadata}`);
-       return roleFromMetadata;
+              return roleFromMetadata;
    }
 
-  console.log(`Role not found in profile or auth metadata for user ${userId}.`);
-  return null; // Return null if role is not found in either location
+    return null; // Return null if role is not found in either location
 }
 
 export async function getCurrentUser() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  return user;
+
+  if (!user?.id) {
+    return null;
+  }
+
+  // Fetch profile data including role information
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("type")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = Row not found
+    console.error("Error fetching user profile:", profileError);
+  }
+
+  // Return user object with role information
+  return {
+    ...user,
+    role: profile?.type || null, // Include role from profile, fallback to null if not found
+  };
 }

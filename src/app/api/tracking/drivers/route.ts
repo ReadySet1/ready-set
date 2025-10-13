@@ -261,15 +261,16 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - Delete a driver
+// DELETE - Delete driver
 export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const driverId = searchParams.get('id');
+    const url = new URL(request.url);
+    const pathParts = url.pathname.split('/');
+    const driverId = pathParts[pathParts.length - 1];
 
-    if (!driverId) {
+    if (!driverId || driverId === 'route') {
       return NextResponse.json(
-        { success: false, error: 'Missing driver ID' },
+        { success: false, error: 'Driver ID is required' },
         { status: 400 }
       );
     }
@@ -286,7 +287,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Driver deleted successfully'
+      data: { id: driverId, deleted: true }
     });
 
   } catch (error) {

@@ -37,10 +37,10 @@ export async function POST(request: Request) {
     if (!user || !user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
     
     const body = await request.json();
-    console.log("Request body:", body);
-    
+        
     const { orderId, driverId, orderType } = body;
 
     if (!orderId || !driverId || !orderType) {
@@ -66,8 +66,7 @@ export async function POST(request: Request) {
         let order;
         let dispatch;
 
-        console.log(`Fetching ${orderType} order with ID: ${orderId}`);
-
+        
         // Fetch the order based on orderType
         if (orderType === "catering") {
           order = await prisma.cateringRequest.findUnique({

@@ -1,0 +1,47 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit validation..."
+
+# 1. TypeScript Type Checking
+echo "📝 Type checking..."
+pnpm run typecheck
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript errors found. Fix them before committing."
+  exit 1
+fi
+
+# 2. Linting
+echo "🧹 Linting..."
+pnpm run lint
+if [ $? -ne 0 ]; then
+  echo "❌ Linting errors found. Fix them before committing."
+  exit 1
+fi
+
+# 3. Prisma Schema Validation
+echo "🗄️  Validating Prisma schema..."
+pnpm prisma validate
+if [ $? -ne 0 ]; then
+  echo "❌ Prisma schema validation failed."
+  exit 1
+fi
+
+# 4. Unit Tests (fast feedback)
+echo "🧪 Running unit tests..."
+pnpm run test:unit --passWithNoTests --silent
+if [ $? -ne 0 ]; then
+  echo "❌ Unit tests failed. Fix them before committing."
+  exit 1
+fi
+
+# 5. Build Check (optional - uncomment if you want to test builds on every commit)
+# Warning: This can slow down commits significantly
+# echo "🏗️  Testing build..."
+# pnpm run build:no-typecheck
+# if [ $? -ne 0 ]; then
+#   echo "❌ Build failed. Fix errors before committing."
+#   exit 1
+# fi
+
+echo "✅ All pre-commit checks passed! Proceeding with commit..."

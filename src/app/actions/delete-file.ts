@@ -5,7 +5,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { revalidatePath } from "next/cache";
-import { loggers } from '@/utils/logger';
 
 type DeleteFileResult =
   | { success: true; message: string }
@@ -15,10 +14,7 @@ export const deleteFile = async (
   userId: string,
   fileKey: string,
 ): Promise<DeleteFileResult> => {
-  loggers.app.debug(
-    `Attempting to delete file with key: ${fileKey} for user: ${userId}`,
-  );
-
+  
   try {
     // 1. Get the file record from the database
     const file = await prisma.fileUpload.findFirst({
@@ -29,12 +25,10 @@ export const deleteFile = async (
     });
 
     if (!file) {
-      loggers.app.debug(`File not found in database: ${fileKey}`);
-      return { success: false, message: "File not found in database" };
+            return { success: false, message: "File not found in database" };
     }
 
-    loggers.app.debug(`File found in database: ${JSON.stringify(file)}`);
-
+    
     // 2. Extract the file path from the URL using regex like in your API route
     const fileUrlMatch = file.fileUrl.match(/fileUploader\/([^?#]+)/);
     const filePath = fileUrlMatch?.[1];
@@ -48,8 +42,7 @@ export const deleteFile = async (
 
       // 4. Delete the file from Supabase Storage
       try {
-        loggers.app.debug(`Attempting to delete file from Supabase Storage: ${filePath}`);
-        const { data, error } = await supabase.storage
+                const { data, error } = await supabase.storage
           .from("fileUploader")
           .remove([filePath]);
 
@@ -57,8 +50,7 @@ export const deleteFile = async (
           console.error("Error deleting from Supabase Storage:", error);
           // We'll continue to delete the database record even if the storage delete fails
         } else {
-          loggers.app.debug(`Supabase Storage delete result:`, data);
-        }
+                  }
       } catch (storageError) {
         console.error("Error calling Supabase Storage API:", storageError);
         // Continue with database deletion anyway
@@ -67,14 +59,12 @@ export const deleteFile = async (
 
     // 5. Delete the database record
     try {
-      loggers.app.debug(`Attempting to delete file record from database: ${fileKey}`);
-      await prisma.fileUpload.delete({
+            await prisma.fileUpload.delete({
         where: {
           id: fileKey,
         },
       });
-      loggers.app.debug(`File record deleted from database: ${fileKey}`);
-      
+            
       // Optionally revalidate any paths that might show this file
       revalidatePath(`/user/${userId}`);
     } catch (dbError) {

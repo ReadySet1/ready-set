@@ -212,6 +212,14 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       className:
         "bg-gradient-to-r from-green-50 to-green-100 text-green-800 border border-green-200",
     },
+    in_progress: {
+      className:
+        "bg-gradient-to-r from-cyan-50 to-cyan-100 text-cyan-800 border border-cyan-200",
+    },
+    delivered: {
+      className:
+        "bg-gradient-to-r from-teal-50 to-teal-100 text-teal-800 border border-teal-200",
+    },
     completed: {
       className:
         "bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-800 border border-emerald-200",
@@ -228,7 +236,11 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     <Badge
       className={`${config?.className || "border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 text-gray-800"} rounded-full px-3 py-1 font-medium`}
     >
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {/* Format status for display: convert IN_PROGRESS to "In Progress" */}
+      {status
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(" ")}
     </Badge>
   );
 };
@@ -505,9 +517,18 @@ export function ModernDashboardHome() {
           const ordersData =
             (await ordersResult.value.json()) as OrdersApiResponse;
           setRecentOrders(ordersData.orders || []);
+          // Filter for orders that are considered "active" (not completed or cancelled)
+          // Active orders include: ACTIVE, ASSIGNED, PENDING, CONFIRMED, IN_PROGRESS, DELIVERED
           const activeOrdersList = (ordersData.orders || []).filter(
             (order: CateringRequest) =>
-              [OrderStatus.ACTIVE, OrderStatus.ASSIGNED].includes(order.status),
+              [
+                OrderStatus.ACTIVE,
+                OrderStatus.ASSIGNED,
+                OrderStatus.PENDING,
+                OrderStatus.CONFIRMED,
+                OrderStatus.IN_PROGRESS,
+                OrderStatus.DELIVERED,
+              ].includes(order.status),
           );
           setActiveOrders(activeOrdersList);
         } else {

@@ -91,16 +91,7 @@ export function usePerformanceMonitor() {
 
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
-      console.log('📊 API Call Logged:', {
-        url: apiCall.url,
-        method: apiCall.method,
-        responseTime: `${apiCall.responseTime}ms`,
-        status: apiCall.status,
-        success: apiCall.success,
-        totalCalls: metricsRef.current.apiCalls,
-        suspiciousPatterns: metricsRef.current.suspiciousPatterns
-      });
-    }
+          }
   }, [detectSuspiciousPatterns]);
 
   // Get current metrics

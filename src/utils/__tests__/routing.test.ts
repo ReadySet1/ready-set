@@ -11,8 +11,8 @@ describe('Routing Utilities', () => {
       expect(getDashboardRouteByRole(UserType.CLIENT)).toBe('/client');
     });
 
-    it('returns /vendor for VENDOR role', () => {
-      expect(getDashboardRouteByRole(UserType.VENDOR)).toBe('/vendor');
+    it('returns /client for VENDOR role', () => {
+      expect(getDashboardRouteByRole(UserType.VENDOR)).toBe('/client');
     });
 
     it('returns /driver for DRIVER role', () => {
@@ -75,8 +75,8 @@ describe('Routing Utilities', () => {
       expect(getOrderCreationRedirectRoute(UserType.CLIENT)).toBe('/client');
     });
 
-    it('returns /vendor for VENDOR role', () => {
-      expect(getOrderCreationRedirectRoute(UserType.VENDOR)).toBe('/vendor');
+    it('returns /client for VENDOR role', () => {
+      expect(getOrderCreationRedirectRoute(UserType.VENDOR)).toBe('/client');
     });
 
     it('returns /driver for DRIVER role', () => {

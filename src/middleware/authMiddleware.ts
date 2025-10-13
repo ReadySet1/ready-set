@@ -46,7 +46,5 @@ export async function validateAdminRole(request: Request) {
   } catch (error) {
     console.error("Auth middleware error:", error);
     return NextResponse.json({ error: "Authentication error" }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
   }
 }

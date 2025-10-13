@@ -9,6 +9,8 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
 
 # next.js
 /.next/
@@ -36,7 +38,7 @@ yarn-error.log*
 .env*development
 
 # vercel
-.vercel
+.vercel/
 
 # typescript
 *.tsbuildinfo
@@ -57,6 +59,7 @@ backups/*
 /backups
 
 .cursor/
+.claude/
 
 # Prisma
 .prisma-initialized
@@ -69,6 +72,7 @@ prisma/migrations/migration_lock.toml
 
 # IDE and Editor files
 .idea/
+.claude/
 *.swp
 *.swo
 *~
@@ -100,3 +104,4 @@ test-results/
 
 # Documentation markdown files
 docs/markdown/
+.vercel

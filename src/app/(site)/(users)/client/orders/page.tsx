@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getStatusColorClasses } from "@/types/order-status";
+import { useUser } from "@/contexts/UserContext";
 
 interface OrderData {
   id: string;
@@ -73,6 +74,9 @@ interface ClientMetrics {
 }
 
 const ClientOrdersPage = () => {
+  // Get user role from context to display correct dashboard title
+  const { userRole } = useUser();
+
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [pagination, setPagination] = useState<PaginationData>({
     currentPage: 1,
@@ -91,6 +95,12 @@ const ClientOrdersPage = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Determine dashboard title based on user role
+  const dashboardTitle =
+    userRole?.toUpperCase() === "VENDOR"
+      ? "Vendor Dashboard"
+      : "Client Dashboard";
 
   useEffect(() => {
     const fetchClientData = async () => {
@@ -257,7 +267,7 @@ const ClientOrdersPage = () => {
 
   return (
     <>
-      <Breadcrumb pageName="Client Dashboard" />
+      <Breadcrumb pageName={dashboardTitle} />
       <section className="relative py-6 md:py-8">
         <div className="absolute left-0 top-0 -z-[1] h-full w-full dark:bg-dark"></div>
         <div className="absolute left-0 top-0 -z-[1] h-1/2 w-full bg-[#E9F9FF] dark:bg-dark-700 lg:h-[45%] xl:h-1/2"></div>
@@ -326,7 +336,7 @@ const ClientOrdersPage = () => {
                             <TableRow key={order.id}>
                               <TableCell>
                                 <Link
-                                  href={`/client/deliveries/${order.orderNumber}`}
+                                  href={`/order-status/${order.orderNumber}`}
                                   className="font-medium hover:underline"
                                 >
                                   {order.orderNumber}

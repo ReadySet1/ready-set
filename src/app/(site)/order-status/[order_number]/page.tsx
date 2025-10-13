@@ -1,15 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import DriverOrder from "@/components/Driver/DriverOrder";
-import { BreadcrumbNavigation } from "@/components/Dashboard";
-import Breadcrumb from "@/components/Common/Breadcrumb";
-import UserOrderDetail from "@/components/User/UserOrder";
-import { usePathname } from "next/navigation";
+import SingleOrder from "@/components/Orders/SingleOrder";
+import { usePathname, useRouter } from "next/navigation";
 
 const OrderPage = () => {
   const [orderNumber, setOrderNumber] = useState("");
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     // Get the order number from the URL
@@ -22,16 +20,21 @@ const OrderPage = () => {
     }
   }, [pathname]);
 
+  const handleDeleteSuccess = () => {
+    // Redirect to home page when order is deleted
+    router.push("/");
+  };
+
   return (
-    <div className="relative z-10 overflow-hidden pb-[60px] pt-[120px] dark:bg-dark md:pt-[130px] lg:pt-[160px]">
-      <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-stroke/0 via-stroke to-stroke/0 dark:via-dark-3"></div>
-      <div className="container">
-        <div className="-mx-4 flex flex-wrap items-center">
-          <div className="w-full px-4">
-            <UserOrderDetail />
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-50">
+      <SingleOrder
+        onDeleteSuccess={handleDeleteSuccess}
+        showHeader={true}
+        canAssignDriver={false}
+        canUpdateDriverStatus={false}
+        canDeleteOrder={false}
+        canEditOrder={false}
+      />
     </div>
   );
 };

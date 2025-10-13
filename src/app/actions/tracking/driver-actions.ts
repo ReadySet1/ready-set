@@ -503,6 +503,26 @@ export async function pauseShift(
 /**
  * Get shift history for a driver
  */
+/**
+ * Pause a driver shift (without specifying break type)
+ * This is a convenience function that starts a 'rest' break
+ */
+export async function pauseShift(
+  shiftId: string,
+  location?: LocationUpdate
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const result = await startShiftBreak(shiftId, 'rest', location);
+    return result;
+  } catch (error) {
+    console.error('Error pausing shift:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to pause shift'
+    };
+  }
+}
+
 export async function getDriverShiftHistory(
   driverId: string,
   limit: number = 10

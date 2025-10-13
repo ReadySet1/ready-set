@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { ApplicationStatus } from "@/types/job-application";
 import { createClient } from "@/utils/supabase/server";
-import { loggers } from '@/utils/logger';
 
 // Route segment config
 export const dynamic = 'force-dynamic';
@@ -17,15 +16,12 @@ export async function PATCH(
     const params = await props.params;
     const id = params.id;
     
-    loggers.app.debug('Request headers:', Object.fromEntries(request.headers.entries()));
-    
+        
         let requestBody;
     try {
       requestBody = await request.json();
-      loggers.app.debug('Parsed request body:', requestBody);
-    } catch (error) {
-      loggers.app.debug('Error parsing request body:', error);
-      return NextResponse.json(
+          } catch (error) {
+            return NextResponse.json(
         { error: "Invalid JSON in request body" },
         { status: 400 }
       );
@@ -93,10 +89,7 @@ export async function PATCH(
     }
 
     // Validate the input
-    loggers.app.debug('Status received:', status);
-    loggers.app.debug('ApplicationStatus values:', Object.values(ApplicationStatus));
-    loggers.app.debug('Is status valid:', Object.values(ApplicationStatus).includes(status as ApplicationStatus));
-    
+                
     if (!Object.values(ApplicationStatus).includes(status as ApplicationStatus)) {
       return NextResponse.json(
         { error: "Invalid status value" },

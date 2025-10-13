@@ -1,9 +1,9 @@
-import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import AdminTrackingDashboard from "@/components/Dashboard/Tracking/AdminTrackingDashboard";
-import { useRealTimeTracking } from "@/hooks/tracking/useRealTimeTracking";
-import { DriverStatus } from "@/types/user";
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import AdminTrackingDashboard from '@/components/Dashboard/Tracking/AdminTrackingDashboard';
+import { useRealTimeTracking } from '@/hooks/tracking/useRealTimeTracking';
+import { DriverStatus } from '@/types/user';
 
 // Mock the tracking hook
 jest.mock("@/hooks/tracking/useRealTimeTracking");
@@ -67,28 +67,15 @@ jest.mock("@/components/Dashboard/Tracking/DeliveryAssignmentPanel", () => {
 describe("AdminTrackingDashboard", () => {
   const mockDrivers = [
     {
-      id: "driver-1",
-      employeeId: "EMP001",
-      phoneNumber: "+1234567890",
+      id: 'driver-1',
+      employeeId: 'EMP001',
+      phoneNumber: '+1234567890',
       isActive: true,
       isOnDuty: true,
       lastKnownLocation: {
-        coordinates: [-74.006, 40.7128] as [number, number], // [lng, lat]
+        coordinates: [-74.0060, 40.7128] as [number, number], // [lng, lat]
       },
       lastLocationUpdate: new Date(),
-      currentShift: {
-        id: "shift-1",
-        driverId: "driver-1",
-        startTime: new Date(Date.now() - 3600000), // 1 hour ago
-        startLocation: { lat: 40.7128, lng: -74.006 },
-        totalDistanceKm: 0,
-        deliveryCount: 0,
-        status: "active" as const,
-        breaks: [],
-        metadata: {},
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
       vehicleInfo: {
         number: "V001",
         type: "van",
@@ -98,14 +85,13 @@ describe("AdminTrackingDashboard", () => {
       updatedAt: new Date(),
     },
     {
-      id: "driver-2",
-      employeeId: "EMP002",
-      phoneNumber: "+0987654321",
+      id: 'driver-2',
+      employeeId: 'EMP002',
+      phoneNumber: '+0987654321',
       isActive: true,
       isOnDuty: false,
       lastKnownLocation: undefined,
       lastLocationUpdate: undefined,
-      currentShift: undefined,
       vehicleInfo: {
         number: "V002",
         type: "car",
@@ -118,15 +104,11 @@ describe("AdminTrackingDashboard", () => {
 
   const mockDeliveries = [
     {
-      id: "delivery-1",
-      driverId: "driver-1",
+      id: 'delivery-1',
+      driverId: 'driver-1',
       status: DriverStatus.ASSIGNED,
-      pickupLocation: {
-        coordinates: [-74.006, 40.7128] as [number, number], // [lng, lat]
-      },
-      deliveryLocation: {
-        coordinates: [-73.9851, 40.7589] as [number, number], // [lng, lat]
-      },
+      pickupLocation: { coordinates: [-74.0060, 40.7128] as [number, number] },
+      deliveryLocation: { coordinates: [-73.9851, 40.7589] as [number, number] },
       estimatedArrival: new Date(Date.now() + 3600000),
       route: [],
       metadata: {},
@@ -135,15 +117,11 @@ describe("AdminTrackingDashboard", () => {
       updatedAt: new Date(),
     },
     {
-      id: "delivery-2",
-      driverId: "driver-1",
+      id: 'delivery-2',
+      driverId: 'driver-1',
       status: DriverStatus.EN_ROUTE_TO_CLIENT,
-      pickupLocation: {
-        coordinates: [-73.9851, 40.7589] as [number, number], // [lng, lat]
-      },
-      deliveryLocation: {
-        coordinates: [-73.9934, 40.7505] as [number, number], // [lng, lat]
-      },
+      pickupLocation: { coordinates: [-73.9851, 40.7589] as [number, number] },
+      deliveryLocation: { coordinates: [-73.9934, 40.7505] as [number, number] },
       estimatedArrival: new Date(Date.now() + 1800000),
       route: [],
       metadata: {},
@@ -195,11 +173,11 @@ describe("AdminTrackingDashboard", () => {
   it("shows disconnected status when not connected", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: mockDrivers,
-      recentLocations: [],
       activeDeliveries: mockDeliveries,
-      isConnected: false,
+      recentLocations: [],
       error: null,
       reconnect: jest.fn(),
+      isConnected: false,
     });
 
     render(<AdminTrackingDashboard />);
@@ -210,8 +188,8 @@ describe("AdminTrackingDashboard", () => {
     const testDate = new Date("2024-01-01T12:00:00Z");
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: mockDrivers,
-      recentLocations: [],
       activeDeliveries: mockDeliveries,
+      recentLocations: [],
       error: null,
       reconnect: jest.fn(),
       isConnected: true,
@@ -224,11 +202,11 @@ describe("AdminTrackingDashboard", () => {
   it("shows loading state when data is loading", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
-      recentLocations: [],
       activeDeliveries: [],
-      isConnected: true,
+      recentLocations: [],
       error: null,
       reconnect: jest.fn(),
+      isConnected: true,
     });
 
     render(<AdminTrackingDashboard />);
@@ -238,11 +216,11 @@ describe("AdminTrackingDashboard", () => {
   it("displays error message when there is an error", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
-      recentLocations: [],
       activeDeliveries: [],
-      isConnected: false,
-      error: "Failed to connect to tracking service",
+      recentLocations: [],
+      error: 'Failed to connect to tracking service',
       reconnect: jest.fn(),
+      isConnected: false,
     });
 
     render(<AdminTrackingDashboard />);
@@ -255,10 +233,10 @@ describe("AdminTrackingDashboard", () => {
     const mockRefreshData = jest.fn();
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: mockDrivers,
-      recentLocations: [],
       activeDeliveries: mockDeliveries,
+      recentLocations: [],
       error: null,
-      reconnect: mockRefreshData,
+      reconnect: jest.fn(),
       isConnected: true,
     });
 
@@ -283,38 +261,26 @@ describe("AdminTrackingDashboard", () => {
 
   it("shows active drivers count", () => {
     render(<AdminTrackingDashboard />);
-    const activeDrivers = mockDrivers.filter((d) => d.isOnDuty).length;
-    expect(
-      screen.getByText(new RegExp(`${activeDrivers} Active`, "i")),
-    ).toBeInTheDocument();
+    const activeDrivers = mockDrivers.filter(d => d.isOnDuty === true).length;
+    expect(screen.getByText(new RegExp(`${activeDrivers} Active`, 'i'))).toBeInTheDocument();
   });
 
   it("shows offline drivers count", () => {
     render(<AdminTrackingDashboard />);
-    const offlineDrivers = mockDrivers.filter((d) => !d.isOnDuty).length;
-    expect(
-      screen.getByText(new RegExp(`${offlineDrivers} Offline`, "i")),
-    ).toBeInTheDocument();
+    const offlineDrivers = mockDrivers.filter(d => d.isOnDuty === false).length;
+    expect(screen.getByText(new RegExp(`${offlineDrivers} Offline`, 'i'))).toBeInTheDocument();
   });
 
   it("displays pending deliveries count", () => {
     render(<AdminTrackingDashboard />);
-    const pendingDeliveries = mockDeliveries.filter(
-      (d) => d.status === "ASSIGNED",
-    ).length;
-    expect(
-      screen.getByText(new RegExp(`${pendingDeliveries} Pending`, "i")),
-    ).toBeInTheDocument();
+    const pendingDeliveries = mockDeliveries.filter(d => d.status === DriverStatus.ASSIGNED).length;
+    expect(screen.getByText(new RegExp(`${pendingDeliveries} Pending`, 'i'))).toBeInTheDocument();
   });
 
   it("displays in-transit deliveries count", () => {
     render(<AdminTrackingDashboard />);
-    const inTransitDeliveries = mockDeliveries.filter(
-      (d) => d.status === "EN_ROUTE_TO_CLIENT",
-    ).length;
-    expect(
-      screen.getByText(new RegExp(`${inTransitDeliveries} In Transit`, "i")),
-    ).toBeInTheDocument();
+    const inTransitDeliveries = mockDeliveries.filter(d => d.status === DriverStatus.EN_ROUTE_TO_CLIENT).length;
+    expect(screen.getByText(new RegExp(`${inTransitDeliveries} In Transit`, 'i'))).toBeInTheDocument();
   });
 
   it("handles driver selection from status list", async () => {
@@ -340,11 +306,11 @@ describe("AdminTrackingDashboard", () => {
   it("displays empty state when no drivers", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
-      recentLocations: [],
       activeDeliveries: mockDeliveries,
-      isConnected: true,
+      recentLocations: [],
       error: null,
       reconnect: jest.fn(),
+      isConnected: true,
     });
 
     render(<AdminTrackingDashboard />);
@@ -354,11 +320,11 @@ describe("AdminTrackingDashboard", () => {
   it("displays empty state when no deliveries", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: mockDrivers,
-      recentLocations: [],
       activeDeliveries: [],
-      isConnected: true,
+      recentLocations: [],
       error: null,
       reconnect: jest.fn(),
+      isConnected: true,
     });
 
     render(<AdminTrackingDashboard />);
@@ -368,11 +334,11 @@ describe("AdminTrackingDashboard", () => {
   it("shows connection retry button when disconnected", () => {
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
-      recentLocations: [],
       activeDeliveries: [],
-      isConnected: false,
-      error: "Connection lost",
+      recentLocations: [],
+      error: 'Connection lost',
       reconnect: jest.fn(),
+      isConnected: false,
     });
 
     render(<AdminTrackingDashboard />);
@@ -385,10 +351,10 @@ describe("AdminTrackingDashboard", () => {
     const mockRefreshData = jest.fn();
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: [],
-      recentLocations: [],
       activeDeliveries: [],
-      error: "Connection lost",
-      reconnect: mockRefreshData,
+      recentLocations: [],
+      error: 'Connection lost',
+      reconnect: jest.fn(),
       isConnected: false,
     });
 
@@ -450,10 +416,10 @@ describe("AdminTrackingDashboard", () => {
     const mockRefreshData = jest.fn();
     mockUseRealTimeTracking.mockReturnValue({
       activeDrivers: mockDrivers,
-      recentLocations: [],
       activeDeliveries: mockDeliveries,
+      recentLocations: [],
       error: null,
-      reconnect: mockRefreshData,
+      reconnect: jest.fn(),
       isConnected: true,
     });
 

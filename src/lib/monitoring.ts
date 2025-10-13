@@ -26,8 +26,7 @@ export function initializeEdgeMonitoring(): void {
       
       // Only log during development
       if (process.env.NODE_ENV === 'development') {
-        console.log('Initializing Edge Runtime monitoring');
-      }
+              }
       
       // Any edge-specific monitoring setup would go here
       // This currently just logs initialization, but can be expanded
@@ -58,8 +57,7 @@ export function initializeNodeMonitoring(): void {
       
       // Only log during development
       if (process.env.NODE_ENV === 'development') {
-        console.log('Initializing Node.js monitoring');
-      }
+              }
       
       // Any Node.js-specific monitoring setup would go here
       
@@ -101,6 +99,5 @@ export function initializeMonitoring(): void {
 export function initializeClientMonitoring() {
   // Only log during development
   if (process.env.NODE_ENV === 'development') {
-    console.log('Client-side monitoring initialized');
-  }
+      }
 } 

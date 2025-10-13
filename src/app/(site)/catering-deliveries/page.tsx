@@ -9,6 +9,7 @@ import HostingChecklist from "@/components/FoodDelivery/HostingChecklist";
 import MainMeal from "@/components/FoodDelivery/MainMeal";
 import FoodHeader from "@/components/FoodDelivery/FoodHeader";
 import PromoPopup from "@/components/PopUpBanner/PromoPopup";
+import CateringStats from "@/components/FoodDelivery/CateringStats";
 
 export const metadata: Metadata = {
   title: "Food Delivery Services for Events | Ready Set",
@@ -57,6 +58,7 @@ export default function FoodPage() {
       <DeliveryTerms />
       <HostingChecklist />
       <MainMeal />
+      <CateringStats />
     </div>
   );
 }

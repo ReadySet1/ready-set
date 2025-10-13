@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AddressFormData } from "@/types/address";
-import { COUNTIES } from "@/components/Auth/SignUp/ui/FormData"; // Make sure this import path is correct
+import { COUNTIES, US_STATES } from "@/components/Auth/SignUp/ui/FormData"; // Make sure this import path is correct
 import { useToast } from "@/components/ui/use-toast";
 
 // Validation schema with zod
@@ -125,8 +125,8 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
             }
           }
         } catch (error) {
-          console.error("AddAddressForm: Error fetching counties:", error);
           // API error - fall back to all counties
+          // Error is silently handled by using fallback counties
         }
       }
 
@@ -143,19 +143,8 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
     setIsSubmitting(true);
     setSubmitError(null); // Clear previous errors
     try {
-      // Normalize state input to CA format
-      const normalizedData = {
-        ...data,
-        state: (() => {
-          const state = data.state.trim().toUpperCase();
-          if (state === "CALIFORNIA" || state === "CALIF") {
-            return "CA";
-          }
-          return state;
-        })(),
-      };
-
-      await onSubmit(normalizedData as AddressFormData);
+      // State is already in 2-letter format from dropdown, no normalization needed
+      await onSubmit(data as AddressFormData);
       reset();
       // onSubmit is responsible for closing the dialog on success
     } catch (error) {
@@ -196,11 +185,11 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value}>
                   <SelectTrigger
-                    className={errors.county ? "border-red-500" : ""}
+                    className={`w-full ${errors.county ? "border-red-500" : ""}`}
                   >
                     <SelectValue placeholder="Select a county" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[1002]">
                     {availableCounties.map((county) => (
                       <SelectItem key={county.value} value={county.value}>
                         {county.label}
@@ -282,11 +271,25 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
             >
               State <span className="text-red-500">*</span>
             </Label>
-            <Input
-              id="state"
-              placeholder="CA"
-              {...register("state")}
-              className={errors.state ? "border-red-500" : ""}
+            <Controller
+              name="state"
+              control={control}
+              render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger
+                    className={`w-full ${errors.state ? "border-red-500" : ""}`}
+                  >
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[1002] max-h-[300px]">
+                    {US_STATES.map((state) => (
+                      <SelectItem key={state.value} value={state.value}>
+                        {state.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             />
             {errors.state && (
               <p className="mt-1 text-xs text-red-500">

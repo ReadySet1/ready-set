@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
 import { UserType } from "@/types/prisma";
-import { loggers } from '@/utils/logger';
 
 
 export async function GET(
@@ -12,24 +11,21 @@ export async function GET(
   { params }: { params: Promise<{ order_number: string }> }
 ) {
   // Add debug logging to see what parameters we're receiving
-  loggers.app.debug("Order files API endpoint called with params", params);
-  
+    
   // Await params before accessing its properties and decode the order number
   const { order_number: encodedOrderNumber } = await params;
   const order_number = decodeURIComponent(encodedOrderNumber);
   
   // Check if order_number exists
   if (!order_number) {
-    loggers.app.debug("Missing order number in params");
-    return NextResponse.json(
+        return NextResponse.json(
       { error: "Missing order number parameter" },
       { status: 400 }
     );
   }
   
   const orderNumber = order_number;
-  loggers.app.debug("Processing files request for order", orderNumber);
-  
+    
   try {
     // Initialize Supabase client for auth check
     const supabase = await createClient();
@@ -39,8 +35,7 @@ export async function GET(
 
     // Check if user is authenticated
     if (!user || !user.id) {
-      loggers.app.debug("Unauthorized access attempt to files API");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get user's role from profiles table
@@ -50,8 +45,7 @@ export async function GET(
     });
 
     if (!userProfile) {
-      loggers.app.debug("User profile not found");
-      return NextResponse.json({ error: "User profile not found" }, { status: 401 });
+            return NextResponse.json({ error: "User profile not found" }, { status: 401 });
     }
 
     // Allow access for admin, super_admin, and helpdesk roles
@@ -59,8 +53,7 @@ export async function GET(
     const hasAccess = allowedRoles.includes(userProfile.type as typeof allowedRoles[number]);
     
     // Try to fetch the catering request
-    loggers.app.debug("Fetching catering request for", orderNumber);
-    const cateringRequest = await prisma.cateringRequest.findFirst({
+        const cateringRequest = await prisma.cateringRequest.findFirst({
       where: { 
         orderNumber: {
           equals: orderNumber,
@@ -81,8 +74,7 @@ export async function GET(
       orderUserId = cateringRequest.userId;
     } else {
       // Try to fetch the on-demand request if catering request not found
-      loggers.app.debug("Catering request not found, trying on_demand");
-      const onDemandRequest = await prisma.onDemand.findFirst({
+            const onDemandRequest = await prisma.onDemand.findFirst({
         where: { 
           orderNumber: {
             equals: orderNumber,
@@ -102,8 +94,7 @@ export async function GET(
     }
 
     if (!orderId) {
-      loggers.app.debug("Order not found:", orderNumber);
-      return NextResponse.json(
+            return NextResponse.json(
         { error: "Order not found" },
         { status: 404 }
       );
@@ -111,8 +102,7 @@ export async function GET(
 
     // Check if user has access to the files
     if (!hasAccess && user.id !== orderUserId) {
-      loggers.app.debug("User does not have permission to access these files");
-      return NextResponse.json(
+            return NextResponse.json(
         { error: "You do not have permission to access these files" },
         { status: 403 }
       );
@@ -143,11 +133,10 @@ export async function GET(
       }
     });
     
-    loggers.app.debug(`Found ${files.length} files for order ${orderNumber}`);
-    return NextResponse.json(files);
+        return NextResponse.json(files);
 
   } catch (error) {
-    loggers.app.error("Error processing files request:", error);
+    console.error("Error processing files request:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

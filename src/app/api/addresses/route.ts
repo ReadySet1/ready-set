@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma-client";
+import { withDatabaseRetry } from "@/utils/prismaDB";
 import { AddressFormData } from "@/types/address";
 import { createClient } from "@/utils/supabase/server";
 
@@ -46,28 +47,43 @@ setInterval(() => {
   }
 }, RATE_LIMIT_WINDOW);
 
+// Helper function to authenticate user via multiple methods
+async function authenticateUser(request: NextRequest) {
+  // Try bearer token authentication first (for backward compatibility)
+  const authHeader = request.headers.get('authorization');
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (!error && user?.id) {
+      return { user, error: null };
+    }
+  }
+  
+  // Fallback to cookie-based authentication (more secure)
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    if (!error && user?.id) {
+      return { user, error: null };
+    }
+    
+    return { user: null, error: error || new Error('No valid authentication found') };
+  } catch (err) {
+    return { user: null, error: err as Error };
+  }
+}
+
 /**
  * GET handler for fetching addresses
  */
 export async function GET(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: "Authentication required - Invalid authorization header" },
-        { status: 401 },
-      );
-    }
-
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-    
-    // Initialize Supabase client
-    const supabase = await createClient();
-    
-    // Verify the token by getting the user
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token);
+    // Authenticate user using multiple methods
+    const { user: currentUser, error: authError } = await authenticateUser(request);
 
     if (authError || !currentUser?.id) {
       console.error("Auth error:", authError);
@@ -107,26 +123,28 @@ export async function GET(request: NextRequest) {
 
     // If requesting a specific address by ID
     if (id) {
-      const address = await prisma.address.findUnique({
-        where: { id },
-        // Optimize query by selecting only needed fields
-        select: {
-          id: true,
-          name: true,
-          street1: true,
-          street2: true,
-          city: true,
-          state: true,
-          zip: true,
-          county: true,
-          isRestaurant: true,
-          isShared: true,
-          locationNumber: true,
-          parkingLoading: true,
-          createdAt: true,
-          createdBy: true,
-          updatedAt: true,
-        },
+      const address = await withDatabaseRetry(async () => {
+        return await prisma.address.findUnique({
+          where: { id },
+          // Optimize query by selecting only needed fields
+          select: {
+            id: true,
+            name: true,
+            street1: true,
+            street2: true,
+            city: true,
+            state: true,
+            zip: true,
+            county: true,
+            isRestaurant: true,
+            isShared: true,
+            locationNumber: true,
+            parkingLoading: true,
+            createdAt: true,
+            createdBy: true,
+            updatedAt: true,
+          },
+        });
       });
 
       // Check if address exists
@@ -208,21 +226,20 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // Execute the query with pagination using Promise.all for parallel execution
-    const [addresses, totalCount] = await Promise.all([
-      prisma.address.findMany(addressesQuery),
-      prisma.address.count({ where: addressesQuery.where }),
-    ]);
+    // Execute the query with pagination using withDatabaseRetry to handle prepared statement conflicts
+    const [addresses, totalCount] = await withDatabaseRetry(async () => {
+      return await Promise.all([
+        prisma.address.findMany(addressesQuery),
+        prisma.address.count({ where: addressesQuery.where }),
+      ]);
+    });
 
     // Calculate pagination info
     const totalPages = Math.ceil(totalCount / limit);
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
 
-    console.log(
-      `Found ${addresses.length} addresses for user ${currentUser.id} (page ${page} of ${totalPages})`,
-    );
-
+    
     // Return paginated response with cache headers
     const response = NextResponse.json({
       addresses,
@@ -261,24 +278,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error("POST /api/addresses: Missing or invalid authorization header");
-      return NextResponse.json(
-        { error: "Authentication required - Invalid authorization header" },
-        { status: 401 },
-      );
-    }
-
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-    
-    // Initialize Supabase client
-    const supabase = await createClient();
-    
-    // Verify the token by getting the user
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token);
+    // Authenticate user using multiple methods
+    const { user: currentUser, error: authError } = await authenticateUser(request);
 
     if (authError || !currentUser?.id) {
       console.error("POST /api/addresses: Auth error:", authError);
@@ -289,11 +290,7 @@ export async function POST(request: NextRequest) {
     }
 
     const formData: AddressFormData = await request.json();
-    console.log("POST /api/addresses: Received form data:", { 
-      userId: currentUser.id, 
-      formData: { ...formData, createdBy: currentUser.id } 
-    });
-
+    
     // Enhanced validation with detailed error messages
     const validationErrors: string[] = [];
     if (!formData.street1?.trim()) {
@@ -320,8 +317,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use database transaction to ensure data consistency
-    const result = await prisma.$transaction(async (tx) => {
+    // Use database transaction with retry mechanism to ensure data consistency
+    const result = await withDatabaseRetry(async () => {
+      return await prisma.$transaction(async (tx) => {
       // Create a new address
       const newAddress = {
         ...formData,
@@ -343,17 +341,12 @@ export async function POST(request: NextRequest) {
         name: formData.name?.trim() || null,
       };
 
-      console.log("POST /api/addresses: Creating address with normalized data:", newAddress);
-
+      
       const createdAddress = await tx.address.create({
         data: newAddress,
       });
 
-      console.log("POST /api/addresses: Address created successfully:", { 
-        addressId: createdAddress.id, 
-        userId: currentUser.id 
-      });
-
+      
       // Create userAddress relation to track ownership if it's not shared
       if (!formData.isShared) {
         await tx.userAddress.create({
@@ -363,17 +356,13 @@ export async function POST(request: NextRequest) {
             isDefault: false, // Could be set based on user preferences
           },
         });
-        console.log("POST /api/addresses: UserAddress relation created");
-      }
+              }
 
       return createdAddress;
+      });
     });
 
-    console.log("POST /api/addresses: Transaction completed successfully:", { 
-      addressId: result.id, 
-      userId: currentUser.id 
-    });
-
+    
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error("POST /api/addresses: Critical error:", error);
@@ -406,23 +395,8 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: "Authentication required - Invalid authorization header" },
-        { status: 401 },
-      );
-    }
-
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-    
-    // Initialize Supabase client
-    const supabase = await createClient();
-    
-    // Verify the token by getting the user
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token);
+    // Authenticate user using multiple methods
+    const { user: currentUser, error: authError } = await authenticateUser(request);
 
     if (authError || !currentUser?.id) {
       console.error("Auth error:", authError);
@@ -515,23 +489,8 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: "Authentication required - Invalid authorization header" },
-        { status: 401 },
-      );
-    }
-
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-    
-    // Initialize Supabase client
-    const supabase = await createClient();
-    
-    // Verify the token by getting the user
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token);
+    // Authenticate user using multiple methods
+    const { user: currentUser, error: authError } = await authenticateUser(request);
 
     if (authError || !currentUser?.id) {
       console.error("Auth error:", authError);

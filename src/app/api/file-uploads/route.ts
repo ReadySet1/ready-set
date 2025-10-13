@@ -2,8 +2,32 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { STORAGE_BUCKETS } from "@/utils/file-service";
+import { STORAGE_BUCKETS, initializeStorageBuckets, diagnoseStorageIssues } from "@/utils/file-service";
 import { prisma } from "@/utils/prismaDB";
+import { v4 as uuidv4 } from 'uuid';
+import {
+  UploadErrorHandler,
+  RetryHandler,
+  FileValidator,
+  DEFAULT_RETRY_CONFIG,
+  DEFAULT_VALIDATION_CONFIG
+} from "@/lib/upload-error-handler";
+import { UploadSecurityManager } from "@/lib/upload-security";
+import { UploadErrorType } from "@/types/upload";
+
+// Helper function to safely extract error message from unknown error
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (error && typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string') {
+    return (error as any).message;
+  }
+  return String(error || 'Unknown error');
+}
 
 // Add a new route to get a signed URL for a file
 export async function GET(request: NextRequest) {
@@ -74,19 +98,94 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("File upload API endpoint called");
-
+  
+  // Debug environment variables (without exposing sensitive data)
+      
+  // Parse form data first to avoid issues with error handling
+  const formData = await request.formData();
+  
+  // Initialize storage buckets to ensure they exist before upload
   try {
-    // Parse form data first to avoid issues with error handling
-    const formData = await request.formData();
-    console.log("Form data keys:", Array.from(formData.keys()));
+    await initializeStorageBuckets();
+      } catch (initError) {
+    console.error("Error initializing storage buckets:", initError);
+    // Continue anyway - bucket creation errors shouldn't prevent uploads if buckets already exist
+  }
 
-    // Extract important data from the form
-    const file = formData.get("file") as File;
-    const entityId = formData.get("entityId") as string;
-    let entityType = (formData.get("entityType") as string) || "job_application"; // Default value
-    const category = (formData.get("category") as string) || "";
-    console.log("File upload request received with category:", category);
+  // Extract important data from the form
+  const file = formData.get("file") as File;
+  const entityId = formData.get("entityId") as string;
+  let entityType = (formData.get("entityType") as string) || "job_application"; // Default value
+  const category = (formData.get("category") as string) || "";
+  
+  try {
+
+    // Check rate limit for uploads
+    const userId = request.headers.get('x-user-id') || 'anonymous';
+    const rateLimitPassed = await UploadSecurityManager.checkRateLimit(userId, 'UPLOAD');
+    if (!rateLimitPassed) {
+      const rateLimitError = UploadErrorHandler.createValidationError(
+        'content',
+        'Rate limit exceeded for file uploads',
+        'Too many upload attempts. Please wait a moment and try again.',
+        { userId, action: 'UPLOAD' }
+      );
+
+      UploadErrorHandler.logError(rateLimitError, { fileName: file.name, entityId, entityType });
+      await UploadErrorHandler.reportError(rateLimitError);
+
+      return NextResponse.json(
+        {
+          error: rateLimitError.userMessage,
+          errorType: rateLimitError.type,
+          correlationId: rateLimitError.correlationId,
+          retryable: rateLimitError.retryable,
+          retryAfter: 60000
+        },
+        { status: 429 }
+      );
+    }
+
+    // Enhanced validation with new error handling system
+    const validationError = FileValidator.validateFile(file, DEFAULT_VALIDATION_CONFIG);
+    if (validationError) {
+      UploadErrorHandler.logError(validationError, { fileName: file.name, entityId, entityType });
+      await UploadErrorHandler.reportError(validationError);
+
+      return NextResponse.json(
+        {
+          error: validationError.userMessage,
+          errorType: validationError.type,
+          correlationId: validationError.correlationId,
+          retryable: validationError.retryable
+        },
+        { status: 400 }
+      );
+    }
+
+    // Security validation
+    const securityCheck = await UploadSecurityManager.validateFileSecurity(file, userId);
+    if (!securityCheck.isSecure) {
+      UploadErrorHandler.logError(securityCheck.error!, {
+        fileName: file.name,
+        entityId,
+        entityType,
+        scanResults: securityCheck.scanResults
+      });
+      await UploadErrorHandler.reportError(securityCheck.error!);
+
+      return NextResponse.json(
+        {
+          error: securityCheck.error!.userMessage,
+          errorType: securityCheck.error!.type,
+          correlationId: securityCheck.error!.correlationId,
+          retryable: securityCheck.error!.retryable,
+          retryAfter: securityCheck.error!.retryAfter,
+          quarantined: securityCheck.quarantineRequired
+        },
+        { status: 403 }
+      );
+    }
 
     // Ensure job-applications/temp paths are properly handled
     let uploadPath = "temp";
@@ -94,14 +193,12 @@ export async function POST(request: NextRequest) {
     // Special handling for job application categories with the new path structure
     if (category.startsWith("job-applications/temp/")) {
       uploadPath = category; // Use the full path as provided 
-      console.log("Using full category path for upload:", uploadPath);
-    } else if (category) {
+          } else if (category) {
       // For other categories, make a simple prefix/category hierarchy
       uploadPath = `${category}`;
     }
     
-    console.log("Final upload path:", uploadPath);
-    
+        
     const bucketName = (formData.get("bucketName") as string);
     
     // Normalize category if provided
@@ -111,24 +208,14 @@ export async function POST(request: NextRequest) {
     // This helps ensure consistent entity types
     if (normalizedCategory === "catering-order") {
       entityType = "catering";
-      console.log("Corrected entityType to 'catering' based on category 'catering-order'");
-    } else if (normalizedCategory === "on-demand") {
+          } else if (normalizedCategory === "on-demand") {
       entityType = "on_demand";
-      console.log("Corrected entityType to 'on_demand' based on category 'on-demand'");
-    }
+          }
     
-    console.log("Upload request details:", {
-      entityType,
-      entityId,
-      category: normalizedCategory,
-      fileName: file?.name,
-      fileSize: file?.size,
-    });
-
+    
     // Basic validation
     if (!file) {
-      console.log("Missing required field: file");
-      return NextResponse.json(
+            return NextResponse.json(
         { error: "Missing required field: file" },
         { status: 400 },
       );
@@ -144,22 +231,20 @@ export async function POST(request: NextRequest) {
       if (entityId.startsWith('temp_') || entityId.startsWith('temp-')) {
         // For temporary IDs, use as-is
         finalEntityId = entityId;
-        console.log(`Using temporary ID as-is: ${finalEntityId}`);
-      } else {
+              } else {
         // For normal IDs, use directly without temp prefix
         finalEntityId = entityId;
       }
     } else {
       // Generate a new temporary ID if none provided
-      finalEntityId = `temp-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+      finalEntityId = `temp-${Date.now()}-${uuidv4().substring(0, 8)}`;
     }
     
-    console.log(`Using entity ID for file upload: ${finalEntityId}`);
-    
+        
     // Upload file to Supabase Storage
     const fileExt = file.name.split(".").pop();
     const timestamp = Date.now();
-    const randomId = Math.random().toString(36).substring(2, 9);
+    const randomId = uuidv4().substring(0, 8);
     const fileName = `${timestamp}-${randomId}.${fileExt}`;
 
     // Create a structured path based on entityType
@@ -168,25 +253,21 @@ export async function POST(request: NextRequest) {
     
     // Convert entityType to a consistent format
     const normalizedEntityType = entityType.toLowerCase();
-    console.log(`Normalized entityType: ${normalizedEntityType}`);
-    
+        
     // Determine which bucket and path to use based on entity type
     if (normalizedEntityType === "catering") {
       // Consistent path for catering orders
       filePath = `orders/catering/${finalEntityId}/${fileName}`;
-      console.log("Using orders/catering path for catering order");
-    } 
+          } 
     else if (normalizedEntityType === "on_demand") {
       // Consistent path for on-demand orders  
       filePath = `orders/on-demand/${finalEntityId}/${fileName}`;
-      console.log("Using orders/on-demand path for on-demand order");
-    }
+          }
     else if (normalizedEntityType === "job_application") {
       // For job application type, check if ID is a temp ID or real UUID
       if (finalEntityId.startsWith('temp_') || finalEntityId.startsWith('temp-')) {
         // Skip UUID validation for temp job application IDs
-        console.log("Using job-applications/temp path for temp job application uploads");
-        filePath = `job-applications/temp/${finalEntityId}/${fileName}`;
+                filePath = `job-applications/temp/${finalEntityId}/${fileName}`;
       } else {
         // Only try to validate as UUID for non-temp IDs
         try {
@@ -195,24 +276,19 @@ export async function POST(request: NextRequest) {
           });
           
           if (jobApp) {
-            console.log("Valid job application ID, using job-applications path");
-            filePath = `job-applications/${jobApp.id}/${fileName}`;
+                        filePath = `job-applications/${jobApp.id}/${fileName}`;
           } else {
             // Check if we have a specific upload path from the category
             if (uploadPath && uploadPath.startsWith("job-applications/temp/")) {
-              console.log(`Using specified upload path: ${uploadPath}`);
-              filePath = `${uploadPath}/${finalEntityId}/${fileName}`;
+                            filePath = `${uploadPath}/${finalEntityId}/${fileName}`;
             }
             // If category suggests this is a catering order but tagged as job application
             else if (normalizedCategory === "catering-order") {
-              console.log("Catering order detected by category, using orders/catering path");
-              filePath = `orders/catering/${finalEntityId}/${fileName}`;
+                            filePath = `orders/catering/${finalEntityId}/${fileName}`;
             } else if (normalizedCategory === "on-demand") {
-              console.log("On-demand order detected by category, using orders/on-demand path");
-              filePath = `orders/on-demand/${finalEntityId}/${fileName}`;
+                            filePath = `orders/on-demand/${finalEntityId}/${fileName}`;
             } else {
-              console.log("Using job-applications/temp path for temp job application uploads");
-              filePath = `job-applications/temp/${finalEntityId}/${fileName}`;
+                            filePath = `job-applications/temp/${finalEntityId}/${fileName}`;
             }
           }
         } catch (error) {
@@ -224,8 +300,7 @@ export async function POST(request: NextRequest) {
     else if (normalizedEntityType === "user") {
       // Consistent path for user files
       filePath = `users/${finalEntityId}/${fileName}`;
-      console.log("Using users path for user files");
-    }
+          }
     // Default handling for other types
     else {
       filePath = `${normalizedEntityType || 'general'}/${finalEntityId}/${fileName}`;
@@ -236,58 +311,275 @@ export async function POST(request: NextRequest) {
       storageBucket = bucketName;
     }
 
-    console.log(`Uploading file to storage path: ${filePath} in bucket: ${storageBucket}`);
+    
+    // Robust bucket checking and creation
+    let bucketVerified = false;
 
-    // Instead of trying to create the bucket, we'll just check if it's accessible
+    // First, check if storage is available and working
+    let storageAvailable = false;
+    try {
+      const diagnostics = await diagnoseStorageIssues();
+      storageAvailable = diagnostics.success;
+
+      if (!storageAvailable) {
+        console.warn('⚠️ Storage is not available. File uploads will be disabled or use fallback methods.');
+      }
+    } catch (initError) {
+      console.error('Storage diagnostics failed:', initError);
+      storageAvailable = false;
+    }
+
+    // Try to verify the bucket exists and is accessible
     try {
       const { data, error: listError } = await supabase.storage
         .from(storageBucket)
         .list();
-      
-      if (listError) {
-        console.error(`Error accessing bucket '${storageBucket}':`, listError);
-        
-        if (listError.message.includes("not found")) {
-          // Try fallback to default bucket if the requested bucket is not found
-          console.log(`Bucket '${storageBucket}' not found, falling back to '${STORAGE_BUCKETS.DEFAULT}'`);
-          storageBucket = STORAGE_BUCKETS.DEFAULT;
-        }
+
+      if (!listError && data !== null) {
+                bucketVerified = true;
       } else {
-        console.log(`Bucket '${storageBucket}' is accessible`);
+        console.error(`Bucket '${storageBucket}' verification failed:`, listError);
+
+        // Try to create the bucket with admin privileges
+        try {
+          const adminClient = await import('@/utils/supabase/server').then(m => m.createAdminClient());
+          const { error: createError } = await adminClient.storage.createBucket(storageBucket, {
+            public: false,
+            fileSizeLimit: 10 * 1024 * 1024, // 10MB
+          });
+
+          if (!createError) {
+                        // Verify it was created successfully
+            const { error: verifyError } = await supabase.storage.from(storageBucket).list();
+            if (!verifyError) {
+                            bucketVerified = true;
+            } else {
+              console.error(`Bucket '${storageBucket}' creation verification failed:`, verifyError);
+            }
+          } else {
+            console.error(`Failed to create bucket '${storageBucket}':`, createError);
+          }
+        } catch (createError) {
+          console.error(`Exception creating bucket '${storageBucket}':`, createError);
+        }
+
+        // If bucket still not verified, try fallback
+        if (!bucketVerified) {
+                    storageBucket = STORAGE_BUCKETS.DEFAULT;
+
+          // Try to verify the default bucket
+          const { error: defaultError } = await supabase.storage.from(storageBucket).list();
+          if (!defaultError) {
+                        bucketVerified = true;
+          }
+        }
       }
     } catch (bucketError) {
-      console.error("Exception checking bucket:", bucketError);
-      // Fall back to default bucket
+      console.error(`Exception during bucket verification for '${storageBucket}':`, bucketError);
+
+      // Last resort: try default bucket
       storageBucket = STORAGE_BUCKETS.DEFAULT;
+      try {
+        const { error: fallbackError } = await supabase.storage.from(storageBucket).list();
+        if (!fallbackError) {
+                    bucketVerified = true;
+        }
+      } catch (fallbackError) {
+        console.error(`Even fallback bucket '${storageBucket}' failed:`, fallbackError);
+      }
     }
 
-    // Upload the file
-    const { data: storageData, error: storageError } = await supabase.storage
-      .from(storageBucket)
-      .upload(filePath, file, {
-        upsert: true,
-        contentType: file.type,
-      });
+    // If no bucket works, we need to handle this gracefully
+    if (!bucketVerified) {
+      console.error(`CRITICAL: No storage buckets are accessible. This will cause upload failures.`);
+      console.error(`Attempted buckets: ${Object.values(STORAGE_BUCKETS).join(', ')}`);
+
+      // Check if storage is completely unavailable
+      if (!storageAvailable) {
+        console.error('STORAGE COMPLETELY UNAVAILABLE: Supabase storage is not configured or accessible');
+
+        // Return a clear error message to help with debugging
+        return NextResponse.json(
+          {
+            error: "File storage is currently unavailable. Please contact support if this issue persists.",
+            errorType: "STORAGE_CONFIGURATION_ERROR",
+            correlationId: uuidv4(),
+            retryable: false,
+            details: {
+              message: "Supabase storage is not properly configured or accessible.",
+              troubleshooting: [
+                "Ensure Storage is enabled in your Supabase project dashboard",
+                "Verify NEXT_PUBLIC_SUPABASE_URL points to the correct project",
+                "Check that SUPABASE_SERVICE_ROLE_KEY has storage permissions",
+                "Confirm your Supabase project has storage quotas available"
+              ],
+              environment: {
+                supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not set',
+                serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Not set',
+                anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Set' : 'Not set'
+              }
+            }
+          },
+          { status: 503 } // Service Unavailable
+        );
+      }
+
+      // For now, we'll still try the upload but it will likely fail
+      // In a production system, you might want to disable uploads or use alternative storage
+    }
+
+    // Upload the file with retry logic and enhanced error handling
+    let storageData: any, storageError: { message?: string } | null = null;
+
+    // Multiple upload strategies in case Supabase storage fails
+    const uploadStrategies = [
+      // Strategy 1: Try Supabase storage with current bucket
+      async () => {
+                const result = await supabase.storage
+          .from(storageBucket)
+          .upload(filePath, file, {
+            upsert: true,
+            contentType: file.type,
+          });
+
+        if (result.error) {
+          throw result.error;
+        }
+
+        return result;
+      },
+
+      // Strategy 2: Try with default bucket if current bucket fails
+      async () => {
+        if (storageBucket !== STORAGE_BUCKETS.DEFAULT) {
+                    const result = await supabase.storage
+            .from(STORAGE_BUCKETS.DEFAULT)
+            .upload(filePath, file, {
+              upsert: true,
+              contentType: file.type,
+            });
+
+          if (result.error) {
+            throw result.error;
+          }
+
+          return result;
+        }
+        throw new Error('Default bucket already tried');
+      }
+    ];
+
+    let lastError;
+
+    for (const strategy of uploadStrategies) {
+      try {
+        const result = await RetryHandler.withRetry(
+          strategy,
+          {
+            ...DEFAULT_RETRY_CONFIG,
+            maxAttempts: 2,
+            baseDelay: 1000
+          },
+          (error, attempt) => {
+                      }
+        );
+
+        storageData = result.data;
+        storageError = result.error;
+        break; // Success, exit the strategy loop
+
+      } catch (error) {
+        lastError = error;
+        const errorMessage = getErrorMessage(error);
+        console.error(`Upload strategy failed:`, errorMessage);
+
+        // If this is a bucket not found error, try the next strategy
+        if (errorMessage.includes('Bucket not found') && strategy !== uploadStrategies[uploadStrategies.length - 1]) {
+                    continue;
+        }
+
+        // For other errors, we might want to stop trying
+        storageError = { message: errorMessage };
+        break;
+      }
+    }
+
+    // If all strategies failed, use the last error
+    if (!storageData && lastError) {
+      storageError = { message: getErrorMessage(lastError) };
+    }
 
     if (storageError) {
-      console.error("Storage upload error:", storageError);
-      
-      // Provide more specific error message based on error type
-      let errorMessage = `Error uploading ${file.name}: ${storageError.message}`;
-      let statusCode = 500;
-      
-      if (storageError.message.includes("Bucket not found")) {
-        errorMessage = `Storage bucket '${storageBucket}' not found. Please contact support.`;
-        console.error(`Bucket '${storageBucket}' does not exist or is not accessible.`);
-        statusCode = 404;
-      } else if (storageError.message.includes("permission")) {
-        errorMessage = `Permission denied to upload to '${storageBucket}'. Please contact support.`;
-        statusCode = 403;
+      console.error("Storage upload error after retries:", storageError);
+
+      // Check if this is a critical storage failure that should disable uploads
+      const errorMessage = storageError.message || '';
+      const isCriticalFailure = errorMessage.includes('Bucket not found') ||
+                               errorMessage.includes('unauthorized') ||
+                               errorMessage.includes('forbidden');
+
+      if (isCriticalFailure && !bucketVerified) {
+        console.error("CRITICAL: Storage system is not functioning properly. Consider disabling file uploads temporarily.");
+
+        // Run diagnostics to help debug the issue
+        try {
+                    await diagnoseStorageIssues();
+        } catch (diagError) {
+          console.error("Diagnostics failed:", diagError);
+        }
+
+        // Return a more informative error to help with debugging
+        return NextResponse.json(
+          {
+            error: "File storage is currently unavailable. Please try again later or contact support if the issue persists.",
+            errorType: "STORAGE_UNAVAILABLE",
+            correlationId: uuidv4(),
+            retryable: true,
+            retryAfter: 30000, // 30 seconds
+            details: {
+              message: "Storage buckets are not accessible. This may be due to configuration issues.",
+              bucket: storageBucket,
+              fileName: file.name,
+              troubleshooting: [
+                "Check that SUPABASE_SERVICE_ROLE_KEY is correctly set",
+                "Verify that the Supabase project has storage enabled",
+                "Ensure the service role has storage permissions",
+                "Check that all required buckets exist in your Supabase project"
+              ]
+            }
+          },
+          { status: 503 } // Service Unavailable
+        );
       }
-      
+
+      // Use enhanced error categorization for non-critical errors
+      const uploadError = UploadErrorHandler.categorizeError(storageError, file);
+
+      // Log and report the error
+      UploadErrorHandler.logError(uploadError, {
+        fileName: file.name,
+        filePath,
+        bucket: storageBucket,
+        entityId,
+        entityType
+      });
+      await UploadErrorHandler.reportError(uploadError);
+
       return NextResponse.json(
-        { error: errorMessage },
-        { status: statusCode },
+        {
+          error: uploadError.userMessage,
+          errorType: uploadError.type,
+          correlationId: uploadError.correlationId,
+          retryable: uploadError.retryable,
+          retryAfter: uploadError.retryAfter,
+          details: {
+            bucket: storageBucket,
+            filePath,
+            fileName: file.name,
+            fileSize: file.size
+          }
+        },
+        { status: uploadError.type === UploadErrorType.PERMISSION_ERROR ? 403 : 500 },
       );
     }
 
@@ -318,17 +610,14 @@ export async function POST(request: NextRequest) {
 
     // CRITICAL FIX: Set the proper foreign key based on either category or entityType
     // This ensures files are associated with the correct records
-    console.log(`Setting entity ID for type: ${entityType} and category: ${normalizedCategory}`);
-    
+        
     try {
       // First, prioritize category for determining the correct foreign key
       if (normalizedCategory === "catering-order" || normalizedCategory === "catering" || entityType === "catering") {
-        console.log(`Evaluating cateringRequestId for: ${finalEntityId}`);
-        
+                
         // Only set cateringRequestId if it's NOT a temporary ID
         if (finalEntityId && !finalEntityId.startsWith('temp-') && !finalEntityId.startsWith('temp_')) {
-          console.log(`Setting cateringRequestId to: ${finalEntityId}`);
-          dbData.cateringRequestId = finalEntityId;
+                    dbData.cateringRequestId = finalEntityId;
           
           // Double-check the catering request exists
           try {
@@ -337,8 +626,7 @@ export async function POST(request: NextRequest) {
             });
             
             if (cateringRequest) {
-              console.log(`Verified catering request exists: ID=${finalEntityId}`);
-              // Make sure category is set consistently to improve retrieval
+                            // Make sure category is set consistently to improve retrieval
               dbData.category = "catering-order";
               dbData.isTemporary = false;
             } else {
@@ -354,8 +642,7 @@ export async function POST(request: NextRequest) {
             dbData.cateringRequestId = null;
           }
         } else if (finalEntityId) {
-          console.log(`Skipping cateringRequestId for temporary ID: ${finalEntityId}`);
-          // For temporary IDs, mark the file as temporary and do NOT set the cateringRequestId
+                    // For temporary IDs, mark the file as temporary and do NOT set the cateringRequestId
           dbData.isTemporary = true;
           dbData.cateringRequestId = null;
           dbData.category = "catering-order";
@@ -363,12 +650,10 @@ export async function POST(request: NextRequest) {
       } else if (normalizedCategory === "on-demand" || entityType === "on_demand") {
         // Similar logic for on-demand requests
         if (finalEntityId && !finalEntityId.startsWith('temp-') && !finalEntityId.startsWith('temp_')) {
-          console.log(`Setting onDemandId to: ${finalEntityId}`);
-          dbData.onDemandId = finalEntityId;
+                    dbData.onDemandId = finalEntityId;
           dbData.isTemporary = false;
         } else if (finalEntityId) {
-          console.log(`Skipping onDemandId for temporary ID: ${finalEntityId}`);
-          dbData.isTemporary = true;
+                    dbData.isTemporary = true;
           dbData.onDemandId = null;
           // Store in category for retrieval
           dbData.category = `on-demand`;
@@ -383,32 +668,27 @@ export async function POST(request: NextRequest) {
             });
             
             if (jobApp) {
-              console.log(`Setting jobApplicationId to: ${finalEntityId} (verified)`);
-              dbData.jobApplicationId = finalEntityId;
+                            dbData.jobApplicationId = finalEntityId;
               dbData.isTemporary = false;
             } else {
-              console.log(`JobApplication ${finalEntityId} not found, not setting foreign key`);
-              dbData.jobApplicationId = null;
+                            dbData.jobApplicationId = null;
               dbData.isTemporary = true;
               // Keep the original category rather than modifying it
             }
           } catch (error) {
-            console.log(`Error finding job application with ID ${finalEntityId}, treating as temporary`, error);
-            dbData.jobApplicationId = null;
+                        dbData.jobApplicationId = null;
             dbData.isTemporary = true;
           }
         } else if (finalEntityId) {
           // For temp IDs, don't try to look up in database at all
-          console.log(`Using temporary ID for job application: ${finalEntityId}`);
-          dbData.jobApplicationId = null;
+                    dbData.jobApplicationId = null;
           dbData.isTemporary = true;
           // Keep the original category rather than modifying it
         }
       } else if (entityType === "user") {
         // For user files, we need to set the userId field
         if (finalEntityId && !finalEntityId.startsWith('temp-') && !finalEntityId.startsWith('temp_')) {
-          console.log(`Setting userId to: ${finalEntityId} for user file`);
-          dbData.userId = finalEntityId;
+                    dbData.userId = finalEntityId;
           
           // Check if user exists
           try {
@@ -417,8 +697,7 @@ export async function POST(request: NextRequest) {
             });
             
             if (userProfile) {
-              console.log(`Verified user exists: ID=${finalEntityId}`);
-              dbData.isTemporary = false;
+                            dbData.isTemporary = false;
             } else {
               console.warn(`User with ID ${finalEntityId} not found in database`);
               dbData.isTemporary = true;
@@ -437,8 +716,7 @@ export async function POST(request: NextRequest) {
           dbData.category = `user`;
         }
       } else {
-        console.log(`No specific entity ID field set for type: ${entityType} and category: ${normalizedCategory}`);
-        // For safety, ensure all fields are null if undefined or temp
+                // For safety, ensure all fields are null if undefined or temp
         if (finalEntityId && (finalEntityId.startsWith('temp-') || finalEntityId.startsWith('temp_'))) {
           dbData.isTemporary = true;
           dbData.cateringRequestId = null;
@@ -456,14 +734,55 @@ export async function POST(request: NextRequest) {
       dbData.userId = null;
     }
 
-    // Create the database record
-    console.log("Creating database record with data:", dbData);
-    const fileUpload = await prisma.fileUpload.create({
-      data: dbData,
-    });
+    // Create the database record with retry logic
+    
+    let fileUpload;
+    try {
+      const dbOperation = async () => {
+        return await prisma.fileUpload.create({
+          data: dbData,
+        });
+      };
 
-    console.log("Database record created successfully:", fileUpload.id);
+      fileUpload = await RetryHandler.withRetry(
+        dbOperation,
+        {
+          ...DEFAULT_RETRY_CONFIG,
+          maxAttempts: 2, // Fewer retries for DB operations
+          baseDelay: 1000
+        },
+        (error, attempt) => {
+                  }
+      );
+    } catch (error) {
+      console.error("Database record creation failed after retries:", error);
 
+      // Use enhanced error categorization for database errors
+      const dbError = UploadErrorHandler.categorizeError(error, file);
+
+      // Log and report the error
+      UploadErrorHandler.logError(dbError, {
+        fileName: file.name,
+        filePath,
+        entityId,
+        entityType,
+        dbData
+      });
+      await UploadErrorHandler.reportError(dbError);
+
+      return NextResponse.json(
+        {
+          error: dbError.userMessage,
+          errorType: dbError.type,
+          correlationId: dbError.correlationId,
+          retryable: dbError.retryable,
+          retryAfter: dbError.retryAfter
+        },
+        { status: 500 }
+      );
+    }
+
+    
     return NextResponse.json({
       success: true,
       file: {
@@ -482,16 +801,29 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("File upload error:", error);
+
+    // Use enhanced error categorization for general errors
+    const uploadError = UploadErrorHandler.categorizeError(error, file);
+
+    // Log and report the error
+    UploadErrorHandler.logError(uploadError, {
+      fileName: file?.name,
+      entityId,
+      entityType,
+      category
+    });
+    await UploadErrorHandler.reportError(uploadError);
+
     return NextResponse.json(
-      { 
-        error: "File upload failed", 
-        details: error.message || String(error)
+      {
+        error: uploadError.userMessage,
+        errorType: uploadError.type,
+        correlationId: uploadError.correlationId,
+        retryable: uploadError.retryable,
+        retryAfter: uploadError.retryAfter
       },
       { status: 500 }
     );
-  } finally {
-    // Disconnect Prisma Client after use
-    await prisma.$disconnect();
   }
 }
 
@@ -523,11 +855,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    console.log('DELETE /api/file-uploads called with params:', {
-      fileUrl,
-      fileId: fileIdParam
-    });
-
+    
     if (!fileUrl && !fileIdParam) {
       return NextResponse.json(
         { error: "Either fileUrl or fileId is required" },
@@ -551,8 +879,7 @@ export async function DELETE(request: NextRequest) {
         );
       }
 
-      console.log('Found file record by ID:', fileRecord.fileName);
-    } else {
+          } else {
       // Find file by URL
       fileRecord = await prisma.fileUpload.findFirst({
         where: { 
@@ -561,15 +888,13 @@ export async function DELETE(request: NextRequest) {
       });
 
       if (!fileRecord) {
-        console.log('File record not found for URL:', fileUrl);
-        return NextResponse.json(
+                return NextResponse.json(
           { error: "File not found" },
           { status: 404 },
         );
       }
 
-      console.log('Found file record by URL:', fileRecord.fileName);
-    }
+          }
 
     // Determine the bucket and path from the fileUrl
     let bucketName = STORAGE_BUCKETS.DEFAULT;
@@ -589,10 +914,8 @@ export async function DELETE(request: NextRequest) {
         // The path is everything after the bucket name
         filePath = pathParts.slice(publicIndex + 2).join('/');
         
-        console.log('Extracted storage details:', { bucketName, filePath });
-      } else {
-        console.log('Could not parse storage path from URL:', fileRecord.fileUrl);
-        // Use default path construction as fallback
+              } else {
+                // Use default path construction as fallback
         filePath = fileRecord.fileUrl.split('/').pop() || '';
       }
     } catch (error) {
@@ -606,8 +929,7 @@ export async function DELETE(request: NextRequest) {
 
     // Delete from Supabase storage
     if (filePath) {
-      console.log(`Attempting to delete from bucket '${bucketName}', path: ${filePath}`);
-      
+            
       const { error: storageError } = await supabase.storage
         .from(bucketName)
         .remove([filePath]);
@@ -616,19 +938,16 @@ export async function DELETE(request: NextRequest) {
         console.error('Error deleting from storage:', storageError);
         // Continue anyway to delete the database record
       } else {
-        console.log('Successfully deleted from storage');
-      }
+              }
     } else {
-      console.log('No valid file path to delete from storage');
-    }
+          }
 
     // Delete from database
     await prisma.fileUpload.delete({
       where: { id: fileRecord.id },
     });
 
-    console.log('Successfully deleted file record from database');
-
+    
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Error deleting file:", error);

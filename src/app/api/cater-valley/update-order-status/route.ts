@@ -56,7 +56,6 @@ export async function POST(request: NextRequest) {
     // --- Security Note ---
     // Add authentication/authorization checks here if this endpoint
     // needs to be protected. Verify the caller has permission to update this order.
-    // Example: const session = await getServerSession(authOptions); if (!session) { return NextResponse.json({ message: 'Unauthorized' }, { status: 401 }); }
 
 
     // 3. Call the External API via the service function

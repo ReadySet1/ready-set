@@ -188,8 +188,7 @@ async function calculateDistance(pickupAddress: string, dropoffAddress: string):
       // Convert meters to miles
       const miles = (distanceValue * 0.000621371);
       
-      console.log(`Distance calculated: ${pickupAddress} to ${dropoffAddress} = ${miles.toFixed(2)} miles`);
-      
+            
       return Math.round(miles * 100) / 100; // Round to 2 decimal places
     } else {
       console.warn('Google Maps API returned error:', data.error_message || data.status);

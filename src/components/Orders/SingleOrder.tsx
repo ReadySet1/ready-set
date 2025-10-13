@@ -44,7 +44,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FileUpload } from "@/types/file";
 import { createClient } from "@/utils/supabase/client";
 import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
-import { UserType } from "@/types/user";
+import { UserType } from "@/types/client-enums";
 import { decodeOrderNumber } from "@/utils/order";
 
 // Make sure the bucket name is user-assets
@@ -53,6 +53,17 @@ const STORAGE_BUCKET = "user-assets";
 interface SingleOrderProps {
   onDeleteSuccess: () => void;
   showHeader?: boolean;
+  // Granular permission props for role-based functionality
+  canAssignDriver?: boolean;
+  canUpdateDriverStatus?: boolean;
+  canDeleteOrder?: boolean;
+  canEditOrder?: boolean;
+  // Granular visibility props for order information
+  canViewOrderTitle?: boolean;
+  canViewOrderStatus?: boolean;
+  canViewOrderNumber?: boolean;
+  canViewDeliveryDate?: boolean;
+  canViewDeliveryTime?: boolean;
 }
 
 // Enhanced status config with more detailed styling
@@ -123,6 +134,16 @@ const OrderSkeleton: React.FC = () => (
 const SingleOrder: React.FC<SingleOrderProps> = ({
   onDeleteSuccess,
   showHeader = true,
+  canAssignDriver = false,
+  canUpdateDriverStatus = false,
+  canDeleteOrder = false,
+  canEditOrder = false,
+  // Granular visibility props with default values
+  canViewOrderTitle = false,
+  canViewOrderStatus = false,
+  canViewOrderNumber = false,
+  canViewDeliveryDate = false,
+  canViewDeliveryTime = false,
 }) => {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -132,6 +153,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
   const [files, setFiles] = useState<FileUpload[]>([]);
+  const [forceCloseDialog, setForceCloseDialog] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -157,17 +179,21 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     isAdmin: boolean;
     isSuperAdmin: boolean;
     isHelpdesk: boolean;
+    isVendor: boolean;
+    isClient: boolean;
+    isDriver: boolean;
   }>({
     isAdmin: false,
     isSuperAdmin: false,
     isHelpdesk: false,
+    isVendor: false,
+    isClient: false,
+    isDriver: false,
   });
 
   // Check for bucket existence but don't try to create it (requires admin privileges)
   const ensureStorageBucketExists = useCallback(async () => {
     try {
-      console.log("Checking storage bucket configuration:", STORAGE_BUCKET);
-
       // Refresh auth session
       const {
         data: { session },
@@ -188,9 +214,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
         // Don't try to create the bucket - just log the error
         if (bucketsError.message.includes("permission")) {
-          console.log(
-            "Permission error listing buckets - this is expected for non-admin users",
-          );
+          // Permission error listing buckets - this is expected for non-admin users
         }
         return;
       }
@@ -200,16 +224,8 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         buckets &&
         Array.isArray(buckets) &&
         buckets.some((bucket) => bucket.name === STORAGE_BUCKET);
-      console.log(
-        "Available buckets:",
-        buckets?.map((b) => b.name).join(", ") || "none",
-      );
 
       if (!bucketExists) {
-        console.log(
-          `Bucket '${STORAGE_BUCKET}' not found in the list, but it might still exist with restricted permissions`,
-        );
-
         // Test accessing the bucket to see if it's actually accessible
         const { data, error: accessError } = await supabase.storage
           .from(STORAGE_BUCKET)
@@ -224,15 +240,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
               "File storage is not configured properly. Please contact support.",
             );
           } else {
-            console.log(
-              `Cannot access bucket contents but it might exist: ${accessError.message}`,
-            );
           }
         } else {
-          console.log(`Bucket '${STORAGE_BUCKET}' exists and is accessible`);
         }
       } else {
-        console.log(`Bucket '${STORAGE_BUCKET}' exists in the list`);
       }
     } catch (error) {
       console.error("Error checking storage bucket:", error);
@@ -247,7 +258,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     }
 
     setIsLoading(true);
-    console.log("Fetching order details for:", orderNumber);
 
     try {
       // Refresh auth session before making the request
@@ -301,7 +311,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       }
 
       const orderData = await orderResponse.json();
-      console.log("Order data received:", orderData);
 
       // Transform the data to match our types
       const transformedOrder: Order = {
@@ -316,17 +325,17 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       setOrder(transformedOrder);
 
       // Set driver info if available
+      
       if (orderData.dispatches?.length > 0 && orderData.dispatches[0]?.driver) {
-        setDriverInfo(orderData.dispatches[0].driver);
+                setDriverInfo(orderData.dispatches[0].driver);
         setIsDriverAssigned(true);
       } else {
-        setDriverInfo(null);
+                setDriverInfo(null);
         setIsDriverAssigned(false);
       }
 
       // Fetch files with improved error handling
       try {
-        console.log(`Fetching files for order: ${orderNumber}`);
         const filesResponse = await fetch(
           `/api/orders/${encodeURIComponent(orderNumber)}/files`,
           {
@@ -343,7 +352,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         }
 
         const filesData = await filesResponse.json();
-        console.log("Files data received:", filesData);
 
         const filesArray = Array.isArray(filesData)
           ? filesData
@@ -411,9 +419,14 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     ensureStorageBucketExists(); // Add this line to check the bucket on mount
   }, [fetchOrderDetails, ensureStorageBucketExists]);
 
-  // Fetch drivers on mount
+  // Fetch drivers on mount - only for non-VENDOR users
   useEffect(() => {
     const fetchDrivers = async () => {
+      // Skip driver fetching for VENDOR users since they don't have access to driver data
+      if (userRoles.isVendor) {
+                return;
+      }
+
       try {
         const {
           data: { session },
@@ -443,6 +456,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
             router.push("/auth/login");
             return;
           }
+          if (response.status === 403) {
+                        // For 403 errors, silently skip driver loading instead of showing an error
+            return;
+          }
           console.error("Failed to fetch drivers");
           toast.error("Failed to load available drivers");
         }
@@ -453,7 +470,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     };
 
     fetchDrivers();
-  }, [setDrivers, supabase.auth, router]);
+  }, [setDrivers, supabase.auth, router, userRoles.isVendor]);
 
   const handleOpenDriverDialog = () => {
     setIsDriverDialogOpen(true);
@@ -463,8 +480,11 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   };
 
   const handleAssignOrEditDriver = async () => {
-    if (!order || !selectedDriver) return;
+    if (!order || !selectedDriver) {
+            return;
+    }
 
+    
     try {
       const {
         data: { session },
@@ -478,7 +498,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         return;
       }
 
-      const response = await fetch("/api/orders/assignDriver", {
+            const response = await fetch("/api/orders/assignDriver", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -493,7 +513,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         }),
       });
 
+      
       if (!response.ok) {
+        console.error("❌ API call failed with status:", response.status);
         if (response.status === 401) {
           toast.error("Session expired. Please log in again.");
           router.push("/auth/login");
@@ -505,8 +527,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         try {
           const errorData = await response.json();
           errorText = errorData.error || errorData.message || "";
+          console.error("❌ API Error details:", errorData);
         } catch (parseError) {
           errorText = "";
+          console.error("❌ Failed to parse error response:", parseError);
         }
 
         throw new Error(
@@ -514,15 +538,29 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         );
       }
 
-      await fetchOrderDetails();
-      setIsDriverDialogOpen(false);
+      const result = await response.json();
+      
+      // Close the dialog first
+                  setIsDriverDialogOpen(false);
+      
+      // Wait for the order details to refresh after closing
+            await fetchOrderDetails();
+
+      // Add a small delay to ensure state updates are processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      
       toast.success(
         isDriverAssigned
           ? "Driver updated successfully!"
           : "Driver assigned successfully!",
       );
     } catch (error) {
-      console.error("Failed to assign/edit driver:", error);
+      console.error("❌ Failed to assign/edit driver:", error);
+      console.error("❌ Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+        error,
+      });
       toast.error(
         error instanceof Error
           ? error.message
@@ -550,11 +588,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         router.push("/auth/login");
         return;
       }
-
-      console.log(
-        `Updating driver status for order ${order.orderNumber} to:`,
-        newStatus,
-      );
 
       const response = await fetch(
         `/api/orders/${encodeURIComponent(order.orderNumber)}`,
@@ -591,21 +624,11 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       }
 
       const updatedOrder = await response.json();
-      console.log(
-        `Driver status for order ${order.orderNumber} updated response:`,
-        updatedOrder,
-      );
       setOrder(updatedOrder);
       toast.success("Driver status updated successfully!");
 
       // If driver status is updated to completed, also update the main order status
-      console.log(
-        `Checking if driver status '${newStatus}' requires order status update.`,
-      );
       if (newStatus === DriverStatus.COMPLETED) {
-        console.log(
-          `Triggering order status update to COMPLETED for order ${order.orderNumber}`,
-        );
         await handleOrderStatusChange(OrderStatus.COMPLETED);
       }
     } catch (error) {
@@ -633,11 +656,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         router.push("/auth/login");
         return;
       }
-
-      console.log(
-        `Updating internal ORDER status for order ${order.orderNumber} to:`,
-        newStatus,
-      );
 
       const response = await fetch(
         `/api/orders/${encodeURIComponent(order.orderNumber)}`,
@@ -671,10 +689,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         );
       }
       const updatedOrderData = await response.json();
-      console.log(
-        `Internal order status for order ${order.orderNumber} updated response:`,
-        updatedOrderData,
-      );
       return updatedOrderData as Order;
     };
 
@@ -721,6 +735,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
           isAdmin: profile.type === UserType.ADMIN,
           isSuperAdmin: profile.type === UserType.SUPER_ADMIN,
           isHelpdesk: profile.type === UserType.HELPDESK,
+          isVendor: profile.type === UserType.VENDOR,
+          isClient: profile.type === UserType.CLIENT,
+          isDriver: profile.type === UserType.DRIVER,
         });
       }
     } catch (error) {
@@ -735,6 +752,23 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   const userCanEditOrder = () => {
     return userRoles.isAdmin || userRoles.isSuperAdmin || userRoles.isHelpdesk;
   };
+
+  // Set granular permissions based on user roles
+  const effectivePermissions = {
+    canViewOrderTitle:
+      canViewOrderTitle || userRoles.isAdmin || userRoles.isSuperAdmin,
+    canViewOrderStatus:
+      canViewOrderStatus || userRoles.isAdmin || userRoles.isSuperAdmin,
+    canViewOrderNumber:
+      canViewOrderNumber || userRoles.isAdmin || userRoles.isSuperAdmin,
+    canViewDeliveryDate:
+      canViewDeliveryDate || userRoles.isAdmin || userRoles.isSuperAdmin,
+    canViewDeliveryTime:
+      canViewDeliveryTime || userRoles.isAdmin || userRoles.isSuperAdmin,
+  };
+
+  // Determine if user can assign drivers based on role
+  const canUserAssignDriver = canAssignDriver && !userRoles.isVendor;
 
   if (isLoading) {
     return <OrderSkeleton />;
@@ -779,71 +813,92 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="container mx-auto px-6 py-8"
+        className={`container mx-auto px-6 pb-8 ${effectivePermissions.canViewOrderTitle ? "pt-8" : "pt-16"}`}
       >
         {/* Modern Header */}
         <div className="mb-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="mb-3 flex items-center gap-4">
-                <h1 className="text-3xl font-bold text-slate-800">
-                  {order.order_type === "catering"
-                    ? "Catering Request"
-                    : "On-Demand Order"}
-                </h1>
-                <Badge
-                  className={`${statusInfo.className} flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold shadow-sm`}
-                >
-                  {statusInfo.icon}
-                  {order.status}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-6 text-slate-600">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  <span className="font-medium">{order.orderNumber}</span>
-                </div>
-                {order.pickupDateTime && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {new Date(order.pickupDateTime).toLocaleDateString(
-                        undefined,
-                        {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        },
-                      )}
-                    </span>
+          {/* Title Section */}
+          <div
+            className={`mb-6 ${effectivePermissions.canViewOrderTitle ? "mt-8" : "mt-20"}`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                {/* Order Title and Status - Only visible to admin/super admin */}
+                {effectivePermissions.canViewOrderTitle && (
+                  <div className="mb-4 flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-slate-800">
+                      {order.order_type === "catering"
+                        ? "Catering Request"
+                        : "On-Demand Order"}
+                    </h1>
+                    {effectivePermissions.canViewOrderStatus && (
+                      <Badge className="border-slate-200 bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+                        {order.status.toUpperCase()}
+                      </Badge>
+                    )}
                   </div>
                 )}
-                {order.pickupDateTime && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {new Date(order.pickupDateTime).toLocaleTimeString(
-                        undefined,
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
 
-            <div className="flex gap-3">
-              <Button
-                onClick={handleOpenDriverDialog}
-                className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-white shadow-lg transition-all duration-200 hover:bg-blue-700 hover:shadow-xl"
-              >
-                <Truck className="h-4 w-4" />
-                {isDriverAssigned ? "Update Driver" : "Assign Driver"}
-              </Button>
+                {/* Order Details Row - Only visible to admin/super admin */}
+                {(effectivePermissions.canViewOrderNumber ||
+                  effectivePermissions.canViewDeliveryDate ||
+                  effectivePermissions.canViewDeliveryTime) && (
+                  <div className="flex items-center gap-6 text-sm text-slate-600">
+                    {effectivePermissions.canViewOrderNumber && (
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-slate-500" />
+                        <span className="font-medium">{order.orderNumber}</span>
+                      </div>
+                    )}
+                    {effectivePermissions.canViewDeliveryDate &&
+                      order.pickupDateTime && (
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-slate-500" />
+                          <span>
+                            {new Date(order.pickupDateTime).toLocaleDateString(
+                              undefined,
+                              {
+                                weekday: "short",
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )}
+                          </span>
+                        </div>
+                      )}
+                    {effectivePermissions.canViewDeliveryTime &&
+                      order.pickupDateTime && (
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-slate-500" />
+                          <span>
+                            {new Date(order.pickupDateTime).toLocaleTimeString(
+                              undefined,
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                              },
+                            )}
+                          </span>
+                        </div>
+                      )}
+                  </div>
+                )}
+              </div>
+
+              {/* Assign Driver Button - Top Right */}
+              {canUserAssignDriver && (
+                <div className="ml-6">
+                  <Button
+                    onClick={handleOpenDriverDialog}
+                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white shadow-sm hover:bg-blue-700"
+                  >
+                    <Truck className="h-4 w-4" />
+                    Assign Driver
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -874,6 +929,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                   }}
                   driverInfo={driverInfo}
                   updateDriverStatus={updateDriverStatus}
+                  canAssignDriver={canUserAssignDriver}
+                  canUpdateDriverStatus={canUpdateDriverStatus}
+                  onAssignDriver={handleOpenDriverDialog}
+                  showAssignDriverButton={false}
                 />
                 <Separator />
                 <OrderStatusCard
@@ -881,6 +940,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                   initialStatus={order.status}
                   orderId={order.id}
                   onStatusChange={handleOrderStatusChange}
+                  canChangeStatus={userRoles.isAdmin || userRoles.isSuperAdmin}
                 />
               </div>
             </div>
@@ -1147,7 +1207,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
       <DriverAssignmentDialog
         isOpen={isDriverDialogOpen}
-        onOpenChange={setIsDriverDialogOpen}
+        onOpenChange={(open) => {
+          setIsDriverDialogOpen(open);
+        }}
         isDriverAssigned={isDriverAssigned}
         drivers={drivers}
         selectedDriver={selectedDriver}

@@ -1,7 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
-  // Remove custom output path to use default location
-  // output   = "../node_modules/.prisma/client"
+  provider        = "prisma-client-js"
   previewFeatures = ["relationJoins"]
 }
 
@@ -12,7 +10,7 @@ datasource db {
 }
 
 model Profile {
-  id                  String            @id @default(uuid()) @db.Uuid
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   guid                String?
   name                String?
   email               String            @unique
@@ -39,7 +37,7 @@ model Profile {
   sideNotes           String?
   confirmationCode    String?
   createdAt           DateTime          @default(now()) @db.Timestamptz(6)
-  updatedAt           DateTime          @updatedAt @db.Timestamptz(6)
+  updatedAt           DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
   isTemporaryPassword Boolean           @default(false)
   deletedAt           DateTime?         @db.Timestamptz(6)
   deletedBy           String?           @db.Uuid
@@ -51,19 +49,22 @@ model Profile {
   userDispatches      Dispatch[]        @relation("UserDispatch")
   fileUploads         FileUpload[]
   jobApplications     JobApplication[]  @relation("ProfileToJobApplication")
-  onDemandRequests    OnDemand[]
-  sessions            Session[]
-  userAddresses       UserAddress[]
-  deletedByUser       Profile?          @relation("UserDeletedBy", fields: [deletedBy], references: [id])
-  deletedUsers        Profile[]         @relation("UserDeletedBy")
-  auditLogs           UserAudit[]
-  performedAudits     UserAudit[]       @relation("UserAuditPerformer")
+  onDemandRequests     OnDemand[]
+  sessions             Session[]
+  userAddresses        UserAddress[]
+  deletedByUser        Profile?                @relation("UserDeletedBy", fields: [deletedBy], references: [id])
+  deletedUsers         Profile[]               @relation("UserDeletedBy")
+  auditLogs            UserAudit[]
+  performedAudits      UserAudit[]             @relation("UserAuditPerformer")
+  clientConfigurations ClientConfiguration[]   @relation("ClientConfigurations")
+  calculationHistory   CalculationHistory[]    @relation("CalculationHistory")
 
   @@index([email])
   @@index([type])
   @@index([status])
   @@index([deletedAt])
   @@index([deletedBy])
+  @@index([type, deletedAt]) // Dashboard vendor counting optimization
   @@map("profiles")
 }
 
@@ -88,7 +89,7 @@ model UserAudit {
 }
 
 model Account {
-  id                String  @id @default(uuid()) @db.Uuid
+  id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId            String  @db.Uuid
   type              String
   provider          String
@@ -100,7 +101,7 @@ model Account {
   scope             String?
   idToken           String?
   sessionState      String?
-  user              Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              Profile @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([provider, providerAccountId])
   @@index([userId])
@@ -108,36 +109,36 @@ model Account {
 }
 
 model Session {
-  id           String   @id @default(uuid()) @db.Uuid
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   sessionToken String   @unique
   userId       String   @db.Uuid
-  expires      DateTime
-  user         Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires      DateTime @db.Timestamptz(6)
+  user         Profile  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([userId])
   @@map("sessions")
 }
 
 model Address {
-  id                       String            @id @default(uuid()) @db.Uuid
+  id                       String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   county                   String?
   street1                  String
   street2                  String?
   city                     String
   state                    String
   zip                      String
-  createdAt                DateTime          @default(now())
+  createdAt                DateTime          @default(now()) @db.Timestamptz(6)
   createdBy                String?           @db.Uuid
   isRestaurant             Boolean           @default(false)
   isShared                 Boolean           @default(false)
   locationNumber           String?
   parkingLoading           String?
-  updatedAt                DateTime          @updatedAt
+  updatedAt                DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
   name                     String?
   latitude                 Float?
   longitude                Float?
   deletedAt                DateTime?         @db.Timestamptz(6)
-  creator                  Profile?          @relation("AddressCreatedBy", fields: [createdBy], references: [id])
+  creator                  Profile?          @relation("AddressCreatedBy", fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
   cateringDeliveryRequests CateringRequest[] @relation("CateringDelivery")
   cateringPickupRequests   CateringRequest[] @relation("CateringPickup")
   onDemandDeliveryRequests OnDemand[]        @relation("OnDemandDelivery")
@@ -150,19 +151,19 @@ model Address {
 }
 
 model PricingTier {
-  id                  String            @id @default(uuid()) @db.Uuid
-  minHeadCount        Int      
-  maxHeadCount        Int?     
-  minFoodCost         Decimal           @db.Decimal(10, 2)
-  maxFoodCost         Decimal?          @db.Decimal(10, 2)
-  priceWithTip        Decimal?          @db.Decimal(10, 2)
-  priceWithoutTip     Decimal?          @db.Decimal(10, 2)
-  percentageWithTip   Decimal?          @db.Decimal(5, 2)
-  percentageWithoutTip Decimal?         @db.Decimal(5, 2)
-  isActive            Boolean           @default(true)
-  createdAt           DateTime          @default(now()) @db.Timestamptz(6)
-  updatedAt           DateTime          @updatedAt @db.Timestamptz(6)
-  cateringRequests    CateringRequest[]
+  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  minHeadCount         Int
+  maxHeadCount         Int?
+  minFoodCost          Decimal           @db.Decimal(10, 2)
+  maxFoodCost          Decimal?          @db.Decimal(10, 2)
+  priceWithTip         Decimal?          @db.Decimal(10, 2)
+  priceWithoutTip      Decimal?          @db.Decimal(10, 2)
+  percentageWithTip    Decimal?          @db.Decimal(5, 2)
+  percentageWithoutTip Decimal?          @db.Decimal(5, 2)
+  isActive             Boolean           @default(true)
+  createdAt            DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+  cateringRequests     CateringRequest[]
 
   @@index([minHeadCount, minFoodCost])
   @@index([isActive])
@@ -170,7 +171,7 @@ model PricingTier {
 }
 
 model CateringRequest {
-  id                String           @id @default(uuid()) @db.Uuid
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   guid              String?
   userId            String           @db.Uuid
   pickupAddressId   String           @db.Uuid
@@ -194,13 +195,13 @@ model CateringRequest {
   appliedDiscount   Decimal?         @db.Decimal(10, 2)
   pricingTierId     String?          @db.Uuid
   createdAt         DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt         DateTime         @updatedAt @db.Timestamptz(6)
+  updatedAt         DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
   driverStatus      DriverStatus?
   deletedAt         DateTime?        @db.Timestamptz(6)
-  deliveryAddress   Address          @relation("CateringDelivery", fields: [deliveryAddressId], references: [id])
-  pickupAddress     Address          @relation("CateringPickup", fields: [pickupAddressId], references: [id])
-  user              Profile          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pricingTier       PricingTier?     @relation(fields: [pricingTierId], references: [id])
+  deliveryAddress   Address          @relation("CateringDelivery", fields: [deliveryAddressId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pickupAddress     Address          @relation("CateringPickup", fields: [pickupAddressId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pricingTier       PricingTier?     @relation(fields: [pricingTierId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user              Profile          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   dispatches        Dispatch[]
   fileUploads       FileUpload[]
 
@@ -210,21 +211,23 @@ model CateringRequest {
   @@index([userId, status])
   @@index([deliveryAddressId, pickupDateTime])
   @@index([pricingTierId])
+  @@index([status, createdAt]) // Dashboard metrics optimization
+  @@index([status, createdAt, orderTotal]) // Dashboard revenue aggregation
   @@map("catering_requests")
 }
 
 model Dispatch {
-  id                String           @id @default(uuid()) @db.Uuid
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   cateringRequestId String?          @db.Uuid
   createdAt         DateTime         @default(now()) @db.Timestamptz(6)
   driverId          String?          @db.Uuid
   onDemandId        String?          @db.Uuid
-  updatedAt         DateTime         @updatedAt @db.Timestamptz(6)
+  updatedAt         DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
   userId            String?          @db.Uuid
-  cateringRequest   CateringRequest? @relation(fields: [cateringRequestId], references: [id])
-  driver            Profile?         @relation("DriverDispatch", fields: [driverId], references: [id])
-  onDemand          OnDemand?        @relation(fields: [onDemandId], references: [id])
-  user              Profile?         @relation("UserDispatch", fields: [userId], references: [id])
+  cateringRequest   CateringRequest? @relation(fields: [cateringRequestId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  driver            Profile?         @relation("DriverDispatch", fields: [driverId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  onDemand          OnDemand?        @relation(fields: [onDemandId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user              Profile?         @relation("UserDispatch", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([driverId])
   @@index([cateringRequestId])
@@ -233,23 +236,23 @@ model Dispatch {
 }
 
 model FileUpload {
-  id                String           @id @default(uuid()) @db.Uuid
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId            String?          @db.Uuid
   fileName          String
   fileType          String
   fileSize          Int
   fileUrl           String
-  uploadedAt        DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  uploadedAt        DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
   cateringRequestId String?          @db.Uuid
   onDemandId        String?          @db.Uuid
   jobApplicationId  String?          @db.Uuid
   category          String?
   isTemporary       Boolean          @default(false)
-  cateringRequest   CateringRequest? @relation(fields: [cateringRequestId], references: [id], onDelete: Cascade)
-  jobApplication    JobApplication?  @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade)
-  onDemand          OnDemand?        @relation(fields: [onDemandId], references: [id], onDelete: Cascade)
-  user              Profile?         @relation(fields: [userId], references: [id])
+  cateringRequest   CateringRequest? @relation(fields: [cateringRequestId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  jobApplication    JobApplication?  @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  onDemand          OnDemand?        @relation(fields: [onDemandId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user              Profile?         @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([userId])
   @@index([cateringRequestId])
@@ -259,8 +262,26 @@ model FileUpload {
   @@map("file_uploads")
 }
 
+model UploadError {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  correlationId String  @unique
+  errorType    String
+  message      String
+  userMessage  String
+  details      String?
+  userId       String?  @db.Uuid
+  timestamp    DateTime @default(now()) @db.Timestamptz(6)
+  retryable    Boolean  @default(false)
+  resolved     Boolean  @default(false)
+
+  @@index([userId])
+  @@index([errorType])
+  @@index([timestamp])
+  @@map("upload_errors")
+}
+
 model OnDemand {
-  id                String         @id @default(uuid()) @db.Uuid
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   guid              String?
   userId            String         @db.Uuid
   pickupAddressId   String         @db.Uuid
@@ -284,14 +305,14 @@ model OnDemand {
   height            Float?
   weight            Float?
   createdAt         DateTime       @default(now()) @db.Timestamptz(6)
-  updatedAt         DateTime       @updatedAt @db.Timestamptz(6)
+  updatedAt         DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
   driverStatus      DriverStatus?
   deletedAt         DateTime?      @db.Timestamptz(6)
   dispatches        Dispatch[]
   fileUploads       FileUpload[]
-  deliveryAddress   Address        @relation("OnDemandDelivery", fields: [deliveryAddressId], references: [id])
-  pickupAddress     Address        @relation("OnDemandPickup", fields: [pickupAddressId], references: [id])
-  user              Profile        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveryAddress   Address        @relation("OnDemandDelivery", fields: [deliveryAddressId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pickupAddress     Address        @relation("OnDemandPickup", fields: [pickupAddressId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user              Profile        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([userId])
   @@index([status])
@@ -302,15 +323,15 @@ model OnDemand {
 }
 
 model UserAddress {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @db.Uuid
   addressId String   @db.Uuid
   alias     String?
   isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  address   Address  @relation(fields: [addressId], references: [id], onDelete: Cascade)
-  user      Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  address   Address  @relation(fields: [addressId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user      Profile  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([userId, addressId])
   @@index([userId])
@@ -319,10 +340,10 @@ model UserAddress {
 }
 
 model VerificationToken {
-  id         String   @id @default(uuid()) @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   identifier String
   token      String   @unique
-  expires    DateTime
+  expires    DateTime @db.Timestamptz(6)
 
   @@unique([identifier, token])
   @@index([token])
@@ -330,9 +351,9 @@ model VerificationToken {
 }
 
 model FormSubmission {
-  id                 String   @id @default(uuid()) @db.Uuid
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt          DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @updatedAt @db.Timestamptz(6)
   formType           FormType
   companyName        String
   contactName        String
@@ -351,14 +372,14 @@ model FormSubmission {
 }
 
 model LeadCapture {
-  id                String   @id @default(uuid()) @db.Uuid
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   firstName         String
   lastName          String
   email             String   @unique
   industry          String
   newsletterConsent Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
   @@index([email])
   @@index([industry])
@@ -366,7 +387,7 @@ model LeadCapture {
 }
 
 model JobApplication {
-  id                     String            @id @default(uuid()) @db.Uuid
+  id                     String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   profileId              String?           @db.Uuid
   firstName              String
   lastName               String
@@ -391,11 +412,11 @@ model JobApplication {
   carPhotoFilePath       String?
   equipmentPhotoFilePath String?
   status                 ApplicationStatus @default(PENDING)
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
+  createdAt              DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
   deletedAt              DateTime?         @db.Timestamptz(6)
   fileUploads            FileUpload[]
-  profile                Profile?          @relation("ProfileToJobApplication", fields: [profileId], references: [id])
+  profile                Profile?          @relation("ProfileToJobApplication", fields: [profileId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([email])
   @@index([status])
@@ -471,4 +492,142 @@ enum FormType {
   FLOWER
   BAKERY
   SPECIALTY
+}
+
+model CalculatorTemplate {
+  id                   String               @id @default(uuid()) @db.Uuid
+  name                 String
+  description          String?
+  isActive             Boolean              @default(true) @map("is_active")
+  createdAt            DateTime             @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt            DateTime             @updatedAt @db.Timestamptz(6) @map("updated_at")
+  pricingRules         PricingRule[]
+  clientConfigurations ClientConfiguration[]
+  calculationHistory   CalculationHistory[]
+
+  @@index([isActive])
+  @@map("calculator_templates")
+}
+
+model PricingRule {
+  id             String             @id @default(uuid()) @db.Uuid
+  templateId     String             @db.Uuid @map("template_id")
+  ruleType       String             @map("rule_type") // 'customer_charge' or 'driver_payment'
+  ruleName       String             @map("rule_name") // 'base_fee', 'mileage', 'toll', etc.
+  baseAmount     Decimal?           @db.Decimal(10, 2) @map("base_amount")
+  perUnitAmount  Decimal?           @db.Decimal(10, 2) @map("per_unit_amount")
+  thresholdValue Decimal?           @db.Decimal(10, 2) @map("threshold_value")
+  thresholdType  String?            @map("threshold_type") // 'above', 'below', 'between'
+  appliesWhen    String?            @map("applies_when") // JSON string for complex conditions
+  priority       Int                @default(0)
+  createdAt      DateTime           @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt      DateTime           @updatedAt @db.Timestamptz(6) @map("updated_at")
+  template       CalculatorTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, ruleType, ruleName], name: "unique_template_rule")
+  @@index([templateId])
+  @@index([ruleType])
+  @@map("pricing_rules")
+}
+
+model ClientConfiguration {
+  id                 String               @id @default(uuid()) @db.Uuid
+  clientId           String?              @db.Uuid @map("client_id")
+  templateId         String               @db.Uuid @map("template_id")
+  clientName         String               @map("client_name")
+  ruleOverrides      Json                 @default("{}") @map("rule_overrides")
+  areaRules          Json                 @default("[]") @map("area_rules")
+  isActive           Boolean              @default(true) @map("is_active")
+  createdAt          DateTime             @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt          DateTime             @updatedAt @db.Timestamptz(6) @map("updated_at")
+  client             Profile?             @relation("ClientConfigurations", fields: [clientId], references: [id])
+  template           CalculatorTemplate   @relation(fields: [templateId], references: [id])
+  calculationHistory CalculationHistory[]
+
+  @@index([clientId])
+  @@index([templateId])
+  @@map("client_configurations")
+}
+
+model CalculationHistory {
+  id               String               @id @default(uuid()) @db.Uuid
+  templateId       String?              @db.Uuid @map("template_id")
+  clientConfigId   String?              @db.Uuid @map("client_config_id")
+  userId           String?              @db.Uuid @map("user_id")
+  inputData        Json                 @map("input_data")
+  customerCharges  Json                 @map("customer_charges")
+  driverPayments   Json                 @map("driver_payments")
+  customerTotal    Decimal              @db.Decimal(10, 2) @map("customer_total")
+  driverTotal      Decimal              @db.Decimal(10, 2) @map("driver_total")
+  notes            String?
+  createdAt        DateTime             @default(now()) @db.Timestamptz(6) @map("created_at")
+  template         CalculatorTemplate?  @relation(fields: [templateId], references: [id])
+  clientConfig     ClientConfiguration? @relation(fields: [clientConfigId], references: [id])
+  user             Profile?             @relation("CalculationHistory", fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([templateId])
+  @@map("calculation_history")
+}
+
+model Testimonial {
+  id          String              @id @default(uuid()) @db.Uuid
+  name        String
+  role        String?
+  content     String
+  image       String?
+  rating      Int                 @default(5)
+  category    TestimonialCategory @default(CLIENTS)
+  isActive    Boolean             @default(true) @map("is_active")
+  sortOrder   Int                 @default(0) @map("sort_order")
+  createdAt   DateTime            @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt   DateTime            @updatedAt @db.Timestamptz(6) @map("updated_at")
+
+  @@index([category, isActive, sortOrder])
+  @@index([isActive])
+  @@map("testimonials")
+}
+
+enum TestimonialCategory {
+  CLIENTS
+  VENDORS
+  DRIVERS
+}
+
+model DeliveryConfiguration {
+  id                    String   @id @default(uuid()) @db.Uuid
+  configId              String   @unique @map("config_id") // e.g., 'ready-set-food-standard'
+  clientName            String   @map("client_name")
+  vendorName            String   @map("vendor_name")
+  description           String?
+  isActive              Boolean  @default(true) @map("is_active")
+
+  // Pricing Settings (stored as JSON for flexibility)
+  pricingTiers          Json     @map("pricing_tiers")
+  mileageRate           Decimal  @db.Decimal(10, 2) @map("mileage_rate")
+  distanceThreshold     Decimal  @db.Decimal(5, 2) @map("distance_threshold")
+
+  // Daily Drive Discounts
+  dailyDriveDiscounts   Json     @map("daily_drive_discounts")
+
+  // Driver Pay Settings
+  driverPaySettings     Json     @map("driver_pay_settings")
+
+  // Bridge Toll Settings
+  bridgeTollSettings    Json     @map("bridge_toll_settings")
+
+  // Custom Settings (flexible for future additions)
+  customSettings        Json?    @map("custom_settings")
+
+  // Metadata
+  createdAt             DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt             DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+  createdBy             String?  @db.Uuid @map("created_by")
+  notes                 String?
+
+  @@index([configId])
+  @@index([isActive])
+  @@index([clientName])
+  @@map("delivery_configurations")
 }

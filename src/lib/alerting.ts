@@ -358,8 +358,8 @@ export function monitorErrorPatterns(error: StructuredError): void {
       'database-monitoring',
       {
         errorId: error.id,
-        endpoint: error.context.endpoint,
-        operation: error.context.additionalContext?.databaseOperation
+        endpoint: error.context.request?.endpoint,
+        operation: error.context.custom?.databaseOperation
       }
     );
   }
@@ -374,8 +374,8 @@ export function monitorErrorPatterns(error: StructuredError): void {
       'payment-monitoring',
       {
         errorId: error.id,
-        endpoint: error.context.endpoint,
-        userId: error.context.userId
+        endpoint: error.context.request?.endpoint,
+        userId: error.context.user?.id
       }
     );
   }
@@ -390,11 +390,7 @@ export function runMonitoringChecks(): void {
     monitorMemoryUsage();
     
     // Log monitoring run
-    console.log('🔍 Monitoring checks completed', {
-      timestamp: new Date().toISOString(),
-      activeAlerts: alertStore.getActiveAlerts().length
-    });
-  } catch (error) {
+      } catch (error) {
     console.error('Error running monitoring checks:', error);
   }
 }
