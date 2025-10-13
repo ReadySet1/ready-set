@@ -28,6 +28,7 @@ import {
 import { sendRegistrationNotification } from "@/lib/notifications";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import GoogleAuthButton from "@/components/Auth/GoogleAuthButton";
+import RegistrationSuccessModal from "./RegistrationSuccessModal";
 
 // User types
 const userTypes = ["vendor", "client"] as const;
@@ -53,6 +54,13 @@ const SignUp = () => {
   const [step, setStep] = useState(1);
   const [userType, setUserType] = useState<ExtendedUserType | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [registrationData, setRegistrationData] = useState<{
+    name: string;
+    email: string;
+    userType: string;
+    emailSent: boolean;
+  } | null>(null);
 
   const onSubmit = async (data: FormDataUnion) => {
     setLoading(true);
@@ -77,8 +85,19 @@ const SignUp = () => {
       // Send notification email
       await sendRegistrationNotification(data);
 
-      toast.success("Successfully registered");
-      router.push("/sign-in");
+      // Extract user name based on user type
+      const userName = data.userType === "vendor" || data.userType === "client"
+        ? (data as VendorFormData | ClientFormData).contact_name
+        : "";
+
+      // Set registration data and show success modal
+      setRegistrationData({
+        name: userName,
+        email: data.email,
+        userType: data.userType,
+        emailSent: userData.emailSent !== false, // Default to true if not specified
+      });
+      setShowSuccessModal(true);
     } catch (err) {
       console.error("SignUp: Registration error:", err);
       setError(
@@ -332,6 +351,18 @@ const SignUp = () => {
           </Card>
         </div>
       </div>
+
+      {/* Registration Success Modal */}
+      {registrationData && (
+        <RegistrationSuccessModal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          userName={registrationData.name}
+          userEmail={registrationData.email}
+          userType={registrationData.userType}
+          emailSent={registrationData.emailSent}
+        />
+      )}
     </section>
   );
 };

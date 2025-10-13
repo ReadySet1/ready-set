@@ -4,6 +4,7 @@ import { prisma } from "@/utils/prismaDB";
 import { Prisma } from '@prisma/client';
 import { UserStatus, UserType, PrismaClientKnownRequestError, PrismaClientInitializationError, PrismaClientValidationError } from '@/types/prisma';
 import { randomUUID } from 'crypto';
+import { sendUserWelcomeEmail } from "@/services/email-notification";
 
 // Map between our form input types and the Prisma enum values
 const userTypeMap: Record<string, string> = {
@@ -60,6 +61,8 @@ interface HelpDeskFormData extends BaseFormData {
 }
 
 type RequestBody = VendorFormData | ClientFormData | DriverFormData | HelpDeskFormData;
+
+// Email sending is now handled by the unified notification service
 
 export async function POST(request: Request) {
   try {
@@ -335,10 +338,25 @@ export async function POST(request: Request) {
 
     // No need to update user metadata here since we included it in the signUp options
 
+    // Send welcome email to the new user
+    const userName = userType === "driver" || userType === "helpdesk"
+      ? (body as DriverFormData | HelpDeskFormData).name
+      : (body as VendorFormData | ClientFormData).contact_name;
+
+    const emailSent = await sendUserWelcomeEmail({
+      email: email.toLowerCase(),
+      name: userName,
+      userType: userType as 'vendor' | 'client' | 'driver' | 'helpdesk' | 'admin' | 'super_admin',
+      isAdminCreated: false,
+    });
+
+    console.log(`📧 User registration complete. Email sent: ${emailSent}`);
+
     return NextResponse.json(
       {
-        message: "User created successfully!",
+        message: "User created successfully! Please check your email for next steps.",
         userId: newUser.id,
+        emailSent: emailSent,
       },
       { status: 200 }
     );

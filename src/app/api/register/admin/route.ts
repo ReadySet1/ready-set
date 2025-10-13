@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { validateAdminRole } from "@/middleware/authMiddleware";
-import { Resend } from "resend";
 import { createClient, createAdminClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from '@prisma/client';
 import { UserStatus, UserType, PrismaClientKnownRequestError } from '@/types/prisma';
+import { sendUserWelcomeEmail } from "@/services/email-notification";
 
 interface AdminRegistrationRequest {
   name: string;
@@ -23,35 +23,7 @@ interface AdminRegistrationRequest {
   generateTemporaryPassword: boolean;
 }
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const sendRegistrationEmail = async (
-  email: string,
-  temporaryPassword: string,
-) => {
-  const body = `
-      <h1>Welcome to Ready Set Platform</h1>
-      <p>Your account has been successfully created. Here are your login details:</p>
-      <p><strong>Email:</strong> ${email}</p>
-      <p><strong>Temporary Password:</strong> ${temporaryPassword}</p>
-      <p>For security reasons, you will be required to change your password upon your first login.</p>
-      <p>Please click on the following link to log in:</p>
-      <a href="${process.env.NEXT_PUBLIC_SITE_URL}/login">Login</a>
-      <p>If you did not request this account, please ignore this email.</p>
-    `;
-
-  try {
-    await resend.emails.send({
-      to: email,
-      from: process.env.EMAIL_FROM || "solutions@updates.readysetllc.com",
-      subject: "Welcome to Our Platform - Account Created",
-      html: body,
-    });
-      } catch (error) {
-    console.error("Error sending registration email:", error);
-    throw new Error("Failed to send registration email");
-  }
-};
+// Email sending is now handled by the unified notification service
 
 export async function POST(request: Request) {
   try {
@@ -177,18 +149,35 @@ export async function POST(request: Request) {
       });
     }
 
-    // Check if email exists before sending registration email
+    // Send registration email with temporary password if applicable
+    let emailSent = false;
     if (newUser.email && body.generateTemporaryPassword) {
       // Only send email with password if using temporary password
-      await sendRegistrationEmail(
-        newUser.email,
-        password as string
-      );
+      try {
+        emailSent = await sendUserWelcomeEmail({
+          email: newUser.email,
+          name: body.name,
+          userType: body.userType as 'driver' | 'helpdesk' | 'admin' | 'super_admin',
+          temporaryPassword: password as string,
+          isAdminCreated: true,
+        });
+      } catch (emailError) {
+        console.error("Failed to send activation email:", emailError);
+        // Don't fail the request if email fails, but log it
+        emailSent = false;
+      }
     }
 
     return NextResponse.json(
       {
         message: "User created successfully! Login instructions sent via email.",
+        user: {
+          id: newUser.id,
+          name: newUser.name,
+          email: newUser.email,
+          type: newUser.type,
+        },
+        emailSent: emailSent,
       },
       { status: 200 }
     );

@@ -26,6 +26,7 @@ import { FileWithPath } from "react-dropzone";
 import { HostSection } from "./HostSection";
 import { useUser } from "@/contexts/UserContext";
 import { getOrderCreationRedirectRoute } from "@/utils/routing";
+import OrderConfirmationModal from "./OrderConfirmationModal";
 
 // Form field components
 const InputField: React.FC<{
@@ -233,6 +234,14 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadedFileKeys, setUploadedFileKeys] = useState<string[]>([]);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [orderConfirmation, setOrderConfirmation] = useState<{
+    orderNumber: string;
+    customerName: string;
+    customerEmail: string;
+    orderId: string;
+    emailSent: boolean;
+  } | null>(null);
 
   // Initialize Supabase client
   useEffect(() => {
@@ -534,14 +543,22 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         }
       }
 
-      reset();
-      toast.success("Catering request submitted successfully!");
-      setErrorMessage("");
+      // Get customer info for modal
+      const customerName = session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'Customer';
+      const customerEmail = session?.user?.email || '';
 
-      // --- Redirect based on user role instead of hardcoded vendor dashboard ---
-      const redirectRoute = getOrderCreationRedirectRoute(userRole);
-            router.push(redirectRoute);
-      // --- End Redirect Logic ---
+      // Set order confirmation data and show modal
+      setOrderConfirmation({
+        orderNumber: data.orderNumber,
+        customerName: customerName,
+        customerEmail: customerEmail,
+        orderId: responseData.orderId,
+        emailSent: responseData.emailSent !== false, // Default to true if not specified
+      });
+      setShowConfirmationModal(true);
+
+      reset();
+      setErrorMessage("");
     } catch (error) {
       console.error("Error submitting order:", error);
       setErrorMessage(
@@ -844,6 +861,24 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           )}
         </button>
       </div>
+
+      {/* Order Confirmation Modal */}
+      {orderConfirmation && (
+        <OrderConfirmationModal
+          isOpen={showConfirmationModal}
+          onClose={() => {
+            setShowConfirmationModal(false);
+            // Redirect after modal is closed
+            const redirectRoute = getOrderCreationRedirectRoute(userRole);
+            router.push(redirectRoute);
+          }}
+          orderNumber={orderConfirmation.orderNumber}
+          customerName={orderConfirmation.customerName}
+          customerEmail={orderConfirmation.customerEmail}
+          orderId={orderConfirmation.orderId}
+          emailSent={orderConfirmation.emailSent}
+        />
+      )}
     </form>
   );
 };

@@ -972,7 +972,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
   };
 
   const refreshToken = async () => {
-    if (!sessionManager) return;
+    if (!sessionManager || !supabase) return;
 
     setAuthProgressState({
       step: "authenticating",
