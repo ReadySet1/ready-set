@@ -59,13 +59,11 @@ export const useUserForm = (
   // Reset form when initialData changes
   useEffect(() => {
     if (initialData) {
-      console.log("[useUserForm] Initial data received, resetting form.");
-      // Reset the form with the new initialData
+            // Reset the form with the new initialData
       // keepDirty: false ensures that the form is no longer considered dirty after reset if data matches
       reset(initialData, { keepDirty: false }); 
     } else {
-      console.log("[useUserForm] No initial data provided, skipping reset.");
-    }
+          }
     // Dependency array ensures this runs only when initialData or reset function identity changes
   }, [initialData, reset]);
 
@@ -116,7 +114,7 @@ export const useUserForm = (
          submitData.contact_name = displayName;
       }
       
-      console.log("Data being sent to API:", submitData); // Add log
+       // Add log
 
       const response = await fetch(`/api/users/${userId}`, {
         method: "PUT",

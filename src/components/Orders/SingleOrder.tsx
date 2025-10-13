@@ -325,20 +325,12 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       setOrder(transformedOrder);
 
       // Set driver info if available
-      console.log("🔍 Checking driver info in orderData:", {
-        dispatches: orderData.dispatches,
-        hasDispatches: orderData.dispatches?.length > 0,
-        firstDispatch: orderData.dispatches?.[0],
-        driver: orderData.dispatches?.[0]?.driver,
-      });
-
+      
       if (orderData.dispatches?.length > 0 && orderData.dispatches[0]?.driver) {
-        console.log("✅ Setting driver info:", orderData.dispatches[0].driver);
-        setDriverInfo(orderData.dispatches[0].driver);
+                setDriverInfo(orderData.dispatches[0].driver);
         setIsDriverAssigned(true);
       } else {
-        console.log("❌ No driver info found, clearing driver state");
-        setDriverInfo(null);
+                setDriverInfo(null);
         setIsDriverAssigned(false);
       }
 
@@ -432,8 +424,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     const fetchDrivers = async () => {
       // Skip driver fetching for VENDOR users since they don't have access to driver data
       if (userRoles.isVendor) {
-        console.log("ℹ️ [SingleOrder] Skipping driver fetch for VENDOR user");
-        return;
+                return;
       }
 
       try {
@@ -466,10 +457,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
             return;
           }
           if (response.status === 403) {
-            console.log(
-              "ℹ️ [SingleOrder] Access denied to drivers (403) - user lacks permission",
-            );
-            // For 403 errors, silently skip driver loading instead of showing an error
+                        // For 403 errors, silently skip driver loading instead of showing an error
             return;
           }
           console.error("Failed to fetch drivers");
@@ -493,19 +481,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
   const handleAssignOrEditDriver = async () => {
     if (!order || !selectedDriver) {
-      console.log("❌ Missing order or selectedDriver:", {
-        order: !!order,
-        selectedDriver,
-      });
-      return;
+            return;
     }
 
-    console.log("🚀 Starting driver assignment:", {
-      orderId: order.id,
-      driverId: selectedDriver,
-      orderType: order.order_type,
-    });
-
+    
     try {
       const {
         data: { session },
@@ -519,8 +498,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         return;
       }
 
-      console.log("📡 Making API call to assign driver...");
-      const response = await fetch("/api/orders/assignDriver", {
+            const response = await fetch("/api/orders/assignDriver", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -535,8 +513,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         }),
       });
 
-      console.log("📊 API Response status:", response.status);
-
+      
       if (!response.ok) {
         console.error("❌ API call failed with status:", response.status);
         if (response.status === 401) {
@@ -562,24 +539,16 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       }
 
       const result = await response.json();
-      console.log("✅ Driver assignment successful:", result);
-
+      
       // Close the dialog first
-      console.log("🚪 Closing dialog...");
-      console.log("🔍 Current dialog state before closing:", {
-        isDriverDialogOpen,
-      });
-      setIsDriverDialogOpen(false);
-      console.log("🔍 Dialog state set to false");
-
+                  setIsDriverDialogOpen(false);
+      
       // Wait for the order details to refresh after closing
-      console.log("🔄 Refreshing order details...");
-      await fetchOrderDetails();
+            await fetchOrderDetails();
 
       // Add a small delay to ensure state updates are processed
       await new Promise((resolve) => setTimeout(resolve, 100));
-      console.log("✅ Assignment process completed");
-
+      
       toast.success(
         isDriverAssigned
           ? "Driver updated successfully!"

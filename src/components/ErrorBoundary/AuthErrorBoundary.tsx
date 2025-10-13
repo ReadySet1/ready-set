@@ -61,8 +61,7 @@ class AuthErrorBoundary extends Component<
 
     // Check if this looks like an auth-related error
     if (this.isAuthError(error)) {
-      console.log("Auth error detected, clearing auth state...");
-      this.handleAuthError();
+            this.handleAuthError();
     }
   }
 
@@ -95,10 +94,7 @@ class AuthErrorBoundary extends Component<
 
       // Attempt automatic retry if under limit
       if (this.state.retryCount < this.maxRetries) {
-        console.log(
-          `Attempting auth error recovery (attempt ${this.state.retryCount + 1}/${this.maxRetries})...`,
-        );
-
+        
         this.retryTimeout = setTimeout(
           () => {
             this.setState((prevState) => ({
@@ -111,18 +107,14 @@ class AuthErrorBoundary extends Component<
           1000 * (this.state.retryCount + 1),
         ); // Exponential backoff
       } else {
-        console.log(
-          "Max auth error retries exceeded, manual intervention required",
-        );
-      }
+              }
     } catch (cleanupError) {
       console.error("Error during auth error cleanup:", cleanupError);
     }
   };
 
   private handleManualRetry = () => {
-    console.log("Manual retry triggered...");
-
+    
     // Clear auth state
     try {
       clearAllHydrationData();

@@ -32,7 +32,7 @@ const GoogleAuthButton = ({
         redirectUrl = `${redirectUrl}${redirectUrl.includes("?") ? "&" : "?"}userType=${userType}`;
       }
 
-      console.log("Redirecting to:", redirectUrl); // Debug log
+       // Debug log
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",

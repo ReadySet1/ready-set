@@ -186,8 +186,7 @@ const createOptimizedPrismaClient = (): PrismaClient => {
     
     if (isVercelServerless) {
       // Serverless environment optimizations for Supabase
-      console.log('🔧 Configuring Supabase connection for Vercel serverless environment')
-      
+            
       // Use pgbouncer for connection pooling and disable prepared statements
       url.searchParams.set('pgbouncer', 'true')
       url.searchParams.set('statement_cache_size', '0')
@@ -201,11 +200,9 @@ const createOptimizedPrismaClient = (): PrismaClient => {
       
       connectionUrl = url.toString()
       
-      console.log('✅ Applied serverless optimizations for Supabase')
-    } else {
+          } else {
       // Local development - use pooled connection since direct port (5432) is not accessible
-      console.log('🔧 Using pooled Supabase connection for local development')
-      const url = new URL(databaseUrl)
+            const url = new URL(databaseUrl)
       
       // Since we're using a pooled connection (port 6543), disable prepared statements
       // to avoid "prepared statement does not exist" errors with pgbouncer
@@ -218,8 +215,7 @@ const createOptimizedPrismaClient = (): PrismaClient => {
       url.searchParams.set('pool_timeout', '10')
       
       connectionUrl = url.toString()
-      console.log('✅ Applied pooled connection optimizations for local development')
-    }
+          }
   } else {
     // Non-Supabase PostgreSQL - apply standard pooling
     const pooledUrl = new URL(databaseUrl)
@@ -257,8 +253,7 @@ const createOptimizedPrismaClient = (): PrismaClient => {
       try {
         await originalConnect();
         if (retries > 0) {
-          console.log(`✅ Database reconnected after ${retries} retries`);
-        }
+                  }
         return;
       } catch (error) {
         retries++;
@@ -410,8 +405,7 @@ export const healthCheck = {
       const result = await prismaPooled.$queryRaw<Array<{ name: string; statement: string; from_sql: boolean }>>`
         SELECT name, statement, from_sql FROM pg_prepared_statements LIMIT 10
       `
-      console.log('🔍 Current prepared statements:', result)
-      return result
+            return result
     } catch (error) {
       console.warn('⚠️ Could not fetch prepared statements (expected in serverless):', error)
       return []

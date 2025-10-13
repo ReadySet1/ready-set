@@ -39,27 +39,17 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
   // Set default template when templates load (prioritize Ready Set Food template)
   useEffect(() => {
     if (templates.length > 0 && !selectedTemplateId) {
-      console.log('🔍 Available templates:', templates.map(t => `${t.name} (${t.id})`));
-      
       // Find Ready Set Food template first, then Standard Delivery, or use first one
-      const readySetTemplate = templates.find(t => 
+      const readySetTemplate = templates.find(t =>
         t.name === 'Ready Set Food Standard Delivery'
       );
-      const standardTemplate = templates.find(t => 
+      const standardTemplate = templates.find(t =>
         t.name === 'Standard Delivery'
       );
       const defaultTemplate = readySetTemplate || standardTemplate || templates[0];
-      
+
       if (defaultTemplate) {
         setSelectedTemplateId(defaultTemplate.id);
-        console.log('🎯 Selected template:', defaultTemplate.name, 'ID:', defaultTemplate.id);
-        
-        // Show success message if Ready Set Food template is found
-        if (readySetTemplate) {
-          console.log('✅ Ready Set Food template found and selected!');
-        } else {
-          console.warn('⚠️ Ready Set Food template not found, using fallback:', defaultTemplate.name);
-        }
       }
     }
   }, [templates, selectedTemplateId]);
@@ -75,7 +65,6 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
 
   const handleCalculationComplete = (result: CalculationResult) => {
     // Auto-save calculations for demo purposes
-    console.log('Calculation completed:', result);
   };
 
   const handleSaveCalculation = (input: CalculationInput, result: CalculationResult) => {
@@ -160,37 +149,6 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
           </div>
         </div>
 
-        {/* Status Banner */}
-        <Alert className={selectedTemplate?.name === 'Ready Set Food Standard Delivery' 
-          ? "border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 shadow-sm" 
-          : "border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-sm"
-        }>
-          <div className={`p-2 rounded-lg ${selectedTemplate?.name === 'Ready Set Food Standard Delivery' ? 'bg-green-100' : 'bg-blue-100'}`}>
-            <Info className={`h-5 w-5 ${selectedTemplate?.name === 'Ready Set Food Standard Delivery' ? 'text-green-600' : 'text-blue-600'}`} />
-          </div>
-          <AlertDescription className={`${selectedTemplate?.name === 'Ready Set Food Standard Delivery' 
-            ? "text-green-800" 
-            : "text-blue-800"} leading-relaxed`}>
-            {selectedTemplate?.name === 'Ready Set Food Standard Delivery' ? (
-              <>
-                <strong className="text-lg">✅ Ready Set Food Template Active!</strong>
-                <p className="mt-2 text-green-700">Using correct tiered compensation rules.</p>
-                <p className="mt-1 text-sm text-green-600">
-                  <strong>Test Scenario 1:</strong> 20 people, $250, 8 miles should give Customer $65, Driver $35
-                </p>
-              </>
-            ) : (
-              <>
-                <strong className="text-lg">Flexible Calculator System Active!</strong>
-                <p className="mt-2 text-blue-700">Currently using template: {selectedTemplate?.name}</p>
-                <p className="mt-1 text-sm text-blue-600">
-                  <strong>Available templates:</strong> {templates.map(t => t.name).join(', ')}
-                </p>
-              </>
-            )}
-          </AlertDescription>
-        </Alert>
-
         <Tabs defaultValue="calculator" className="w-full">
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-2 mb-8">
             <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-slate-50 to-slate-100 p-1.5 rounded-xl shadow-inner h-14">
@@ -267,7 +225,7 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
                             </div>
                             <div className="space-y-1">
                               <div className="text-sm font-medium text-slate-500">Margin</div>
-                              <div className="text-xl font-bold text-slate-900">{calc.result.profitMargin.toFixed(1)}%</div>
+                              <div className="text-xl font-bold text-slate-900">{calc.result.profitMargin?.toFixed(1) || '0.0'}%</div>
                             </div>
                           </div>
                           <div className="text-sm text-slate-400 ml-6 bg-slate-100 px-3 py-1 rounded-full">
@@ -314,13 +272,14 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
 
         {/* Templates Tab */}
         <TabsContent value="templates">
+            {/* Note: Keeping old template system for backward compatibility */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {templates.map(template => (
-                <Card 
-                  key={template.id} 
+                <Card
+                  key={template.id}
                   className={`border-0 shadow-lg rounded-3xl bg-white/80 backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:scale-105 ${
-                    selectedTemplateId === template.id 
-                      ? 'ring-2 ring-blue-500 ring-offset-4 shadow-xl' 
+                    selectedTemplateId === template.id
+                      ? 'ring-2 ring-blue-500 ring-offset-4 shadow-xl'
                       : ''
                   }`}
                 >
@@ -345,7 +304,7 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
                     <p className="text-slate-600 leading-relaxed">
                       {template.description}
                     </p>
-                    
+
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium text-slate-500">Rules:</span>
@@ -356,8 +315,8 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium text-slate-500">Status:</span>
                         <span className={`text-sm font-semibold px-2 py-1 rounded-full ${
-                          template.isActive 
-                            ? 'bg-green-100 text-green-700' 
+                          template.isActive
+                            ? 'bg-green-100 text-green-700'
                             : 'bg-gray-100 text-gray-600'
                         }`}>
                           {template.isActive ? 'Active' : 'Inactive'}
@@ -371,7 +330,7 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
                         </div>
                       )}
                     </div>
-                    
+
                     <Button
                       variant={selectedTemplateId === template.id ? "default" : "outline"}
                       size="lg"

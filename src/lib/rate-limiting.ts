@@ -329,10 +329,8 @@ function getClientIdentifier(request: NextRequest): string {
 export function setupRateLimitStorage(redisClient?: any): void {
   if (redisClient) {
     rateLimitStorage = new RedisRateLimitStorage(redisClient);
-    console.log('✅ Rate limiting configured with Redis storage');
-  } else {
-    console.log('ℹ️ Rate limiting using in-memory storage (Redis not configured)');
-  }
+      } else {
+      }
 }
 
 /**

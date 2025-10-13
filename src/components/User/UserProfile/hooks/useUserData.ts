@@ -66,16 +66,14 @@ export const useUserData = (
   // Fetch user data
   const fetchUser = useCallback(async () => {
     if (!userId) {
-      console.log("No userId provided to fetchUser");
-      setUserData(null); // Ensure userData is null if no userId
+            setUserData(null); // Ensure userData is null if no userId
       return null;
     }
 
     try {
       setLoading(true);
       const cacheKey = Date.now().toString() + Math.random().toString(36).substring(7);
-      console.log(`Fetching user data for ID: ${userId} with cache key: ${cacheKey}`);
-      
+            
       const response = await fetch(`/api/users/${userId}?t=${cacheKey}`, {
         cache: "no-store",
         headers: {
@@ -85,8 +83,7 @@ export const useUserData = (
         },
       });
 
-      console.log("API Response status:", response.status);
-      
+            
       if (!response.ok) {
         const errorText = await response.text();
         console.error("API Error Response:", {
@@ -98,8 +95,7 @@ export const useUserData = (
       }
 
       const data = await response.json();
-      console.log("API Response data:", data);
-      
+            
       if (!data) {
         console.error("No data received from API");
         throw new Error("No data received from API");
@@ -145,8 +141,7 @@ export const useUserData = (
         contact_name: data.contactName,
       };
       
-      console.log("Transformed form data:", formData);
-      setUserData(formData); // Set the state with fetched data
+            setUserData(formData); // Set the state with fetched data
       return formData;
     } catch (error) {
       console.error("Error in fetchUser:", error);

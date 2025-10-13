@@ -63,8 +63,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
     }
 
     reconnectTimeoutRef.current = setTimeout(() => {
-      console.log(`Reconnection attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts}`);
-      connectRef.current?.();
+            connectRef.current?.();
     }, delay);
   }, []);
 
@@ -80,8 +79,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
-        console.log('Connected to real-time tracking');
-        setIsConnected(true);
+                setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
       };
@@ -91,8 +89,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
           const data = JSON.parse(event.data);
           
           if (data.type === 'connection') {
-            console.log('SSE connection established:', data.message);
-          } else if (data.type === 'driver_update') {
+                      } else if (data.type === 'driver_update') {
             const realtimeData: RealtimeData = data.data;
             
             setActiveDrivers(realtimeData.activeDrivers || []);
@@ -113,8 +110,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
         setIsConnected(false);
         
         if (eventSource.readyState === EventSource.CLOSED) {
-          console.log('SSE connection closed, attempting to reconnect...');
-          scheduleReconnect();
+                    scheduleReconnect();
         } else {
           setError('Connection error occurred');
         }
@@ -160,12 +156,10 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         // Page is hidden, we could optionally pause connection
-        console.log('Page hidden, SSE connection remains active');
-      } else {
+              } else {
         // Page is visible, ensure connection is active
         if (!isConnected && eventSourceRef.current?.readyState !== EventSource.CONNECTING) {
-          console.log('Page visible, checking SSE connection');
-          reconnect();
+                    reconnect();
         }
       }
     };
@@ -183,8 +177,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
     const healthCheckInterval = setInterval(() => {
       // If we're connected but no drivers, might indicate a problem
       if (isConnected && activeDrivers.length === 0) {
-        console.log('Health check: No driver data received, checking connection');
-        // Could implement a ping mechanism here
+                // Could implement a ping mechanism here
       }
     }, 30000); // Check every 30 seconds
 

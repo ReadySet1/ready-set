@@ -36,16 +36,7 @@ export default function ClientLayout({
 
   // Debug header rendering
   useEffect(() => {
-    console.log("🎯 ClientLayout: Header should be rendered?", {
-      shouldRenderHeader:
-        !isBackendAdminRoute && !isStudioRoute && !isHomePage && !isProfilePage,
-      pathname,
-      headerKey,
-      hasUser: !!user,
-      userRole,
-      isLoading,
-    });
-  }, [
+      }, [
     pathname,
     headerKey,
     user,

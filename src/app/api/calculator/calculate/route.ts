@@ -38,12 +38,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Debug: Check what template we're trying to load
-    console.log('🔍 Calculator API Debug:', {
-      templateId,
-      clientConfigId,
-      inputData: validatedInput
-    });
-
+    
     // Perform calculation
     const result = await CalculatorService.calculate(
       supabase,
@@ -53,13 +48,7 @@ export async function POST(request: NextRequest) {
       user?.id || 'test-user'
     );
 
-    console.log('📊 Calculation Result:', {
-      customerTotal: result.customerCharges.total,
-      driverTotal: result.driverPayments.total,
-      templateUsed: result.templateUsed,
-      hasRules: !!result.templateUsed
-    });
-
+    
     // Save to history if requested
     if (saveHistory) {
       await CalculatorService.saveCalculationHistory(
