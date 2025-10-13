@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: NextRequest) {
     
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     // Upload file to Supabase Storage
     const fileExt = file.name.split('.').pop();
     const timestamp = Date.now();
-    const randomId = Math.random().toString(36).substring(2, 9);
+    const randomId = uuidv4().substring(0, 8);
     const fileName = `${timestamp}-${randomId}.${fileExt}`;
     
     // Create a structured path with userType/userId/fileName

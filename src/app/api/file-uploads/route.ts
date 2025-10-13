@@ -237,14 +237,14 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Generate a new temporary ID if none provided
-      finalEntityId = `temp-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+      finalEntityId = `temp-${Date.now()}-${uuidv4().substring(0, 8)}`;
     }
     
         
     // Upload file to Supabase Storage
     const fileExt = file.name.split(".").pop();
     const timestamp = Date.now();
-    const randomId = Math.random().toString(36).substring(2, 9);
+    const randomId = uuidv4().substring(0, 8);
     const fileName = `${timestamp}-${randomId}.${fileExt}`;
 
     // Create a structured path based on entityType
