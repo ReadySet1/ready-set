@@ -56,7 +56,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils"; // For conditional classes
-import AddressManager from "@/components/AddressManager";
+import { AddressSelector } from "@/components/AddressSelector";
 import { Address, AddressFormData } from "@/types/address";
 import AddAddressForm from "@/components/AddressManager/AddAddressForm";
 import {
@@ -74,105 +74,6 @@ import { useToast } from "@/components/ui/use-toast";
 interface CreateCateringOrderFormProps {
   clients: ClientListItem[];
 }
-
-// Custom AddressManager Wrapper component with better error handling
-interface AddressManagerWrapperProps {
-  onAddressesLoaded: (addresses: Address[]) => void;
-  onAddressSelected: (addressId: string) => void;
-  onError: (error: string) => void;
-  errorState: string | null;
-  setErrorState: (error: string | null) => void;
-  onSwitchToManual: () => void;
-  onAddNewAddress: () => void;
-  onRefresh?: (refreshFn: () => void) => void;
-}
-
-const AddressManagerWrapper: React.FC<AddressManagerWrapperProps> = ({
-  onAddressesLoaded,
-  onAddressSelected,
-  onError,
-  errorState,
-  setErrorState,
-  onSwitchToManual,
-  onAddNewAddress,
-  onRefresh,
-}) => {
-  // Maintain a local error state to avoid unnecessary re-renders
-  const [localErrorState, setLocalErrorState] = useState<string | null>(
-    errorState,
-  );
-
-  // Use an effect to sync parent error state with local error state only when parent changes
-  useEffect(() => {
-    setLocalErrorState(errorState);
-  }, [errorState]);
-
-  // Create a custom onAddressesLoaded handler
-  const handleAddressesLoaded = useCallback(
-    (addresses: Address[]) => {
-      if (addresses.length === 0) {
-        setErrorState("No saved addresses found.");
-      } else {
-        setErrorState(null);
-      }
-      onAddressesLoaded(addresses);
-    },
-    [onAddressesLoaded, setErrorState],
-  );
-
-  // Custom onError handler to update local state
-  const handleAddressManagerError = useCallback(
-    (errorMessage: string) => {
-      setLocalErrorState(errorMessage);
-      setErrorState(errorMessage);
-      onError(errorMessage);
-    },
-    [onError, setErrorState],
-  );
-
-  return (
-    <>
-      <div className="mb-4 flex items-center justify-between">
-        <span className="text-muted-foreground text-sm">
-          Select an existing address or add a new one
-        </span>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={onAddNewAddress}
-          className="gap-1"
-        >
-          <Plus className="h-4 w-4" /> Add Address
-        </Button>
-      </div>
-
-      <AddressManager
-        onAddressesLoaded={handleAddressesLoaded}
-        onAddressSelected={onAddressSelected}
-        onError={handleAddressManagerError}
-        defaultFilter="all"
-        showFilters={true}
-        showManagementButtons={false}
-        onRefresh={onRefresh}
-      />
-
-      {localErrorState && (
-        <div className="mt-4">
-          <p className="mb-2 text-amber-600">{localErrorState}</p>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onSwitchToManual}
-            size="sm"
-          >
-            Enter Address Manually
-          </Button>
-        </div>
-      )}
-    </>
-  );
-};
 
 // Define Bay Area counties
 const bayAreaCountyValues = [
@@ -210,27 +111,6 @@ export const CreateCateringOrderForm: React.FC<
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clientComboboxOpen, setClientComboboxOpen] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState<string>("");
-  const [pickupAddresses, setPickupAddresses] = useState<Address[]>([]);
-  const [deliveryAddresses, setDeliveryAddresses] = useState<Address[]>([]);
-  const [pickupAddressError, setPickupAddressError] = useState<string | null>(
-    null,
-  );
-  const [deliveryAddressError, setDeliveryAddressError] = useState<
-    string | null
-  >(null);
-  const [showManualPickupEntry, setShowManualPickupEntry] = useState(false);
-  const [showManualDeliveryEntry, setShowManualDeliveryEntry] = useState(false);
-
-  // State for address dialog
-  const [addressDialogOpen, setAddressDialogOpen] = useState(false);
-  const [addressDialogType, setAddressDialogType] = useState<
-    "pickup" | "delivery"
-  >("pickup");
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-
-  // Refs to store refresh functions from AddressManager components
-  const pickupAddressRefreshRef = useRef<(() => void) | null>(null);
-  const deliveryAddressRefreshRef = useRef<(() => void) | null>(null);
 
   // File upload state
   const [uploadedFileKeys, setUploadedFileKeys] = useState<string[]>([]);
@@ -324,109 +204,6 @@ export const CreateCateringOrderForm: React.FC<
     }
   }, [needHostValue, form]);
 
-  // Wrap prop handlers in useCallback
-  const handlePickupAddressesLoaded = useCallback((addresses: Address[]) => {
-    setPickupAddresses(addresses);
-    if (addresses.length === 0) {
-      setPickupAddressError("No saved addresses found.");
-    } else {
-      setPickupAddressError(null); // Clear error if addresses are found
-    }
-  }, []); // Empty dependency array means this function reference is stable
-
-  const handleDeliveryAddressesLoaded = useCallback((addresses: Address[]) => {
-    setDeliveryAddresses(addresses);
-    if (addresses.length === 0) {
-      setDeliveryAddressError("No saved addresses found.");
-    } else {
-      setDeliveryAddressError(null); // Clear error if addresses are found
-    }
-  }, []); // Empty dependency array
-
-  const handlePickupAddressSelected = useCallback(
-    (addressId: string) => {
-      const selectedAddress = pickupAddresses.find(
-        (addr) => addr.id === addressId,
-      );
-      if (selectedAddress) {
-        const addressData = {
-          street1: selectedAddress.street1,
-          street2: selectedAddress.street2 || undefined,
-          city: selectedAddress.city,
-          state: selectedAddress.state,
-          zip: selectedAddress.zip,
-          county: selectedAddress.county || undefined,
-        };
-
-        setValue("pickupAddress", addressData, { shouldValidate: true });
-
-        // Clear form validation errors for pickup address
-        form.clearErrors("pickupAddress");
-
-        setPickupAddressError(null); // Clear error on selection
-        setShowManualPickupEntry(false); // Switch back from manual if selection is made
-      }
-    },
-    [pickupAddresses, setValue, form],
-  ); // Depends on pickupAddresses, setValue, and form
-
-  const handleDeliveryAddressSelected = useCallback(
-    (addressId: string) => {
-      const selectedAddress = deliveryAddresses.find(
-        (addr) => addr.id === addressId,
-      );
-      if (selectedAddress) {
-        const addressData = {
-          street1: selectedAddress.street1,
-          street2: selectedAddress.street2 || undefined,
-          city: selectedAddress.city,
-          state: selectedAddress.state,
-          zip: selectedAddress.zip,
-          county: selectedAddress.county || undefined,
-        };
-
-        setValue("deliveryAddress", addressData, { shouldValidate: true });
-
-        // Clear form validation errors for delivery address
-        form.clearErrors("deliveryAddress");
-
-        setDeliveryAddressError(null); // Clear error on selection
-        setShowManualDeliveryEntry(false); // Switch back from manual if selection is made
-      }
-    },
-    [deliveryAddresses, setValue, form],
-  ); // Depends on deliveryAddresses, setValue, and form
-
-  const handleAddressError = useCallback((error: string) => {
-    // If the error is auth-related, trigger the auth dialog
-    // Note: The AddressManager component itself now handles setting its internal error state
-    // and clearing the user state if it detects a 401.
-    // This handler in the form is now mostly for logging or additional UI reactions if needed.
-    if (
-      error.includes("Unauthorized") ||
-      error.includes("Authentication required")
-    ) {
-      setIsAuthenticated(false);
-      // Let AddressManager handle its own error state, but ensure manual mode is triggered
-      // by the auth dialog closing or the error propogating.
-      // We might not need to explicitly set manual entry here anymore if the auth dialog flow works.
-      // setShowManualPickupEntry(true);
-      // setShowManualDeliveryEntry(true);
-    }
-    // We don't need to call setPickupAddressError/setDeliveryAddressError here
-    // as the AddressManagerWrapper now uses its own internal state managed via setErrorState prop
-  }, []); // Empty dependency array is likely okay, as it only logs and sets auth state
-
-  // Handle refresh function storage for pickup addresses
-  const handlePickupAddressRefresh = useCallback((refreshFn: () => void) => {
-    pickupAddressRefreshRef.current = refreshFn;
-  }, []);
-
-  // Handle refresh function storage for delivery addresses
-  const handleDeliveryAddressRefresh = useCallback((refreshFn: () => void) => {
-    deliveryAddressRefreshRef.current = refreshFn;
-  }, []);
-
   // Use useEffect for cleanup on unmount
   useEffect(() => {
     // Cleanup uploaded files on unmount if not submitted
@@ -504,257 +281,6 @@ export const CreateCateringOrderForm: React.FC<
       setIsSubmitting(false);
     }
   };
-
-  // Check authentication status on mount and set up auth state listener
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-        setIsAuthenticated(!!session);
-        if (!session) {
-          setPickupAddressError("Please log in to access your addresses.");
-          setDeliveryAddressError("Please log in to access your addresses.");
-          setShowManualPickupEntry(true);
-          setShowManualDeliveryEntry(true);
-        }
-      } catch (error) {
-        console.error("Auth check failed:", error);
-        setIsAuthenticated(false);
-      }
-    };
-
-    checkAuth();
-
-    // Set up auth state change listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session);
-      if (!session) {
-        setPickupAddressError("Please log in to access your addresses.");
-        setDeliveryAddressError("Please log in to access your addresses.");
-        setShowManualPickupEntry(true);
-        setShowManualDeliveryEntry(true);
-      } else {
-        // Refresh addresses when user logs in
-        setShowManualPickupEntry(false);
-        setShowManualDeliveryEntry(false);
-        setPickupAddressError(null);
-        setDeliveryAddressError(null);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [supabase.auth]);
-
-  const handleAddNewAddress = async (type: "pickup" | "delivery") => {
-    // Check authentication before opening dialog
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      // Show auth dialog
-      setIsAuthenticated(false);
-      return;
-    }
-
-    setAddressDialogType(type);
-    setAddressDialogOpen(true);
-  };
-
-  const handleAddressFormSubmit = async (addressData: AddressFormData) => {
-    
-    try {
-      // Check authentication before submitting
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      
-      if (!session) {
-                throw new Error(
-          "Please log in to add an address. You can continue with manual entry if needed.",
-        );
-      }
-
-            const response = await fetch("/api/addresses", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(addressData),
-      });
-
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-                    setIsAuthenticated(false); // Trigger auth dialog
-          throw new Error(
-            "Your session has expired. Please log in again to add addresses.",
-          );
-        }
-
-        // Try to get error details from response
-        let errorMessage = `Error ${response.status}: ${response.statusText}`;
-        try {
-          const errorData = await response.json();
-          if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch (e) {
-                  }
-
-                throw new Error(`Failed to add address: ${errorMessage}`);
-      }
-
-      const addedAddress = await response.json();
-      
-      if (addressDialogType === "pickup") {
-                // Update local state with new address
-        setPickupAddresses((prev) => [...prev, addedAddress]);
-
-        // Refresh the AddressManager to show the new address
-        if (pickupAddressRefreshRef.current) {
-                    pickupAddressRefreshRef.current();
-        }
-
-        // Select the new address after a short delay to ensure it's loaded
-        setTimeout(() => {
-                    handlePickupAddressSelected(addedAddress.id);
-        }, 300);
-      } else {
-                // Update local state with new address
-        setDeliveryAddresses((prev) => [...prev, addedAddress]);
-
-        // Refresh the AddressManager to show the new address
-        if (deliveryAddressRefreshRef.current) {
-                    deliveryAddressRefreshRef.current();
-        }
-
-        // Select the new address after a short delay to ensure it's loaded
-        setTimeout(() => {
-                    handleDeliveryAddressSelected(addedAddress.id);
-        }, 300);
-      }
-
-            setAddressDialogOpen(false);
-    } catch (error) {
-      console.error("💥 Exception in address submission", error);
-      // Throw the error so AddAddressForm can display it in the dialog
-      // This prevents the form from resetting and keeps the dialog open
-      throw error;
-    }
-  };
-
-  const handleLogin = () => {
-    // Store the current URL to redirect back after login
-    const currentPath = window.location.pathname + window.location.search;
-    localStorage.setItem("returnTo", currentPath);
-
-    // Redirect to login page
-    router.push("/auth/login");
-  };
-
-  // Helper component for Manual Address Fields
-  const ManualAddressFields: React.FC<{
-    fieldName: "pickupAddress" | "deliveryAddress";
-  }> = ({ fieldName }) => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="space-y-1">
-          <Label htmlFor={`${fieldName}.street1`}>Street Address 1</Label>
-          <Input
-            id={`${fieldName}.street1`}
-            {...register(`${fieldName}.street1`)}
-            placeholder="123 Main St"
-          />
-          {errors[fieldName]?.street1 && (
-            <p className="text-sm text-red-500">
-              {errors[fieldName]?.street1?.message}
-            </p>
-          )}
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor={`${fieldName}.street2`}>
-            Street Address 2 (Optional)
-          </Label>
-          <Input
-            id={`${fieldName}.street2`}
-            {...register(`${fieldName}.street2`)}
-            placeholder="Apt, Suite, etc."
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor={`${fieldName}.city`}>City</Label>
-          <Input
-            id={`${fieldName}.city`}
-            {...register(`${fieldName}.city`)}
-            placeholder="Anytown"
-          />
-          {errors[fieldName]?.city && (
-            <p className="text-sm text-red-500">
-              {errors[fieldName]?.city?.message}
-            </p>
-          )}
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor={`${fieldName}.state`}>State</Label>
-          <Input
-            id={`${fieldName}.state`}
-            {...register(`${fieldName}.state`)}
-            placeholder="CA"
-            maxLength={2}
-          />
-          {errors[fieldName]?.state && (
-            <p className="text-sm text-red-500">
-              {errors[fieldName]?.state?.message}
-            </p>
-          )}
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor={`${fieldName}.zip`}>Zip Code</Label>
-          <Input
-            id={`${fieldName}.zip`}
-            {...register(`${fieldName}.zip`)}
-            placeholder="90210"
-          />
-          {errors[fieldName]?.zip && (
-            <p className="text-sm text-red-500">
-              {errors[fieldName]?.zip?.message}
-            </p>
-          )}
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor={`${fieldName}.county`}>County (Optional)</Label>
-          <Controller
-            name={`${fieldName}.county`}
-            control={control}
-            render={({ field }) => (
-              <Select value={field.value || ""} onValueChange={field.onChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Bay Area county" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bayAreaCountyValues.map((county) => (
-                    <SelectItem key={county} value={county}>
-                      {county}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-          <p className="text-xs text-gray-500">Bay Area counties only</p>
-        </div>
-      </div>
-    </div>
-  );
 
   // Handle file upload
   const handleFileUpload = async (
@@ -1651,35 +1177,18 @@ export const CreateCateringOrderForm: React.FC<
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="space-y-4 rounded-md border bg-slate-50/50 p-4">
             <h4 className="text-md mb-3 font-semibold">Pickup Address</h4>
-
-            {!showManualPickupEntry ? (
-              <AddressManagerWrapper
-                onAddressesLoaded={handlePickupAddressesLoaded}
-                onAddressSelected={handlePickupAddressSelected}
-                onError={handleAddressError}
-                errorState={pickupAddressError}
-                setErrorState={setPickupAddressError}
-                onSwitchToManual={() => setShowManualPickupEntry(true)}
-                onAddNewAddress={() => handleAddNewAddress("pickup")}
-                onRefresh={handlePickupAddressRefresh}
-              />
-            ) : (
-              <>
-                <ManualAddressFields fieldName="pickupAddress" />
-                <div className="mt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowManualPickupEntry(false)}
-                    size="sm"
-                  >
-                    Use Address Manager
-                  </Button>
-                </div>
-              </>
-            )}
-
-            {errors.pickupAddress && !showManualPickupEntry && (
+            <AddressSelector
+              mode="admin"
+              type="pickup"
+              onSelect={(address) => {
+                setValue("pickupAddress", address);
+              }}
+              selectedAddressId={'id' in watch("pickupAddress") ? (watch("pickupAddress") as { id?: string }).id : undefined}
+              showFavorites
+              showRecents
+              allowAddNew
+            />
+            {errors.pickupAddress && (
               <div className="mt-2 text-sm text-red-500">
                 {errors.pickupAddress.street1?.message ||
                   errors.pickupAddress.city?.message ||
@@ -1691,35 +1200,18 @@ export const CreateCateringOrderForm: React.FC<
 
           <div className="space-y-4 rounded-md border bg-slate-50/50 p-4">
             <h4 className="text-md mb-3 font-semibold">Delivery Address</h4>
-
-            {!showManualDeliveryEntry ? (
-              <AddressManagerWrapper
-                onAddressesLoaded={handleDeliveryAddressesLoaded}
-                onAddressSelected={handleDeliveryAddressSelected}
-                onError={handleAddressError}
-                errorState={deliveryAddressError}
-                setErrorState={setDeliveryAddressError}
-                onSwitchToManual={() => setShowManualDeliveryEntry(true)}
-                onAddNewAddress={() => handleAddNewAddress("delivery")}
-                onRefresh={handleDeliveryAddressRefresh}
-              />
-            ) : (
-              <>
-                <ManualAddressFields fieldName="deliveryAddress" />
-                <div className="mt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowManualDeliveryEntry(false)}
-                    size="sm"
-                  >
-                    Use Address Manager
-                  </Button>
-                </div>
-              </>
-            )}
-
-            {errors.deliveryAddress && !showManualDeliveryEntry && (
+            <AddressSelector
+              mode="admin"
+              type="delivery"
+              onSelect={(address) => {
+                setValue("deliveryAddress", address);
+              }}
+              selectedAddressId={'id' in watch("deliveryAddress") ? (watch("deliveryAddress") as { id?: string }).id : undefined}
+              showFavorites
+              showRecents
+              allowAddNew
+            />
+            {errors.deliveryAddress && (
               <div className="mt-2 text-sm text-red-500">
                 {errors.deliveryAddress.street1?.message ||
                   errors.deliveryAddress.city?.message ||
@@ -1850,61 +1342,6 @@ export const CreateCateringOrderForm: React.FC<
           </Button>
         </div>
       </form>
-
-      {/* Address Dialog */}
-      <Dialog open={addressDialogOpen} onOpenChange={setAddressDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogTitle>
-            {addressDialogType === "pickup"
-              ? "Add New Pickup Address"
-              : "Add New Delivery Address"}
-          </DialogTitle>
-          <DialogDescription>
-            Fill in the address details below. This address will be saved for
-            future use.
-          </DialogDescription>
-          <div className="pt-2">
-            <AddAddressForm
-              onSubmit={handleAddressFormSubmit}
-              onClose={() => setAddressDialogOpen(false)}
-              allowedCounties={bayAreaCountyValues}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Auth Dialog */}
-      <Dialog
-        open={!isAuthenticated}
-        onOpenChange={(open) => {
-          if (!open) {
-            // If closing the dialog, switch to manual entry
-            setShowManualPickupEntry(true);
-            setShowManualDeliveryEntry(true);
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogTitle>Authentication Required</DialogTitle>
-          <DialogDescription>
-            You need to be logged in to manage addresses. You can continue with
-            manual address entry or log in to access your saved addresses.
-          </DialogDescription>
-          <div className="mt-4 flex justify-end space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowManualPickupEntry(true);
-                setShowManualDeliveryEntry(true);
-                setIsAuthenticated(true); // Close the dialog
-              }}
-            >
-              Continue with Manual Entry
-            </Button>
-            <Button onClick={handleLogin}>Log In</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };
