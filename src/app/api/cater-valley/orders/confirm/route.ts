@@ -59,8 +59,7 @@ async function triggerOrderDispatch(orderId: string): Promise<void> {
     // 3. Start the driver assignment process
     // 4. Set up tracking and notifications
 
-    console.log(`Order ${orderId} has been queued for driver assignment`);
-    
+        
     // For now, we'll just log the action
     // In the future, you might call internal services here:
     // await dispatchService.queueOrder(orderId);
@@ -178,8 +177,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      console.log(`Cancelled CaterValley order ${cancelledOrder.orderNumber}. Reason: ${validatedData.reason || 'Not specified'}`);
-
+      
       return NextResponse.json({
         id: cancelledOrder.id,
         orderNumber: cancelledOrder.orderNumber,
@@ -221,8 +219,7 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    console.log(`Confirmed CaterValley order ${confirmedOrder.orderNumber} - ready for driver assignment`);
-
+    
     return NextResponse.json(response, { status: 200 });
 
   } catch (error) {

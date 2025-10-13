@@ -109,22 +109,19 @@ export class CarrierService {
     const carrier = this.detectCarrier(orderNumber);
     
     if (!carrier || !carrier.enabled) {
-      console.log(`No enabled carrier found for order ${orderNumber}`);
-      return null;
+            return null;
     }
 
     const mappedStatus = carrier.statusMapping[driverStatus];
     if (!mappedStatus) {
-      console.log(`No status mapping for ${driverStatus} in carrier ${carrier.id}`);
-      return {
+            return {
         success: true,
         attempts: 0,
         carrierId: carrier.id,
       };
     }
 
-    console.log(`Sending ${carrier.name} webhook for order ${orderNumber}: ${driverStatus} -> ${mappedStatus}`);
-
+    
     // Remove carrier prefix for clean order number
     const cleanOrderNumber = orderNumber.replace(carrier.orderPrefix, '');
 
@@ -155,8 +152,7 @@ export class CarrierService {
         const isSuccess = this.isSuccessResponse(carrier, result);
         
         if (isSuccess) {
-          console.log(`${carrier.name} webhook successful (attempt ${attempt}/${carrier.retryPolicy.maxAttempts})`);
-          return {
+                    return {
             success: true,
             attempts: attempt,
             response: result,

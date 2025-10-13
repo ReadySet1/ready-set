@@ -32,12 +32,7 @@ export const CateringOrdersTable: React.FC<CateringOrdersTableProps> = ({
   userRoles,
   onOrderDeleted,
 }) => {
-  console.log("CateringOrdersTable rendered with:", {
-    orders,
-    isLoading,
-    statusFilter,
-  });
-
+  
   // Function to get proper status badge styling
   const getStatusBadgeClass = (status: string) => {
     switch (status.toUpperCase()) {

@@ -87,8 +87,7 @@ class PerformanceMonitor {
     } else if (duration >= this.thresholds.warning) {
       console.warn(`🟡 SLOW OPERATION: ${name} took ${formattedDuration}`, metadata);
     } else if (process.env.NODE_ENV === 'development') {
-      console.log(`⚡ ${name}: ${formattedDuration}`, metadata);
-    }
+          }
   }
 
   /**

@@ -81,16 +81,9 @@ export default function ModernUserProfile({
   // Effect to fetch initial data only
   useEffect(() => {
     if (!isUserLoading && userId) {
-      console.log(
-        "[AdminProfileView] useEffect triggered. Fetching initial user...",
-      );
-      fetchUser();
+            fetchUser();
     } else {
-      console.log("[AdminProfileView] useEffect skipped. Conditions not met:", {
-        isUserLoading,
-        userId,
-      });
-    }
+          }
     // Dependencies: only run when auth state loads or the user ID/trigger changes.
   }, [userId, refreshTrigger, isUserLoading, fetchUser]); // Keep fetchUser OUT to avoid re-fetching when its identity changes (should be stable anyway)
 

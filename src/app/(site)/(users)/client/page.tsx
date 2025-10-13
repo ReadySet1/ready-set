@@ -567,10 +567,7 @@ const ClientPage = async () => {
     userRole.toUpperCase() === UserType.VENDOR;
 
   if (!isAllowedRole) {
-    console.log(
-      "User does not have CLIENT or VENDOR role, redirecting away from unified dashboard",
-    );
-    // Redirect to their appropriate dashboard based on role
+        // Redirect to their appropriate dashboard based on role
     const roleRoutes: Record<string, string> = {
       admin: "/admin",
       super_admin: "/admin",

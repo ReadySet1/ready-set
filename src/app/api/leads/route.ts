@@ -79,11 +79,7 @@ export async function POST(req: NextRequest) {
         const [response, body] = await client.request(request);
 
         if (response.statusCode === 202) {
-          console.log('Contact queued for processing', {
-            jobId: body.job_id,
-            email: validatedData.email,
-          });
-        } else {
+                  } else {
           console.error('SendGrid unexpected status:', response.statusCode);
         }
       } catch (error) {

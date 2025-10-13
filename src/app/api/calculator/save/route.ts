@@ -43,13 +43,7 @@ export async function POST(request: NextRequest) {
       user.id
     );
 
-    console.log('✅ Calculation saved to database:', {
-      templateId,
-      clientConfigId,
-      userId: user.id,
-      timestamp: new Date().toISOString(),
-    });
-
+    
     return NextResponse.json({
       success: true,
       message: 'Calculation saved successfully',

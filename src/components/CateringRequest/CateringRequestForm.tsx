@@ -369,8 +369,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
       if (!fileKeys.length) return;
 
       try {
-        console.log("Cleaning up uploaded files:", fileKeys);
-        const response = await fetch("/api/file-uploads/cleanup", {
+                const response = await fetch("/api/file-uploads/cleanup", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -389,8 +388,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         }
 
         const result = await response.json();
-        console.log("Cleanup result:", result);
-      } catch (error) {
+              } catch (error) {
         console.error("Error cleaning up files:", error);
       }
     },
@@ -430,10 +428,8 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
 
     const files = Array.from(event.target.files) as FileWithPath[];
     try {
-      console.log("Starting upload of", files.length, "files");
-      const result = await onUpload(files);
-      console.log("Upload completed successfully:", result);
-
+            const result = await onUpload(files);
+      
       // Set uploaded files to form data
       setValue("attachments", result);
 
@@ -453,8 +449,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   // Remove file handler
   const removeFile = async (fileToRemove: UploadedFile) => {
     try {
-      console.log("Removing file:", fileToRemove);
-
+      
       // Remove from UI immediately
       const updatedFiles = uploadedFiles.filter(
         (file) => file.key !== fileToRemove.key,
@@ -468,18 +463,14 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
 
       // Delete the file
       await deleteFile(fileToRemove.key);
-      console.log("File removed successfully");
-    } catch (error) {
+          } catch (error) {
       console.error("Error removing file:", error);
       toast.error("Failed to remove file. Please try again.");
     }
   };
 
   const onSubmit = async (data: ExtendedCateringFormData) => {
-    console.log("Starting catering form submission:", {
-      formData: { ...data, attachments: data.attachments?.length },
-    });
-
+    
     // In admin mode, require a client prop
     if (isAdminMode && !client) {
       toast.error("A client must be selected for admin submission.");
@@ -533,17 +524,12 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         }
       }
 
-      console.log("Order submitted successfully:", responseData);
-
+      
       // IMPORTANT FIX: Update the file entity IDs to link them to the catering request
       if (responseData.orderId && uploadedFiles.length > 0) {
-        console.log(
-          `Updating file entity IDs to associate with catering request ID: ${responseData.orderId}`,
-        );
-        try {
+                try {
           await updateEntityId(responseData.orderId);
-          console.log("Files successfully linked to catering request");
-        } catch (fileUpdateError) {
+                  } catch (fileUpdateError) {
           console.error(
             "Error linking files to catering request:",
             fileUpdateError,

@@ -63,8 +63,7 @@ export async function updateCaterValleyOrderStatus(
     };
   }
 
-  console.log(`[CaterValley Service] Attempting to update order ${orderNumber} to status ${status}`);
-
+  
   try {
     const response = await fetch(CATER_VALLEY_API_URL, {
       method: 'POST',
@@ -136,8 +135,7 @@ export async function updateCaterValleyOrderStatus(
     }
 
     const responseData: CaterValleyApiResponse = await response.json();
-    console.log(`[CaterValley Service] API Response for order ${orderNumber}:`, responseData);
-
+    
     // Optional: Add more specific checks based on expected response structure
     if (typeof responseData.result !== 'boolean') {
       console.warn("[CaterValley Service] Response 'result' field has unexpected type:", responseData);
@@ -157,8 +155,7 @@ export async function updateCaterValleyOrderStatus(
     }
 
     // Success case
-    console.log(`[CaterValley Service] Successfully updated order ${orderNumber} to status ${status}`);
-    
+        
     return {
       success: true,
       orderFound: true,

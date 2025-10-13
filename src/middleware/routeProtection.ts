@@ -30,8 +30,7 @@ export async function protectRoutes(request: Request) {
     const { pathname } = new URL(request.url);
     
     // Add debug logging
-    console.log('Current pathname:', pathname);
-    
+        
     // Allow access to public routes
     if (PUBLIC_ROUTES.includes(pathname)) {
       return null;
@@ -70,15 +69,12 @@ export async function protectRoutes(request: Request) {
     }
 
     // Add debug logging
-    console.log('User profile type from DB:', profile.type);
-    
+        
     // Convert the user type to lowercase to match our route keys
     const userTypeKey = profile.type.toLowerCase();
     
     // Add debug logging
-    console.log('Normalized user type key for routing:', userTypeKey);
-    console.log('Available route keys:', Object.keys(PROTECTED_ROUTES));
-
+        
     // Check if the userType exists as a key in PROTECTED_ROUTES
     if (!PROTECTED_ROUTES[userTypeKey]) {
       console.error(`Invalid or unexpected user type '${profile.type}' found for user ${user.id}. Redirecting to home.`);
@@ -89,8 +85,7 @@ export async function protectRoutes(request: Request) {
     const isAllowedRoute = PROTECTED_ROUTES[userTypeKey].test(pathname);
     
     // Add debug logging
-    console.log('Is allowed route:', isAllowedRoute);
-
+    
     // If the route is not allowed for the user's type, redirect to their home page
     if (!isAllowedRoute) {
       // For helpdesk users, redirect to admin instead of /helpdesk

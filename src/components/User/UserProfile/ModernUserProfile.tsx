@@ -36,8 +36,7 @@ export default function UserProfile({
   const { session, isLoading: isUserLoading } = useUser();
   const userId = propUserId || session?.user?.id || "";
 
-  console.log("User ID from props or session:", userId);
-
+  
   // Custom hooks for user data and form management
   const { 
     loading, 
@@ -74,30 +73,22 @@ export default function UserProfile({
     // Prevent refreshes that are too close together (minimum 5 seconds between refreshes)
     const now = Date.now();
     if ((now - lastRefreshTime) < 5000 && lastRefreshTime !== 0) {
-      console.log("Skipping refresh - too soon since last refresh");
-      return;
+            return;
     }
     
-    console.log("Profile component mount. Session status:", { 
-      isUserLoading, 
-      userId, 
-      sessionExists: !!session
-    });
-    
+        
     if (!isUserLoading && userId) {
       // Cancel any existing timer
       const timeoutId = setTimeout(() => {
         // Set the ref to true to indicate fetch is in progress
         fetchInProgressRef.current = true;
-        console.log("About to fetch user data for ID:", userId);
-        
+                
         // Update last refresh time
         setLastRefreshTime(Date.now());
         
         fetchUser()
           .then(result => {
-            console.log("Fetch user result:", result ? "Data received" : "No data");
-            fetchInProgressRef.current = false;
+                        fetchInProgressRef.current = false;
             if (isInitialLoad) setIsInitialLoad(false);
           })
           .catch(err => {

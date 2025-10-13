@@ -401,39 +401,32 @@ const Header: React.FC = () => {
 
   // 🔥 ADD GLOBAL TEST FUNCTIONS IMMEDIATELY (not in useEffect)
   if (typeof window !== "undefined" && !(window as any).testCookieAuth) {
-    console.log("🧪 Adding global test functions to window IMMEDIATELY...");
-
+    
     (window as any).testCookieAuth = () => {
-      console.log("🧪 MANUAL COOKIE TEST:");
-      const cookies = document.cookie;
-      console.log("🍪 All cookies:", cookies);
-
+            const cookies = document.cookie;
+      
       const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
       if (sessionMatch && sessionMatch[1]) {
         try {
           const decoded = decodeURIComponent(sessionMatch[1]);
           const sessionData = JSON.parse(decoded);
-          console.log("✅ Successfully parsed session data:", sessionData);
-          return sessionData;
+                    return sessionData;
         } catch (error) {
           console.error("❌ Failed to parse session data:", error);
         }
       } else {
-        console.log("❌ No session cookie found");
-      }
+              }
       return null;
     };
 
     (window as any).forceAuthUpdate = () => {
-      console.log("🔄 FORCING AUTH UPDATE...");
-      const cookies = document.cookie;
+            const cookies = document.cookie;
       const sessionMatch = cookies.match(/user-session-data=([^;]+)/);
       if (sessionMatch && sessionMatch[1]) {
         try {
           const decoded = decodeURIComponent(sessionMatch[1]);
           const sessionData = JSON.parse(decoded);
-          console.log("📊 Found session data:", sessionData);
-
+          
           const mockUser = {
             id: sessionData.userId,
             email: sessionData.email,
@@ -444,8 +437,7 @@ const Header: React.FC = () => {
 
           setFallbackUser(mockUser);
           setFallbackRole(sessionData.userRole.toLowerCase());
-          console.log("✅ Manually set fallback user and role!");
-          return true;
+                    return true;
         } catch (error) {
           console.error("❌ Failed to force auth update:", error);
         }
@@ -453,10 +445,7 @@ const Header: React.FC = () => {
       return false;
     };
 
-    console.log(
-      "✅ Global functions added: testCookieAuth() and forceAuthUpdate()",
-    );
-  }
+      }
 
   // Use base menu items without adding role-specific item (it will be shown separately)
   const menuItems = baseMenuItems;

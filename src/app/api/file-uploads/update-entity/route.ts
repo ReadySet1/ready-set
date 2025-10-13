@@ -21,15 +21,8 @@ export async function PUT(request: NextRequest) {
 
     // Allow operations even without session for server-to-server calls
     const hasSession = !!session;
-    console.log("Session available:", hasSession);
-
-    console.log("Update entity request:", {
-      oldEntityId,
-      newEntityId,
-      entityType,
-      userId: session?.user?.id || 'server-action',
-    });
-
+    
+    
     // Get all files with temp entity ID, using different approaches
     let fileRecords = await prisma.fileUpload.findMany({
       where: {
@@ -72,10 +65,7 @@ export async function PUT(request: NextRequest) {
       },
     });
 
-    console.log(
-      `Found ${fileRecords.length} files to update from ${oldEntityId} to ${newEntityId}`,
-    );
-
+    
     if (fileRecords.length === 0) {
       // Check for raw path matches in the fileUrl field
       const pathFileRecords = await prisma.fileUpload.findMany({
@@ -103,8 +93,7 @@ export async function PUT(request: NextRequest) {
       });
 
       if (pathFileRecords.length > 0) {
-        console.log(`Found ${pathFileRecords.length} files with path matching ${oldEntityId}`);
-        fileRecords = fileRecords.concat(pathFileRecords);
+                fileRecords = fileRecords.concat(pathFileRecords);
       } else {
         // If still no files found, check if any files already exist with the new entity ID
         const newIdFileRecords = await prisma.fileUpload.findMany({
@@ -120,10 +109,7 @@ export async function PUT(request: NextRequest) {
         });
 
         if (newIdFileRecords.length > 0) {
-          console.log(
-            `Found ${newIdFileRecords.length} files already using entityId: ${newEntityId}`,
-          );
-          // Files are already using the new ID, so we consider this a success
+                    // Files are already using the new ID, so we consider this a success
           return NextResponse.json({
             success: true,
             message: "Files are already associated with the new entity ID",
@@ -133,10 +119,7 @@ export async function PUT(request: NextRequest) {
         }
 
         // No files found with old or new entityId, which is unusual but not necessarily an error
-        console.log(
-          `No files found with entityId: ${oldEntityId} or ${newEntityId}`,
-        );
-        return NextResponse.json({
+                return NextResponse.json({
           success: true,
           message: "No files found to update",
           updatedCount: 0,
@@ -148,8 +131,7 @@ export async function PUT(request: NextRequest) {
     let updatedCount = 0;
 
     for (const file of fileRecords) {
-      console.log(`Processing file ${file.id} with URL ${file.fileUrl}`);
-
+      
       try {
         // First update the DB record
         await prisma.fileUpload.update({
@@ -217,8 +199,7 @@ export async function PUT(request: NextRequest) {
               }
               
               if (oldPath && newPath) {
-                console.log(`Attempting to move file from ${oldPath} to ${newPath} in bucket ${bucketName}`);
-                
+                                
                 try {
                   const { error: moveError } = await supabase.storage
                     .from(bucketName)
@@ -227,8 +208,7 @@ export async function PUT(request: NextRequest) {
                   if (moveError) {
                     console.error(`Error moving file: ${moveError.message}`);
                   } else {
-                    console.log(`Successfully moved file to ${newPath}`);
-                    
+                                        
                     // Update file URL in database
                     const { data: { publicUrl } } = supabase.storage
                       .from(bucketName)
@@ -239,14 +219,12 @@ export async function PUT(request: NextRequest) {
                       data: { fileUrl: publicUrl }
                     });
                     
-                    console.log(`Updated file URL to ${publicUrl}`);
-                  }
+                                      }
                 } catch (moveError) {
                   console.error(`Exception moving file: ${moveError}`);
                 }
               } else {
-                console.log(`Could not determine proper path mapping for ${file.fileUrl}`);
-              }
+                              }
             }
           }
         }

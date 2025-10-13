@@ -171,8 +171,6 @@ export async function sendDeliveryNotifications(
   data: DeliveryNotificationData
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    console.log('Sending delivery notification for order:', data.orderId);
-
     // Fetch order details from database
     // Try catering first
     const cateringOrder = await prisma.cateringRequest.findUnique({
@@ -205,7 +203,6 @@ export async function sendDeliveryNotifications(
         };
       }
 
-      console.log('✅ Catering order notification sent successfully');
       return { success: true };
     }
 
@@ -240,7 +237,6 @@ export async function sendDeliveryNotifications(
         };
       }
 
-      console.log('✅ On-demand order notification sent successfully');
       return { success: true };
     }
 

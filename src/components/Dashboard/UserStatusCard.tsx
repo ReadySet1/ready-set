@@ -50,14 +50,7 @@ const UserStatusCard: React.FC<UserStatusCardProps> = ({
   
   // Log whenever the component renders to debug
   useEffect(() => {
-    console.log("UserStatusCard rendered with:", {
-      userId: user.id,
-      userType: user.type,
-      userStatus: user.status,
-      currentUserRole,
-      isSuperAdmin
-    });
-  }, [user.id, user.type, user.status, currentUserRole, isSuperAdmin]);
+      }, [user.id, user.type, user.status, currentUserRole, isSuperAdmin]);
 
   const availableRoles: UserType[] = [
     "vendor",
@@ -78,11 +71,9 @@ const UserStatusCard: React.FC<UserStatusCardProps> = ({
     setErrorMessage(null);
     
     try {
-      console.log(`Attempting to update status to: ${newStatus}`);
-      await onStatusChange(newStatus);
+            await onStatusChange(newStatus);
       setCurrentStatus(newStatus);
-      console.log("Status update successful");
-    } catch (error) {
+          } catch (error) {
       console.error("Failed to update status:", error);
       setErrorMessage(error instanceof Error ? error.message : "Failed to update status");
     } finally {
@@ -98,10 +89,8 @@ const UserStatusCard: React.FC<UserStatusCardProps> = ({
     setErrorMessage(null);
     
     try {
-      console.log(`Attempting to update role to: ${role}`);
-      await onRoleChange(role);
-      console.log("Role update successful");
-    } catch (error) {
+            await onRoleChange(role);
+          } catch (error) {
       console.error("Failed to update role:", error);
       setErrorMessage(error instanceof Error ? error.message : "Failed to update role");
     } finally {
@@ -129,8 +118,7 @@ const UserStatusCard: React.FC<UserStatusCardProps> = ({
         throw new Error(data.error || "Permission test failed");
       }
       
-      console.log("Permission test result:", data);
-      setErrorMessage(`Your actual role: ${data.userRole}`);
+            setErrorMessage(`Your actual role: ${data.userRole}`);
     } catch (error) {
       console.error("Permission test failed:", error);
       setErrorMessage(error instanceof Error ? error.message : "Permission test failed");
