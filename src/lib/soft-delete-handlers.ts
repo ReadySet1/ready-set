@@ -1,9 +1,9 @@
-import { prisma, softDeleteHelpers } from '@/utils/prismaDB';
-import { loggers } from '@/utils/logger';
+import { prisma } from '@/utils/prismaDB';
+import { prismaLogger } from '@/utils/logger';
 
 /**
  * Utility functions for handling soft-deleted users in related entities
- * 
+ *
  * These functions ensure that soft-deleted users are properly excluded
  * from various business operations and data queries.
  */
@@ -16,19 +16,30 @@ export async function validateUserNotSoftDeleted(userId: string): Promise<{
   error?: string;
 }> {
   try {
-    const isDeleted = await softDeleteHelpers.isProfileSoftDeleted(userId);
-    
-    if (isDeleted) {
-      loggers.prisma.warn('Operation attempted on soft-deleted user', { userId });
+    const user = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { deletedAt: true }
+    });
+
+    if (!user) {
+      prismaLogger.warn('User not found during validation', { userId });
+      return {
+        isValid: false,
+        error: 'User not found'
+      };
+    }
+
+    if (user.deletedAt) {
+      prismaLogger.warn('Operation attempted on soft-deleted user', { userId });
       return {
         isValid: false,
         error: 'User account has been deactivated'
       };
     }
-    
+
     return { isValid: true };
   } catch (error) {
-    loggers.prisma.error('Error validating user soft delete status', { userId, error });
+    prismaLogger.error('Error validating user soft delete status', { userId, error });
     return {
       isValid: false,
       error: 'Unable to verify user status'
@@ -57,13 +68,13 @@ export async function getActiveDriversForDispatch(): Promise<any[]> {
       }
     });
 
-    loggers.prisma.debug('Retrieved active drivers for dispatch', { 
+    prismaLogger.debug('Retrieved active drivers for dispatch', { 
       count: activeDrivers.length 
     });
 
     return activeDrivers;
   } catch (error) {
-    loggers.prisma.error('Error fetching active drivers', { error });
+    prismaLogger.error('Error fetching active drivers', { error });
     throw new Error('Failed to fetch available drivers');
   }
 }
@@ -89,13 +100,13 @@ export async function getActiveVendorsForOrders(): Promise<any[]> {
       }
     });
 
-    loggers.prisma.debug('Retrieved active vendors for orders', { 
+    prismaLogger.debug('Retrieved active vendors for orders', { 
       count: activeVendors.length 
     });
 
     return activeVendors;
   } catch (error) {
-    loggers.prisma.error('Error fetching active vendors', { error });
+    prismaLogger.error('Error fetching active vendors', { error });
     throw new Error('Failed to fetch available vendors');
   }
 }
@@ -121,13 +132,13 @@ export async function getActiveClientsForCatering(): Promise<any[]> {
       }
     });
 
-    loggers.prisma.debug('Retrieved active clients for catering', { 
+    prismaLogger.debug('Retrieved active clients for catering', { 
       count: activeClients.length 
     });
 
     return activeClients;
   } catch (error) {
-    loggers.prisma.error('Error fetching active clients', { error });
+    prismaLogger.error('Error fetching active clients', { error });
     throw new Error('Failed to fetch available clients');
   }
 }
@@ -149,9 +160,9 @@ export async function archiveFileUploadsForUser(userId: string): Promise<void> {
       }
     });
 
-    loggers.prisma.info('Archived file uploads for soft-deleted user', { userId });
+    prismaLogger.info('Archived file uploads for soft-deleted user', { userId });
   } catch (error) {
-    loggers.prisma.error('Error archiving file uploads', { userId, error });
+    prismaLogger.error('Error archiving file uploads', { userId, error });
     throw new Error('Failed to archive user files');
   }
 }
@@ -208,7 +219,7 @@ export async function getOrdersExcludingSoftDeletedUsers(
       });
     }
   } catch (error) {
-    loggers.prisma.error('Error fetching orders excluding soft-deleted users', { 
+    prismaLogger.error('Error fetching orders excluding soft-deleted users', { 
       orderType, 
       error 
     });
@@ -277,7 +288,7 @@ export async function getDispatchesExcludingSoftDeletedUsers(
       orderBy: { createdAt: 'desc' }
     });
   } catch (error) {
-    loggers.prisma.error('Error fetching dispatches excluding soft-deleted users', { 
+    prismaLogger.error('Error fetching dispatches excluding soft-deleted users', { 
       error 
     });
     throw new Error('Failed to fetch dispatches');
@@ -355,10 +366,10 @@ export async function softDeleteUserWithCleanup(userId: string): Promise<{
       // by the middleware which will automatically filter them out
     });
 
-    loggers.prisma.info('User soft-deleted with cleanup completed', { userId });
+    prismaLogger.info('User soft-deleted with cleanup completed', { userId });
     return { success: true };
   } catch (error) {
-    loggers.prisma.error('Error soft-deleting user with cleanup', { userId, error });
+    prismaLogger.error('Error soft-deleting user with cleanup', { userId, error });
     return { 
       success: false, 
       error: 'Failed to soft-delete user and perform cleanup' 

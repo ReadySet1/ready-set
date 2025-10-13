@@ -6,7 +6,7 @@
 
 import { prisma } from '@/utils/prismaDB';
 import { UserType } from '@/types/prisma';
-import { loggers } from '@/utils/logger';
+import { prismaLogger } from '@/utils/logger';
 
 export interface RetentionPolicy {
   id: string;
@@ -156,7 +156,7 @@ export class HistoricalDataAnalysisService {
    */
   static async analyzeHistoricalData(): Promise<HistoricalDataAnalysis> {
     try {
-      loggers.prisma.info('Starting historical data analysis');
+      prismaLogger.info('Starting historical data analysis');
 
       // Get basic user counts
       const [
@@ -293,7 +293,7 @@ export class HistoricalDataAnalysisService {
         retentionCompliance,
       };
 
-      loggers.prisma.info('Historical data analysis completed', {
+      prismaLogger.info('Historical data analysis completed', {
         totalUsers: totalUsersEverCreated,
         activeUsers: currentActiveUsers,
         softDeletedUsers: currentSoftDeletedUsers,
@@ -304,7 +304,7 @@ export class HistoricalDataAnalysisService {
       return analysis;
 
     } catch (error) {
-      loggers.prisma.error('Historical data analysis failed', { error });
+      prismaLogger.error('Historical data analysis failed', { error });
       throw error;
     }
   }

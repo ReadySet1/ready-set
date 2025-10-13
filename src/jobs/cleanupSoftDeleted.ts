@@ -10,7 +10,7 @@
 
 import { prisma } from '@/utils/prismaDB';
 import { userSoftDeleteService } from '@/services/userSoftDeleteService';
-import { loggers } from '@/utils/logger';
+import { prismaLogger } from '@/utils/logger';
 import { UserType } from '@/types/prisma';
 
 // Configuration constants
@@ -124,7 +124,7 @@ export class SoftDeleteCleanupService {
         newestDeletionDate: newestRecord?.deletedAt || null,
       };
     } catch (error) {
-      loggers.prisma.error('Failed to get cleanup metrics', { error });
+      prismaLogger.error('Failed to get cleanup metrics', { error });
       throw error;
     }
   }
@@ -145,7 +145,7 @@ export class SoftDeleteCleanupService {
     };
 
     try {
-      loggers.prisma.info('Starting soft delete cleanup job', {
+      prismaLogger.info('Starting soft delete cleanup job', {
         config: this.config,
         dryRun: this.config.dryRun,
       });
@@ -155,7 +155,7 @@ export class SoftDeleteCleanupService {
       
       // Safety check: don't process more than daily limit
       if (metrics.processedToday >= this.config.maxDailyDeletions) {
-        loggers.prisma.warn('Daily deletion limit reached, skipping cleanup', {
+        prismaLogger.warn('Daily deletion limit reached, skipping cleanup', {
           processedToday: metrics.processedToday,
           maxDaily: this.config.maxDailyDeletions,
         });
@@ -168,7 +168,7 @@ export class SoftDeleteCleanupService {
       const toProcess = Math.min(remainingQuota, metrics.totalEligible);
 
       if (toProcess === 0) {
-        loggers.prisma.info('No records to process', { metrics });
+        prismaLogger.info('No records to process', { metrics });
         result.success = true;
         return result;
       }
@@ -188,7 +188,7 @@ export class SoftDeleteCleanupService {
           processed += batchResult.processed;
           
           // Log progress
-          loggers.prisma.info('Batch processed', {
+          prismaLogger.info('Batch processed', {
             batchSize,
             totalProcessed: processed,
             totalToProcess: toProcess,
@@ -202,14 +202,14 @@ export class SoftDeleteCleanupService {
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           result.errors.push(`Batch processing error: ${errorMessage}`);
-          loggers.prisma.error('Batch processing failed', { error, processed });
+          prismaLogger.error('Batch processing failed', { error, processed });
           break; // Stop processing on batch failure
         }
       }
 
       result.success = result.errors.length === 0;
       
-      loggers.prisma.info('Cleanup job completed', {
+      prismaLogger.info('Cleanup job completed', {
         result,
         config: this.config,
       });
@@ -217,7 +217,7 @@ export class SoftDeleteCleanupService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       result.errors.push(`Cleanup job failed: ${errorMessage}`);
-      loggers.prisma.error('Cleanup job failed', { error, config: this.config });
+      prismaLogger.error('Cleanup job failed', { error, config: this.config });
     } finally {
       result.duration = Date.now() - startTime;
     }
@@ -279,7 +279,7 @@ export class SoftDeleteCleanupService {
       try {
         if (this.config.dryRun) {
           // In dry run mode, just log what would be done
-          loggers.prisma.info('DRY RUN: Would permanently delete user', {
+          prismaLogger.info('DRY RUN: Would permanently delete user', {
             userId: user.id,
             email: user.email,
             type: user.type,
@@ -321,7 +321,7 @@ export class SoftDeleteCleanupService {
 
           batchResult.permanentlyDeleted++;
           
-          loggers.prisma.info('User permanently deleted by cleanup job', {
+          prismaLogger.info('User permanently deleted by cleanup job', {
             userId: user.id,
             email: user.email,
             type: user.type,
@@ -335,7 +335,7 @@ export class SoftDeleteCleanupService {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         batchResult.errors.push(`Failed to process user ${user.id}: ${errorMessage}`);
-        loggers.prisma.error('Failed to process user in cleanup batch', {
+        prismaLogger.error('Failed to process user in cleanup batch', {
           userId: user.id,
           email: user.email,
           error,
@@ -426,7 +426,7 @@ export async function getSoftDeleteMetrics(config?: CleanupConfig): Promise<Clea
  */
 export async function scheduledCleanup(): Promise<void> {
   try {
-    loggers.prisma.info('Starting scheduled soft delete cleanup');
+    prismaLogger.info('Starting scheduled soft delete cleanup');
     
     const result = await runSoftDeleteCleanup({
       dryRun: process.env.CLEANUP_DRY_RUN === 'true',
@@ -435,9 +435,9 @@ export async function scheduledCleanup(): Promise<void> {
     });
     
     if (result.success) {
-      loggers.prisma.info('Scheduled cleanup completed successfully', result);
+      prismaLogger.info('Scheduled cleanup completed successfully', result);
     } else {
-      loggers.prisma.error('Scheduled cleanup completed with errors', result);
+      prismaLogger.error('Scheduled cleanup completed with errors', result);
     }
     
     // Send alert if there were errors
@@ -447,7 +447,7 @@ export async function scheduledCleanup(): Promise<void> {
     }
     
   } catch (error) {
-    loggers.prisma.error('Scheduled cleanup failed', { error });
+    prismaLogger.error('Scheduled cleanup failed', { error });
     // TODO: Send critical alert for cleanup failure
     throw error;
   }

@@ -83,7 +83,7 @@ import toast, { Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { UserType, UserStatus } from "@/types/prisma";
-import { loggers } from "@/utils/logger";
+import { logger } from "@/utils/logger";
 import {
   ApiTypeUtils,
   ApiUserTypeFilter,

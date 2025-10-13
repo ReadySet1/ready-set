@@ -5,7 +5,7 @@
  */
 
 import { prisma } from '@/utils/prismaDB';
-import { loggers } from '@/utils/logger';
+import { prismaLogger } from '@/utils/logger';
 import { UserType } from '@/types/prisma';
 
 export interface SoftDeleteMetrics {
@@ -201,7 +201,7 @@ export class SoftDeleteMonitoringService {
         },
       };
 
-      loggers.prisma.info('Soft delete metrics collected', {
+      prismaLogger.info('Soft delete metrics collected', {
         period: metrics.period,
         totalSoftDeletes: softDeletes,
         totalRestores: restores,
@@ -212,7 +212,7 @@ export class SoftDeleteMonitoringService {
       return metrics;
 
     } catch (error) {
-      loggers.prisma.error('Failed to collect soft delete metrics', { error });
+      prismaLogger.error('Failed to collect soft delete metrics', { error });
       throw error;
     }
   }
@@ -347,7 +347,7 @@ export class SoftDeleteMonitoringService {
           
           alerts.push(alert);
           
-          loggers.prisma.warn('Soft delete alert triggered', {
+          prismaLogger.warn('Soft delete alert triggered', {
             alertId: alert.id,
             triggerId: trigger.id,
             severity: trigger.severity,
@@ -355,7 +355,7 @@ export class SoftDeleteMonitoringService {
           });
         }
       } catch (error) {
-        loggers.prisma.error('Error checking alert trigger', {
+        prismaLogger.error('Error checking alert trigger', {
           triggerId: trigger.id,
           error,
         });
@@ -426,7 +426,7 @@ export class SoftDeleteMonitoringService {
     }
 
     try {
-      loggers.prisma.info('Running soft delete monitoring check', {
+      prismaLogger.info('Running soft delete monitoring check', {
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
       });
@@ -441,7 +441,7 @@ export class SoftDeleteMonitoringService {
       };
 
       if (alerts.length > 0) {
-        loggers.prisma.warn('Soft delete monitoring alerts generated', {
+        prismaLogger.warn('Soft delete monitoring alerts generated', {
           alertCount: alerts.length,
           severities: alerts.reduce((acc, alert) => {
             acc[alert.severity] = (acc[alert.severity] || 0) + 1;
@@ -452,13 +452,13 @@ export class SoftDeleteMonitoringService {
         // Here you would integrate with your alerting system
         // await this.sendAlertsToNotificationSystem(alerts);
       } else {
-        loggers.prisma.info('No soft delete alerts generated');
+        prismaLogger.info('No soft delete alerts generated');
       }
 
       return result;
 
     } catch (error) {
-      loggers.prisma.error('Soft delete monitoring check failed', { error });
+      prismaLogger.error('Soft delete monitoring check failed', { error });
       throw error;
     }
   }
@@ -536,7 +536,7 @@ export class SoftDeleteMonitoringService {
  */
 export async function scheduledMonitoring(): Promise<void> {
   try {
-    loggers.prisma.info('Starting scheduled soft delete monitoring');
+    prismaLogger.info('Starting scheduled soft delete monitoring');
     
     const result = await SoftDeleteMonitoringService.runMonitoringCheck();
     
@@ -545,7 +545,7 @@ export async function scheduledMonitoring(): Promise<void> {
       const highAlerts = result.alerts.filter(alert => alert.severity === 'high');
       
       if (criticalAlerts.length > 0) {
-        loggers.prisma.error('Critical soft delete alerts detected', {
+        prismaLogger.error('Critical soft delete alerts detected', {
           count: criticalAlerts.length,
           alerts: criticalAlerts.map(alert => ({
             id: alert.id,
@@ -557,7 +557,7 @@ export async function scheduledMonitoring(): Promise<void> {
       }
       
       if (highAlerts.length > 0) {
-        loggers.prisma.warn('High-severity soft delete alerts detected', {
+        prismaLogger.warn('High-severity soft delete alerts detected', {
           count: highAlerts.length,
           alerts: highAlerts.map(alert => ({
             id: alert.id,
@@ -568,13 +568,13 @@ export async function scheduledMonitoring(): Promise<void> {
       }
     }
     
-    loggers.prisma.info('Scheduled soft delete monitoring completed', {
+    prismaLogger.info('Scheduled soft delete monitoring completed', {
       alertsGenerated: result.alerts.length,
       metricsCollected: true,
     });
     
   } catch (error) {
-    loggers.prisma.error('Scheduled soft delete monitoring failed', { error });
+    prismaLogger.error('Scheduled soft delete monitoring failed', { error });
     // TODO: Send critical alert for monitoring system failure
     throw error;
   }

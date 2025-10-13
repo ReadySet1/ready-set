@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { loggers } from '@/utils/logger';
+import { prismaLogger } from '@/utils/logger';
 
 /**
  * Prisma middleware for automatic soft delete filtering
@@ -177,7 +177,7 @@ export const softDeleteMiddleware: Prisma.Middleware = async (params, next) => {
   }
 
   // Log middleware application for debugging
-  loggers.prisma.debug('Soft delete middleware applied', {
+  prismaLogger.debug('Soft delete middleware applied', {
     model: params.model,
     action: params.action,
     hasWhereClause: !!params.args?.where
@@ -199,7 +199,7 @@ export async function softDeleteProfile(
     data: { deletedAt: new Date() }
   });
   
-  loggers.prisma.info('Profile soft deleted', { profileId });
+  prismaLogger.info('Profile soft deleted', { profileId });
 }
 
 /**
@@ -215,7 +215,7 @@ export async function restoreProfile(
     data: { deletedAt: null }
   });
   
-  loggers.prisma.info('Profile restored', { profileId });
+  prismaLogger.info('Profile restored', { profileId });
 }
 
 /**

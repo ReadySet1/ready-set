@@ -5,7 +5,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { prisma } from '@/lib/db/prisma'; 
 import { createClient } from '@/utils/supabase/server';
-import { loggers } from '@/utils/logger';
+import logger from '@/utils/logger';
 
 /**
  * Server action to approve a job application and create a corresponding user profile.
@@ -37,7 +37,7 @@ export const approveJobApplication = async (jobApplicationId: string): Promise<{
   const isApprover = userType === "ADMIN" || userType === "SUPER_ADMIN" || userType === "HELPDESK";
 
   if (!isApprover) {
-    loggers.app.warn(`Unauthorized attempt by user ${user.id} with type ${userType}`);
+    logger.warn(`Unauthorized attempt by user ${user.id} with type ${userType}`);
     throw new Error("Unauthorized: Admin, Super Admin, or Helpdesk privileges required.");
   }
   // --- End Authorization Check ---
@@ -192,7 +192,7 @@ export const deleteJobApplication = async (jobApplicationId: string): Promise<{ 
   const isAuthorized = userType === "ADMIN" || userType === "SUPER_ADMIN";
 
   if (!isAuthorized) {
-    loggers.app.warn(`Unauthorized deletion attempt by user ${user.id} with type ${userType}`);
+    logger.warn(`Unauthorized deletion attempt by user ${user.id} with type ${userType}`);
     throw new Error("Unauthorized: Only Admin or Super Admin can delete job applications.");
   }
   // --- End Authorization Check ---

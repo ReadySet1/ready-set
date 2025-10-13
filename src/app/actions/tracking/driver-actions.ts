@@ -491,19 +491,6 @@ export async function updateDriverLocation(
 }
 
 /**
- * Pause the current shift (alias for startShiftBreak with 'rest' type)
- */
-export async function pauseShift(
-  shiftId: string,
-  location?: LocationUpdate
-): Promise<{ success: boolean; breakId?: string; error?: string }> {
-  return startShiftBreak(shiftId, 'rest', location);
-}
-
-/**
- * Get shift history for a driver
- */
-/**
  * Pause a driver shift (without specifying break type)
  * This is a convenience function that starts a 'rest' break
  */
