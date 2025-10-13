@@ -104,3 +104,4 @@ test-results/
 
 # Documentation markdown files
 docs/markdown/
+.vercel
