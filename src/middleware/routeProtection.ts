@@ -59,13 +59,23 @@ export async function protectRoutes(request: Request) {
     // Get user's role from profiles table
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('type')
+      .select('type, deletedAt')
       .eq('id', user.id)
       .single();
 
-    if (error || !profile?.type) {
+    if (error || !profile || !profile.type) {
       console.error('Error fetching user role:', error);
       return NextResponse.redirect(new URL('/', request.url));
+    }
+
+    // Check if user account has been soft-deleted
+    if (profile.deletedAt) {
+      console.log(`Access attempt by soft-deleted user: ${user.id}`);
+      // Sign out the user and redirect to sign-in with error message
+      await supabase.auth.signOut();
+      const url = new URL('/sign-in', request.url);
+      url.searchParams.set('error', 'Account has been deactivated');
+      return NextResponse.redirect(url);
     }
 
     // Add debug logging

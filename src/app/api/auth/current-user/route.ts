@@ -39,23 +39,34 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Note: Enhanced session validation happens on client side only
-    // This API route provides basic server-side authentication checks
+    // Check if user profile exists and is not soft-deleted
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('type, email, name, status, deletedAt')
+      .eq('id', user.id)
+      .single();
 
-    // Get user profile data for enhanced response
-    let profile = null;
-    try {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('type, email, name, status')
-        .eq('id', user.id)
-        .single();
+    if (profileError) {
+      console.error('Error fetching user profile:', profileError);
+      return NextResponse.json(
+        { error: 'Unable to verify account status' },
+        { status: 500 }
+      );
+    }
 
-      if (!profileError && profileData) {
-        profile = profileData;
-      }
-    } catch (profileErr) {
-      console.warn('Failed to fetch user profile:', profileErr);
+    if (!profile) {
+      return NextResponse.json(
+        { error: 'User profile not found' },
+        { status: 404 }
+      );
+    }
+
+    // Check if user account has been soft-deleted
+    if (profile.deletedAt) {
+      return NextResponse.json(
+        { error: 'Account has been deactivated' },
+        { status: 403 }
+      );
     }
 
     // Return enhanced user data

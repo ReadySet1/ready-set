@@ -3,6 +3,7 @@ import { prisma } from "@/utils/prismaDB";
 import { Prisma } from "@prisma/client";
 import { Decimal } from "@/types/prisma";
 import { createClient } from "@/utils/supabase/server";
+import { validateUserNotSoftDeleted, getActiveDriversForDispatch } from "@/lib/soft-delete-handlers";
 
 function serializeData(obj: unknown): number | string | Date | Record<string, unknown> | unknown {
   if (typeof obj === "bigint") {
@@ -47,6 +48,16 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: `Missing required fields: ${!orderId ? 'orderId' : ''} ${!driverId ? 'driverId' : ''} ${!orderType ? 'orderType' : ''}`.trim() },
         { status: 400 },
+      );
+    }
+
+    // Validate that the driver is not soft-deleted
+    const driverValidation = await validateUserNotSoftDeleted(driverId);
+    if (!driverValidation.isValid) {
+      console.error("Driver validation failed:", driverValidation.error);
+      return NextResponse.json(
+        { error: driverValidation.error },
+        { status: 403 }
       );
     }
 

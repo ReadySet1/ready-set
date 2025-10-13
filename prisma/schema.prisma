@@ -40,6 +40,8 @@ model Profile {
   updatedAt           DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
   isTemporaryPassword Boolean           @default(false)
   deletedAt           DateTime?         @db.Timestamptz(6)
+  deletedBy           String?           @db.Uuid
+  deletionReason      String?
   accounts            Account[]
   createdAddresses    Address[]         @relation("AddressCreatedBy")
   cateringRequests    CateringRequest[]
@@ -50,14 +52,40 @@ model Profile {
   onDemandRequests     OnDemand[]
   sessions             Session[]
   userAddresses        UserAddress[]
-  clientConfigurations ClientConfiguration[] @relation("ClientConfigurations")
-  calculationHistory   CalculationHistory[]   @relation("CalculationHistory")
+  deletedByUser        Profile?                @relation("UserDeletedBy", fields: [deletedBy], references: [id])
+  deletedUsers         Profile[]               @relation("UserDeletedBy")
+  auditLogs            UserAudit[]
+  performedAudits      UserAudit[]             @relation("UserAuditPerformer")
+  clientConfigurations ClientConfiguration[]   @relation("ClientConfigurations")
+  calculationHistory   CalculationHistory[]    @relation("CalculationHistory")
 
   @@index([email])
   @@index([type])
   @@index([status])
+  @@index([deletedAt])
+  @@index([deletedBy])
   @@index([type, deletedAt]) // Dashboard vendor counting optimization
   @@map("profiles")
+}
+
+model UserAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  action      String   // CREATE, UPDATE, DELETE, RESTORE, etc.
+  performedBy String?  @db.Uuid
+  changes     Json?    // Store the changes made (before/after values)
+  reason      String?  // Reason for the action
+  metadata    Json?    // Additional metadata
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  
+  user        Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  performer   Profile? @relation("UserAuditPerformer", fields: [performedBy], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([performedBy])
+  @@index([createdAt])
+  @@map("user_audits")
 }
 
 model Account {
