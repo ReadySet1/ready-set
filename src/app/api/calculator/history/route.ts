@@ -69,14 +69,7 @@ export async function GET(request: NextRequest) {
       }
     );
     
-    console.log('📊 History API Debug:', {
-      effectiveUserId,
-      templateId,
-      limit: validatedLimit,
-      historyCount: history.length,
-      history: history.slice(0, 2) // Show first 2 entries for debugging
-    });
-    
+        
     return NextResponse.json({
       success: true,
       data: history,

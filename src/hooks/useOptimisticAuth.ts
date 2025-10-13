@@ -59,16 +59,14 @@ export const useOptimisticAuth = (options: UseOptimisticAuthOptions = {}) => {
   }, []);
 
   const applyOptimisticUpdate = useCallback((update: OptimisticUpdate) => {
-    console.log('Applying optimistic auth update:', update);
-
+    
     // Check if update meets confidence threshold
     const confidenceLevels = ['low', 'medium', 'high'];
     const updateLevel = confidenceLevels.indexOf(update.confidence);
     const thresholdLevel = confidenceLevels.indexOf(confidenceThreshold);
 
     if (updateLevel < thresholdLevel) {
-      console.log('Optimistic update below confidence threshold, skipping');
-      return;
+            return;
     }
 
     // Store pending update
@@ -90,8 +88,7 @@ export const useOptimisticAuth = (options: UseOptimisticAuthOptions = {}) => {
     }
 
     timeoutRef.current = setTimeout(() => {
-      console.log('Optimistic auth update timed out, reverting...');
-      setAuthState(prev => ({
+            setAuthState(prev => ({
         ...prev,
         isOptimistic: false,
         optimisticTimestamp: null,
@@ -102,8 +99,7 @@ export const useOptimisticAuth = (options: UseOptimisticAuthOptions = {}) => {
   }, [confidenceThreshold, optimisticTimeout]);
 
   const confirmOptimisticUpdate = useCallback((confirmedUser: User | null, confirmedRole: UserType | null) => {
-    console.log('Confirming optimistic auth update:', { confirmedUser: !!confirmedUser, confirmedRole });
-
+    
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -119,10 +115,8 @@ export const useOptimisticAuth = (options: UseOptimisticAuthOptions = {}) => {
         confirmedRole === pendingUpdate.userRole;
 
       if (matchesOptimistic) {
-        console.log('✅ Optimistic update confirmed successfully');
-      } else {
-        console.log('⚠️ Optimistic update mismatch, using confirmed state');
-      }
+              } else {
+              }
 
       return {
         ...prev,
@@ -136,8 +130,7 @@ export const useOptimisticAuth = (options: UseOptimisticAuthOptions = {}) => {
   }, []);
 
   const revertOptimisticUpdate = useCallback((reason?: string) => {
-    console.log('Reverting optimistic auth update:', reason || 'No reason provided');
-
+    
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;

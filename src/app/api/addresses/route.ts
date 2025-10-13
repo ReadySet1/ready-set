@@ -239,10 +239,7 @@ export async function GET(request: NextRequest) {
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
 
-    console.log(
-      `Found ${addresses.length} addresses for user ${currentUser.id} (page ${page} of ${totalPages})`,
-    );
-
+    
     // Return paginated response with cache headers
     const response = NextResponse.json({
       addresses,
@@ -293,11 +290,7 @@ export async function POST(request: NextRequest) {
     }
 
     const formData: AddressFormData = await request.json();
-    console.log("POST /api/addresses: Received form data:", { 
-      userId: currentUser.id, 
-      formData: { ...formData, createdBy: currentUser.id } 
-    });
-
+    
     // Enhanced validation with detailed error messages
     const validationErrors: string[] = [];
     if (!formData.street1?.trim()) {
@@ -348,17 +341,12 @@ export async function POST(request: NextRequest) {
         name: formData.name?.trim() || null,
       };
 
-      console.log("POST /api/addresses: Creating address with normalized data:", newAddress);
-
+      
       const createdAddress = await tx.address.create({
         data: newAddress,
       });
 
-      console.log("POST /api/addresses: Address created successfully:", { 
-        addressId: createdAddress.id, 
-        userId: currentUser.id 
-      });
-
+      
       // Create userAddress relation to track ownership if it's not shared
       if (!formData.isShared) {
         await tx.userAddress.create({
@@ -368,18 +356,13 @@ export async function POST(request: NextRequest) {
             isDefault: false, // Could be set based on user preferences
           },
         });
-        console.log("POST /api/addresses: UserAddress relation created");
-      }
+              }
 
       return createdAddress;
       });
     });
 
-    console.log("POST /api/addresses: Transaction completed successfully:", { 
-      addressId: result.id, 
-      userId: currentUser.id 
-    });
-
+    
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error("POST /api/addresses: Critical error:", error);

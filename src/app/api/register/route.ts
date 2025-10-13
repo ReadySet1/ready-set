@@ -153,9 +153,7 @@ export async function POST(request: Request) {
     }
 
     // Create user in Supabase with retry mechanism
-    console.log('Attempting to create Supabase user with email:', email.toLowerCase());
-    console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
-    
+            
     let authData: { user: any } | null = null;
     let authError;
     let retryCount = 0;
@@ -163,8 +161,7 @@ export async function POST(request: Request) {
     const baseDelay = 15000; // 15 seconds base delay
     
     while (retryCount < maxRetries) {
-      console.log(`Attempt ${retryCount + 1}: Signing up with email ${email.toLowerCase()}`);
-      const result = await supabase.auth.signUp({
+            const result = await supabase.auth.signUp({
         email: email.toLowerCase(),
         password: password,
         options: {
@@ -186,18 +183,11 @@ export async function POST(request: Request) {
       
       if (!authError) break;
       
-      console.log(`Retry attempt ${retryCount + 1} of ${maxRetries}`);
-      console.log('Auth error details:', {
-        message: authError.message,
-        status: authError.status,
-        name: authError.name
-      });
-
+            
       // If we get a rate limit error, wait longer
       if (authError.status === 429) {
         const delay = baseDelay + (retryCount * 5000); // Add 5 seconds for each retry
-        console.log(`Rate limit hit. Waiting ${delay/1000} seconds before retry...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+                await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         // For other errors, wait 1 second
         await new Promise(resolve => setTimeout(resolve, 1000));

@@ -17,8 +17,7 @@ const CateringStats: React.FC = () => {
    * Opens the food delivery quote form
    */
   const handleQuoteClick = () => {
-    console.log("CateringStats - Get a quote clicked");
-    openForm("food");
+        openForm("food");
   };
 
   return (

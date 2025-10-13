@@ -211,16 +211,10 @@ export const CreateCateringOrderForm: React.FC<
       if (uploadedFileKeys.length > 0 && !isSubmitting) {
         const cleanup = async () => {
           try {
-            console.log(
-              "Cleaning up uploaded files on unmount:",
-              uploadedFileKeys,
-            );
-            console.log("Using tempEntityId for cleanup:", tempEntityId);
-
+                        
             // Don't attempt cleanup if we don't have the IDs we need
             if (!uploadedFileKeys.length || !tempEntityId) {
-              console.log("Skipping cleanup - missing keys or tempEntityId");
-              return;
+                            return;
             }
 
             const response = await fetch("/api/file-uploads/cleanup", {
@@ -242,8 +236,7 @@ export const CreateCateringOrderForm: React.FC<
               );
               // Don't throw - just log the error
             } else {
-              console.log("File cleanup completed successfully");
-            }
+                          }
           } catch (error) {
             console.error("Error cleaning up files:", error);
             // Error already logged, no need to re-throw
@@ -269,10 +262,7 @@ export const CreateCateringOrderForm: React.FC<
       // Include the tempEntityId in the submitted data if available
       if (tempEntityId) {
         data.tempEntityId = tempEntityId;
-        console.log(
-          `Including tempEntityId in form submission: ${tempEntityId}`,
-        );
-      }
+              }
 
       const result = await createCateringOrder(data);
 
@@ -292,7 +282,6 @@ export const CreateCateringOrderForm: React.FC<
     }
   };
 
-
   // Handle file upload
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -301,10 +290,8 @@ export const CreateCateringOrderForm: React.FC<
 
     const files = Array.from(event.target.files) as FileWithPath[];
     try {
-      console.log("Starting upload of", files.length, "files");
-      const result = await onUpload(files);
-      console.log("Upload completed successfully:", result);
-
+            const result = await onUpload(files);
+      
       // Set uploaded files to form state
       // setValue("attachments", result); // We'd need to add this to the schema
 
@@ -324,8 +311,7 @@ export const CreateCateringOrderForm: React.FC<
   // Remove file handler
   const removeFile = async (fileToRemove: UploadedFile) => {
     try {
-      console.log("Removing file:", fileToRemove);
-
+      
       // Remove from UI immediately
       const updatedFiles = uploadedFiles.filter(
         (file) => file.key !== fileToRemove.key,
@@ -339,8 +325,7 @@ export const CreateCateringOrderForm: React.FC<
 
       // Delete the file
       await deleteFile(fileToRemove.key);
-      console.log("File removed successfully");
-    } catch (error) {
+          } catch (error) {
       console.error("Error removing file:", error);
       setGeneralError("Failed to remove file. Please try again.");
     }
@@ -364,14 +349,12 @@ export const CreateCateringOrderForm: React.FC<
   // Direct manual submit that bypasses the form's validation
   const manualDirectSubmit = async () => {
     try {
-      console.log("Manual direct submit clicked");
-      setIsSubmitting(true);
+            setIsSubmitting(true);
       setGeneralError(null);
 
       // Get form data
       const formData = form.getValues();
-      console.log("Submitting with data:", formData);
-
+      
       // Ensure required fields are present
       if (!formData.userId) {
         alert("Please select a client");
@@ -408,22 +391,15 @@ export const CreateCateringOrderForm: React.FC<
       // Include the tempEntityId in the submitted data if available
       if (tempEntityId) {
         formData.tempEntityId = tempEntityId;
-        console.log(
-          `Including tempEntityId in manual submission: ${tempEntityId}`,
-        );
-      }
+              }
 
       // Call server action directly
       const result = await createCateringOrder(formData);
-      console.log("Server action result:", result);
-
+      
       if (result.success) {
         // If we have uploaded files, update their entity ID
         if (uploadedFiles.length > 0 && result.orderId) {
-          console.log(
-            `Updating file entities from temp ID to actual order ID: ${result.orderId}`,
-          );
-          await updateEntityId(result.orderId);
+                    await updateEntityId(result.orderId);
         }
 
         alert("Order created successfully!");
@@ -450,8 +426,7 @@ export const CreateCateringOrderForm: React.FC<
   const debugSubmit = () => {
     // Log the current form state
     const formData = form.getValues();
-    console.log("Current form state:", formData);
-
+    
     // Handle needHost validation manually
     if (formData.needHost === "NO") {
       // If needHost is NO, ensure hoursNeeded and numberOfHosts are set to null
@@ -465,24 +440,20 @@ export const CreateCateringOrderForm: React.FC<
 
     // Try to manually trigger validation
     form.trigger().then((isValid) => {
-      console.log("Manual validation result:", isValid);
-
+      
       if (!isValid) {
         // Alert about validation errors
         alert("Form validation failed. Please check the form for errors.");
-        console.log("Validation errors:", form.formState.errors);
-      } else {
+              } else {
         // If valid, try to manually submit
-        console.log("Attempting manual submission with data:", formData);
-
+        
         // Show submission in progress
         setIsSubmitting(true);
 
         // Directly call the server action
         createCateringOrder(formData)
           .then((result) => {
-            console.log("Server action result:", result);
-            if (result.success) {
+                        if (result.success) {
               alert("Order created successfully!");
               if (result.orderNumber) {
                 router.push(

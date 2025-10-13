@@ -18,11 +18,7 @@ export const ClientFormWrapper: React.FC<WrapperProps> = ({ children }) => {
       const newProps = {
         ...(child.props as object), // Cast to object to ensure spread works
         onRequestQuote: (formType: FormType) => {
-          console.log(
-            "ClientFormWrapper - onRequestQuote called with:",
-            formType,
-          );
-          openForm(formType);
+                    openForm(formType);
         },
       };
 

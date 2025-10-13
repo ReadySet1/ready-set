@@ -40,8 +40,7 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
   }, []);
 
   const handleQuoteClick = () => {
-    console.log("CateringHero - Get a quote clicked");
-    openForm("food");
+        openForm("food");
   };
 
   // Animation variants

@@ -17,8 +17,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = React.memo(
         e.preventDefault();
         e.stopPropagation();
         onPrev();
-        console.log(`Navegando al anterior desde índice ${currentIndex}`);
-      },
+              },
       [onPrev, currentIndex],
     );
 
@@ -27,8 +26,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = React.memo(
         e.preventDefault();
         e.stopPropagation();
         onNext();
-        console.log(`Navegando al siguiente desde índice ${currentIndex}`);
-      },
+              },
       [onNext, currentIndex],
     );
 

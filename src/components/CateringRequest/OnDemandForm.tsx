@@ -355,10 +355,7 @@ const OnDemandOrderForm: React.FC = () => {
 
         // Redirect based on user role instead of hardcoded vendor dashboard
         const redirectRoute = getOrderCreationRedirectRoute(userRole);
-        console.log(
-          `Redirecting user to ${redirectRoute} based on role: ${userRole}`,
-        );
-        router.push(redirectRoute);
+                router.push(redirectRoute);
       } else {
         const errorData = await response.json();
         console.error("Failed to create on-demand request", errorData);

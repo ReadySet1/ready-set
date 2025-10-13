@@ -41,8 +41,7 @@ export function OrderFilesManager({
 
       try {
         setIsLoading(true);
-        console.log("Fetching files for order:", orderNumber);
-
+        
         const response = await fetch(
           `/api/orders/${encodeURIComponent(orderNumber)}/files`,
         );
@@ -52,8 +51,7 @@ export function OrderFilesManager({
         }
 
         const responseData = await response.json();
-        console.log("Files fetched:", responseData);
-
+        
         let filesArray: any[] = [];
         if (Array.isArray(responseData)) {
           filesArray = responseData;
@@ -137,10 +135,7 @@ export function OrderFilesManager({
   }));
 
   // Add console logs for debugging
-  console.log(
-    `OrderFilesManager - Order type: ${order_type}, Order ID: ${orderId}`,
-  );
-
+  
   // Updated to use single object parameter
   const { onUpload, uploadedFiles, progresses, isUploading } = useUploadFile({
     bucketName: "fileUploader", // Use the fileUploader bucket consistently
@@ -163,16 +158,10 @@ export function OrderFilesManager({
   });
 
   // Add a console log to see what entity type we're passing to the FileUploader
-  console.log("FileUploader props:", {
-    category: "catering-order",
-    entityType: "catering",
-    entityId: orderId,
-  });
-
+  
   useEffect(() => {
     if (uploadedFiles.length > 0) {
-      console.log("New files uploaded:", uploadedFiles);
-
+      
       setAllFiles((prev) => {
         const newFiles = [...prev];
 
@@ -221,8 +210,7 @@ export function OrderFilesManager({
   // Updated handleUpload function to use FileWithPath
   const handleUpload = async (files: FileWithPath[]): Promise<void> => {
     try {
-      console.log("Starting upload for files:", files);
-      await onUpload(files);
+            await onUpload(files);
       toast({
         title: "Success",
         description: "Files uploaded successfully",

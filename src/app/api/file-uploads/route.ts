@@ -98,22 +98,16 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("Enhanced file upload API endpoint called");
-
+  
   // Debug environment variables (without exposing sensitive data)
-  console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not set');
-  console.log("Supabase Anon Key:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Set' : 'Not set');
-  console.log("Supabase Service Key:", process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Not set');
-
+      
   // Parse form data first to avoid issues with error handling
   const formData = await request.formData();
-  console.log("Form data keys:", Array.from(formData.keys()));
-
+  
   // Initialize storage buckets to ensure they exist before upload
   try {
     await initializeStorageBuckets();
-    console.log("Storage buckets initialized successfully");
-  } catch (initError) {
+      } catch (initError) {
     console.error("Error initializing storage buckets:", initError);
     // Continue anyway - bucket creation errors shouldn't prevent uploads if buckets already exist
   }
@@ -123,8 +117,7 @@ export async function POST(request: NextRequest) {
   const entityId = formData.get("entityId") as string;
   let entityType = (formData.get("entityType") as string) || "job_application"; // Default value
   const category = (formData.get("category") as string) || "";
-  console.log("File upload request received with category:", category);
-
+  
   try {
 
     // Check rate limit for uploads
@@ -200,14 +193,12 @@ export async function POST(request: NextRequest) {
     // Special handling for job application categories with the new path structure
     if (category.startsWith("job-applications/temp/")) {
       uploadPath = category; // Use the full path as provided 
-      console.log("Using full category path for upload:", uploadPath);
-    } else if (category) {
+          } else if (category) {
       // For other categories, make a simple prefix/category hierarchy
       uploadPath = `${category}`;
     }
     
-    console.log("Final upload path:", uploadPath);
-    
+        
     const bucketName = (formData.get("bucketName") as string);
     
     // Normalize category if provided
@@ -217,24 +208,14 @@ export async function POST(request: NextRequest) {
     // This helps ensure consistent entity types
     if (normalizedCategory === "catering-order") {
       entityType = "catering";
-      console.log("Corrected entityType to 'catering' based on category 'catering-order'");
-    } else if (normalizedCategory === "on-demand") {
+          } else if (normalizedCategory === "on-demand") {
       entityType = "on_demand";
-      console.log("Corrected entityType to 'on_demand' based on category 'on-demand'");
-    }
+          }
     
-    console.log("Upload request details:", {
-      entityType,
-      entityId,
-      category: normalizedCategory,
-      fileName: file?.name,
-      fileSize: file?.size,
-    });
-
+    
     // Basic validation
     if (!file) {
-      console.log("Missing required field: file");
-      return NextResponse.json(
+            return NextResponse.json(
         { error: "Missing required field: file" },
         { status: 400 },
       );
@@ -250,8 +231,7 @@ export async function POST(request: NextRequest) {
       if (entityId.startsWith('temp_') || entityId.startsWith('temp-')) {
         // For temporary IDs, use as-is
         finalEntityId = entityId;
-        console.log(`Using temporary ID as-is: ${finalEntityId}`);
-      } else {
+              } else {
         // For normal IDs, use directly without temp prefix
         finalEntityId = entityId;
       }
@@ -260,8 +240,7 @@ export async function POST(request: NextRequest) {
       finalEntityId = `temp-${Date.now()}-${Math.random().toString(36).substring(2)}`;
     }
     
-    console.log(`Using entity ID for file upload: ${finalEntityId}`);
-    
+        
     // Upload file to Supabase Storage
     const fileExt = file.name.split(".").pop();
     const timestamp = Date.now();
@@ -274,25 +253,21 @@ export async function POST(request: NextRequest) {
     
     // Convert entityType to a consistent format
     const normalizedEntityType = entityType.toLowerCase();
-    console.log(`Normalized entityType: ${normalizedEntityType}`);
-    
+        
     // Determine which bucket and path to use based on entity type
     if (normalizedEntityType === "catering") {
       // Consistent path for catering orders
       filePath = `orders/catering/${finalEntityId}/${fileName}`;
-      console.log("Using orders/catering path for catering order");
-    } 
+          } 
     else if (normalizedEntityType === "on_demand") {
       // Consistent path for on-demand orders  
       filePath = `orders/on-demand/${finalEntityId}/${fileName}`;
-      console.log("Using orders/on-demand path for on-demand order");
-    }
+          }
     else if (normalizedEntityType === "job_application") {
       // For job application type, check if ID is a temp ID or real UUID
       if (finalEntityId.startsWith('temp_') || finalEntityId.startsWith('temp-')) {
         // Skip UUID validation for temp job application IDs
-        console.log("Using job-applications/temp path for temp job application uploads");
-        filePath = `job-applications/temp/${finalEntityId}/${fileName}`;
+                filePath = `job-applications/temp/${finalEntityId}/${fileName}`;
       } else {
         // Only try to validate as UUID for non-temp IDs
         try {
@@ -301,24 +276,19 @@ export async function POST(request: NextRequest) {
           });
           
           if (jobApp) {
-            console.log("Valid job application ID, using job-applications path");
-            filePath = `job-applications/${jobApp.id}/${fileName}`;
+                        filePath = `job-applications/${jobApp.id}/${fileName}`;
           } else {
             // Check if we have a specific upload path from the category
             if (uploadPath && uploadPath.startsWith("job-applications/temp/")) {
-              console.log(`Using specified upload path: ${uploadPath}`);
-              filePath = `${uploadPath}/${finalEntityId}/${fileName}`;
+                            filePath = `${uploadPath}/${finalEntityId}/${fileName}`;
             }
             // If category suggests this is a catering order but tagged as job application
             else if (normalizedCategory === "catering-order") {
-              console.log("Catering order detected by category, using orders/catering path");
-              filePath = `orders/catering/${finalEntityId}/${fileName}`;
+                            filePath = `orders/catering/${finalEntityId}/${fileName}`;
             } else if (normalizedCategory === "on-demand") {
-              console.log("On-demand order detected by category, using orders/on-demand path");
-              filePath = `orders/on-demand/${finalEntityId}/${fileName}`;
+                            filePath = `orders/on-demand/${finalEntityId}/${fileName}`;
             } else {
-              console.log("Using job-applications/temp path for temp job application uploads");
-              filePath = `job-applications/temp/${finalEntityId}/${fileName}`;
+                            filePath = `job-applications/temp/${finalEntityId}/${fileName}`;
             }
           }
         } catch (error) {
@@ -330,8 +300,7 @@ export async function POST(request: NextRequest) {
     else if (normalizedEntityType === "user") {
       // Consistent path for user files
       filePath = `users/${finalEntityId}/${fileName}`;
-      console.log("Using users path for user files");
-    }
+          }
     // Default handling for other types
     else {
       filePath = `${normalizedEntityType || 'general'}/${finalEntityId}/${fileName}`;
@@ -342,8 +311,7 @@ export async function POST(request: NextRequest) {
       storageBucket = bucketName;
     }
 
-    console.log(`Uploading file to storage path: ${filePath} in bucket: ${storageBucket}`);
-
+    
     // Robust bucket checking and creation
     let bucketVerified = false;
 
@@ -368,8 +336,7 @@ export async function POST(request: NextRequest) {
         .list();
 
       if (!listError && data !== null) {
-        console.log(`Bucket '${storageBucket}' is accessible and verified`);
-        bucketVerified = true;
+                bucketVerified = true;
       } else {
         console.error(`Bucket '${storageBucket}' verification failed:`, listError);
 
@@ -382,12 +349,10 @@ export async function POST(request: NextRequest) {
           });
 
           if (!createError) {
-            console.log(`Successfully created bucket '${storageBucket}'`);
-            // Verify it was created successfully
+                        // Verify it was created successfully
             const { error: verifyError } = await supabase.storage.from(storageBucket).list();
             if (!verifyError) {
-              console.log(`Bucket '${storageBucket}' creation verified`);
-              bucketVerified = true;
+                            bucketVerified = true;
             } else {
               console.error(`Bucket '${storageBucket}' creation verification failed:`, verifyError);
             }
@@ -400,14 +365,12 @@ export async function POST(request: NextRequest) {
 
         // If bucket still not verified, try fallback
         if (!bucketVerified) {
-          console.log(`Bucket '${storageBucket}' not working, trying fallback to '${STORAGE_BUCKETS.DEFAULT}'`);
-          storageBucket = STORAGE_BUCKETS.DEFAULT;
+                    storageBucket = STORAGE_BUCKETS.DEFAULT;
 
           // Try to verify the default bucket
           const { error: defaultError } = await supabase.storage.from(storageBucket).list();
           if (!defaultError) {
-            console.log(`Default bucket '${storageBucket}' is accessible`);
-            bucketVerified = true;
+                        bucketVerified = true;
           }
         }
       }
@@ -419,8 +382,7 @@ export async function POST(request: NextRequest) {
       try {
         const { error: fallbackError } = await supabase.storage.from(storageBucket).list();
         if (!fallbackError) {
-          console.log(`Fallback bucket '${storageBucket}' is accessible`);
-          bucketVerified = true;
+                    bucketVerified = true;
         }
       } catch (fallbackError) {
         console.error(`Even fallback bucket '${storageBucket}' failed:`, fallbackError);
@@ -473,8 +435,7 @@ export async function POST(request: NextRequest) {
     const uploadStrategies = [
       // Strategy 1: Try Supabase storage with current bucket
       async () => {
-        console.log(`Attempting upload to bucket '${storageBucket}'`);
-        const result = await supabase.storage
+                const result = await supabase.storage
           .from(storageBucket)
           .upload(filePath, file, {
             upsert: true,
@@ -491,8 +452,7 @@ export async function POST(request: NextRequest) {
       // Strategy 2: Try with default bucket if current bucket fails
       async () => {
         if (storageBucket !== STORAGE_BUCKETS.DEFAULT) {
-          console.log(`Retrying upload with default bucket '${STORAGE_BUCKETS.DEFAULT}'`);
-          const result = await supabase.storage
+                    const result = await supabase.storage
             .from(STORAGE_BUCKETS.DEFAULT)
             .upload(filePath, file, {
               upsert: true,
@@ -521,8 +481,7 @@ export async function POST(request: NextRequest) {
             baseDelay: 1000
           },
           (error, attempt) => {
-            console.log(`Upload retry attempt ${attempt} for file ${file.name}:`, error.message);
-          }
+                      }
         );
 
         storageData = result.data;
@@ -536,8 +495,7 @@ export async function POST(request: NextRequest) {
 
         // If this is a bucket not found error, try the next strategy
         if (errorMessage.includes('Bucket not found') && strategy !== uploadStrategies[uploadStrategies.length - 1]) {
-          console.log('Trying next upload strategy...');
-          continue;
+                    continue;
         }
 
         // For other errors, we might want to stop trying
@@ -565,8 +523,7 @@ export async function POST(request: NextRequest) {
 
         // Run diagnostics to help debug the issue
         try {
-          console.log("Running storage diagnostics...");
-          await diagnoseStorageIssues();
+                    await diagnoseStorageIssues();
         } catch (diagError) {
           console.error("Diagnostics failed:", diagError);
         }
@@ -653,17 +610,14 @@ export async function POST(request: NextRequest) {
 
     // CRITICAL FIX: Set the proper foreign key based on either category or entityType
     // This ensures files are associated with the correct records
-    console.log(`Setting entity ID for type: ${entityType} and category: ${normalizedCategory}`);
-    
+        
     try {
       // First, prioritize category for determining the correct foreign key
       if (normalizedCategory === "catering-order" || normalizedCategory === "catering" || entityType === "catering") {
-        console.log(`Evaluating cateringRequestId for: ${finalEntityId}`);
-        
+                
         // Only set cateringRequestId if it's NOT a temporary ID
         if (finalEntityId && !finalEntityId.startsWith('temp-') && !finalEntityId.startsWith('temp_')) {
-          console.log(`Setting cateringRequestId to: ${finalEntityId}`);
-          dbData.cateringRequestId = finalEntityId;
+                    dbData.cateringRequestId = finalEntityId;
           
           // Double-check the catering request exists
           try {
@@ -672,8 +626,7 @@ export async function POST(request: NextRequest) {
             });
             
             if (cateringRequest) {
-              console.log(`Verified catering request exists: ID=${finalEntityId}`);
-              // Make sure category is set consistently to improve retrieval
+                            // Make sure category is set consistently to improve retrieval
               dbData.category = "catering-order";
               dbData.isTemporary = false;
             } else {
@@ -689,8 +642,7 @@ export async function POST(request: NextRequest) {
             dbData.cateringRequestId = null;
           }
         } else if (finalEntityId) {
-          console.log(`Skipping cateringRequestId for temporary ID: ${finalEntityId}`);
-          // For temporary IDs, mark the file as temporary and do NOT set the cateringRequestId
+                    // For temporary IDs, mark the file as temporary and do NOT set the cateringRequestId
           dbData.isTemporary = true;
           dbData.cateringRequestId = null;
           dbData.category = "catering-order";
@@ -698,12 +650,10 @@ export async function POST(request: NextRequest) {
       } else if (normalizedCategory === "on-demand" || entityType === "on_demand") {
         // Similar logic for on-demand requests
         if (finalEntityId && !finalEntityId.startsWith('temp-') && !finalEntityId.startsWith('temp_')) {
-          console.log(`Setting onDemandId to: ${finalEntityId}`);
-          dbData.onDemandId = finalEntityId;
+                    dbData.onDemandId = finalEntityId;
           dbData.isTemporary = false;
         } else if (finalEntityId) {
-          console.log(`Skipping onDemandId for temporary ID: ${finalEntityId}`);
-          dbData.isTemporary = true;
+                    dbData.isTemporary = true;
           dbData.onDemandId = null;
           // Store in category for retrieval
           dbData.category = `on-demand`;
@@ -718,32 +668,27 @@ export async function POST(request: NextRequest) {
             });
             
             if (jobApp) {
-              console.log(`Setting jobApplicationId to: ${finalEntityId} (verified)`);
-              dbData.jobApplicationId = finalEntityId;
+                            dbData.jobApplicationId = finalEntityId;
               dbData.isTemporary = false;
             } else {
-              console.log(`JobApplication ${finalEntityId} not found, not setting foreign key`);
-              dbData.jobApplicationId = null;
+                            dbData.jobApplicationId = null;
               dbData.isTemporary = true;
               // Keep the original category rather than modifying it
             }
           } catch (error) {
-            console.log(`Error finding job application with ID ${finalEntityId}, treating as temporary`, error);
-            dbData.jobApplicationId = null;
+                        dbData.jobApplicationId = null;
             dbData.isTemporary = true;
           }
         } else if (finalEntityId) {
           // For temp IDs, don't try to look up in database at all
-          console.log(`Using temporary ID for job application: ${finalEntityId}`);
-          dbData.jobApplicationId = null;
+                    dbData.jobApplicationId = null;
           dbData.isTemporary = true;
           // Keep the original category rather than modifying it
         }
       } else if (entityType === "user") {
         // For user files, we need to set the userId field
         if (finalEntityId && !finalEntityId.startsWith('temp-') && !finalEntityId.startsWith('temp_')) {
-          console.log(`Setting userId to: ${finalEntityId} for user file`);
-          dbData.userId = finalEntityId;
+                    dbData.userId = finalEntityId;
           
           // Check if user exists
           try {
@@ -752,8 +697,7 @@ export async function POST(request: NextRequest) {
             });
             
             if (userProfile) {
-              console.log(`Verified user exists: ID=${finalEntityId}`);
-              dbData.isTemporary = false;
+                            dbData.isTemporary = false;
             } else {
               console.warn(`User with ID ${finalEntityId} not found in database`);
               dbData.isTemporary = true;
@@ -772,8 +716,7 @@ export async function POST(request: NextRequest) {
           dbData.category = `user`;
         }
       } else {
-        console.log(`No specific entity ID field set for type: ${entityType} and category: ${normalizedCategory}`);
-        // For safety, ensure all fields are null if undefined or temp
+                // For safety, ensure all fields are null if undefined or temp
         if (finalEntityId && (finalEntityId.startsWith('temp-') || finalEntityId.startsWith('temp_'))) {
           dbData.isTemporary = true;
           dbData.cateringRequestId = null;
@@ -792,8 +735,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the database record with retry logic
-    console.log("Creating database record with data:", dbData);
-
+    
     let fileUpload;
     try {
       const dbOperation = async () => {
@@ -810,8 +752,7 @@ export async function POST(request: NextRequest) {
           baseDelay: 1000
         },
         (error, attempt) => {
-          console.log(`Database record creation retry attempt ${attempt}:`, error.message);
-        }
+                  }
       );
     } catch (error) {
       console.error("Database record creation failed after retries:", error);
@@ -841,8 +782,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Database record created successfully:", fileUpload.id);
-
+    
     return NextResponse.json({
       success: true,
       file: {
@@ -915,11 +855,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    console.log('DELETE /api/file-uploads called with params:', {
-      fileUrl,
-      fileId: fileIdParam
-    });
-
+    
     if (!fileUrl && !fileIdParam) {
       return NextResponse.json(
         { error: "Either fileUrl or fileId is required" },
@@ -943,8 +879,7 @@ export async function DELETE(request: NextRequest) {
         );
       }
 
-      console.log('Found file record by ID:', fileRecord.fileName);
-    } else {
+          } else {
       // Find file by URL
       fileRecord = await prisma.fileUpload.findFirst({
         where: { 
@@ -953,15 +888,13 @@ export async function DELETE(request: NextRequest) {
       });
 
       if (!fileRecord) {
-        console.log('File record not found for URL:', fileUrl);
-        return NextResponse.json(
+                return NextResponse.json(
           { error: "File not found" },
           { status: 404 },
         );
       }
 
-      console.log('Found file record by URL:', fileRecord.fileName);
-    }
+          }
 
     // Determine the bucket and path from the fileUrl
     let bucketName = STORAGE_BUCKETS.DEFAULT;
@@ -981,10 +914,8 @@ export async function DELETE(request: NextRequest) {
         // The path is everything after the bucket name
         filePath = pathParts.slice(publicIndex + 2).join('/');
         
-        console.log('Extracted storage details:', { bucketName, filePath });
-      } else {
-        console.log('Could not parse storage path from URL:', fileRecord.fileUrl);
-        // Use default path construction as fallback
+              } else {
+                // Use default path construction as fallback
         filePath = fileRecord.fileUrl.split('/').pop() || '';
       }
     } catch (error) {
@@ -998,8 +929,7 @@ export async function DELETE(request: NextRequest) {
 
     // Delete from Supabase storage
     if (filePath) {
-      console.log(`Attempting to delete from bucket '${bucketName}', path: ${filePath}`);
-      
+            
       const { error: storageError } = await supabase.storage
         .from(bucketName)
         .remove([filePath]);
@@ -1008,19 +938,16 @@ export async function DELETE(request: NextRequest) {
         console.error('Error deleting from storage:', storageError);
         // Continue anyway to delete the database record
       } else {
-        console.log('Successfully deleted from storage');
-      }
+              }
     } else {
-      console.log('No valid file path to delete from storage');
-    }
+          }
 
     // Delete from database
     await prisma.fileUpload.delete({
       where: { id: fileRecord.id },
     });
 
-    console.log('Successfully deleted file record from database');
-
+    
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Error deleting file:", error);

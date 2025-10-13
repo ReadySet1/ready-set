@@ -323,8 +323,7 @@ export async function POST(request: NextRequest) {
     
     // Reset query statistics (if pg_stat_statements is available)
     await prismaPooled.$queryRaw`SELECT pg_stat_reset()`.catch(() => {
-      console.log('pg_stat_reset not available - skipping');
-    });
+          });
 
     const response = NextResponse.json({
       success: true,
