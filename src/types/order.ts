@@ -14,6 +14,10 @@ export enum DriverStatus {
 export enum OrderStatus {
   ACTIVE = 'ACTIVE', // Match Prisma values
   ASSIGNED = 'ASSIGNED',
+  PENDING = 'PENDING',
+  CONFIRMED = 'CONFIRMED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  DELIVERED = 'DELIVERED',
   CANCELLED = 'CANCELLED',
   COMPLETED = 'COMPLETED'
 }
