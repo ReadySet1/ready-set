@@ -14,7 +14,7 @@ This document tracks all GitHub security alerts and provides a systematic approa
 | Priority | Count | Status |
 |----------|-------|--------|
 | Critical | 0 | ✅ Fixed |
-| High | 2 | 🔴 Open |
+| High | 0 | ✅ Fixed |
 | Low | 5 | 🟡 Open |
 
 ### CodeQL Alerts (19 total)
@@ -40,21 +40,26 @@ This document tracks all GitHub security alerts and provides a systematic approa
 - **GitHub**: [Alert #2](https://github.com/ReadySet1/ready-set/security/dependabot/2)
 - **Documentation**: [Fix Details](./docs/security-fixes/REA-156-form-data-fix.md)
 
-### 2. axios DoS Vulnerability
+### 2. ✅ axios DoS Vulnerability
 - **Type**: Dependabot
 - **Severity**: High
+- **Status**: ✅ **FIXED** (October 13, 2025)
 - **CVE**: CVE-2025-58754
-- **Fix**: Update axios package
-- **Estimated Time**: 3-4 hours
+- **Fix**: Updated axios from 1.10.0 → 1.12.2
+- **Time Taken**: 1 hour
 - **GitHub**: [Alert #10](https://github.com/ReadySet1/ready-set/security/dependabot/10)
+- **Branch**: `security/high-severity-dependabot-fixes`
 
-### 3. tar-fs Symlink Validation Bypass
+### 3. ✅ tar-fs Symlink Validation Bypass
 - **Type**: Dependabot
 - **Severity**: High
+- **Status**: ✅ **FIXED** (October 13, 2025)
 - **CVE**: CVE-2025-59343
-- **Fix**: Update tar-fs package
-- **Estimated Time**: 2-3 hours
+- **Fix**: Updated tar-fs to 3.1.1 via pnpm overrides
+- **Time Taken**: 2 hours
 - **GitHub**: [Alert #7](https://github.com/ReadySet1/ready-set/security/dependabot/7), [Alert #8](https://github.com/ReadySet1/ready-set/security/dependabot/8)
+- **Branch**: `security/high-severity-dependabot-fixes`
+- **Documentation**: [Fix Details](./docs/security-fixes/HIGH-SEVERITY-axios-tarfs-fixes.md)
 
 ## 🔍 CodeQL Issues (High Priority)
 
