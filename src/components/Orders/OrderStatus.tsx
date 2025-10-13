@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle, Clock, XCircle, Truck } from "lucide-react";
+import { CheckCircle, Clock, XCircle, Truck, AlertCircle, CheckCheck, PlayCircle, PackageCheck } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { OrderStatus, OrderType } from "@/types/order";
 
@@ -31,10 +31,18 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
         return "bg-blue-500 hover:bg-blue-600";
       case OrderStatus.ASSIGNED:
         return "bg-yellow-500 hover:bg-yellow-600";
+      case OrderStatus.PENDING:
+        return "bg-orange-500 hover:bg-orange-600";
+      case OrderStatus.CONFIRMED:
+        return "bg-green-500 hover:bg-green-600";
+      case OrderStatus.IN_PROGRESS:
+        return "bg-cyan-500 hover:bg-cyan-600";
+      case OrderStatus.DELIVERED:
+        return "bg-teal-500 hover:bg-teal-600";
       case OrderStatus.CANCELLED:
         return "bg-red-500 hover:bg-red-600";
       case OrderStatus.COMPLETED:
-        return "bg-green-500 hover:bg-green-600";
+        return "bg-emerald-500 hover:bg-emerald-600";
       default:
         return "bg-gray-500 hover:bg-gray-600";
     }
@@ -46,6 +54,14 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
         return <Clock className="mr-1 h-4 w-4" />;
       case OrderStatus.ASSIGNED:
         return <Truck className="mr-1 h-4 w-4" />;
+      case OrderStatus.PENDING:
+        return <AlertCircle className="mr-1 h-4 w-4" />;
+      case OrderStatus.CONFIRMED:
+        return <CheckCheck className="mr-1 h-4 w-4" />;
+      case OrderStatus.IN_PROGRESS:
+        return <PlayCircle className="mr-1 h-4 w-4" />;
+      case OrderStatus.DELIVERED:
+        return <PackageCheck className="mr-1 h-4 w-4" />;
       case OrderStatus.CANCELLED:
         return <XCircle className="mr-1 h-4 w-4" />;
       case OrderStatus.COMPLETED:
@@ -60,7 +76,11 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
       className={`${getStatusColor(status)} flex items-center capitalize text-white`}
     >
       {getStatusIcon(status)}
-      {status}
+      {/* Format status for display: convert IN_PROGRESS to "In Progress" */}
+      {status
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(" ")}
     </Badge>
   );
 };
@@ -104,8 +124,12 @@ export const OrderStatusCard: React.FC<OrderStatusProps> = ({
 
   // Get all available order statuses
   const availableStatuses: OrderStatus[] = [
+    OrderStatus.PENDING,
+    OrderStatus.CONFIRMED,
     OrderStatus.ACTIVE,
     OrderStatus.ASSIGNED,
+    OrderStatus.IN_PROGRESS,
+    OrderStatus.DELIVERED,
     OrderStatus.COMPLETED,
     OrderStatus.CANCELLED,
   ];
@@ -144,6 +168,18 @@ export const OrderStatusCard: React.FC<OrderStatusProps> = ({
                         {statusOption === OrderStatus.ASSIGNED && (
                           <Truck className="h-4 w-4" />
                         )}
+                        {statusOption === OrderStatus.PENDING && (
+                          <AlertCircle className="h-4 w-4" />
+                        )}
+                        {statusOption === OrderStatus.CONFIRMED && (
+                          <CheckCheck className="h-4 w-4" />
+                        )}
+                        {statusOption === OrderStatus.IN_PROGRESS && (
+                          <PlayCircle className="h-4 w-4" />
+                        )}
+                        {statusOption === OrderStatus.DELIVERED && (
+                          <PackageCheck className="h-4 w-4" />
+                        )}
                         {statusOption === OrderStatus.COMPLETED && (
                           <CheckCircle className="h-4 w-4" />
                         )}
@@ -151,7 +187,7 @@ export const OrderStatusCard: React.FC<OrderStatusProps> = ({
                           <XCircle className="h-4 w-4" />
                         )}
                         <span className="capitalize">
-                          {statusOption.replace("_", " ").toLowerCase()}
+                          {statusOption.replace(/_/g, " ").toLowerCase()}
                         </span>
                       </div>
                     </SelectItem>
