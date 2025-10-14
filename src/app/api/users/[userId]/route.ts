@@ -27,6 +27,25 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Handle "new" as a special case - it's not a valid UUID
+    if (userId === 'new') {
+      console.log('[GET /api/users/[userId]] Special case: userId="new", returning 404');
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    // Validate UUID format before querying database
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userId)) {
+      console.log(`[GET /api/users/[userId]] Invalid UUID format: ${userId}`);
+      return NextResponse.json(
+        { error: 'Invalid user ID format' },
+        { status: 400 }
+      );
+    }
     
     // SECURITY FIX: Remove dangerous admin panel bypass
     // All requests must go through proper authentication
@@ -179,6 +198,25 @@ export async function PUT(
     if (!userId) {
       return NextResponse.json(
         { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Handle "new" as a special case - it's not a valid UUID
+    if (userId === 'new') {
+      console.log('[PUT /api/users/[userId]] Special case: userId="new", cannot update');
+      return NextResponse.json(
+        { error: 'Cannot update a non-existent user' },
+        { status: 404 }
+      );
+    }
+
+    // Validate UUID format before querying database
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userId)) {
+      console.log(`[PUT /api/users/[userId]] Invalid UUID format: ${userId}`);
+      return NextResponse.json(
+        { error: 'Invalid user ID format' },
         { status: 400 }
       );
     }
@@ -406,6 +444,25 @@ export async function PATCH(
     if (!userId) {
       return NextResponse.json(
         { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Handle "new" as a special case - it's not a valid UUID
+    if (userId === 'new') {
+      console.log('[PATCH /api/users/[userId]] Special case: userId="new", cannot update');
+      return NextResponse.json(
+        { error: 'Cannot update a non-existent user' },
+        { status: 404 }
+      );
+    }
+
+    // Validate UUID format before querying database
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userId)) {
+      console.log(`[PATCH /api/users/[userId]] Invalid UUID format: ${userId}`);
+      return NextResponse.json(
+        { error: 'Invalid user ID format' },
         { status: 400 }
       );
     }
@@ -639,6 +696,25 @@ export async function DELETE(
     if (!userId) {
       return NextResponse.json(
         { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Handle "new" as a special case - it's not a valid UUID
+    if (userId === 'new') {
+      console.log('[DELETE /api/users/[userId]] Special case: userId="new", cannot delete');
+      return NextResponse.json(
+        { error: 'Cannot delete a non-existent user' },
+        { status: 404 }
+      );
+    }
+
+    // Validate UUID format before querying database
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userId)) {
+      console.log(`[DELETE /api/users/[userId]] Invalid UUID format: ${userId}`);
+      return NextResponse.json(
+        { error: 'Invalid user ID format' },
         { status: 400 }
       );
     }
