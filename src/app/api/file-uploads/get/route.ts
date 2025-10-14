@@ -22,6 +22,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Handle "new" as a special case - return empty file list
+    if (entityId === 'new') {
+      console.log('GET /api/file-uploads/get - Special case: entityId="new", returning empty list');
+      return NextResponse.json({
+        success: true,
+        files: [],
+      });
+    }
+
+    // Validate UUID format before querying database
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(entityId)) {
+      console.log(`GET /api/file-uploads/get - Invalid UUID format: ${entityId}`);
+      return NextResponse.json(
+        { error: "Invalid entity ID format" },
+        { status: 400 }
+      );
+    }
+
     // Build where clause for DB query
     const whereClause: any = {};
 
