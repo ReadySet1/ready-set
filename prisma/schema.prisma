@@ -40,6 +40,8 @@ model Profile {
   updatedAt           DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
   isTemporaryPassword Boolean           @default(false)
   deletedAt           DateTime?         @db.Timestamptz(6)
+  deletedBy           String?           @db.Uuid
+  deletionReason      String?
   accounts            Account[]
   createdAddresses    Address[]         @relation("AddressCreatedBy")
   cateringRequests    CateringRequest[]
@@ -50,14 +52,40 @@ model Profile {
   onDemandRequests     OnDemand[]
   sessions             Session[]
   userAddresses        UserAddress[]
-  clientConfigurations ClientConfiguration[] @relation("ClientConfigurations")
-  calculationHistory   CalculationHistory[]   @relation("CalculationHistory")
+  deletedByUser        Profile?                @relation("UserDeletedBy", fields: [deletedBy], references: [id])
+  deletedUsers         Profile[]               @relation("UserDeletedBy")
+  auditLogs            UserAudit[]
+  performedAudits      UserAudit[]             @relation("UserAuditPerformer")
+  clientConfigurations ClientConfiguration[]   @relation("ClientConfigurations")
+  calculationHistory   CalculationHistory[]    @relation("CalculationHistory")
 
   @@index([email])
   @@index([type])
   @@index([status])
+  @@index([deletedAt])
+  @@index([deletedBy])
   @@index([type, deletedAt]) // Dashboard vendor counting optimization
   @@map("profiles")
+}
+
+model UserAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  action      String   // CREATE, UPDATE, DELETE, RESTORE, etc.
+  performedBy String?  @db.Uuid
+  changes     Json?    // Store the changes made (before/after values)
+  reason      String?  // Reason for the action
+  metadata    Json?    // Additional metadata
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  
+  user        Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  performer   Profile? @relation("UserAuditPerformer", fields: [performedBy], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([performedBy])
+  @@index([createdAt])
+  @@map("user_audits")
 }
 
 model Account {
@@ -565,4 +593,41 @@ enum TestimonialCategory {
   CLIENTS
   VENDORS
   DRIVERS
+}
+
+model DeliveryConfiguration {
+  id                    String   @id @default(uuid()) @db.Uuid
+  configId              String   @unique @map("config_id") // e.g., 'ready-set-food-standard'
+  clientName            String   @map("client_name")
+  vendorName            String   @map("vendor_name")
+  description           String?
+  isActive              Boolean  @default(true) @map("is_active")
+
+  // Pricing Settings (stored as JSON for flexibility)
+  pricingTiers          Json     @map("pricing_tiers")
+  mileageRate           Decimal  @db.Decimal(10, 2) @map("mileage_rate")
+  distanceThreshold     Decimal  @db.Decimal(5, 2) @map("distance_threshold")
+
+  // Daily Drive Discounts
+  dailyDriveDiscounts   Json     @map("daily_drive_discounts")
+
+  // Driver Pay Settings
+  driverPaySettings     Json     @map("driver_pay_settings")
+
+  // Bridge Toll Settings
+  bridgeTollSettings    Json     @map("bridge_toll_settings")
+
+  // Custom Settings (flexible for future additions)
+  customSettings        Json?    @map("custom_settings")
+
+  // Metadata
+  createdAt             DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt             DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+  createdBy             String?  @db.Uuid @map("created_by")
+  notes                 String?
+
+  @@index([configId])
+  @@index([isActive])
+  @@index([clientName])
+  @@map("delivery_configurations")
 }

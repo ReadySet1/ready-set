@@ -168,8 +168,7 @@ export async function GET(request: NextRequest) {
         });
 
         const queryDuration = performance.now() - queryStartTime;
-        console.log(`✅ Dashboard metrics queries executed in ${queryDuration.toFixed(2)}ms`);
-
+        
         totalRevenue = results.totalRevenue;
         deliveriesRequests = results.deliveriesRequests;
         salesTotal = results.salesTotal;

@@ -391,13 +391,44 @@ export async function getActiveShift(driverId: string): Promise<DriverShift | nu
 export async function updateDriverLocation(
   driverId: string,
   location: LocationUpdate
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string }>;
+export async function updateDriverLocation(
+  locations: LocationUpdate[]
+): Promise<boolean>;
+export async function updateDriverLocation(
+  driverIdOrLocations: string | LocationUpdate[],
+  location?: LocationUpdate
+): Promise<{ success: boolean; error?: string } | boolean> {
   try {
+    // Handle array of locations (legacy test interface)
+    if (Array.isArray(driverIdOrLocations)) {
+      const locations = driverIdOrLocations;
+      if (locations.length === 0) {
+        return true; // Empty array is valid
+      }
+      
+      // Process each location update
+      for (const loc of locations) {
+        const result = await updateDriverLocation(loc.driverId, loc);
+        if (!result.success) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // Handle single location update (current interface)
+    const driverId = driverIdOrLocations;
+    if (!location) {
+      return { success: false, error: 'Location is required' };
+    }
+
     // Validate UUID
     const uuid = z.string().uuid().safeParse(driverId);
     if (!uuid.success) {
       return { success: false, error: 'Invalid driverId' };
     }
+    
     // Insert location record
     await prisma.$executeRawUnsafe(`
       INSERT INTO driver_locations (
@@ -459,9 +490,6 @@ export async function updateDriverLocation(
   }
 }
 
-/**
- * Get shift history for a driver
- */
 /**
  * Pause a driver shift (without specifying break type)
  * This is a convenience function that starts a 'rest' break

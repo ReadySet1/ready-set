@@ -32,8 +32,7 @@ export function FormSection({
     (error: Error) => {
       // Save form state before error occurs
       if (preserveFormData) {
-        console.log(`Saving form state for ${formName} before error`);
-        // This would typically save the current form values
+                // This would typically save the current form values
         // saveState(`form_${formName}`, formData);
       }
     },
@@ -45,8 +44,7 @@ export function FormSection({
     if (preserveFormData) {
       const savedState = getState(`form_${formName}`);
       if (savedState) {
-        console.log(`Restoring form state for ${formName}`);
-        // This would typically restore form values
+                // This would typically restore form values
       }
     }
   }, [formName, preserveFormData, getState]);

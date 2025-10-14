@@ -32,6 +32,13 @@ import {
   Filter,
   Mail,
   Phone,
+  Trash2,
+  RotateCcw,
+  AlertTriangle,
+  Eye,
+  EyeOff,
+  History,
+  ShieldAlert,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -60,11 +67,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import toast, { Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { UserType, UserStatus } from "@/types/prisma";
+import { logger } from "@/utils/logger";
 import {
   ApiTypeUtils,
   ApiUserTypeFilter,
@@ -83,6 +102,19 @@ interface User {
   companyName?: string | null;
   status: UserStatus; // Now uses uppercase enum values
   createdAt: string;
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  deletionReason?: string | null;
+}
+
+interface DeletedUser extends User {
+  deletedAt: string;
+  deletedBy: string;
+  deletionReason?: string | null;
+  deletedByUser?: {
+    name?: string | null;
+    email: string;
+  };
 }
 
 // --- Status and Type Configuration using uppercase enum values ---
@@ -178,7 +210,9 @@ interface UsersClientProps {
 
 const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
   // --- State ---
+  const [activeTab, setActiveTab] = useState<"active" | "deleted">("active");
   const [users, setUsers] = useState<User[]>([]);
+  const [deletedUsers, setDeletedUsers] = useState<DeletedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -188,9 +222,26 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<string>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  // Delete/Restore related state
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deletionReason, setDeletionReason] = useState("");
+
+  // Restore related state
+  const [userToRestore, setUserToRestore] = useState<DeletedUser | null>(null);
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  // Permanent delete related state
+  const [userToPermanentlyDelete, setUserToPermanentlyDelete] =
+    useState<DeletedUser | null>(null);
+  const [showPermanentDeleteDialog, setShowPermanentDeleteDialog] =
+    useState(false);
+  const [isPermanentlyDeleting, setIsPermanentlyDeleting] = useState(false);
+  const [permanentDeletionReason, setPermanentDeletionReason] = useState("");
+
   const { toast } = useToast();
   const router = useRouter();
   const supabase = createClient();
@@ -199,247 +250,202 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
   const normalizedUserType = ApiTypeUtils.normalizeUserType(userType);
   const canDeleteUsers =
     normalizedUserType === "ADMIN" || normalizedUserType === "SUPER_ADMIN";
+  const canPermanentlyDelete = normalizedUserType === "SUPER_ADMIN";
 
-  // --- Data Fetching ---
+  // --- Data Fetching Effect ---
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout | null = null;
-    let isMounted = true; // Flag to prevent state updates on unmounted component
+    let isMounted = true;
 
-    const fetchUsers = async () => {
+    // Move fetch functions inside useEffect to avoid dependency issues
+    const fetchActiveUsers = async () => {
+      const params = new URLSearchParams();
+      params.append("page", page.toString());
+      params.append("limit", ITEMS_PER_PAGE.toString());
+      if (searchTerm) params.append("search", searchTerm);
+      if (statusFilter !== "all") params.append("status", statusFilter);
+      if (typeFilter !== "all") params.append("type", typeFilter);
+      params.append("sort", sortField);
+      params.append("direction", sortDirection);
+
+      const apiUrl = `/api/users?${params.toString()}`;
+
+      // Get the session and ensure authentication
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("No active session - please log in again");
+      }
+
+      const response = await fetch(apiUrl, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          errorData = null;
+        }
+
+        let errorMessage = "An unexpected error occurred";
+        if (errorData?.error) {
+          errorMessage = errorData.error;
+        } else if (response.status === 403) {
+          errorMessage = "You don't have permission to access this resource";
+        } else if (response.status === 401) {
+          errorMessage = "Please log in again to continue";
+        } else if (response.status === 500) {
+          errorMessage = "Server error. Please try again later.";
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      return data;
+    };
+
+    const fetchDeletedUsers = async () => {
+      const params = new URLSearchParams();
+      params.append("page", page.toString());
+      params.append("limit", ITEMS_PER_PAGE.toString());
+      if (searchTerm) params.append("search", searchTerm);
+      if (typeFilter !== "all") params.append("type", typeFilter);
+      params.append("sort", sortField);
+      params.append("direction", sortDirection);
+
+      const apiUrl = `/api/users/deleted?${params.toString()}`;
+
+      // Get the session and ensure authentication
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("No active session - please log in again");
+      }
+
+      const response = await fetch(apiUrl, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          errorData = null;
+        }
+
+        let errorMessage = "An unexpected error occurred";
+        if (errorData?.error) {
+          errorMessage = errorData.error;
+        } else if (response.status === 403) {
+          errorMessage = "You don't have permission to access this resource";
+        } else if (response.status === 401) {
+          errorMessage = "Please log in again to continue";
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      return data;
+    };
+
+    const fetchData = async () => {
       if (!isMounted) return;
 
       try {
-        // Set loading state at the beginning of the fetch attempt
         setIsLoading(true);
         setError(null);
 
-        // Build query params
-        const params = new URLSearchParams();
-        params.append("page", page.toString());
-        params.append("limit", ITEMS_PER_PAGE.toString());
-        if (searchTerm) params.append("search", searchTerm);
-        if (statusFilter !== "all") params.append("status", statusFilter);
-        if (typeFilter !== "all") params.append("type", typeFilter);
-        params.append("sort", sortField);
-        params.append("direction", sortDirection);
+        let data;
+        if (activeTab === "active") {
+          data = await fetchActiveUsers();
 
-        const apiUrl = `/api/users?${params.toString()}`;
-
-        // Send event to Highlight for debugging
-        if (typeof window !== "undefined" && window.H) {
-          window.H.track("admin_users_fetch_attempt", {
-            url: apiUrl,
-            page,
-            searchTerm,
-            statusFilter,
-            typeFilter,
-            timestamp: new Date().toISOString(),
-          });
-        }
-
-        // Get the session and ensure authentication
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-          throw new Error("No active session - please log in again");
-        }
-
-        const response = await fetch(apiUrl, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          let errorData;
-          try {
-            errorData = await response.json();
-          } catch (parseError) {
-            // If response body is not JSON, use default error
-            errorData = null;
+          // Validate and process active users data
+          let validatedUsers: User[] = [];
+          if (Array.isArray(data.users)) {
+            validatedUsers = data.users
+              .filter((user: any) => user && user.id && user.email)
+              .map((user: any) => ({
+                ...user,
+                type:
+                  ApiTypeUtils.normalizeUserType(user.type) !== "all"
+                    ? (ApiTypeUtils.normalizeUserType(user.type) as UserType)
+                    : ("VENDOR" as UserType),
+                status:
+                  ApiTypeUtils.normalizeUserStatus(user.status) !== "all"
+                    ? (ApiTypeUtils.normalizeUserStatus(
+                        user.status,
+                      ) as UserStatus)
+                    : ("PENDING" as UserStatus),
+                name: user.name || user.contact_name || null,
+                createdAt: user.createdAt || new Date().toISOString(),
+              }));
           }
 
-          // Enhanced error handling with specific error types
-          let errorMessage = "An unexpected error occurred";
-
-          if (errorData) {
-            // Handle structured API errors
-            if (errorData.code === "VALIDATION_ERROR") {
-              errorMessage = `Invalid data: ${errorData.error}`;
-              if (errorData.field) {
-                errorMessage += ` (Field: ${errorData.field})`;
-              }
-            } else if (errorData.code === "DUPLICATE_EMAIL") {
-              errorMessage = "This email address is already in use";
-            } else if (errorData.code === "USER_NOT_FOUND") {
-              errorMessage = "User not found";
-            } else if (errorData.code === "CONSTRAINT_VIOLATION") {
-              errorMessage = "Data validation failed";
-            } else if (errorData.error) {
-              errorMessage = errorData.error;
-            }
-          } else {
-            // Fallback to HTTP status messages
-            if (response.status === 403) {
-              errorMessage =
-                "You don't have permission to access this resource";
-            } else if (response.status === 401) {
-              errorMessage = "Please log in again to continue";
-            } else if (response.status === 500) {
-              errorMessage = "Server error. Please try again later.";
-            } else {
-              errorMessage = `API Error: ${response.status} ${response.statusText}`;
-            }
+          if (isMounted) {
+            setUsers(validatedUsers);
+            setDeletedUsers([]); // Clear deleted users when viewing active
           }
-
-          // Track this error in Highlight with enhanced context
-          if (typeof window !== "undefined" && window.H) {
-            window.H.track("admin_users_api_error", {
-              status: response.status,
-              statusText: response.statusText,
-              url: apiUrl,
-              errorMessage,
-              errorCode: errorData?.code,
-              errorField: errorData?.field,
-              page,
-              searchTerm,
-              statusFilter,
-              typeFilter,
-              timestamp: new Date().toISOString(),
-            });
-          }
-
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json();
-
-        // Enhanced data validation with fallbacks
-        if (!data || typeof data !== "object") {
-          console.error(
-            "No data or invalid data type received from API:",
-            data,
-          );
-
-          // Track this validation error in Highlight with context
-          if (typeof window !== "undefined" && window.H) {
-            window.H.track("admin_users_invalid_data", {
-              dataType: typeof data,
-              hasData: !!data,
-              url: apiUrl,
-            });
-          }
-
-          throw new Error("No valid data received from API");
-        }
-
-        // Validate and fallback for users array
-        let validatedUsers: User[] = [];
-        if (Array.isArray(data.users)) {
-          validatedUsers = data.users
-            .filter((user: any) => user && user.id && user.email) // Filter out invalid users
-            .map((user: any) => ({
-              ...user,
-              // Apply fallbacks and normalize data
-              type:
-                ApiTypeUtils.normalizeUserType(user.type) !== "all"
-                  ? (ApiTypeUtils.normalizeUserType(user.type) as UserType)
-                  : ("VENDOR" as UserType), // Default fallback
-              status:
-                ApiTypeUtils.normalizeUserStatus(user.status) !== "all"
-                  ? (ApiTypeUtils.normalizeUserStatus(
-                      user.status,
-                    ) as UserStatus)
-                  : ("PENDING" as UserStatus), // Default fallback
-              name: user.name || user.contact_name || null,
-              createdAt: user.createdAt || new Date().toISOString(),
-            }));
         } else {
-          console.warn(
-            "Users array not found or invalid, using empty array fallback",
-          );
-          validatedUsers = [];
-        }
+          data = await fetchDeletedUsers();
 
-        // Validate and fallback for pagination data
-        const validatedTotalPages =
-          typeof data.totalPages === "number" && data.totalPages > 0
-            ? data.totalPages
-            : 1; // Default fallback
+          // Validate and process deleted users data
+          let validatedDeletedUsers: DeletedUser[] = [];
+          if (Array.isArray(data.users)) {
+            validatedDeletedUsers = data.users
+              .filter(
+                (user: any) => user && user.id && user.email && user.deletedAt,
+              )
+              .map((user: any) => ({
+                ...user,
+                type:
+                  ApiTypeUtils.normalizeUserType(user.type) !== "all"
+                    ? (ApiTypeUtils.normalizeUserType(user.type) as UserType)
+                    : ("VENDOR" as UserType),
+                status:
+                  ApiTypeUtils.normalizeUserStatus(user.status) !== "all"
+                    ? (ApiTypeUtils.normalizeUserStatus(
+                        user.status,
+                      ) as UserStatus)
+                    : ("PENDING" as UserStatus),
+                name: user.name || user.contact_name || null,
+                createdAt: user.createdAt || new Date().toISOString(),
+                deletedAt: user.deletedAt,
+                deletedBy: user.deletedBy,
+                deletionReason: user.deletionReason,
+                deletedByUser: user.deletedByUser,
+              }));
+          }
 
-        // Log validation issues for debugging
-        if (data.users && !Array.isArray(data.users)) {
-          console.warn("Users data is not an array:", typeof data.users);
-        }
-        if (validatedUsers.length !== (data.users?.length || 0)) {
-          console.warn(
-            `Filtered ${(data.users?.length || 0) - validatedUsers.length} invalid users from response`,
-          );
-        }
-
-        // Track validation stats
-        if (typeof window !== "undefined" && window.H) {
-          window.H.track("admin_users_data_validation", {
-            originalCount: data.users?.length || 0,
-            validatedCount: validatedUsers.length,
-            filteredCount: (data.users?.length || 0) - validatedUsers.length,
-            totalPages: validatedTotalPages,
-            url: apiUrl,
-          });
+          if (isMounted) {
+            setDeletedUsers(validatedDeletedUsers);
+            setUsers([]); // Clear active users when viewing deleted
+          }
         }
 
         if (isMounted) {
-          setUsers(validatedUsers);
-          setTotalPages(validatedTotalPages);
-
-          // Report successful fetch to Highlight
-          if (typeof window !== "undefined" && window.H) {
-            window.H.track("admin_users_fetch_success", {
-              url: apiUrl,
-              count: validatedUsers.length,
-              totalPages: validatedTotalPages,
-              page: page,
-              originalCount: data.users?.length || 0,
-            });
-          }
+          setTotalPages(
+            typeof data.totalPages === "number" && data.totalPages > 0
+              ? data.totalPages
+              : 1,
+          );
         }
       } catch (error) {
         console.error("API Fetch Error:", error);
-
-        // Report error to Highlight directly
-        if (typeof window !== "undefined" && window.H) {
-          // Ensure the error is properly formatted for Highlight
-          try {
-            if (error instanceof Error) {
-              window.H.consumeError(error);
-            } else {
-              window.H.consumeError(new Error(String(error)));
-            }
-
-            // Additional tracking with more context
-            window.H.track("admin_users_fetch_error", {
-              message: error instanceof Error ? error.message : String(error),
-              stack: error instanceof Error ? error.stack : undefined,
-              page,
-              filters: {
-                search: searchTerm,
-                status: statusFilter,
-                type: typeFilter,
-                sort: sortField,
-                direction: sortDirection,
-              },
-              timestamp: new Date().toISOString(),
-            });
-          } catch (highlightError) {
-            console.error(
-              "Failed to report error to Highlight:",
-              highlightError,
-            );
-          }
-        }
 
         if (isMounted) {
           setError(
@@ -447,34 +453,32 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
               ? error.message
               : "An unknown error occurred while fetching users",
           );
-          setUsers([]); // Clear users on error
-          setTotalPages(1); // Reset pagination on error
+          setUsers([]);
+          setDeletedUsers([]);
+          setTotalPages(1);
         }
       } finally {
-        // Ensure loading is set to false only after everything, even errors
         if (isMounted) {
           setIsLoading(false);
         }
       }
     };
 
-    // --- Effect Logic ---
     // Clear any existing timer
     if (debounceTimer) clearTimeout(debounceTimer);
 
-    // Set a new timer to fetch users after a delay
+    // Set a new timer to fetch data after a delay
     debounceTimer = setTimeout(() => {
-      fetchUsers();
-    }, 300); // Debounce all fetches triggered by dependency changes
+      fetchData();
+    }, 300);
 
     // Cleanup function
     return () => {
-      isMounted = false; // Set flag when component unmounts
-      if (debounceTimer) clearTimeout(debounceTimer); // Clear timer on unmount or re-run
+      isMounted = false;
+      if (debounceTimer) clearTimeout(debounceTimer);
     };
-
-    // Fetch when page, filters, search, or sort changes.
   }, [
+    activeTab,
     page,
     statusFilter,
     typeFilter,
@@ -485,6 +489,12 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
   ]);
 
   // --- Handlers ---
+  const handleTabChange = (value: string) => {
+    setActiveTab(value as "active" | "deleted");
+    setPage(1); // Reset to first page on tab change
+    setSearchTerm(""); // Clear search when switching tabs
+  };
+
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > totalPages) return;
     setPage(newPage);
@@ -493,29 +503,26 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
 
   const handleStatusFilter = (status: ApiUserStatusFilter) => {
     setStatusFilter(status);
-    setPage(1); // Reset to first page on filter change
+    setPage(1);
   };
 
   const handleTypeFilter = (type: ApiUserTypeFilter) => {
     setTypeFilter(type);
-    setPage(1); // Reset to first page on filter change
+    setPage(1);
   };
 
   const handleSort = (field: string) => {
     if (field === sortField) {
-      // Toggle sort direction if clicking the same field
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
-      // Set new field and default to ascending
       setSortField(field);
       setSortDirection("asc");
     }
-    setPage(1); // Reset to first page on sort change
+    setPage(1);
   };
 
   const getSortIcon = (field: string) => {
     if (field !== sortField) return null;
-
     return sortDirection === "asc" ? (
       <ChevronDown className="ml-1 h-4 w-4 text-amber-600" />
     ) : (
@@ -523,10 +530,10 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
     );
   };
 
-  const handleDelete = async (userId: string) => {
+  // Soft Delete Handler
+  const handleSoftDelete = async (userId: string, reason: string) => {
     setIsDeleting(true);
     try {
-      // Get session for auth token
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -537,6 +544,7 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
           "Content-Type": "application/json",
           Authorization: session ? `Bearer ${session.access_token}` : "",
         },
+        body: JSON.stringify({ reason }),
         credentials: "include",
       });
 
@@ -547,16 +555,16 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
         );
       }
 
-      // On success, remove user from local state
+      // On success, remove user from active users list
       setUsers(users.filter((user) => user.id !== userId));
 
       toast({
-        title: "User deleted",
-        description: "The user has been successfully deleted.",
+        title: "User moved to trash",
+        description: "The user has been successfully moved to trash.",
         duration: 3000,
       });
     } catch (error) {
-      console.error("Delete Error:", error);
+      console.error("Soft Delete Error:", error);
       toast({
         title: "Error",
         description:
@@ -568,6 +576,108 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
       setUserToDelete(null);
       setShowDeleteDialog(false);
       setIsDeleting(false);
+      setDeletionReason("");
+    }
+  };
+
+  // Restore Handler
+  const handleRestore = async (userId: string) => {
+    setIsRestoring(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch(`/api/users/${userId}/restore`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: session ? `Bearer ${session.access_token}` : "",
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || `Failed to restore user: ${response.status}`,
+        );
+      }
+
+      // On success, remove user from deleted users list
+      setDeletedUsers(deletedUsers.filter((user) => user.id !== userId));
+
+      toast({
+        title: "User restored",
+        description: "The user has been successfully restored.",
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error("Restore Error:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to restore user",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setUserToRestore(null);
+      setShowRestoreDialog(false);
+      setIsRestoring(false);
+    }
+  };
+
+  // Permanent Delete Handler
+  const handlePermanentDelete = async (userId: string, reason: string) => {
+    setIsPermanentlyDeleting(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch(`/api/users/${userId}/purge`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: session ? `Bearer ${session.access_token}` : "",
+        },
+        body: JSON.stringify({ reason }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error ||
+            `Failed to permanently delete user: ${response.status}`,
+        );
+      }
+
+      // On success, remove user from deleted users list
+      setDeletedUsers(deletedUsers.filter((user) => user.id !== userId));
+
+      toast({
+        title: "User permanently deleted",
+        description: "The user has been permanently deleted from the system.",
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error("Permanent Delete Error:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to permanently delete user",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setUserToPermanentlyDelete(null);
+      setShowPermanentDeleteDialog(false);
+      setIsPermanentlyDeleting(false);
+      setPermanentDeletionReason("");
     }
   };
 
@@ -583,13 +693,66 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
               <div className="flex items-center space-x-2">
                 <h2 className="flex items-center text-xl font-bold text-slate-800">
                   <Users2 className="mr-2 h-5 w-5 text-amber-500" />
-                  Users
+                  User Management
                 </h2>
+              </div>
 
-                {/* --- Filter Dropdowns --- */}
+              <div className="ml-auto flex items-center space-x-2">
+                {/* --- Search Bar --- */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
+                  <Input
+                    type="text"
+                    placeholder={`Search ${activeTab === "active" ? "active" : "deleted"} users...`}
+                    className="w-[200px] pl-9 md:w-[300px]"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+
+                {/* --- Add User Button (only show on active tab) --- */}
+                {activeTab === "active" && (
+                  <Link href="/admin/users/new">
+                    <Button size="sm" className="whitespace-nowrap">
+                      <PlusCircle className="mr-1 h-4 w-4" />
+                      Add User
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            {/* --- Tabs Section --- */}
+            <div className="border-b bg-slate-50">
+              <Tabs value={activeTab} onValueChange={handleTabChange}>
+                <TabsList className="h-12 w-full justify-start rounded-none bg-transparent p-0">
+                  <TabsTrigger
+                    value="active"
+                    className="flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-3 data-[state=active]:border-amber-500 data-[state=active]:bg-transparent data-[state=active]:text-amber-600"
+                  >
+                    <Users2 className="h-4 w-4" />
+                    Active Users
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="deleted"
+                    className="flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-3 data-[state=active]:border-red-500 data-[state=active]:bg-transparent data-[state=active]:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Deleted Users
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            {/* --- Filters Section (only show on active tab for status filter) --- */}
+            <div className="flex flex-wrap items-center gap-3 border-b bg-slate-50 p-4">
+              {activeTab === "active" && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="ml-2">
+                    <Button variant="outline" size="sm">
                       <Filter className="mr-1 h-4 w-4" />
                       Status
                       {statusFilter !== "all" && (
@@ -612,58 +775,33 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
+              )}
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <Filter className="mr-1 h-4 w-4" />
-                      Type
-                      {typeFilter !== "all" && (
-                        <Badge variant="outline" className="ml-2">
-                          {ApiTypeUtils.getUserTypeDisplayLabel(
-                            typeFilter as UserType,
-                          )}
-                        </Badge>
-                      )}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {ApiTypeUtils.getUserTypeOptions().map((option) => (
-                      <DropdownMenuItem
-                        key={option.value}
-                        onClick={() => handleTypeFilter(option.value)}
-                      >
-                        {option.label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div className="ml-auto flex items-center space-x-2">
-                {/* --- Search Bar --- */}
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-                  <Input
-                    type="text"
-                    placeholder="Search users..."
-                    className="w-[200px] pl-9 md:w-[300px]"
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setPage(1); // Reset to first page on search
-                    }}
-                  />
-                </div>
-
-                {/* --- Add User Button --- */}
-                <Link href="/admin/users/new">
-                  <Button size="sm" className="whitespace-nowrap">
-                    <PlusCircle className="mr-1 h-4 w-4" />
-                    Add User
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Filter className="mr-1 h-4 w-4" />
+                    Type
+                    {typeFilter !== "all" && (
+                      <Badge variant="outline" className="ml-2">
+                        {ApiTypeUtils.getUserTypeDisplayLabel(
+                          typeFilter as UserType,
+                        )}
+                      </Badge>
+                    )}
                   </Button>
-                </Link>
-              </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {ApiTypeUtils.getUserTypeOptions().map((option) => (
+                    <DropdownMenuItem
+                      key={option.value}
+                      onClick={() => handleTypeFilter(option.value)}
+                    >
+                      {option.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {/* --- Error State --- */}
@@ -677,224 +815,395 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
               </div>
             )}
 
-            {/* --- Loading State --- */}
-            {isLoading ? (
-              <LoadingSkeleton />
-            ) : users.length > 0 ? (
-              <div className="overflow-auto">
-                <Table className="min-w-[800px]">
-                  <TableHeader className="bg-slate-50">
-                    <TableRow>
-                      <TableHead
-                        className="min-w-[200px] cursor-pointer"
-                        onClick={() => handleSort("name")}
-                      >
-                        <div className="flex items-center">
-                          <span>Name / Email</span>
-                          {getSortIcon("name")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="min-w-[100px] cursor-pointer"
-                        onClick={() => handleSort("type")}
-                      >
-                        <div className="flex items-center">
-                          <span>Type</span>
-                          {getSortIcon("type")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="min-w-[140px] cursor-pointer"
-                        onClick={() => handleSort("contact_number")}
-                      >
-                        <div className="flex items-center">
-                          <span>Phone</span>
-                          {getSortIcon("contact_number")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="min-w-[100px] cursor-pointer"
-                        onClick={() => handleSort("status")}
-                      >
-                        <div className="flex items-center">
-                          <span>Status</span>
-                          {getSortIcon("status")}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="min-w-[140px] cursor-pointer text-right"
-                        onClick={() => handleSort("createdAt")}
-                      >
-                        <div className="flex items-center justify-end">
-                          <span>Created</span>
-                          {getSortIcon("createdAt")}
-                        </div>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <AnimatePresence>
-                      {users.map((user) => {
-                        // Safely get type configuration with fallback
-                        const typeInfo = userTypeConfig[user.type] || {
-                          className: "bg-gray-100 text-gray-800",
-                          icon: null,
-                        };
-                        const statusInfo = statusConfig[user.status] || {
-                          className: "bg-gray-100 text-gray-800",
-                          icon: null,
-                        };
-
-                        // Check if created_at is a valid date
-                        const createdAtDate = new Date(user.createdAt);
-                        const isValidDate = !isNaN(createdAtDate.getTime());
-
-                        if (!isValidDate) {
-                          console.error(
-                            `Invalid date for user ${user.id}:`,
-                            user.createdAt,
-                          );
-                        }
-
-                        return (
-                          <motion.tr
-                            key={user.id}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="group hover:bg-slate-50"
+            {/* --- Content Section with Tabs --- */}
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
+              <TabsContent value="active" className="m-0">
+                {isLoading ? (
+                  <LoadingSkeleton />
+                ) : users.length > 0 ? (
+                  <div className="overflow-auto">
+                    <Table className="min-w-[800px]">
+                      <TableHeader className="bg-slate-50">
+                        <TableRow>
+                          <TableHead
+                            className="min-w-[200px] cursor-pointer"
+                            onClick={() => handleSort("name")}
                           >
-                            <TableCell>
-                              <Link
-                                href={`/admin/users/${user.id}`}
-                                className="font-medium text-slate-800 transition-colors hover:text-amber-600 group-hover:underline"
+                            <div className="flex items-center">
+                              <span>Name / Email</span>
+                              {getSortIcon("name")}
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="min-w-[100px] cursor-pointer"
+                            onClick={() => handleSort("type")}
+                          >
+                            <div className="flex items-center">
+                              <span>Type</span>
+                              {getSortIcon("type")}
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="min-w-[140px] cursor-pointer"
+                            onClick={() => handleSort("contact_number")}
+                          >
+                            <div className="flex items-center">
+                              <span>Phone</span>
+                              {getSortIcon("contact_number")}
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="min-w-[100px] cursor-pointer"
+                            onClick={() => handleSort("status")}
+                          >
+                            <div className="flex items-center">
+                              <span>Status</span>
+                              {getSortIcon("status")}
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="min-w-[140px] cursor-pointer text-right"
+                            onClick={() => handleSort("createdAt")}
+                          >
+                            <div className="flex items-center justify-end">
+                              <span>Created</span>
+                              {getSortIcon("createdAt")}
+                            </div>
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <AnimatePresence>
+                          {users.map((user) => {
+                            const typeInfo = userTypeConfig[user.type] || {
+                              className: "bg-gray-100 text-gray-800",
+                              icon: null,
+                            };
+                            const statusInfo = statusConfig[user.status] || {
+                              className: "bg-gray-100 text-gray-800",
+                              icon: null,
+                            };
+
+                            const createdAtDate = new Date(user.createdAt);
+                            const isValidDate = !isNaN(createdAtDate.getTime());
+
+                            return (
+                              <motion.tr
+                                key={user.id}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="group hover:bg-slate-50"
                               >
-                                <div>
-                                  {user.name ||
-                                    user.contact_name ||
-                                    "Unnamed User"}
-                                </div>
-                                <div className="text-sm text-slate-500">
-                                  {user.email}
-                                </div>
-                                {user.type === "VENDOR" && user.companyName && (
-                                  <div className="mt-1 text-xs font-medium text-amber-600">
-                                    🏢 {user.companyName}
+                                <TableCell>
+                                  <Link
+                                    href={`/admin/users/${user.id}`}
+                                    className="font-medium text-slate-800 transition-colors hover:text-amber-600 group-hover:underline"
+                                  >
+                                    <div>
+                                      {user.name ||
+                                        user.contact_name ||
+                                        "Unnamed User"}
+                                    </div>
+                                    <div className="text-sm text-slate-500">
+                                      {user.email}
+                                    </div>
+                                    {user.type === "VENDOR" &&
+                                      user.companyName && (
+                                        <div className="mt-1 text-xs font-medium text-amber-600">
+                                          🏢 {user.companyName}
+                                        </div>
+                                      )}
+                                  </Link>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    className={`${typeInfo.className} flex w-fit items-center gap-1 px-2 py-0.5 text-xs font-semibold`}
+                                  >
+                                    {typeInfo.icon}
+                                    {ApiTypeUtils.getUserTypeDisplayLabel(
+                                      user.type,
+                                    )}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-sm text-slate-600">
+                                  <div className="flex items-center gap-1">
+                                    <Phone className="h-3 w-3 text-slate-400" />
+                                    {user.contact_number || (
+                                      <span className="italic text-slate-400">
+                                        No phone
+                                      </span>
+                                    )}
                                   </div>
-                                )}
-                              </Link>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                className={`${typeInfo.className} flex w-fit items-center gap-1 px-2 py-0.5 text-xs font-semibold`}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    className={`${statusInfo.className} flex w-fit items-center gap-1 px-2 py-0.5 text-xs font-semibold`}
+                                  >
+                                    {statusInfo.icon}
+                                    {ApiTypeUtils.getUserStatusDisplayLabel(
+                                      user.status,
+                                    )}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right font-medium text-slate-600">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <span>
+                                      {isValidDate
+                                        ? createdAtDate.toLocaleDateString(
+                                            undefined,
+                                            {
+                                              year: "numeric",
+                                              month: "short",
+                                              day: "numeric",
+                                              timeZone: "UTC",
+                                            },
+                                          )
+                                        : "Invalid Date"}
+                                    </span>
+                                    {canDeleteUsers && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-orange-600 opacity-0 transition-opacity hover:bg-orange-50 hover:text-orange-700 group-hover:opacity-100"
+                                        onClick={() => {
+                                          setUserToDelete(user);
+                                          setShowDeleteDialog(true);
+                                        }}
+                                        disabled={user.type === "SUPER_ADMIN"}
+                                        title="Move to Trash"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        <span className="sr-only">
+                                          Move to Trash
+                                        </span>
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </motion.tr>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-100">
+                      <Users2 className="h-8 w-8 text-slate-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-800">
+                      No Active Users Found
+                    </h3>
+                    <p className="mt-1 max-w-md text-slate-500">
+                      No active users match your current filters. Try adjusting
+                      your search or filters.
+                    </p>
+                    <Link href="/admin/users/new" className="mt-4">
+                      <Button variant="outline" className="mt-2">
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add New User
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="deleted" className="m-0">
+                {isLoading ? (
+                  <LoadingSkeleton />
+                ) : deletedUsers.length > 0 ? (
+                  <div className="overflow-auto">
+                    <Table className="min-w-[900px]">
+                      <TableHeader className="bg-slate-50">
+                        <TableRow>
+                          <TableHead
+                            className="min-w-[200px] cursor-pointer"
+                            onClick={() => handleSort("name")}
+                          >
+                            <div className="flex items-center">
+                              <span>Name / Email</span>
+                              {getSortIcon("name")}
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="min-w-[100px] cursor-pointer"
+                            onClick={() => handleSort("type")}
+                          >
+                            <div className="flex items-center">
+                              <span>Type</span>
+                              {getSortIcon("type")}
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="min-w-[150px] cursor-pointer"
+                            onClick={() => handleSort("deletedAt")}
+                          >
+                            <div className="flex items-center">
+                              <span>Deleted Date</span>
+                              {getSortIcon("deletedAt")}
+                            </div>
+                          </TableHead>
+                          <TableHead className="min-w-[130px]">
+                            <span>Deleted By</span>
+                          </TableHead>
+                          <TableHead className="min-w-[150px]">
+                            <span>Reason</span>
+                          </TableHead>
+                          <TableHead className="min-w-[150px] text-right">
+                            Actions
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <AnimatePresence>
+                          {deletedUsers.map((user) => {
+                            const typeInfo = userTypeConfig[user.type] || {
+                              className: "bg-gray-100 text-gray-800",
+                              icon: null,
+                            };
+
+                            const deletedAtDate = new Date(user.deletedAt);
+                            const isValidDeletedDate = !isNaN(
+                              deletedAtDate.getTime(),
+                            );
+
+                            return (
+                              <motion.tr
+                                key={user.id}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="group bg-red-50/30 hover:bg-red-50/60"
                               >
-                                {typeInfo.icon}
-                                {ApiTypeUtils.getUserTypeDisplayLabel(
-                                  user.type,
-                                )}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-sm text-slate-600">
-                              <div className="flex items-center gap-1">
-                                <Phone className="h-3 w-3 text-slate-400" />
-                                {user.contact_number || (
-                                  <span className="italic text-slate-400">
-                                    No phone
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                className={`${statusInfo.className} flex w-fit items-center gap-1 px-2 py-0.5 text-xs font-semibold`}
-                              >
-                                {statusInfo.icon}
-                                {ApiTypeUtils.getUserStatusDisplayLabel(
-                                  user.status,
-                                )}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-medium text-slate-600">
-                              <div className="flex items-center justify-end gap-2">
-                                <span>
-                                  {isValidDate
-                                    ? createdAtDate.toLocaleDateString(
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-500" />
+                                    <div>
+                                      <div className="font-medium text-slate-700">
+                                        {user.name ||
+                                          user.contact_name ||
+                                          "Unnamed User"}
+                                      </div>
+                                      <div className="text-sm text-slate-500">
+                                        {user.email}
+                                      </div>
+                                      {user.type === "VENDOR" &&
+                                        user.companyName && (
+                                          <div className="mt-1 text-xs font-medium text-amber-600">
+                                            🏢 {user.companyName}
+                                          </div>
+                                        )}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    className={`${typeInfo.className} flex w-fit items-center gap-1 px-2 py-0.5 text-xs font-semibold opacity-70`}
+                                  >
+                                    {typeInfo.icon}
+                                    {ApiTypeUtils.getUserTypeDisplayLabel(
+                                      user.type,
+                                    )}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-sm text-slate-600">
+                                  {isValidDeletedDate
+                                    ? deletedAtDate.toLocaleDateString(
                                         undefined,
                                         {
                                           year: "numeric",
                                           month: "short",
                                           day: "numeric",
+                                          hour: "2-digit",
+                                          minute: "2-digit",
                                           timeZone: "UTC",
                                         },
                                       )
                                     : "Invalid Date"}
-                                </span>
-                                {canDeleteUsers && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-red-600 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-700 group-hover:opacity-100"
-                                    onClick={() => {
-                                      setUserToDelete(user);
-                                      setShowDeleteDialog(true);
-                                    }}
-                                    disabled={user.type === "SUPER_ADMIN"}
+                                </TableCell>
+                                <TableCell className="text-sm text-slate-600">
+                                  {user.deletedByUser?.name ||
+                                    user.deletedByUser?.email ||
+                                    "Unknown"}
+                                </TableCell>
+                                <TableCell className="text-sm text-slate-600">
+                                  <div
+                                    className="max-w-[150px] truncate"
+                                    title={
+                                      user.deletionReason ||
+                                      "No reason provided"
+                                    }
                                   >
-                                    <AlertCircle className="h-4 w-4" />
-                                    <span className="sr-only">Delete</span>
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </motion.tr>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              // --- Empty State ---
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-100">
-                  <Users2 className="h-8 w-8 text-slate-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-800">
-                  No Users Found
-                </h3>
-                <p className="mt-1 max-w-md text-slate-500">
-                  No{" "}
-                  {statusFilter !== "all" ? (
-                    <span className="font-medium">
-                      {ApiTypeUtils.getUserStatusDisplayLabel(
-                        statusFilter as UserStatus,
-                      )}
-                    </span>
-                  ) : (
-                    ""
-                  )}
-                  {typeFilter !== "all" && statusFilter !== "all" ? " " : ""}
-                  {typeFilter !== "all" ? (
-                    <span className="font-medium">
-                      {ApiTypeUtils.getUserTypeDisplayLabel(
-                        typeFilter as UserType,
-                      )}
-                    </span>
-                  ) : (
-                    ""
-                  )}
-                  users match your current filters. Try adjusting your search or
-                  filters.
-                </p>
-                <Link href="/admin/users/new" className="mt-4">
-                  <Button variant="outline" className="mt-2">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add New User
-                  </Button>
-                </Link>
-              </div>
-            )}
+                                    {user.deletionReason || (
+                                      <span className="italic text-slate-400">
+                                        No reason provided
+                                      </span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    {canDeleteUsers && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-green-600 opacity-0 transition-opacity hover:bg-green-50 hover:text-green-700 group-hover:opacity-100"
+                                        onClick={() => {
+                                          setUserToRestore(user);
+                                          setShowRestoreDialog(true);
+                                        }}
+                                        title="Restore User"
+                                      >
+                                        <RotateCcw className="h-4 w-4" />
+                                        <span className="sr-only">Restore</span>
+                                      </Button>
+                                    )}
+                                    {canPermanentlyDelete && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-red-600 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-700 group-hover:opacity-100"
+                                        onClick={() => {
+                                          setUserToPermanentlyDelete(user);
+                                          setShowPermanentDeleteDialog(true);
+                                        }}
+                                        title="Permanently Delete"
+                                      >
+                                        <ShieldAlert className="h-4 w-4" />
+                                        <span className="sr-only">
+                                          Permanently Delete
+                                        </span>
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </motion.tr>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-100">
+                      <Trash2 className="h-8 w-8 text-slate-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-800">
+                      No Deleted Users Found
+                    </h3>
+                    <p className="mt-1 max-w-md text-slate-500">
+                      No deleted users match your current filters. Deleted users
+                      will appear here when moved to trash.
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
 
             {/* --- Pagination Section --- */}
             {!isLoading && totalPages > 1 && (
@@ -943,31 +1252,178 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
         </CardContent>
       </Card>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      {/* Soft Delete Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-orange-500" />
+              Move User to Trash
+            </DialogTitle>
+            <DialogDescription>
+              This will move &quot;
+              {userToDelete?.name || userToDelete?.email || "the selected user"}
+              &quot; to the trash. The user can be restored later if needed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="deletion-reason">
+                Reason for deletion (optional)
+              </Label>
+              <Textarea
+                id="deletion-reason"
+                placeholder="e.g., Account violation, User request, Duplicate account..."
+                value={deletionReason}
+                onChange={(e) => setDeletionReason(e.target.value)}
+                className="mt-2"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setUserToDelete(null);
+                setDeletionReason("");
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            {canDeleteUsers && (
+              <Button
+                onClick={() =>
+                  userToDelete &&
+                  handleSoftDelete(userToDelete.id, deletionReason)
+                }
+                disabled={isDeleting || userToDelete?.type === "SUPER_ADMIN"}
+                className="bg-orange-600 text-white hover:bg-orange-700"
+              >
+                {isDeleting ? "Moving to Trash..." : "Move to Trash"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Restore Dialog */}
+      <AlertDialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-green-500" />
+              Restore User
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This action will delete the user &quot;
-              {userToDelete?.name || userToDelete?.email || "Selected user"}
-              &quot;. This action cannot be undone.
+              This will restore &quot;
+              {userToRestore?.name ||
+                userToRestore?.email ||
+                "the selected user"}
+              &quot; and make them active again. They will regain access to the
+              system.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isRestoring}>Cancel</AlertDialogCancel>
             {canDeleteUsers && (
               <AlertDialogAction
-                onClick={() => userToDelete && handleDelete(userToDelete.id)}
-                disabled={isDeleting}
-                className="bg-red-600 text-white hover:bg-red-700"
+                onClick={() => userToRestore && handleRestore(userToRestore.id)}
+                disabled={isRestoring}
+                className="bg-green-600 text-white hover:bg-green-700"
               >
-                {isDeleting ? "Deleting..." : "Delete"}
+                {isRestoring ? "Restoring..." : "Restore User"}
               </AlertDialogAction>
             )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Permanent Delete Dialog */}
+      <Dialog
+        open={showPermanentDeleteDialog}
+        onOpenChange={setShowPermanentDeleteDialog}
+      >
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <ShieldAlert className="h-5 w-5" />
+              Permanently Delete User
+            </DialogTitle>
+            <DialogDescription className="text-red-600">
+              ⚠️ <strong>DANGER:</strong> This action cannot be undone. The user
+              &quot;
+              {userToPermanentlyDelete?.name ||
+                userToPermanentlyDelete?.email ||
+                "the selected user"}
+              &quot; and all their data will be permanently removed from the
+              system.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Warning</AlertTitle>
+              <AlertDescription>
+                This will permanently delete all user data, including their
+                orders, addresses, and file uploads. This action is irreversible
+                and should only be used for GDPR compliance or security reasons.
+              </AlertDescription>
+            </Alert>
+            <div>
+              <Label htmlFor="permanent-deletion-reason">
+                Reason for permanent deletion (required - minimum 10 characters)
+              </Label>
+              <Textarea
+                id="permanent-deletion-reason"
+                placeholder="e.g., GDPR data deletion request, Security breach, Legal requirement..."
+                value={permanentDeletionReason}
+                onChange={(e) => setPermanentDeletionReason(e.target.value)}
+                className="mt-2"
+                rows={3}
+                required
+              />
+              <div className="text-muted-foreground mt-1 text-sm">
+                {permanentDeletionReason.length}/10 characters minimum
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPermanentDeleteDialog(false);
+                setUserToPermanentlyDelete(null);
+                setPermanentDeletionReason("");
+              }}
+              disabled={isPermanentlyDeleting}
+            >
+              Cancel
+            </Button>
+            {canPermanentlyDelete && (
+              <Button
+                onClick={() =>
+                  userToPermanentlyDelete &&
+                  handlePermanentDelete(
+                    userToPermanentlyDelete.id,
+                    permanentDeletionReason,
+                  )
+                }
+                disabled={
+                  isPermanentlyDeleting || permanentDeletionReason.length < 10
+                }
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                {isPermanentlyDeleting
+                  ? "Permanently Deleting..."
+                  : "Permanently Delete"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -27,11 +27,7 @@ export class FormSubmissionService {
     }
 
     try {
-      console.log(
-        "Processing submission with data:",
-        JSON.stringify(data, null, 2),
-      );
-
+      
       // Extract base fields and specifications
       const {
         companyName,
@@ -69,15 +65,7 @@ export class FormSubmissionService {
         },
       });
 
-      console.log("Created submission:", {
-        id: submission.id,
-        formType: submission.formType,
-        specifications:
-          typeof submission.specifications === "string"
-            ? JSON.parse(submission.specifications)
-            : submission.specifications,
-      });
-
+      
       return submission;
     } catch (error) {
       console.error("Error in form submission:", error);

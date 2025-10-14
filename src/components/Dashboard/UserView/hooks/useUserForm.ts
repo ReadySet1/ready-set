@@ -54,11 +54,9 @@ export const useUserForm = (
   // Load initial data
   useEffect(() => {
     const loadUserData = async () => {
-      console.log("[useUserForm] Fetching user data...");
-      const userData = await fetchUser();
+            const userData = await fetchUser();
       if (userData) {
-        console.log("[useUserForm] User data fetched, attempting reset with:", JSON.stringify(userData, null, 2));
-        try {
+                try {
           // Ensure array fields are arrays, not null
           const formattedUserData = {
             ...userData,
@@ -69,13 +67,11 @@ export const useUserForm = (
             provisions: userData.provisions || [],
           };
           methods.reset(formattedUserData);
-          console.log("[useUserForm] Form reset executed successfully with formatted data.");
-        } catch (error) {
+                  } catch (error) {
           console.error("[useUserForm] Error during form reset:", error);
         }
       } else {
-        console.log("[useUserForm] No user data fetched, skipping reset.");
-      }
+              }
     };
     
     loadUserData();
@@ -98,11 +94,7 @@ export const useUserForm = (
         ...baseSubmitData
       } = data;
 
-      console.log("DEBUG - Form submission data:");
-      console.log("  - User type:", type);
-      console.log("  - countiesServed:", countiesServed);
-      console.log("  - counties:", counties);
-
+                        
       // Prepare data for the API, matching Prisma schema fields
       const submitData: any = {
         ...baseSubmitData, // Includes id, email, address fields, headCount, frequency, status, etc.
@@ -111,14 +103,11 @@ export const useUserForm = (
         // Fix: Handle counties field properly - both vendors and clients use 'counties' field in database
         counties: (() => {
           if (type === 'vendor' && countiesServed && Array.isArray(countiesServed)) {
-            console.log("Using countiesServed for vendor:", countiesServed);
-            return countiesServed.join(",");
+                        return countiesServed.join(",");
           } else if (type === 'client' && counties && Array.isArray(counties)) {
-            console.log("Using counties for client:", counties);
-            return counties.join(",");
+                        return counties.join(",");
           }
-          console.log("No counties data found or not arrays");
-          return null;
+                    return null;
         })(),
         
         // timeNeeded field in Prisma is String?
@@ -155,9 +144,7 @@ export const useUserForm = (
         submitData.contact_name = displayName;
       }
       
-      console.log("Final data being sent to API:", submitData);
-      console.log("Counties field value:", submitData.counties);
-
+            
       // Get the current auth token
       let authToken = session?.access_token;
       
@@ -167,16 +154,14 @@ export const useUserForm = (
           const supabase = createClient();
           const { data } = await supabase.auth.getSession();
           authToken = data.session?.access_token;
-          console.log("Retrieved new auth token from Supabase:", !!authToken);
-        } catch (tokenError) {
+                  } catch (tokenError) {
           console.error("Failed to get auth token:", tokenError);
         }
       }
       
       // Check if we have the admin mode flag
       const isAdminMode = typeof window !== 'undefined' && localStorage.getItem('admin_mode') === 'true';
-      console.log("Admin mode active:", isAdminMode);
-
+      
       const response = await fetch(`/api/users/${userId}`, {
         method: "PUT",
         headers: {
@@ -204,8 +189,7 @@ export const useUserForm = (
       }
 
       const result = await response.json();
-      console.log("API Response:", result);
-      
+            
       await fetchUser(); // Refetch to ensure UI is updated
       toast.success("User saved successfully!");
       

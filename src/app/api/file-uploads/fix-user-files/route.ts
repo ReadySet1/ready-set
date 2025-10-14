@@ -9,8 +9,7 @@ import { prisma } from "@/utils/prismaDB";
  * It can be used by admins to repair database inconsistencies.
  */
 export async function POST(request: NextRequest) {
-  console.log("Fix user files API endpoint called");
-  
+    
   try {
     // Verify admin permissions
     const supabase = await createClient();
@@ -53,8 +52,7 @@ export async function POST(request: NextRequest) {
       whereClause.fileUrl = { contains: `/user/${userId}/` };
     }
     
-    console.log("Finding files with query:", whereClause);
-    
+        
     // Find affected files
     const filesToFix = await prisma.fileUpload.findMany({
       where: whereClause,
@@ -64,8 +62,7 @@ export async function POST(request: NextRequest) {
       }
     });
     
-    console.log(`Found ${filesToFix.length} files to fix`);
-    
+        
     // If dry run, just return the list of files that would be updated
     if (dryRun) {
       return NextResponse.json({

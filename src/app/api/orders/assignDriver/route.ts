@@ -3,6 +3,7 @@ import { prisma } from "@/utils/prismaDB";
 import { Prisma } from "@prisma/client";
 import { Decimal } from "@/types/prisma";
 import { createClient } from "@/utils/supabase/server";
+import { validateUserNotSoftDeleted, getActiveDriversForDispatch } from "@/lib/soft-delete-handlers";
 
 function serializeData(obj: unknown): number | string | Date | Record<string, unknown> | unknown {
   if (typeof obj === "bigint") {
@@ -39,8 +40,7 @@ export async function POST(request: Request) {
 
     
     const body = await request.json();
-    console.log("Request body:", body);
-    
+        
     const { orderId, driverId, orderType } = body;
 
     if (!orderId || !driverId || !orderType) {
@@ -51,13 +51,22 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate that the driver is not soft-deleted
+    const driverValidation = await validateUserNotSoftDeleted(driverId);
+    if (!driverValidation.isValid) {
+      console.error("Driver validation failed:", driverValidation.error);
+      return NextResponse.json(
+        { error: driverValidation.error },
+        { status: 403 }
+      );
+    }
+
     try {
       const result = await prisma.$transaction(async (prisma: any) => {
         let order;
         let dispatch;
 
-        console.log(`Fetching ${orderType} order with ID: ${orderId}`);
-
+        
         // Fetch the order based on orderType
         if (orderType === "catering") {
           order = await prisma.cateringRequest.findUnique({

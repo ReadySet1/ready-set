@@ -64,13 +64,7 @@ const AuthButtons: React.FC<AuthButtonsProps> = ({ sticky, pathUrl }) => {
 
   // Add debug logging to track state changes
   useEffect(() => {
-    console.log("🔍 AuthButtons state:", {
-      hasUser: !!user,
-      userRole,
-      isLoading,
-      userEmail: user?.email,
-    });
-  }, [user, userRole, isLoading]);
+      }, [user, userRole, isLoading]);
 
   // Show minimal loading state - skeleton loader
   if (isLoading) {

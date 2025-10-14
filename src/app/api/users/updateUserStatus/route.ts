@@ -72,8 +72,7 @@ export async function PUT(request: Request) {
       }, { status: 400 });
     }
 
-    console.log(`Attempting to update user ${userId} status to ${newStatus}`);
-    
+        
     // Convert lowercase status string to uppercase enum value
     const statusEnum = newStatus.toUpperCase() as UserStatus;
 
@@ -98,8 +97,7 @@ export async function PUT(request: Request) {
       }
     });
 
-    console.log("User status updated successfully:", updatedUser);
-
+    
     return NextResponse.json({
       message: "User status updated successfully",
       user: updatedUser

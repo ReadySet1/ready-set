@@ -59,13 +59,7 @@ export const sendDownloadEmail = async (
       throw new Error("Invalid email format");
     }
 
-    console.log("Attempting to send email:", {
-      apiKeyExists: !!RESEND_API_KEY,
-      apiKeyLength: RESEND_API_KEY?.length,
-      fromEmail: FROM_EMAIL,
-      toEmail: userEmail,
-    });
-
+    
     // Get the title from the resource map or use a default if not found
     const resourceTitle = resource?.title || "Resource";
 
@@ -92,8 +86,7 @@ export const sendDownloadEmail = async (
       throw new Error(`Resend API error: ${error.message}`);
     }
 
-    console.log('Resend API Response:', data);
-    return true;
+        return true;
 
   } catch (error) {
     console.error("Download email failed:", {

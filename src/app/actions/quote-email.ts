@@ -74,13 +74,7 @@ type DeliveryFormData =
 
 const formatCommonFields = (data: BaseFormData) => {
   // Log common fields for debugging
-  console.log('Formatting common fields:', {
-    name: data.name,
-    email: data.email,
-    companyName: data.companyName,
-    selectedCounties: data.selectedCounties
-  });
-
+  
   return `
     <h3>Client Information</h3>
     <ul>
@@ -112,8 +106,7 @@ const formatCommonFields = (data: BaseFormData) => {
 
 const formatSpecificFields = (data: DeliveryFormData): string => {
   // Log specific fields for debugging
-  console.log('Formatting specific fields for type:', data.formType, data);
-
+  
   switch (data.formType) {
     case 'bakery':
       return `
@@ -179,20 +172,7 @@ const formatSpecificFields = (data: DeliveryFormData): string => {
 
 const sendDeliveryQuoteRequest = async (data: DeliveryFormData) => {
   // Log the complete incoming data
-  console.log('Received form submission:', {
-    formType: data.formType,
-    name: data.name,
-    email: data.email,
-    companyName: data.companyName,
-    selectedCounties: data.selectedCounties,
-    // Log type-specific fields
-    specificFields: data.formType === 'bakery' ? {
-      deliveryTypes: data.deliveryTypes,
-      deliveryFrequency: data.deliveryFrequency,
-      supplyPickupFrequency: data.supplyPickupFrequency
-    } : 'Other form type'
-  });
-
+  
   const formTypeLabels = {
     bakery: 'Bake Goods',
     flower: 'Flower',
@@ -239,8 +219,7 @@ const sendDeliveryQuoteRequest = async (data: DeliveryFormData) => {
     );
 
     if (response.status === 201) {
-      console.log('Email sent successfully');
-      return { 
+            return { 
         success: true, 
         message: "Your quote request was sent successfully." 
       };

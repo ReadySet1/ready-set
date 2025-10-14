@@ -9,7 +9,7 @@ import { Session, SupabaseClient } from "@supabase/supabase-js";
 import { CateringFormData, Address } from "@/types/catering";
 import { CateringNeedHost } from "@/types/order";
 import { createClient } from "@/utils/supabase/client";
-import AddressManager from "../AddressManager";
+import { AddressSelector } from "@/components/AddressSelector";
 import {
   Loader2,
   AlertCircle,
@@ -26,6 +26,7 @@ import { FileWithPath } from "react-dropzone";
 import { HostSection } from "./HostSection";
 import { useUser } from "@/contexts/UserContext";
 import { getOrderCreationRedirectRoute } from "@/utils/routing";
+import OrderConfirmationModal from "./OrderConfirmationModal";
 
 // Form field components
 const InputField: React.FC<{
@@ -230,9 +231,16 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   const [session, setSession] = useState<Session | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [addresses, setAddresses] = useState<Address[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadedFileKeys, setUploadedFileKeys] = useState<string[]>([]);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [orderConfirmation, setOrderConfirmation] = useState<{
+    orderNumber: string;
+    customerName: string;
+    customerEmail: string;
+    orderId: string;
+    emailSent: boolean;
+  } | null>(null);
 
   // Initialize Supabase client
   useEffect(() => {
@@ -327,19 +335,6 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
     };
   }, [supabase]);
 
-  const handleAddressesLoaded = useCallback((loadedAddresses: Address[]) => {
-    console.log("📥 handleAddressesLoaded called in CateringRequestForm", {
-      count: loadedAddresses.length,
-      addresses: loadedAddresses.map((a) => ({
-        id: a.id,
-        street1: a.street1,
-        city: a.city,
-        state: a.state,
-      })),
-    });
-    setAddresses(loadedAddresses);
-  }, []);
-
   const needHost = watch("needHost");
 
   // Initialize file upload hook
@@ -374,8 +369,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
       if (!fileKeys.length) return;
 
       try {
-        console.log("Cleaning up uploaded files:", fileKeys);
-        const response = await fetch("/api/file-uploads/cleanup", {
+                const response = await fetch("/api/file-uploads/cleanup", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -394,8 +388,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         }
 
         const result = await response.json();
-        console.log("Cleanup result:", result);
-      } catch (error) {
+              } catch (error) {
         console.error("Error cleaning up files:", error);
       }
     },
@@ -435,10 +428,8 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
 
     const files = Array.from(event.target.files) as FileWithPath[];
     try {
-      console.log("Starting upload of", files.length, "files");
-      const result = await onUpload(files);
-      console.log("Upload completed successfully:", result);
-
+            const result = await onUpload(files);
+      
       // Set uploaded files to form data
       setValue("attachments", result);
 
@@ -458,8 +449,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
   // Remove file handler
   const removeFile = async (fileToRemove: UploadedFile) => {
     try {
-      console.log("Removing file:", fileToRemove);
-
+      
       // Remove from UI immediately
       const updatedFiles = uploadedFiles.filter(
         (file) => file.key !== fileToRemove.key,
@@ -473,18 +463,14 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
 
       // Delete the file
       await deleteFile(fileToRemove.key);
-      console.log("File removed successfully");
-    } catch (error) {
+          } catch (error) {
       console.error("Error removing file:", error);
       toast.error("Failed to remove file. Please try again.");
     }
   };
 
   const onSubmit = async (data: ExtendedCateringFormData) => {
-    console.log("Starting catering form submission:", {
-      formData: { ...data, attachments: data.attachments?.length },
-    });
-
+    
     // In admin mode, require a client prop
     if (isAdminMode && !client) {
       toast.error("A client must be selected for admin submission.");
@@ -538,17 +524,12 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         }
       }
 
-      console.log("Order submitted successfully:", responseData);
-
+      
       // IMPORTANT FIX: Update the file entity IDs to link them to the catering request
       if (responseData.orderId && uploadedFiles.length > 0) {
-        console.log(
-          `Updating file entity IDs to associate with catering request ID: ${responseData.orderId}`,
-        );
-        try {
+                try {
           await updateEntityId(responseData.orderId);
-          console.log("Files successfully linked to catering request");
-        } catch (fileUpdateError) {
+                  } catch (fileUpdateError) {
           console.error(
             "Error linking files to catering request:",
             fileUpdateError,
@@ -557,17 +538,22 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         }
       }
 
-      reset();
-      toast.success("Catering request submitted successfully!");
-      setErrorMessage("");
+      // Get customer info for modal
+      const customerName = session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'Customer';
+      const customerEmail = session?.user?.email || '';
 
-      // --- Redirect based on user role instead of hardcoded vendor dashboard ---
-      const redirectRoute = getOrderCreationRedirectRoute(userRole);
-      console.log(
-        `Redirecting user to ${redirectRoute} based on role: ${userRole}`,
-      );
-      router.push(redirectRoute);
-      // --- End Redirect Logic ---
+      // Set order confirmation data and show modal
+      setOrderConfirmation({
+        orderNumber: data.orderNumber,
+        customerName: customerName,
+        customerEmail: customerEmail,
+        orderId: responseData.orderId,
+        emailSent: responseData.emailSent !== false, // Default to true if not specified
+      });
+      setShowConfirmationModal(true);
+
+      reset();
+      setErrorMessage("");
     } catch (error) {
       console.error("Error submitting order:", error);
       setErrorMessage(
@@ -595,18 +581,16 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         <h3 className="mb-4 border-b border-gray-200 pb-2 text-lg font-medium text-gray-800">
           Pickup Location
         </h3>
-        <AddressManager
-          onAddressesLoaded={handleAddressesLoaded}
-          onAddressSelected={(addressId) => {
-            const selectedAddress = addresses.find(
-              (addr) => addr.id === addressId,
-            );
-            if (selectedAddress) {
-              setValue("pickupAddress", selectedAddress);
-            }
+        <AddressSelector
+          mode="client"
+          type="pickup"
+          onSelect={(address) => {
+            setValue("pickupAddress", address);
           }}
-          showFilters={true}
-          showManagementButtons={true}
+          selectedAddressId={watch("pickupAddress")?.id}
+          showFavorites
+          showRecents
+          allowAddNew
         />
       </div>
 
@@ -728,18 +712,16 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         <h3 className="mb-5 border-b border-gray-200 pb-3 text-lg font-medium text-gray-800">
           Delivery Details
         </h3>
-        <AddressManager
-          onAddressesLoaded={handleAddressesLoaded}
-          onAddressSelected={(addressId) => {
-            const selectedAddress = addresses.find(
-              (addr) => addr.id === addressId,
-            );
-            if (selectedAddress) {
-              setValue("deliveryAddress", selectedAddress);
-            }
+        <AddressSelector
+          mode="client"
+          type="delivery"
+          onSelect={(address) => {
+            setValue("deliveryAddress", address);
           }}
-          showFilters={true}
-          showManagementButtons={true}
+          selectedAddressId={watch("deliveryAddress")?.id}
+          showFavorites
+          showRecents
+          allowAddNew
         />
       </div>
 
@@ -870,6 +852,24 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           )}
         </button>
       </div>
+
+      {/* Order Confirmation Modal */}
+      {orderConfirmation && (
+        <OrderConfirmationModal
+          isOpen={showConfirmationModal}
+          onClose={() => {
+            setShowConfirmationModal(false);
+            // Redirect after modal is closed
+            const redirectRoute = getOrderCreationRedirectRoute(userRole);
+            router.push(redirectRoute);
+          }}
+          orderNumber={orderConfirmation.orderNumber}
+          customerName={orderConfirmation.customerName}
+          customerEmail={orderConfirmation.customerEmail}
+          orderId={orderConfirmation.orderId}
+          emailSent={orderConfirmation.emailSent}
+        />
+      )}
     </form>
   );
 };

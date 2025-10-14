@@ -12,17 +12,7 @@ export function trackAuthRedirect(
   details?: Record<string, any>
 ) {
   // Log authentication redirect for debugging
-  console.log('Auth redirect:', {
-    from,
-    to,
-    reason,
-    timestamp: new Date().toISOString(),
-    details,
-    params: typeof window !== 'undefined' 
-      ? Object.fromEntries(new URLSearchParams(window.location.search)) 
-      : {}
-  });
-}
+  }
 
 /**
  * Track server-side authentication checks for protected routes

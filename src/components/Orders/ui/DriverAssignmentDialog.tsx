@@ -144,12 +144,7 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
 
   // Debug logging
   useEffect(() => {
-    console.log("🔍 DialogFooter state:", {
-      selectedDriver,
-      isAssigning,
-      isDriverAssigned,
-    });
-  }, [selectedDriver, isAssigning, isDriverAssigned]);
+      }, [selectedDriver, isAssigning, isDriverAssigned]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

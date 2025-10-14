@@ -8,15 +8,9 @@ export async function GET(request: NextRequest) {
     const entityType = searchParams.get("entityType") || "user";
     const category = searchParams.get("category");
 
-    console.log('GET /api/file-uploads/get - Request params:', {
-      entityId,
-      entityType,
-      category
-    });
-
+    
     if (!entityId) {
-      console.log('Missing entityId parameter');
-      return NextResponse.json(
+            return NextResponse.json(
         { error: "Entity ID is required" },
         { status: 400 }
       );
@@ -55,19 +49,16 @@ export async function GET(request: NextRequest) {
         startsWith: normalizedCategory
       };
       
-      console.log(`Using startsWith condition for category: ${normalizedCategory}`);
-    }
+          }
 
     // Handle entity type normalization
     const normalizedEntityType = entityType.toLowerCase();
-    console.log('Normalized entity type:', normalizedEntityType);
-    
+        
     // Critical fix: If category is catering-order and entityType is user, we need to query by cateringRequestId
     if (category?.toLowerCase() === "catering-order") {
       // For catering orders, regardless of entityType parameter, use cateringRequestId
       whereClause.cateringRequestId = entityId;
-      console.log('Using cateringRequestId for catering-order category');
-    } else if (normalizedEntityType === "user") {
+          } else if (normalizedEntityType === "user") {
       whereClause.userId = entityId;
     } else if (normalizedEntityType === "catering" || normalizedEntityType === "catering-order") {
       whereClause.cateringRequestId = entityId;
@@ -83,8 +74,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('Prisma query whereClause:', whereClause);
-
+    
     const files = await prisma.fileUpload.findMany({
       where: whereClause,
       orderBy: {
@@ -92,8 +82,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    console.log('Found files:', files);
-
+    
     return NextResponse.json({
       success: true,
       files: files.map((file: any) => ({

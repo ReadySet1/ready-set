@@ -47,17 +47,14 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log('Attempting to create submission...');
-    const submission = await FormSubmissionService.createSubmission({
+        const submission = await FormSubmissionService.createSubmission({
       formType,
       formData: body.formData,
     });
 
-    console.log(`Submission created with ID: ${submission.id}`);
-    
+        
     try {
-      console.log('Attempting to send notification email...');
-      await EmailService.sendFormSubmissionNotification({
+            await EmailService.sendFormSubmissionNotification({
         formType,
         formData: body.formData,
         submissionId: submission.id

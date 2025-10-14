@@ -7,11 +7,9 @@ import { PrismaClient } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
   try {
-    console.log('🔍 Vendor Debug API: Starting comprehensive diagnosis...');
-    
+        
     // Test 1: Prisma client and database connection
-    console.log('🔍 Test 1: Prisma client and database connection...');
-    let prismaTest: any = { success: false, error: 'Unknown error' };
+        let prismaTest: any = { success: false, error: 'Unknown error' };
     try {
       const testQuery = await prisma.$queryRaw`SELECT 1 as test`;
       
@@ -75,8 +73,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Test 2: Authentication
-    console.log('🔍 Test 2: Authentication test...');
-    let authTest: any = { success: false, error: 'Unknown error' };
+        let authTest: any = { success: false, error: 'Unknown error' };
     try {
       const user = await getCurrentUser();
       authTest = {
@@ -92,8 +89,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Test 3: Vendor access with detailed debugging
-    console.log('🔍 Test 3: Vendor access test...');
-    let vendorTest: any = { success: false, error: 'Unknown error' };
+        let vendorTest: any = { success: false, error: 'Unknown error' };
     try {
       const hasAccess = await checkVendorAccess();
       vendorTest = {
@@ -109,8 +105,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Test 4: Direct profile test with fresh client
-    console.log('🔍 Test 4: Direct profile test with fresh client...');
-    let profileTest: any = { success: false, error: 'Unknown error' };
+        let profileTest: any = { success: false, error: 'Unknown error' };
     try {
       const freshClientForTest = new PrismaClient();
       const profileCount = await freshClientForTest.profile.count();
@@ -131,8 +126,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Test 5: Environment variables
-    console.log('🔍 Test 5: Environment variables...');
-    const envTest = {
+        const envTest = {
       NODE_ENV: process.env.NODE_ENV,
       NEXT_RUNTIME: process.env.NEXT_RUNTIME,
       hasDataBaseUrl: !!process.env.DATABASE_URL,

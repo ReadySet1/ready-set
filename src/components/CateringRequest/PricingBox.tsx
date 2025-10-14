@@ -7,8 +7,7 @@ const PricingBox = ({ product }: { product: Price }) => {
 
   // POST request
   const handleSubscription = async (e: any) => {
-   console.log("testing")
-  };
+     };
 
   return (
     <div className="w-full px-4 md:w-1/2 lg:w-1/3">

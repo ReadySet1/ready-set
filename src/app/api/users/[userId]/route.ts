@@ -17,8 +17,7 @@ import { UserType } from '@/types/prisma';
 import { PrismaTransaction } from '@/types/prisma-types';
 
 export async function GET(request: NextRequest) {
-  console.log(`[GET /api/users/[userId]] Request received for URL: ${request.url}`);
-  try {
+    try {
     // Get userId from URL path
     const url = new URL(request.url);
     const userId = url.pathname.split('/').pop();
@@ -61,8 +60,7 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    console.log(`[GET /api/users/[userId]] Authenticated user ID: ${user.id}`);
-
+    
     // Check permissions for all requests
     let requesterProfile;
     let isAdminOrHelpdesk = false;
@@ -72,8 +70,7 @@ export async function GET(request: NextRequest) {
         where: { id: user.id },
         select: { type: true }
       });
-      console.log(`[GET /api/users/[userId]] Requester profile fetched:`, requesterProfile);
-      
+            
       isAdminOrHelpdesk =
         requesterProfile?.type === UserType.ADMIN ||
         requesterProfile?.type === UserType.SUPER_ADMIN ||
@@ -82,11 +79,9 @@ export async function GET(request: NextRequest) {
       // Only allow if requesting own profile or admin/super_admin
       const isSelf = user.id === userId;
 
-      console.log(`[GET /api/users/[userId]] Authorization check: isSelf=${isSelf}, isAdminOrHelpdesk=${isAdminOrHelpdesk}, requesterType=${requesterProfile?.type}`);
-
+      
       if (!isSelf && !isAdminOrHelpdesk) {
-        console.log(`[GET /api/users/[userId]] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to access profile ${userId}.`);
-        return NextResponse.json(
+                return NextResponse.json(
           { error: 'Forbidden: Insufficient permissions' },
           { status: 403 }
         );
@@ -96,11 +91,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch requester profile' }, { status: 500 });
     }
 
-    // Fetch the target user profile
+    // Fetch the target user profile (exclude soft-deleted users)
     let profile;
     try {
       profile = await prisma.profile.findUnique({
-        where: { id: userId },
+        where: { 
+          id: userId,
+          deletedAt: null // Exclude soft-deleted users
+        },
         select: {
           id: true,
           name: true,
@@ -126,22 +124,19 @@ export async function GET(request: NextRequest) {
           contactName: true,
         }
       });
-      console.log(`[GET /api/users/[userId]] Target profile fetched (ID: ${userId}):`, profile ? 'Found' : 'Not Found');
-    } catch (targetProfileError) {
+          } catch (targetProfileError) {
       console.error(`[GET /api/users/[userId]] Error fetching target profile (ID: ${userId}):`, targetProfileError);
       return NextResponse.json({ error: 'Failed to fetch target user profile' }, { status: 500 });
     }
 
     if (!profile) {
-      console.log(`[GET /api/users/[userId]] User not found: ID ${userId}`);
-      return NextResponse.json(
+            return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       );
     }
 
-    console.log(`[GET /api/users/[userId]] Successfully fetched profile for user ID: ${userId}`);
-    
+        
     // Helper to parse comma-separated strings, potentially with extra quotes
     const parseCommaSeparatedString = (value: unknown): string[] => {
       // Ensure the input is a string before processing
@@ -239,8 +234,7 @@ export async function PUT(
       );
     }
     
-    console.log(`[PUT /api/users/[userId]] Authenticated user ID: ${user.id}`);
-
+    
     // Check permissions for all requests
     let requesterProfile;
     
@@ -249,8 +243,7 @@ export async function PUT(
         where: { id: user.id },
         select: { type: true }
       });
-      console.log(`[PUT /api/users/[userId]] Requester profile fetched:`, requesterProfile);
-      
+            
       const isAdminOrHelpdesk =
         requesterProfile?.type === UserType.ADMIN ||
         requesterProfile?.type === UserType.SUPER_ADMIN ||
@@ -259,11 +252,9 @@ export async function PUT(
       // Only allow if requesting own profile or admin/super_admin
       const isSelf = user.id === userId;
 
-      console.log(`[PUT /api/users/[userId]] Authorization check: isSelf=${isSelf}, isAdminOrHelpdesk=${isAdminOrHelpdesk}, requesterType=${requesterProfile?.type}`);
-
+      
       if (!isSelf && !isAdminOrHelpdesk) {
-        console.log(`[PUT /api/users/[userId]] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to update profile ${userId}.`);
-        return NextResponse.json(
+                return NextResponse.json(
           { error: 'Forbidden: Insufficient permissions' },
           { status: 403 }
         );
@@ -275,8 +266,7 @@ export async function PUT(
     
     // Parse request body
     const requestBody = await request.json();
-    console.log('[PUT /api/users/[userId]] Request body:', requestBody);
-    
+        
     // Validate required fields
     if (!requestBody) {
       return NextResponse.json(
@@ -292,14 +282,11 @@ export async function PUT(
     if (requestBody.type) {
       try {
         const typeKey = requestBody.type.toUpperCase();
-        console.log(`[PUT /api/users/[userId]] Converting user type: '${requestBody.type}' to enum. Available UserType keys:`, Object.keys(UserType));
-        
+                
         if (Object.keys(UserType).includes(typeKey)) {
           userTypeEnum = UserType[typeKey as keyof typeof UserType];
-          console.log(`[PUT /api/users/[userId]] Successfully converted '${requestBody.type}' to UserType enum: ${userTypeEnum}`);
-        } else {
-          console.log(`[PUT /api/users/[userId]] Invalid user type: '${requestBody.type}'. Valid types are:`, Object.keys(UserType));
-          return NextResponse.json(
+                  } else {
+                    return NextResponse.json(
             { error: `Invalid user type: ${requestBody.type}. Valid types are: ${Object.keys(UserType).map(k => k.toLowerCase()).join(', ')}` },
             { status: 400 }
           );
@@ -365,8 +352,26 @@ export async function PUT(
         delete updateData[key as keyof typeof updateData];
       }
     });
-    
-    console.log('[PUT /api/users/[userId]] Update data:', updateData);
+
+    // Check if user exists and is not soft-deleted before updating
+    const existingUser = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { id: true, deletedAt: true }
+    });
+
+    if (!existingUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    if (existingUser.deletedAt) {
+      return NextResponse.json(
+        { error: 'Cannot update soft-deleted user' },
+        { status: 409 }
+      );
+    }
 
     // Update user profile
     const updatedProfile = await prisma.profile.update({
@@ -374,8 +379,7 @@ export async function PUT(
       data: updateData,
     });
     
-    console.log('[PUT /api/users/[userId]] Profile updated successfully');
-
+    
     // Transform the response to match frontend expectations (snake_case)
     const transformedProfile = {
       id: updatedProfile.id,
@@ -476,8 +480,7 @@ export async function PATCH(
       );
     }
     
-    console.log(`[PATCH /api/users/[userId]] Authenticated user ID: ${user.id}`);
-
+    
     // Check permissions for all requests
     let requesterProfile;
     
@@ -486,8 +489,7 @@ export async function PATCH(
         where: { id: user.id },
         select: { type: true }
       });
-      console.log(`[PATCH /api/users/[userId]] Requester profile fetched:`, requesterProfile);
-      
+            
       const isAdminOrHelpdesk =
         requesterProfile?.type === UserType.ADMIN ||
         requesterProfile?.type === UserType.SUPER_ADMIN ||
@@ -496,11 +498,9 @@ export async function PATCH(
       // Only allow if requesting own profile or admin/super_admin
       const isSelf = user.id === userId;
 
-      console.log(`[PATCH /api/users/[userId]] Authorization check: isSelf=${isSelf}, isAdminOrHelpdesk=${isAdminOrHelpdesk}, requesterType=${requesterProfile?.type}`);
-
+      
       if (!isSelf && !isAdminOrHelpdesk) {
-        console.log(`[PATCH /api/users/[userId]] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to update profile ${userId}.`);
-        return NextResponse.json(
+                return NextResponse.json(
           { error: 'Forbidden: Insufficient permissions' },
           { status: 403 }
         );
@@ -512,8 +512,7 @@ export async function PATCH(
     
     // Parse request body
     const requestBody = await request.json();
-    console.log('[PATCH /api/users/[userId]] Request body:', requestBody);
-    
+        
     // Validate required fields
     if (!requestBody) {
       return NextResponse.json(
@@ -529,14 +528,11 @@ export async function PATCH(
     if (requestBody.type) {
       try {
         const typeKey = requestBody.type.toUpperCase();
-        console.log(`[PATCH /api/users/[userId]] Converting user type: '${requestBody.type}' to enum. Available UserType keys:`, Object.keys(UserType));
-        
+                
         if (Object.keys(UserType).includes(typeKey)) {
           userTypeEnum = UserType[typeKey as keyof typeof UserType];
-          console.log(`[PATCH /api/users/[userId]] Successfully converted '${requestBody.type}' to UserType enum: ${userTypeEnum}`);
-        } else {
-          console.log(`[PATCH /api/users/[userId]] Invalid user type: '${requestBody.type}'. Valid types are:`, Object.keys(UserType));
-          return NextResponse.json(
+                  } else {
+                    return NextResponse.json(
             { error: `Invalid user type: ${requestBody.type}. Valid types are: ${Object.keys(UserType).map(k => k.toLowerCase()).join(', ')}` },
             { status: 400 }
           );
@@ -602,8 +598,26 @@ export async function PATCH(
         delete updateData[key as keyof typeof updateData];
       }
     });
-    
-    console.log('[PATCH /api/users/[userId]] Update data:', updateData);
+
+    // Check if user exists and is not soft-deleted before updating
+    const existingUser = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { id: true, deletedAt: true }
+    });
+
+    if (!existingUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    if (existingUser.deletedAt) {
+      return NextResponse.json(
+        { error: 'Cannot update soft-deleted user' },
+        { status: 409 }
+      );
+    }
 
     // Update user profile
     const updatedProfile = await prisma.profile.update({
@@ -611,8 +625,7 @@ export async function PATCH(
       data: updateData,
     });
     
-    console.log('[PATCH /api/users/[userId]] Profile updated successfully');
-
+    
     // Transform the response to match frontend expectations (snake_case)
     const transformedProfile = {
       id: updatedProfile.id,
@@ -666,7 +679,7 @@ export async function PATCH(
   }
 }
 
-// DELETE: Delete a user by ID
+// DELETE: Soft delete a user by ID
 export async function DELETE(
   request: NextRequest
 ) {
@@ -705,6 +718,16 @@ export async function DELETE(
         { status: 400 }
       );
     }
+
+    // Parse request body for deletion reason
+    let deletionReason: string | undefined;
+    try {
+      const body = await request.json();
+      deletionReason = body.reason;
+    } catch {
+      // No body provided, deletionReason remains undefined
+    }
+
     const supabase = await createClient();
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) {
@@ -730,7 +753,7 @@ export async function DELETE(
     // Prevent deletion of SUPER_ADMIN users and get user details
     userToDelete = await prisma.profile.findUnique({
       where: { id: userId },
-      select: { type: true, email: true }
+      select: { type: true, email: true, deletedAt: true }
     });
     
     if (!userToDelete) {
@@ -746,6 +769,13 @@ export async function DELETE(
         { status: 403 }
       );
     }
+
+    if (userToDelete.deletedAt) {
+      return NextResponse.json(
+        { error: 'User is already soft deleted' },
+        { status: 409 }
+      );
+    }
     
     // Prevent self-deletion
     if (user.id === userId) {
@@ -754,197 +784,45 @@ export async function DELETE(
         { status: 403 }
       );
     }
-    
-    console.log(`[DELETE /api/users/[userId]] Starting user deletion process for user: ${userId}`);
-    console.log(`[DELETE] Requester: ${user.id} (Type: ${requesterProfile?.type})`);
-    
-    // Step 1: Pre-deletion validation - Check for active orders
-    console.log(`[DELETE] Step 1: Validating active orders...`);
-    const activeOrders = await Promise.all([
-      prisma.cateringRequest.count({
-        where: { 
-          userId, 
-          status: { in: ['ACTIVE', 'ASSIGNED', 'PENDING', 'CONFIRMED', 'IN_PROGRESS'] }
-        }
-      }),
-      prisma.onDemand.count({
-        where: { 
-          userId, 
-          status: { in: ['ACTIVE', 'ASSIGNED', 'PENDING', 'CONFIRMED', 'IN_PROGRESS'] }
-        }
-      })
-    ]);
-    
-    const totalActiveOrders = activeOrders[0] + activeOrders[1];
-    console.log(`[DELETE] Found ${totalActiveOrders} active orders (${activeOrders[0]} catering, ${activeOrders[1]} on-demand)`);
-    
-    if (totalActiveOrders > 0) {
-      return NextResponse.json(
-        { 
-          error: 'Cannot delete user with active orders. Complete or cancel orders first.',
-          details: { 
-            activeCateringOrders: activeOrders[0],
-            activeOnDemandOrders: activeOrders[1],
-            totalActiveOrders 
-          }
-        },
-        { status: 409 }
-      );
-    }
-    
-    // Step 2: Execute deletion transaction
-    console.log(`[DELETE] Step 2: Beginning deletion transaction...`);
-    const transactionResult = await prisma.$transaction(async (tx: PrismaTransaction) => {
-      // Step 2a: Delete Dispatch records (no CASCADE defined)
-      console.log(`[DELETE] Step 2a: Deleting dispatch records...`);
-      const deletedDispatches = await tx.dispatch.deleteMany({
-        where: {
-          OR: [{ driverId: userId }, { userId }],
-        },
-      });
-      console.log(`[DELETE] Deleted ${deletedDispatches.count} dispatch records`);
-      
-      // Step 2b: Update FileUpload records to null out userId (preserve files)
-      console.log(`[DELETE] Step 2b: Updating file upload records...`);
-      const updatedFileUploads = await tx.fileUpload.updateMany({
-        where: { userId },
-        data: { userId: null },
-      });
-      console.log(`[DELETE] Updated ${updatedFileUploads.count} file upload records`);
-      
-      // Step 2c: Handle Address ownership logic
-      console.log(`[DELETE] Step 2c: Processing address relationships...`);
-      const createdAddresses = await tx.address.findMany({
-        where: { createdBy: userId },
-        include: {
-          userAddresses: true,
-          cateringPickupRequests: true,
-          cateringDeliveryRequests: true,
-          onDemandPickupRequests: true,
-          onDemandDeliveryRequests: true,
-        }
-      });
-      
-      let deletedAddresses = 0;
-      let updatedAddresses = 0;
-      
-      for (const address of createdAddresses) {
-        const isUsedByOthers = 
-          address.userAddresses.some((ua: { userId: string }) => ua.userId !== userId) ||
-          address.cateringPickupRequests.length > 0 ||
-          address.cateringDeliveryRequests.length > 0 ||
-          address.onDemandPickupRequests.length > 0 ||
-          address.onDemandDeliveryRequests.length > 0;
-        
-        if (!isUsedByOthers) {
-          // Delete unused addresses
-          await tx.address.delete({
-            where: { id: address.id }
-          });
-          deletedAddresses++;
-        } else {
-          // Null out the createdBy field for addresses used by others
-          await tx.address.update({
-            where: { id: address.id },
-            data: { createdBy: null }
-          });
-          updatedAddresses++;
-        }
-      }
-      
-      console.log(`[DELETE] Processed ${createdAddresses.length} addresses: ${deletedAddresses} deleted, ${updatedAddresses} updated`);
-      
-      // Step 2d: Delete the Profile (triggers CASCADE deletes)
-      console.log(`[DELETE] Step 2d: Deleting user profile...`);
-      const deletedProfile = await tx.profile.delete({
-        where: { id: userId },
-      });
-      console.log(`[DELETE] Profile deleted successfully: ${deletedProfile.id}`);
-      
-      return {
-        deletedProfile,
-        deletedDispatches: deletedDispatches.count,
-        updatedFileUploads: updatedFileUploads.count,
-        deletedAddresses,
-        updatedAddresses,
-        totalAddressesProcessed: createdAddresses.length
-      };
-    }, {
-      timeout: 10000, // 10 second timeout for complex deletions
-    });
-    
+
+    // Import the soft delete service
+    const { userSoftDeleteService } = await import('@/services/userSoftDeleteService');
+
+    // Perform soft delete
+    const result = await userSoftDeleteService.softDeleteUser(
+      userId,
+      user.id,
+      deletionReason
+    );
+
     const duration = Date.now() - startTime;
-    console.log(`[DELETE] Transaction completed successfully in ${duration}ms`);
-    
-    // Step 3: Create audit log entry
-    const auditEntry = {
-      action: 'USER_DELETION',
-      performedBy: user.id,
-      performedByType: requesterProfile?.type,
-      targetUserId: userId,
-      targetUserEmail: userToDelete.email,
-      targetUserType: userToDelete.type,
-      timestamp: new Date(),
-      affectedRecords: {
-        dispatchesDeleted: transactionResult.deletedDispatches,
-        fileUploadsUpdated: transactionResult.updatedFileUploads,
-        addressesDeleted: transactionResult.deletedAddresses,
-        addressesUpdated: transactionResult.updatedAddresses
-      },
-      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
-      userAgent: request.headers.get('user-agent') || 'unknown',
-      success: true,
-      duration: `${duration}ms`
-    };
-    
-    console.log(`[AUDIT] User deletion completed:`, JSON.stringify(auditEntry));
-    
+
     return NextResponse.json({
-      message: 'User and associated data deleted successfully',
+      message: 'User soft deleted successfully',
       summary: {
         deletedUser: {
-          id: userId,
+          id: result.userId,
           email: userToDelete.email,
           type: userToDelete.type
         },
-        deletedDispatches: transactionResult.deletedDispatches,
-        updatedFileUploads: transactionResult.updatedFileUploads,
-        processedAddresses: transactionResult.totalAddressesProcessed,
-        deletedAddresses: transactionResult.deletedAddresses,
-        updatedAddresses: transactionResult.updatedAddresses,
+        deletedAt: result.deletedAt,
+        deletedBy: result.deletedBy,
+        deletionReason: result.deletionReason,
         duration: `${duration}ms`,
         timestamp: new Date().toISOString()
       }
     });
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`[DELETE] Transaction failed after ${duration}ms:`, error);
-    
-    // Create failure audit log entry
-    const failureAuditEntry = {
-      action: 'USER_DELETION_FAILED',
-      performedBy: user?.id || 'unknown',
-      performedByType: requesterProfile?.type || 'unknown',
-      targetUserId: userId || 'unknown',
-      targetUserEmail: userToDelete?.email || 'unknown',
-      targetUserType: userToDelete?.type || 'unknown',
-      timestamp: new Date(),
-      error: error instanceof Error ? error.message : 'Unknown error',
-      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
-      userAgent: request.headers.get('user-agent') || 'unknown',
-      success: false,
-      duration: `${duration}ms`
-    };
-    
-    console.log(`[AUDIT] User deletion failed:`, JSON.stringify(failureAuditEntry));
-    
+    console.error(`[DELETE] Soft delete failed after ${duration}ms:`, error);
+
     // Handle Prisma-specific errors
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       switch (error.code) {
         case 'P2025': // Record not found
           return NextResponse.json(
             { 
-              error: 'User not found or already deleted',
+              error: 'User not found',
               code: 'USER_NOT_FOUND',
               details: error.meta
             },
@@ -1005,34 +883,34 @@ export async function DELETE(
       }
     }
     
-    // Handle transaction timeout
-    if (error instanceof Error && error.message.includes('timeout')) {
-      return NextResponse.json(
-        { 
-          error: 'Deletion operation timed out. The operation may have been too complex.',
-          code: 'TRANSACTION_TIMEOUT',
-          details: { duration: `${duration}ms` }
-        },
-        { status: 408 }
-      );
-    }
-    
-    // Handle business logic errors (thrown by our validation)
-    if (error instanceof Error && error.message.includes('Cannot delete user with active orders')) {
-      return NextResponse.json(
-        { 
-          error: error.message,
-          code: 'ACTIVE_ORDERS_EXIST'
-        },
-        { status: 409 }
-      );
+    // Handle business logic errors
+    if (error instanceof Error) {
+      if (error.message.includes('Cannot delete user with active orders')) {
+        return NextResponse.json(
+          { 
+            error: error.message,
+            code: 'ACTIVE_ORDERS_EXIST'
+          },
+          { status: 409 }
+        );
+      }
+      
+      if (error.message.includes('User is already soft deleted')) {
+        return NextResponse.json(
+          { 
+            error: error.message,
+            code: 'ALREADY_DELETED'
+          },
+          { status: 409 }
+        );
+      }
     }
     
     // Handle general errors
     return NextResponse.json(
       { 
-        error: 'Failed to delete user',
-        code: 'DELETION_FAILED',
+        error: 'Failed to soft delete user',
+        code: 'SOFT_DELETE_FAILED',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }

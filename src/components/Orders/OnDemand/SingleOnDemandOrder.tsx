@@ -417,10 +417,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
     const fetchDrivers = async () => {
       // Skip driver fetching for VENDOR users since they don't have access to driver data
       if (userRoles.isVendor) {
-        console.log(
-          "ℹ️ [SingleOnDemandOrder] Skipping driver fetch for VENDOR user",
-        );
-        return;
+                return;
       }
 
       try {
@@ -453,10 +450,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
             return;
           }
           if (response.status === 403) {
-            console.log(
-              "ℹ️ [SingleOnDemandOrder] Access denied to drivers (403) - user lacks permission",
-            );
-            // For 403 errors, silently skip driver loading instead of showing an error
+                        // For 403 errors, silently skip driver loading instead of showing an error
             return;
           }
           console.error("Failed to fetch drivers");
@@ -531,8 +525,7 @@ const SingleOnDemandOrder: React.FC<SingleOnDemandOrderProps> = ({
       }
 
       const result = await response.json();
-      console.log("✅ Driver assignment successful:", result);
-
+      
       // Close the dialog first
       setIsDriverDialogOpen(false);
 
