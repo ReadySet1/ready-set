@@ -78,7 +78,7 @@ export class UploadSecurityManager {
 
       // Generate unique quarantine path
       const timestamp = Date.now();
-      const randomId = Math.random().toString(36).substring(2, 9);
+      const randomId = crypto.randomUUID().split('-')[0]; // Use cryptographically secure random
       const fileExt = file.name.split('.').pop() || 'unknown';
       const quarantinePath = `quarantine/${timestamp}-${randomId}.${fileExt}`;
 
