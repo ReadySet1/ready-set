@@ -7,6 +7,7 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  schemas   = ["public", "auth"]
 }
 
 model Profile {
@@ -65,6 +66,7 @@ model Profile {
   @@index([deletedAt])
   @@index([deletedBy])
   @@index([type, deletedAt]) // Dashboard vendor counting optimization
+  @@schema("public")
   @@map("profiles")
 }
 
@@ -85,6 +87,7 @@ model UserAudit {
   @@index([action])
   @@index([performedBy])
   @@index([createdAt])
+  @@schema("public")
   @@map("user_audits")
 }
 
@@ -105,6 +108,7 @@ model Account {
 
   @@unique([provider, providerAccountId])
   @@index([userId])
+  @@schema("public")
   @@map("accounts")
 }
 
@@ -116,6 +120,7 @@ model Session {
   user         Profile  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([userId])
+  @@schema("public")
   @@map("sessions")
 }
 
@@ -147,6 +152,7 @@ model Address {
 
   @@index([createdBy])
   @@index([city, state])
+  @@schema("public")
   @@map("addresses")
 }
 
@@ -167,6 +173,7 @@ model PricingTier {
 
   @@index([minHeadCount, minFoodCost])
   @@index([isActive])
+  @@schema("public")
   @@map("pricing_tiers")
 }
 
@@ -213,6 +220,7 @@ model CateringRequest {
   @@index([pricingTierId])
   @@index([status, createdAt]) // Dashboard metrics optimization
   @@index([status, createdAt, orderTotal]) // Dashboard revenue aggregation
+  @@schema("public")
   @@map("catering_requests")
 }
 
@@ -232,6 +240,7 @@ model Dispatch {
   @@index([driverId])
   @@index([cateringRequestId])
   @@index([onDemandId])
+  @@schema("public")
   @@map("dispatches")
 }
 
@@ -259,6 +268,7 @@ model FileUpload {
   @@index([onDemandId])
   @@index([jobApplicationId])
   @@index([fileType])
+  @@schema("public")
   @@map("file_uploads")
 }
 
@@ -277,6 +287,7 @@ model UploadError {
   @@index([userId])
   @@index([errorType])
   @@index([timestamp])
+  @@schema("public")
   @@map("upload_errors")
 }
 
@@ -319,6 +330,7 @@ model OnDemand {
   @@index([pickupDateTime])
   @@index([vehicleType])
   @@index([userId, status])
+  @@schema("public")
   @@map("on_demand_requests")
 }
 
@@ -336,6 +348,7 @@ model UserAddress {
   @@unique([userId, addressId])
   @@index([userId])
   @@index([addressId])
+  @@schema("public")
   @@map("user_addresses")
 }
 
@@ -347,6 +360,7 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@index([token])
+  @@schema("public")
   @@map("verification_tokens")
 }
 
@@ -368,6 +382,7 @@ model FormSubmission {
 
   @@index([formType])
   @@index([email])
+  @@schema("public")
   @@map("form_submissions")
 }
 
@@ -383,6 +398,7 @@ model LeadCapture {
 
   @@index([email])
   @@index([industry])
+  @@schema("public")
   @@map("lead_captures")
 }
 
@@ -421,6 +437,7 @@ model JobApplication {
   @@index([email])
   @@index([status])
   @@index([position])
+  @@schema("public")
   @@map("job_applications")
 }
 
@@ -431,12 +448,14 @@ enum UserType {
   ADMIN
   HELPDESK
   SUPER_ADMIN
+  @@schema("public")
 }
 
 enum UserStatus {
   ACTIVE
   PENDING
   DELETED
+  @@schema("public")
 }
 
 enum DriverStatus {
@@ -445,11 +464,13 @@ enum DriverStatus {
   ARRIVED_TO_CLIENT
   ASSIGNED
   COMPLETED
+  @@schema("public")
 }
 
 enum CateringNeedHost {
   YES
   NO
+  @@schema("public")
 }
 
 enum CateringStatus {
@@ -461,6 +482,7 @@ enum CateringStatus {
   CONFIRMED
   IN_PROGRESS
   DELIVERED
+  @@schema("public")
 }
 
 enum OnDemandStatus {
@@ -472,12 +494,14 @@ enum OnDemandStatus {
   CONFIRMED
   IN_PROGRESS
   DELIVERED
+  @@schema("public")
 }
 
 enum VehicleType {
   CAR
   VAN
   TRUCK
+  @@schema("public")
 }
 
 enum ApplicationStatus {
@@ -485,6 +509,7 @@ enum ApplicationStatus {
   APPROVED
   REJECTED
   INTERVIEWING
+  @@schema("public")
 }
 
 enum FormType {
@@ -492,6 +517,7 @@ enum FormType {
   FLOWER
   BAKERY
   SPECIALTY
+  @@schema("public")
 }
 
 model CalculatorTemplate {
@@ -506,6 +532,7 @@ model CalculatorTemplate {
   calculationHistory   CalculationHistory[]
 
   @@index([isActive])
+  @@schema("public")
   @@map("calculator_templates")
 }
 
@@ -527,6 +554,7 @@ model PricingRule {
   @@unique([templateId, ruleType, ruleName], name: "unique_template_rule")
   @@index([templateId])
   @@index([ruleType])
+  @@schema("public")
   @@map("pricing_rules")
 }
 
@@ -546,6 +574,7 @@ model ClientConfiguration {
 
   @@index([clientId])
   @@index([templateId])
+  @@schema("public")
   @@map("client_configurations")
 }
 
@@ -568,6 +597,7 @@ model CalculationHistory {
   @@index([createdAt])
   @@index([userId])
   @@index([templateId])
+  @@schema("public")
   @@map("calculation_history")
 }
 
@@ -586,6 +616,7 @@ model Testimonial {
 
   @@index([category, isActive, sortOrder])
   @@index([isActive])
+  @@schema("public")
   @@map("testimonials")
 }
 
@@ -593,6 +624,7 @@ enum TestimonialCategory {
   CLIENTS
   VENDORS
   DRIVERS
+  @@schema("public")
 }
 
 model DeliveryConfiguration {
@@ -629,5 +661,6 @@ model DeliveryConfiguration {
   @@index([configId])
   @@index([isActive])
   @@index([clientName])
+  @@schema("public")
   @@map("delivery_configurations")
 }
