@@ -364,9 +364,11 @@ export async function PUT(
       sideNotes: requestBody.sideNotes,
     };
 
-    // For create operations, add status field (default to 'active' if not provided)
+    // For create operations, add status field (default to 'ACTIVE' if not provided)
     if (isCreateOperation) {
-      profileData.status = requestBody.status || 'active';
+      // Normalize status to uppercase to match UserStatus enum
+      const statusValue = requestBody.status ? requestBody.status.toUpperCase() : 'ACTIVE';
+      profileData.status = statusValue;
     }
 
     // Remove undefined values from profileData
