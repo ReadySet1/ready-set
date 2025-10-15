@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
 }
 
 
-// PUT: Update a user by ID
+// PUT: Update a user by ID, or create a new user if userId is "new"
 export async function PUT(
   request: NextRequest
 ) {
@@ -202,23 +202,25 @@ export async function PUT(
       );
     }
 
-    // Handle "new" as a special case - it's not a valid UUID
-    if (userId === 'new') {
-      console.log('[PUT /api/users/[userId]] Special case: userId="new", cannot update');
-      return NextResponse.json(
-        { error: 'Cannot update a non-existent user' },
-        { status: 404 }
-      );
-    }
+    // Parse request body early to check if this is a create operation
+    const requestBody = await request.json();
 
-    // Validate UUID format before querying database
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(userId)) {
-      console.log(`[PUT /api/users/[userId]] Invalid UUID format: ${userId}`);
-      return NextResponse.json(
-        { error: 'Invalid user ID format' },
-        { status: 400 }
-      );
+    // Determine if this is a create operation
+    // Create if: userId is "new" OR requestBody.id is empty/undefined
+    const isCreateOperation = userId === 'new' || !requestBody.id || requestBody.id === '';
+
+    if (!isCreateOperation) {
+      // For update operations, validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(userId)) {
+        console.log(`[PUT /api/users/[userId]] Invalid UUID format: ${userId}`);
+        return NextResponse.json(
+          { error: 'Invalid user ID format' },
+          { status: 400 }
+        );
+      }
+    } else {
+      console.log('[PUT /api/users/[userId]] Creating new user (userId="new" or empty id in request body)');
     }
     
     // SECURITY FIX: Remove dangerous admin panel bypass
@@ -237,36 +239,42 @@ export async function PUT(
     
     // Check permissions for all requests
     let requesterProfile;
-    
+
     try {
       requesterProfile = await prisma.profile.findUnique({
         where: { id: user.id },
         select: { type: true }
       });
-            
+
       const isAdminOrHelpdesk =
         requesterProfile?.type === UserType.ADMIN ||
         requesterProfile?.type === UserType.SUPER_ADMIN ||
         requesterProfile?.type === UserType.HELPDESK;
-        
-      // Only allow if requesting own profile or admin/super_admin
-      const isSelf = user.id === userId;
 
-      
-      if (!isSelf && !isAdminOrHelpdesk) {
-                return NextResponse.json(
-          { error: 'Forbidden: Insufficient permissions' },
-          { status: 403 }
-        );
+      // For create operations, require admin privileges
+      if (isCreateOperation) {
+        if (!isAdminOrHelpdesk) {
+          return NextResponse.json(
+            { error: 'Forbidden: Only admins can create users' },
+            { status: 403 }
+          );
+        }
+      } else {
+        // For update operations, allow if requesting own profile or admin/super_admin
+        const isSelf = user.id === userId;
+
+        if (!isSelf && !isAdminOrHelpdesk) {
+          return NextResponse.json(
+            { error: 'Forbidden: Insufficient permissions' },
+            { status: 403 }
+          );
+        }
       }
     } catch (profileError) {
       console.error(`[PUT /api/users/[userId]] Error fetching requester profile (ID: ${user.id}):`, profileError);
       return NextResponse.json({ error: 'Failed to fetch requester profile' }, { status: 500 });
     }
-    
-    // Parse request body
-    const requestBody = await request.json();
-        
+
     // Validate required fields
     if (!requestBody) {
       return NextResponse.json(
@@ -274,19 +282,29 @@ export async function PUT(
         { status: 400 }
       );
     }
-    
-    // Prepare data for update
+
+    // For create operations, validate required fields
+    if (isCreateOperation) {
+      if (!requestBody.email || !requestBody.type) {
+        return NextResponse.json(
+          { error: 'Missing required fields: email and type are required for new users' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Prepare data for create/update
     let userTypeEnum: UserType | undefined = undefined;
-    
+
     // Convert string type to UserType enum with validation
     if (requestBody.type) {
       try {
         const typeKey = requestBody.type.toUpperCase();
-                
+
         if (Object.keys(UserType).includes(typeKey)) {
           userTypeEnum = UserType[typeKey as keyof typeof UserType];
-                  } else {
-                    return NextResponse.json(
+        } else {
+          return NextResponse.json(
             { error: `Invalid user type: ${requestBody.type}. Valid types are: ${Object.keys(UserType).map(k => k.toLowerCase()).join(', ')}` },
             { status: 400 }
           );
@@ -299,116 +317,150 @@ export async function PUT(
         );
       }
     }
-    
-    const updateData: any = {
+
+    const profileData: any = {
       // Basic information
       email: requestBody.email,
       contactNumber: requestBody.contact_number,
       // Use the validated enum value
       type: userTypeEnum,
-      
+
       // Name handling based on user type - Fix field mapping
       name: requestBody.name,
       contactName: requestBody.contact_name, // Fix: use contactName (camelCase) for Prisma
-      
+
       // Company information
       companyName: requestBody.company_name,
       website: requestBody.website,
-      
+
       // Address information
       street1: requestBody.street1,
       street2: requestBody.street2,
       city: requestBody.city,
       state: requestBody.state,
       zip: requestBody.zip,
-      
+
       // Location details
       locationNumber: requestBody.location_number,
       parkingLoading: requestBody.parking_loading,
-      
+
       // Service details
       counties: requestBody.counties,
-      timeNeeded: Array.isArray(requestBody.timeNeeded) 
-        ? requestBody.timeNeeded.join(',') 
+      timeNeeded: Array.isArray(requestBody.timeNeeded)
+        ? requestBody.timeNeeded.join(',')
         : requestBody.timeNeeded,
-      cateringBrokerage: Array.isArray(requestBody.cateringBrokerage) 
-        ? requestBody.cateringBrokerage.join(',') 
+      cateringBrokerage: Array.isArray(requestBody.cateringBrokerage)
+        ? requestBody.cateringBrokerage.join(',')
         : requestBody.cateringBrokerage,
-      provide: Array.isArray(requestBody.provisions) 
-        ? requestBody.provisions.join(',') 
+      provide: Array.isArray(requestBody.provisions)
+        ? requestBody.provisions.join(',')
         : requestBody.provisions,
-      
+
       // Operational details
       frequency: requestBody.frequency,
       headCount: requestBody.headCount,
-      
+
       // Side notes
       sideNotes: requestBody.sideNotes,
     };
-    
-    // Remove undefined values from updateData
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key as keyof typeof updateData] === undefined) {
-        delete updateData[key as keyof typeof updateData];
+
+    // For create operations, add status field (default to 'active' if not provided)
+    if (isCreateOperation) {
+      profileData.status = requestBody.status || 'active';
+    }
+
+    // Remove undefined values from profileData
+    Object.keys(profileData).forEach(key => {
+      if (profileData[key as keyof typeof profileData] === undefined) {
+        delete profileData[key as keyof typeof profileData];
       }
     });
 
-    // Check if user exists and is not soft-deleted before updating
-    const existingUser = await prisma.profile.findUnique({
-      where: { id: userId },
-      select: { id: true, deletedAt: true }
-    });
+    let profile;
 
-    if (!existingUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+    if (isCreateOperation) {
+      // Create new user profile
+      console.log('[PUT /api/users/[userId]] Creating new user with email:', requestBody.email);
+
+      // Check if email already exists
+      const existingUser = await prisma.profile.findUnique({
+        where: { email: requestBody.email }
+      });
+
+      if (existingUser) {
+        return NextResponse.json(
+          { error: 'Email already in use' },
+          { status: 409 }
+        );
+      }
+
+      profile = await prisma.profile.create({
+        data: profileData,
+      });
+
+      console.log('[PUT /api/users/[userId]] Successfully created user with ID:', profile.id);
+    } else {
+      // Update existing user profile
+      console.log('[PUT /api/users/[userId]] Updating user with ID:', userId);
+
+      // Check if user exists and is not soft-deleted before updating
+      const existingUser = await prisma.profile.findUnique({
+        where: { id: userId },
+        select: { id: true, deletedAt: true }
+      });
+
+      if (!existingUser) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        );
+      }
+
+      if (existingUser.deletedAt) {
+        return NextResponse.json(
+          { error: 'Cannot update soft-deleted user' },
+          { status: 409 }
+        );
+      }
+
+      profile = await prisma.profile.update({
+        where: { id: userId },
+        data: profileData,
+      });
+
+      console.log('[PUT /api/users/[userId]] Successfully updated user with ID:', userId);
     }
 
-    if (existingUser.deletedAt) {
-      return NextResponse.json(
-        { error: 'Cannot update soft-deleted user' },
-        { status: 409 }
-      );
-    }
 
-    // Update user profile
-    const updatedProfile = await prisma.profile.update({
-      where: { id: userId },
-      data: updateData,
-    });
-    
-    
     // Transform the response to match frontend expectations (snake_case)
     const transformedProfile = {
-      id: updatedProfile.id,
-      name: updatedProfile.name,
-      email: updatedProfile.email,
-      contact_number: updatedProfile.contactNumber,
-      company_name: updatedProfile.companyName,
-      website: updatedProfile.website,
-      street1: updatedProfile.street1,
-      street2: updatedProfile.street2,
-      city: updatedProfile.city,
-      state: updatedProfile.state,
-      zip: updatedProfile.zip,
-      type: updatedProfile.type,
-      status: updatedProfile.status,
-      location_number: updatedProfile.locationNumber,
-      parking_loading: updatedProfile.parkingLoading,
-      counties: updatedProfile.counties,
-      timeNeeded: updatedProfile.timeNeeded,
-      cateringBrokerage: updatedProfile.cateringBrokerage,
-      provide: updatedProfile.provide,
-      frequency: updatedProfile.frequency,
-      headCount: updatedProfile.headCount,
-      sideNotes: updatedProfile.sideNotes,
-      contact_name: updatedProfile.contactName,
+      id: profile.id,
+      name: profile.name,
+      email: profile.email,
+      contact_number: profile.contactNumber,
+      company_name: profile.companyName,
+      website: profile.website,
+      street1: profile.street1,
+      street2: profile.street2,
+      city: profile.city,
+      state: profile.state,
+      zip: profile.zip,
+      type: profile.type,
+      status: profile.status,
+      location_number: profile.locationNumber,
+      parking_loading: profile.parkingLoading,
+      counties: profile.counties,
+      timeNeeded: profile.timeNeeded,
+      cateringBrokerage: profile.cateringBrokerage,
+      provide: profile.provide,
+      frequency: profile.frequency,
+      headCount: profile.headCount,
+      sideNotes: profile.sideNotes,
+      contact_name: profile.contactName,
     };
 
     return NextResponse.json({
-      message: 'User profile updated successfully',
+      message: isCreateOperation ? 'User profile created successfully' : 'User profile updated successfully',
       user: transformedProfile,
       // Also return the profile data directly for easier frontend consumption
       ...transformedProfile
