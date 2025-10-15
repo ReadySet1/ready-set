@@ -6,7 +6,7 @@ import React from "react";
 import Logo from "@/components/ui/logo";
 import type { Metadata } from "next";
 import { DownloadButtonWrapper } from "./DownloadButtonWrapper";
-import { SanitizedContent } from "@/components/Common/SanitizedContent";
+import DOMPurify from "isomorphic-dompurify";
 
 export const revalidate = 30;
 
@@ -213,13 +213,13 @@ export async function generateMetadata({
   };
 }
 
-// Helper function to render portable text blocks
+// Helper function to render portable text blocks with sanitization
 const renderPortableText = (
   blocks: PortableTextBlock[] | undefined,
 ): string => {
   if (!blocks || !Array.isArray(blocks)) return "";
 
-  return blocks
+  const htmlString = blocks
     .map((block) => {
       if (!block.children) return "";
       return block.children
@@ -227,6 +227,12 @@ const renderPortableText = (
         .join("");
     })
     .join("<br/>");
+
+  // Sanitize HTML to prevent XSS attacks
+  return DOMPurify.sanitize(htmlString, {
+    ALLOWED_TAGS: ['br', 'p', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li'],
+    ALLOWED_ATTR: ['href', 'target', 'rel']
+  });
 };
 
 export default async function GuidePage({
@@ -289,9 +295,11 @@ export default async function GuidePage({
 
                 {/* Introduction */}
                 {guide.introduction && (
-                  <SanitizedContent
-                    html={renderPortableText(guide.introduction)}
+                  <div
                     className="text-gray-600"
+                    dangerouslySetInnerHTML={{
+                      __html: renderPortableText(guide.introduction),
+                    }}
                   />
                 )}
 
@@ -304,9 +312,11 @@ export default async function GuidePage({
                           {section.title}
                         </h2>
                         {section.content && (
-                          <SanitizedContent
-                            html={renderPortableText(section.content)}
+                          <div
                             className="text-gray-600"
+                            dangerouslySetInnerHTML={{
+                              __html: renderPortableText(section.content),
+                            }}
                           />
                         )}
                       </div>

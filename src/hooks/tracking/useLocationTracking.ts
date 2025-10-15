@@ -3,15 +3,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { LocationUpdate } from '@/types/tracking';
 import { updateDriverLocation } from '@/app/actions/tracking/driver-actions';
+import { getLocationStore } from '@/utils/indexedDB/locationStore';
 
 interface UseLocationTrackingReturn {
   currentLocation: LocationUpdate | null;
   isTracking: boolean;
   accuracy: number | null;
   error: string | null;
+  unsyncedCount: number;
+  isOnline: boolean;
   startTracking: () => void;
   stopTracking: () => void;
   updateLocationManually: () => Promise<void>;
+  syncOfflineLocations: () => Promise<void>;
 }
 
 const TRACKING_INTERVAL = 30000; // 30 seconds
@@ -26,10 +30,14 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const [isTracking, setIsTracking] = useState(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+  const [unsyncedCount, setUnsyncedCount] = useState(0);
+  const [isOnline, setIsOnline] = useState(true);
+
   const watchIdRef = useRef<number | null>(null);
   const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
   const lastLocationRef = useRef<LocationUpdate | null>(null);
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const locationStoreRef = useRef(getLocationStore());
 
   // Get driver ID from session (simplified - you'll need to implement proper session management)
   const getDriverId = useCallback(async (): Promise<string | null> => {
@@ -108,6 +116,75 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     return 'driving';
   };
 
+  // Sync offline locations to server
+  const syncOfflineLocations = useCallback(async () => {
+    if (!isOnline) return;
+
+    try {
+      const locationStore = locationStoreRef.current;
+      const unsyncedLocations = await locationStore.getUnsyncedLocations();
+
+      if (unsyncedLocations.length === 0) {
+        setUnsyncedCount(0);
+        return;
+      }
+
+      console.log(`Syncing ${unsyncedLocations.length} offline locations...`);
+
+      let successCount = 0;
+      let failureCount = 0;
+
+      for (const storedLocation of unsyncedLocations) {
+        try {
+          // Convert stored location back to LocationUpdate format
+          const locationUpdate: LocationUpdate = {
+            driverId: storedLocation.driverId,
+            coordinates: storedLocation.coordinates,
+            accuracy: storedLocation.accuracy,
+            speed: storedLocation.speed,
+            heading: storedLocation.heading,
+            altitude: storedLocation.altitude,
+            batteryLevel: storedLocation.batteryLevel,
+            activityType: storedLocation.activityType,
+            isMoving: storedLocation.isMoving,
+            timestamp: new Date(storedLocation.timestamp)
+          };
+
+          const result = await updateDriverLocation(storedLocation.driverId, locationUpdate);
+
+          if (result.success) {
+            await locationStore.markAsSynced(storedLocation.id);
+            successCount++;
+          } else {
+            await locationStore.incrementSyncAttempts(storedLocation.id);
+            failureCount++;
+
+            // Remove locations that have failed too many times (10 attempts)
+            if (storedLocation.syncAttempts >= 10) {
+              console.warn(`Removing location ${storedLocation.id} after 10 failed attempts`);
+              await locationStore.deleteLocation(storedLocation.id);
+            }
+          }
+        } catch (error) {
+          console.error('Error syncing individual location:', error);
+          await locationStore.incrementSyncAttempts(storedLocation.id);
+          failureCount++;
+        }
+      }
+
+      console.log(`Sync complete: ${successCount} succeeded, ${failureCount} failed`);
+
+      // Update unsynced count
+      const remaining = await locationStore.getUnsyncedCount();
+      setUnsyncedCount(remaining);
+
+      // Cleanup old synced locations (older than 7 days)
+      await locationStore.clearOldSyncedLocations(7);
+    } catch (error) {
+      console.error('Error during offline sync:', error);
+    }
+  }, [isOnline]);
+
   // Update location to server
   const syncLocationToServer = useCallback(async (location: LocationUpdate) => {
     try {
@@ -117,8 +194,17 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       }
     } catch (error) {
       console.error('Error syncing location to server:', error);
-      // Store in IndexedDB for offline sync (to be implemented)
-      // await storeLocationOffline(location);
+
+      // Store in IndexedDB for offline sync
+      try {
+        const locationStore = locationStoreRef.current;
+        await locationStore.addLocation(location);
+        const count = await locationStore.getUnsyncedCount();
+        setUnsyncedCount(count);
+        console.log(`Location stored offline. Total unsynced: ${count}`);
+      } catch (storageError) {
+        console.error('Failed to store location offline:', storageError);
+      }
     }
   }, []);
 
@@ -207,7 +293,15 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       }
     }, TRACKING_INTERVAL);
 
-      }, [handlePositionUpdate, handleGeolocationError, getCurrentPosition]);
+    // Set up periodic offline sync (every 2 minutes)
+    syncIntervalRef.current = setInterval(() => {
+      syncOfflineLocations();
+    }, 120000); // 2 minutes
+
+    // Trigger initial sync on start
+    syncOfflineLocations();
+
+      }, [handlePositionUpdate, handleGeolocationError, getCurrentPosition, syncOfflineLocations]);
 
   // Stop location tracking
   const stopTracking = useCallback(() => {
@@ -221,6 +315,11 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     if (intervalIdRef.current !== null) {
       clearInterval(intervalIdRef.current);
       intervalIdRef.current = null;
+    }
+
+    if (syncIntervalRef.current !== null) {
+      clearInterval(syncIntervalRef.current);
+      syncIntervalRef.current = null;
     }
 
       }, []);
@@ -272,6 +371,51 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     };
   }, [stopTracking]);
 
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('Connection restored - syncing offline locations...');
+      setIsOnline(true);
+      syncOfflineLocations();
+    };
+
+    const handleOffline = () => {
+      console.log('Connection lost - locations will be stored offline');
+      setIsOnline(false);
+    };
+
+    // Set initial state
+    setIsOnline(navigator.onLine);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [syncOfflineLocations]);
+
+  // Load initial unsynced count on mount
+  useEffect(() => {
+    const loadUnsyncedCount = async () => {
+      try {
+        const locationStore = locationStoreRef.current;
+        await locationStore.init();
+        const count = await locationStore.getUnsyncedCount();
+        setUnsyncedCount(count);
+
+        if (count > 0) {
+          console.log(`Found ${count} unsynced locations on startup`);
+        }
+      } catch (error) {
+        console.error('Failed to load unsynced count:', error);
+      }
+    };
+
+    loadUnsyncedCount();
+  }, []);
+
   // Handle page visibility changes (pause tracking when hidden)
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -315,8 +459,11 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     isTracking,
     accuracy,
     error,
+    unsyncedCount,
+    isOnline,
     startTracking,
     stopTracking,
-    updateLocationManually
+    updateLocationManually,
+    syncOfflineLocations
   };
 }
