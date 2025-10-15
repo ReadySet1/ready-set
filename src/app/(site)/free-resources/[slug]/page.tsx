@@ -6,6 +6,7 @@ import React from "react";
 import Logo from "@/components/ui/logo";
 import type { Metadata } from "next";
 import { DownloadButtonWrapper } from "./DownloadButtonWrapper";
+import { sanitizeHtml } from "@/lib/security/sanitize";
 
 export const revalidate = 30;
 
@@ -291,7 +292,7 @@ export default async function GuidePage({
                   <div className="text-gray-600">
                     <div
                       dangerouslySetInnerHTML={{
-                        __html: renderPortableText(guide.introduction),
+                        __html: sanitizeHtml(renderPortableText(guide.introduction)),
                       }}
                     />
                   </div>
@@ -309,7 +310,7 @@ export default async function GuidePage({
                           <div className="text-gray-600">
                             <div
                               dangerouslySetInnerHTML={{
-                                __html: renderPortableText(section.content),
+                                __html: sanitizeHtml(renderPortableText(section.content)),
                               }}
                             />
                           </div>
