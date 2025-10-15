@@ -325,24 +325,48 @@ export async function getDriverActiveDeliveries(driverId: string): Promise<Deliv
 }
 
 /**
- * Upload proof of delivery (file handling to be implemented separately)
+ * Upload proof of delivery image and update database
+ *
+ * @param deliveryId - The delivery UUID
+ * @param file - The image file as a File or Blob
+ * @param description - Optional description
+ * @returns Success status with URL or error message
  */
 export async function uploadProofOfDelivery(
   deliveryId: string,
-  fileUrl: string,
+  file: File | Blob,
   description?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
+    // Validate UUID
+    if (!z.string().uuid().safeParse(deliveryId).success) {
+      return { success: false, error: 'Invalid deliveryId' };
+    }
+
+    // Import upload function
+    const { uploadPODImage } = await import('@/utils/supabase/storage');
+
+    // Upload file to storage
+    const uploadResult = await uploadPODImage(file, deliveryId);
+
+    if (uploadResult.error || !uploadResult.url) {
+      return {
+        success: false,
+        error: uploadResult.error || 'Upload failed - no URL returned'
+      };
+    }
+
+    // Update delivery record with proof URL
     await prisma.$executeRawUnsafe(`
-      UPDATE deliveries 
-      SET 
+      UPDATE deliveries
+      SET
         proof_of_delivery = $2,
         metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       deliveryId,
-      fileUrl,
+      uploadResult.url,
       JSON.stringify({
         proofDescription: description,
         proofUploadedAt: new Date().toISOString()
@@ -352,7 +376,7 @@ export async function uploadProofOfDelivery(
     revalidatePath('/admin/tracking');
     revalidatePath('/driver');
 
-    return { success: true };
+    return { success: true, url: uploadResult.url };
   } catch (error) {
     console.error('Error uploading proof of delivery:', error);
     return {
