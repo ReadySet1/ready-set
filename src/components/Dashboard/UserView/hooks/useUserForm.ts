@@ -189,10 +189,20 @@ export const useUserForm = (
       }
 
       const result = await response.json();
-            
+
+      // If this was a new user creation (userId === 'new'), redirect to the new user's page
+      if (userId === 'new' && result.id) {
+        toast.success("User created successfully!");
+        // Redirect to the newly created user's page
+        setTimeout(() => {
+          window.location.href = `/admin/users/${result.id}`;
+        }, 500);
+        return;
+      }
+
       await fetchUser(); // Refetch to ensure UI is updated
       toast.success("User saved successfully!");
-      
+
       // Call the success callback if provided (for navigation/refresh)
       if (onSaveSuccess) {
         // Add a small delay to allow the toast to show before navigation
