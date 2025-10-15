@@ -37,16 +37,24 @@ For comprehensive documentation, setup instructions, and development guides, see
 - **Professional standards** with HIPAA compliance
 - **Modern tech stack** with Next.js, TypeScript, and PostgreSQL
 
-## 🔐 Authentication
+## 🔐 Security
 
-This project uses **Supabase Auth** for secure user authentication:
+This project implements comprehensive security measures:
 
+### Authentication
+- **Supabase Auth** for secure user authentication
 - **Email/Password authentication** with secure password hashing
 - **Google OAuth integration** for social login
 - **Magic link authentication** for passwordless login
 - **Session management** with secure JWT tokens
 - **Role-based access control** (CLIENT, ADMIN, SUPER_ADMIN, DRIVER, VENDOR, HELPDESK)
 - **Protected routes** with middleware-based authorization
+
+### XSS Prevention
+- **DOMPurify sanitization** for all user-generated HTML content
+- **Input sanitization utilities** in `src/lib/security/sanitize.ts`
+- **Comprehensive test coverage** for XSS attack vectors
+- Protection against script injection, event handlers, and malicious URLs
 
 ## 🔧 Development
 
