@@ -1,12 +1,18 @@
-import DOMPurify from 'isomorphic-dompurify';
+import DOMPurify from 'dompurify';
 
 /**
  * Sanitizes HTML to prevent XSS attacks
- * Uses isomorphic-dompurify which works in both browser and Node.js environments
+ * NOTE: This function should only be called in client components (use 'client' directive)
  * @param dirty - Potentially unsafe HTML string
  * @returns Safe HTML string
  */
 export function sanitizeHtml(dirty: string): string {
+  // Ensure we're in a browser environment
+  if (typeof window === 'undefined') {
+    console.warn('sanitizeHtml called in server environment - returning empty string for safety');
+    return '';
+  }
+
   return DOMPurify.sanitize(dirty, {
     ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div'],
     ALLOWED_ATTR: ['href', 'target', 'rel'],
@@ -16,11 +22,17 @@ export function sanitizeHtml(dirty: string): string {
 
 /**
  * Sanitizes text (strips all HTML)
- * Uses isomorphic-dompurify which works in both browser and Node.js environments
+ * NOTE: This function should only be called in client components (use 'client' directive)
  * @param text - Text that may contain HTML
  * @returns Plain text only
  */
 export function sanitizeText(text: string): string {
+  // Ensure we're in a browser environment
+  if (typeof window === 'undefined') {
+    console.warn('sanitizeText called in server environment - returning empty string for safety');
+    return '';
+  }
+
   return DOMPurify.sanitize(text, {
     ALLOWED_TAGS: [],
     ALLOWED_ATTR: [],
