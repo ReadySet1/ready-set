@@ -299,11 +299,11 @@ describe("AddressModal", () => {
     });
 
     it("includes proper authorization header in requests", async () => {
-      const testToken = "test-access-token";
+      const mockToken = "mock-auth-token-" + Date.now();
       mockSupabase.auth.getSession.mockResolvedValue({
         data: {
           session: {
-            access_token: testToken,
+            access_token: mockToken,
             user: { id: "user1" },
           },
         },
@@ -331,7 +331,7 @@ describe("AddressModal", () => {
           "/api/addresses",
           expect.objectContaining({
             headers: expect.objectContaining({
-              Authorization: `Bearer ${testToken}`,
+              Authorization: `Bearer ${mockToken}`,
             }),
           }),
         );

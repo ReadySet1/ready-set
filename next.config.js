@@ -4,6 +4,7 @@ const path = require('path');
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
+  compress: true, // Enable gzip compression for production
   typescript: {
     // Always skip type checking during builds to prevent deployment failures
     ignoreBuildErrors: true,

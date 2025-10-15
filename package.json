@@ -2,6 +2,10 @@
   "name": "ready-set-nextjs",
   "version": "2.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0 <21.0.0",
+    "pnpm": ">=10.0.0"
+  },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "dev": "next dev",
