@@ -1,7 +1,8 @@
 // src/utils/local-backup.ts
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import * as path from 'path';
 import * as cron from 'node-cron';
 import { config } from 'dotenv';
@@ -34,10 +35,10 @@ async function createBackup(): Promise<void> {
     // Create backups directory in your home folder
     const homeDir = process.env.HOME || require('os').homedir();
     const backupDir = path.join(homeDir, 'db-backups');
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir);
+    if (!fsSync.existsSync(backupDir)) {
+      await fs.mkdir(backupDir, { recursive: true });
     }
-    
+
     const backupPath = path.join(backupDir, `backup-${date}.sql`);
 
     // Construct pg_dump command with proper escaping
@@ -53,15 +54,15 @@ async function createBackup(): Promise<void> {
     ].join(' ');
 
         await execAsync(command);
-    
+
     // Keep only last 7 backups
-    const backupFiles = fs.readdirSync(backupDir)
+    const backupFiles = (await fs.readdir(backupDir))
       .filter(file => file.endsWith('.sql'))
       .sort();
-      
+
     if (backupFiles.length > 7 && backupFiles[0]) {
       const oldestFile = backupFiles[0];
-      fs.unlinkSync(path.join(backupDir, oldestFile));
+      await fs.unlink(path.join(backupDir, oldestFile));
           }
 
     return;

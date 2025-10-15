@@ -26,9 +26,9 @@ jest.mock("next/navigation", () => ({
 let mockOnAddressSelect: ((id: string) => void) | undefined = undefined;
 jest.mock("@/components/AddressManager", () => ({
   __esModule: true,
-  default: (props: { onAddressSelect: (id: string) => void }) => {
+  default: (props: { onAddressSelected: (id: string) => void }) => {
     // Store the callback for later use in tests
-    mockOnAddressSelect = props.onAddressSelect;
+    mockOnAddressSelect = props.onAddressSelected;
     return <div data-testid="mock-address-manager">Mock Address Manager</div>;
   },
 }));
@@ -105,6 +105,20 @@ describe("CateringOrderForm", () => {
     jest.clearAllMocks();
     mockOnAddressSelect = undefined; // Reset the address select callback
     mockPush.mockClear(); // Clear router mock
+
+    // Default mock for useUser - tests can override this
+    mockUseUser.mockReturnValue({
+      userRole: UserType.CLIENT,
+      session: null,
+      user: null,
+      isLoading: false,
+      error: null,
+      refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
+    });
 
     // Mock fetch implementation - handle different endpoints and methods
     mockFetch.mockImplementation(
@@ -188,11 +202,10 @@ describe("CateringOrderForm", () => {
       await user.click(submitButton);
     });
 
-    // Check for validation messages - only check for the ones that actually exist
+    // Check for validation messages
     await waitFor(() => {
       expect(screen.getByText(/event name is required/i)).toBeInTheDocument();
-      // Remove the address validation check since it's not implemented in the component
-      // expect(screen.getByText(/address must be selected/i)).toBeInTheDocument();
+      expect(screen.getByText(/address must be selected/i)).toBeInTheDocument();
     });
   });
 
