@@ -91,38 +91,38 @@ export const useUserData = (
       // Transform the API data to match form structure
       const formData: UserFormValues = {
         id: data.id,
-        displayName: getDisplayNameByUserType(data.type, data.name, data.contactName),
+        displayName: getDisplayNameByUserType(data.type, data.name, data.contact_name),
         email: data.email,
-        contact_number: data.contactNumber,
+        contact_number: data.contact_number,
         type: (data.type?.toLowerCase() as UserFormValues['type']) || "client",
-        company_name: data.companyName,
+        company_name: data.company_name,
         website: data.website,
         street1: data.street1 || "",
         street2: data.street2 || "",
         city: data.city || "",
         state: data.state || "",
         zip: data.zip || "",
-        location_number: data.locationNumber || "",
-        parking_loading: data.parkingLoading || "",
-        
+        location_number: data.location_number || "",
+        parking_loading: data.parking_loading || "",
+
         // Counties - Use the array provided by the API (already split)
         countiesServed: Array.isArray(data.countiesServed) ? data.countiesServed : [],
         // Keep original string if needed elsewhere, ensure it's a string or fallback
-        counties: typeof data.counties === 'string' ? data.counties : "", 
-        
+        counties: typeof data.counties === 'string' ? data.counties : "",
+
         // Time Needed - Use the array directly from the API
         timeNeeded: Array.isArray(data.timeNeeded) ? data.timeNeeded : [],
-        
+
         // Catering Brokerage - Use the array directly from the API
         cateringBrokerage: Array.isArray(data.cateringBrokerage) ? data.cateringBrokerage : [],
-        
+
         // Provisions - Use the array directly from the API
         provisions: Array.isArray(data.provisions) ? data.provisions : [],
         frequency: data.frequency || null,
         headCount: data.headCount ?? null,
         status: data.status || "pending",
         name: data.name,
-        contact_name: data.contactName,
+        contact_name: data.contact_name,
         sideNotes: data.sideNotes
       };
       

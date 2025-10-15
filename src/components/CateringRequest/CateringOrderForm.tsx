@@ -117,6 +117,7 @@ const CateringOrderForm: React.FC = () => {
     formState: { errors, isSubmitting },
     setValue,
   } = useForm<FormData>({
+    mode: "onBlur", // Validate on blur for better UX
     defaultValues: {
       eventName: "",
       eventDate: "",
@@ -132,7 +133,7 @@ const CateringOrderForm: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleAddressSelect = (addressId: string) => {
-    setValue("addressId", addressId);
+    setValue("addressId", addressId, { shouldValidate: true });
   };
 
   const handleAddressesLoaded = (addresses: Address[]) => {
@@ -327,6 +328,12 @@ const CateringOrderForm: React.FC = () => {
 
       <div className="space-y-4">
         <Label>Event Location</Label>
+        <input
+          type="hidden"
+          {...register("addressId", {
+            required: "Address must be selected",
+          })}
+        />
         <AddressManager
           onAddressSelected={handleAddressSelect}
           onAddressesLoaded={handleAddressesLoaded}
