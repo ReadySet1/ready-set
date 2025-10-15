@@ -13,7 +13,7 @@ const nextConfig = {
     // Enable 'use cache' directive for static site generation
     useCache: true,
   },
-  serverExternalPackages: ['@prisma/client', 'prisma'],
+  serverExternalPackages: ['@prisma/client', 'prisma', 'jsdom'],
   skipTrailingSlashRedirect: true,
   // Ensure all API routes are treated as dynamic
   async rewrites() {
@@ -25,7 +25,10 @@ const nextConfig = {
     if (isServer) {
       config.externals = config.externals || [];
       config.externals.push('pg');
-      
+
+      // Externalize jsdom to avoid CSS file bundling issues with isomorphic-dompurify
+      config.externals.push('jsdom');
+
       // Don't externalize @prisma/client - bundle it
       if (config.externals.includes('@prisma/client')) {
         config.externals = config.externals.filter(external => external !== '@prisma/client');
