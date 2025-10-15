@@ -6,6 +6,7 @@ import React from "react";
 import Logo from "@/components/ui/logo";
 import type { Metadata } from "next";
 import { DownloadButtonWrapper } from "./DownloadButtonWrapper";
+import { SanitizedContent } from "@/components/Common/SanitizedContent";
 
 export const revalidate = 30;
 
@@ -288,13 +289,10 @@ export default async function GuidePage({
 
                 {/* Introduction */}
                 {guide.introduction && (
-                  <div className="text-gray-600">
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: renderPortableText(guide.introduction),
-                      }}
-                    />
-                  </div>
+                  <SanitizedContent
+                    html={renderPortableText(guide.introduction)}
+                    className="text-gray-600"
+                  />
                 )}
 
                 {/* Main Content Sections */}
@@ -306,13 +304,10 @@ export default async function GuidePage({
                           {section.title}
                         </h2>
                         {section.content && (
-                          <div className="text-gray-600">
-                            <div
-                              dangerouslySetInnerHTML={{
-                                __html: renderPortableText(section.content),
-                              }}
-                            />
-                          </div>
+                          <SanitizedContent
+                            html={renderPortableText(section.content)}
+                            className="text-gray-600"
+                          />
                         )}
                       </div>
                     ))}
