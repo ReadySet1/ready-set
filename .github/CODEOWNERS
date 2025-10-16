@@ -1,0 +1,32 @@
+# Code Owners for Ready Set
+
+# These owners will be automatically requested for review when someone opens a pull request.
+
+# Default owners for everything in the repo
+* @ready-set-llc
+
+# Workflow files require approval from DevOps team
+/.github/workflows/ @ready-set-llc
+
+# Infrastructure and deployment
+/scripts/deployment/ @ready-set-llc
+/scripts/monitoring/ @ready-set-llc
+
+# Database migrations require careful review
+/prisma/ @ready-set-llc
+/scripts/*migration*.ts @ready-set-llc
+
+# Critical API routes
+/src/app/api/users/ @ready-set-llc
+/src/app/api/auth/ @ready-set-llc
+/src/app/api/orders/ @ready-set-llc
+
+# Security-sensitive files
+/src/utils/supabase/ @ready-set-llc
+/src/contexts/UserContext.tsx @ready-set-llc
+
+# Configuration files
+*.config.js @ready-set-llc
+*.config.ts @ready-set-llc
+package.json @ready-set-llc
+pnpm-lock.yaml @ready-set-llc
