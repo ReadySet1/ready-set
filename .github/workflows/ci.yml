@@ -29,6 +29,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          PRISMA_SKIP_POSTINSTALL_GENERATE: 'true'
+
+      - name: Generate Prisma Client
+        run: pnpm prisma generate
 
       - name: Run ESLint
         run: pnpm lint
