@@ -76,8 +76,8 @@ export function PricingCalculator({
         <div className="pricing-inputs space-y-4">
           {/* Head Count Input */}
           <div className={`input-group ${styles.inputGroup || ''}`}>
-            <label 
-              htmlFor="headCount" 
+            <label
+              htmlFor="headCount"
               className={`block text-sm font-medium text-gray-700 mb-1 ${styles.label || ''}`}
             >
               Head Count
@@ -90,7 +90,7 @@ export function PricingCalculator({
               onChange={(e) => setHeadCount(parseInt(e.target.value) || 0)}
               placeholder="Enter number of people"
               className={`
-                w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm 
+                w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm
                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
                 ${styles.input || ''}
               `}
@@ -99,8 +99,8 @@ export function PricingCalculator({
 
           {/* Food Cost Input */}
           <div className={`input-group ${styles.inputGroup || ''}`}>
-            <label 
-              htmlFor="foodCost" 
+            <label
+              htmlFor="foodCost"
               className={`block text-sm font-medium text-gray-700 mb-1 ${styles.label || ''}`}
             >
               Food Cost
@@ -114,7 +114,7 @@ export function PricingCalculator({
               onChange={(e) => setFoodCost(parseFloat(e.target.value) || 0)}
               placeholder="Enter food cost"
               className={`
-                w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm 
+                w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm
                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
                 ${styles.input || ''}
               `}
@@ -166,7 +166,7 @@ export function PricingCalculator({
         {!loading && !error && calculation && (
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Pricing Details</h3>
-            
+
             <div className="space-y-3">
               {/* Base Price */}
               <div className="flex justify-between items-center">
@@ -191,7 +191,7 @@ export function PricingCalculator({
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Applied Rate:</span>
                   <span className="text-sm text-gray-700">
-                    {calculation.calculationDetails.isPercentageBased 
+                    {calculation.calculationDetails.isPercentageBased
                       ? formatPercentage(calculation.calculationDetails.appliedRate)
                       : formatCurrency(calculation.calculationDetails.appliedRate)
                     }
@@ -230,7 +230,7 @@ export function PricingCalculator({
             {calculation.calculationDetails?.isPercentageBased && (
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                 <p className="text-sm text-blue-800">
-                  <strong>Note:</strong> This order qualifies for percentage-based pricing 
+                  <strong>Note:</strong> This order qualifies for percentage-based pricing
                   ({formatPercentage(calculation.calculationDetails.appliedRate || 0)} of food cost).
                 </p>
               </div>
@@ -261,4 +261,4 @@ export function PricingCalculator({
   );
 }
 
-export default PricingCalculator; 
+export default PricingCalculator;
