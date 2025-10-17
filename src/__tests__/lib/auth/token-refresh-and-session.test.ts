@@ -52,7 +52,7 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 // Mock BroadcastChannel
 class MockBroadcastChannel {
   name: string;
-  listeners: Map<string, Function[]> = new Map();
+  listeners: Map<string, Array<(event: MessageEvent) => void>> = new Map();
 
   constructor(name: string) {
     this.name = name;
@@ -66,7 +66,7 @@ class MockBroadcastChannel {
     }, 0);
   }
 
-  addEventListener(event: string, listener: Function) {
+  addEventListener(event: string, listener: (event: MessageEvent) => void) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
