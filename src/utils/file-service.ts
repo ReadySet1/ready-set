@@ -21,8 +21,9 @@ export interface FileMetadata {
 }
 
 // Define the buckets we'll use in the application
+// NOTE: Only fileUploader bucket is currently active in production
 export const STORAGE_BUCKETS = {
-  DEFAULT: 'user-assets',
+  DEFAULT: 'fileUploader', // Changed from 'user-assets' to match actual working bucket
   FILE_UPLOADER: 'fileUploader',
   CATERING_FILES: 'catering-files',
   USER_FILES: 'user-files',
@@ -31,169 +32,78 @@ export const STORAGE_BUCKETS = {
 } as const;
 
 // Function to create storage buckets (run on app initialization)
+// Simplified to only ensure the DEFAULT bucket exists to reduce log noise
 export async function initializeStorageBuckets() {
   try {
     const supabase = await createAdminClient();
-    
-    // Create all the necessary buckets
-    for (const bucketName of Object.values(STORAGE_BUCKETS)) {
-      try {
-        const { data, error } = await supabase.storage.getBucket(bucketName);
 
-        if (error && error.message.includes('does not exist')) {
-          // Create the bucket if it doesn't exist
-          const { data: createData, error: createError } = await supabase.storage.createBucket(bucketName, {
-            public: false,
-            fileSizeLimit: 10 * 1024 * 1024, // 10MB
-          });
+    // Only initialize the DEFAULT bucket (fileUploader) which is actually in use
+    const defaultBucket = STORAGE_BUCKETS.DEFAULT;
 
-          if (createError) {
-            console.error(`Failed to create bucket ${bucketName}:`, createError);
-          } else {
-                      }
-        } else if (error) {
-          console.error(`Error checking bucket ${bucketName}:`, error);
-        } else {
-                  }
-      } catch (bucketError) {
-        console.error(`Exception handling bucket ${bucketName}:`, bucketError);
-      }
-    }
-
-    // Create quarantine bucket if it doesn't exist
     try {
-      const { data: quarantineData, error: quarantineError } = await supabase.storage.getBucket('quarantined-files');
-      if (quarantineError && quarantineError.message.includes('does not exist')) {
-        const { error: createError } = await supabase.storage.createBucket('quarantined-files', {
+      const { data, error } = await supabase.storage.getBucket(defaultBucket);
+
+      if (error && error.message.includes('does not exist')) {
+        // Create the bucket if it doesn't exist
+        const { error: createError } = await supabase.storage.createBucket(defaultBucket, {
           public: false,
-          fileSizeLimit: 50 * 1024 * 1024, // 50MB for quarantined files
+          fileSizeLimit: 10 * 1024 * 1024, // 10MB
         });
 
         if (createError) {
-          console.error('Failed to create quarantine bucket:', createError);
-        } else {
-                  }
-      } else if (quarantineError) {
-        console.error('Error checking quarantine bucket:', quarantineError);
-      } else {
-              }
-    } catch (quarantineError) {
-      console.error('Exception with quarantine bucket:', quarantineError);
+          console.warn(`⚠️ Failed to create bucket ${defaultBucket}:`, createError.message);
+        }
+      } else if (error) {
+        console.warn(`⚠️ Error checking bucket ${defaultBucket}:`, error.message);
+      }
+    } catch (bucketError) {
+      console.warn(`⚠️ Exception handling bucket ${defaultBucket}:`, bucketError);
     }
 
     // Initialize security cleanup scheduler
-    if (typeof window === 'undefined') { // Only run on server side
+    if (typeof window === 'undefined') {
+      // Only run on server side
       UploadSecurityManager.startCleanupScheduler();
     }
 
-        return { success: true };
+    return { success: true };
   } catch (error) {
-    console.error('Error initializing storage buckets (falling back to anon client):', error);
-
-    // Fallback to regular client if admin client fails
-    try {
-      const supabase = await createClient();
-
-      // Try to check if buckets exist (but don't try to create them with anon key)
-      for (const bucketName of Object.values(STORAGE_BUCKETS)) {
-        try {
-          const { data, error } = await supabase.storage.getBucket(bucketName);
-          if (error) {
-            console.error(`Bucket ${bucketName} not accessible:`, error.message);
-          } else {
-                      }
-        } catch (bucketError) {
-          console.error(`Exception checking bucket ${bucketName}:`, bucketError);
-        }
-      }
-    } catch (fallbackError) {
-      console.error('Fallback bucket check also failed:', fallbackError);
-    }
-
+    console.warn('⚠️ Error initializing storage buckets:', error);
     return { success: false, error };
   }
 }
 
 // Diagnostic function to check Supabase storage configuration
+// Simplified version that only checks the DEFAULT bucket to reduce log noise
 export async function diagnoseStorageIssues() {
-  
   try {
-    // Test admin client
-        const adminClient = await createAdminClient();
-    
-    // Check if we can list buckets
-        const { data: buckets, error: bucketsError } = await adminClient.storage.listBuckets();
+    const adminClient = await createAdminClient();
 
-    if (bucketsError) {
-      console.error('   ❌ Failed to list buckets:', bucketsError);
-                              return { success: false, errors: [bucketsError], storageEnabled: false };
-    } else {
-            buckets?.forEach(bucket => {
-              });
-    }
+    // Only check the DEFAULT bucket (fileUploader) which is actually in use
+    const defaultBucket = STORAGE_BUCKETS.DEFAULT;
 
-    // Test each required bucket
-        const requiredBuckets = Object.values(STORAGE_BUCKETS);
-    let allBucketsExist = true;
+    try {
+      // Simple check: try to list files in the default bucket
+      const { data, error } = await adminClient.storage
+        .from(defaultBucket)
+        .list('', { limit: 1 });
 
-    for (const bucketName of requiredBuckets) {
-      try {
-        const { data, error } = await adminClient.storage.getBucket(bucketName);
-
-        if (error && error.message.includes('does not exist')) {
-                    allBucketsExist = false;
-
-          // Try to create it
-          const { error: createError } = await adminClient.storage.createBucket(bucketName, {
-            public: false,
-            fileSizeLimit: 10 * 1024 * 1024,
-          });
-
-          if (createError) {
-            console.error(`   ❌ Failed to create bucket '${bucketName}':`, createError);
-          } else {
-                      }
-        } else if (error) {
-          console.error(`   ❌ Error accessing bucket '${bucketName}':`, error);
-          allBucketsExist = false;
-        } else {
-                  }
-      } catch (bucketError) {
-        console.error(`   ❌ Exception testing bucket '${bucketName}':`, bucketError);
-        allBucketsExist = false;
+      if (error) {
+        console.warn(`⚠️ Storage bucket '${defaultBucket}' check failed:`, error.message);
+        return { success: false, storageEnabled: false };
       }
-    }
 
-    // Test quarantine bucket specifically
-        try {
-      const { data, error } = await adminClient.storage.getBucket('quarantined-files');
-      if (error && error.message.includes('does not exist')) {
-                const { error: createError } = await adminClient.storage.createBucket('quarantined-files', {
-          public: false,
-          fileSizeLimit: 50 * 1024 * 1024,
-        });
-        if (createError) {
-          console.error('   ❌ Failed to create quarantine bucket:', createError);
-        } else {
-                  }
-      } else if (error) {
-        console.error('   ❌ Error accessing quarantine bucket:', error);
-      } else {
-              }
-    } catch (quarantineError) {
-      console.error('   ❌ Exception testing quarantine bucket:', quarantineError);
-    }
+      // If we can list files, storage is working
+      return { success: true, storageEnabled: true };
 
-    // Test regular client
-        const regularClient = await createClient();
-    
-    const storageWorking = allBucketsExist && !bucketsError;
-    
-    return { success: storageWorking, storageEnabled: true };
+    } catch (bucketError) {
+      console.warn(`⚠️ Storage diagnostics failed for bucket '${defaultBucket}':`, bucketError);
+      return { success: false, storageEnabled: false };
+    }
 
   } catch (error) {
-    console.error('❌ Storage diagnostics failed:', error);
-                    return { success: false, errors: [error], storageEnabled: false };
+    console.warn('⚠️ Storage diagnostics failed:', error);
+    return { success: false, storageEnabled: false };
   }
 }
 
