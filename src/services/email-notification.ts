@@ -20,7 +20,15 @@ import {
   BRAND_COLORS
 } from "@/utils/email-templates";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization to avoid build-time errors when API key is not set
+const getResendClient = () => {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("RESEND_API_KEY not configured");
+    return null;
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
+
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 const fromEmail = process.env.EMAIL_FROM || "solutions@updates.readysetllc.com";
 const adminEmail = process.env.ADMIN_EMAIL || "info@ready-set.co";
@@ -169,6 +177,12 @@ export async function sendUserWelcomeEmail(data: UserRegistrationData): Promise<
   });
 
   try {
+    const resend = getResendClient();
+    if (!resend) {
+      console.warn("⚠️  Resend client not available - skipping welcome email");
+      return false;
+    }
+
     await resend.emails.send({
       to: data.email,
       from: fromEmail,
@@ -319,6 +333,12 @@ export async function sendOrderNotificationToAdmin(data: OrderNotificationData):
   });
 
   try {
+    const resend = getResendClient();
+    if (!resend) {
+      console.warn("⚠️  Resend client not available - skipping order notification email");
+      return false;
+    }
+
     await resend.emails.send({
       to: adminEmail,
       from: fromEmail,
@@ -404,6 +424,12 @@ export async function sendOrderConfirmationToCustomer(data: CustomerOrderConfirm
   });
 
   try {
+    const resend = getResendClient();
+    if (!resend) {
+      console.warn("⚠️  Resend client not available - skipping order confirmation email");
+      return false;
+    }
+
     await resend.emails.send({
       to: data.customerEmail,
       from: fromEmail,

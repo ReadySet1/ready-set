@@ -14,8 +14,14 @@ interface FormInputs {
   subject?: string;
 }
 
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization to avoid build-time errors when API key is not set
+const getResendClient = () => {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("RESEND_API_KEY not configured");
+    return null;
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
 
 const sendEmail = async (data: FormInputs) => {
   if (data.message.length > 1000) {
@@ -32,6 +38,12 @@ const sendEmail = async (data: FormInputs) => {
   const { subject, html } = await createEmailContent(data, notificationType);
 
   try {
+    const resend = getResendClient();
+    if (!resend) {
+      console.warn("⚠️  Resend client not available - skipping email");
+      throw new Error("Email service not configured");
+    }
+
     // Add this validation before sending
     if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
       throw new Error("Invalid recipient email address");

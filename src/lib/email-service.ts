@@ -6,7 +6,14 @@ import {
   DeliveryFormData,
 } from "@/components/Logistics/QuoteRequest/types";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization to avoid build-time errors when API key is not set
+const getResendClient = () => {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("RESEND_API_KEY not configured");
+    return null;
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
 
 export class EmailService {
   static async sendFormSubmissionNotification(data: {
@@ -98,6 +105,12 @@ export class EmailService {
     `;
 
     try {
+      const resend = getResendClient();
+      if (!resend) {
+        console.warn("⚠️  Resend client not available - skipping notification email");
+        return;
+      }
+
       await resend.emails.send({
         to: process.env.NOTIFICATION_RECIPIENT || 'info@ready-set.co',
         from: 'Ready Set Website <updates@updates.readysetllc.com>',
@@ -105,7 +118,7 @@ export class EmailService {
         html: htmlContent,
         text: htmlContent.replace(/<[^>]*>/g, ""), // Strip HTML for plain text version
       });
-          } catch (error) {
+    } catch (error) {
       console.error("Error sending notification email:", error);
       throw error;
     }
