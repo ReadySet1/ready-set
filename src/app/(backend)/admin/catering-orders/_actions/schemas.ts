@@ -30,8 +30,8 @@ export const createCateringOrderSchema = z.object({
   orderNumber: z.string().optional(),
   brokerage: z.string().optional().nullable(),
   tempEntityId: z.string().optional(),
-  pickupDateTime: z.date({ required_error: "Pickup date and time are required" }),
-  arrivalDateTime: z.date({ required_error: "Arrival date and time are required" }),
+  pickupDateTime: z.date({ message: "Pickup date and time are required" }),
+  arrivalDateTime: z.date({ message: "Arrival date and time are required" }),
   completeDateTime: z.date().optional().nullable(),
   headcount: z.preprocess(
     (val) => {

@@ -62,7 +62,37 @@ export const SecurityConfigSchema = z.object({
         strategy: 'sliding-window'
       }
     })
-  }).default({}),
+  }).default({
+    enabled: true,
+    defaultTier: 'API',
+    tiers: {
+      AUTH: {
+        windowMs: 15 * 60 * 1000,
+        maxRequests: 5,
+        strategy: 'sliding-window'
+      },
+      API: {
+        windowMs: 15 * 60 * 1000,
+        maxRequests: 100,
+        strategy: 'sliding-window'
+      },
+      UPLOAD: {
+        windowMs: 60 * 60 * 1000,
+        maxRequests: 50,
+        strategy: 'sliding-window'
+      },
+      ADMIN: {
+        windowMs: 15 * 60 * 1000,
+        maxRequests: 50,
+        strategy: 'sliding-window'
+      },
+      SENSITIVE: {
+        windowMs: 5 * 60 * 1000,
+        maxRequests: 10,
+        strategy: 'sliding-window'
+      }
+    }
+  }),
 
   // Request validation configuration
   validation: z.object({
@@ -71,7 +101,13 @@ export const SecurityConfigSchema = z.object({
     strictValidation: z.boolean().default(false),
     maxRequestSize: z.number().default(10 * 1024 * 1024), // 10MB
     allowedContentTypes: z.array(z.string()).default(['application/json', 'multipart/form-data'])
-  }).default({}),
+  }).default({
+    enabled: true,
+    sanitizeInputs: true,
+    strictValidation: false,
+    maxRequestSize: 10 * 1024 * 1024,
+    allowedContentTypes: ['application/json', 'multipart/form-data']
+  }),
 
   // CSRF protection configuration
   csrf: z.object({
@@ -82,7 +118,15 @@ export const SecurityConfigSchema = z.object({
     tokenMaxAge: z.number().default(60 * 60 * 1000), // 1 hour
     cookieSecure: z.boolean().default(true),
     cookieSameSite: z.enum(['strict', 'lax', 'none']).default('strict')
-  }).default({}),
+  }).default({
+    enabled: true,
+    requiredForMethods: ['POST', 'PUT', 'DELETE', 'PATCH'],
+    exemptPaths: ['/api/auth'],
+    allowApiKeyBypass: true,
+    tokenMaxAge: 60 * 60 * 1000,
+    cookieSecure: true,
+    cookieSameSite: 'strict'
+  }),
 
   // IP access control configuration
   ipAccessControl: z.object({
@@ -97,17 +141,32 @@ export const SecurityConfigSchema = z.object({
       action: z.enum(['allow', 'block']),
       reason: z.string().optional()
     })).default([])
-  }).default({}),
+  }).default({
+    enabled: false,
+    allowlist: [],
+    blocklist: [],
+    allowPrivateIPs: true,
+    allowTrustedProxies: true,
+    enableThreatIntelligence: false,
+    geolocationRules: []
+  }),
 
   // Security headers configuration
   securityHeaders: z.object({
     enabled: z.boolean().default(true),
     includeAll: z.boolean().default(true),
-    customHeaders: z.record(z.string()).default({}),
+    customHeaders: z.record(z.string(), z.string()).default({}),
     excludeHeaders: z.array(z.string()).default([]),
-    environmentOverrides: z.record(z.record(z.string())).default({}),
-    pathOverrides: z.record(z.record(z.string())).default({})
-  }).default({}),
+    environmentOverrides: z.record(z.string(), z.record(z.string(), z.string())).default({}),
+    pathOverrides: z.record(z.string(), z.record(z.string(), z.string())).default({})
+  }).default({
+    enabled: true,
+    includeAll: true,
+    customHeaders: {},
+    excludeHeaders: [],
+    environmentOverrides: {},
+    pathOverrides: {}
+  }),
 
   // Security logging configuration
   securityLogging: z.object({
@@ -118,14 +177,29 @@ export const SecurityConfigSchema = z.object({
     retentionDays: z.number().default(90),
     enableRealTimeAlerts: z.boolean().default(false),
     alertWebhooks: z.array(z.string()).default([]),
-    alertThresholds: z.record(z.number()).default({
+    alertThresholds: z.record(z.string(), z.number()).default({
       login_failure: 5,
       [SecurityEventType.UNAUTHORIZED_ACCESS]: 10,
       csrf_violation: 3,
       rate_limit_exceeded: 50,
       injection_attempt: 1
     })
-  }).default({}),
+  }).default({
+    enabled: true,
+    logLevel: 'info',
+    storeEvents: true,
+    maxEventAge: 90,
+    retentionDays: 90,
+    enableRealTimeAlerts: false,
+    alertWebhooks: [],
+    alertThresholds: {
+      login_failure: 5,
+      [SecurityEventType.UNAUTHORIZED_ACCESS]: 10,
+      csrf_violation: 3,
+      rate_limit_exceeded: 50,
+      injection_attempt: 1
+    }
+  }),
 
   // Input sanitization configuration
   inputSanitization: z.object({
@@ -135,7 +209,14 @@ export const SecurityConfigSchema = z.object({
     xssPrevention: z.boolean().default(true),
     filenameSanitization: z.boolean().default(true),
     aggressiveFiltering: z.boolean().default(false)
-  }).default({})
+  }).default({
+    enabled: true,
+    htmlSanitization: true,
+    sqlInjectionPrevention: true,
+    xssPrevention: true,
+    filenameSanitization: true,
+    aggressiveFiltering: false
+  })
 });
 
 // Security configuration type
@@ -405,7 +486,7 @@ export class SecurityConfigManager {
       if (error instanceof z.ZodError) {
         return {
           isValid: false,
-          errors: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+          errors: error.issues.map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`)
         };
       }
       return { isValid: false, errors: ['Unknown validation error'] };

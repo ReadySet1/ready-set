@@ -11,7 +11,7 @@ import { z } from "zod";
 
 // Extend the catering form schema to require clientId
 const adminCateringSchema = z.object({
-  clientId: z.number({ required_error: "Client is required" }),
+  clientId: z.number({ message: "Client is required" }),
 });
 
 export type AdminCateringFormData = z.infer<typeof adminCateringSchema> & any;

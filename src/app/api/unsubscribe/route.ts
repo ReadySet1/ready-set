@@ -29,7 +29,7 @@ export async function DELETE(request: Request) {
     const emailValidation = EmailSchema.safeParse(email);
     if (!emailValidation.success) {
       return NextResponse.json({ 
-        error: emailValidation.error.errors[0]?.message || "Invalid email address"
+        error: emailValidation.error.issues[0]?.message || "Invalid email address"
       }, { 
         status: 400 
       });

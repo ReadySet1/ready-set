@@ -25,7 +25,7 @@ const StatusUpdateSchema = z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
   }).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 type StatusUpdateRequest = z.infer<typeof StatusUpdateSchema>;
