@@ -54,6 +54,7 @@ jobs:
           # Allow these licenses (common permissive licenses in JavaScript ecosystem)
           # Note: LGPL licenses included for sharp image processing library
           # Note: JSON license included for victory-vendor package
+          # Note: CC0-1.0 included for vite and other build tools
           allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC-BY-4.0, CC0-1.0, 0BSD, MITNFA, LGPL-2.0-only, LGPL-2.1-only, LGPL-3.0-only, LGPL-3.0-or-later, JSON
 
   npm-audit:
