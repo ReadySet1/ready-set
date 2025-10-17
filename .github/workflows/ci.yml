@@ -125,6 +125,7 @@ jobs:
         run: pnpm build:no-typecheck
         env:
           SKIP_TYPECHECK: 'true'
+          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
           NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
 
@@ -132,6 +133,7 @@ jobs:
         run: pnpm test:e2e
         env:
           CI: true
+          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
           NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
 
@@ -180,6 +182,7 @@ jobs:
       - name: Build application
         run: pnpm build
         env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
           NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
           SKIP_ENV_VALIDATION: 'true'
