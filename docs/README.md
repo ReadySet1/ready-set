@@ -85,6 +85,7 @@ UI-related fixes and improvements.
 
 ## Root Files
 
+- `auth-testing-summary.md` - Comprehensive authentication & authorization testing documentation (REA-24)
 - `LINEAR_ISSUE_TEMPLATE.md` - Template for creating Linear issues
 
 ## Contributing
