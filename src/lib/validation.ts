@@ -259,7 +259,7 @@ export async function validateRequest<T = any>(
         };
       }
 
-      validatedData = { ...validatedData, ...bodyResult.data };
+      validatedData = { ...validatedData, ...(bodyResult.data as object) };
     }
 
     // Validate query parameters if schema provided
@@ -293,7 +293,7 @@ export async function validateRequest<T = any>(
         };
       }
 
-      validatedData = { ...validatedData, ...queryResult.data };
+      validatedData = { ...validatedData, ...(queryResult.data as object) };
     }
 
     // Validate URL params if schema provided
@@ -308,7 +308,7 @@ export async function validateRequest<T = any>(
         };
       }
 
-      validatedData = { ...validatedData, ...paramsResult.data };
+      validatedData = { ...validatedData, ...(paramsResult.data as object) };
     }
 
     // Validate headers if schema provided
@@ -326,7 +326,7 @@ export async function validateRequest<T = any>(
         };
       }
 
-      validatedData = { ...validatedData, ...headersResult.data };
+      validatedData = { ...validatedData, ...(headersResult.data as object) };
     }
 
     return {
