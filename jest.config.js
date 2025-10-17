@@ -49,6 +49,14 @@ const customJestConfig = {
   },
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
   coverageDirectory: 'coverage',
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/__tests__/',
+    '/test/',
+    '/tests/',
+    '\\.(test|spec)\\.(js|jsx|ts|tsx)$',
+    'src/__tests__/helpers/',
+  ],
   // Update transform for Next.js 15
   transform: {
     '^.+\\.(t|j)sx?$': ['@swc/jest', {
