@@ -3,13 +3,13 @@ import { prismaLogger } from '@/utils/logger';
 
 /**
  * Prisma middleware for automatic soft delete filtering
- * 
+ *
  * This middleware automatically filters out soft-deleted records from all queries
  * unless explicitly included using the `includeDeleted` parameter.
- * 
+ *
  * Soft-deleted records are identified by having a non-null `deletedAt` field.
  */
-export const softDeleteMiddleware: Prisma.Middleware = async (params, next) => {
+export const softDeleteMiddleware = async (params: any, next: any) => {
   // Skip middleware for specific operations that should include deleted records
   if (params.args?.includeDeleted === true) {
     // Remove the includeDeleted flag before passing to Prisma

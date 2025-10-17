@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const fullPath = path.join(process.cwd(), "public", "resources", filePath);
     const fileBuffer = await fs.readFile(fullPath);
 
-    const response = new NextResponse(fileBuffer);
+    const response = new NextResponse(new Uint8Array(fileBuffer));
     response.headers.set("Content-Type", "application/pdf");
     response.headers.set(
       "Content-Disposition",
