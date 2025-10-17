@@ -9,6 +9,9 @@ const createJestConfig = nextJest({
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testEnvironment: 'jsdom',
+  // Use V8 coverage provider instead of babel-plugin-istanbul
+  // This prevents instrumentation errors with mock objects in test files
+  coverageProvider: 'v8',
   moduleNameMapper: {
     // Fix module resolution
     '^@/(.*)$': '<rootDir>/src/$1',
@@ -49,6 +52,14 @@ const customJestConfig = {
   },
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
   coverageDirectory: 'coverage',
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/__tests__/',
+    '/test/',
+    '/tests/',
+    '\\.(test|spec)\\.(js|jsx|ts|tsx)$',
+    'src/__tests__/helpers/',
+  ],
   // Update transform for Next.js 15
   transform: {
     '^.+\\.(t|j)sx?$': ['@swc/jest', {
