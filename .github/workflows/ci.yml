@@ -128,6 +128,8 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
           NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+          NEXT_PUBLIC_SANITY_PROJECT_ID: test-project-id
+          NEXT_PUBLIC_SANITY_DATASET: test
 
       - name: Run E2E tests
         run: pnpm test:e2e
@@ -185,6 +187,8 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
           NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+          NEXT_PUBLIC_SANITY_PROJECT_ID: test-project-id
+          NEXT_PUBLIC_SANITY_DATASET: test
           SKIP_ENV_VALIDATION: 'true'
 
       - name: Check build size
