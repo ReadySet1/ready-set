@@ -9,6 +9,9 @@ const createJestConfig = nextJest({
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testEnvironment: 'jsdom',
+  // Use V8 coverage provider instead of babel-plugin-istanbul
+  // This prevents instrumentation errors with mock objects in test files
+  coverageProvider: 'v8',
   moduleNameMapper: {
     // Fix module resolution
     '^@/(.*)$': '<rootDir>/src/$1',
