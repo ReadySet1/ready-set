@@ -36,7 +36,7 @@ export const PricingRuleSchema = z.object({
   perUnitAmount: z.number().optional(),
   thresholdValue: z.number().optional(),
   thresholdType: z.enum(['above', 'below', 'between']).optional(),
-  appliesWhen: z.record(z.any()).optional(),
+  appliesWhen: z.record(z.string(), z.any()).optional(),
   priority: z.number().default(0),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional()
@@ -75,7 +75,7 @@ export const ClientConfigurationSchema = z.object({
   clientId: z.string().optional(),
   templateId: z.string(),
   clientName: z.string(),
-  ruleOverrides: z.record(z.any()).default({}),
+  ruleOverrides: z.record(z.string(), z.any()).default({}),
   areaRules: z.array(AreaRuleSchema).default([]),
   isActive: z.boolean().default(true),
   createdAt: z.date().optional(),
@@ -111,7 +111,7 @@ export const CalculationInputSchema = z.object({
   clientConfigId: z.string().optional(),
 
   // Custom fields for flexible pricing
-  customFields: z.record(z.any()).optional()
+  customFields: z.record(z.string(), z.any()).optional()
 });
 
 export type CalculationInput = z.infer<typeof CalculationInputSchema>;
@@ -186,9 +186,9 @@ export const CalculationHistorySchema = z.object({
   templateId: z.string().optional(),
   clientConfigId: z.string().optional(),
   userId: z.string().optional(),
-  inputData: z.record(z.any()),
-  customerCharges: z.record(z.any()),
-  driverPayments: z.record(z.any()),
+  inputData: z.record(z.string(), z.any()),
+  customerCharges: z.record(z.string(), z.any()),
+  driverPayments: z.record(z.string(), z.any()),
   customerTotal: z.number(),
   driverTotal: z.number(),
   notes: z.string().optional(),
@@ -252,7 +252,7 @@ export const CreateClientConfigSchema = z.object({
   clientId: z.string().optional(),
   templateId: z.string(),
   clientName: z.string().min(1, 'Client name is required'),
-  ruleOverrides: z.record(z.any()).default({}),
+  ruleOverrides: z.record(z.string(), z.any()).default({}),
   areaRules: z.array(AreaRuleSchema).default([]),
   isActive: z.boolean().default(true)
 });

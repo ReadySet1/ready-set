@@ -35,7 +35,7 @@ const DraftOrderSchema = z.object({
       phone: z.string().min(10, 'Valid phone number is required'),
     }),
   }),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 type DraftOrderRequest = z.infer<typeof DraftOrderSchema>;

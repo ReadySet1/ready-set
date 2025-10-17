@@ -12,7 +12,7 @@ const ConfirmOrderSchema = z.object({
   id: z.string().uuid('Invalid order ID format'),
   isAccepted: z.boolean(),
   reason: z.string().optional(), // For rejection reasons
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 type ConfirmOrderRequest = z.infer<typeof ConfirmOrderSchema>;
