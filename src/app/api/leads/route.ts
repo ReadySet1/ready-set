@@ -6,15 +6,21 @@ import { ClientRequest } from "@sendgrid/client/src/request";
 import { sendDownloadEmail } from "@/app/actions/send-download-email";
 
 import { prisma } from "@/utils/prismaDB";
-const client = new Client();
 
-// We're still using SendGrid for list management
-if (!process.env.SENDGRID_API_KEY || !process.env.SENDGRID_LIST_ID) {
-  throw new Error('SendGrid configuration is missing');
-}
+// Lazy initialization to avoid build-time errors when API keys are not set
+const getSendGridClient = () => {
+  if (!process.env.SENDGRID_API_KEY || !process.env.SENDGRID_LIST_ID) {
+    console.warn("SendGrid configuration is missing - newsletter subscriptions will be skipped");
+    return null;
+  }
 
-client.setApiKey(process.env.SENDGRID_API_KEY);
-const WEBSITE_LEADS_LIST_ID = process.env.SENDGRID_LIST_ID;
+  const client = new Client();
+  client.setApiKey(process.env.SENDGRID_API_KEY);
+  return {
+    client,
+    listId: process.env.SENDGRID_LIST_ID
+  };
+};
 
 // Updated schema to include sendEmail flag
 const FormSchema = z.object({
@@ -55,39 +61,45 @@ export async function POST(req: NextRequest) {
 
     // Handle SendGrid subscription for newsletter
     if (validatedData.newsletterConsent) {
-      try {
-        const sendgridData = {
-          list_ids: [WEBSITE_LEADS_LIST_ID],
-          contacts: [
-            {
-              email: validatedData.email.toLowerCase(),
-              first_name: validatedData.firstName,
-              last_name: validatedData.lastName,
-              custom_fields: {
-                industry: validatedData.industry,
+      const sendgridConfig = getSendGridClient();
+
+      if (!sendgridConfig) {
+        console.warn("⚠️  SendGrid not configured - skipping newsletter subscription");
+      } else {
+        try {
+          const sendgridData = {
+            list_ids: [sendgridConfig.listId],
+            contacts: [
+              {
+                email: validatedData.email.toLowerCase(),
+                first_name: validatedData.firstName,
+                last_name: validatedData.lastName,
+                custom_fields: {
+                  industry: validatedData.industry,
+                },
               },
-            },
-          ],
-        };
+            ],
+          };
 
-        const request: ClientRequest = {
-          url: `/v3/marketing/contacts`,
-          method: 'PUT' as const,
-          body: sendgridData,
-        };
+          const request: ClientRequest = {
+            url: `/v3/marketing/contacts`,
+            method: 'PUT' as const,
+            body: sendgridData,
+          };
 
-        const [response, body] = await client.request(request);
+          const [response, body] = await sendgridConfig.client.request(request);
 
-        if (response.statusCode === 202) {
-                  } else {
-          console.error('SendGrid unexpected status:', response.statusCode);
+          if (response.statusCode === 202) {
+                    } else {
+            console.error('SendGrid unexpected status:', response.statusCode);
+          }
+        } catch (error) {
+          // Log the error but don't throw it
+          console.error('SendGrid subscription error:', {
+            error,
+            email: validatedData.email,
+          });
         }
-      } catch (error) {
-        // Log the error but don't throw it
-        console.error('SendGrid subscription error:', {
-          error,
-          email: validatedData.email,
-        });
       }
     }
 

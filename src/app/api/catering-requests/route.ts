@@ -10,7 +10,14 @@ import { randomUUID } from "crypto";
 import { Resend } from "resend";
 import { generateUnifiedEmailTemplate, generateDetailsTable, BRAND_COLORS } from "@/utils/email-templates";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization to avoid build-time errors when API key is not set
+const getResendClient = () => {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("RESEND_API_KEY not configured");
+    return null;
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
 
 const sendOrderConfirmationEmail = async (
   customerEmail: string,
@@ -97,6 +104,12 @@ const sendOrderConfirmationEmail = async (
   });
 
   try {
+    const resend = getResendClient();
+    if (!resend) {
+      console.warn("⚠️  Resend client not available - skipping email");
+      return false;
+    }
+
     await resend.emails.send({
       to: customerEmail,
       from: process.env.EMAIL_FROM || "solutions@updates.readysetllc.com",

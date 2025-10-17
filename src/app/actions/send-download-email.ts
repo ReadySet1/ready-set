@@ -19,17 +19,17 @@ const RESOURCE_MAP = resources.reduce(
   {} as Record<ResourceSlug, Resource>,
 );
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = "solutions@updates.readysetllc.com";
 const FROM_NAME = "Ready Set";
 
-if (!RESEND_API_KEY) {
-  console.error("RESEND_API_KEY is not configured in environment variables");
-  throw new Error("Email service not properly configured");
-}
-
-// Create a single Resend instance
-const resend = new Resend(RESEND_API_KEY);
+// Lazy initialization to avoid build-time errors when API key is not set
+const getResendClient = () => {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("RESEND_API_KEY not configured");
+    return null;
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
 
 export const sendDownloadEmail = async (
   userEmail: string,
@@ -74,6 +74,12 @@ export const sendDownloadEmail = async (
     };
 
     // Send email using Resend with React template
+    const resend = getResendClient();
+    if (!resend) {
+      console.warn("⚠️  Resend client not available - skipping email");
+      throw new Error("Email service not configured");
+    }
+
     const { data, error } = await resend.emails.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: [userEmail],
@@ -97,8 +103,8 @@ export const sendDownloadEmail = async (
         response: error instanceof Response ? await error.text() : undefined
       } : error,
       config: {
-        apiKeyExists: !!RESEND_API_KEY,
-        apiKeyPrefix: RESEND_API_KEY?.substring(0, 5),
+        apiKeyExists: !!process.env.RESEND_API_KEY,
+        apiKeyPrefix: process.env.RESEND_API_KEY?.substring(0, 5),
         fromEmail: FROM_EMAIL
       }
     });
