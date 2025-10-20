@@ -3,14 +3,13 @@
 import React, { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { clientSchema } from "@/components/Auth/SignUp/FormSchemas";
+import { clientSchema, ClientFormData } from "@/components/Auth/SignUp/FormSchemas";
 import CommonFields from "../CommonFields";
 import {
   COUNTIES,
   TIME_NEEDED,
   FREQUENCY,
   HEAD_COUNT,
-  ClientFormData,
 } from "./FormData";
 import { CheckboxGroup, RadioGroup } from "./FormComponents";
 import toast from "react-hot-toast";
@@ -32,8 +31,6 @@ const VendorForm: React.FC<ClientFormProps> = ({ onSubmit, isLoading = false }) 
       userType: "client",
       countiesServed: [],
       timeNeeded: [],
-      frequency: undefined,
-      head_count: undefined,
     },
   });
 

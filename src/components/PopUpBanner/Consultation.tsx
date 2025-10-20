@@ -5,18 +5,18 @@ import { Phone } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import * as Dialog from "@radix-ui/react-dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import AppointmentDialog from "../VirtualAssistant/Appointment";
 import dynamic from "next/dynamic";
 import { getPromotionDates } from "@/utils/dates";
 
 // Framer Motion variants for animations
-const overlayVariants = {
+const overlayVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1 },
 };
 
-const contentVariants = {
+const contentVariants: Variants = {
   hidden: {
     opacity: 0,
     scale: 0.8,
@@ -42,7 +42,7 @@ const contentVariants = {
   },
 };
 
-const textVariants = {
+const textVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: (custom: number) => ({
     opacity: 1,
