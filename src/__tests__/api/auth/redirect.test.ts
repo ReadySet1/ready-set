@@ -1,16 +1,17 @@
 // src/__tests__/api/auth/redirect.test.ts
 
 import { GET } from '@/app/api/auth/redirect/route';
-import { NextRequest } from 'next/server';
+import { createRequestWithParams, createGetRequest } from '@/__tests__/helpers/api-test-helpers';
 
 describe('/api/auth/redirect GET API', () => {
   // Helper to create request with query parameters
-  const createRedirectRequest = (destination?: string): NextRequest => {
-    const url = new URL('http://localhost:3000/api/auth/redirect');
+  const createRedirectRequest = (destination?: string) => {
     if (destination) {
-      url.searchParams.set('destination', destination);
+      return createRequestWithParams('http://localhost:3000/api/auth/redirect', {
+        destination,
+      });
     }
-    return new NextRequest(url.toString());
+    return createGetRequest('http://localhost:3000/api/auth/redirect');
   };
 
   describe('✅ Successful Redirects', () => {

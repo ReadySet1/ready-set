@@ -3,7 +3,7 @@
 import { GET } from '@/app/api/auth/user-role/route';
 import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/lib/db/prisma';
-import { NextRequest } from 'next/server';
+import { createGetRequest } from '@/__tests__/helpers/api-test-helpers';
 
 // Mock dependencies
 jest.mock('@/utils/supabase/server');
@@ -28,12 +28,9 @@ describe('/api/auth/user-role GET API', () => {
   });
 
   // Helper to create request with Authorization header
-  const createAuthRequest = (token: string = 'valid-token'): NextRequest => {
-    const headers = new Headers();
-    headers.set('Authorization', `Bearer ${token}`);
-
-    return new NextRequest('http://localhost:3000/api/auth/user-role', {
-      headers,
+  const createAuthRequest = (token: string = 'valid-token') => {
+    return createGetRequest('http://localhost:3000/api/auth/user-role', {
+      'Authorization': `Bearer ${token}`,
     });
   };
 
@@ -211,7 +208,7 @@ describe('/api/auth/user-role GET API', () => {
 
   describe('🔐 Authentication Tests', () => {
     it('should return 401 when Authorization header is missing', async () => {
-      const request = new NextRequest('http://localhost:3000/api/auth/user-role');
+      const request = createGetRequest('http://localhost:3000/api/auth/user-role');
       const response = await GET(request);
       const data = await response.json();
 
@@ -224,11 +221,8 @@ describe('/api/auth/user-role GET API', () => {
     });
 
     it('should return 401 when Authorization header does not start with Bearer', async () => {
-      const headers = new Headers();
-      headers.set('Authorization', 'Basic some-token');
-
-      const request = new NextRequest('http://localhost:3000/api/auth/user-role', {
-        headers,
+      const request = createGetRequest('http://localhost:3000/api/auth/user-role', {
+        'Authorization': 'Basic some-token',
       });
       const response = await GET(request);
       const data = await response.json();
@@ -484,7 +478,7 @@ describe('/api/auth/user-role GET API', () => {
     });
 
     it('should include error field in error responses', async () => {
-      const request = new NextRequest('http://localhost:3000/api/auth/user-role');
+      const request = createGetRequest('http://localhost:3000/api/auth/user-role');
       const response = await GET(request);
       const data = await response.json();
 

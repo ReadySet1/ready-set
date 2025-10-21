@@ -265,10 +265,15 @@ const mockNextResponse = {
   })),
 };
 
-jest.mock('next/server', () => ({
-  NextRequest: jest.fn(),
-  NextResponse: mockNextResponse,
-}));
+jest.mock('next/server', () => {
+  // Import the actual NextRequest for proper functionality
+  const actualNextServer = jest.requireActual('next/server');
+
+  return {
+    NextRequest: actualNextServer.NextRequest,
+    NextResponse: mockNextResponse,
+  };
+});
 
 // Also mock NextResponse directly for API routes
 // Use proper typing for global assignment

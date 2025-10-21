@@ -416,16 +416,33 @@ export function createRequestWithParams(
   const request = new NextRequest(urlString);
   // Ensure url property is set for the route handler
   Object.defineProperty(request, 'url', { value: urlString, writable: true });
+  // Ensure nextUrl property exists and has searchParams
+  if (!request.nextUrl) {
+    Object.defineProperty(request, 'nextUrl', {
+      value: url,
+      writable: true,
+      configurable: true,
+    });
+  }
   return request;
 }
 
 /**
  * Creates a basic GET NextRequest with proper URL
  */
-export function createGetRequest(url: string): NextRequest {
-  const request = new NextRequest(url);
+export function createGetRequest(url: string, headers?: HeadersInit): NextRequest {
+  const request = new NextRequest(url, { headers });
+  const urlObj = new URL(url);
   // Ensure url property is set for the route handler
   Object.defineProperty(request, 'url', { value: url, writable: true });
+  // Ensure nextUrl property exists and has searchParams
+  if (!request.nextUrl) {
+    Object.defineProperty(request, 'nextUrl', {
+      value: urlObj,
+      writable: true,
+      configurable: true,
+    });
+  }
   return request;
 }
 
