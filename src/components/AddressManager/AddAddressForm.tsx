@@ -26,7 +26,7 @@ import { AddressFormData } from "@/types/address";
 import { COUNTIES, US_STATES } from "@/components/Auth/SignUp/ui/FormData"; // Make sure this import path is correct
 import { useToast } from "@/components/ui/use-toast";
 
-// Validation schema with zod
+// Validation schema with zod - matches AddressFormData interface
 const addressSchema = z.object({
   county: z.string().min(1, { message: "County is required" }),
   name: z.string().optional().nullable(),
@@ -37,8 +37,8 @@ const addressSchema = z.object({
   zip: z.string().min(5, { message: "Valid ZIP code is required" }),
   locationNumber: z.string().optional().nullable(),
   parkingLoading: z.string().optional().nullable(),
-  isRestaurant: z.boolean().default(false),
-  isShared: z.boolean().default(false),
+  isRestaurant: z.boolean(),
+  isShared: z.boolean(),
 });
 
 interface AddAddressFormProps {
@@ -137,8 +137,8 @@ const AddAddressForm: React.FC<AddAddressFormProps> = ({
     fetchCounties();
   }, [allowedCounties]);
 
-  const submitHandler: SubmitHandler<z.infer<typeof addressSchema>> = async (
-    data,
+  const submitHandler = async (
+    data: z.infer<typeof addressSchema>,
   ) => {
     setIsSubmitting(true);
     setSubmitError(null); // Clear previous errors

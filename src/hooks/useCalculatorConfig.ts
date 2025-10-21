@@ -234,10 +234,14 @@ export function useCalculatorConfig(options: UseCalculatorConfigOptions = {}): U
    * Sets active client configuration and reloads
    */
   const setActiveClientConfig = useCallback((configId?: string) => {
+    // Don't reload if we're already using this config
+    if (config?.clientConfig?.id === configId) {
+      return;
+    }
     if (config?.template?.id) {
       loadConfig(config.template.id, configId);
     }
-  }, [loadConfig, config?.template?.id]);
+  }, [loadConfig, config?.template?.id, config?.clientConfig?.id]);
 
   /**
    * Clears error state
@@ -247,18 +251,21 @@ export function useCalculatorConfig(options: UseCalculatorConfigOptions = {}): U
   }, []);
 
   // Auto-load configuration on mount or when options change
+  // NOTE: This is typically not used in DeliveryCalculator since it manually manages loading
   useEffect(() => {
     if (autoLoad && templateId) {
       loadConfig(templateId, clientConfigId);
     }
-  }, [autoLoad, templateId, clientConfigId, loadConfig]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoad, templateId, clientConfigId]); // Note: autoLoad should typically be false to prevent conflicts with manual loading
 
   // Auto-load templates on mount
   useEffect(() => {
     if (autoLoad) {
       loadTemplates();
     }
-  }, [autoLoad, loadTemplates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoad]); // ✅ FIXED: Removed loadTemplates from dependencies to prevent infinite loop
 
   return {
     // Configuration state
@@ -368,7 +375,8 @@ export function useCalculatorHistory(options: UseCalculatorHistoryOptions = {}):
     if (autoLoad) {
       loadHistory();
     }
-  }, [autoLoad, loadHistory]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoad, userId, templateId, limit]); // ✅ FIXED: Removed loadHistory from dependencies, added actual dependencies
 
   return {
     history,

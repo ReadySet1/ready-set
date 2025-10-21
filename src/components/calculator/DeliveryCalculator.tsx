@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -67,10 +67,10 @@ export function DeliveryCalculator({
     setActiveTemplate,
     setActiveClientConfig,
     clearError
-  } = useCalculatorConfig({ 
-    templateId, 
-    clientConfigId, 
-    autoLoad: true 
+  } = useCalculatorConfig({
+    templateId,
+    clientConfigId,
+    autoLoad: false // ✅ FIXED: Disable auto-load since we manually load config after selecting client config
   });
 
   // Hook for real-time calculation
@@ -112,6 +112,30 @@ export function DeliveryCalculator({
   const [activeTab, setActiveTab] = useState('input');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [selectedClientConfigId, setSelectedClientConfigId] = useState<string | undefined>(clientConfigId);
+
+  // Track if we've already auto-selected a client config to prevent loops
+  const hasAutoSelectedClientConfig = useRef(false);
+  const hasLoadedClientConfigs = useRef(false);
+  const hasLoadedInitialConfig = useRef(false);
+  const hasLoadedTemplates = useRef(false);
+
+  // Load templates on mount
+  useEffect(() => {
+    if (!hasLoadedTemplates.current) {
+      hasLoadedTemplates.current = true;
+      loadTemplates();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
+
+  // Load initial config when template is available
+  useEffect(() => {
+    if (templateId && !hasLoadedInitialConfig.current) {
+      hasLoadedInitialConfig.current = true;
+      loadConfig(templateId);
+    }
+  }, [templateId]);
 
   // Auto-calculate when input changes and config is loaded
   useEffect(() => {
@@ -122,7 +146,7 @@ export function DeliveryCalculator({
 
       return () => clearTimeout(timer);
     }
-  }, [input, config, calculate]);
+  }, [input, config]); // ✅ FIXED: Removed 'calculate' from dependencies to prevent infinite loop
 
   // Call completion callback when calculation finishes
   useEffect(() => {
@@ -131,22 +155,32 @@ export function DeliveryCalculator({
     }
   }, [result, onCalculationComplete]);
 
-  // Load client configs when templates change
+  // Sync local state with loaded config
   useEffect(() => {
-    if (templates.length > 0) {
+    if (config?.clientConfig?.id && config.clientConfig.id !== selectedClientConfigId) {
+      setSelectedClientConfigId(config.clientConfig.id);
+    }
+  }, [config?.clientConfig?.id, selectedClientConfigId]);
+
+  // Load client configs when templates change (only once)
+  useEffect(() => {
+    if (templates.length > 0 && !hasLoadedClientConfigs.current) {
+      hasLoadedClientConfigs.current = true;
       loadClientConfigs();
     }
-  }, [templates, loadClientConfigs]);
+  }, [templates.length]); // ✅ FIXED: Only depend on templates.length, not the function or array reference
 
-  // Auto-select Ready Set Food - Standard when configs load
+  // Auto-select Ready Set Food - Standard when configs load (only once)
   useEffect(() => {
-    if (clientConfigs.length > 0 && !config?.clientConfig && config?.template) {
+    if (clientConfigs.length > 0 && !config?.clientConfig && config?.template && !hasAutoSelectedClientConfig.current) {
       const readySetConfig = clientConfigs.find(c => c.clientName === 'Ready Set Food - Standard');
       if (readySetConfig) {
+        hasAutoSelectedClientConfig.current = true; // Mark as done to prevent re-runs
+        setSelectedClientConfigId(readySetConfig.id); // Update local state
         setActiveClientConfig(readySetConfig.id);
       }
     }
-  }, [clientConfigs, config?.clientConfig, config?.template, setActiveClientConfig]);
+  }, [clientConfigs.length, config?.clientConfig?.id, config?.template?.id]); // ✅ FIXED: Removed function from dependencies, use specific IDs only
 
   const handleInputChange = (field: keyof CalculationInput, value: any) => {
     setInput(prev => ({ ...prev, [field]: value }));
@@ -157,7 +191,8 @@ export function DeliveryCalculator({
     clearCalculationError();
   };
 
-  const handleClientConfigChange = (configId: string | undefined) => {
+  const handleClientConfigChange = (configId: string) => {
+    setSelectedClientConfigId(configId); // Update local state immediately
     setActiveClientConfig(configId);
     clearCalculationError();
   };
@@ -323,8 +358,8 @@ export function DeliveryCalculator({
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                   Calculator Template
                 </Label>
-                <Select 
-                  value={config?.template?.id || ''} 
+                <Select
+                  value={config?.template?.id || templateId || ''}
                   onValueChange={handleTemplateChange}
                 >
                   <SelectTrigger className="h-10 border-slate-200 focus:border-blue-400 focus:ring-blue-200 bg-white shadow-sm transition-all duration-200 hover:border-slate-300">
@@ -346,7 +381,7 @@ export function DeliveryCalculator({
                   Client Configuration <span className="text-slate-500 font-normal">(Optional)</span>
                 </Label>
                 <Select
-                  value={config?.clientConfig?.id}
+                  value={selectedClientConfigId || config?.clientConfig?.id || ''}
                   onValueChange={handleClientConfigChange}
                 >
                   <SelectTrigger className="h-10 border-slate-200 focus:border-purple-400 focus:ring-purple-200 bg-white shadow-sm transition-all duration-200 hover:border-slate-300">

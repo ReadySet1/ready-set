@@ -62,7 +62,6 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
       y: 0,
       transition: {
         duration: 0.6,
-        ease: "easeOut",
       },
     },
   };
@@ -74,7 +73,6 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
       scale: 1,
       transition: {
         duration: 0.8,
-        ease: "easeOut",
         delay: 0.2,
       },
     },
@@ -92,7 +90,6 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
     scale: [1, 1.02, 1],
     transition: {
       duration: 3,
-      ease: "easeInOut",
       repeat: Infinity,
       repeatType: "reverse" as const,
     },

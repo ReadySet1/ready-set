@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { vendorSchema } from "@/components/Auth/SignUp/FormSchemas";
+import { vendorSchema, VendorFormData } from "@/components/Auth/SignUp/FormSchemas";
 import CommonFields from "../CommonFields";
 import {
   COUNTIES,
@@ -11,7 +11,6 @@ import {
   CATERING_BROKERAGE,
   FREQUENCY,
   PROVISIONS,
-  VendorFormData,
 } from "./FormData";
 import { CheckboxGroup, RadioGroup } from "./FormComponents";
 import toast from "react-hot-toast";
@@ -36,7 +35,6 @@ const VendorForm: React.FC<VendorFormProps> = ({ onSubmit, isLoading = false }) 
       countiesServed: [],
       timeNeeded: [],
       cateringBrokerage: [],
-      frequency: undefined,
       provisions: [],
     },
   });

@@ -119,8 +119,8 @@ export const createCateringOrderSchema = z.object({
   }
 });
 
-// Type inferred from the schema
-export type CreateCateringOrderInput = z.infer<typeof createCateringOrderSchema>;
+// Type inferred from the schema - use z.output to properly handle preprocessor types
+export type CreateCateringOrderInput = z.output<typeof createCateringOrderSchema>;
 
 // Define success/error return type for the action
 export interface CreateOrderResult {
