@@ -167,6 +167,7 @@ export async function GET(request: NextRequest) {
                 fileName: true,
                 fileType: true,
                 fileSize: true,
+                fileUrl: true,
                 uploadedAt: true,
                 category: true,
               },
@@ -177,14 +178,56 @@ export async function GET(request: NextRequest) {
     });
 
     const totalPages = Math.ceil(totalCount / limit);
-    
-    // Process applications to fix file upload inconsistency
-    const processedApplications = applications.map((app: any) => {
+
+    // Initialize admin Supabase client for generating signed URLs
+    const { createAdminClient } = await import('@/utils/supabase/server');
+    const supabaseAdmin = await createAdminClient();
+
+    // Process applications to fix file upload inconsistency and generate signed URLs
+    const processedApplications = await Promise.all(applications.map(async (app: any) => {
       const fileUploadCount = app.fileUploads?.length || 0;
       const hasFileUploads = fileUploadCount > 0;
-      
+
+      // Generate fresh signed URLs for all files
+      const fileUploadsWithSignedUrls = await Promise.all(
+        (app.fileUploads || []).map(async (file: any) => {
+          // Extract bucket name and path from the existing fileUrl
+          let signedUrl = file.fileUrl; // Default to original URL
+
+          try {
+            const urlObj = new URL(file.fileUrl);
+            const pathParts = urlObj.pathname.split('/');
+
+            // Find the bucket name and file path
+            if (pathParts.length > 6 && pathParts[1] === 'storage' && pathParts[4] === 'public') {
+              const bucketName = pathParts[5];
+              const filePath = pathParts.slice(6).join('/');
+
+              if (bucketName) {
+                // Generate a signed URL (valid for 1 hour)
+                const { data: signedData, error: signedError } = await supabaseAdmin.storage
+                  .from(bucketName)
+                  .createSignedUrl(filePath, 3600); // 1 hour expiry
+
+                if (!signedError && signedData?.signedUrl) {
+                  signedUrl = signedData.signedUrl;
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error generating signed URL for file:', file.id, error);
+          }
+
+          return {
+            ...file,
+            fileUrl: signedUrl, // Replace with signed URL
+          };
+        })
+      );
+
       return {
         ...app,
+        fileUploads: fileUploadsWithSignedUrls,
         hasFileUploads,
         fileUploadCount,
         // Add computed field for better debugging
@@ -194,7 +237,7 @@ export async function GET(request: NextRequest) {
           uploadIds: app.fileUploads?.map((f: any) => f.id) || [],
         },
       };
-    });
+    }));
 
     
     return NextResponse.json({
