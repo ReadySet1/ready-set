@@ -536,19 +536,15 @@ export class FileValidator {
 
   private static isValidFilename(filename: string, config: FileValidationConfig): boolean {
     if (config.sanitizeFilename) {
-      // Check for path traversal attempts
-      if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-        return false;
-      }
-
       // Check length - allow slightly longer filenames (300 chars instead of 255)
       if (filename.length > 300) {
         return false;
       }
 
-      // Only check for the most dangerous characters - allow spaces, hyphens, parentheses, etc.
-      // Only reject: null bytes, control characters (0x00-0x1f), and Windows reserved characters
-      const dangerousChars = /[\x00-\x1f<>:"|?*]/;
+      // Only check for the most dangerous characters
+      // Only reject: null bytes and control characters (0x00-0x1f)
+      // Allow everything else as sanitization will clean it up
+      const dangerousChars = /[\x00-\x1f]/;
       if (dangerousChars.test(filename)) {
         return false;
       }
@@ -558,20 +554,33 @@ export class FileValidator {
   }
 
   static sanitizeFilename(filename: string): string {
-    // Remove path traversal attempts (both ../ and ..\)
-    let sanitized = filename.replace(/\.\./g, '');
+    // First, extract the extension to preserve it
+    const lastDotIndex = filename.lastIndexOf('.');
+    let nameWithoutExt = filename;
+    let extension = '';
 
-    // Remove path separators
-    sanitized = sanitized.replace(/[\/\\]/g, '');
+    if (lastDotIndex > 0 && lastDotIndex < filename.length - 1) {
+      nameWithoutExt = filename.substring(0, lastDotIndex);
+      extension = filename.substring(lastDotIndex); // includes the dot
+    }
+
+    // Remove path separators from the name part
+    let sanitizedName = nameWithoutExt.replace(/[\/\\]/g, '');
 
     // Remove only the most dangerous characters - keep spaces, hyphens, parentheses, etc.
-    sanitized = sanitized.replace(/[\x00-\x1f<>:"|?*]/g, '');
+    // Do NOT use replace(/\.\./g, '') as it can break filenames with multiple dots
+    sanitizedName = sanitizedName.replace(/[\x00-\x1f<>:"|?*]/g, '');
+
+    // Remove any remaining path traversal patterns
+    sanitizedName = sanitizedName.replace(/\.\./g, '_');
+
+    // Combine name and extension
+    let sanitized = sanitizedName + extension;
 
     // Truncate if too long (allow up to 300 chars)
     if (sanitized.length > 300) {
-      const extension = this.getExtension(sanitized);
-      const nameWithoutExt = sanitized.substring(0, sanitized.length - extension.length);
-      sanitized = nameWithoutExt.substring(0, 295 - extension.length) + extension;
+      const maxNameLength = 295 - extension.length;
+      sanitized = sanitizedName.substring(0, maxNameLength) + extension;
     }
 
     return sanitized;
