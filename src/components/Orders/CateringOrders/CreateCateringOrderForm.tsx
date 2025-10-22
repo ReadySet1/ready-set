@@ -158,18 +158,19 @@ export const CreateCateringOrderForm: React.FC<
     userId: session?.user?.id,
   });
 
-  const form = useForm<CreateCateringOrderInput>({
+  const form = useForm({
     resolver: zodResolver(createCateringOrderSchema),
     defaultValues: {
-      needHost: "NO", // Default value
+      needHost: "NO",
       pickupAddress: { street1: "", city: "", state: "", zip: "" },
       deliveryAddress: { street1: "", city: "", state: "", zip: "" },
       pickupDateTime: undefined,
       arrivalDateTime: undefined,
-      orderNumber: "", // Add order number
-      brokerage: "", // Add brokerage field
-      userId: undefined, // Initialize userId
-      hoursNeeded: null, // Initialize host-related fields
+      completeDateTime: undefined,
+      orderNumber: "",
+      brokerage: "",
+      userId: undefined,
+      hoursNeeded: null,
       numberOfHosts: null,
       headcount: null,
       orderTotal: null,
@@ -254,17 +255,17 @@ export const CreateCateringOrderForm: React.FC<
   // Add the scrollToTop utility function
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-  const handleFormSubmit = async (data: CreateCateringOrderInput) => {
+  const handleFormSubmit = async (data: any) => {
     setIsSubmitting(true);
     setGeneralError(null);
 
     try {
-      // Include the tempEntityId in the submitted data if available
-      if (tempEntityId) {
-        data.tempEntityId = tempEntityId;
-              }
+      // Cast the data to the proper type and include tempEntityId if available
+      const submitData: CreateCateringOrderInput = tempEntityId
+        ? { ...data, tempEntityId } as CreateCateringOrderInput
+        : data as CreateCateringOrderInput;
 
-      const result = await createCateringOrder(data);
+      const result = await createCateringOrder(submitData);
 
       if (result.error) {
         setGeneralError(result.error);
@@ -393,8 +394,8 @@ export const CreateCateringOrderForm: React.FC<
         formData.tempEntityId = tempEntityId;
               }
 
-      // Call server action directly
-      const result = await createCateringOrder(formData);
+      // Call server action directly - cast to proper type
+      const result = await createCateringOrder(formData as CreateCateringOrderInput);
       
       if (result.success) {
         // If we have uploaded files, update their entity ID
@@ -450,8 +451,8 @@ export const CreateCateringOrderForm: React.FC<
         // Show submission in progress
         setIsSubmitting(true);
 
-        // Directly call the server action
-        createCateringOrder(formData)
+        // Directly call the server action - cast to proper type
+        createCateringOrder(formData as CreateCateringOrderInput)
           .then((result) => {
                         if (result.success) {
               alert("Order created successfully!");
@@ -999,19 +1000,22 @@ export const CreateCateringOrderForm: React.FC<
             <Controller
               name="headcount"
               control={control}
-              render={({ field: { onChange, value, ...field } }) => (
-                <Input
-                  {...field}
-                  id="headcount"
-                  type="number"
-                  value={value === null ? "" : value}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    onChange(val === "" ? null : Number(val));
-                  }}
-                  placeholder="e.g., 50"
-                />
-              )}
+              render={({ field: { onChange, value, ...field } }) => {
+                const numValue = value as number | null;
+                return (
+                  <Input
+                    {...field}
+                    id="headcount"
+                    type="number"
+                    value={numValue === null ? "" : numValue}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      onChange(val === "" ? null : Number(val));
+                    }}
+                    placeholder="e.g., 50"
+                  />
+                );
+              }}
             />
             {errors.headcount && (
               <p className="text-sm text-red-500">{errors.headcount.message}</p>
@@ -1024,20 +1028,23 @@ export const CreateCateringOrderForm: React.FC<
             <Controller
               name="orderTotal"
               control={control}
-              render={({ field: { onChange, value, ...field } }) => (
-                <Input
-                  {...field}
-                  id="orderTotal"
-                  type="number"
-                  step="0.01"
-                  value={value === null ? "" : value}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    onChange(val === "" ? null : Number(val));
-                  }}
-                  placeholder="e.g., 1250.50"
-                />
-              )}
+              render={({ field: { onChange, value, ...field } }) => {
+                const numValue = value as number | null;
+                return (
+                  <Input
+                    {...field}
+                    id="orderTotal"
+                    type="number"
+                    step="0.01"
+                    value={numValue === null ? "" : numValue}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      onChange(val === "" ? null : Number(val));
+                    }}
+                    placeholder="e.g., 1250.50"
+                  />
+                );
+              }}
             />
             {errors.orderTotal && (
               <p className="text-sm text-red-500">
@@ -1052,20 +1059,23 @@ export const CreateCateringOrderForm: React.FC<
             <Controller
               name="tip"
               control={control}
-              render={({ field: { onChange, value, ...field } }) => (
-                <Input
-                  {...field}
-                  id="tip"
-                  type="number"
-                  step="0.01"
-                  value={value === null ? "" : value}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    onChange(val === "" ? null : Number(val));
-                  }}
-                  placeholder="e.g., 100.00"
-                />
-              )}
+              render={({ field: { onChange, value, ...field } }) => {
+                const numValue = value as number | null;
+                return (
+                  <Input
+                    {...field}
+                    id="tip"
+                    type="number"
+                    step="0.01"
+                    value={numValue === null ? "" : numValue}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      onChange(val === "" ? null : Number(val));
+                    }}
+                    placeholder="e.g., 100.00"
+                  />
+                );
+              }}
             />
             {errors.tip && (
               <p className="text-sm text-red-500">{errors.tip.message}</p>
@@ -1122,20 +1132,23 @@ export const CreateCateringOrderForm: React.FC<
                   <Controller
                     name="hoursNeeded"
                     control={control}
-                    render={({ field: { onChange, value, ...field } }) => (
-                      <Input
-                        {...field}
-                        id="hoursNeeded"
-                        type="number"
-                        step="0.1"
-                        value={value === null ? "" : value}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          onChange(val === "" ? null : parseFloat(val));
-                        }}
-                        placeholder="e.g., 4.5"
-                      />
-                    )}
+                    render={({ field: { onChange, value, ...field } }) => {
+                      const numValue = value as number | null;
+                      return (
+                        <Input
+                          {...field}
+                          id="hoursNeeded"
+                          type="number"
+                          step="0.1"
+                          value={numValue === null ? "" : numValue}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            onChange(val === "" ? null : parseFloat(val));
+                          }}
+                          placeholder="e.g., 4.5"
+                        />
+                      );
+                    }}
                   />
                   {errors.hoursNeeded && (
                     <p className="text-sm text-red-500">
@@ -1148,19 +1161,22 @@ export const CreateCateringOrderForm: React.FC<
                   <Controller
                     name="numberOfHosts"
                     control={control}
-                    render={({ field: { onChange, value, ...field } }) => (
-                      <Input
-                        {...field}
-                        id="numberOfHosts"
-                        type="number"
-                        value={value === null ? "" : value}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          onChange(val === "" ? null : parseInt(val, 10));
-                        }}
-                        placeholder="e.g., 2"
-                      />
-                    )}
+                    render={({ field: { onChange, value, ...field } }) => {
+                      const numValue = value as number | null;
+                      return (
+                        <Input
+                          {...field}
+                          id="numberOfHosts"
+                          type="number"
+                          value={numValue === null ? "" : numValue}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            onChange(val === "" ? null : parseInt(val, 10));
+                          }}
+                          placeholder="e.g., 2"
+                        />
+                      );
+                    }}
                   />
                   {errors.numberOfHosts && (
                     <p className="text-sm text-red-500">

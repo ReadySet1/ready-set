@@ -1,5 +1,6 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import UserAddresses from "@/components/AddressManager/UserAddresses";
 import { Address } from "@/types/address";
 
@@ -8,7 +9,15 @@ jest.mock("@/utils/supabase/client", () => ({
   createClient: jest.fn(() => ({
     auth: {
       getUser: jest.fn(() =>
-        Promise.resolve({ data: { user: { id: "test-user" } }, error: null }),
+        Promise.resolve({
+          data: {
+            user: {
+              id: "test-user",
+              user_metadata: { role: "user" }
+            }
+          },
+          error: null
+        }),
       ),
       onAuthStateChange: jest.fn(() => ({
         data: { subscription: { unsubscribe: jest.fn() } },
@@ -20,6 +29,18 @@ jest.mock("@/utils/supabase/client", () => ({
         }),
       ),
     },
+    from: jest.fn(() => ({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          single: jest.fn(() =>
+            Promise.resolve({
+              data: { role: "user" },
+              error: null,
+            })
+          ),
+        })),
+      })),
+    })),
   })),
 }));
 
@@ -72,6 +93,25 @@ const mockAddresses: Address[] = [
   },
 ];
 
+// Create a test wrapper with QueryClient
+function createTestWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false, // Disable retries for testing
+        staleTime: 0, // Always stale for testing
+      },
+      mutations: {
+        retry: false,
+      },
+    },
+  });
+
+  return ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+}
+
 describe("UserAddresses - Mobile Responsiveness", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -83,7 +123,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
 
   describe("Responsive Layout", () => {
     it("should render with mobile-first responsive classes", () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       // Check that the main container has responsive classes
       const mainContainer = screen.getByText("Your Addresses").closest("div");
@@ -93,14 +133,14 @@ describe("UserAddresses - Mobile Responsiveness", () => {
     });
 
     it("should have responsive header text sizing", () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       const header = screen.getByText("Your Addresses");
       expect(header).toHaveClass("text-xl", "sm:text-2xl");
     });
 
     it("should stack tabs and button vertically on mobile", () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       const tabsContainer = screen
         .getByText("All")
@@ -116,7 +156,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
     });
 
     it("should make tabs full width on mobile", () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       const tabsList = screen.getByText("All").closest("div")
         ?.parentElement?.parentElement;
@@ -126,7 +166,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
     });
 
     it("should use grid layout for tabs on mobile", () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       const tabsList = screen.getByText("All").closest("div")
         ?.parentElement?.parentElement;
@@ -136,7 +176,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
     });
 
     it("should make add button full width on mobile", () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       const addButton = screen.getByText("+ Add New Address");
       expect(addButton).toHaveClass("w-full", "sm:w-auto");
@@ -145,7 +185,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
 
   describe("Responsive Card Layout", () => {
     it("should render addresses as cards instead of table rows", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       // Wait for addresses to load
       await screen.findByText("Test Restaurant");
@@ -167,7 +207,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
     });
 
     it("should have responsive card padding", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       await screen.findByText("Test Restaurant");
 
@@ -178,7 +218,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
     });
 
     it("should stack action buttons vertically on mobile", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       await screen.findByText("Test Restaurant");
 
@@ -194,7 +234,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
     });
 
     it("should make action buttons full width on mobile", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       await screen.findByText("Test Restaurant");
 
@@ -208,7 +248,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
 
   describe("Responsive Typography and Spacing", () => {
     it("should have responsive text sizing for address details", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       await screen.findByText("Test Restaurant");
 
@@ -219,7 +259,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
     });
 
     it("should have responsive spacing between address sections", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       await screen.findByText("Test Restaurant");
 
@@ -230,7 +270,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
     });
 
     it("should have responsive gap between county and type info", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       await screen.findByText("Test Restaurant");
 
@@ -250,7 +290,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
 
   describe("Responsive Tab Labels", () => {
     it("should use shortened tab labels for mobile", () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       // Check that tabs use shortened labels
       expect(screen.getByText("All")).toBeInTheDocument();
@@ -266,7 +306,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
     });
 
     it("should have responsive text sizing for tabs", () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       const allTab = screen.getByText("All");
       expect(allTab).toHaveClass("text-xs", "sm:text-sm");
@@ -275,7 +315,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
 
   describe("Responsive Badge Display", () => {
     it("should have responsive badge sizing", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       await screen.findByText("Test Restaurant");
 
@@ -287,7 +327,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
     });
 
     it("should wrap badges properly on mobile", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       await screen.findByText("Test Restaurant");
 
@@ -298,7 +338,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
 
   describe("Responsive Form Layout", () => {
     it("should handle responsive form elements when adding new address", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       const addButton = screen.getByText("+ Add New Address");
       addButton.click();
@@ -311,7 +351,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
 
   describe("Responsive Error Handling", () => {
     it("should display errors with responsive styling", () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       // Simulate an error state by mocking a failed fetch
       (global.fetch as jest.Mock).mockRejectedValueOnce(
@@ -319,7 +359,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
       );
 
       // Re-render to trigger the error
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       // Error should be displayed with responsive classes
       const errorContainer = screen.queryByText(/Failed to load addresses/);
@@ -332,7 +372,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
 
   describe("Responsive Loading States", () => {
     it("should show loading spinner with responsive positioning", () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       // Initially should show loading
       const loadingSpinner = screen.getByRole("status", { hidden: true });
@@ -352,7 +392,7 @@ describe("UserAddresses - Mobile Responsiveness", () => {
         json: () => Promise.resolve([]),
       });
 
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createTestWrapper() });
 
       // Wait for empty state to appear
       await screen.findByText("No addresses found");

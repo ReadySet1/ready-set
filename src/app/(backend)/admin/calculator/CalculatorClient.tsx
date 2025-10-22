@@ -52,7 +52,7 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
         setSelectedTemplateId(defaultTemplate.id);
       }
     }
-  }, [templates, selectedTemplateId]);
+  }, [templates.length, selectedTemplateId]); // ✅ FIXED: Use templates.length instead of templates array
 
   // Check migration status (simplified for demo)
   useEffect(() => {
@@ -61,7 +61,7 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
     } else if (templatesError) {
       setMigrationStatus('error');
     }
-  }, [templates, templatesError]);
+  }, [templates.length, templatesError]); // ✅ FIXED: Use templates.length instead of templates array
 
   const handleCalculationComplete = (result: CalculationResult) => {
     // Auto-save calculations for demo purposes

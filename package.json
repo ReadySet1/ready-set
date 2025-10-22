@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "engines": {
-    "node": ">=20.0.0 <21.0.0",
+    "node": ">=20.0.0 <23.0.0",
     "pnpm": ">=10.0.0"
   },
   "scripts": {
@@ -233,7 +233,6 @@
     "typescript": "^5.9.3"
   },
   "overrides": {
-    "@octokit/request": "8.4.1",
     "@octokit/core": ">=5.2.1",
     "@octokit/graphql": ">=7.1.1",
     "@types/react-dom": "npm:types-react-dom@19.0.0-rc.1"

@@ -250,7 +250,7 @@ const FAQSection: React.FC<FAQSectionProps> = ({ className = "" }) => {
                 className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
                 variants={itemVariants}
                 whileHover={{
-                  shadow:
+                  boxShadow:
                     "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
                   transition: { duration: 0.2 },
                 }}
