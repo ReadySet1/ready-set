@@ -20,6 +20,7 @@ export function CateringModal() {
   const router = useRouter();
 
   const handleApplyClick = () => {
+    // Close the modal
     const escKeyEvent = new KeyboardEvent('keydown', {
       key: 'Escape',
       code: 'Escape',
@@ -29,6 +30,14 @@ export function CateringModal() {
       cancelable: true
     });
     document.dispatchEvent(escKeyEvent);
+
+    // Scroll to the form after a brief delay to allow modal to close
+    setTimeout(() => {
+      const formElement = document.getElementById('apply-now');
+      if (formElement) {
+        formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   return (
