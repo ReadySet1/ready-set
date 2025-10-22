@@ -68,30 +68,8 @@ beforeEach(() => {
   }
 });
 
-// Mock React 18's createRoot to fall back to React 17 render
-jest.mock('react-dom/client', () => ({
-  createRoot: jest.fn().mockImplementation((container) => {
-    const ReactDOM = require('react-dom');
-    
-    // If no container is provided or it's not a valid DOM element, create one
-    let targetContainer = container;
-    if (!container || !container.nodeType) {
-      targetContainer = document.createElement('div');
-      if (document.body) {
-        document.body.appendChild(targetContainer);
-      }
-    }
-    
-    return {
-      // eslint-disable-next-line react/no-deprecated
-      render: (element: any) => {
-        ReactDOM.render(element, targetContainer);
-      },
-      // eslint-disable-next-line react/no-deprecated
-      unmount: () => ReactDOM.unmountComponentAtNode(targetContainer),
-    };
-  }),
-}));
+// React 18's createRoot is properly supported by React Testing Library
+// No need to mock it - let React Testing Library handle createRoot natively
 
 // Mock next/navigation properly
 jest.mock('next/navigation', () => ({
