@@ -416,16 +416,33 @@ export function createRequestWithParams(
   const request = new NextRequest(urlString);
   // Ensure url property is set for the route handler
   Object.defineProperty(request, 'url', { value: urlString, writable: true });
+  // Ensure nextUrl property exists and has searchParams
+  if (!request.nextUrl) {
+    Object.defineProperty(request, 'nextUrl', {
+      value: url,
+      writable: true,
+      configurable: true,
+    });
+  }
   return request;
 }
 
 /**
  * Creates a basic GET NextRequest with proper URL
  */
-export function createGetRequest(url: string): NextRequest {
-  const request = new NextRequest(url);
+export function createGetRequest(url: string, headers?: HeadersInit): NextRequest {
+  const request = new NextRequest(url, { headers });
+  const urlObj = new URL(url);
   // Ensure url property is set for the route handler
   Object.defineProperty(request, 'url', { value: url, writable: true });
+  // Ensure nextUrl property exists and has searchParams
+  if (!request.nextUrl) {
+    Object.defineProperty(request, 'nextUrl', {
+      value: urlObj,
+      writable: true,
+      configurable: true,
+    });
+  }
   return request;
 }
 
@@ -434,12 +451,14 @@ export function createGetRequest(url: string): NextRequest {
  */
 export function createPostRequest(
   url: string,
-  body: any
+  body: any,
+  additionalHeaders?: Record<string, string>
 ): NextRequest {
   const request = new NextRequest(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...additionalHeaders,
     },
     body: JSON.stringify(body),
   });
@@ -458,12 +477,14 @@ export function createPostRequest(
  */
 export function createPatchRequest(
   url: string,
-  body: any
+  body: any,
+  additionalHeaders?: Record<string, string>
 ): NextRequest {
   const request = new NextRequest(url, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
+      ...additionalHeaders,
     },
     body: JSON.stringify(body),
   });
@@ -480,9 +501,10 @@ export function createPatchRequest(
 /**
  * Creates a DELETE request
  */
-export function createDeleteRequest(url: string): NextRequest {
+export function createDeleteRequest(url: string, additionalHeaders?: Record<string, string>): NextRequest {
   const request = new NextRequest(url, {
     method: "DELETE",
+    headers: additionalHeaders,
   });
   // Ensure url property is set for the route handler
   Object.defineProperty(request, 'url', { value: url, writable: true });
@@ -494,12 +516,14 @@ export function createDeleteRequest(url: string): NextRequest {
  */
 export function createPutRequest(
   url: string,
-  body: any
+  body: any,
+  additionalHeaders?: Record<string, string>
 ): NextRequest {
   const request = new NextRequest(url, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
+      ...additionalHeaders,
     },
     body: JSON.stringify(body),
   });

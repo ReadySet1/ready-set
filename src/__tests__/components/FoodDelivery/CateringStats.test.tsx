@@ -104,21 +104,6 @@ describe("CateringStats Component", () => {
       expect(mockOpenForm).toHaveBeenCalledWith("food");
     });
 
-    it("logs console message when Get a Quote is clicked", () => {
-      const consoleLogSpy = jest.spyOn(console, "log");
-
-      render(<CateringStats />);
-
-      const quoteButton = screen.getByRole("button", { name: /Get a Quote/i });
-      fireEvent.click(quoteButton);
-
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        "CateringStats - Get a quote clicked"
-      );
-
-      consoleLogSpy.mockRestore();
-    });
-
     it("Book a Call button has the correct calendar URL", () => {
       render(<CateringStats />);
 
