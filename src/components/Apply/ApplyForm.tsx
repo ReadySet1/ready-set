@@ -198,7 +198,7 @@ const JobApplicationForm = () => {
     formState: { errors, isSubmitting: formIsSubmitting, isDirty, isValid },
     trigger,
   } = useForm<FormData>({
-    mode: "onChange", // Enable real-time validation
+    mode: "onTouched", // Validate only when field is touched/blurred
     defaultValues: {
       role: "",
       firstName: "",

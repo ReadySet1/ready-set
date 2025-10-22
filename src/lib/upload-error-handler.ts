@@ -494,15 +494,17 @@ export class FileValidator {
 
   private static isAllowedType(file: File, config: FileValidationConfig): boolean {
     // Check blocked types first
-    for (const blockedType of config.blockedTypes) {
+    const blockedTypes = config.blockedTypes || [];
+    for (const blockedType of blockedTypes) {
       if (file.type.includes(blockedType)) {
         return false;
       }
     }
 
     // Check allowed types
-    if (config.allowedTypes.length > 0) {
-      return config.allowedTypes.some(type => file.type.startsWith(type));
+    const allowedTypes = config.allowedTypes || [];
+    if (allowedTypes.length > 0) {
+      return allowedTypes.some(type => file.type.startsWith(type));
     }
 
     return true;
@@ -512,15 +514,17 @@ export class FileValidator {
     const extension = this.getExtension(file.name).toLowerCase();
 
     // Check blocked extensions
-    for (const blockedExt of config.blockedExtensions) {
+    const blockedExtensions = config.blockedExtensions || [];
+    for (const blockedExt of blockedExtensions) {
       if (extension === blockedExt.toLowerCase()) {
         return false;
       }
     }
 
     // Check allowed extensions
-    if (config.allowedExtensions.length > 0) {
-      return config.allowedExtensions.some(ext => extension === ext.toLowerCase());
+    const allowedExtensions = config.allowedExtensions || [];
+    if (allowedExtensions.length > 0) {
+      return allowedExtensions.some(ext => extension === ext.toLowerCase());
     }
 
     return true;
@@ -537,13 +541,14 @@ export class FileValidator {
         return false;
       }
 
-      // Check length
-      if (filename.length > 255) {
+      // Check length - allow slightly longer filenames (300 chars instead of 255)
+      if (filename.length > 300) {
         return false;
       }
 
-      // Check for dangerous characters
-      const dangerousChars = /[<>:"|?*\x00-\x1f]/;
+      // Only check for the most dangerous characters - allow spaces, hyphens, parentheses, etc.
+      // Only reject: null bytes, control characters (0x00-0x1f), and Windows reserved characters
+      const dangerousChars = /[\x00-\x1f<>:"|?*]/;
       if (dangerousChars.test(filename)) {
         return false;
       }
@@ -553,17 +558,20 @@ export class FileValidator {
   }
 
   static sanitizeFilename(filename: string): string {
-    // Remove path traversal attempts
-    let sanitized = filename.replace(/[\/\\]/g, '');
+    // Remove path traversal attempts (both ../ and ..\)
+    let sanitized = filename.replace(/\.\./g, '');
 
-    // Remove dangerous characters
-    sanitized = sanitized.replace(/[<>:"|?*\x00-\x1f]/g, '');
+    // Remove path separators
+    sanitized = sanitized.replace(/[\/\\]/g, '');
 
-    // Truncate if too long
-    if (sanitized.length > 255) {
+    // Remove only the most dangerous characters - keep spaces, hyphens, parentheses, etc.
+    sanitized = sanitized.replace(/[\x00-\x1f<>:"|?*]/g, '');
+
+    // Truncate if too long (allow up to 300 chars)
+    if (sanitized.length > 300) {
       const extension = this.getExtension(sanitized);
       const nameWithoutExt = sanitized.substring(0, sanitized.length - extension.length);
-      sanitized = nameWithoutExt.substring(0, 250 - extension.length) + extension;
+      sanitized = nameWithoutExt.substring(0, 295 - extension.length) + extension;
     }
 
     return sanitized;
