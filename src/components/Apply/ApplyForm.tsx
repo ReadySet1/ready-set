@@ -14,6 +14,7 @@ import { FileUpload } from "./FileUpload";
 import { v4 as uuidv4 } from "uuid";
 import { motion } from "framer-motion";
 import { useSearchParams } from "next/navigation";
+import { useApplicationSession } from "@/contexts/ApplicationSessionContext";
 
 // Helper to generate accept string from allowed file types
 const generateAcceptString = (types: string[]): string => types.join(",");
@@ -189,6 +190,9 @@ const JobApplicationForm = () => {
   // State to store the role from URL
   const [roleFromUrl, setRoleFromUrl] = useState<string | null>(null);
 
+  // Use application session context
+  const { session, createSession, markSessionCompleted, resetSession } = useApplicationSession();
+
   const {
     register,
     handleSubmit,
@@ -260,6 +264,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: RESUME_TYPES,
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const licenseUpload = useJobApplicationUpload({
@@ -269,6 +274,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: IMAGE_PDF_TYPES,
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const insuranceUpload = useJobApplicationUpload({
@@ -278,6 +284,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: IMAGE_PDF_TYPES,
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const registrationUpload = useJobApplicationUpload({
@@ -287,6 +294,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: IMAGE_PDF_TYPES,
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const foodHandlerUpload = useJobApplicationUpload({
@@ -296,6 +304,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: IMAGE_PDF_TYPES,
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const hipaaUpload = useJobApplicationUpload({
@@ -305,6 +314,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: IMAGE_PDF_TYPES,
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const driverPhotoUpload = useJobApplicationUpload({
@@ -314,6 +324,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: [".jpg", ".jpeg", ".png"],
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const carPhotoUpload = useJobApplicationUpload({
@@ -323,6 +334,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: [".jpg", ".jpeg", ".png"],
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const equipmentPhotoUpload = useJobApplicationUpload({
@@ -332,6 +344,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: [".jpg", ".jpeg", ".png"],
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   // Watch for role changes to trigger validation
@@ -340,6 +353,22 @@ const JobApplicationForm = () => {
       trigger(); // Re-validate form when role changes
     }
   }, [selectedRole, isDirty, trigger]);
+
+  // Create session when user provides basic information
+  React.useEffect(() => {
+    const email = watch("email");
+    const firstName = watch("firstName");
+    const lastName = watch("lastName");
+    const role = watch("role");
+
+    // Only create session if we have all required info and don't already have a valid session
+    if (email && firstName && lastName && role && !session) {
+      createSession({ email, firstName, lastName, role }).catch(err => {
+        console.error('Failed to create session:', err);
+        // Session creation failure is logged but non-blocking
+      });
+    }
+  }, [watch("email"), watch("firstName"), watch("lastName"), watch("role"), session, createSession, watch]);
 
   // Handle step navigation
   const goToNextStep = async (event?: React.MouseEvent) => {
@@ -529,6 +558,16 @@ const JobApplicationForm = () => {
       }
 
       const responseData = await response.json();
+
+      // Mark session as completed
+      if (responseData.id) {
+        try {
+          await markSessionCompleted(responseData.id);
+        } catch (sessionError) {
+          console.error('Failed to mark session as completed:', sessionError);
+          // Non-blocking - don't prevent showing success to user
+        }
+      }
 
       // Reset form to initial state
       reset();

@@ -27,6 +27,7 @@ interface UseJobApplicationUploadOptions {
   userId?: string;
   entityId?: string;
   category?: string;
+  uploadToken?: string | null; // Session upload token
 }
 
 export function useJobApplicationUpload({
@@ -39,6 +40,7 @@ export function useJobApplicationUpload({
   userId,
   entityId: initialEntityId,
   category,
+  uploadToken,
 }: UseJobApplicationUploadOptions = {}) {
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [uploadedFiles, setUploadedFiles] =
@@ -108,9 +110,15 @@ export function useJobApplicationUpload({
           newProgresses[file.name] = 50;
           setProgresses({ ...newProgresses });
 
-          // Upload via the API route
+          // Upload via the API route with session token if available
+          const headers: HeadersInit = {};
+          if (uploadToken) {
+            headers['x-upload-token'] = uploadToken;
+          }
+
           const response = await fetch("/api/file-uploads", {
             method: "POST",
+            headers,
             body: formData,
           });
 
@@ -168,7 +176,7 @@ export function useJobApplicationUpload({
         setIsUploading(false);
       }
     },
-    [bucketName, category, entityId, entityType, progresses, userId, uploadedFiles.length, maxFileCount]
+    [bucketName, category, entityId, entityType, progresses, userId, uploadedFiles.length, maxFileCount, uploadToken]
   );
 
   // Update the entity ID for all uploaded files

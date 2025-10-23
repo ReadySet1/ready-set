@@ -5,6 +5,11 @@ import userEvent from '@testing-library/user-event';
 import JobApplicationForm from '@/components/Apply/ApplyForm';
 import React from 'react';
 
+// Mock session functions
+const mockCreateSession = jest.fn();
+const mockMarkSessionCompleted = jest.fn();
+const mockResetSession = jest.fn();
+
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
   useSearchParams: jest.fn(() => ({
@@ -29,6 +34,31 @@ jest.mock('@/hooks/use-job-application-upload', () => ({
     progresses: {}
   }))
 }));
+
+// Mock ApplicationSessionContext
+jest.mock('@/contexts/ApplicationSessionContext', () => {
+  const mockCreateSession = jest.fn();
+  const mockMarkSessionCompleted = jest.fn();
+  const mockResetSession = jest.fn();
+
+  return {
+    useApplicationSession: () => ({
+      session: {
+        sessionId: 'test-session-id',
+        uploadToken: 'test-upload-token',
+        expiresAt: new Date(Date.now() + 7200000).toISOString(), // 2 hours from now
+        uploadCount: 0,
+        maxUploads: 10
+      },
+      isLoading: false,
+      error: null,
+      createSession: mockCreateSession,
+      markSessionCompleted: mockMarkSessionCompleted,
+      resetSession: mockResetSession
+    }),
+    ApplicationSessionProvider: ({ children }: any) => children
+  };
+});
 
 // Mock framer-motion
 jest.mock('framer-motion', () => ({
