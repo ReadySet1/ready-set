@@ -100,8 +100,17 @@ export async function GET(request: NextRequest) {
       'id' | 'email' | 'first_name' | 'last_name' | 'role' | 'session_expires_at' |
       'upload_count' | 'max_uploads' | 'verified' | 'completed'>>();
 
-    if (error || !session) {
-      logDatabaseError(error || new Error('Session not found'), 'getSession', { sessionId, hasToken: !!sessionToken });
+    // Separate database errors from not-found cases for better debugging
+    if (error) {
+      logDatabaseError(error, 'getSession', { sessionId, hasToken: !!sessionToken, errorCode: error.code });
+      return NextResponse.json(
+        { error: 'Database error while fetching session', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    if (!session) {
+      // Not a database error - session simply doesn't exist
       return NextResponse.json(
         { error: 'Session not found' },
         { status: 404 }

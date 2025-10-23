@@ -14,6 +14,10 @@ import {
 } from "@/lib/upload-error-handler";
 import { UploadSecurityManager } from "@/lib/upload-security";
 import { UploadErrorType } from "@/types/upload";
+import type { Database } from '@/types/supabase';
+
+// Type definitions for application_sessions
+type ApplicationSession = Database['public']['Tables']['application_sessions']['Row'];
 
 // Helper function to safely extract error message from unknown error
 function getErrorMessage(error: unknown): string {
@@ -130,12 +134,11 @@ export async function POST(request: NextRequest) {
 
       // Validate session
       const supabase = await createClient();
-      // @ts-ignore - application_sessions table will be available after migration
-      const { data: session, error: sessionError }: any = await (supabase as any)
+      const { data: session, error: sessionError } = await supabase
         .from('application_sessions')
         .select('id, session_token, session_expires_at, upload_count, max_uploads, completed')
         .eq('session_token', sessionToken)
-        .single();
+        .single<Pick<ApplicationSession, 'id' | 'session_token' | 'session_expires_at' | 'upload_count' | 'max_uploads' | 'completed'>>();
 
       if (sessionError || !session) {
         console.error('Session validation error:', sessionError);
@@ -750,34 +753,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update session after successful upload
+    // Update session after successful upload (atomic operation to prevent race conditions)
     if (validatedSession) {
       try {
-        // Get current session state
-        // @ts-ignore - application_sessions table will be available after migration
-        const { data: currentSession }: any = await (supabase as any)
-          .from('application_sessions')
-          .select('upload_count, uploaded_files')
-          .eq('id', validatedSession.id)
-          .single();
+        // Use RPC function for atomic increment to prevent race conditions
+        // This is safer than read-modify-write pattern
+        // @ts-expect-error - RPC function added in migration, types will be updated after deployment
+        const { error: sessionUpdateError } = await supabase.rpc('increment_session_upload', {
+          p_session_id: validatedSession.id,
+          p_file_path: filePath
+        });
 
-        if (currentSession) {
-          // Update with incremented values
-          // @ts-ignore - application_sessions table will be available after migration
-          const { error: sessionUpdateError }: any = await (supabase as any)
+        // Fallback to direct update if RPC doesn't exist (backward compatibility)
+        if (sessionUpdateError && sessionUpdateError.message?.includes('function')) {
+          const { data: currentSession } = await supabase
             .from('application_sessions')
-            .update({
-              upload_count: currentSession.upload_count + 1,
-              uploaded_files: [...(currentSession.uploaded_files || []), filePath],
-              // last_activity_at is automatically updated by trigger
-            })
+            .select('upload_count, uploaded_files')
             .eq('id', validatedSession.id)
-            .eq('session_token', validatedSession.session_token);
+            .single<Pick<ApplicationSession, 'upload_count' | 'uploaded_files'>>();
 
-          if (sessionUpdateError) {
-            console.error('Failed to update session after upload:', sessionUpdateError);
-            // Don't fail the upload, just log the error
+          if (currentSession) {
+            const { error: fallbackError } = await supabase
+              .from('application_sessions')
+              .update({
+                upload_count: currentSession.upload_count + 1,
+                uploaded_files: [...(currentSession.uploaded_files || []), filePath],
+                last_activity_at: new Date().toISOString()
+              })
+              .eq('id', validatedSession.id)
+              .eq('session_token', validatedSession.session_token);
+
+            if (fallbackError) {
+              console.error('Failed to update session after upload (fallback):', fallbackError);
+            }
           }
+        } else if (sessionUpdateError) {
+          console.error('Failed to update session after upload:', sessionUpdateError);
+          // Don't fail the upload, just log the error
         }
       } catch (sessionError) {
         console.error('Error updating session:', sessionError);
@@ -844,11 +856,16 @@ export async function DELETE(request: NextRequest) {
         const bodyText = await request.text();
         if (bodyText) {
           try {
-            const parsed = contentType.includes('application/json')
+            const parsed: unknown = contentType.includes('application/json')
               ? JSON.parse(bodyText)
               : Object.fromEntries(new URLSearchParams(bodyText));
-            fileUrl = (parsed as any)?.fileUrl || fileUrl;
-            fileIdParam = (parsed as any)?.fileId || fileIdParam;
+
+            // Type-safe property access for parsed body
+            if (parsed && typeof parsed === 'object') {
+              const parsedObj = parsed as Record<string, unknown>;
+              if (typeof parsedObj.fileUrl === 'string') fileUrl = parsedObj.fileUrl;
+              if (typeof parsedObj.fileId === 'string') fileIdParam = parsedObj.fileId;
+            }
           } catch {
             // ignore parse errors; handled by validation below
           }
