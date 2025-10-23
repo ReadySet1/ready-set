@@ -11,12 +11,12 @@ import type { Database } from '@/types/supabase';
 type ApplicationSession = Database['public']['Tables']['application_sessions']['Row'];
 type ApplicationSessionInsert = Database['public']['Tables']['application_sessions']['Insert'];
 
-// Validation schema
+// Validation schema - all fields required for accountability
 const createSessionSchema = z.object({
-  email: z.string().email('Invalid email format').max(255, 'Email too long').optional(),
-  firstName: z.string().min(1, 'First name required').max(100, 'First name too long').optional(),
-  lastName: z.string().min(1, 'Last name required').max(100, 'Last name too long').optional(),
-  role: z.string().min(1, 'Role required').max(100, 'Role too long').optional()
+  email: z.string().email('Invalid email format').max(255, 'Email too long'),
+  firstName: z.string().min(1, 'First name required').max(100, 'First name too long'),
+  lastName: z.string().min(1, 'Last name required').max(100, 'Last name too long'),
+  role: z.string().min(1, 'Role required').max(100, 'Role too long')
 });
 
 // Constants
@@ -26,6 +26,38 @@ const MAX_SESSIONS_PER_IP_PER_HOUR = 5;
 
 /**
  * Rate limiting helper
+ *
+ * KNOWN ISSUE - RACE CONDITION (TOCTOU):
+ * This implementation has a Time-of-Check to Time-of-Use vulnerability.
+ * Two concurrent requests from the same IP could both pass the rate limit check
+ * before either creates their session, bypassing the rate limit.
+ *
+ * PROPER FIX (requires database migration):
+ * Implement atomic check-and-insert using PostgreSQL advisory locks or a stored function:
+ *
+ * CREATE OR REPLACE FUNCTION check_and_create_session(
+ *   p_ip_address TEXT,
+ *   p_max_sessions INT,
+ *   ... other params
+ * ) RETURNS TABLE(...) AS $$
+ * BEGIN
+ *   -- Lock for this IP address (released at transaction end)
+ *   PERFORM pg_advisory_xact_lock(hashtext(p_ip_address));
+ *
+ *   -- Check count atomically within the lock
+ *   IF (SELECT COUNT(*) FROM application_sessions
+ *       WHERE ip_address = p_ip_address
+ *       AND created_at >= NOW() - INTERVAL '1 hour') >= p_max_sessions THEN
+ *     RAISE EXCEPTION 'Rate limit exceeded';
+ *   END IF;
+ *
+ *   -- Insert session
+ *   INSERT INTO application_sessions ...;
+ *   RETURN ...;
+ * END;
+ * $$ LANGUAGE plpgsql;
+ *
+ * TODO: Implement database function for atomic rate limiting
  */
 async function checkRateLimit(
   supabase: Awaited<ReturnType<typeof createClient>>,

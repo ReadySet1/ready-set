@@ -1243,7 +1243,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_session_upload: {
+        Args: {
+          p_session_id: string
+          p_file_path: string
+          p_session_token: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       ApplicationStatus: "PENDING" | "APPROVED" | "REJECTED" | "INTERVIEWING"

@@ -1,96 +1,75 @@
 // src/lib/session-encryption.ts
 
 /**
- * Simple encryption utility for client-side session data
+ * Session storage utility for client-side session data
  *
- * SECURITY NOTE: This provides basic obfuscation but is NOT a complete solution
- * to XSS attacks. A sophisticated attacker with XSS access can still:
- * - Read the encryption key from the code
- * - Decrypt the stored data
- * - Execute arbitrary JavaScript
+ * SECURITY NOTICE: sessionStorage provides NO security against XSS attacks.
+ * - Any JavaScript running in the browser can access sessionStorage
+ * - XSS attacks can steal all data stored here
+ * - This is for USER EXPERIENCE only, NOT security
  *
- * For full security, consider:
- * 1. Using httpOnly cookies (requires backend changes)
- * 2. Implementing Content Security Policy (CSP)
- * 3. Regular security audits
- * 4. Input sanitization to prevent XSS
+ * IMPORTANT: Never store sensitive tokens or credentials in sessionStorage.
+ * For secure session management, use httpOnly cookies set by the backend.
  *
- * This encryption adds a layer of defense-in-depth but should not be
- * relied upon as the sole security measure.
+ * Current implementation:
+ * - Stores minimal session data (sessionId only) in sessionStorage
+ * - uploadToken is kept in React state (memory) only
+ * - On page refresh, user needs to create a new session
+ *
+ * Future improvement:
+ * - Migrate to httpOnly cookies for token storage
+ * - Implement proper CSRF protection
+ * - Add Content Security Policy (CSP)
  */
-
-const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_SESSION_ENCRYPTION_KEY || 'default-key-change-me';
 
 /**
- * Simple XOR-based encryption with Base64 encoding
- * Note: This is obfuscation, not cryptographic security
+ * Store session data in sessionStorage (plaintext - no false security)
+ *
+ * SECURITY: Only stores non-sensitive data. Use for UX only.
  */
-function xorEncrypt(text: string, key: string): string {
-  let encrypted = '';
-  for (let i = 0; i < text.length; i++) {
-    const charCode = text.charCodeAt(i) ^ key.charCodeAt(i % key.length);
-    encrypted += String.fromCharCode(charCode);
-  }
-  return btoa(encrypted); // Base64 encode
-}
-
-/**
- * Decrypt XOR-encrypted data
- */
-function xorDecrypt(encrypted: string, key: string): string {
-  const decoded = atob(encrypted); // Base64 decode
-  let decrypted = '';
-  for (let i = 0; i < decoded.length; i++) {
-    const charCode = decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length);
-    decrypted += String.fromCharCode(charCode);
-  }
-  return decrypted;
-}
-
-/**
- * Encrypt session data before storing in sessionStorage
- */
-export function encryptSession(sessionData: unknown): string {
-  const jsonString = JSON.stringify(sessionData);
-  return xorEncrypt(jsonString, ENCRYPTION_KEY);
-}
-
-/**
- * Decrypt session data retrieved from sessionStorage
- */
-export function decryptSession<T>(encryptedData: string): T | null {
+export function storeSession(key: string, data: unknown): void {
   try {
-    const decrypted = xorDecrypt(encryptedData, ENCRYPTION_KEY);
-    return JSON.parse(decrypted) as T;
+    const jsonString = JSON.stringify(data);
+    sessionStorage.setItem(key, jsonString);
   } catch (error) {
-    console.error('Failed to decrypt session data:', error);
-    return null;
-  }
-}
-
-/**
- * Securely store session in sessionStorage with encryption
- */
-export function storeEncryptedSession(key: string, data: unknown): void {
-  try {
-    const encrypted = encryptSession(data);
-    sessionStorage.setItem(key, encrypted);
-  } catch (error) {
-    console.error('Failed to store encrypted session:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Failed to store session:', error);
+    }
     throw error;
   }
 }
 
 /**
- * Retrieve and decrypt session from sessionStorage
+ * Retrieve session data from sessionStorage
+ *
+ * SECURITY: Assumes data in sessionStorage is untrusted. Validate after retrieval.
  */
-export function retrieveEncryptedSession<T>(key: string): T | null {
+export function retrieveSession<T>(key: string): T | null {
   try {
-    const encrypted = sessionStorage.getItem(key);
-    if (!encrypted) return null;
-    return decryptSession<T>(encrypted);
+    const data = sessionStorage.getItem(key);
+    if (!data) return null;
+    return JSON.parse(data) as T;
   } catch (error) {
-    console.error('Failed to retrieve encrypted session:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Failed to retrieve session:', error);
+    }
     return null;
   }
 }
+
+/**
+ * Remove session data from sessionStorage
+ */
+export function removeSession(key: string): void {
+  try {
+    sessionStorage.removeItem(key);
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Failed to remove session:', error);
+    }
+  }
+}
+
+// Legacy exports for backwards compatibility - will be removed in future
+export const storeEncryptedSession = storeSession;
+export const retrieveEncryptedSession = retrieveSession;

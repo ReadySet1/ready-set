@@ -103,9 +103,10 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
 
       setSession(newSession);
 
-      // Store in sessionStorage with encryption for basic protection against casual inspection
-      // SECURITY NOTE: This is defense-in-depth, not a complete XSS protection
-      // See src/lib/session-encryption.ts for security considerations
+      // Store in sessionStorage for UX (allows session restoration on page refresh)
+      // SECURITY WARNING: sessionStorage provides NO protection against XSS attacks
+      // uploadToken is stored here for UX only - consider this data public
+      // Future: Migrate to httpOnly cookies for real security
       storeEncryptedSession('application_session', newSession);
 
       if (process.env.NODE_ENV === 'development') {

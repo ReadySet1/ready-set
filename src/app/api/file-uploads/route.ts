@@ -15,6 +15,7 @@ import {
 import { UploadSecurityManager } from "@/lib/upload-security";
 import { UploadErrorType } from "@/types/upload";
 import type { Database } from '@/types/supabase';
+import { logApiError, logDatabaseError, logAuthError } from '@/lib/error-logging';
 
 // Type definitions for application_sessions
 type ApplicationSession = Database['public']['Tables']['application_sessions']['Row'];
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
-      console.error('Auth error:', authError);
+      logAuthError(authError || new Error('No user found'), 'file-uploads-get', user?.id, request);
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
       .createSignedUrl(path, 60 * 30); // 30 minutes expiration
     
     if (signedUrlError) {
-      console.error('Error creating signed URL:', signedUrlError);
+      logApiError(signedUrlError, '/api/file-uploads', 'GET', { operation: 'createSignedUrl', path }, request);
       // Fall back to public URL if signed URL fails
       const { data: { publicUrl } } = supabase.storage
         .from(STORAGE_BUCKETS.DEFAULT)
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
       expiresIn: '30 minutes'
     });
   } catch (error: any) {
-    console.error('Error generating file URL:', error);
+    logApiError(error, '/api/file-uploads', 'GET', { operation: 'generateFileURL' }, request);
     return NextResponse.json(
       { error: 'Failed to generate file URL', details: error.message || String(error) },
       { status: 500 }
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
         .single<Pick<ApplicationSession, 'id' | 'session_token' | 'session_expires_at' | 'upload_count' | 'max_uploads' | 'completed'>>();
 
       if (sessionError || !session) {
-        console.error('Session validation error:', sessionError);
+        logDatabaseError(sessionError || new Error('Session not found'), 'validateSession', { sessionToken: '***' });
         return NextResponse.json(
           {
             error: 'Invalid or expired session',
@@ -197,7 +198,7 @@ export async function POST(request: NextRequest) {
     try {
       await initializeStorageBuckets();
     } catch (initError) {
-      console.error("Error initializing storage buckets:", initError);
+      logApiError(initError, '/api/file-uploads', 'POST', { operation: 'initializeStorageBuckets' }, request);
       // Continue anyway - bucket creation errors shouldn't prevent uploads if buckets already exist
     }
 
@@ -383,7 +384,7 @@ export async function POST(request: NextRequest) {
             }
           }
         } catch (error) {
-          console.error("Error checking job application:", error);
+          logDatabaseError(error, 'checkJobApplication', { entityId: finalEntityId });
           filePath = `job-applications/temp/${finalEntityId}/${fileName}`;
         }
       }
@@ -502,7 +503,7 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         lastError = error;
         const errorMessage = getErrorMessage(error);
-        console.error(`Upload strategy failed:`, errorMessage);
+        logApiError(error, '/api/file-uploads', 'POST', { operation: 'uploadStrategy', strategy: strategy.name }, request);
 
         // If this is a bucket not found error, try the next strategy
         if (errorMessage.includes('Bucket not found') && strategy !== uploadStrategies[uploadStrategies.length - 1]) {
@@ -521,7 +522,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (storageError) {
-      console.error("Storage upload error after retries:", storageError);
+      logApiError(storageError, '/api/file-uploads', 'POST', { operation: 'storageUpload', allStrategiesFailed: true }, request);
 
       // Use enhanced error categorization
       const uploadError = UploadErrorHandler.categorizeError(storageError, file);
@@ -607,7 +608,7 @@ export async function POST(request: NextRequest) {
               dbData.cateringRequestId = null;
             }
           } catch (err) {
-            console.error("Error verifying catering request:", err);
+            logDatabaseError(err, 'verifyCateringRequest', { entityId: finalEntityId });
             dbData.isTemporary = true;
             // Clear the ID to avoid database errors
             dbData.cateringRequestId = null;
@@ -676,7 +677,7 @@ export async function POST(request: NextRequest) {
               dbData.userId = null;
             }
           } catch (err) {
-            console.error("Error verifying user:", err);
+            logDatabaseError(err, 'verifyUser', { userId: finalEntityId });
             dbData.isTemporary = true;
             dbData.userId = null;
           }
@@ -697,7 +698,7 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (error) {
-      console.error("Error processing entity ID:", error);
+      logApiError(error, '/api/file-uploads', 'POST', { operation: 'processEntityID', entityId: finalEntityId }, request);
       // Safety: reset all foreign keys to null if there was an error
       dbData.cateringRequestId = null;
       dbData.onDemandId = null;
@@ -726,7 +727,7 @@ export async function POST(request: NextRequest) {
                   }
       );
     } catch (error) {
-      console.error("Database record creation failed after retries:", error);
+      logDatabaseError(error, 'createFileUploadRecord', { fileName: file.name, entityId: finalEntityId });
 
       // Use enhanced error categorization for database errors
       const dbError = UploadErrorHandler.categorizeError(error, file);
@@ -760,7 +761,6 @@ export async function POST(request: NextRequest) {
         // CRITICAL: This RPC function MUST exist in the database before deployment
         // Migration required: see docs/security/deployment-guide.md
         // SECURITY: Pass session token to validate ownership and prevent session hijacking
-        // @ts-expect-error - RPC function added in migration, types will be updated after deployment
         const { error: sessionUpdateError } = await supabase.rpc('increment_session_upload', {
           p_session_id: validatedSession.id,
           p_file_path: filePath,
@@ -768,14 +768,14 @@ export async function POST(request: NextRequest) {
         });
 
         if (sessionUpdateError) {
-          console.error('CRITICAL: Failed to update session after upload:', sessionUpdateError);
+          logDatabaseError(sessionUpdateError, 'incrementSessionUpload', { sessionId: validatedSession.id, filePath });
 
           // Check if this is a missing function error
           if (sessionUpdateError.message?.includes('function')) {
-            console.error(
-              'CRITICAL: Database migration required! The increment_session_upload RPC function is missing. ' +
-              'This indicates the database has not been properly migrated. ' +
-              'See docs/security/deployment-guide.md for migration instructions.'
+            logDatabaseError(
+              new Error('Database migration required: increment_session_upload RPC function missing'),
+              'incrementSessionUpload',
+              { requiresMigration: true, sessionId: validatedSession.id }
             );
 
             // Return error to prevent data inconsistency
@@ -795,10 +795,10 @@ export async function POST(request: NextRequest) {
           }
 
           // For other errors, log but don't fail the upload
-          console.error('Session update failed, but upload succeeded');
+          logDatabaseError(sessionUpdateError, 'incrementSessionUpload', { uploadSucceeded: true, sessionId: validatedSession.id });
         }
       } catch (sessionError) {
-        console.error('Error updating session:', sessionError);
+        logDatabaseError(sessionError, 'updateSession', { uploadSucceeded: true, sessionId: validatedSession.id });
         // Don't fail the upload, just log the error
       }
     }
@@ -821,7 +821,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error("File upload error:", error);
+    logApiError(error, '/api/file-uploads', 'POST', { operation: 'fileUpload', fileName: file?.name }, request);
 
     // Use enhanced error categorization for general errors
     const uploadError = UploadErrorHandler.categorizeError(error, file);
@@ -945,7 +945,7 @@ export async function DELETE(request: NextRequest) {
         filePath = fileRecord.fileUrl.split('/').pop() || '';
       }
     } catch (error) {
-      console.error('Error parsing file URL:', error);
+      logApiError(error, '/api/file-uploads', 'DELETE', { operation: 'parseFileURL', fileUrl: fileRecord.fileUrl }, request);
       // Use default path construction as fallback
       filePath = fileRecord.fileUrl.split('/').pop() || '';
     }
@@ -961,7 +961,7 @@ export async function DELETE(request: NextRequest) {
         .remove([filePath]);
 
       if (storageError) {
-        console.error('Error deleting from storage:', storageError);
+        logApiError(storageError, '/api/file-uploads', 'DELETE', { operation: 'deleteFromStorage', filePath }, request);
         // Continue anyway to delete the database record
       } else {
               }
@@ -976,7 +976,7 @@ export async function DELETE(request: NextRequest) {
     
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting file:", error);
+    logApiError(error, '/api/file-uploads', 'DELETE', { operation: 'deleteFile' }, request);
     return NextResponse.json(
       { error: "Failed to delete file", details: error.message || String(error) },
       { status: 500 },
