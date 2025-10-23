@@ -98,19 +98,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  
-  // Debug environment variables (without exposing sensitive data)
-      
+
   // Parse form data first to avoid issues with error handling
   const formData = await request.formData();
-  
-  // Initialize storage buckets to ensure they exist before upload
-  try {
-    await initializeStorageBuckets();
-      } catch (initError) {
-    console.error("Error initializing storage buckets:", initError);
-    // Continue anyway - bucket creation errors shouldn't prevent uploads if buckets already exist
-  }
 
   // Extract important data from the form
   let file = formData.get("file") as File;
@@ -118,7 +108,95 @@ export async function POST(request: NextRequest) {
   let entityType = (formData.get("entityType") as string) || "job_application"; // Default value
   const category = (formData.get("category") as string) || "";
 
+  // Store session info for later use
+  let validatedSession: { id: string; session_token: string } | null = null;
+
   try {
+    // ===== SESSION VALIDATION (Security Enhancement) =====
+    // Validate upload session token for job applications
+    if (entityType === "job_application" || category.startsWith("job-applications")) {
+      const sessionToken = request.headers.get('x-upload-token');
+
+      if (!sessionToken) {
+        return NextResponse.json(
+          {
+            error: 'Authentication required',
+            errorType: 'AUTH_REQUIRED',
+            message: 'Upload session token is required. Please start a new application session.'
+          },
+          { status: 401 }
+        );
+      }
+
+      // Validate session
+      const supabase = await createClient();
+      // @ts-ignore - application_sessions table will be available after migration
+      const { data: session, error: sessionError }: any = await (supabase as any)
+        .from('application_sessions')
+        .select('id, session_token, session_expires_at, upload_count, max_uploads, completed')
+        .eq('session_token', sessionToken)
+        .single();
+
+      if (sessionError || !session) {
+        console.error('Session validation error:', sessionError);
+        return NextResponse.json(
+          {
+            error: 'Invalid or expired session',
+            errorType: 'INVALID_SESSION',
+            message: 'Your upload session is invalid. Please start a new application.'
+          },
+          { status: 401 }
+        );
+      }
+
+      // Check if session is expired
+      if (new Date(session.session_expires_at) < new Date()) {
+        return NextResponse.json(
+          {
+            error: 'Session expired',
+            errorType: 'SESSION_EXPIRED',
+            message: 'Your upload session has expired. Please start a new application.'
+          },
+          { status: 401 }
+        );
+      }
+
+      // Check upload limit
+      if (session.upload_count >= session.max_uploads) {
+        return NextResponse.json(
+          {
+            error: 'Upload limit exceeded',
+            errorType: 'UPLOAD_LIMIT_EXCEEDED',
+            message: `Maximum uploads (${session.max_uploads}) reached for this session.`
+          },
+          { status: 429 }
+        );
+      }
+
+      // Check if session is already completed
+      if (session.completed) {
+        return NextResponse.json(
+          {
+            error: 'Session completed',
+            errorType: 'SESSION_COMPLETED',
+            message: 'This application session is already completed.'
+          },
+          { status: 400 }
+        );
+      }
+
+      // Store validated session info
+      validatedSession = { id: session.id, session_token: session.session_token };
+    }
+    // ===== END SESSION VALIDATION =====
+
+    // Initialize storage buckets to ensure they exist before upload
+    try {
+      await initializeStorageBuckets();
+    } catch (initError) {
+      console.error("Error initializing storage buckets:", initError);
+      // Continue anyway - bucket creation errors shouldn't prevent uploads if buckets already exist
+    }
 
     // Sanitize the filename before validation to avoid rejecting files with special characters
     const sanitizedFilename = FileValidator.sanitizeFilename(file.name);
@@ -271,9 +349,12 @@ export async function POST(request: NextRequest) {
       filePath = `orders/on-demand/${finalEntityId}/${fileName}`;
           }
     else if (normalizedEntityType === "job_application") {
-      // For job application type, check if ID is a temp ID or real UUID
-      if (finalEntityId.startsWith('temp_') || finalEntityId.startsWith('temp-')) {
-        // Skip UUID validation for temp job application IDs
+      // For job application type, prioritize validated session
+      if (validatedSession) {
+        // Use session ID for secure, tracked uploads
+        filePath = `job-applications/temp/${validatedSession.id}/${fileName}`;
+      } else if (finalEntityId.startsWith('temp_') || finalEntityId.startsWith('temp-')) {
+        // Skip UUID validation for temp job application IDs (legacy)
                 filePath = `job-applications/temp/${finalEntityId}/${fileName}`;
       } else {
         // Only try to validate as UUID for non-temp IDs
@@ -669,7 +750,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    
+    // Update session after successful upload
+    if (validatedSession) {
+      try {
+        // Get current session state
+        // @ts-ignore - application_sessions table will be available after migration
+        const { data: currentSession }: any = await (supabase as any)
+          .from('application_sessions')
+          .select('upload_count, uploaded_files')
+          .eq('id', validatedSession.id)
+          .single();
+
+        if (currentSession) {
+          // Update with incremented values
+          // @ts-ignore - application_sessions table will be available after migration
+          const { error: sessionUpdateError }: any = await (supabase as any)
+            .from('application_sessions')
+            .update({
+              upload_count: currentSession.upload_count + 1,
+              uploaded_files: [...(currentSession.uploaded_files || []), filePath],
+              // last_activity_at is automatically updated by trigger
+            })
+            .eq('id', validatedSession.id)
+            .eq('session_token', validatedSession.session_token);
+
+          if (sessionUpdateError) {
+            console.error('Failed to update session after upload:', sessionUpdateError);
+            // Don't fail the upload, just log the error
+          }
+        }
+      } catch (sessionError) {
+        console.error('Error updating session:', sessionError);
+        // Don't fail the upload, just log the error
+      }
+    }
+
+
     return NextResponse.json({
       success: true,
       file: {
