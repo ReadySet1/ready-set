@@ -14,6 +14,7 @@ import { FileUpload } from "./FileUpload";
 import { v4 as uuidv4 } from "uuid";
 import { motion } from "framer-motion";
 import { useSearchParams } from "next/navigation";
+import { useApplicationSession } from "@/contexts/ApplicationSessionContext";
 
 // Helper to generate accept string from allowed file types
 const generateAcceptString = (types: string[]): string => types.join(",");
@@ -189,6 +190,9 @@ const JobApplicationForm = () => {
   // State to store the role from URL
   const [roleFromUrl, setRoleFromUrl] = useState<string | null>(null);
 
+  // Use application session context
+  const { session, createSession, markSessionCompleted, resetSession } = useApplicationSession();
+
   const {
     register,
     handleSubmit,
@@ -198,7 +202,7 @@ const JobApplicationForm = () => {
     formState: { errors, isSubmitting: formIsSubmitting, isDirty, isValid },
     trigger,
   } = useForm<FormData>({
-    mode: "onChange", // Enable real-time validation
+    mode: "onTouched", // Validate only when field is touched/blurred
     defaultValues: {
       role: "",
       firstName: "",
@@ -260,6 +264,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: RESUME_TYPES,
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const licenseUpload = useJobApplicationUpload({
@@ -269,6 +274,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: IMAGE_PDF_TYPES,
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const insuranceUpload = useJobApplicationUpload({
@@ -278,6 +284,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: IMAGE_PDF_TYPES,
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const registrationUpload = useJobApplicationUpload({
@@ -287,6 +294,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: IMAGE_PDF_TYPES,
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const foodHandlerUpload = useJobApplicationUpload({
@@ -296,6 +304,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: IMAGE_PDF_TYPES,
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const hipaaUpload = useJobApplicationUpload({
@@ -305,6 +314,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: IMAGE_PDF_TYPES,
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const driverPhotoUpload = useJobApplicationUpload({
@@ -314,6 +324,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: [".jpg", ".jpeg", ".png"],
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const carPhotoUpload = useJobApplicationUpload({
@@ -323,6 +334,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: [".jpg", ".jpeg", ".png"],
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   const equipmentPhotoUpload = useJobApplicationUpload({
@@ -332,6 +344,7 @@ const JobApplicationForm = () => {
     entityId: tempEntityId,
     allowedFileTypes: [".jpg", ".jpeg", ".png"],
     maxFileCount: 1,
+    uploadToken: session?.uploadToken,
   });
 
   // Watch for role changes to trigger validation
@@ -341,11 +354,58 @@ const JobApplicationForm = () => {
     }
   }, [selectedRole, isDirty, trigger]);
 
+  // Create session when user provides basic information
+  React.useEffect(() => {
+    const email = watch("email");
+    const firstName = watch("firstName");
+    const lastName = watch("lastName");
+    const role = watch("role");
+
+    // Only create session if we have all required info and don't already have a valid session
+    if (email && firstName && lastName && role && !session) {
+      createSession({ email, firstName, lastName, role }).catch(err => {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to create session:', err);
+        }
+        // Session creation failure is logged but non-blocking
+      });
+    }
+  }, [watch("email"), watch("firstName"), watch("lastName"), watch("role"), session, createSession, watch]);
+
   // Handle step navigation
   const goToNextStep = async (event?: React.MouseEvent) => {
     // Prevent any default form submission
     if (event) {
       event.preventDefault();
+    }
+
+    // Get the fields for the current step
+    const currentStepData = FORM_STEPS[currentStep - 1];
+    if (!currentStepData) {
+      console.error('Invalid step:', currentStep);
+      return;
+    }
+    const currentStepFields = currentStepData.fields;
+
+    // Validate all fields in the current step
+    const fieldsToValidate = currentStepFields.filter(field => {
+      // Skip file fields as they have their own validation
+      return !['resume', 'driversLicense', 'insurance', 'vehicleRegistration',
+               'foodHandler', 'hipaa', 'driverPhoto', 'carPhoto', 'equipmentPhoto'].includes(field);
+    });
+
+    // Trigger validation for current step fields
+    if (fieldsToValidate.length > 0) {
+      const isStepValid = await trigger(fieldsToValidate as any);
+      if (!isStepValid) {
+        // Don't proceed if validation fails
+        toast({
+          title: "Validation Error",
+          description: "Please fill out all required fields before continuing.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     // *** Keep file validation specifically before moving from Step 3 ***
@@ -365,7 +425,7 @@ const JobApplicationForm = () => {
       }
     }
 
-    // If step-specific validation passes (only file check for step 3), proceed
+    // If step-specific validation passes, proceed
     setCurrentStep((prev) => Math.min(prev + 1, FORM_STEPS.length));
     // Remove scroll to top behavior
   };
@@ -500,15 +560,35 @@ const JobApplicationForm = () => {
       }
 
       const responseData = await response.json();
-      
-      toast({
-        title: "Application Received",
-        description:
-          "Your application has been submitted successfully! We will contact you soon.",
-        variant: "default",
-      });
 
-      // Set application as submitted instead of just resetting
+      // Mark session as completed
+      if (responseData.id) {
+        try {
+          await markSessionCompleted(responseData.id);
+        } catch (sessionError) {
+          console.error('Failed to mark session as completed:', sessionError);
+          // Non-blocking - don't prevent showing success to user
+        }
+      }
+
+      // Reset form to initial state
+      reset();
+
+      // Clear all uploaded files
+      resumeUpload.setUploadedFiles([]);
+      licenseUpload.setUploadedFiles([]);
+      insuranceUpload.setUploadedFiles([]);
+      registrationUpload.setUploadedFiles([]);
+      foodHandlerUpload.setUploadedFiles([]);
+      hipaaUpload.setUploadedFiles([]);
+      driverPhotoUpload.setUploadedFiles([]);
+      carPhotoUpload.setUploadedFiles([]);
+      equipmentPhotoUpload.setUploadedFiles([]);
+
+      // Reset to step 1
+      setCurrentStep(1);
+
+      // Set application as submitted to show success message
       setIsSubmitted(true);
     } catch (error) {
       console.error("Submission error:", error);
@@ -566,6 +646,94 @@ const JobApplicationForm = () => {
         <SearchParamsHandler onRoleChange={handleRoleChange} />
       </Suspense>
 
+      {/* Success Message - Show when application is submitted */}
+      {isSubmitted && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="text-center"
+        >
+          <div className="mx-auto max-w-2xl rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 p-8 shadow-xl border-2 border-green-200">
+            {/* Success Icon */}
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+              className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-500 shadow-lg"
+            >
+              <svg
+                className="h-10 w-10 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </motion.div>
+
+            {/* Success Title */}
+            <h2 className="mb-4 text-3xl font-bold text-gray-900">
+              Application Received!
+            </h2>
+
+            {/* Success Message */}
+            <p className="mb-6 text-lg text-gray-700 leading-relaxed">
+              Thank you for applying to join our team! Your application has been submitted successfully.
+            </p>
+
+            {/* Contact Information */}
+            <div className="mb-8 rounded-xl bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <svg
+                  className="h-6 w-6 text-green-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <h3 className="text-xl font-semibold text-gray-900">
+                  What Happens Next?
+                </h3>
+              </div>
+              <p className="text-gray-600">
+                Our recruitment team will carefully review your application.
+                If your qualifications match our requirements, we'll reach out to you
+                within <span className="font-semibold text-green-600">3-5 business days</span> to
+                discuss the next steps.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={() => setIsSubmitted(false)}
+                className="inline-flex items-center justify-center rounded-xl bg-green-600 px-6 py-3 font-semibold text-white shadow-lg hover:bg-green-700 transition-all duration-200 hover:shadow-xl"
+              >
+                Submit Another Application
+              </button>
+              <button
+                onClick={() => window.location.href = '/'}
+                className="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 font-semibold text-gray-700 border-2 border-gray-300 hover:border-gray-400 transition-all duration-200"
+              >
+                Return to Home
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Add notification for users coming from signup */}
       {fromSignup && !isSubmitted && (
         <div className="mb-6 rounded border-l-4 border-yellow-400 bg-yellow-50 p-4">
@@ -599,8 +767,11 @@ const JobApplicationForm = () => {
         </div>
       )}
 
-      {/* Form steps UI */}
-      <div className="relative mb-8">
+      {/* Form - Hide when submitted */}
+      {!isSubmitted && (
+        <>
+          {/* Form steps UI */}
+          <div className="relative mb-8">
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={goToPrevStep}
@@ -1344,6 +1515,8 @@ const JobApplicationForm = () => {
           )}
         </div>
       </form>
+        </>
+      )}
     </div>
   );
 };

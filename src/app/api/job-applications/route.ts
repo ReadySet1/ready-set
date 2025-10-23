@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { sendEmail } from "@/utils/email";
-import { createClient } from "@/utils/supabase/server"; // Import Supabase server client
+import { createClient, createAdminClient } from "@/utils/supabase/server"; // Import Supabase clients
 import { Prisma } from "@prisma/client";
 
 export async function POST(request: Request) {
-  const supabase = await createClient(); // Initialize Supabase client AND AWAIT IT
+  const supabase = await createClient(); // Regular client for user operations
+  const supabaseAdmin = await createAdminClient(); // Admin client for storage operations
   const bucketName = process.env.NEXT_PUBLIC_SUPABASE_BUCKET_NAME || 'user-assets'; // Get bucket name
 
   try {
@@ -26,6 +27,19 @@ export async function POST(request: Request) {
       data.equipmentPhotoFileId
     ].filter((id): id is string => typeof id === 'string' && id !== '');
 
+    console.log('🔍 [FILE DEBUG] Extracted file IDs from request:', fileIdsToProcess);
+    console.log('🔍 [FILE DEBUG] Raw data file IDs:', {
+      resumeFileId: data.resumeFileId,
+      driversLicenseFileId: data.driversLicenseFileId,
+      insuranceFileId: data.insuranceFileId,
+      vehicleRegFileId: data.vehicleRegFileId,
+      foodHandlerFileId: data.foodHandlerFileId,
+      hipaaFileId: data.hipaaFileId,
+      driverPhotoFileId: data.driverPhotoFileId,
+      carPhotoFileId: data.carPhotoFileId,
+      equipmentPhotoFileId: data.equipmentPhotoFileId
+    });
+
     let temporaryFileUploads: any[] = [];
     if (fileIdsToProcess.length > 0) {
                 temporaryFileUploads = await prisma.fileUpload.findMany({
@@ -35,13 +49,17 @@ export async function POST(request: Request) {
                 // but we still want to process them
             }
         });
-                
+
+        console.log('🔍 [FILE DEBUG] Found file uploads in database:', temporaryFileUploads.length, 'out of', fileIdsToProcess.length);
+        console.log('🔍 [FILE DEBUG] File details:', temporaryFileUploads.map(f => ({ id: f.id, fileName: f.fileName, isTemporary: f.isTemporary })));
+
         // Optional: Check if all requested IDs were found
         if (temporaryFileUploads.length !== fileIdsToProcess.length) {
-            console.warn("Mismatch between requested file IDs and found files. Some files might not exist or IDs are invalid.");
+            console.warn("⚠️ Mismatch between requested file IDs and found files. Some files might not exist or IDs are invalid.");
             // Decide if this should be a hard error or just a warning
         }
     } else {
+        console.log('🔍 [FILE DEBUG] No file IDs to process');
           }
 
 
@@ -98,14 +116,30 @@ export async function POST(request: Request) {
 
         // Extract the temporary path from the fileUrl
         let oldPath = '';
+        let actualBucketName = bucketName;
         try {
             const urlObject = new URL(file.fileUrl);
             // Pathname usually starts with /storage/v1/object/public/bucket_name/
             const pathParts = urlObject.pathname.split('/');
-            if (pathParts.length > 6 && pathParts[5] === bucketName) {
+
+            console.log(`🔍 [PATH DEBUG] URL: ${file.fileUrl}`);
+            console.log(`🔍 [PATH DEBUG] Path parts:`, pathParts);
+            console.log(`🔍 [PATH DEBUG] Expected bucket name: ${bucketName}`);
+            console.log(`🔍 [PATH DEBUG] Actual bucket name in URL: ${pathParts[5]}`);
+
+            if (pathParts.length > 6 && pathParts[1] === 'storage' && pathParts[4] === 'public') {
+                // Extract the actual bucket name from the URL
+                const bucketFromUrl = pathParts[5];
+                if (!bucketFromUrl) {
+                    console.error(`❌ [PATH DEBUG] Could not extract bucket name from URL: ${file.fileUrl}`);
+                    continue;
+                }
+                actualBucketName = bucketFromUrl;
                 oldPath = pathParts.slice(6).join('/'); // Join the rest as the path
+                console.log(`✅ [PATH DEBUG] Extracted path: ${oldPath} from bucket: ${actualBucketName}`);
             } else {
-                 console.error(`Could not extract valid path from URL: ${file.fileUrl}`);
+                 console.error(`❌ [PATH DEBUG] Could not extract valid path from URL: ${file.fileUrl}`);
+                 console.error(`Path parts length: ${pathParts.length}, pathParts[1]: ${pathParts[1]}, pathParts[4]: ${pathParts[4]}`);
                  continue;
             }
         } catch (e) {
@@ -132,25 +166,42 @@ export async function POST(request: Request) {
         
         
         try {
-          // Move the file in Supabase Storage
-          const { data: moveData, error: moveError } = await supabase.storage
-            .from(bucketName)
+          // Move the file in Supabase Storage using admin client to bypass RLS
+          console.log(`📦 [STORAGE DEBUG] Moving file from ${oldPath} to ${newPath} in bucket ${actualBucketName}`);
+          const { data: moveData, error: moveError } = await supabaseAdmin.storage
+            .from(actualBucketName)
             .move(oldPath, newPath);
 
           if (moveError) {
             // Log the error but continue processing other files
-            console.error(`Error moving file ${oldPath} to ${newPath}:`, moveError);
+            console.error(`❌ [STORAGE DEBUG] Error moving file ${oldPath} to ${newPath}:`, moveError);
             // Potentially add logic here to mark this file as failed or retry later
             continue; // Skip updating this file record if move failed
           }
 
-          
-          // Construct the new public URL
-          const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(newPath);
-          const newPublicUrl = urlData?.publicUrl || ''; // Fallback to empty string if URL generation fails
+          console.log(`✅ [STORAGE DEBUG] Successfully moved file from ${oldPath} to ${newPath}`);
+
+          // Generate a signed URL that works regardless of bucket public access settings
+          // Signed URLs are valid for 1 year (31536000 seconds)
+          const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin.storage
+            .from(actualBucketName)
+            .createSignedUrl(newPath, 31536000); // 1 year expiry
+
+          let newPublicUrl: string;
+          if (signedUrlError) {
+            console.error(`❌ [URL DEBUG] Error generating signed URL:`, signedUrlError);
+            // Fallback to public URL if signed URL fails
+            const { data: urlData } = supabaseAdmin.storage.from(actualBucketName).getPublicUrl(newPath);
+            newPublicUrl = urlData?.publicUrl || '';
+          } else {
+            newPublicUrl = signedUrlData?.signedUrl || '';
+          }
+
+          console.log(`🔗 [URL DEBUG] Generated URL: ${newPublicUrl}`);
 
           // Update the FileUpload record in Prisma
-                    await prisma.fileUpload.update({
+          console.log(`💾 [DATABASE DEBUG] Updating file ${file.id} with jobApplicationId: ${application.id}`);
+          await prisma.fileUpload.update({
             where: { id: file.id },
             data: {
               jobApplicationId: application.id, // Critical: Associate with the job application
@@ -158,7 +209,8 @@ export async function POST(request: Request) {
               fileUrl: newPublicUrl, // Store the new public URL
             },
           });
-                    processedFilesInfo.push({ id: file.id, newPath: newPath, newUrl: newPublicUrl });
+          console.log(`✅ [DATABASE DEBUG] Successfully updated file ${file.id} in database`);
+          processedFilesInfo.push({ id: file.id, newPath: newPath, newUrl: newPublicUrl });
 
         } catch (processingError: any) {
           console.error(`Error processing file ID ${file.id} (path: ${oldPath}):`, {

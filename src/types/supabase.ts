@@ -575,6 +575,80 @@ export type Database = {
         }
         Relationships: []
       }
+      application_sessions: {
+        Row: {
+          id: string
+          email: string | null
+          first_name: string | null
+          last_name: string | null
+          role: string | null
+          verification_code: string | null
+          code_expires_at: string | null
+          verified: boolean
+          session_token: string
+          session_expires_at: string
+          uploaded_files: string[]
+          upload_count: number
+          max_uploads: number
+          ip_address: string | null
+          user_agent: string | null
+          created_at: string
+          last_activity_at: string
+          completed: boolean
+          job_application_id: string | null
+        }
+        Insert: {
+          id?: string
+          email?: string | null
+          first_name?: string | null
+          last_name?: string | null
+          role?: string | null
+          verification_code?: string | null
+          code_expires_at?: string | null
+          verified?: boolean
+          session_token: string
+          session_expires_at: string
+          uploaded_files?: string[]
+          upload_count?: number
+          max_uploads?: number
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+          last_activity_at?: string
+          completed?: boolean
+          job_application_id?: string | null
+        }
+        Update: {
+          id?: string
+          email?: string | null
+          first_name?: string | null
+          last_name?: string | null
+          role?: string | null
+          verification_code?: string | null
+          code_expires_at?: string | null
+          verified?: boolean
+          session_token?: string
+          session_expires_at?: string
+          uploaded_files?: string[]
+          upload_count?: number
+          max_uploads?: number
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+          last_activity_at?: string
+          completed?: boolean
+          job_application_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_sessions_job_application_id_fkey"
+            columns: ["job_application_id"]
+            isOneToOne: false
+            referencedRelation: "job_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_applications: {
         Row: {
           addressCity: string

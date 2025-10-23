@@ -844,6 +844,12 @@ const JobApplicationsClient = ({ userType }: JobApplicationsClientProps) => {
       });
 
       fetchStats();
+
+      // Close the detail dialog if the deleted application was being viewed
+      if (selectedApplication && selectedApplication.id === id) {
+        setIsDetailDialogOpen(false);
+        setSelectedApplication(null);
+      }
     } catch (error: any) {
       console.error("Error deleting application:", error);
       const description = error.message || "An unexpected error occurred. Please try again.";

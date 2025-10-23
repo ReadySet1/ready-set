@@ -1,11 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import JobApplicationForm from "@/components/Apply/ApplyForm"; 
-import { 
-  Truck, 
-  Headphones, 
-  ArrowRight, 
+import JobApplicationForm from "@/components/Apply/ApplyForm";
+import { ApplicationSessionProvider } from "@/contexts/ApplicationSessionContext";
+import {
+  Truck,
+  Headphones,
+  ArrowRight,
   Users,
   TrendingUp,
   Heart,
@@ -315,7 +316,9 @@ export default function ApplyPage() {
               </CardHeader>
               
               <CardContent className="p-8 lg:p-12">
-                <JobApplicationForm />
+                <ApplicationSessionProvider>
+                  <JobApplicationForm />
+                </ApplicationSessionProvider>
               </CardContent>
             </Card>
           </motion.div>
