@@ -3,28 +3,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
+import { z } from 'zod';
+import { logApiError, logDatabaseError } from '@/lib/error-logging';
+import type { Database } from '@/types/supabase';
 
-// Types
-interface CreateSessionRequest {
-  email?: string;
-  firstName?: string;
-  lastName?: string;
-  role?: string;
-}
+// Type definitions
+type ApplicationSession = Database['public']['Tables']['application_sessions']['Row'];
+type ApplicationSessionInsert = Database['public']['Tables']['application_sessions']['Insert'];
 
-interface ApplicationSession {
-  id: string;
-  session_token: string;
-  session_expires_at: string;
-  email?: string;
-  first_name?: string;
-  last_name?: string;
-  role?: string;
-  ip_address?: string;
-  user_agent?: string;
-  upload_count: number;
-  max_uploads: number;
-}
+// Validation schema
+const createSessionSchema = z.object({
+  email: z.string().email('Invalid email format').max(255, 'Email too long').optional(),
+  firstName: z.string().min(1, 'First name required').max(100, 'First name too long').optional(),
+  lastName: z.string().min(1, 'Last name required').max(100, 'Last name too long').optional(),
+  role: z.string().min(1, 'Role required').max(100, 'Role too long').optional()
+});
 
 // Constants
 const SESSION_DURATION_HOURS = 2;
@@ -41,17 +34,19 @@ async function checkRateLimit(
   try {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-    // @ts-ignore - application_sessions table will be available after migration
-    const { data: recentSessions, error }: any = await (supabase as any)
+    const { data: recentSessions, error } = await supabase
       .from('application_sessions')
       .select('id')
       .eq('ip_address', ipAddress)
       .gte('created_at', oneHourAgo.toISOString());
 
     if (error) {
-      console.error('Error checking rate limit:', error);
-      // Fail open on error (allow the request)
-      return { allowed: true };
+      // Fail closed - reject request if rate limit check fails
+      logDatabaseError(error, 'checkRateLimit', { ipAddress });
+      return {
+        allowed: false,
+        message: 'Rate limiting check failed. Please try again later.'
+      };
     }
 
     if (recentSessions && recentSessions.length >= MAX_SESSIONS_PER_IP_PER_HOUR) {
@@ -63,9 +58,12 @@ async function checkRateLimit(
 
     return { allowed: true };
   } catch (error) {
-    console.error('Rate limit check failed:', error);
-    // Fail open on error
-    return { allowed: true };
+    // Fail closed on unexpected errors
+    logApiError(error, '/api/application-sessions/checkRateLimit', 'GET', { ipAddress });
+    return {
+      allowed: false,
+      message: 'Rate limiting check failed. Please try again later.'
+    };
   }
 }
 
@@ -87,9 +85,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Build query
-    // @ts-ignore - application_sessions table will be available after migration
-    let query: any = (supabase as any)
+    // Build query with proper typing
+    let query = supabase
       .from('application_sessions')
       .select('id, email, first_name, last_name, role, session_expires_at, upload_count, max_uploads, verified, completed');
 
@@ -99,11 +96,12 @@ export async function GET(request: NextRequest) {
       query = query.eq('session_token', sessionToken);
     }
 
-    query = query.single();
-
-    const { data: session, error } = await query;
+    const { data: session, error } = await query.single<Pick<ApplicationSession,
+      'id' | 'email' | 'first_name' | 'last_name' | 'role' | 'session_expires_at' |
+      'upload_count' | 'max_uploads' | 'verified' | 'completed'>>();
 
     if (error || !session) {
+      logDatabaseError(error || new Error('Session not found'), 'getSession', { sessionId, hasToken: !!sessionToken });
       return NextResponse.json(
         { error: 'Session not found' },
         { status: 404 }
@@ -134,7 +132,7 @@ export async function GET(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('Error fetching session:', error);
+    logApiError(error, '/api/application-sessions', 'GET', {}, request);
     return NextResponse.json(
       { error: 'Failed to fetch session', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -149,7 +147,22 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const body: CreateSessionRequest = await request.json();
+
+    // Parse and validate request body
+    const rawBody = await request.json();
+    const validationResult = createSessionSchema.safeParse(rawBody);
+
+    if (!validationResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Invalid request data',
+          details: validationResult.error.issues.map(e => `${String(e.path.join('.'))}:${e.message}`).join(', ')
+        },
+        { status: 400 }
+      );
+    }
+
+    const body = validationResult.data;
 
     // Extract client info
     const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
@@ -174,29 +187,30 @@ export async function POST(request: NextRequest) {
       Date.now() + SESSION_DURATION_HOURS * 60 * 60 * 1000
     );
 
-    // Create session record
-    // @ts-ignore - application_sessions table will be available after migration
-    const { data: session, error }: any = await (supabase as any)
+    // Create session record with proper typing
+    const sessionData: ApplicationSessionInsert = {
+      email: body.email,
+      first_name: body.firstName,
+      last_name: body.lastName,
+      role: body.role,
+      session_token: sessionToken,
+      session_expires_at: sessionExpiresAt.toISOString(),
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      upload_count: 0,
+      max_uploads: MAX_UPLOADS_PER_SESSION,
+      verified: false,
+      completed: false
+    };
+
+    const { data: session, error } = await supabase
       .from('application_sessions')
-      .insert({
-        email: body.email,
-        first_name: body.firstName,
-        last_name: body.lastName,
-        role: body.role,
-        session_token: sessionToken,
-        session_expires_at: sessionExpiresAt.toISOString(),
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        upload_count: 0,
-        max_uploads: MAX_UPLOADS_PER_SESSION,
-        verified: false, // Will be true after email verification
-        completed: false
-      })
+      .insert(sessionData)
       .select('id, session_token, session_expires_at')
-      .single();
+      .single<Pick<ApplicationSession, 'id' | 'session_token' | 'session_expires_at'>>();
 
     if (error) {
-      console.error('Error creating session:', error);
+      logDatabaseError(error, 'createSession', { email: body.email, role: body.role });
       return NextResponse.json(
         { error: 'Failed to create session', details: error.message },
         { status: 500 }
@@ -213,7 +227,7 @@ export async function POST(request: NextRequest) {
       message: 'Session created successfully. You can now upload files.'
     }, { status: 201 });
   } catch (error) {
-    console.error('Error in POST /api/application-sessions:', error);
+    logApiError(error, '/api/application-sessions', 'POST', {}, request);
     return NextResponse.json(
       { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -242,8 +256,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
 
     // Validate session ownership
-    // @ts-ignore - application_sessions table will be available after migration
-    const { data: existingSession, error: fetchError }: any = await (supabase as any)
+    const { data: existingSession, error: fetchError } = await supabase
       .from('application_sessions')
       .select('id')
       .eq('id', sessionId)
@@ -251,6 +264,7 @@ export async function PATCH(request: NextRequest) {
       .single();
 
     if (fetchError || !existingSession) {
+      logDatabaseError(fetchError || new Error('Session not found'), 'validateSession', { sessionId });
       return NextResponse.json(
         { error: 'Invalid session or token' },
         { status: 401 }
@@ -258,20 +272,19 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update allowed fields only
-    const allowedUpdates: Record<string, any> = {};
+    const allowedUpdates: Partial<ApplicationSession> = {};
     if (body.completed !== undefined) allowedUpdates.completed = body.completed;
     if (body.jobApplicationId) allowedUpdates.job_application_id = body.jobApplicationId;
 
-    // @ts-ignore - application_sessions table will be available after migration
-    const { data: updatedSession, error: updateError }: any = await (supabase as any)
+    const { data: updatedSession, error: updateError } = await supabase
       .from('application_sessions')
       .update(allowedUpdates)
       .eq('id', sessionId)
       .select()
-      .single();
+      .single<ApplicationSession>();
 
     if (updateError) {
-      console.error('Error updating session:', updateError);
+      logDatabaseError(updateError, 'updateSession', { sessionId });
       return NextResponse.json(
         { error: 'Failed to update session', details: updateError.message },
         { status: 500 }
@@ -283,7 +296,7 @@ export async function PATCH(request: NextRequest) {
       session: updatedSession
     });
   } catch (error) {
-    console.error('Error in PATCH /api/application-sessions:', error);
+    logApiError(error, '/api/application-sessions', 'PATCH', {}, request);
     return NextResponse.json(
       { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

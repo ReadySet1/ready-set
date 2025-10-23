@@ -364,7 +364,9 @@ const JobApplicationForm = () => {
     // Only create session if we have all required info and don't already have a valid session
     if (email && firstName && lastName && role && !session) {
       createSession({ email, firstName, lastName, role }).catch(err => {
-        console.error('Failed to create session:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to create session:', err);
+        }
         // Session creation failure is logged but non-blocking
       });
     }

@@ -61,7 +61,9 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
   }) => {
     // Don't create a new session if we already have a valid one
     if (session && !isSessionExpired()) {
-      console.log('Using existing valid session');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Using existing valid session');
+      }
       return;
     }
 
@@ -102,11 +104,17 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
       // Store in sessionStorage for persistence across page refreshes
       sessionStorage.setItem('application_session', JSON.stringify(newSession));
 
-      console.log('Application session created:', newSession.sessionId);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Application session created:', newSession.sessionId);
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create session';
       setError(errorMessage);
-      console.error('Error creating session:', err);
+
+      // Only log errors in development
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error creating session:', err);
+      }
 
       toast({
         title: 'Session Error',
@@ -122,7 +130,9 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
   // Mark session as completed
   const markSessionCompleted = useCallback(async (jobApplicationId: string) => {
     if (!session || !session.sessionId || !session.uploadToken) {
-      console.warn('No active session to mark as completed');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('No active session to mark as completed');
+      }
       return;
     }
 
@@ -144,12 +154,16 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
         throw new Error(errorData.error || 'Failed to mark session as completed');
       }
 
-      console.log('Session marked as completed');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Session marked as completed');
+      }
 
       // Clear the session after marking it complete
       resetSession();
     } catch (err) {
-      console.error('Error marking session as completed:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error marking session as completed:', err);
+      }
       // Don't throw - this is not critical for the user experience
     }
   }, [session]);
@@ -171,13 +185,19 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
         // Check if stored session is expired
         if (new Date(parsedSession.expiresAt) > new Date()) {
           setSession(parsedSession);
-          console.log('Restored session from storage:', parsedSession.sessionId);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Restored session from storage:', parsedSession.sessionId);
+          }
         } else {
-          console.log('Stored session is expired, clearing...');
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Stored session is expired, clearing...');
+          }
           sessionStorage.removeItem('application_session');
         }
       } catch (err) {
-        console.error('Error restoring session:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error restoring session:', err);
+        }
         sessionStorage.removeItem('application_session');
       }
     }
@@ -189,7 +209,9 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
 
     const checkExpiration = () => {
       if (isSessionExpired()) {
-        console.log('Session expired, clearing...');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Session expired, clearing...');
+        }
         resetSession();
         toast({
           title: 'Session Expired',
