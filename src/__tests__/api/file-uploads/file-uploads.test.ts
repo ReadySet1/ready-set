@@ -386,5 +386,114 @@ describe('/api/file-uploads API', () => {
         expect(response.status).toBeGreaterThanOrEqual(500);
       });
     });
+
+    describe('🔐 Session Token Validation (Security Enhancement)', () => {
+      it('should accept uploads with valid session token for job applications', async () => {
+        (UploadSecurityManager.checkRateLimit as jest.Mock).mockResolvedValue(true);
+        (FileValidator.validateFile as jest.Mock).mockReturnValue(null);
+
+        mockSupabaseClient.storage.from().upload.mockResolvedValue({
+          data: { path: 'job-applications/temp/session-123/file.pdf' },
+          error: null,
+        });
+
+        (prisma as any).fileUpload = {
+          create: jest.fn().mockResolvedValue({
+            id: 'upload-123',
+            fileName: 'resume.pdf',
+            filePath: 'job-applications/temp/session-123/file.pdf',
+          }),
+        };
+
+        const mockFile = new File(['resume content'], 'resume.pdf', {
+          type: 'application/pdf',
+        });
+
+        const formData = new FormData();
+        formData.append('file', mockFile);
+        formData.append('entityId', 'temp_123_abc');
+        formData.append('entityType', 'job_application');
+
+        const request = new Request('http://localhost:3000/api/file-uploads', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'x-upload-token': 'valid-session-token',
+          },
+        });
+
+        const response = await POST(request as any);
+
+        expect(response.status).toBeGreaterThanOrEqual(200);
+        expect(response.status).toBeLessThan(300);
+      });
+
+      it('should reject job application uploads without session token', async () => {
+        const mockFile = new File(['resume content'], 'resume.pdf', {
+          type: 'application/pdf',
+        });
+
+        const formData = new FormData();
+        formData.append('file', mockFile);
+        formData.append('entityId', 'temp_123_abc');
+        formData.append('entityType', 'job_application');
+
+        // No x-upload-token header provided
+        const request = new Request('http://localhost:3000/api/file-uploads', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const response = await POST(request as any);
+
+        // Should fail due to missing session token for job applications
+        expect(response.status).toBeGreaterThanOrEqual(400);
+      });
+
+      it('should allow uploads for non-job-application entity types without session token', async () => {
+        (UploadSecurityManager.checkRateLimit as jest.Mock).mockResolvedValue(true);
+        (FileValidator.validateFile as jest.Mock).mockReturnValue(null);
+
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'user-123' } },
+          error: null,
+        });
+
+        mockSupabaseClient.storage.from().upload.mockResolvedValue({
+          data: { path: 'documents/file.pdf' },
+          error: null,
+        });
+
+        (prisma as any).fileUpload = {
+          create: jest.fn().mockResolvedValue({
+            id: 'upload-123',
+            fileName: 'document.pdf',
+            filePath: 'documents/file.pdf',
+          }),
+        };
+
+        const mockFile = new File(['content'], 'document.pdf', {
+          type: 'application/pdf',
+        });
+
+        const formData = new FormData();
+        formData.append('file', mockFile);
+        formData.append('entityId', 'entity-123');
+        formData.append('entityType', 'document'); // Not job_application
+
+        const request = new Request('http://localhost:3000/api/file-uploads', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'x-user-id': 'user-123',
+          },
+        });
+
+        const response = await POST(request as any);
+
+        expect(response.status).toBeGreaterThanOrEqual(200);
+        expect(response.status).toBeLessThan(300);
+      });
+    });
   });
 });

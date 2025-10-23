@@ -52,6 +52,9 @@ describe("Enhanced SignIn Component - Phases 3 & 4", () => {
     setLoginProgress: jest.fn(),
     clearLoginProgress: jest.fn(),
     handleAuthStateChange: jest.fn(),
+    isAuthenticating: false,
+    authProgress: null,
+    clearAuthError: jest.fn(),
   };
 
   beforeEach(() => {

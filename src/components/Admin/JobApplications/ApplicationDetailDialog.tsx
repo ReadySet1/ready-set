@@ -105,64 +105,94 @@ export const ApplicationDetailDialog: React.FC<ApplicationDetailDialogProps> = (
   };
 
   // Get document sources from both legacy fields and new fileUploads
+  // Helper function to convert category to friendly label
+  const getCategoryLabel = (category: string): string => {
+    const categoryMap: Record<string, string> = {
+      'resume': 'Resume',
+      'license': 'Driver\'s License',
+      'insurance': 'Insurance',
+      'registration': 'Vehicle Registration',
+      'food_handler': 'Food Handler Certificate',
+      'hipaa': 'HIPAA Certificate',
+      'driver_photo': 'Driver Photo',
+      'car_photo': 'Vehicle Photo',
+      'equipment_photo': 'Equipment Photo',
+    };
+
+    // Extract the base category from paths like "job-applications/temp/license"
+    const match = category.match(/\/(license|insurance|registration|food_handler|hipaa|driver_photo|car_photo|equipment_photo|resume)$/);
+    if (match && match[1]) {
+      return categoryMap[match[1]] || category;
+    }
+
+    // Check for exact match
+    if (categoryMap[category]) {
+      return categoryMap[category];
+    }
+
+    // Fallback: capitalize first letter
+    return category.charAt(0).toUpperCase() + category.slice(1).replace(/_/g, ' ');
+  };
+
   const getDocumentSources = () => {
     const sources: { label: string; url: string | null; category?: string; icon: React.ReactNode }[] = [];
-    
+
     // Add resume
     if (application.resumeUrl) {
       sources.push({ label: "Resume", url: application.resumeUrl, icon: <FileText className="h-4 w-4" /> });
     }
-    
+
     // Add driver's license if applicable
     if (application.driversLicenseUrl) {
       sources.push({ label: "Driver's License", url: application.driversLicenseUrl, icon: <Award className="h-4 w-4" /> });
     }
-    
+
     // Add insurance if applicable
     if (application.insuranceUrl) {
       sources.push({ label: "Insurance", url: application.insuranceUrl, icon: <FileText className="h-4 w-4" /> });
     }
-    
+
     // Add vehicle registration if applicable
     if (application.vehicleRegUrl) {
       sources.push({ label: "Vehicle Registration", url: application.vehicleRegUrl, icon: <FileText className="h-4 w-4" /> });
     }
-    
+
     // Add food handler if applicable
     if (application.foodHandlerUrl) {
       sources.push({ label: "Food Handler Certificate", url: application.foodHandlerUrl, icon: <Award className="h-4 w-4" /> });
     }
-    
+
     // Add HIPAA if applicable
     if (application.hipaaUrl) {
       sources.push({ label: "HIPAA Certificate", url: application.hipaaUrl, icon: <Award className="h-4 w-4" /> });
     }
-    
+
     // Add photos if applicable
     if (application.driverPhotoUrl) {
       sources.push({ label: "Driver Photo", url: application.driverPhotoUrl, icon: <User className="h-4 w-4" /> });
     }
-    
+
     if (application.carPhotoUrl) {
       sources.push({ label: "Vehicle Photo", url: application.carPhotoUrl, icon: <FileText className="h-4 w-4" /> });
     }
-    
+
     if (application.equipmentPhotoUrl) {
       sources.push({ label: "Equipment Photo", url: application.equipmentPhotoUrl, icon: <FileText className="h-4 w-4" /> });
     }
-    
+
     // Add any file uploads
     if (application.fileUploads?.length) {
       application.fileUploads.forEach(upload => {
+        const friendlyLabel = upload.category ? getCategoryLabel(upload.category) : upload.fileName;
         sources.push({
-          label: upload.category || upload.fileName,
+          label: friendlyLabel,
           url: upload.fileUrl,
           category: upload.category,
           icon: <FileText className="h-4 w-4" />
         });
       });
     }
-    
+
     return sources;
   };
 
@@ -328,24 +358,24 @@ export const ApplicationDetailDialog: React.FC<ApplicationDetailDialogProps> = (
                 <p className="text-slate-500">No documents available</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {documentSources.map((doc, i) => (
                   <Button
                     key={i}
                     variant="outline"
-                    className="justify-start h-auto p-4 hover:bg-slate-50 transition-colors"
+                    className="justify-start h-auto p-5 hover:bg-indigo-50 hover:border-indigo-300 transition-all duration-200 border-slate-200 rounded-xl"
                     onClick={() => doc.url && openDocument(doc.url)}
                     disabled={!doc.url}
                   >
                     <div className="flex items-center gap-3 w-full">
-                      <div className="text-slate-400">
+                      <div className="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
                         {doc.icon}
                       </div>
-                      <div className="flex-1 text-left">
-                        <div className="font-medium text-sm text-slate-800 truncate">{doc.label}</div>
-                        <div className="text-xs text-slate-500">Click to view</div>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="font-semibold text-sm text-slate-800 truncate">{doc.label}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">Click to view</div>
                       </div>
-                      <ExternalLink className="h-3 w-3 text-slate-400" />
+                      <ExternalLink className="flex-shrink-0 h-4 w-4 text-slate-400" />
                     </div>
                   </Button>
                 ))}

@@ -229,19 +229,36 @@ global.Response = jest.fn().mockImplementation((body, options) => ({
   text: () => Promise.resolve(body),
 }));
 
-// Mock NextResponse
-const mockNextResponse = {
-  json: jest.fn((data, options) => ({
-    json: () => Promise.resolve(data),
-    status: options?.status || 200,
-    headers: new Headers(),
-  })),
-  next: jest.fn(() => ({
-    json: () => Promise.resolve({}),
-    status: 200,
-    headers: new Headers(),
-  })),
-};
+// Mock NextResponse with constructor support
+class MockNextResponse {
+  public status: number;
+  public headers: Headers;
+  private body: any;
+
+  constructor(body?: any, init?: ResponseInit) {
+    this.body = body;
+    this.status = init?.status || 200;
+    this.headers = new Headers(init?.headers);
+  }
+
+  async json() {
+    return this.body;
+  }
+
+  async text() {
+    return this.body ? String(this.body) : '';
+  }
+
+  static json(data: any, options?: ResponseInit) {
+    const response = new MockNextResponse(data, options);
+    response.json = () => Promise.resolve(data);
+    return response;
+  }
+
+  static next() {
+    return new MockNextResponse({}, { status: 200 });
+  }
+}
 
 jest.mock('next/server', () => {
   // Import the actual NextRequest for proper functionality
@@ -249,13 +266,12 @@ jest.mock('next/server', () => {
 
   return {
     NextRequest: actualNextServer.NextRequest,
-    NextResponse: mockNextResponse,
+    NextResponse: MockNextResponse,
   };
 });
 
 // Also mock NextResponse directly for API routes
-// Use proper typing for global assignment
-(global as any).NextResponse = mockNextResponse;
+(global as any).NextResponse = MockNextResponse;
 
 // Mock Radix UI Select primitive
 jest.mock('@radix-ui/react-select', () => {
@@ -298,6 +314,20 @@ jest.mock('framer-motion', () => ({
     button: ({ children, ...props }: any) => React.createElement('button', props, children),
   },
   AnimatePresence: ({ children }: any) => children,
+}));
+
+// Mock react-hot-toast
+jest.mock('react-hot-toast', () => ({
+  __esModule: true,
+  default: {
+    success: jest.fn(),
+    error: jest.fn(),
+    loading: jest.fn(),
+    custom: jest.fn(),
+    promise: jest.fn(),
+    dismiss: jest.fn(),
+  },
+  Toaster: () => null,
 }));
 
 // Increase timeout for async operations

@@ -19,7 +19,10 @@ import { useRouter } from "next/navigation";
 export function VAModal() {
   const router = useRouter();
 
-  const handleApplyClick = () => {
+  const handleApplyClick = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent Link navigation
+
+    // Close the modal first
     const escKeyEvent = new KeyboardEvent('keydown', {
       key: 'Escape',
       code: 'Escape',
@@ -29,6 +32,28 @@ export function VAModal() {
       cancelable: true
     });
     document.dispatchEvent(escKeyEvent);
+
+    // Wait for modal to close, then navigate if needed
+    setTimeout(() => {
+      // Check if we're already on the apply page
+      if (window.location.pathname === '/apply') {
+        // Already on apply page, just scroll to form
+        const formElement = document.getElementById('apply-now');
+        if (formElement) {
+          formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      } else {
+        // Navigate to apply page with role parameter, then scroll
+        router.push('/apply?role=Virtual Assistant');
+        // Wait for navigation and DOM to be ready
+        setTimeout(() => {
+          const formElement = document.getElementById('apply-now');
+          if (formElement) {
+            formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 500);
+      }
+    }, 150);
   };
 
   return (

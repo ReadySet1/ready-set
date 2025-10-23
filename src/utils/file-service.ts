@@ -47,7 +47,24 @@ export async function initializeStorageBuckets() {
         // Create the bucket if it doesn't exist
         const { error: createError } = await supabase.storage.createBucket(defaultBucket, {
           public: false,
-          fileSizeLimit: 10 * 1024 * 1024, // 10MB
+          fileSizeLimit: 50 * 1024 * 1024, // 50MB (matching config.toml)
+          allowedMimeTypes: [
+            // Images
+            'image/jpeg',
+            'image/jpg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+            // Documents
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            // Text files
+            'text/plain',
+            'text/csv',
+          ],
         });
 
         if (createError) {
@@ -55,6 +72,33 @@ export async function initializeStorageBuckets() {
         }
       } else if (error) {
         console.warn(`⚠️ Error checking bucket ${defaultBucket}:`, error.message);
+      } else if (data) {
+        // Bucket exists, update it to ensure correct MIME type configuration
+        const { error: updateError } = await supabase.storage.updateBucket(defaultBucket, {
+          public: false,
+          fileSizeLimit: 50 * 1024 * 1024, // 50MB
+          allowedMimeTypes: [
+            // Images
+            'image/jpeg',
+            'image/jpg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+            // Documents
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            // Text files
+            'text/plain',
+            'text/csv',
+          ],
+        });
+
+        if (updateError) {
+          console.warn(`⚠️ Failed to update bucket ${defaultBucket}:`, updateError.message);
+        }
       }
     } catch (bucketError) {
       console.warn(`⚠️ Exception handling bucket ${defaultBucket}:`, bucketError);

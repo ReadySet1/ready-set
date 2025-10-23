@@ -27,6 +27,7 @@ interface UseJobApplicationUploadOptions {
   userId?: string;
   entityId?: string;
   category?: string;
+  uploadToken?: string | null; // Session upload token
 }
 
 export function useJobApplicationUpload({
@@ -39,6 +40,7 @@ export function useJobApplicationUpload({
   userId,
   entityId: initialEntityId,
   category,
+  uploadToken,
 }: UseJobApplicationUploadOptions = {}) {
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [uploadedFiles, setUploadedFiles] =
@@ -108,9 +110,24 @@ export function useJobApplicationUpload({
           newProgresses[file.name] = 50;
           setProgresses({ ...newProgresses });
 
-          // Upload via the API route
+          // SECURITY: Upload token is required for job applications
+          // Fail early with clear error message if missing
+          if (entityType === 'job_application' && !uploadToken) {
+            const errorMessage = 'Upload session token is required for job applications. Please start a new application session.';
+            console.error('Upload token validation failed:', errorMessage);
+            toast.error(errorMessage);
+            throw new Error(errorMessage);
+          }
+
+          // Upload via the API route with session token
+          const headers: HeadersInit = {};
+          if (uploadToken) {
+            headers['x-upload-token'] = uploadToken;
+          }
+
           const response = await fetch("/api/file-uploads", {
             method: "POST",
+            headers,
             body: formData,
           });
 
@@ -168,7 +185,7 @@ export function useJobApplicationUpload({
         setIsUploading(false);
       }
     },
-    [bucketName, category, entityId, entityType, progresses, userId, uploadedFiles.length, maxFileCount]
+    [bucketName, category, entityId, entityType, progresses, userId, uploadedFiles.length, maxFileCount, uploadToken]
   );
 
   // Update the entity ID for all uploaded files
