@@ -43,6 +43,9 @@ describe("SignIn Component", () => {
     userRole: null,
     error: null,
     refreshUserData: jest.fn(),
+    isAuthenticating: false,
+    authProgress: null,
+    clearAuthError: jest.fn(),
   };
 
   beforeEach(() => {
