@@ -4,6 +4,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { toast } from '@/components/ui/use-toast';
+import { storeEncryptedSession, retrieveEncryptedSession } from '@/lib/session-encryption';
+import { logError, ErrorSeverity, ErrorCategory } from '@/lib/error-logging';
 
 interface ApplicationSession {
   sessionId: string | null;
@@ -101,8 +103,10 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
 
       setSession(newSession);
 
-      // Store in sessionStorage for persistence across page refreshes
-      sessionStorage.setItem('application_session', JSON.stringify(newSession));
+      // Store in sessionStorage with encryption for basic protection against casual inspection
+      // SECURITY NOTE: This is defense-in-depth, not a complete XSS protection
+      // See src/lib/session-encryption.ts for security considerations
+      storeEncryptedSession('application_session', newSession);
 
       if (process.env.NODE_ENV === 'development') {
         console.log('Application session created:', newSession.sessionId);
@@ -161,10 +165,22 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
       // Clear the session after marking it complete
       resetSession();
     } catch (err) {
+      // Log error for monitoring in production
+      // This is not critical for user experience, so we don't throw
+      logError(err, {
+        source: 'ApplicationSessionContext.markSessionCompleted',
+        category: ErrorCategory.API,
+        severity: ErrorSeverity.MEDIUM,
+        message: 'Failed to mark session as completed',
+        additionalContext: {
+          sessionId: session.sessionId,
+          jobApplicationId
+        }
+      });
+
       if (process.env.NODE_ENV === 'development') {
         console.error('Error marking session as completed:', err);
       }
-      // Don't throw - this is not critical for the user experience
     }
   }, [session]);
 
@@ -177,11 +193,10 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
 
   // Restore session from sessionStorage on mount
   useEffect(() => {
-    const storedSession = sessionStorage.getItem('application_session');
-    if (storedSession) {
-      try {
-        const parsedSession = JSON.parse(storedSession);
+    try {
+      const parsedSession = retrieveEncryptedSession<ApplicationSession>('application_session');
 
+      if (parsedSession && parsedSession.expiresAt) {
         // Check if stored session is expired
         if (new Date(parsedSession.expiresAt) > new Date()) {
           setSession(parsedSession);
@@ -194,12 +209,12 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
           }
           sessionStorage.removeItem('application_session');
         }
-      } catch (err) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Error restoring session:', err);
-        }
-        sessionStorage.removeItem('application_session');
       }
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error restoring session:', err);
+      }
+      sessionStorage.removeItem('application_session');
     }
   }, []);
 

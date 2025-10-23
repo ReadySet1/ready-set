@@ -757,39 +757,45 @@ export async function POST(request: NextRequest) {
     if (validatedSession) {
       try {
         // Use RPC function for atomic increment to prevent race conditions
-        // This is safer than read-modify-write pattern
+        // CRITICAL: This RPC function MUST exist in the database before deployment
+        // Migration required: see docs/security/deployment-guide.md
+        // SECURITY: Pass session token to validate ownership and prevent session hijacking
         // @ts-expect-error - RPC function added in migration, types will be updated after deployment
         const { error: sessionUpdateError } = await supabase.rpc('increment_session_upload', {
           p_session_id: validatedSession.id,
-          p_file_path: filePath
+          p_file_path: filePath,
+          p_session_token: validatedSession.session_token
         });
 
-        // Fallback to direct update if RPC doesn't exist (backward compatibility)
-        if (sessionUpdateError && sessionUpdateError.message?.includes('function')) {
-          const { data: currentSession } = await supabase
-            .from('application_sessions')
-            .select('upload_count, uploaded_files')
-            .eq('id', validatedSession.id)
-            .single<Pick<ApplicationSession, 'upload_count' | 'uploaded_files'>>();
+        if (sessionUpdateError) {
+          console.error('CRITICAL: Failed to update session after upload:', sessionUpdateError);
 
-          if (currentSession) {
-            const { error: fallbackError } = await supabase
-              .from('application_sessions')
-              .update({
-                upload_count: currentSession.upload_count + 1,
-                uploaded_files: [...(currentSession.uploaded_files || []), filePath],
-                last_activity_at: new Date().toISOString()
-              })
-              .eq('id', validatedSession.id)
-              .eq('session_token', validatedSession.session_token);
+          // Check if this is a missing function error
+          if (sessionUpdateError.message?.includes('function')) {
+            console.error(
+              'CRITICAL: Database migration required! The increment_session_upload RPC function is missing. ' +
+              'This indicates the database has not been properly migrated. ' +
+              'See docs/security/deployment-guide.md for migration instructions.'
+            );
 
-            if (fallbackError) {
-              console.error('Failed to update session after upload (fallback):', fallbackError);
-            }
+            // Return error to prevent data inconsistency
+            // Note: The file upload succeeded, but session tracking failed
+            return NextResponse.json(
+              {
+                error: 'System configuration error',
+                errorType: 'CONFIGURATION_ERROR',
+                message: 'Upload succeeded but session tracking failed. Please contact support.',
+                details: {
+                  uploadedFile: fileUpload.id,
+                  requiresMigration: true
+                }
+              },
+              { status: 500 }
+            );
           }
-        } else if (sessionUpdateError) {
-          console.error('Failed to update session after upload:', sessionUpdateError);
-          // Don't fail the upload, just log the error
+
+          // For other errors, log but don't fail the upload
+          console.error('Session update failed, but upload succeeded');
         }
       } catch (sessionError) {
         console.error('Error updating session:', sessionError);

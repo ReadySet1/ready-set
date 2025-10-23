@@ -168,51 +168,64 @@ Wait 2 hours after creating a session, then try to upload. Should fail with:
 }
 ```
 
-## Phase 5: Frontend Integration (TODO)
+## Phase 5: Frontend Integration
 
-⚠️ **NOT YET IMPLEMENTED** - This is planned for the next iteration.
+✅ **IMPLEMENTED** - Frontend integration is complete as of PR #88.
 
-The frontend needs to be updated to:
+The frontend has been updated to:
 
-1. **Create session on form load**
+1. **Create session when user provides basic information**
    ```typescript
-   // In ApplyForm.tsx
-   useEffect(() => {
-     async function createUploadSession() {
-       const response = await fetch('/api/application-sessions', {
-         method: 'POST',
-         body: JSON.stringify({
-           email: formData.email,
-           firstName: formData.firstName,
-           lastName: formData.lastName,
-           role: formData.position
-         })
+   // In ApplyForm.tsx (lines 358-373)
+   // Using ApplicationSessionContext from src/contexts/ApplicationSessionContext.tsx
+   React.useEffect(() => {
+     const email = watch("email");
+     const firstName = watch("firstName");
+     const lastName = watch("lastName");
+     const role = watch("role");
+
+     // Only create session if we have all required info and don't already have a valid session
+     if (email && firstName && lastName && role && !session) {
+       createSession({ email, firstName, lastName, role }).catch(err => {
+         if (process.env.NODE_ENV === 'development') {
+           console.error('Failed to create session:', err);
+         }
+         // Session creation failure is logged but non-blocking
        });
-       const { sessionId, uploadToken } = await response.json();
-       setUploadToken(uploadToken);
      }
-     createUploadSession();
-   }, []);
+   }, [watch("email"), watch("firstName"), watch("lastName"), watch("role"), session, createSession, watch]);
    ```
 
 2. **Pass token in file upload headers**
    ```typescript
-   // In file upload utility
-   const formData = new FormData();
-   formData.append('file', file);
+   // In use-job-application-upload.ts (lines 113-132)
+   // SECURITY: Upload token is required for job applications
+   if (entityType === 'job_application' && !uploadToken) {
+     const errorMessage = 'Upload session token is required for job applications. Please start a new application session.';
+     console.error('Upload token validation failed:', errorMessage);
+     toast.error(errorMessage);
+     throw new Error(errorMessage);
+   }
 
-   const response = await fetch('/api/file-uploads', {
-     method: 'POST',
-     headers: {
-       'x-upload-token': uploadToken
-     },
-     body: formData
+   // Upload via the API route with session token
+   const headers: HeadersInit = {};
+   if (uploadToken) {
+     headers['x-upload-token'] = uploadToken;
+   }
+
+   const response = await fetch("/api/file-uploads", {
+     method: "POST",
+     headers,
+     body: formData,
    });
    ```
 
 3. **Mark session as completed on form submission**
    ```typescript
-   // After successful application submission
+   // Using ApplicationSessionContext.markSessionCompleted (lines 131-185)
+   await markSessionCompleted(jobApplicationId);
+
+   // This internally calls:
    await fetch(`/api/application-sessions?id=${sessionId}`, {
      method: 'PATCH',
      headers: {

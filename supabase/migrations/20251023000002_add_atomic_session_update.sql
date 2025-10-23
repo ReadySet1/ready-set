@@ -5,7 +5,8 @@
 -- Create function for atomic session upload increment
 CREATE OR REPLACE FUNCTION public.increment_session_upload(
   p_session_id UUID,
-  p_file_path TEXT
+  p_file_path TEXT,
+  p_session_token TEXT DEFAULT NULL
 )
 RETURNS TABLE (
   new_upload_count INTEGER,
@@ -20,10 +21,12 @@ DECLARE
   v_max_uploads INTEGER;
   v_completed BOOLEAN;
   v_expires_at TIMESTAMPTZ;
+  v_session_token TEXT;
 BEGIN
   -- Lock the row for update to prevent race conditions
-  SELECT upload_count, max_uploads, completed, session_expires_at
-  INTO v_current_count, v_max_uploads, v_completed, v_expires_at
+  -- SECURITY: Validate session token ownership to prevent session hijacking
+  SELECT upload_count, max_uploads, completed, session_expires_at, session_token
+  INTO v_current_count, v_max_uploads, v_completed, v_expires_at, v_session_token
   FROM public.application_sessions
   WHERE id = p_session_id
   FOR UPDATE;
@@ -31,6 +34,12 @@ BEGIN
   -- Check if session exists
   IF NOT FOUND THEN
     RETURN QUERY SELECT 0, FALSE, 'Session not found'::TEXT;
+    RETURN;
+  END IF;
+
+  -- SECURITY: Validate token ownership if provided
+  IF p_session_token IS NOT NULL AND v_session_token != p_session_token THEN
+    RETURN QUERY SELECT v_current_count, FALSE, 'Invalid session token'::TEXT;
     RETURN;
   END IF;
 

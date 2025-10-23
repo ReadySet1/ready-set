@@ -110,7 +110,16 @@ export function useJobApplicationUpload({
           newProgresses[file.name] = 50;
           setProgresses({ ...newProgresses });
 
-          // Upload via the API route with session token if available
+          // SECURITY: Upload token is required for job applications
+          // Fail early with clear error message if missing
+          if (entityType === 'job_application' && !uploadToken) {
+            const errorMessage = 'Upload session token is required for job applications. Please start a new application session.';
+            console.error('Upload token validation failed:', errorMessage);
+            toast.error(errorMessage);
+            throw new Error(errorMessage);
+          }
+
+          // Upload via the API route with session token
           const headers: HeadersInit = {};
           if (uploadToken) {
             headers['x-upload-token'] = uploadToken;
