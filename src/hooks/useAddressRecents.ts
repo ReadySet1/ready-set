@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/utils/supabase/client';
+import { ADDRESS_USAGE_CONFIG } from '@/config/file-config';
 import type { Address } from '@/types/address';
 
 interface AddressUsageHistoryRow {
@@ -60,7 +61,7 @@ export function useAddressRecents(userId?: string, limit: number = 5) {
         `)
         .eq('user_id', userId)
         .order('used_at', { ascending: false })
-        .limit(limit * 3); // Fetch extra to account for duplicates
+        .limit(limit * ADDRESS_USAGE_CONFIG.FETCH_MULTIPLIER); // Fetch extra to account for duplicates
 
       if (error) {
         console.error('[useAddressRecents] Error fetching address usage history:', {
