@@ -190,15 +190,8 @@ const Signin = ({
     }
 
     isSubmittingRef.current = true;
-    setLoading(true);
-    setErrors((prev) => ({ ...prev, general: "" }));
-    setIsRedirecting(false);
-    setShowSuccessMessage(false);
 
-    // Clear any previous auth errors from context
-    clearAuthError();
-
-    // Validate form data
+    // Validate form data BEFORE setting loading state
     if (!loginData.email) {
       const errorMsg = "Email is required";
       setErrors((prev) => ({ ...prev, email: errorMsg }));
@@ -207,7 +200,6 @@ const Signin = ({
         description: errorMsg,
         variant: "destructive",
       });
-      setLoading(false);
       isSubmittingRef.current = false;
       return;
     }
@@ -220,7 +212,6 @@ const Signin = ({
         description: errorMsg,
         variant: "destructive",
       });
-      setLoading(false);
       isSubmittingRef.current = false;
       return;
     }
@@ -233,10 +224,18 @@ const Signin = ({
         description: errorMsg,
         variant: "destructive",
       });
-      setLoading(false);
       isSubmittingRef.current = false;
       return;
     }
+
+    // All validation passed, now set loading state
+    setLoading(true);
+    setErrors((prev) => ({ ...prev, general: "" }));
+    setIsRedirecting(false);
+    setShowSuccessMessage(false);
+
+    // Clear any previous auth errors from context
+    clearAuthError();
 
     try {
       // Create FormData object

@@ -83,7 +83,7 @@ export function AddressCompactCard({
   const cardClasses = cn(
     'cursor-pointer transition-all duration-200 hover:shadow-md',
     'touch-manipulation', // Improve touch responsiveness
-    isSelected && 'ring-2 ring-primary ring-offset-2',
+    isSelected && 'border-2 border-primary shadow-md',
     variant === 'compact' && 'p-3',
     variant === 'minimal' && 'p-2'
   );
@@ -195,8 +195,8 @@ export function AddressCompactCard({
 
         {/* Selected Indicator */}
         {isSelected && (
-          <div className="mt-3 pt-3 border-t">
-            <span className="text-xs font-medium text-primary">
+          <div className="mt-3 pt-2.5 border-t border-primary/20">
+            <span className="text-xs font-semibold text-primary flex items-center gap-1">
               ✓ Selected
             </span>
           </div>

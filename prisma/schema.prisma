@@ -251,6 +251,7 @@ model FileUpload {
   fileType          String
   fileSize          Int
   fileUrl           String
+  filePath          String?          // Storage path for generating signed URLs
   uploadedAt        DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt         DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
   cateringRequestId String?          @db.Uuid

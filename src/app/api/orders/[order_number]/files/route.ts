@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { STORAGE_BUCKETS } from '@/utils/file-service';
+import { DEFAULT_SIGNED_URL_EXPIRATION } from '@/config/file-config';
 import { prisma } from '@/utils/prismaDB';
 import { UserType } from "@/types/prisma";
 
@@ -132,8 +134,33 @@ export async function GET(
         uploadedAt: 'desc'
       }
     });
-    
-        return NextResponse.json(files);
+
+    // Generate fresh signed URLs for each file
+    const filesWithSignedUrls = await Promise.all(
+      files.map(async (file) => {
+        // If file has filePath, generate a new signed URL
+        if (file.filePath) {
+          try {
+            const { data: signedData, error: signedError } = await supabase.storage
+              .from(STORAGE_BUCKETS.DEFAULT)
+              .createSignedUrl(file.filePath, DEFAULT_SIGNED_URL_EXPIRATION);
+
+            if (!signedError && signedData) {
+              return {
+                ...file,
+                fileUrl: signedData.signedUrl
+              };
+            }
+          } catch (error) {
+            console.error('Error generating signed URL for file:', file.id, error);
+          }
+        }
+        // Return original file if no filePath or error occurred
+        return file;
+      })
+    );
+
+    return NextResponse.json(filesWithSignedUrls);
 
   } catch (error) {
     console.error("Error processing files request:", error);

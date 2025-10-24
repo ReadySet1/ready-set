@@ -22,6 +22,7 @@ const NewCateringOrderPage = async () => {
   const clientResult = await getClients();
 
   if ('error' in clientResult) {
+    console.error('[NewCateringOrderPage] Failed to load clients:', clientResult.error);
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -32,7 +33,7 @@ const NewCateringOrderPage = async () => {
                   <AlertCircle className="h-5 w-5" />
                   <AlertTitle className="text-red-800 font-semibold">Error Loading Clients</AlertTitle>
                   <AlertDescription className="text-red-700">
-                    Could not load client list. Please try again later or contact support if the issue persists.
+                    {clientResult.error}
                   </AlertDescription>
                 </Alert>
               </div>
@@ -44,6 +45,13 @@ const NewCateringOrderPage = async () => {
   }
 
   const clients = clientResult as ClientListItem[];
+
+  // Log warning if no clients are available
+  if (clients.length === 0) {
+    console.warn('[NewCateringOrderPage] No clients available. Users will not be able to create orders.');
+  } else {
+    console.log(`[NewCateringOrderPage] Loaded ${clients.length} client(s)`);
+  }
 
   return <NewCateringOrderClient clients={clients} />;
 };

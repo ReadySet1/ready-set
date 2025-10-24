@@ -40,10 +40,16 @@ export function AddressSectionList({
   emptyState,
   onFavoriteToggle,
   favoriteIds = [],
+  defaultCollapsed = false,
 }: AddressSectionListProps) {
-  const [collapsedSections, setCollapsedSections] = React.useState<Set<string>>(
-    new Set()
-  );
+  // Initialize collapsed sections based on defaultCollapsed prop
+  const [collapsedSections, setCollapsedSections] = React.useState<Set<string>>(() => {
+    if (defaultCollapsed) {
+      // If defaultCollapsed is true, collapse all sections initially
+      return new Set(sections.map((s) => s.id));
+    }
+    return new Set();
+  });
 
   const toggleSection = (sectionId: string) => {
     setCollapsedSections((prev) => {

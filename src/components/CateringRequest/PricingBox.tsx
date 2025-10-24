@@ -6,7 +6,7 @@ import { Price } from "@/types/price";
 const PricingBox = ({ product }: { product: Price }) => {
 
   // POST request
-  const handleSubscription = async (e: any) => {
+  const handleSubscription = async (e: React.MouseEvent<HTMLButtonElement>) => {
      };
 
   return (

@@ -179,7 +179,7 @@ export const CreateCateringOrderForm: React.FC<
       pickupNotes: "",
       specialNotes: "",
     },
-    mode: "onTouched", // Show validation errors as soon as a field is touched
+    mode: "onSubmit", // Only validate on form submission to avoid premature errors
   });
 
   const {
@@ -507,62 +507,71 @@ export const CreateCateringOrderForm: React.FC<
         {/* Client Selection Combobox */}
         <div className="space-y-2">
           <Label htmlFor="userId">Client</Label>
-          <Popover
-            open={clientComboboxOpen}
-            onOpenChange={setClientComboboxOpen}
-          >
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={clientComboboxOpen}
-                className="w-full justify-between font-normal"
-              >
-                {currentUserId
-                  ? clients.find((client) => client.id === currentUserId)?.name
-                  : "Select client..."}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-              <Command>
-                <CommandInput placeholder="Search clients..." />
-                <CommandList>
-                  <CommandEmpty>No client found.</CommandEmpty>
-                  <CommandGroup>
-                    {clients.map((client) => (
-                      <CommandItem
-                        key={client.id}
-                        value={client.name} // Use name for filtering in CommandInput
-                        onSelect={(currentValue: string) => {
-                          const selectedClientId = clients.find(
-                            (c) =>
-                              c.name.toLowerCase() ===
-                              currentValue.toLowerCase(),
-                          )?.id;
-                          if (selectedClientId) {
-                            form.setValue("userId", selectedClientId);
-                            setSelectedClientName(client.name);
-                          }
-                          setClientComboboxOpen(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            currentUserId === client.id
-                              ? "opacity-100"
-                              : "opacity-0",
-                          )}
-                        />
-                        {client.name}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          {clients.length === 0 ? (
+            <div className="w-full rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              <p className="font-medium">No clients available</p>
+              <p className="mt-1 text-xs">
+                Please contact your administrator to add CLIENT profiles before creating orders.
+              </p>
+            </div>
+          ) : (
+            <Popover
+              open={clientComboboxOpen}
+              onOpenChange={setClientComboboxOpen}
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={clientComboboxOpen}
+                  className="w-full justify-between font-normal"
+                >
+                  {currentUserId
+                    ? clients.find((client) => client.id === currentUserId)?.name
+                    : "Select client..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                  <CommandInput placeholder="Search clients..." />
+                  <CommandList>
+                    <CommandEmpty>No client found.</CommandEmpty>
+                    <CommandGroup>
+                      {clients.map((client) => (
+                        <CommandItem
+                          key={client.id}
+                          value={client.name} // Use name for filtering in CommandInput
+                          onSelect={(currentValue: string) => {
+                            const selectedClientId = clients.find(
+                              (c) =>
+                                c.name.toLowerCase() ===
+                                currentValue.toLowerCase(),
+                            )?.id;
+                            if (selectedClientId) {
+                              form.setValue("userId", selectedClientId);
+                              setSelectedClientName(client.name);
+                            }
+                            setClientComboboxOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              currentUserId === client.id
+                                ? "opacity-100"
+                                : "opacity-0",
+                            )}
+                          />
+                          {client.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
           {errors.userId && (
             <p className="text-sm text-red-500">{errors.userId.message}</p>
           )}

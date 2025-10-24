@@ -36,6 +36,9 @@ For comprehensive documentation, setup instructions, and development guides, see
 - **Real-time delivery tracking**
 - **Professional standards** with HIPAA compliance
 - **Modern tech stack** with Next.js, TypeScript, and PostgreSQL
+- **Address management** with favorites and recent addresses tracking
+- **Secure file uploads** with signed URLs and comprehensive metadata storage
+- **Enhanced address selector** with search, filtering, and organization
 
 ## 🔐 Security
 

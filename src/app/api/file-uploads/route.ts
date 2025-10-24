@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { STORAGE_BUCKETS, initializeStorageBuckets, diagnoseStorageIssues } from "@/utils/file-service";
+import { DEFAULT_SIGNED_URL_EXPIRATION } from "@/config/file-config";
 import { prisma } from "@/utils/prismaDB";
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
     // First try to create a signed URL (works for private buckets)
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from(STORAGE_BUCKETS.DEFAULT)
-      .createSignedUrl(path, 60 * 30); // 30 minutes expiration
+      .createSignedUrl(path, DEFAULT_SIGNED_URL_EXPIRATION);
     
     if (signedUrlError) {
       logApiError(signedUrlError, '/api/file-uploads', 'GET', { operation: 'createSignedUrl', path }, request);
@@ -555,12 +556,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get public URL for the file
+    // Generate signed URL for private bucket
     const {
-      data: { publicUrl },
-    } = supabase.storage.from(storageBucket).getPublicUrl(filePath);
+      data: signedData,
+      error: signedError
+    } = await supabase.storage
+      .from(storageBucket)
+      .createSignedUrl(filePath, DEFAULT_SIGNED_URL_EXPIRATION);
 
-    const finalUrl = publicUrl;
+    let finalUrl: string;
+    if (signedError || !signedData) {
+      // SECURITY WARNING: Falling back to public URL - file may be exposed publicly
+      logApiError(
+        signedError || new Error('No signed URL data returned'),
+        '/api/file-uploads',
+        'POST',
+        {
+          operation: 'createSignedUrl',
+          filePath,
+          bucket: storageBucket,
+          securityWarning: 'FALLING_BACK_TO_PUBLIC_URL'
+        },
+        request
+      );
+
+      // Fallback to public URL if signed URL fails
+      const { data: { publicUrl } } = supabase.storage.from(storageBucket).getPublicUrl(filePath);
+      finalUrl = publicUrl;
+    } else {
+      finalUrl = signedData.signedUrl;
+    }
 
     // Prepare database record data based on entityType
     const dbData: any = {
@@ -568,6 +593,7 @@ export async function POST(request: NextRequest) {
       fileType: file.type,
       fileSize: file.size,
       fileUrl: finalUrl,
+      filePath: filePath, // Store the file path for generating new signed URLs
       uploadedAt: new Date(),
       updatedAt: new Date(),
       category: normalizedCategory,

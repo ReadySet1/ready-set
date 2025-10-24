@@ -132,6 +132,15 @@ const SignUp = () => {
     }
   };
 
+  const handleModalClose = () => {
+    setShowSuccessModal(false);
+    // Reset form state
+    setStep(1);
+    setUserType(null);
+    setRegistrationData(null);
+    setError(null);
+  };
+
   const renderUserTypeSelection = () => (
     <div className="space-y-8">
       {/* User Accounts Section */}
@@ -205,8 +214,8 @@ const SignUp = () => {
             
             {/* Divider */}
             <div className="relative flex justify-center text-xs uppercase my-6">
-              <span className="bg-white dark:bg-dark-2 px-2 text-gray-500">Or complete the form</span>
               <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gray-300 dark:bg-dark-3"></div>
+              <span className="relative z-10 bg-white dark:bg-dark-2 px-2 text-gray-500">Or complete the form</span>
             </div>
             
             <div className="mb-6">
@@ -233,8 +242,8 @@ const SignUp = () => {
             
             {/* Divider */}
             <div className="relative flex justify-center text-xs uppercase my-6">
-              <span className="bg-white dark:bg-dark-2 px-2 text-gray-500">Or complete the form</span>
               <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gray-300 dark:bg-dark-3"></div>
+              <span className="relative z-10 bg-white dark:bg-dark-2 px-2 text-gray-500">Or complete the form</span>
             </div>
             
             <div className="mb-6">
@@ -356,7 +365,7 @@ const SignUp = () => {
       {registrationData && (
         <RegistrationSuccessModal
           isOpen={showSuccessModal}
-          onClose={() => setShowSuccessModal(false)}
+          onClose={handleModalClose}
           userName={registrationData.name}
           userEmail={registrationData.email}
           userType={registrationData.userType}

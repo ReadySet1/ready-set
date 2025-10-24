@@ -5,64 +5,19 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Session, AuthChangeEvent } from "@supabase/supabase-js";
-import { Loader2, ChevronDown } from "lucide-react";
+import { Loader2, ClipboardCheck } from "lucide-react";
 import Faq from "@/components/Faq";
 import SectionTitle from "@/components/Common/SectionTitle";
 import CateringRequestForm from "@/components/CateringRequest/CateringRequestForm";
+import { DeliveryChecklistModal } from "@/components/CateringRequest/DeliveryChecklistModal";
 import { createClient } from "@/utils/supabase/client";
-
-// Checklist Component
-const DeliveryChecklist = () => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const checklistItems = [
-    "Verify pickup location and delivery address details",
-    "Confirm headcount and order total accuracy",
-    "Double-check order number from brokerage service",
-    "Verify pickup and delivery time windows",
-    "Check if a host is needed and for how long",
-    "Note any special delivery or setup instructions",
-    "Confirm payment details are accurate",
-    "Include any necessary dietary restrictions or allergen information",
-  ];
-
-  return (
-    <div className="mx-auto mb-8 max-w-3xl py-4">
-      <div
-        className="flex cursor-pointer items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:bg-gray-50"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <h3 className="text-lg font-medium text-gray-800">
-          8-Point Delivery Checklist
-        </h3>
-        <ChevronDown
-          className={`h-5 w-5 transform text-gray-500 transition-transform ${isOpen ? "rotate-180" : ""}`}
-        />
-      </div>
-
-      {isOpen && (
-        <div className="mt-2 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <ul className="space-y-2">
-            {checklistItems.map((item, index) => (
-              <li key={index} className="flex items-start">
-                <span className="mr-2 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-800">
-                  {index + 1}
-                </span>
-                <span className="text-gray-700">{item}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-};
 
 const CateringPage = () => {
   const router = useRouter();
   const [supabase, setSupabase] = useState<any>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showChecklistModal, setShowChecklistModal] = useState(false);
 
   // Initialize Supabase client
   useEffect(() => {
@@ -140,16 +95,31 @@ const CateringPage = () => {
           <SectionTitle
             title="Catering Request"
             subtitle="Professional Delivery"
-            paragraph="Complete the form below to request catering services. We follow our 8-point checklist to ensure flawless delivery and setup."
+            paragraph="Complete the form below to request catering services. Click the checklist button to view our 8-point delivery guidelines."
             center
           />
         </div>
 
-        <DeliveryChecklist />
+        {/* Checklist Modal Button */}
+        <div className="mx-auto mb-6 max-w-3xl">
+          <button
+            onClick={() => setShowChecklistModal(true)}
+            className="flex items-center gap-2 rounded-md bg-blue-50 px-4 py-2 text-blue-700 transition-colors hover:bg-blue-100 hover:text-blue-800"
+          >
+            <ClipboardCheck className="h-5 w-5" />
+            <span className="font-medium">View 8-Point Delivery Checklist</span>
+          </button>
+        </div>
 
         <div className="mx-auto">
           <CateringRequestForm />
         </div>
+
+        {/* Checklist Modal */}
+        <DeliveryChecklistModal
+          isOpen={showChecklistModal}
+          onClose={() => setShowChecklistModal(false)}
+        />
 
         {/* <div className="mt-16">
           <h2 className="mb-8 text-center text-2xl font-bold text-gray-800 dark:text-white">
