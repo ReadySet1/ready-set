@@ -132,8 +132,33 @@ export async function GET(
         uploadedAt: 'desc'
       }
     });
-    
-        return NextResponse.json(files);
+
+    // Generate fresh signed URLs for each file
+    const filesWithSignedUrls = await Promise.all(
+      files.map(async (file) => {
+        // If file has filePath, generate a new signed URL
+        if (file.filePath) {
+          try {
+            const { data: signedData, error: signedError } = await supabase.storage
+              .from('fileUploader')
+              .createSignedUrl(file.filePath, 31536000); // 1 year validity
+
+            if (!signedError && signedData) {
+              return {
+                ...file,
+                fileUrl: signedData.signedUrl
+              };
+            }
+          } catch (error) {
+            console.error('Error generating signed URL for file:', file.id, error);
+          }
+        }
+        // Return original file if no filePath or error occurred
+        return file;
+      })
+    );
+
+    return NextResponse.json(filesWithSignedUrls);
 
   } catch (error) {
     console.error("Error processing files request:", error);

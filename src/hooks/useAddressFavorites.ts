@@ -7,7 +7,7 @@ interface AddressFavoriteRow {
   user_id: string;
   address_id: string;
   created_at: string;
-  addresses: any; // Supabase returns the joined address data
+  addresses: Address | Address[]; // Supabase returns the joined address data
 }
 
 /**
@@ -41,47 +41,62 @@ export function useAddressFavorites(userId?: string) {
             city,
             state,
             zip,
-            locationNumber:location_number,
-            parkingLoading:parking_loading,
+            locationNumber,
+            parkingLoading,
             name,
-            isRestaurant:is_restaurant,
-            isShared:is_shared,
-            createdAt:created_at,
-            updatedAt:updated_at,
-            createdBy:created_by
+            isRestaurant,
+            isShared,
+            createdAt,
+            updatedAt,
+            createdBy
           )
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching address favorites:', error);
-        throw new Error('Failed to fetch favorite addresses');
+        console.error('[useAddressFavorites] Error fetching address favorites:', {
+          errorType: typeof error,
+          errorKeys: Object.keys(error),
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          fullError: JSON.stringify(error),
+        });
+        // Return empty array instead of throwing to allow component to render
+        return [];
       }
 
       // Transform the data to extract addresses
       // Supabase returns addresses as an array when using joins
-      return (data as AddressFavoriteRow[]).map((fav) => {
-        // Map the database column names to our Address interface
-        const addr = Array.isArray(fav.addresses) ? fav.addresses[0] : fav.addresses;
-        return {
-          id: addr.id,
-          county: addr.county,
-          street1: addr.street1,
-          street2: addr.street2,
-          city: addr.city,
-          state: addr.state,
-          zip: addr.zip,
-          locationNumber: addr.locationNumber,
-          parkingLoading: addr.parkingLoading,
-          name: addr.name,
-          isRestaurant: addr.isRestaurant,
-          isShared: addr.isShared,
-          createdAt: new Date(addr.createdAt),
-          updatedAt: new Date(addr.updatedAt),
-          createdBy: addr.createdBy,
-        } as Address;
-      });
+      return (data as AddressFavoriteRow[])
+        .map((fav) => {
+          // Map the database column names to our Address interface
+          const addr = Array.isArray(fav.addresses) ? fav.addresses[0] : fav.addresses;
+
+          // Skip if address data is missing
+          if (!addr) return null;
+
+          return {
+            id: addr.id,
+            county: addr.county,
+            street1: addr.street1,
+            street2: addr.street2,
+            city: addr.city,
+            state: addr.state,
+            zip: addr.zip,
+            locationNumber: addr.locationNumber,
+            parkingLoading: addr.parkingLoading,
+            name: addr.name,
+            isRestaurant: addr.isRestaurant,
+            isShared: addr.isShared,
+            createdAt: new Date(addr.createdAt),
+            updatedAt: new Date(addr.updatedAt),
+            createdBy: addr.createdBy,
+          } as Address;
+        })
+        .filter((addr): addr is Address => addr !== null);
     },
     enabled: !!userId,
     staleTime: 5 * 60 * 1000, // 5 minutes

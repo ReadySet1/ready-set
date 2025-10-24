@@ -126,7 +126,7 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
           </div>
         </div>
 
-        <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+        <DialogFooter className="flex flex-col gap-3 sm:flex-row sm:justify-center sm:gap-4">
           <Button
             onClick={handleViewOrder}
             className="w-full bg-gradient-to-r from-[#FBD113] to-[#FFC61A] font-semibold text-[#1A1A1A] hover:from-[#E5BE00] hover:to-[#F0B610] sm:w-auto"

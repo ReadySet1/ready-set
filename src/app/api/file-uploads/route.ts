@@ -555,12 +555,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get public URL for the file
+    // Generate signed URL for private bucket (valid for 1 year)
     const {
-      data: { publicUrl },
-    } = supabase.storage.from(storageBucket).getPublicUrl(filePath);
+      data: signedData,
+      error: signedError
+    } = await supabase.storage
+      .from(storageBucket)
+      .createSignedUrl(filePath, 31536000); // 1 year in seconds
 
-    const finalUrl = publicUrl;
+    let finalUrl: string;
+    if (signedError || !signedData) {
+      // Fallback to public URL if signed URL fails
+      const { data: { publicUrl } } = supabase.storage.from(storageBucket).getPublicUrl(filePath);
+      finalUrl = publicUrl;
+    } else {
+      finalUrl = signedData.signedUrl;
+    }
 
     // Prepare database record data based on entityType
     const dbData: any = {
@@ -568,6 +578,7 @@ export async function POST(request: NextRequest) {
       fileType: file.type,
       fileSize: file.size,
       fileUrl: finalUrl,
+      filePath: filePath, // Store the file path for generating new signed URLs
       uploadedAt: new Date(),
       updatedAt: new Date(),
       category: normalizedCategory,
