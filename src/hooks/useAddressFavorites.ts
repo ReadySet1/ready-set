@@ -1,13 +1,34 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/utils/supabase/client';
+import { CACHE_PRESETS } from '@/config/cache-config';
 import type { Address } from '@/types/address';
 
+/**
+ * Database row type for address_favorites table with joined address data
+ * Supabase returns the joined address as an object (not array) when using single relation
+ */
 interface AddressFavoriteRow {
   id: string;
   user_id: string;
   address_id: string;
   created_at: string;
-  addresses: Address | Address[]; // Supabase returns the joined address data
+  addresses: {
+    id: string;
+    county: string;
+    street1: string;
+    street2: string | null;
+    city: string;
+    state: string;
+    zip: string;
+    locationNumber: string | null;
+    parkingLoading: string | null;
+    name: string | null;
+    isRestaurant: boolean;
+    isShared: boolean;
+    createdAt: string;
+    updatedAt: string;
+    createdBy: string | null;
+  } | null;
 }
 
 /**
@@ -54,29 +75,27 @@ export function useAddressFavorites(userId?: string) {
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
+      // Let React Query handle errors naturally - throw instead of returning empty array
       if (error) {
         console.error('[useAddressFavorites] Error fetching address favorites:', {
-          errorType: typeof error,
-          errorKeys: Object.keys(error),
           message: error.message,
           details: error.details,
           hint: error.hint,
           code: error.code,
-          fullError: JSON.stringify(error),
         });
-        // Return empty array instead of throwing to allow component to render
-        return [];
+        throw new Error(`Failed to fetch address favorites: ${error.message}`);
       }
 
       // Transform the data to extract addresses
-      // Supabase returns addresses as an array when using joins
-      return (data as AddressFavoriteRow[])
-        .map((fav) => {
-          // Map the database column names to our Address interface
-          const addr = Array.isArray(fav.addresses) ? fav.addresses[0] : fav.addresses;
-
+      // Supabase returns the joined address as a single object (not array)
+      const addresses: Address[] = data
+        .map((fav): Address | null => {
           // Skip if address data is missing
-          if (!addr) return null;
+          if (!fav.addresses) return null;
+
+          // Explicit type assertion to help TypeScript recognize this as a single object
+          // Two-step assertion needed because Supabase's type inference differs from our interface
+          const addr = fav.addresses as unknown as NonNullable<AddressFavoriteRow['addresses']>;
 
           return {
             id: addr.id,
@@ -94,13 +113,15 @@ export function useAddressFavorites(userId?: string) {
             createdAt: new Date(addr.createdAt),
             updatedAt: new Date(addr.updatedAt),
             createdBy: addr.createdBy,
-          } as Address;
+          };
         })
         .filter((addr): addr is Address => addr !== null);
+
+      return addresses;
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    // Use STANDARD cache preset for moderately stable user data
+    ...CACHE_PRESETS.STANDARD,
   });
 
   // Get array of favorite address IDs for quick lookups
@@ -199,5 +220,6 @@ export function useAddressFavorites(userId?: string) {
     addFavorite,
     removeFavorite,
     isToggling: toggleFavoriteMutation.isPending,
+    toggleError: toggleFavoriteMutation.error,
   };
 }

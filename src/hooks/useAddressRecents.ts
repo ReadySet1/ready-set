@@ -1,15 +1,36 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/utils/supabase/client';
 import { ADDRESS_USAGE_CONFIG } from '@/config/file-config';
+import { CACHE_PRESETS } from '@/config/cache-config';
 import type { Address } from '@/types/address';
 
+/**
+ * Database row type for address_usage_history table with joined address data
+ * Supabase returns the joined address as an object (not array) when using single relation
+ */
 interface AddressUsageHistoryRow {
   id: string;
   user_id: string;
   address_id: string;
   used_at: string;
   context: string | null;
-  addresses: Address | Address[]; // Supabase returns the joined address data
+  addresses: {
+    id: string;
+    county: string;
+    street1: string;
+    street2: string | null;
+    city: string;
+    state: string;
+    zip: string;
+    locationNumber: string | null;
+    parkingLoading: string | null;
+    name: string | null;
+    isRestaurant: boolean;
+    isShared: boolean;
+    createdAt: string;
+    updatedAt: string;
+    createdBy: string | null;
+  } | null;
 }
 
 interface RecentAddress extends Address {
@@ -63,34 +84,33 @@ export function useAddressRecents(userId?: string, limit: number = 5) {
         .order('used_at', { ascending: false })
         .limit(limit * ADDRESS_USAGE_CONFIG.FETCH_MULTIPLIER); // Fetch extra to account for duplicates
 
+      // Let React Query handle errors naturally - throw instead of returning empty array
       if (error) {
         console.error('[useAddressRecents] Error fetching address usage history:', {
-          errorType: typeof error,
-          errorKeys: Object.keys(error),
           message: error.message,
           details: error.details,
           hint: error.hint,
           code: error.code,
-          fullError: JSON.stringify(error),
         });
-        // Return empty array instead of throwing to allow component to render
-        return [];
+        throw new Error(`Failed to fetch recent addresses: ${error.message}`);
       }
 
       // Deduplicate addresses (keep most recent usage per address)
       const seenAddressIds = new Set<string>();
       const uniqueRecents: RecentAddress[] = [];
 
-      for (const usage of data as AddressUsageHistoryRow[]) {
+      for (const usage of data) {
         if (!seenAddressIds.has(usage.address_id) && uniqueRecents.length < limit) {
-          // Map the database column names to our Address interface
-          const addr = Array.isArray(usage.addresses) ? usage.addresses[0] : usage.addresses;
-
           // Skip if address data is missing
-          if (!addr) continue;
+          if (!usage.addresses) continue;
+
+          // Explicit type assertion to help TypeScript recognize this as a single object
+          // Two-step assertion needed because Supabase's type inference differs from our interface
+          const addr = usage.addresses as unknown as NonNullable<AddressUsageHistoryRow['addresses']>;
 
           seenAddressIds.add(usage.address_id);
-          uniqueRecents.push({
+
+          const recentAddress: RecentAddress = {
             id: addr.id,
             county: addr.county,
             street1: addr.street1,
@@ -108,15 +128,17 @@ export function useAddressRecents(userId?: string, limit: number = 5) {
             createdBy: addr.createdBy,
             lastUsedAt: new Date(usage.used_at),
             usageContext: usage.context || undefined,
-          });
+          };
+
+          uniqueRecents.push(recentAddress);
         }
       }
 
       return uniqueRecents;
     },
     enabled: !!userId,
-    staleTime: 2 * 60 * 1000, // 2 minutes (shorter for recents)
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    // Use USER_DATA cache preset for frequently accessed user-specific data
+    ...CACHE_PRESETS.USER_DATA,
   });
 
   // Track address usage mutation
@@ -184,5 +206,6 @@ export function useAddressRecents(userId?: string, limit: number = 5) {
     trackUsage: trackUsageMutation.mutate,
     trackUsageAsync: trackUsageMutation.mutateAsync,
     isTracking: trackUsageMutation.isPending,
+    trackError: trackUsageMutation.error,
   };
 }
