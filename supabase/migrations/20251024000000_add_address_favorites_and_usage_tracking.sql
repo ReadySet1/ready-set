@@ -71,14 +71,3 @@ CREATE POLICY "Users can view their own usage history"
 CREATE POLICY "System can insert usage history"
   ON address_usage_history FOR INSERT
   WITH CHECK (auth.uid() = user_id);
-
--- Optional: Add trigger to automatically update usage history
--- This could be triggered by application logic instead
-CREATE OR REPLACE FUNCTION update_address_usage()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- This function can be called from application triggers
-  -- Currently just a placeholder for future enhancements
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
