@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { MapPin, Star, Clock } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { MapPin, Star, Clock, Search, Plus } from 'lucide-react';
 import type { Address } from '@/types/address';
 import type { AddressSelectorProps, AddressSection } from '@/types/address-selector';
 import { useUser } from '@/contexts/UserContext';
@@ -10,11 +10,13 @@ import { useAddressSearch } from '@/hooks/useAddressSearch';
 import { useAddressFavorites } from '@/hooks/useAddressFavorites';
 import { useAddressRecents } from '@/hooks/useAddressRecents';
 import {
-  AddressSearchCombobox,
   AddressQuickFilters,
   AddressSectionList,
+  AddressCompactCard,
 } from './index';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import AddressModal from '@/components/AddressManager/AddressModal';
 
 /**
  * Main AddressSelector component
@@ -29,11 +31,15 @@ export function AddressSelector({
   showRecents = true,
   allowAddNew = true,
   className,
+  addressTypeFilter = 'all',
+  defaultCollapsed = false,
+  showAllAddressesSection = true,
 }: AddressSelectorProps) {
   const { user } = useUser();
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
 
   // Fetch all addresses with pagination (we'll load all for now)
-  const { data: addressesResponse, isLoading: isLoadingAddresses } = useAddresses(
+  const { data: addressesResponse, isLoading: isLoadingAddresses, refetch: refetchAddresses } = useAddresses(
     {
       filter: 'all',
       page: 1,
@@ -44,11 +50,20 @@ export function AddressSelector({
     }
   );
 
-  // Memoize addresses to prevent unnecessary re-renders
-  const addresses = useMemo(
-    () => addressesResponse?.addresses || [],
-    [addressesResponse?.addresses]
-  );
+  // Memoize addresses and apply address type filter to prevent unnecessary re-renders
+  const addresses = useMemo(() => {
+    const allAddresses = addressesResponse?.addresses || [];
+
+    // Apply address type filter
+    if (addressTypeFilter === 'restaurant') {
+      return allAddresses.filter((addr) => addr.isRestaurant === true);
+    } else if (addressTypeFilter === 'private') {
+      return allAddresses.filter((addr) => addr.isRestaurant === false || addr.isRestaurant === undefined);
+    }
+
+    // Default: return all addresses
+    return allAddresses;
+  }, [addressesResponse?.addresses, addressTypeFilter]);
 
   // Favorites management
   const {
@@ -75,6 +90,7 @@ export function AddressSelector({
     favoriteAddresses,
     recentAddresses,
     resultCount,
+    debouncedQuery,
   } = useAddressSearch({
     addresses,
     initialFilter: 'all',
@@ -113,15 +129,17 @@ export function AddressSelector({
       });
     }
 
-    // All addresses section
-    result.push({
-      id: 'all',
-      title: 'All Addresses',
-      icon: MapPin,
-      addresses: filteredAddresses,
-      count: addresses.length,
-      emptyMessage: query ? 'No addresses found matching your search' : 'No addresses available',
-    });
+    // All addresses section (only if showAllAddressesSection is true)
+    if (showAllAddressesSection) {
+      result.push({
+        id: 'all',
+        title: 'All Addresses',
+        icon: MapPin,
+        addresses: filteredAddresses,
+        count: addresses.length,
+        emptyMessage: query ? 'No addresses found matching your search' : 'No addresses available',
+      });
+    }
 
     return result;
   }, [
@@ -132,6 +150,7 @@ export function AddressSelector({
     filteredAddresses,
     addresses.length,
     query,
+    showAllAddressesSection,
   ]);
 
   // Handle address selection
@@ -167,18 +186,22 @@ export function AddressSelector({
 
   return (
     <div className={cn('space-y-4', className)}>
-      {/* Search Combobox */}
-      <AddressSearchCombobox
-        addresses={addresses}
-        onSelect={handleAddressSelect}
-        selectedAddressId={selectedAddressId}
-        placeholder={
-          type
-            ? `Search ${type} addresses...`
-            : 'Search addresses...'
-        }
-        disabled={isLoading}
-      />
+      {/* Search Input */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder={
+            type
+              ? `Search ${type} addresses...`
+              : 'Search addresses...'
+          }
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          disabled={isLoading}
+          className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+      </div>
 
       {/* Quick Filters */}
       <AddressQuickFilters
@@ -187,24 +210,124 @@ export function AddressSelector({
         counts={filterCounts}
       />
 
-      {/* Address Sections */}
-      <AddressSectionList
-        sections={sections}
-        onAddressSelect={handleAddressSelect}
-        selectedAddressId={selectedAddressId}
-        isLoading={isLoading}
-        onFavoriteToggle={handleFavoriteToggle}
-        favoriteIds={favoriteIds}
-      />
+      {/* Address Sections - only show if there are sections to display */}
+      {sections.length > 0 && (
+        <AddressSectionList
+          sections={sections}
+          onAddressSelect={handleAddressSelect}
+          selectedAddressId={selectedAddressId}
+          isLoading={isLoading}
+          onFavoriteToggle={handleFavoriteToggle}
+          favoriteIds={favoriteIds}
+          defaultCollapsed={defaultCollapsed}
+        />
+      )}
 
-      {/* TODO: Add New Address Button */}
-      {/* Implement in Phase 5 when integrating with pages */}
+      {/* Render filtered addresses directly if All Addresses section is hidden */}
+      {!showAllAddressesSection && (
+        <>
+          {/* Show prompt to search if no query */}
+          {debouncedQuery.length === 0 && !isLoading && (
+            <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed bg-slate-50">
+              <div className="text-center space-y-2 px-4">
+                <Search className="h-8 w-8 mx-auto text-muted-foreground/50" />
+                <p className="text-sm font-medium text-slate-700">
+                  Start typing to search addresses
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Enter at least 2 characters to see results
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Show message for queries that are too short */}
+          {debouncedQuery.length > 0 && debouncedQuery.length < 2 && !isLoading && (
+            <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed">
+              <p className="text-sm text-muted-foreground">
+                Type at least 2 characters to search
+              </p>
+            </div>
+          )}
+
+          {/* Show results when query is 2+ characters */}
+          {debouncedQuery.length >= 2 && filteredAddresses.length > 0 && (
+            <>
+              {/* Results count */}
+              <div className="text-sm text-muted-foreground">
+                Found {filteredAddresses.length} address{filteredAddresses.length !== 1 ? 'es' : ''}
+              </div>
+
+              <div className="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+                {filteredAddresses.map((address) => {
+                  const addressWithFavorite = {
+                    ...address,
+                    isFavorite: favoriteIds.includes(address.id),
+                  };
+
+                  return (
+                    <div key={address.id}>
+                      <AddressCompactCard
+                        address={addressWithFavorite}
+                        onSelect={() => handleAddressSelect(address)}
+                        isSelected={selectedAddressId === address.id}
+                        variant="compact"
+                        showActions={true}
+                        onFavoriteToggle={
+                          handleFavoriteToggle
+                            ? () => handleFavoriteToggle(address.id)
+                            : undefined
+                        }
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* No results found */}
+          {debouncedQuery.length >= 2 && filteredAddresses.length === 0 && !isLoading && (
+            <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed">
+              <div className="text-center space-y-2 px-4">
+                <MapPin className="h-8 w-8 mx-auto text-muted-foreground/50" />
+                <p className="text-sm font-medium text-slate-700">
+                  No addresses found
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Try a different search term
+                </p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Add New Address Button */}
       {allowAddNew && (
         <div className="pt-2 border-t">
-          <p className="text-sm text-muted-foreground text-center">
-            Add new address functionality coming soon
-          </p>
+          <Button
+            onClick={() => setIsAddressModalOpen(true)}
+            variant="outline"
+            className="w-full flex items-center justify-center gap-2 transition-all duration-200 hover:bg-primary hover:text-white"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add New {addressTypeFilter === 'restaurant' ? 'Restaurant' : 'Address'}</span>
+          </Button>
         </div>
+      )}
+
+      {/* Address Modal */}
+      {isAddressModalOpen && (
+        <AddressModal
+          isOpen={isAddressModalOpen}
+          onClose={() => setIsAddressModalOpen(false)}
+          addressToEdit={null}
+          onAddressUpdated={() => {
+            refetchAddresses();
+            setIsAddressModalOpen(false);
+          }}
+        />
       )}
     </div>
   );

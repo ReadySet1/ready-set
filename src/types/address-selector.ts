@@ -15,6 +15,9 @@ export interface AddressSelectorProps {
   showRecents?: boolean;
   allowAddNew?: boolean;
   className?: string;
+  addressTypeFilter?: 'restaurant' | 'private' | 'all';
+  defaultCollapsed?: boolean;
+  showAllAddressesSection?: boolean;
 }
 
 /**
@@ -84,6 +87,7 @@ export interface AddressSectionListProps {
   emptyState?: React.ReactNode;
   onFavoriteToggle?: (addressId: string) => void;
   favoriteIds?: string[];
+  defaultCollapsed?: boolean;
 }
 
 /**

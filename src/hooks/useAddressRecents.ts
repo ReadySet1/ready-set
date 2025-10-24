@@ -8,7 +8,7 @@ interface AddressUsageHistoryRow {
   address_id: string;
   used_at: string;
   context: string | null;
-  addresses: any; // Supabase returns the joined address data
+  addresses: Address | Address[]; // Supabase returns the joined address data
 }
 
 interface RecentAddress extends Address {
@@ -48,14 +48,14 @@ export function useAddressRecents(userId?: string, limit: number = 5) {
             city,
             state,
             zip,
-            locationNumber:location_number,
-            parkingLoading:parking_loading,
+            locationNumber,
+            parkingLoading,
             name,
-            isRestaurant:is_restaurant,
-            isShared:is_shared,
-            createdAt:created_at,
-            updatedAt:updated_at,
-            createdBy:created_by
+            isRestaurant,
+            isShared,
+            createdAt,
+            updatedAt,
+            createdBy
           )
         `)
         .eq('user_id', userId)
@@ -63,8 +63,17 @@ export function useAddressRecents(userId?: string, limit: number = 5) {
         .limit(limit * 3); // Fetch extra to account for duplicates
 
       if (error) {
-        console.error('Error fetching address usage history:', error);
-        throw new Error('Failed to fetch recent addresses');
+        console.error('[useAddressRecents] Error fetching address usage history:', {
+          errorType: typeof error,
+          errorKeys: Object.keys(error),
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          fullError: JSON.stringify(error),
+        });
+        // Return empty array instead of throwing to allow component to render
+        return [];
       }
 
       // Deduplicate addresses (keep most recent usage per address)
@@ -73,10 +82,13 @@ export function useAddressRecents(userId?: string, limit: number = 5) {
 
       for (const usage of data as AddressUsageHistoryRow[]) {
         if (!seenAddressIds.has(usage.address_id) && uniqueRecents.length < limit) {
-          seenAddressIds.add(usage.address_id);
-
           // Map the database column names to our Address interface
           const addr = Array.isArray(usage.addresses) ? usage.addresses[0] : usage.addresses;
+
+          // Skip if address data is missing
+          if (!addr) continue;
+
+          seenAddressIds.add(usage.address_id);
           uniqueRecents.push({
             id: addr.id,
             county: addr.county,

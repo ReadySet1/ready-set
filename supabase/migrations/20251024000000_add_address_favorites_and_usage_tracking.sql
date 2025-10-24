@@ -18,8 +18,7 @@ CREATE TABLE IF NOT EXISTS address_usage_history (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   address_id UUID NOT NULL REFERENCES addresses(id) ON DELETE CASCADE,
   used_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  context TEXT CHECK (context IN ('pickup', 'delivery', 'order')),
-  CONSTRAINT valid_context CHECK (context IS NOT NULL)
+  context TEXT CHECK (context IS NULL OR context IN ('pickup', 'delivery', 'order'))
 );
 
 -- Indexes for Performance

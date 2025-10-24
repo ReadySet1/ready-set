@@ -28,6 +28,28 @@ import { useUser } from "@/contexts/UserContext";
 import { getOrderCreationRedirectRoute } from "@/utils/routing";
 import OrderConfirmationModal from "./OrderConfirmationModal";
 
+// Extended form data type
+interface ExtendedCateringFormData extends CateringFormData {
+  attachments?: UploadedFile[];
+  brokerage?: string;
+  orderNumber: string;
+  date: string;
+  pickupTime: string;
+  arrivalTime: string;
+  completeTime?: string;
+  headcount: string;
+  needHost: CateringNeedHost;
+  hoursNeeded: string;
+  numberOfHosts?: string;
+  clientAttention?: string;
+  pickupNotes?: string;
+  specialNotes?: string;
+  orderTotal?: string;
+  tip?: string;
+  pickupAddress?: Address;
+  deliveryAddress?: Address;
+}
+
 // Form field components
 const InputField: React.FC<{
   control: any;
@@ -173,27 +195,6 @@ const SelectField: React.FC<{
 );
 
 // Form Component
-interface ExtendedCateringFormData extends CateringFormData {
-  attachments?: UploadedFile[];
-  brokerage?: string;
-  orderNumber: string;
-  date: string;
-  pickupTime: string;
-  arrivalTime: string;
-  completeTime?: string;
-  headcount: string;
-  needHost: CateringNeedHost;
-  hoursNeeded: string;
-  numberOfHosts?: string;
-  clientAttention?: string;
-  pickupNotes?: string;
-  specialNotes?: string;
-  orderTotal?: string;
-  tip?: string;
-  pickupAddress?: Address;
-  deliveryAddress?: Address;
-}
-
 const BROKERAGE_OPTIONS = [
   { value: "Foodee", label: "Foodee" },
   { value: "Ez Cater", label: "Ez Cater" },
@@ -591,6 +592,9 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           showFavorites
           showRecents
           allowAddNew
+          addressTypeFilter="restaurant"
+          defaultCollapsed={true}
+          showAllAddressesSection={false}
         />
       </div>
 
@@ -722,6 +726,9 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           showFavorites
           showRecents
           allowAddNew
+          addressTypeFilter="private"
+          defaultCollapsed={true}
+          showAllAddressesSection={false}
         />
       </div>
 
