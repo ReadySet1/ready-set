@@ -88,7 +88,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
 
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: coverage-report
@@ -162,7 +162,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: playwright-report
@@ -170,7 +170,7 @@ jobs:
           retention-days: 30
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: e2e-test-results
