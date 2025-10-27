@@ -45,10 +45,10 @@ export async function login(
   if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
       }
 
-  // Use cookies() to opt out of caching (skip in test environment to avoid request context issues)
-  if (process.env.NODE_ENV !== 'test') {
-    await cookies();
-  }
+  // Use cookies() to opt out of caching
+  // Note: cookies() must be called in Next.js to opt out of static caching
+  // In test environment, this is mocked via jest.mock('next/headers')
+  await cookies();
   const supabase = await createClient();
 
     const email = formData.get("email")?.toString().toLowerCase() || "";
@@ -363,18 +363,19 @@ export async function login(
   if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
       }
 
-  // Set immediate session data in cookies for client-side access
-  // In test environment, create a mock cookie store to avoid request context issues
-  const cookieStore = process.env.NODE_ENV === 'test'
-    ? { set: () => {}, get: () => undefined, delete: () => {} } as any
-    : await cookies();
+  // Get cookie store
+  const cookieStore = await cookies();
 
-  // Set user session data that can be read immediately by client
   // Normalize userRole to match TypeScript enum (lowercase)
   const normalizedUserRole = userType ? Object.values(UserType).find(
     enumValue => enumValue.toUpperCase() === (userType as string)?.toUpperCase()
   ) || (userType as string)?.toLowerCase() : 'customer';
 
+  if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+      }
+
+  // Set secure session cookie (httpOnly for XSS protection)
+  // Contains sensitive data: userId, email
   const sessionData = {
     userId: user.id,
     email: user.email || '',
@@ -382,45 +383,31 @@ export async function login(
     timestamp: Date.now()
   };
 
-  if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-      }
-
-  // Set session cookie with enhanced security - allow client access for hydration
   cookieStore.set('user-session-data', JSON.stringify(sessionData), {
     path: '/',
-    httpOnly: false, // Allow client-side access for hydration
+    httpOnly: true, // Protect sensitive data from XSS attacks
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict', // Better CSRF protection
     maxAge: 60 * 60 * 24 * 7, // 7 days
-    // Additional security headers
     ...(process.env.NODE_ENV === 'production' && {
       domain: process.env.NEXT_PUBLIC_COOKIE_DOMAIN || undefined,
     })
   });
 
-  // Prefetch and cache user profile data for faster client-side loading
-  try {
-    const { prefetchUserProfile } = await import("@/utils/supabase/client");
-    // Note: This will run on server, so we manually cache the profile data
-    const profileData = {
-      type: normalizedUserRole,
-      email: user.email || '',
-      name: user.user_metadata?.name || user.email?.split('@')[0] || '',
-      timestamp: Date.now()
-    };
-    
-    // Set a server-side cache cookie that client can read immediately
-    cookieStore.set(`user-profile-${user.id}`, JSON.stringify(profileData), {
-      path: '/',
-      httpOnly: false, // Allow client-side access
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 10 // 10 minutes
-    });
-  } catch (error) {
-    console.error("Error prefetching user profile data:", error);
-    // Don't fail login if prefetch fails
-  }
+  // Set client-accessible cookie for UI hydration (non-sensitive data only)
+  // Only contains userRole - no sensitive information
+  const displayData = {
+    userRole: normalizedUserRole,
+    timestamp: Date.now()
+  };
+
+  cookieStore.set('user-display-data', JSON.stringify(displayData), {
+    path: '/',
+    httpOnly: false, // Allow client-side access for UI hydration
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+  });
 
     // Determine where to redirect the user
     let redirectPath: string;
@@ -452,34 +439,22 @@ export async function login(
       message: `Welcome back! Redirecting to your dashboard...`
     };
 
-    // Log success metrics for monitoring BEFORE redirect
-    
-    // Store session data in a way that can be accessed by the client
-    // Use a client-accessible cookie that survives the redirect
-    cookieStore.set('temp-session-data', JSON.stringify(sessionData), {
-      path: '/',
-      httpOnly: false, // Allow client-side access
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60, // Short-lived cookie, will be cleaned up by client
-    });
-
     // IMPORTANT: Return the redirect path instead of calling redirect()
     // This ensures cookies are properly committed before the client-side redirect
     // The client will handle the actual redirect using router.push()
-     return {
-       success: true,
-       redirectTo: redirectPath,
-       userType: userType || 'unknown',
-       message: `Welcome back! Redirecting to your dashboard...`
-     };
+    return {
+      success: true,
+      redirectTo: redirectPath,
+      userType: userType || 'unknown',
+      message: `Welcome back! Redirecting to your dashboard...`
+    };
 }
 
 export async function signup(formData: FormData) {
-  // Use cookies() to opt out of caching (skip in test environment to avoid request context issues)
-  if (process.env.NODE_ENV !== 'test') {
-    await cookies();
-  }
+  // Use cookies() to opt out of caching
+  // Note: cookies() must be called in Next.js to opt out of static caching
+  // In test environment, this is mocked via jest.mock('next/headers')
+  await cookies();
 
   // Create and await the Supabase client
   const supabase = await createClient();
