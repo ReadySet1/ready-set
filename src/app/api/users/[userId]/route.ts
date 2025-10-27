@@ -12,7 +12,7 @@ import { createClient } from "@/utils/supabase/server";
  * - Returns 404 if not found, 403 if forbidden.
  */
 import { prisma } from '@/utils/prismaDB';
-import { Prisma } from '@prisma/client';
+import { Prisma, PrismaClientKnownRequestError } from '@prisma/client';
 import { UserType } from '@/types/prisma';
 import { PrismaTransaction } from '@/types/prisma-types';
 
@@ -870,8 +870,8 @@ export async function DELETE(
     const duration = Date.now() - startTime;
     console.error(`[DELETE] Soft delete failed after ${duration}ms:`, error);
 
-    // Handle Prisma-specific errors
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    // Handle Prisma-specific errors (use directly imported class)
+    if (error instanceof PrismaClientKnownRequestError) {
       switch (error.code) {
         case 'P2025': // Record not found
           return NextResponse.json(
