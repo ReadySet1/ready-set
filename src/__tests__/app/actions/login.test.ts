@@ -36,6 +36,52 @@ describe('Login Action', () => {
   let mockSupabase: any;
   let mockAdminSupabase: any;
 
+  // Helper to set up successful login flow
+  const setupSuccessfulLogin = (userType: string = 'CLIENT', userId: string = 'user-123') => {
+    // Mock successful auth
+    mockSupabase.auth.signInWithPassword.mockResolvedValue({
+      data: {
+        user: { id: userId, email: 'test@example.com' },
+        session: { access_token: 'token' }
+      },
+      error: null
+    });
+
+    mockSupabase.auth.getUser.mockResolvedValue({
+      data: { user: { id: userId, email: 'test@example.com' } },
+      error: null
+    });
+
+    // Mock from() to return proper chains
+    // Call 1: connection test (limit)
+    // Call 2: get profile (single)
+    let callIndex = 0;
+    mockSupabase.from.mockImplementation(() => {
+      const chain: any = {
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        limit: jest.fn(),
+        single: jest.fn(),
+        maybeSingle: jest.fn(),
+      };
+
+      // Connection test (first call)
+      if (callIndex === 0) {
+        chain.limit.mockResolvedValue({ data: [], error: null });
+      }
+      // Profile fetch (second call)
+      else if (callIndex === 1) {
+        chain.single.mockResolvedValue({
+          data: { type: userType, email: 'test@example.com' },
+          error: null
+        });
+      }
+
+      callIndex++;
+      return chain;
+    });
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -59,31 +105,34 @@ describe('Login Action', () => {
       // Default resolved values for terminal methods
       chain.single.mockResolvedValue({ data: null, error: null });
       chain.maybeSingle.mockResolvedValue({ data: null, error: null });
+      chain.limit.mockResolvedValue({ data: [], error: null });
 
       return chain;
     };
 
-    // Mock Supabase client with proper from() method
+    // Mock Supabase client with proper from() method that returns a fresh chain each time
     mockSupabase = {
       auth: {
         signInWithPassword: jest.fn(),
         getUser: jest.fn(),
         signUp: jest.fn(),
       },
-      from: jest.fn((table) => createMockChain()),
-      select: jest.fn(),
-      eq: jest.fn(),
-      single: jest.fn(),
-      maybeSingle: jest.fn(),
-      limit: jest.fn(),
-      upsert: jest.fn(),
+      from: jest.fn(() => createMockChain()),
     };
 
+    // Mock admin Supabase client with chainable methods
     mockAdminSupabase = {
-      from: jest.fn().mockReturnThis(),
-      upsert: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      single: jest.fn(),
+      from: jest.fn(() => {
+        const chain: any = {
+          upsert: jest.fn(),
+          select: jest.fn(),
+          single: jest.fn(),
+        };
+        chain.upsert.mockReturnValue(chain);
+        chain.select.mockReturnValue(chain);
+        chain.single.mockResolvedValue({ data: null, error: null });
+        return chain;
+      }),
     };
 
     mockCreateClient.mockResolvedValue(mockSupabase);
@@ -136,31 +185,7 @@ describe('Login Action', () => {
       formData.append('email', 'Test@EXAMPLE.COM');
       formData.append('password', 'ValidPassword123!');
 
-      // Mock connection test success
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-
-      // Mock auth success
-      mockSupabase.auth.signInWithPassword.mockResolvedValue({
-        data: {
-          user: { id: 'user-123', email: 'test@example.com' },
-          session: { access_token: 'token' }
-        },
-        error: null
-      });
-
-      mockSupabase.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'user-123', email: 'test@example.com' } },
-        error: null
-      });
-
-      mockSupabase.single.mockResolvedValue({
-        data: { type: 'CLIENT', email: 'test@example.com' },
-        error: null
-      });
+      setupSuccessfulLogin();
 
       await login(null, formData);
 
