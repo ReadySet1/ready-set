@@ -39,31 +39,44 @@ describe('Login Action', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Create chainable mock methods
-    const mockChain = {
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue({ data: null, error: null }),
-      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-      limit: jest.fn().mockResolvedValue({ data: [], error: null }),
-      upsert: jest.fn().mockResolvedValue({ data: null, error: null }),
+    // Create chainable mock methods for query builder
+    const createMockChain = () => {
+      const chain: any = {
+        select: jest.fn(),
+        eq: jest.fn(),
+        single: jest.fn(),
+        maybeSingle: jest.fn(),
+        limit: jest.fn(),
+        upsert: jest.fn(),
+      };
+
+      // Make methods chainable
+      chain.select.mockReturnValue(chain);
+      chain.eq.mockReturnValue(chain);
+      chain.limit.mockReturnValue(chain);
+      chain.upsert.mockReturnValue(chain);
+
+      // Default resolved values for terminal methods
+      chain.single.mockResolvedValue({ data: null, error: null });
+      chain.maybeSingle.mockResolvedValue({ data: null, error: null });
+
+      return chain;
     };
 
-    // Make select, eq, limit, upsert return the chain
-    mockChain.select.mockReturnValue(mockChain);
-    mockChain.eq.mockReturnValue(mockChain);
-    mockChain.limit.mockReturnValue(mockChain);
-    mockChain.upsert.mockReturnValue(mockChain);
-
-    // Mock Supabase client
+    // Mock Supabase client with proper from() method
     mockSupabase = {
       auth: {
         signInWithPassword: jest.fn(),
         getUser: jest.fn(),
         signUp: jest.fn(),
       },
-      from: jest.fn(() => mockChain),
-      ...mockChain,
+      from: jest.fn((table) => createMockChain()),
+      select: jest.fn(),
+      eq: jest.fn(),
+      single: jest.fn(),
+      maybeSingle: jest.fn(),
+      limit: jest.fn(),
+      upsert: jest.fn(),
     };
 
     mockAdminSupabase = {
@@ -1060,28 +1073,35 @@ describe('Signup Action', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Create chainable mock methods for signup
-    const mockChain = {
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue({ data: null, error: null }),
-      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-      limit: jest.fn().mockResolvedValue({ data: [], error: null }),
-      upsert: jest.fn().mockResolvedValue({ data: null, error: null }),
-    };
+    // Create chainable mock methods for signup query builder
+    const createMockChain = () => {
+      const chain: any = {
+        select: jest.fn(),
+        eq: jest.fn(),
+        single: jest.fn(),
+        maybeSingle: jest.fn(),
+        limit: jest.fn(),
+        upsert: jest.fn(),
+      };
 
-    // Make select, eq, limit, upsert return the chain
-    mockChain.select.mockReturnValue(mockChain);
-    mockChain.eq.mockReturnValue(mockChain);
-    mockChain.limit.mockReturnValue(mockChain);
-    mockChain.upsert.mockReturnValue(mockChain);
+      // Make methods chainable
+      chain.select.mockReturnValue(chain);
+      chain.eq.mockReturnValue(chain);
+      chain.limit.mockReturnValue(chain);
+      chain.upsert.mockReturnValue(chain);
+
+      // Default resolved values for terminal methods
+      chain.single.mockResolvedValue({ data: null, error: null });
+      chain.maybeSingle.mockResolvedValue({ data: null, error: null });
+
+      return chain;
+    };
 
     mockSupabase = {
       auth: {
         signUp: jest.fn(),
       },
-      from: jest.fn(() => mockChain),
-      ...mockChain,
+      from: jest.fn((table) => createMockChain()),
     };
 
     mockCreateClient.mockResolvedValue(mockSupabase);
