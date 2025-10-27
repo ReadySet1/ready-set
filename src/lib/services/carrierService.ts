@@ -317,26 +317,51 @@ export class CarrierService {
         const startTime = Date.now();
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
+
         try {
-          const headers = { ...carrier.webhookHeaders };
-          if (carrier.apiKey) {
-            headers['x-api-key'] = carrier.apiKey;
+          // For CaterValley, test via our internal status endpoint
+          if (carrier.id === 'catervalley') {
+            const response = await fetch('/api/cater-valley/status', {
+              method: 'GET',
+              signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+            const latencyMs = Date.now() - startTime;
+
+            if (response.ok) {
+              const data = await response.json();
+              results[carrier.id] = {
+                connected: data.status === 'ok' || data.connected === true,
+                latencyMs,
+              };
+            } else {
+              results[carrier.id] = {
+                connected: false,
+                error: `HTTP ${response.status}: ${response.statusText}`,
+              };
+            }
+          } else {
+            // For other carriers, use HEAD request (lighter than OPTIONS)
+            const headers = { ...carrier.webhookHeaders };
+            if (carrier.apiKey) {
+              headers['x-api-key'] = carrier.apiKey;
+            }
+
+            const response = await fetch(carrier.webhookUrl, {
+              method: 'HEAD',
+              headers,
+              signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+            const latencyMs = Date.now() - startTime;
+
+            results[carrier.id] = {
+              connected: response.ok,
+              latencyMs,
+            };
           }
-
-          const response = await fetch(carrier.webhookUrl, {
-            method: 'OPTIONS',
-            headers,
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-          const latencyMs = Date.now() - startTime;
-
-          results[carrier.id] = {
-            connected: response.ok,
-            latencyMs,
-          };
         } catch (error) {
           clearTimeout(timeoutId);
           results[carrier.id] = {
