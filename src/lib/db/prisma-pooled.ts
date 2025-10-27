@@ -244,6 +244,9 @@ const createOptimizedPrismaClient = (): PrismaClient => {
   });
 
   // Add connection retry logic with exponential backoff
+  // NOTE: This only handles connection establishment ($connect)
+  // For retry logic on database operations (queries, mutations), use withDatabaseRetry()
+  // from @/utils/prismaDB which handles connection errors, prepared statement errors, etc.
   // Guard against undefined $connect (can happen in test environments)
   if (client.$connect && typeof client.$connect === 'function') {
     const originalConnect = client.$connect.bind(client);

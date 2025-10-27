@@ -38,10 +38,6 @@ const mockSupabase = {
   from: jest.fn(),
 };
 
-// Debug: verify mockSupabase.from is defined at module level
-console.log('🔧 Module level - mockSupabase.from type:', typeof mockSupabase.from);
-console.log('🔧 Module level - mockSupabase.from value:', mockSupabase.from);
-
 const mockAdminSupabase = {
   from: jest.fn(),
 };
@@ -54,17 +50,20 @@ const mockCookieStore = {
 // NOTE: Jest automocking works for createClient but NOT for createAdminClient
 // This is a known Jest limitation with ES modules - see comments at end of file
 jest.mock('@/utils/supabase/server');
-jest.mock('next/navigation');
-jest.mock('next/headers');
 jest.mock('@/utils/supabase/client');
 
 // Import after mocking
 import { login, signup, FormState } from '@/app/actions/login';
 import * as supabaseServer from '@/utils/supabase/server';
+import { cookies } from 'next/headers';
 
 describe('Login Action', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Mock cookies() function to return our mock cookie store
+    // Note: cookies is globally mocked in jest.setup.ts
+    (cookies as jest.Mock).mockResolvedValue(mockCookieStore);
 
     // Reset chain mocks to default chainable behavior
     mockChain.select.mockReturnThis();
@@ -864,10 +863,6 @@ describe('Signup Action', () => {
     mockSupabase.from.mockClear();
     mockSupabase.auth.signUp.mockClear();
 
-    // Clear top-level mocks
-    mockCreateClient.mockClear();
-    mockRedirect.mockClear();
-
     // Reset chain mocks
     mockChain.select.mockReturnThis();
     mockChain.eq.mockReturnThis();
@@ -879,11 +874,8 @@ describe('Signup Action', () => {
     // Make from() return the shared chain
     mockSupabase.from.mockReturnValue(mockChain);
 
-    // Setup top-level mocked functions
-    mockCreateClient.mockResolvedValue(mockSupabase);
-    mockRedirect.mockImplementation((url: string) => {
-      throw new Error(`REDIRECT: ${url}`);
-    });
+    // Setup mocked Supabase client
+    (supabaseServer.createClient as jest.Mock).mockResolvedValue(mockSupabase);
   });
 
   it('should reject signup without email', async () => {
