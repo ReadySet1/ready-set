@@ -243,12 +243,28 @@ export class EnhancedSessionManager implements SessionManager {
         return false;
       }
 
-      // Validate fingerprint if enabled
+      // ENHANCED: Always validate fingerprint on every request for better security
+      // This prevents XSS attacks from accessing session data even if localStorage is compromised
       if (this.config.enableFingerprinting) {
         const currentFingerprint = generateFingerprint();
         if (!compareFingerprints(storedSession.fingerprint, currentFingerprint)) {
-          authLogger.warn('EnhancedSessionManager: Fingerprint mismatch detected');
+          authLogger.warn('EnhancedSessionManager: Fingerprint mismatch detected - possible session hijacking attempt');
           this.handleSuspiciousActivity('fingerprint_mismatch');
+          // Immediately clear session on fingerprint mismatch
+          await this.clearSession();
+          return false;
+        }
+
+        // Additional validation: Check if critical fingerprint properties have changed
+        const criticalPropertiesMatch = this.validateCriticalFingerprint(
+          storedSession.fingerprint,
+          currentFingerprint
+        );
+
+        if (!criticalPropertiesMatch) {
+          authLogger.warn('EnhancedSessionManager: Critical fingerprint properties changed');
+          this.handleSuspiciousActivity('critical_fingerprint_change');
+          await this.clearSession();
           return false;
         }
       }
@@ -261,6 +277,21 @@ export class EnhancedSessionManager implements SessionManager {
       authLogger.error('EnhancedSessionManager: Session validation failed', error);
       return false;
     }
+  }
+
+  // Validate critical fingerprint properties that should never change
+  private validateCriticalFingerprint(stored: SessionFingerprint, current: SessionFingerprint): boolean {
+    // Critical properties that indicate session hijacking if changed
+    const criticalProperties = ['userAgent', 'platform', 'timezone'];
+
+    for (const prop of criticalProperties) {
+      if (stored[prop as keyof SessionFingerprint] !== current[prop as keyof SessionFingerprint]) {
+        authLogger.warn(`EnhancedSessionManager: Critical property changed: ${prop}`);
+        return false;
+      }
+    }
+
+    return true;
   }
 
   async refreshToken(): Promise<EnhancedSession | null> {

@@ -131,9 +131,12 @@ export async function withAuth(
 
     const userType = userRole as 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT';
 
-    
-    // Check role permissions
-    if (allowedRoles.length > 0 && userType && !allowedRoles.includes(userType)) {
+
+    // Check role permissions (normalize to uppercase for case-insensitive comparison)
+    const normalizedUserType = userType?.toUpperCase();
+    const normalizedAllowedRoles = allowedRoles.map(role => role.toUpperCase());
+
+    if (allowedRoles.length > 0 && normalizedUserType && !normalizedAllowedRoles.includes(normalizedUserType)) {
       console.error('❌ [Auth Middleware] Insufficient permissions for user type:', userType, 'Allowed roles:', allowedRoles);
       return {
         success: false,
@@ -145,7 +148,7 @@ export async function withAuth(
       };
     }
 
-    
+
     // Create auth context with real user data
     const authUser = {
       id: user.id,
@@ -154,13 +157,15 @@ export async function withAuth(
       driverId: userType === 'DRIVER' ? user.id : undefined
     };
 
+    // Normalize role checks to uppercase for case-insensitive comparison
+    const normalizedType = userType?.toUpperCase();
     return {
       success: true,
-      context: { 
+      context: {
         user: authUser,
-        isAdmin: ['ADMIN', 'SUPER_ADMIN'].includes(userType),
-        isSuperAdmin: ['SUPER_ADMIN'].includes(userType),
-        isHelpdesk: ['HELPDESK'].includes(userType)
+        isAdmin: ['ADMIN', 'SUPER_ADMIN'].includes(normalizedType),
+        isSuperAdmin: ['SUPER_ADMIN'].includes(normalizedType),
+        isHelpdesk: ['HELPDESK'].includes(normalizedType)
       }
     };
   } catch (error) {
