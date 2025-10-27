@@ -122,42 +122,18 @@ export async function login(
       if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
               }
 
-      // Enhanced error handling with specific messages
+      // Enhanced error handling with generic messages to prevent user enumeration
       if (authError.message.includes('Invalid login credentials')) {
-        // Check if user exists in profiles table for more specific error
-        try {
-          const { data: userData, error: profileError } = await supabase
-            .from("profiles")
-            .select("email, type")
-            .eq("email", email)
-            .maybeSingle();
-
-          if (profileError && process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-            console.error(`❌ [${requestId}] Profile lookup error:`, profileError);
-          }
-
-          if (userData) {
-            if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-                          }
-            return {
-              error: "Incorrect password. Please check your password and try again, or use Magic Link for password-free sign in.",
-              success: false
-            };
-          } else {
-            if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-                          }
-            return {
-              error: "Account not found. Please check your email address or sign up for a new account.",
-              success: false
-            };
-          }
-        } catch (profileLookupError) {
-          console.error(`❌ [${requestId}] Profile lookup failed:`, profileLookupError);
-          return { 
-            error: "Unable to verify account status. Please try again or contact support.",
-            success: false 
-          };
+        // Use generic error message to prevent account enumeration attacks
+        // This prevents attackers from discovering which email addresses exist in the system
+        if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+          console.error(`❌ [${requestId}] Invalid credentials for email:`, email);
         }
+
+        return {
+          error: "Invalid email or password. Please check your credentials and try again, or use Magic Link for password-free sign in.",
+          success: false
+        };
       } else if (authError.message.includes('Email not confirmed')) {
         // Check if this user exists and if email confirmation is actually required
         try {
