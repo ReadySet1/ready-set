@@ -51,9 +51,16 @@ export async function getClients(): Promise<ClientListItem[] | ActionError> {
         name: 'asc',
       },
     });
+
+    console.log(`[getClients] Successfully fetched ${clients.length} client(s)`);
+
+    if (clients.length === 0) {
+      console.warn("[getClients] No CLIENT profiles found in database. Please ensure CLIENT profiles exist.");
+    }
+
     return clients as ClientListItem[];
   } catch (error) {
-    console.error("Failed to fetch clients:", error);
+    console.error("[getClients] Failed to fetch clients:", error);
     return { error: "Database error: Failed to fetch clients." };
   }
 }

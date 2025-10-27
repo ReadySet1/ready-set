@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { STORAGE_BUCKETS, initializeStorageBuckets, diagnoseStorageIssues } from "@/utils/file-service";
+import { DEFAULT_SIGNED_URL_EXPIRATION } from "@/config/file-config";
 import { prisma } from "@/utils/prismaDB";
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
     // First try to create a signed URL (works for private buckets)
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from(STORAGE_BUCKETS.DEFAULT)
-      .createSignedUrl(path, 60 * 30); // 30 minutes expiration
+      .createSignedUrl(path, DEFAULT_SIGNED_URL_EXPIRATION);
     
     if (signedUrlError) {
       logApiError(signedUrlError, '/api/file-uploads', 'GET', { operation: 'createSignedUrl', path }, request);
@@ -555,12 +556,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get public URL for the file
+    // Generate signed URL for private bucket
+    // Generate signed URL - fail upload if this fails (security requirement)
     const {
-      data: { publicUrl },
-    } = supabase.storage.from(storageBucket).getPublicUrl(filePath);
+      data: signedData,
+      error: signedError
+    } = await supabase.storage
+      .from(storageBucket)
+      .createSignedUrl(filePath, DEFAULT_SIGNED_URL_EXPIRATION);
 
-    const finalUrl = publicUrl;
+    if (signedError || !signedData) {
+      // Clean up uploaded file since we can't generate a secure signed URL
+      await supabase.storage.from(storageBucket).remove([filePath]);
+
+      logApiError(
+        signedError || new Error('No signed URL data returned'),
+        '/api/file-uploads',
+        'POST',
+        {
+          operation: 'createSignedUrl',
+          filePath,
+          bucket: storageBucket,
+          action: 'upload_failed_and_cleaned_up'
+        },
+        request
+      );
+
+      return NextResponse.json(
+        {
+          error: 'Failed to generate secure file URL. Please try again or contact support if the problem persists.',
+          code: 'SIGNED_URL_GENERATION_FAILED'
+        },
+        { status: 500 }
+      );
+    }
+
+    const finalUrl = signedData.signedUrl;
 
     // Prepare database record data based on entityType
     const dbData: any = {
@@ -568,6 +599,7 @@ export async function POST(request: NextRequest) {
       fileType: file.type,
       fileSize: file.size,
       fileUrl: finalUrl,
+      filePath: filePath, // Store the file path for generating new signed URLs
       uploadedAt: new Date(),
       updatedAt: new Date(),
       category: normalizedCategory,
@@ -579,6 +611,32 @@ export async function POST(request: NextRequest) {
       jobApplicationId: null,
       userId: null
     };
+
+    // CRITICAL: Validate that file_path is always set for new uploads (security requirement)
+    if (!dbData.filePath || dbData.filePath.trim() === '') {
+      // This should never happen, but fail loudly if it does
+      await supabase.storage.from(storageBucket).remove([filePath]);
+
+      logApiError(
+        new Error('File path is missing or empty'),
+        '/api/file-uploads',
+        'POST',
+        {
+          operation: 'validate_file_path',
+          fileName: file.name,
+          critical: true
+        },
+        request
+      );
+
+      return NextResponse.json(
+        {
+          error: 'Internal error: file path validation failed. Please contact support.',
+          code: 'FILE_PATH_VALIDATION_FAILED'
+        },
+        { status: 500 }
+      );
+    }
 
     // CRITICAL FIX: Set the proper foreign key based on either category or entityType
     // This ensures files are associated with the correct records

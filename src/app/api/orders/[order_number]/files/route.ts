@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { STORAGE_BUCKETS } from '@/utils/file-service';
+import { DEFAULT_SIGNED_URL_EXPIRATION } from '@/config/file-config';
 import { prisma } from '@/utils/prismaDB';
 import { UserType } from "@/types/prisma";
 
@@ -132,8 +134,37 @@ export async function GET(
         uploadedAt: 'desc'
       }
     });
-    
-        return NextResponse.json(files);
+
+    // Generate fresh signed URLs using batch cache for better performance
+    // This solves the N+1 query problem and provides caching for repeated requests
+    const { getSignedUrlCache } = await import('@/lib/signed-url-cache');
+    const cache = getSignedUrlCache();
+
+    // Get all file paths that need signed URLs
+    const filePathsNeeded = files
+      .filter(file => file.filePath)
+      .map(file => file.filePath as string);
+
+    // Batch fetch signed URLs with caching
+    const signedUrlMap = await cache.getBatchSignedUrls(
+      STORAGE_BUCKETS.DEFAULT,
+      filePathsNeeded,
+      DEFAULT_SIGNED_URL_EXPIRATION
+    );
+
+    // Map signed URLs back to files
+    const filesWithSignedUrls = files.map(file => {
+      if (file.filePath && signedUrlMap.has(file.filePath)) {
+        return {
+          ...file,
+          fileUrl: signedUrlMap.get(file.filePath)
+        };
+      }
+      // Return original file if no filePath or signed URL generation failed
+      return file;
+    });
+
+    return NextResponse.json(filesWithSignedUrls);
 
   } catch (error) {
     console.error("Error processing files request:", error);
