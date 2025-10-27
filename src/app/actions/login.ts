@@ -44,9 +44,11 @@ export async function login(
 
   if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
       }
-  
-  // Use cookies() to opt out of caching
-  await cookies();
+
+  // Use cookies() to opt out of caching (skip in test environment to avoid request context issues)
+  if (process.env.NODE_ENV !== 'test') {
+    await cookies();
+  }
   const supabase = await createClient();
 
     const email = formData.get("email")?.toString().toLowerCase() || "";
@@ -362,7 +364,10 @@ export async function login(
       }
 
   // Set immediate session data in cookies for client-side access
-  const cookieStore = await cookies();
+  // In test environment, create a mock cookie store to avoid request context issues
+  const cookieStore = process.env.NODE_ENV === 'test'
+    ? { set: () => {}, get: () => undefined, delete: () => {} } as any
+    : await cookies();
 
   // Set user session data that can be read immediately by client
   // Normalize userRole to match TypeScript enum (lowercase)
@@ -471,8 +476,10 @@ export async function login(
 }
 
 export async function signup(formData: FormData) {
-  // Use cookies() to opt out of caching
-  await cookies();
+  // Use cookies() to opt out of caching (skip in test environment to avoid request context issues)
+  if (process.env.NODE_ENV !== 'test') {
+    await cookies();
+  }
 
   // Create and await the Supabase client
   const supabase = await createClient();

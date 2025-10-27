@@ -244,31 +244,35 @@ const createOptimizedPrismaClient = (): PrismaClient => {
   });
 
   // Add connection retry logic with exponential backoff
-  const originalConnect = client.$connect.bind(client);
-  client.$connect = async () => {
-    let retries = 0;
-    const maxRetries = 3;
-    
-    while (retries < maxRetries) {
-      try {
-        await originalConnect();
-        if (retries > 0) {
-                  }
-        return;
-      } catch (error) {
-        retries++;
-        const delay = Math.min(1000 * Math.pow(2, retries), 5000); // Exponential backoff, max 5s
-        
-        if (retries < maxRetries) {
-          console.warn(`⚠️ Database connection attempt ${retries} failed, retrying in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        } else {
-          console.error(`❌ Database connection failed after ${maxRetries} attempts:`, error);
-          throw error;
+  // Guard against undefined $connect (can happen in test environments)
+  if (client.$connect && typeof client.$connect === 'function') {
+    const originalConnect = client.$connect.bind(client);
+    client.$connect = async () => {
+      let retries = 0;
+      const maxRetries = 3;
+
+      while (retries < maxRetries) {
+        try {
+          await originalConnect();
+          if (retries > 0) {
+            prismaLogger.info(`✅ Database connection succeeded after ${retries} retries`);
+          }
+          return;
+        } catch (error) {
+          retries++;
+          const delay = Math.min(1000 * Math.pow(2, retries), 5000); // Exponential backoff, max 5s
+
+          if (retries < maxRetries) {
+            console.warn(`⚠️ Database connection attempt ${retries} failed, retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+            console.error(`❌ Database connection failed after ${maxRetries} attempts:`, error);
+            throw error;
+          }
         }
       }
-    }
-  };
+    };
+  }
 
   // Enhanced error handling and query monitoring
   // Note: Event listeners temporarily disabled due to TypeScript compatibility
