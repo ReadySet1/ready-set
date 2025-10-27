@@ -81,8 +81,8 @@ function handlePrismaError(error: unknown): { error: ApiError; status: number } 
     }
   }
   
-  // Handle generic Prisma errors
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+  // Handle generic Prisma errors (use directly imported class, not Prisma.X)
+  if (error instanceof PrismaClientKnownRequestError) {
     const prismaError: ApiError = {
       error: "Database operation failed",
       code: error.code,
