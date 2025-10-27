@@ -265,7 +265,7 @@ describe('Security Fix 3: Admin Role Check Normalization', () => {
 describe('Security Fix 4: Generic Error Messages', () => {
   it('should not reveal whether user exists in system', () => {
     // The fixed login action now returns generic error message
-    const genericError = 'Invalid email or password. Please verify your credentials and try again.';
+    const genericError = 'Invalid email or password. Please try again or use Magic Link for password-free sign in.';
 
     // This error is used for both:
     // 1. User doesn't exist
@@ -295,12 +295,13 @@ describe('Security Fix 4: Generic Error Messages', () => {
   it('should use generic messages for timing-attack prevention', () => {
     // Error message should be simple enough to return quickly
     // Avoiding database lookups that could reveal user existence via timing
-    const genericError = 'Invalid email or password. Please verify your credentials and try again.';
+    const genericError = 'Invalid email or password. Please try again or use Magic Link for password-free sign in.';
 
     // Should be short and not depend on database queries
     expect(genericError.length).toBeLessThan(200);
     expect(genericError).not.toContain('database');
     expect(genericError).not.toContain('lookup');
+    expect(genericError).not.toContain('check'); // Avoid words that could aid timing attacks
   });
 
   it('should handle all invalid credential scenarios identically', () => {
