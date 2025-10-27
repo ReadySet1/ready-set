@@ -331,8 +331,9 @@ export class CarrierService {
 
             if (response.ok) {
               const data = await response.json();
+              // Check for operational status or explicit connected flag
               results[carrier.id] = {
-                connected: data.status === 'ok' || data.connected === true,
+                connected: data.status === 'ok' || data.status === 'operational' || data.connected === true,
                 latencyMs,
               };
             } else {
