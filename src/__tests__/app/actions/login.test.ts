@@ -15,13 +15,19 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 import { login, signup, FormState } from '@/app/actions/login';
 import { createClient, createAdminClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 // Mock dependencies
-jest.mock('next/headers');
-jest.mock('next/navigation');
-jest.mock('@/utils/supabase/server');
+const mockRedirect = jest.fn();
+const mockCreateClient = jest.fn();
+const mockCreateAdminClient = jest.fn();
+jest.mock('next/navigation', () => ({
+  redirect: mockRedirect
+}));
+jest.mock('@/utils/supabase/server', () => ({
+  createClient: mockCreateClient,
+  createAdminClient: mockCreateAdminClient
+}));
 jest.mock('@/utils/supabase/client', () => ({
   prefetchUserProfile: jest.fn().mockResolvedValue(undefined)
 }));
@@ -29,18 +35,25 @@ jest.mock('@/utils/supabase/client', () => ({
 describe('Login Action', () => {
   let mockSupabase: any;
   let mockAdminSupabase: any;
-  let mockCookieStore: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Mock cookie store
-    mockCookieStore = {
-      set: jest.fn(),
-      get: jest.fn(),
-      delete: jest.fn(),
+    // Create chainable mock methods
+    const mockChain = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: null, error: null }),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+      limit: jest.fn().mockResolvedValue({ data: [], error: null }),
+      upsert: jest.fn().mockResolvedValue({ data: null, error: null }),
     };
-    (cookies as jest.MockedFunction<any>).mockImplementation(() => Promise.resolve(mockCookieStore));
+
+    // Make select, eq, limit, upsert return the chain
+    mockChain.select.mockReturnValue(mockChain);
+    mockChain.eq.mockReturnValue(mockChain);
+    mockChain.limit.mockReturnValue(mockChain);
+    mockChain.upsert.mockReturnValue(mockChain);
 
     // Mock Supabase client
     mockSupabase = {
@@ -49,13 +62,8 @@ describe('Login Action', () => {
         getUser: jest.fn(),
         signUp: jest.fn(),
       },
-      from: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn(),
-      maybeSingle: jest.fn(),
-      limit: jest.fn().mockReturnThis(),
-      upsert: jest.fn().mockReturnThis(),
+      from: jest.fn(() => mockChain),
+      ...mockChain,
     };
 
     mockAdminSupabase = {
@@ -65,8 +73,8 @@ describe('Login Action', () => {
       single: jest.fn(),
     };
 
-    (createClient as jest.MockedFunction<any>).mockResolvedValue(mockSupabase);
-    (createAdminClient as jest.MockedFunction<any>).mockResolvedValue(mockAdminSupabase);
+    mockCreateClient.mockResolvedValue(mockSupabase);
+    mockCreateAdminClient.mockResolvedValue(mockAdminSupabase);
   });
 
   describe('Input Validation', () => {
@@ -1052,16 +1060,32 @@ describe('Signup Action', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    (cookies as jest.MockedFunction<any>).mockImplementation(() => Promise.resolve({}));
+    // Create chainable mock methods for signup
+    const mockChain = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: null, error: null }),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+      limit: jest.fn().mockResolvedValue({ data: [], error: null }),
+      upsert: jest.fn().mockResolvedValue({ data: null, error: null }),
+    };
+
+    // Make select, eq, limit, upsert return the chain
+    mockChain.select.mockReturnValue(mockChain);
+    mockChain.eq.mockReturnValue(mockChain);
+    mockChain.limit.mockReturnValue(mockChain);
+    mockChain.upsert.mockReturnValue(mockChain);
 
     mockSupabase = {
       auth: {
         signUp: jest.fn(),
       },
+      from: jest.fn(() => mockChain),
+      ...mockChain,
     };
 
-    (createClient as jest.MockedFunction<any>).mockResolvedValue(mockSupabase);
-    (redirect as jest.MockedFunction<any>).mockImplementation((url: string) => {
+    mockCreateClient.mockResolvedValue(mockSupabase);
+    mockRedirect.mockImplementation((url: string) => {
       throw new Error(`REDIRECT: ${url}`);
     });
   });
