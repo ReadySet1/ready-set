@@ -135,30 +135,34 @@ export async function GET(
       }
     });
 
-    // Generate fresh signed URLs for each file
-    const filesWithSignedUrls = await Promise.all(
-      files.map(async (file) => {
-        // If file has filePath, generate a new signed URL
-        if (file.filePath) {
-          try {
-            const { data: signedData, error: signedError } = await supabase.storage
-              .from(STORAGE_BUCKETS.DEFAULT)
-              .createSignedUrl(file.filePath, DEFAULT_SIGNED_URL_EXPIRATION);
+    // Generate fresh signed URLs using batch cache for better performance
+    // This solves the N+1 query problem and provides caching for repeated requests
+    const { getSignedUrlCache } = await import('@/lib/signed-url-cache');
+    const cache = getSignedUrlCache();
 
-            if (!signedError && signedData) {
-              return {
-                ...file,
-                fileUrl: signedData.signedUrl
-              };
-            }
-          } catch (error) {
-            console.error('Error generating signed URL for file:', file.id, error);
-          }
-        }
-        // Return original file if no filePath or error occurred
-        return file;
-      })
+    // Get all file paths that need signed URLs
+    const filePathsNeeded = files
+      .filter(file => file.filePath)
+      .map(file => file.filePath as string);
+
+    // Batch fetch signed URLs with caching
+    const signedUrlMap = await cache.getBatchSignedUrls(
+      STORAGE_BUCKETS.DEFAULT,
+      filePathsNeeded,
+      DEFAULT_SIGNED_URL_EXPIRATION
     );
+
+    // Map signed URLs back to files
+    const filesWithSignedUrls = files.map(file => {
+      if (file.filePath && signedUrlMap.has(file.filePath)) {
+        return {
+          ...file,
+          fileUrl: signedUrlMap.get(file.filePath)
+        };
+      }
+      // Return original file if no filePath or signed URL generation failed
+      return file;
+    });
 
     return NextResponse.json(filesWithSignedUrls);
 

@@ -557,6 +557,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate signed URL for private bucket
+    // Generate signed URL - fail upload if this fails (security requirement)
     const {
       data: signedData,
       error: signedError
@@ -564,9 +565,10 @@ export async function POST(request: NextRequest) {
       .from(storageBucket)
       .createSignedUrl(filePath, DEFAULT_SIGNED_URL_EXPIRATION);
 
-    let finalUrl: string;
     if (signedError || !signedData) {
-      // SECURITY WARNING: Falling back to public URL - file may be exposed publicly
+      // Clean up uploaded file since we can't generate a secure signed URL
+      await supabase.storage.from(storageBucket).remove([filePath]);
+
       logApiError(
         signedError || new Error('No signed URL data returned'),
         '/api/file-uploads',
@@ -575,17 +577,21 @@ export async function POST(request: NextRequest) {
           operation: 'createSignedUrl',
           filePath,
           bucket: storageBucket,
-          securityWarning: 'FALLING_BACK_TO_PUBLIC_URL'
+          action: 'upload_failed_and_cleaned_up'
         },
         request
       );
 
-      // Fallback to public URL if signed URL fails
-      const { data: { publicUrl } } = supabase.storage.from(storageBucket).getPublicUrl(filePath);
-      finalUrl = publicUrl;
-    } else {
-      finalUrl = signedData.signedUrl;
+      return NextResponse.json(
+        {
+          error: 'Failed to generate secure file URL. Please try again or contact support if the problem persists.',
+          code: 'SIGNED_URL_GENERATION_FAILED'
+        },
+        { status: 500 }
+      );
     }
+
+    const finalUrl = signedData.signedUrl;
 
     // Prepare database record data based on entityType
     const dbData: any = {
@@ -605,6 +611,32 @@ export async function POST(request: NextRequest) {
       jobApplicationId: null,
       userId: null
     };
+
+    // CRITICAL: Validate that file_path is always set for new uploads (security requirement)
+    if (!dbData.filePath || dbData.filePath.trim() === '') {
+      // This should never happen, but fail loudly if it does
+      await supabase.storage.from(storageBucket).remove([filePath]);
+
+      logApiError(
+        new Error('File path is missing or empty'),
+        '/api/file-uploads',
+        'POST',
+        {
+          operation: 'validate_file_path',
+          fileName: file.name,
+          critical: true
+        },
+        request
+      );
+
+      return NextResponse.json(
+        {
+          error: 'Internal error: file path validation failed. Please contact support.',
+          code: 'FILE_PATH_VALIDATION_FAILED'
+        },
+        { status: 500 }
+      );
+    }
 
     // CRITICAL FIX: Set the proper foreign key based on either category or entityType
     // This ensures files are associated with the correct records

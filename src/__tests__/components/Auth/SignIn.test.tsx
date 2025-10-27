@@ -14,7 +14,30 @@ jest.mock("@/contexts/UserContext", () => ({
 }));
 
 jest.mock("@/app/actions/login", () => ({
-  login: jest.fn(),
+  login: jest
+    .fn()
+    .mockImplementation(async (prevState: any, formData: FormData) => {
+      const email = formData.get("email") as string;
+      const password = formData.get("password") as string;
+
+      if (!email && !password) {
+        return { error: "Email is required" };
+      }
+
+      if (!email) {
+        return { error: "Email is required" };
+      }
+
+      if (!/\S+@\S+\.\S+/.test(email)) {
+        return { error: "Please enter a valid email" };
+      }
+
+      if (!password) {
+        return { error: "Password is required" };
+      }
+
+      return { error: "" };
+    }),
 }));
 
 jest.mock("@/components/Auth/GoogleAuthButton", () => {
@@ -63,7 +86,7 @@ describe("SignIn Component", () => {
     expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
 
-  it("shows validation errors for empty fields", async () => {
+  it("shows validation error for empty email field", async () => {
     render(<Signin />);
 
     const submitButton = screen.getByRole("button", { name: "Sign in" });
@@ -71,6 +94,19 @@ describe("SignIn Component", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Email is required")).toBeInTheDocument();
+    });
+  });
+
+  it("shows validation error for empty password field", async () => {
+    render(<Signin />);
+
+    const emailInput = screen.getByPlaceholderText("Email");
+    const submitButton = screen.getByRole("button", { name: "Sign in" });
+
+    fireEvent.change(emailInput, { target: { value: "test@example.com" } });
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
       expect(screen.getByText("Password is required")).toBeInTheDocument();
     });
   });
