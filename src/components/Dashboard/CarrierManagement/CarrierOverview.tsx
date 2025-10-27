@@ -1,20 +1,21 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  AlertCircle, 
-  CheckCircle, 
-  Clock, 
-  ExternalLink, 
-  RefreshCw, 
-  Settings, 
+import {
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  RefreshCw,
+  Settings,
   Truck,
   Activity,
   Zap,
-  Loader2
+  Loader2,
+  FileText
 } from 'lucide-react';
 import { CarrierService, CarrierConfig } from '@/lib/services/carrierService';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -36,6 +37,7 @@ interface CarrierStatus {
 }
 
 export const CarrierOverview: React.FC = () => {
+  const router = useRouter();
   const [carriers, setCarriers] = useState<CarrierStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
@@ -343,20 +345,19 @@ export const CarrierOverview: React.FC = () => {
                   variant="outline"
                   size="sm"
                   className="flex-1 gap-2"
-                  onClick={() => {/* Navigate to carrier details */}}
+                  onClick={() => router.push(`/admin/carriers/${carrier.config.id}`)}
                 >
                   <Settings className="h-4 w-4" />
                   Manage
                 </Button>
-                {carrier.config.webhookUrl && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => window.open(carrier.config.webhookUrl, '_blank')}
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push(`/admin/carriers/${carrier.config.id}/logs`)}
+                  title="View webhook logs"
+                >
+                  <FileText className="h-4 w-4" />
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -372,7 +373,11 @@ export const CarrierOverview: React.FC = () => {
             <p className="text-sm text-gray-600 max-w-sm">
               Integrate with additional delivery platforms to expand your service reach
             </p>
-            <Button variant="outline" className="mt-4">
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => router.push('/admin/carriers/configure')}
+            >
               Configure Integration
             </Button>
           </div>

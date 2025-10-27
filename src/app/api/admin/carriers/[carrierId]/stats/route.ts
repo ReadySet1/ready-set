@@ -1,6 +1,9 @@
 /**
  * Carrier Statistics API
  * Provides order statistics and webhook performance metrics for carriers
+ *
+ * Authentication: Protected by API middleware (admin routes)
+ * Authorization: Admin access required
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -127,11 +130,10 @@ export async function GET(
           },
         });
 
-        // In a real implementation, you'd track actual webhook successes/failures
-        // For now, we'll simulate a high success rate with some variation
+        // TODO: Implement proper webhook logging to track actual success/failure rates
+        // For now, use a deterministic fallback value until webhook logging is implemented
         if (ordersWithStatus > 0) {
-          webhookSuccess = Math.max(85, Math.min(100, 95 + Math.random() * 5));
-          webhookSuccess = Math.round(webhookSuccess);
+          webhookSuccess = 99; // Deterministic fallback - replace with real tracking
         }
       } catch (error) {
         console.error('Error calculating webhook success rate:', error);
