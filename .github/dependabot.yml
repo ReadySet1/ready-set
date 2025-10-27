@@ -3,6 +3,8 @@ updates:
   # Enable version updates for npm
   - package-ecosystem: "npm"
     directory: "/"
+    # Target development branch for safer testing
+    target-branch: "development"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -13,6 +15,10 @@ updates:
     labels:
       - "dependencies"
       - "automated"
+    # Ignore major version updates to prevent breaking changes
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     # Group dependencies to reduce PR spam
     groups:
       production-dependencies:
