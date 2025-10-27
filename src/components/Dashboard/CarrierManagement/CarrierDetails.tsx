@@ -62,8 +62,9 @@ export const CarrierDetails: React.FC<CarrierDetailsProps> = ({ carrierId }) => 
       // Get carrier configuration
       const carrierConfig = CarrierService.getCarrier(carrierId);
       if (!carrierConfig) {
+        setLoading(false);
         router.push('/admin/carriers');
-        return;
+        return; // Early return prevents state updates after redirect
       }
       setCarrier(carrierConfig);
 

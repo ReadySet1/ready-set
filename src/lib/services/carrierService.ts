@@ -71,6 +71,9 @@ const CARRIER_CONFIGS: Record<string, CarrierConfig> = {
   // },
 };
 
+// Constants for connectivity testing
+const CONNECTIVITY_TEST_TIMEOUT_MS = 5000;
+
 export class CarrierService {
   /**
    * Get all available carrier configurations
@@ -316,7 +319,7 @@ export class CarrierService {
       .map(async (carrier) => {
         const startTime = Date.now();
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), CONNECTIVITY_TEST_TIMEOUT_MS);
 
         try {
           // For CaterValley, test via our internal status endpoint
