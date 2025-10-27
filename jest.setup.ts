@@ -98,6 +98,15 @@ jest.mock('next/navigation', () => ({
   },
 }));
 
+// Mock next/headers globally
+jest.mock('next/headers', () => ({
+  cookies: jest.fn().mockResolvedValue({
+    set: jest.fn(),
+    get: jest.fn(),
+    delete: jest.fn(),
+  }),
+}));
+
 // PointerEvent polyfill for JSDOM (needed for Radix UI components tested with user-event)
 if (typeof window !== 'undefined' && !window.PointerEvent) {
   class PointerEvent extends MouseEvent {

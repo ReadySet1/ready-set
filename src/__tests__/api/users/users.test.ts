@@ -21,15 +21,18 @@ jest.mock('@/lib/rate-limiting', () => ({
 }));
 
 describe('/api/users API', () => {
+  // Create a shared chain object that can be configured by tests
+  const mockChain = {
+    select: jest.fn(),
+    eq: jest.fn(),
+    single: jest.fn(),
+  };
+
   const mockSupabaseClient = {
     auth: {
       getUser: jest.fn(),
     },
-    from: jest.fn(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn(),
-    })),
+    from: jest.fn(),
   };
 
   const mockPrisma = {
@@ -43,6 +46,15 @@ describe('/api/users API', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Reset chain mocks
+    mockChain.select.mockReturnThis();
+    mockChain.eq.mockReturnThis();
+    mockChain.single.mockResolvedValue({ data: null, error: null });
+
+    // Make from() return the shared chain
+    mockSupabaseClient.from.mockReturnValue(mockChain);
+
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
     (prisma as any).profile = mockPrisma.profile;
     (withDatabaseRetry as jest.Mock).mockImplementation((fn) => fn());
@@ -57,7 +69,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -119,7 +131,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'SUPER_ADMIN' },
           error: null,
         });
@@ -158,7 +170,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'HELPDESK' },
           error: null,
         });
@@ -196,7 +208,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -228,7 +240,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -260,7 +272,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -290,7 +302,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -357,7 +369,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: null,
           error: { message: 'Profile not found' },
         });
@@ -378,7 +390,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'CLIENT' },
           error: null,
         });
@@ -397,7 +409,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'VENDOR' },
           error: null,
         });
@@ -416,7 +428,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'DRIVER' },
           error: null,
         });
@@ -435,7 +447,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -457,7 +469,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'SUPER_ADMIN' },
           error: null,
         });
@@ -479,7 +491,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'HELPDESK' },
           error: null,
         });
@@ -503,7 +515,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -530,7 +542,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -588,7 +600,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'SUPER_ADMIN' },
           error: null,
         });
@@ -625,7 +637,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -710,7 +722,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'CLIENT' },
           error: null,
         });
@@ -739,7 +751,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -769,7 +781,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -799,7 +811,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -829,7 +841,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -860,7 +872,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -894,7 +906,7 @@ describe('/api/users API', () => {
           error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockChain.single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });

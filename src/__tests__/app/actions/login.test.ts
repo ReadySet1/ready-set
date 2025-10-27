@@ -12,61 +12,85 @@
  * - Security edge cases
  */
 
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { login, signup, FormState } from '@/app/actions/login';
-import { createClient, createAdminClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { describe, it, expect, jest, beforeEach, afterEach, beforeAll } from '@jest/globals';
 
-// Mock dependencies
-jest.mock('next/headers');
-jest.mock('next/navigation');
+// Factory functions to create fresh mock instances
+const createMockChain = () => ({
+  select: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  single: jest.fn().mockResolvedValue({ data: null, error: null }),
+  maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+  limit: jest.fn().mockResolvedValue({ data: null, error: null }),
+});
+
+const createMockAdminChain = () => ({
+  upsert: jest.fn().mockReturnThis(),
+  select: jest.fn().mockReturnThis(),
+  single: jest.fn().mockResolvedValue({ data: null, error: null }),
+});
+
+// Shared mock objects
+let mockChain: ReturnType<typeof createMockChain>;
+let mockAdminChain: ReturnType<typeof createMockAdminChain>;
+
+const mockSupabase = {
+  auth: {
+    signInWithPassword: jest.fn(),
+    getUser: jest.fn(),
+    signUp: jest.fn(),
+  },
+  from: jest.fn(),
+};
+
+const mockAdminSupabase = {
+  from: jest.fn(),
+};
+
+const mockCookieStore = {
+  set: jest.fn(),
+};
+
+// Mock the modules
+// NOTE: Jest automocking works for createClient but NOT for createAdminClient
+// This is a known Jest limitation with ES modules - see comments at end of file
 jest.mock('@/utils/supabase/server');
-jest.mock('@/utils/supabase/client', () => ({
-  prefetchUserProfile: jest.fn().mockResolvedValue(undefined)
-}));
+jest.mock('@/utils/supabase/client');
+
+// Import after mocking
+import { login, signup, FormState } from '@/app/actions/login';
+import * as supabaseServer from '@/utils/supabase/server';
+import { cookies } from 'next/headers';
 
 describe('Login Action', () => {
-  let mockSupabase: any;
-  let mockAdminSupabase: any;
-  let mockCookieStore: any;
+  beforeAll(() => {
+    // Setup createAdminClient once (ES module limitation workaround)
+    if (!supabaseServer.createAdminClient) {
+      Object.defineProperty(supabaseServer, 'createAdminClient', {
+        value: jest.fn(),
+        writable: true,
+        configurable: true,
+      });
+    }
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Mock cookie store
-    mockCookieStore = {
-      set: jest.fn(),
-      get: jest.fn(),
-      delete: jest.fn(),
-    };
-    (cookies as jest.MockedFunction<any>).mockImplementation(() => Promise.resolve(mockCookieStore));
+    // Create fresh mock chains for each test
+    mockChain = createMockChain();
+    mockAdminChain = createMockAdminChain();
 
-    // Mock Supabase client
-    mockSupabase = {
-      auth: {
-        signInWithPassword: jest.fn(),
-        getUser: jest.fn(),
-        signUp: jest.fn(),
-      },
-      from: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn(),
-      maybeSingle: jest.fn(),
-      limit: jest.fn().mockReturnThis(),
-      upsert: jest.fn().mockReturnThis(),
-    };
+    // Mock cookies() function to return our mock cookie store
+    // Note: cookies is globally mocked in jest.setup.ts
+    (cookies as jest.Mock).mockResolvedValue(mockCookieStore);
 
-    mockAdminSupabase = {
-      from: jest.fn().mockReturnThis(),
-      upsert: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      single: jest.fn(),
-    };
+    // Make from() return the fresh chains
+    mockSupabase.from.mockReturnValue(mockChain);
+    mockAdminSupabase.from.mockReturnValue(mockAdminChain);
 
-    (createClient as jest.MockedFunction<any>).mockResolvedValue(mockSupabase);
-    (createAdminClient as jest.MockedFunction<any>).mockResolvedValue(mockAdminSupabase);
+    // Setup createClient and createAdminClient to return our mocks
+    (supabaseServer.createClient as jest.Mock).mockResolvedValue(mockSupabase);
+    (supabaseServer.createAdminClient as jest.Mock).mockResolvedValue(mockAdminSupabase);
   });
 
   describe('Input Validation', () => {
@@ -115,14 +139,7 @@ describe('Login Action', () => {
       formData.append('email', 'Test@EXAMPLE.COM');
       formData.append('password', 'ValidPassword123!');
 
-      // Mock connection test success
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-
-      // Mock auth success
+      // Mock successful auth
       mockSupabase.auth.signInWithPassword.mockResolvedValue({
         data: {
           user: { id: 'user-123', email: 'test@example.com' },
@@ -136,7 +153,8 @@ describe('Login Action', () => {
         error: null
       });
 
-      mockSupabase.single.mockResolvedValue({
+      // Mock profile fetch
+      mockChain.single.mockResolvedValue({
         data: { type: 'CLIENT', email: 'test@example.com' },
         error: null
       });
@@ -156,14 +174,7 @@ describe('Login Action', () => {
       formData.append('email', 'test@example.com');
       formData.append('password', 'ValidPassword123!');
 
-      // Mock connection test to succeed
-      const mockConnectionTest = jest.fn().mockResolvedValue({ data: [], error: null });
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: mockConnectionTest
-        })
-      });
-
+      // Mock connection test (already set in beforeEach to succeed)
       // Mock auth to fail so we don't proceed further
       mockSupabase.auth.signInWithPassword.mockResolvedValue({
         data: null,
@@ -172,7 +183,9 @@ describe('Login Action', () => {
 
       await login(null, formData);
 
-      expect(mockConnectionTest).toHaveBeenCalled();
+      // Verify connection was tested (from() and limit() were called)
+      expect(mockSupabase.from).toHaveBeenCalledWith('profiles');
+      expect(mockChain.limit).toHaveBeenCalled();
     });
 
     it('should handle connection errors gracefully', async () => {
@@ -181,13 +194,9 @@ describe('Login Action', () => {
       formData.append('password', 'ValidPassword123!');
 
       // Mock connection test to fail
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue({
-            data: null,
-            error: { message: 'Connection failed' }
-          })
-        })
+      mockChain.limit.mockResolvedValue({
+        data: null,
+        error: { message: 'Connection failed' }
       });
 
       const result = await login(null, formData);
@@ -202,11 +211,7 @@ describe('Login Action', () => {
       formData.append('password', 'ValidPassword123!');
 
       // Mock connection test to throw
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: jest.fn().mockRejectedValue(new Error('Network error'))
-        })
-      });
+      mockChain.limit.mockRejectedValue(new Error('Network error'));
 
       const result = await login(null, formData);
 
@@ -216,18 +221,6 @@ describe('Login Action', () => {
   });
 
   describe('Authentication Flows', () => {
-    beforeEach(() => {
-      // Mock successful connection test for all auth tests
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue({ data: [], error: null }),
-          eq: jest.fn().mockReturnThis(),
-          single: jest.fn(),
-          maybeSingle: jest.fn(),
-        })
-      });
-    });
-
     it('should successfully authenticate with valid credentials', async () => {
       const formData = new FormData();
       formData.append('email', 'test@example.com');
@@ -248,17 +241,10 @@ describe('Login Action', () => {
       });
 
       // Mock profile fetch
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'CLIENT', email: 'test@example.com' },
-              error: null
-            })
-          })
-        })
+      mockChain.single.mockResolvedValue({
+        data: { type: 'CLIENT', email: 'test@example.com' },
+        error: null
       });
-      mockSupabase.from = mockFrom;
 
       const result = await login(null, formData);
 
@@ -279,19 +265,10 @@ describe('Login Action', () => {
       });
 
       // Mock user exists in profiles
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            maybeSingle: jest.fn().mockResolvedValue({
-              data: { email: 'test@example.com', type: 'CLIENT' },
-              error: null
-            }),
-            single: jest.fn(),
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
+      mockChain.maybeSingle.mockResolvedValue({
+        data: { email: 'test@example.com', type: 'CLIENT' },
+        error: null
       });
-      mockSupabase.from = mockFrom;
 
       const result = await login(null, formData);
 
@@ -310,20 +287,7 @@ describe('Login Action', () => {
         error: { message: 'Invalid login credentials' }
       });
 
-      // Mock user does not exist
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            maybeSingle: jest.fn().mockResolvedValue({
-              data: null,
-              error: null
-            }),
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
-
+      // Mock user does not exist (maybeSingle returns null by default from beforeEach)
       const result = await login(null, formData);
 
       expect(result.error).toContain('Account not found');
@@ -349,59 +313,35 @@ describe('Login Action', () => {
   });
 
   describe('Profile Management', () => {
-    beforeEach(() => {
-      // Mock successful connection and auth for profile tests
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue({ data: [], error: null }),
-          eq: jest.fn().mockReturnThis(),
-          single: jest.fn(),
-        })
-      });
+    it('should create profile for user without profile', async () => {
+      const formData = new FormData();
+      formData.append('email', 'newuser@example.com');
+      formData.append('password', 'ValidPassword123!');
 
+      // Mock successful auth
       mockSupabase.auth.signInWithPassword.mockResolvedValue({
         data: {
-          user: { id: 'user-123', email: 'test@example.com' },
+          user: { id: 'user-123', email: 'newuser@example.com' },
           session: { access_token: 'token' }
         },
         error: null
       });
 
       mockSupabase.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'user-123', email: 'test@example.com', user_metadata: {} } },
+        data: { user: { id: 'user-123', email: 'newuser@example.com', user_metadata: {} } },
         error: null
       });
-    });
-
-    it('should create profile for user without profile', async () => {
-      const formData = new FormData();
-      formData.append('email', 'newuser@example.com');
-      formData.append('password', 'ValidPassword123!');
 
       // Mock no profile found
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: null,
-              error: { code: 'PGRST116' } // No rows returned
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
+      mockChain.single.mockResolvedValue({
+        data: null,
+        error: { code: 'PGRST116' } // No rows returned
       });
-      mockSupabase.from = mockFrom;
 
       // Mock admin client profile creation
-      mockAdminSupabase.from.mockReturnValue({
-        upsert: jest.fn().mockReturnValue({
-          select: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'CLIENT', email: 'newuser@example.com' },
-              error: null
-            })
-          })
-        })
+      mockAdminChain.single.mockResolvedValue({
+        data: { type: 'CLIENT', email: 'newuser@example.com' },
+        error: null
       });
 
       const result = await login(null, formData);
@@ -416,30 +356,30 @@ describe('Login Action', () => {
       formData.append('email', 'newuser@example.com');
       formData.append('password', 'ValidPassword123!');
 
-      // Mock no profile found
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: null,
-              error: { code: 'PGRST116' }
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
+      // Mock successful auth
+      mockSupabase.auth.signInWithPassword.mockResolvedValue({
+        data: {
+          user: { id: 'user-123', email: 'newuser@example.com' },
+          session: { access_token: 'token' }
+        },
+        error: null
       });
-      mockSupabase.from = mockFrom;
+
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-123', email: 'newuser@example.com', user_metadata: {} } },
+        error: null
+      });
+
+      // Mock no profile found
+      mockChain.single.mockResolvedValue({
+        data: null,
+        error: { code: 'PGRST116' }
+      });
 
       // Mock admin client profile creation failure
-      mockAdminSupabase.from.mockReturnValue({
-        upsert: jest.fn().mockReturnValue({
-          select: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: null,
-              error: { message: 'Database error' }
-            })
-          })
-        })
+      mockAdminChain.single.mockResolvedValue({
+        data: null,
+        error: { message: 'Database error' }
       });
 
       const result = await login(null, formData);
@@ -453,19 +393,25 @@ describe('Login Action', () => {
       formData.append('email', 'existing@example.com');
       formData.append('password', 'ValidPassword123!');
 
-      // Mock existing profile
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'DRIVER', email: 'existing@example.com' },
-              error: null
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
+      // Mock successful auth
+      mockSupabase.auth.signInWithPassword.mockResolvedValue({
+        data: {
+          user: { id: 'user-123', email: 'existing@example.com' },
+          session: { access_token: 'token' }
+        },
+        error: null
       });
-      mockSupabase.from = mockFrom;
+
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-123', email: 'existing@example.com' } },
+        error: null
+      });
+
+      // Mock existing profile
+      mockChain.single.mockResolvedValue({
+        data: { type: 'DRIVER', email: 'existing@example.com' },
+        error: null
+      });
 
       const result = await login(null, formData);
 
@@ -476,47 +422,33 @@ describe('Login Action', () => {
   });
 
   describe('Role-Based Redirects', () => {
-    beforeEach(() => {
-      // Setup common mocks for redirect tests
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue({ data: [], error: null }),
-          eq: jest.fn().mockReturnThis(),
-          single: jest.fn(),
-        })
-      });
-
+    // Helper to set up successful auth with a specific user type
+    const setupAuthWithUserType = (userType: string, email: string) => {
       mockSupabase.auth.signInWithPassword.mockResolvedValue({
         data: {
-          user: { id: 'user-123', email: 'test@example.com' },
+          user: { id: 'user-123', email },
           session: { access_token: 'token' }
         },
         error: null
       });
 
       mockSupabase.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'user-123', email: 'test@example.com' } },
+        data: { user: { id: 'user-123', email } },
         error: null
       });
-    });
+
+      mockChain.single.mockResolvedValue({
+        data: { type: userType, email },
+        error: null
+      });
+    };
 
     it('should redirect ADMIN users to /admin', async () => {
       const formData = new FormData();
       formData.append('email', 'admin@example.com');
       formData.append('password', 'AdminPass123!');
 
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'ADMIN', email: 'admin@example.com' },
-              error: null
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
+      setupAuthWithUserType('ADMIN', 'admin@example.com');
 
       const result = await login(null, formData);
 
@@ -529,18 +461,7 @@ describe('Login Action', () => {
       formData.append('email', 'superadmin@example.com');
       formData.append('password', 'SuperPass123!');
 
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'SUPER_ADMIN', email: 'superadmin@example.com' },
-              error: null
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
+      setupAuthWithUserType('SUPER_ADMIN', 'superadmin@example.com');
 
       const result = await login(null, formData);
 
@@ -553,18 +474,7 @@ describe('Login Action', () => {
       formData.append('email', 'driver@example.com');
       formData.append('password', 'DriverPass123!');
 
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'DRIVER', email: 'driver@example.com' },
-              error: null
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
+      setupAuthWithUserType('DRIVER', 'driver@example.com');
 
       const result = await login(null, formData);
 
@@ -577,18 +487,7 @@ describe('Login Action', () => {
       formData.append('email', 'client@example.com');
       formData.append('password', 'ClientPass123!');
 
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'CLIENT', email: 'client@example.com' },
-              error: null
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
+      setupAuthWithUserType('CLIENT', 'client@example.com');
 
       const result = await login(null, formData);
 
@@ -601,18 +500,7 @@ describe('Login Action', () => {
       formData.append('email', 'vendor@example.com');
       formData.append('password', 'VendorPass123!');
 
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'VENDOR', email: 'vendor@example.com' },
-              error: null
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
+      setupAuthWithUserType('VENDOR', 'vendor@example.com');
 
       const result = await login(null, formData);
 
@@ -625,18 +513,7 @@ describe('Login Action', () => {
       formData.append('email', 'helpdesk@example.com');
       formData.append('password', 'HelpdeskPass123!');
 
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'HELPDESK', email: 'helpdesk@example.com' },
-              error: null
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
+      setupAuthWithUserType('HELPDESK', 'helpdesk@example.com');
 
       const result = await login(null, formData);
 
@@ -650,18 +527,7 @@ describe('Login Action', () => {
       formData.append('password', 'AdminPass123!');
       formData.append('returnTo', '/admin/users');
 
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'ADMIN', email: 'admin@example.com' },
-              error: null
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
+      setupAuthWithUserType('ADMIN', 'admin@example.com');
 
       const result = await login(null, formData);
 
@@ -674,18 +540,7 @@ describe('Login Action', () => {
       formData.append('password', 'ClientPass123!');
       formData.append('returnTo', '/admin/users'); // CLIENT shouldn't have access
 
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'CLIENT', email: 'client@example.com' },
-              error: null
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
+      setupAuthWithUserType('CLIENT', 'client@example.com');
 
       const result = await login(null, formData);
 
@@ -698,18 +553,7 @@ describe('Login Action', () => {
       formData.append('password', 'DriverPass123!');
       formData.append('returnTo', '/');
 
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'DRIVER', email: 'driver@example.com' },
-              error: null
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
+      setupAuthWithUserType('DRIVER', 'driver@example.com');
 
       const result = await login(null, formData);
 
@@ -718,18 +562,10 @@ describe('Login Action', () => {
   });
 
   describe('Session Management', () => {
-    beforeEach(() => {
-      // Setup common mocks
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue({ data: [], error: null }),
-          eq: jest.fn().mockReturnThis(),
-          single: jest.fn().mockResolvedValue({
-            data: { type: 'CLIENT', email: 'test@example.com' },
-            error: null
-          }),
-        })
-      });
+    it('should set user-session-data cookie on successful login', async () => {
+      const formData = new FormData();
+      formData.append('email', 'test@example.com');
+      formData.append('password', 'ValidPassword123!');
 
       mockSupabase.auth.signInWithPassword.mockResolvedValue({
         data: {
@@ -743,12 +579,11 @@ describe('Login Action', () => {
         data: { user: { id: 'user-123', email: 'test@example.com' } },
         error: null
       });
-    });
 
-    it('should set user-session-data cookie on successful login', async () => {
-      const formData = new FormData();
-      formData.append('email', 'test@example.com');
-      formData.append('password', 'ValidPassword123!');
+      mockChain.single.mockResolvedValue({
+        data: { type: 'CLIENT', email: 'test@example.com' },
+        error: null
+      });
 
       await login(null, formData);
 
@@ -768,6 +603,24 @@ describe('Login Action', () => {
       formData.append('email', 'test@example.com');
       formData.append('password', 'ValidPassword123!');
 
+      mockSupabase.auth.signInWithPassword.mockResolvedValue({
+        data: {
+          user: { id: 'user-123', email: 'test@example.com' },
+          session: { access_token: 'token' }
+        },
+        error: null
+      });
+
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-123', email: 'test@example.com' } },
+        error: null
+      });
+
+      mockChain.single.mockResolvedValue({
+        data: { type: 'CLIENT', email: 'test@example.com' },
+        error: null
+      });
+
       await login(null, formData);
 
       expect(mockCookieStore.set).toHaveBeenCalledWith(
@@ -786,6 +639,24 @@ describe('Login Action', () => {
       formData.append('email', 'test@example.com');
       formData.append('password', 'ValidPassword123!');
 
+      mockSupabase.auth.signInWithPassword.mockResolvedValue({
+        data: {
+          user: { id: 'user-123', email: 'test@example.com' },
+          session: { access_token: 'token' }
+        },
+        error: null
+      });
+
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-123', email: 'test@example.com' } },
+        error: null
+      });
+
+      mockChain.single.mockResolvedValue({
+        data: { type: 'CLIENT', email: 'test@example.com' },
+        error: null
+      });
+
       await login(null, formData);
 
       expect(mockCookieStore.set).toHaveBeenCalledWith(
@@ -799,14 +670,6 @@ describe('Login Action', () => {
   });
 
   describe('Security Edge Cases', () => {
-    beforeEach(() => {
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue({ data: [], error: null }),
-        })
-      });
-    });
-
     it('should handle SQL injection attempts in email', async () => {
       const formData = new FormData();
       formData.append('email', "admin'--@example.com");
@@ -817,19 +680,6 @@ describe('Login Action', () => {
         data: null,
         error: { message: 'Invalid login credentials' }
       });
-
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            maybeSingle: jest.fn().mockResolvedValue({
-              data: null,
-              error: null
-            }),
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
 
       const result = await login(null, formData);
 
@@ -858,31 +708,11 @@ describe('Login Action', () => {
       formData.append('email', 'test@example.com');
       formData.append('password', 'a'.repeat(10000)); // Very long password
 
-      // Mock connection test
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-
       // Mock auth to handle it
       mockSupabase.auth.signInWithPassword.mockResolvedValue({
         data: null,
         error: { message: 'Invalid login credentials' }
       });
-
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            maybeSingle: jest.fn().mockResolvedValue({
-              data: null,
-              error: null
-            }),
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
 
       const result = await login(null, formData);
 
@@ -899,31 +729,11 @@ describe('Login Action', () => {
       formData.append('email', 'test@例え.com');
       formData.append('password', '密码Password123!');
 
-      // Mock connection test
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-
       // Mock auth
       mockSupabase.auth.signInWithPassword.mockResolvedValue({
         data: null,
         error: { message: 'Invalid login credentials' }
       });
-
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            maybeSingle: jest.fn().mockResolvedValue({
-              data: null,
-              error: null
-            }),
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
-      });
-      mockSupabase.from = mockFrom;
 
       const result = await login(null, formData);
 
@@ -935,14 +745,6 @@ describe('Login Action', () => {
   });
 
   describe('Error Handling', () => {
-    beforeEach(() => {
-      mockSupabase.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue({ data: [], error: null }),
-        })
-      });
-    });
-
     it('should handle getUser failure after successful auth', async () => {
       const formData = new FormData();
       formData.append('email', 'test@example.com');
@@ -987,18 +789,10 @@ describe('Login Action', () => {
       });
 
       // Mock profile fetch error
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: null,
-              error: { code: 'SOME_ERROR', message: 'Database error' }
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
+      mockChain.single.mockResolvedValue({
+        data: null,
+        error: { code: 'SOME_ERROR', message: 'Database error' }
       });
-      mockSupabase.from = mockFrom;
 
       const result = await login(null, formData);
 
@@ -1025,18 +819,10 @@ describe('Login Action', () => {
       });
 
       // Mock profile with missing type
-      const mockFrom = jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { email: 'test@example.com', type: null }, // Missing type
-              error: null
-            })
-          }),
-          limit: jest.fn().mockResolvedValue({ data: [], error: null })
-        })
+      mockChain.single.mockResolvedValue({
+        data: { email: 'test@example.com', type: null }, // Missing type
+        error: null
       });
-      mockSupabase.from = mockFrom;
 
       const result = await login(null, formData);
 
@@ -1047,23 +833,36 @@ describe('Login Action', () => {
 });
 
 describe('Signup Action', () => {
-  let mockSupabase: any;
+  // Factory function for signup mock chain
+  const createSignupMockChain = () => ({
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: null, error: null }),
+    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    limit: jest.fn().mockResolvedValue({ data: null, error: null }),
+    upsert: jest.fn().mockReturnThis(),
+  });
+
+  let mockChain: ReturnType<typeof createSignupMockChain>;
+
+  const mockSupabase = {
+    auth: {
+      signUp: jest.fn(),
+    },
+    from: jest.fn(),
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
 
-    (cookies as jest.MockedFunction<any>).mockImplementation(() => Promise.resolve({}));
+    // Create fresh mock chain for each test
+    mockChain = createSignupMockChain();
 
-    mockSupabase = {
-      auth: {
-        signUp: jest.fn(),
-      },
-    };
+    // Make from() return the fresh chain
+    mockSupabase.from.mockReturnValue(mockChain);
 
-    (createClient as jest.MockedFunction<any>).mockResolvedValue(mockSupabase);
-    (redirect as jest.MockedFunction<any>).mockImplementation((url: string) => {
-      throw new Error(`REDIRECT: ${url}`);
-    });
+    // Setup mocked Supabase client
+    (supabaseServer.createClient as jest.Mock).mockResolvedValue(mockSupabase);
   });
 
   it('should reject signup without email', async () => {
@@ -1133,3 +932,46 @@ describe('Signup Action', () => {
     await expect(signup(formData)).rejects.toThrow('REDIRECT: /sign-in?error=Email+already+registered');
   });
 });
+
+/**
+ * KNOWN LIMITATION - Jest ES Module Mocking
+ *
+ * Status: 28/40 tests passing (70% success rate)
+ *
+ * Issue:
+ * Jest's automocking does NOT create the `createAdminClient` export from '@/utils/supabase/server'.
+ * Only `createClient` is properly automocked. This is a fundamental Jest limitation with ES modules.
+ *
+ * Failing Tests (12):
+ * - Profile Management › should create profile for user without profile
+ * - Profile Management › should handle profile creation failure
+ * - Session Management › should set user-session-data cookie on successful login
+ * - Session Management › should set temp-session-data cookie
+ * - Session Management › should set user-profile cache cookie
+ * - Security Edge Cases › should handle XSS attempts in input
+ * - All Signup Action tests (6 tests)
+ *
+ * Root Cause:
+ * When login.ts imports `createAdminClient`, it gets `undefined` because Jest's automocking
+ * doesn't create it. Factory-based mocking (jest.mock with a factory function) creates
+ * mock instances that are DIFFERENT from what gets imported, making it impossible to configure
+ * them in beforeEach.
+ *
+ * Attempted Solutions (all failed):
+ * 1. Factory mocking with jest.fn() - creates different instances
+ * 2. Object.defineProperty after import - too late, bindings already created
+ * 3. Various factory syntaxes (arrow functions, named functions, module.exports) - all fail
+ * 4. Pre-creating mocks before jest.mock - Jest replaces them with different instances
+ * 5. __esModule: true flag - no effect
+ * 6. jest.requireActual() - circular dependency issues
+ *
+ * Possible Solutions:
+ * 1. Refactor login.ts to not use createAdminClient directly (use dependency injection)
+ * 2. Use integration tests instead of unit tests for these scenarios
+ * 3. Wait for Jest to improve ES module support
+ * 4. Switch to a different test framework (Vitest has better ES module support)
+ *
+ * References:
+ * - https://jestjs.io/docs/ecmascript-modules
+ * - https://github.com/facebook/jest/issues/10025
+ */

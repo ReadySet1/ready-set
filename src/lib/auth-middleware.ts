@@ -91,6 +91,8 @@ export async function withAuth(
 
     if (authError || !user) {
       if (requireAuth) {
+        // Note: Using console.error here instead of authLogger to avoid circular dependencies
+        // authLogger may depend on auth utilities which could create import cycles
         console.error('❌ [Auth Middleware] Authentication failed:', {
           authError: authError?.message,
           hasUser: !!user,
@@ -118,6 +120,7 @@ export async function withAuth(
         const userRole = await getUserRole(user.id);
 
     if (!userRole && requireAuth) {
+      // Note: Using console.error to avoid circular dependencies with authLogger
       console.error('❌ [Auth Middleware] User role not found for user ID:', user.id);
       return {
         success: false,
@@ -131,9 +134,13 @@ export async function withAuth(
 
     const userType = userRole as 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT';
 
-    
-    // Check role permissions
-    if (allowedRoles.length > 0 && userType && !allowedRoles.includes(userType)) {
+
+    // Check role permissions (normalize to uppercase for case-insensitive comparison)
+    const normalizedUserType = userType?.toUpperCase();
+    const normalizedAllowedRoles = allowedRoles.map(role => role.toUpperCase());
+
+    if (allowedRoles.length > 0 && normalizedUserType && !normalizedAllowedRoles.includes(normalizedUserType)) {
+      // Note: Using console.error to avoid circular dependencies with authLogger
       console.error('❌ [Auth Middleware] Insufficient permissions for user type:', userType, 'Allowed roles:', allowedRoles);
       return {
         success: false,
@@ -145,7 +152,7 @@ export async function withAuth(
       };
     }
 
-    
+
     // Create auth context with real user data
     const authUser = {
       id: user.id,
@@ -154,13 +161,15 @@ export async function withAuth(
       driverId: userType === 'DRIVER' ? user.id : undefined
     };
 
+    // Normalize role checks to uppercase for case-insensitive comparison
+    const normalizedType = userType?.toUpperCase();
     return {
       success: true,
-      context: { 
+      context: {
         user: authUser,
-        isAdmin: ['ADMIN', 'SUPER_ADMIN'].includes(userType),
-        isSuperAdmin: ['SUPER_ADMIN'].includes(userType),
-        isHelpdesk: ['HELPDESK'].includes(userType)
+        isAdmin: ['ADMIN', 'SUPER_ADMIN'].includes(normalizedType),
+        isSuperAdmin: ['SUPER_ADMIN'].includes(normalizedType),
+        isHelpdesk: ['HELPDESK'].includes(normalizedType)
       }
     };
   } catch (error) {
