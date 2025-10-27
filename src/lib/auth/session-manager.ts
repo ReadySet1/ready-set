@@ -1,5 +1,17 @@
 // src/lib/auth/session-manager.ts
 // Enhanced session management with automatic token refresh and cross-tab synchronization
+//
+// BROWSER COMPATIBILITY REQUIREMENTS:
+// - Modern browsers (Chrome 60+, Firefox 55+, Safari 11+, Edge 79+)
+// - Required APIs:
+//   - Web Crypto API (window.crypto.subtle) for SHA-256 fingerprint hashing
+//   - BroadcastChannel API for cross-tab synchronization (optional, graceful fallback)
+//   - localStorage for session persistence
+//   - Canvas API for fingerprint generation
+// - Graceful fallbacks are provided for older browsers:
+//   - SHA-256 falls back to base64 encoding if crypto.subtle unavailable
+//   - BroadcastChannel is optional and can be disabled via config
+//   - Server-side rendering is fully supported with appropriate checks
 
 import { User, Session } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
