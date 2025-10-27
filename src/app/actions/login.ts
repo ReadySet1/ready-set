@@ -131,7 +131,7 @@ export async function login(
         }
 
         return {
-          error: "Invalid email or password. Please check your credentials and try again.",
+          error: "Invalid email or password. Please try again or use Magic Link for password-free sign in.",
           success: false
         };
       } else if (authError.message.includes('Email not confirmed')) {
@@ -216,16 +216,16 @@ export async function login(
               };
             }
           } else {
-                        return { 
-              error: "Please check your email and click the confirmation link before signing in.",
-              success: false 
+                        return {
+              error: "Please verify your email address before signing in.",
+              success: false
             };
           }
         } catch (checkError) {
           console.error(`❌ [${requestId}] Error checking user profile:`, checkError);
-          return { 
-            error: "Please check your email and click the confirmation link before signing in.",
-            success: false 
+          return {
+            error: "Please verify your email address before signing in.",
+            success: false
           };
         }
       } else if (authError.message.includes('Too many requests')) {

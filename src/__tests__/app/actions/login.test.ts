@@ -12,22 +12,26 @@
  * - Security edge cases
  */
 
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterEach, beforeAll } from '@jest/globals';
 
-// Create shared mock objects first (before the mocks that will use them)
-const mockChain = {
-  select: jest.fn(),
-  eq: jest.fn(),
-  single: jest.fn(),
-  maybeSingle: jest.fn(),
-  limit: jest.fn(),
-};
+// Factory functions to create fresh mock instances
+const createMockChain = () => ({
+  select: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  single: jest.fn().mockResolvedValue({ data: null, error: null }),
+  maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+  limit: jest.fn().mockResolvedValue({ data: null, error: null }),
+});
 
-const mockAdminChain = {
-  upsert: jest.fn(),
-  select: jest.fn(),
-  single: jest.fn(),
-};
+const createMockAdminChain = () => ({
+  upsert: jest.fn().mockReturnThis(),
+  select: jest.fn().mockReturnThis(),
+  single: jest.fn().mockResolvedValue({ data: null, error: null }),
+});
+
+// Shared mock objects
+let mockChain: ReturnType<typeof createMockChain>;
+let mockAdminChain: ReturnType<typeof createMockAdminChain>;
 
 const mockSupabase = {
   auth: {
@@ -58,34 +62,8 @@ import * as supabaseServer from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 
 describe('Login Action', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-
-    // Mock cookies() function to return our mock cookie store
-    // Note: cookies is globally mocked in jest.setup.ts
-    (cookies as jest.Mock).mockResolvedValue(mockCookieStore);
-
-    // Reset chain mocks to default chainable behavior
-    mockChain.select.mockReturnThis();
-    mockChain.eq.mockReturnThis();
-    mockChain.single.mockResolvedValue({ data: null, error: null });
-    mockChain.maybeSingle.mockResolvedValue({ data: null, error: null });
-    mockChain.limit.mockResolvedValue({ data: null, error: null });
-
-    // Reset admin chain mocks
-    mockAdminChain.upsert.mockReturnThis();
-    mockAdminChain.select.mockReturnThis();
-    mockAdminChain.single.mockResolvedValue({ data: null, error: null });
-
-    // Make from() return the shared chains
-    mockSupabase.from.mockReturnValue(mockChain);
-    mockAdminSupabase.from.mockReturnValue(mockAdminChain);
-
-    // Setup createClient and createAdminClient to return our mocks
-    (supabaseServer.createClient as jest.Mock).mockResolvedValue(mockSupabase);
-
-    // createAdminClient is not automocked by Jest (ES module limitation)
-    // Add it manually if it doesn't exist
+  beforeAll(() => {
+    // Setup createAdminClient once (ES module limitation workaround)
     if (!supabaseServer.createAdminClient) {
       Object.defineProperty(supabaseServer, 'createAdminClient', {
         value: jest.fn(),
@@ -93,6 +71,25 @@ describe('Login Action', () => {
         configurable: true,
       });
     }
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    // Create fresh mock chains for each test
+    mockChain = createMockChain();
+    mockAdminChain = createMockAdminChain();
+
+    // Mock cookies() function to return our mock cookie store
+    // Note: cookies is globally mocked in jest.setup.ts
+    (cookies as jest.Mock).mockResolvedValue(mockCookieStore);
+
+    // Make from() return the fresh chains
+    mockSupabase.from.mockReturnValue(mockChain);
+    mockAdminSupabase.from.mockReturnValue(mockAdminChain);
+
+    // Setup createClient and createAdminClient to return our mocks
+    (supabaseServer.createClient as jest.Mock).mockResolvedValue(mockSupabase);
     (supabaseServer.createAdminClient as jest.Mock).mockResolvedValue(mockAdminSupabase);
   });
 
@@ -836,14 +833,17 @@ describe('Login Action', () => {
 });
 
 describe('Signup Action', () => {
-  const mockChain = {
-    select: jest.fn(),
-    eq: jest.fn(),
-    single: jest.fn(),
-    maybeSingle: jest.fn(),
-    limit: jest.fn(),
-    upsert: jest.fn(),
-  };
+  // Factory function for signup mock chain
+  const createSignupMockChain = () => ({
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: null, error: null }),
+    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    limit: jest.fn().mockResolvedValue({ data: null, error: null }),
+    upsert: jest.fn().mockReturnThis(),
+  });
+
+  let mockChain: ReturnType<typeof createSignupMockChain>;
 
   const mockSupabase = {
     auth: {
@@ -853,25 +853,12 @@ describe('Signup Action', () => {
   };
 
   beforeEach(() => {
-    // Clear mocks
-    mockChain.select.mockClear();
-    mockChain.eq.mockClear();
-    mockChain.single.mockClear();
-    mockChain.maybeSingle.mockClear();
-    mockChain.limit.mockClear();
-    mockChain.upsert.mockClear();
-    mockSupabase.from.mockClear();
-    mockSupabase.auth.signUp.mockClear();
+    jest.clearAllMocks();
 
-    // Reset chain mocks
-    mockChain.select.mockReturnThis();
-    mockChain.eq.mockReturnThis();
-    mockChain.limit.mockReturnThis();
-    mockChain.upsert.mockReturnThis();
-    mockChain.single.mockResolvedValue({ data: null, error: null });
-    mockChain.maybeSingle.mockResolvedValue({ data: null, error: null });
+    // Create fresh mock chain for each test
+    mockChain = createSignupMockChain();
 
-    // Make from() return the shared chain
+    // Make from() return the fresh chain
     mockSupabase.from.mockReturnValue(mockChain);
 
     // Setup mocked Supabase client

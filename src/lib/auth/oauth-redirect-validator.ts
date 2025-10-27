@@ -65,8 +65,43 @@ export function validateOAuthRedirect(redirectUrl: string, isProduction = false)
 
 /**
  * Validates OAuth state parameter to prevent CSRF attacks
+ *
+ * IMPORTANT: State Storage Implementation Required
+ *
+ * The state parameter must be stored securely before initiating OAuth flow
+ * and retrieved during the callback. Recommended implementation:
+ *
+ * @example
+ * // Step 1: Initiating OAuth flow
+ * import { generateOAuthState } from '@/lib/auth/oauth-redirect-validator';
+ * import { cookies } from 'next/headers';
+ *
+ * const state = generateOAuthState();
+ * cookies().set('oauth_state', state, {
+ *   httpOnly: true,
+ *   secure: process.env.NODE_ENV === 'production',
+ *   sameSite: 'lax',
+ *   maxAge: 60 * 10 // 10 minutes
+ * });
+ * // Redirect to OAuth provider with state parameter
+ *
+ * @example
+ * // Step 2: OAuth callback handler
+ * import { validateOAuthState } from '@/lib/auth/oauth-redirect-validator';
+ * import { cookies } from 'next/headers';
+ *
+ * const callbackState = searchParams.get('state');
+ * const savedState = cookies().get('oauth_state')?.value;
+ *
+ * if (!validateOAuthState(callbackState, savedState)) {
+ *   return { error: 'Invalid OAuth state - possible CSRF attack' };
+ * }
+ *
+ * // Clear the state cookie after validation
+ * cookies().delete('oauth_state');
+ *
  * @param state - The state parameter from OAuth callback
- * @param expectedState - The expected state value (stored in session)
+ * @param expectedState - The expected state value (stored in session/cookie)
  * @returns true if state is valid, false otherwise
  */
 export function validateOAuthState(state: string | null, expectedState: string | null): boolean {
@@ -95,9 +130,18 @@ export function generateOAuthState(): string {
     window.crypto.getRandomValues(array);
   } else {
     // Fallback for server-side (Node.js)
-    // Using dynamic import to avoid require() in ES module
-    const { randomFillSync } = require('crypto');
-    randomFillSync(array);
+    // Using dynamic require for compatibility (wrapped in try-catch)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const crypto = require('crypto');
+      crypto.randomFillSync(array);
+    } catch (error) {
+      // Fallback to less secure but functional random generation
+      authLogger.warn('Crypto module not available, using Math.random fallback');
+      for (let i = 0; i < array.length; i++) {
+        array[i] = Math.floor(Math.random() * 256);
+      }
+    }
   }
 
   // Convert to base64url (URL-safe base64)
