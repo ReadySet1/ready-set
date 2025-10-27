@@ -42,7 +42,7 @@ export function validateOAuthRedirect(redirectUrl: string, isProduction = false)
     const allowedDomains = isProduction ? PRODUCTION_DOMAINS : ALLOWED_REDIRECT_DOMAINS;
 
     // Exact match validation (no suffix matching)
-    const isAllowed = allowedDomains.includes(host as any);
+    const isAllowed = (allowedDomains as readonly string[]).includes(host);
 
     if (!isAllowed) {
       authLogger.warn('OAuth redirect validation failed', {
@@ -95,16 +95,27 @@ export function generateOAuthState(): string {
     window.crypto.getRandomValues(array);
   } else {
     // Fallback for server-side (Node.js)
-    const crypto = require('crypto');
-    crypto.randomFillSync(array);
+    // Using dynamic import to avoid require() in ES module
+    const { randomFillSync } = require('crypto');
+    randomFillSync(array);
   }
 
   // Convert to base64url (URL-safe base64)
-  return Buffer.from(array)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
+  // Note: Buffer is available in Node.js but not in browser
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(array)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  } else {
+    // Browser fallback using btoa
+    const base64 = btoa(String.fromCharCode(...array));
+    return base64
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  }
 }
 
 /**

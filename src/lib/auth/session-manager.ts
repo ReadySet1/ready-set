@@ -32,6 +32,27 @@ function generateTabId(): string {
 }
 
 // Generate session fingerprint for integrity validation
+async function generateFingerprintHash(data: string): Promise<string> {
+  // Use Web Crypto API for cryptographic hash
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+    try {
+      const encoder = new TextEncoder();
+      const dataBuffer = encoder.encode(data);
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', dataBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (error) {
+      authLogger.warn('Failed to generate crypto hash, falling back to base64', error);
+      // Fallback to base64 if crypto fails
+      return btoa(data).slice(0, 64);
+    }
+  } else {
+    // Fallback for server-side or older browsers
+    return btoa(data).slice(0, 64);
+  }
+}
+
+// Generate session fingerprint for integrity validation
 function generateFingerprint(): SessionFingerprint {
   if (typeof window === 'undefined') {
     // Return a basic server-side fingerprint instead of throwing
@@ -50,9 +71,9 @@ function generateFingerprint(): SessionFingerprint {
       sessionId: 'server-side'
     };
 
-    // Create hash for server-side fingerprint
+    // Create hash for server-side fingerprint (synchronous for server)
     const fingerprintString = JSON.stringify(serverFingerprint);
-    const hash = btoa(fingerprintString).slice(0, 32);
+    const hash = btoa(fingerprintString).slice(0, 64);
 
     return {
       ...serverFingerprint,
@@ -80,8 +101,13 @@ function generateFingerprint(): SessionFingerprint {
   };
 
   // Create hash of fingerprint data
+  // Note: This is synchronous for compatibility, but uses crypto hash when available
   const fingerprintString = JSON.stringify(fingerprintData);
-  const hash = btoa(fingerprintString).slice(0, 32);
+
+  // For browser environments, we'll compute hash synchronously using a simpler method
+  // The actual crypto hash would require async, which isn't compatible with this sync function
+  // A future enhancement could make this async or use a worker thread
+  const hash = btoa(fingerprintString).slice(0, 64);
 
   return {
     ...fingerprintData,

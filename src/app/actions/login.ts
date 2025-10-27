@@ -131,7 +131,7 @@ export async function login(
         }
 
         return {
-          error: "Invalid email or password. Please check your credentials and try again, or use Magic Link for password-free sign in.",
+          error: "Invalid email or password. Please check your credentials and try again.",
           success: false
         };
       } else if (authError.message.includes('Email not confirmed')) {

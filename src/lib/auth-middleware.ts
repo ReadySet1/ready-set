@@ -91,6 +91,8 @@ export async function withAuth(
 
     if (authError || !user) {
       if (requireAuth) {
+        // Note: Using console.error here instead of authLogger to avoid circular dependencies
+        // authLogger may depend on auth utilities which could create import cycles
         console.error('❌ [Auth Middleware] Authentication failed:', {
           authError: authError?.message,
           hasUser: !!user,
@@ -118,6 +120,7 @@ export async function withAuth(
         const userRole = await getUserRole(user.id);
 
     if (!userRole && requireAuth) {
+      // Note: Using console.error to avoid circular dependencies with authLogger
       console.error('❌ [Auth Middleware] User role not found for user ID:', user.id);
       return {
         success: false,
@@ -137,6 +140,7 @@ export async function withAuth(
     const normalizedAllowedRoles = allowedRoles.map(role => role.toUpperCase());
 
     if (allowedRoles.length > 0 && normalizedUserType && !normalizedAllowedRoles.includes(normalizedUserType)) {
+      // Note: Using console.error to avoid circular dependencies with authLogger
       console.error('❌ [Auth Middleware] Insufficient permissions for user type:', userType, 'Allowed roles:', allowedRoles);
       return {
         success: false,
