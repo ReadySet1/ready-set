@@ -12,8 +12,8 @@ import { createClient } from "@/utils/supabase/server";
  * - Returns 404 if not found, 403 if forbidden.
  */
 import { prisma } from '@/utils/prismaDB';
-import { Prisma, PrismaClientKnownRequestError } from '@prisma/client';
-import { UserType } from '@/types/prisma';
+import { Prisma } from '@prisma/client';
+import { UserType, PrismaClientKnownRequestError } from '@/types/prisma';
 import { PrismaTransaction } from '@/types/prisma-types';
 
 export async function GET(request: NextRequest) {
