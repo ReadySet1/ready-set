@@ -14,23 +14,44 @@ import { chromium, type FullConfig } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 
+/**
+ * Gets a required environment variable or throws with a helpful error message
+ * @param key - Environment variable name
+ * @param context - Description of what this variable is used for
+ * @returns The environment variable value
+ * @throws Error if the environment variable is not set
+ */
+function getRequiredEnv(key: string, context: string): string {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(
+      `Missing required environment variable: ${key}\n` +
+      `Context: ${context}\n` +
+      `Please set this in your .env.test file or CI secrets.\n` +
+      `See e2e/README.md for setup instructions.`
+    );
+  }
+  return value;
+}
+
 // Test user credentials from environment variables
-// These should be set in .env.test (gitignored) or CI secrets
+// These MUST be set in .env.test (gitignored) or CI secrets
+// No fallbacks to ensure security - will fail fast if not configured
 const TEST_USERS = {
   CLIENT: {
-    email: process.env.TEST_CLIENT_EMAIL || 'test-client@example.com',
-    password: process.env.TEST_CLIENT_PASSWORD || 'TestPassword123!',
+    email: getRequiredEnv('TEST_CLIENT_EMAIL', 'E2E test client authentication'),
+    password: getRequiredEnv('TEST_CLIENT_PASSWORD', 'E2E test client authentication'),
     role: 'CLIENT',
   },
   VENDOR: {
-    email: process.env.TEST_VENDOR_EMAIL || 'test-vendor@example.com',
-    password: process.env.TEST_VENDOR_PASSWORD || 'TestPassword123!',
+    email: getRequiredEnv('TEST_VENDOR_EMAIL', 'E2E test vendor authentication'),
+    password: getRequiredEnv('TEST_VENDOR_PASSWORD', 'E2E test vendor authentication'),
     role: 'VENDOR',
   },
   // Add ADMIN when available
   // ADMIN: {
-  //   email: process.env.TEST_ADMIN_EMAIL || 'test-admin@example.com',
-  //   password: process.env.TEST_ADMIN_PASSWORD || 'TestPassword123!',
+  //   email: getRequiredEnv('TEST_ADMIN_EMAIL', 'E2E test admin authentication'),
+  //   password: getRequiredEnv('TEST_ADMIN_PASSWORD', 'E2E test admin authentication'),
   //   role: 'ADMIN',
   // },
 };

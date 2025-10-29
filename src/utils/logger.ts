@@ -97,6 +97,20 @@ export const carrierLogger = new Logger({
   enabledInTest: false,
 });
 
+export const emailResilienceLogger = new Logger({
+  enabledInProduction: false, // Disable verbose retries in production
+  enabledInBuild: false,
+  enabledInDevelopment: true, // Enable for debugging retry logic
+  enabledInTest: false,
+});
+
+export const apiResilienceLogger = new Logger({
+  enabledInProduction: false, // Disable verbose retries in production
+  enabledInBuild: false,
+  enabledInDevelopment: true, // Enable for debugging retry logic
+  enabledInTest: false,
+});
+
 // General logger
 export const logger = new Logger();
 

@@ -7,6 +7,8 @@
  * Part of REA-77: External API Resilience Implementation
  */
 
+import { apiResilienceLogger } from './logger';
+
 // ============================================================================
 // Configuration Types
 // ============================================================================
@@ -196,7 +198,7 @@ export class ApiCircuitBreaker {
   }
 
   private transitionToOpen(): void {
-    console.warn(`[${this.name} Circuit Breaker] Opening circuit after threshold failures`, {
+    apiResilienceLogger.warn(`[${this.name} Circuit Breaker] Opening circuit after threshold failures`, {
       failureCount: this.state.failureCount,
       threshold: this.config.circuitBreakerThreshold,
     });
@@ -206,14 +208,14 @@ export class ApiCircuitBreaker {
   }
 
   private transitionToHalfOpen(): void {
-    console.info(`[${this.name} Circuit Breaker] Transitioning to half-open state`);
+    apiResilienceLogger.info(`[${this.name} Circuit Breaker] Transitioning to half-open state`);
 
     this.state.state = 'half-open';
     this.state.successCount = 0;
   }
 
   private transitionToClosed(): void {
-    console.info(`[${this.name} Circuit Breaker] Closing circuit after recovery`);
+    apiResilienceLogger.info(`[${this.name} Circuit Breaker] Closing circuit after recovery`);
 
     this.state.state = 'closed';
     this.state.failureCount = 0;
@@ -345,14 +347,14 @@ export async function withApiRetry<T>(
       circuitBreaker.recordSuccess();
 
       if (attempt > 1) {
-        console.info(`[${apiName} Resilience] Operation succeeded after ${attempt} attempts`);
+        apiResilienceLogger.info(`[${apiName} Resilience] Operation succeeded after ${attempt} attempts`);
       }
 
       return result;
     } catch (error: any) {
       lastError = error;
 
-      console.warn(`[${apiName} Resilience] Attempt ${attempt}/${fullConfig.maxRetries} failed:`, {
+      apiResilienceLogger.warn(`[${apiName} Resilience] Attempt ${attempt}/${fullConfig.maxRetries} failed:`, {
         error: error.message || error,
         statusCode: error.statusCode || error.status,
       });
@@ -364,13 +366,13 @@ export async function withApiRetry<T>(
       const isRetryable = isRetryableApiError(error, fullConfig);
 
       if (!isRetryable) {
-        console.warn(`[${apiName} Resilience] Non-retryable error detected - aborting retry`);
+        apiResilienceLogger.warn(`[${apiName} Resilience] Non-retryable error detected - aborting retry`);
         throw error;
       }
 
       // Don't retry if this was the last attempt
       if (attempt >= fullConfig.maxRetries) {
-        console.error(
+        apiResilienceLogger.error(
           `[${apiName} Resilience] All ${fullConfig.maxRetries} attempts failed - giving up`
         );
         throw error;
@@ -382,12 +384,12 @@ export async function withApiRetry<T>(
 
       if (retryAfterDelay !== null) {
         delay = retryAfterDelay;
-        console.info(
+        apiResilienceLogger.info(
           `[${apiName} Resilience] Rate limited - respecting Retry-After: ${delay}ms`
         );
       } else {
         delay = calculateBackoffDelay(attempt, fullConfig);
-        console.info(
+        apiResilienceLogger.info(
           `[${apiName} Resilience] Waiting ${delay}ms before attempt ${attempt + 1}`
         );
       }
@@ -415,7 +417,7 @@ export async function withCaterValleyResilience<T>(
     return await withApiRetry('CaterValley', caterValleyCircuitBreaker, operation, config);
   } catch (error: any) {
     // Log final failure
-    console.error('[CaterValley Resilience] Operation failed after all retries:', {
+    apiResilienceLogger.error('[CaterValley Resilience] Operation failed after all retries:', {
       error: error.message || error,
       statusCode: error.statusCode || error.status,
       circuitBreakerState: caterValleyCircuitBreaker.getState().state,

@@ -7,6 +7,8 @@
  * Part of REA-77: External API Resilience Implementation
  */
 
+import { emailResilienceLogger } from './logger';
+
 // ============================================================================
 // Configuration Types
 // ============================================================================
@@ -189,7 +191,7 @@ export class EmailCircuitBreaker {
   }
 
   private transitionToOpen(): void {
-    console.warn('[Email Circuit Breaker] Opening circuit after threshold failures', {
+    emailResilienceLogger.warn('[Email Circuit Breaker] Opening circuit after threshold failures', {
       failureCount: this.state.failureCount,
       threshold: this.config.circuitBreakerThreshold,
     });
@@ -199,14 +201,14 @@ export class EmailCircuitBreaker {
   }
 
   private transitionToHalfOpen(): void {
-    console.info('[Email Circuit Breaker] Transitioning to half-open state');
+    emailResilienceLogger.info('[Email Circuit Breaker] Transitioning to half-open state');
 
     this.state.state = 'half-open';
     this.state.successCount = 0;
   }
 
   private transitionToClosed(): void {
-    console.info('[Email Circuit Breaker] Closing circuit after recovery');
+    emailResilienceLogger.info('[Email Circuit Breaker] Closing circuit after recovery');
 
     this.state.state = 'closed';
     this.state.failureCount = 0;
@@ -352,14 +354,14 @@ export async function withRetry<T>(
       emailCircuitBreaker.recordSuccess();
 
       if (attempt > 1) {
-        console.info(`[Email Resilience] Operation succeeded after ${attempt} attempts`);
+        emailResilienceLogger.info(`[Email Resilience] Operation succeeded after ${attempt} attempts`);
       }
 
       return result;
     } catch (error: any) {
       lastError = error;
 
-      console.warn(`[Email Resilience] Attempt ${attempt}/${fullConfig.maxRetries} failed:`, {
+      emailResilienceLogger.warn(`[Email Resilience] Attempt ${attempt}/${fullConfig.maxRetries} failed:`, {
         error: error.message || error,
         statusCode: error.statusCode || error.status,
       });
@@ -371,13 +373,13 @@ export async function withRetry<T>(
       const isRetryable = isRetryableEmailError(error);
 
       if (!isRetryable) {
-        console.warn('[Email Resilience] Non-retryable error detected - aborting retry');
+        emailResilienceLogger.warn('[Email Resilience] Non-retryable error detected - aborting retry');
         throw error;
       }
 
       // Don't retry if this was the last attempt
       if (attempt >= fullConfig.maxRetries) {
-        console.error(
+        emailResilienceLogger.error(
           `[Email Resilience] All ${fullConfig.maxRetries} attempts failed - giving up`
         );
         throw error;
@@ -389,12 +391,12 @@ export async function withRetry<T>(
 
       if (retryAfterDelay !== null) {
         delay = retryAfterDelay;
-        console.info(
+        emailResilienceLogger.info(
           `[Email Resilience] Rate limited - respecting Retry-After: ${delay}ms`
         );
       } else {
         delay = calculateBackoffDelay(attempt, fullConfig);
-        console.info(
+        emailResilienceLogger.info(
           `[Email Resilience] Waiting ${delay}ms before attempt ${attempt + 1}`
         );
       }
@@ -422,7 +424,7 @@ export async function sendEmailWithResilience<T>(
     return await withRetry(operation, config);
   } catch (error: any) {
     // Log final failure
-    console.error('[Email Resilience] Email operation failed after all retries:', {
+    emailResilienceLogger.error('[Email Resilience] Email operation failed after all retries:', {
       error: error.message || error,
       statusCode: error.statusCode || error.status,
       circuitBreakerState: emailCircuitBreaker.getState().state,
