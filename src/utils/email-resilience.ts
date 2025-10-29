@@ -30,16 +30,56 @@ export interface CircuitBreakerState {
 }
 
 // ============================================================================
+// Error Classification Constants
+// ============================================================================
+
+/**
+ * HTTP status codes that indicate transient failures and should be retried.
+ * These errors are typically temporary and may succeed on subsequent attempts.
+ */
+export const RETRYABLE_STATUS_CODES = [429, 500, 502, 503, 504] as const;
+
+/**
+ * HTTP status codes that indicate permanent failures and should NOT be retried.
+ * These errors require user intervention or code changes to resolve.
+ */
+export const NON_RETRYABLE_STATUS_CODES = [400, 401, 403, 404] as const;
+
+/**
+ * Network error codes/messages that indicate transient failures and should be retried.
+ * These are typically connection-level issues that may resolve on retry.
+ */
+export const RETRYABLE_NETWORK_ERRORS = ['ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND'] as const;
+
+// ============================================================================
 // Default Configuration
 // ============================================================================
 
+/**
+ * Default configuration for email API resilience.
+ *
+ * Configuration Rationale:
+ * - **Timeout (30s)**: Longer than generic APIs due to:
+ *   - Larger email payloads (HTML templates, attachments)
+ *   - Template rendering and processing overhead
+ *   - Email service provider processing time
+ *
+ * - **Circuit Breaker Threshold (3)**: Stricter than generic APIs because:
+ *   - Email is a critical user-facing feature
+ *   - Failures directly impact user experience
+ *   - We want to fail fast if email service is degraded
+ *
+ * - **Max Retries (3)**: Standard retry count with exponential backoff (1s, 2s, 4s)
+ *
+ * @see {@link isRetryableEmailError} for error classification logic
+ */
 export const DEFAULT_EMAIL_RESILIENCE_CONFIG: EmailResilienceConfig = {
-  timeout: 30000, // 30 seconds
+  timeout: 30000, // 30 seconds - longer for email processing
   maxRetries: 3,
   baseDelay: 1000, // 1s, 2s, 4s pattern
   maxDelay: 10000, // Cap at 10 seconds
   enableCircuitBreaker: true,
-  circuitBreakerThreshold: 3,
+  circuitBreakerThreshold: 3, // Stricter for critical email notifications
   circuitBreakerTimeout: 60000, // 60 seconds
 };
 
@@ -182,38 +222,40 @@ export const emailCircuitBreaker = new EmailCircuitBreaker();
 // ============================================================================
 
 /**
- * Determine if an error should be retried
+ * Determine if an error should be retried based on status code or error type
+ *
+ * Uses the exported constants {@link RETRYABLE_STATUS_CODES}, {@link NON_RETRYABLE_STATUS_CODES},
+ * and {@link RETRYABLE_NETWORK_ERRORS} for classification.
  */
 export function isRetryableEmailError(error: any): boolean {
   // Check for retryable HTTP status codes
   const statusCode = error?.statusCode || error?.status;
   if (statusCode) {
     // Retry on server errors and rate limiting
-    const retryableStatusCodes = [429, 500, 502, 503, 504];
-    if (retryableStatusCodes.includes(statusCode)) {
+    if (RETRYABLE_STATUS_CODES.includes(statusCode)) {
       return true;
     }
 
-    // Don't retry on client errors (except 429)
-    const nonRetryableStatusCodes = [400, 401, 403, 404];
-    if (nonRetryableStatusCodes.includes(statusCode)) {
+    // Don't retry on client errors
+    if (NON_RETRYABLE_STATUS_CODES.includes(statusCode)) {
       return false;
     }
   }
 
   // Check for network errors
   if (error instanceof Error) {
-    const message = error.message.toLowerCase();
-    const networkErrors = [
-      'etimedout',
-      'econnreset',
-      'econnrefused',
-      'enotfound',
-      'timeout',
-      'network',
-    ];
+    const message = error.message.toUpperCase();
 
-    return networkErrors.some((errType) => message.includes(errType));
+    // Check against known retryable network errors
+    if (RETRYABLE_NETWORK_ERRORS.some((errType) => message.includes(errType))) {
+      return true;
+    }
+
+    // Also check for common network error keywords
+    const additionalNetworkKeywords = ['TIMEOUT', 'NETWORK'];
+    if (additionalNetworkKeywords.some((keyword) => message.includes(keyword))) {
+      return true;
+    }
   }
 
   // Default: don't retry unknown errors
