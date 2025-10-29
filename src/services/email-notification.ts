@@ -9,9 +9,13 @@
  * - User Registration (all roles: vendor, client, driver, helpdesk, admin, super_admin)
  * - Order Notifications (catering and on-demand orders)
  * - Password Reset (customized Supabase template)
+ *
+ * Part of REA-77: External API Resilience Implementation
+ * All email sends are wrapped with retry, circuit breaker, and timeout protection
  */
 
 import { Resend } from "resend";
+import { sendEmailWithResilience } from "@/utils/email-resilience";
 import {
   generateUnifiedEmailTemplate,
   generateDetailsTable,
@@ -177,17 +181,19 @@ export async function sendUserWelcomeEmail(data: UserRegistrationData): Promise<
   });
 
   try {
-    const resend = getResendClient();
-    if (!resend) {
-      console.warn("⚠️  Resend client not available - skipping welcome email");
-      return false;
-    }
+    await sendEmailWithResilience(async () => {
+      const resend = getResendClient();
+      if (!resend) {
+        console.warn("⚠️  Resend client not available - skipping welcome email");
+        throw new Error("Email service not configured");
+      }
 
-    await resend.emails.send({
-      to: data.email,
-      from: fromEmail,
-      subject: `Welcome to Ready Set - Your ${userTypeLabel} Account is Ready!`,
-      html: emailBody,
+      return await resend.emails.send({
+        to: data.email,
+        from: fromEmail,
+        subject: `Welcome to Ready Set - Your ${userTypeLabel} Account is Ready!`,
+        html: emailBody,
+      });
     });
     console.log(`✅ Welcome email sent successfully to ${data.email}`);
     return true;
@@ -333,17 +339,19 @@ export async function sendOrderNotificationToAdmin(data: OrderNotificationData):
   });
 
   try {
-    const resend = getResendClient();
-    if (!resend) {
-      console.warn("⚠️  Resend client not available - skipping order notification email");
-      return false;
-    }
+    await sendEmailWithResilience(async () => {
+      const resend = getResendClient();
+      if (!resend) {
+        console.warn("⚠️  Resend client not available - skipping order notification email");
+        throw new Error("Email service not configured");
+      }
 
-    await resend.emails.send({
-      to: adminEmail,
-      from: fromEmail,
-      subject: `New ${data.orderType === 'catering' ? 'Catering' : 'On-Demand'} Order - ${data.orderNumber}`,
-      html: emailBody,
+      return await resend.emails.send({
+        to: adminEmail,
+        from: fromEmail,
+        subject: `New ${data.orderType === 'catering' ? 'Catering' : 'On-Demand'} Order - ${data.orderNumber}`,
+        html: emailBody,
+      });
     });
     console.log(`✅ Order notification email sent successfully to admin for order ${data.orderNumber}`);
     return true;
@@ -424,17 +432,19 @@ export async function sendOrderConfirmationToCustomer(data: CustomerOrderConfirm
   });
 
   try {
-    const resend = getResendClient();
-    if (!resend) {
-      console.warn("⚠️  Resend client not available - skipping order confirmation email");
-      return false;
-    }
+    await sendEmailWithResilience(async () => {
+      const resend = getResendClient();
+      if (!resend) {
+        console.warn("⚠️  Resend client not available - skipping order confirmation email");
+        throw new Error("Email service not configured");
+      }
 
-    await resend.emails.send({
-      to: data.customerEmail,
-      from: fromEmail,
-      subject: `Order Confirmation - ${data.orderNumber}`,
-      html: emailBody,
+      return await resend.emails.send({
+        to: data.customerEmail,
+        from: fromEmail,
+        subject: `Order Confirmation - ${data.orderNumber}`,
+        html: emailBody,
+      });
     });
     console.log(`✅ Order confirmation email sent successfully to ${data.customerEmail}`);
     return true;
