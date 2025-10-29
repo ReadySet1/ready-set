@@ -10,10 +10,43 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "12.2.3 (519615d)"
   }
   public: {
     Tables: {
+      _prisma_migrations: {
+        Row: {
+          applied_steps_count: number
+          checksum: string
+          finished_at: string | null
+          id: string
+          logs: string | null
+          migration_name: string
+          rolled_back_at: string | null
+          started_at: string
+        }
+        Insert: {
+          applied_steps_count?: number
+          checksum: string
+          finished_at?: string | null
+          id: string
+          logs?: string | null
+          migration_name: string
+          rolled_back_at?: string | null
+          started_at?: string
+        }
+        Update: {
+          applied_steps_count?: number
+          checksum?: string
+          finished_at?: string | null
+          id?: string
+          logs?: string | null
+          migration_name?: string
+          rolled_back_at?: string | null
+          started_at?: string
+        }
+        Relationships: []
+      }
       accounts: {
         Row: {
           accessToken: string | null
@@ -32,7 +65,7 @@ export type Database = {
         Insert: {
           accessToken?: string | null
           expiresAt?: number | null
-          id: string
+          id?: string
           idToken?: string | null
           provider: string
           providerAccountId: string
@@ -57,12 +90,65 @@ export type Database = {
           type?: string
           userId?: string
         }
+        Relationships: []
+      }
+      address_favorites: {
+        Row: {
+          address_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          address_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          address_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "accounts_userId_fkey"
-            columns: ["userId"]
+            foreignKeyName: "address_favorites_address_id_fkey"
+            columns: ["address_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "addresses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      address_usage_history: {
+        Row: {
+          address_id: string
+          context: string | null
+          id: string
+          used_at: string
+          user_id: string
+        }
+        Insert: {
+          address_id: string
+          context?: string | null
+          id?: string
+          used_at?: string
+          user_id: string
+        }
+        Update: {
+          address_id?: string
+          context?: string | null
+          id?: string
+          used_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "address_usage_history_address_id_fkey"
+            columns: ["address_id"]
+            isOneToOne: false
+            referencedRelation: "addresses"
             referencedColumns: ["id"]
           },
         ]
@@ -94,7 +180,7 @@ export type Database = {
           createdAt?: string
           createdBy?: string | null
           deletedAt?: string | null
-          id: string
+          id?: string
           isRestaurant?: boolean
           isShared?: boolean
           latitude?: number | null
@@ -105,7 +191,7 @@ export type Database = {
           state: string
           street1: string
           street2?: string | null
-          updatedAt: string
+          updatedAt?: string
           zip: string
         }
         Update: {
@@ -128,15 +214,142 @@ export type Database = {
           updatedAt?: string
           zip?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "addresses_createdBy_fkey"
-            columns: ["createdBy"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
+      }
+      application_sessions: {
+        Row: {
+          code_expires_at: string | null
+          completed: boolean | null
+          created_at: string | null
+          email: string | null
+          first_name: string | null
+          id: string
+          ip_address: string | null
+          job_application_id: string | null
+          last_activity_at: string | null
+          last_name: string | null
+          max_uploads: number | null
+          role: string | null
+          session_expires_at: string
+          session_token: string
+          upload_count: number | null
+          uploaded_files: string[] | null
+          user_agent: string | null
+          verification_code: string | null
+          verified: boolean | null
+        }
+        Insert: {
+          code_expires_at?: string | null
+          completed?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          ip_address?: string | null
+          job_application_id?: string | null
+          last_activity_at?: string | null
+          last_name?: string | null
+          max_uploads?: number | null
+          role?: string | null
+          session_expires_at: string
+          session_token: string
+          upload_count?: number | null
+          uploaded_files?: string[] | null
+          user_agent?: string | null
+          verification_code?: string | null
+          verified?: boolean | null
+        }
+        Update: {
+          code_expires_at?: string | null
+          completed?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          ip_address?: string | null
+          job_application_id?: string | null
+          last_activity_at?: string | null
+          last_name?: string | null
+          max_uploads?: number | null
+          role?: string | null
+          session_expires_at?: string
+          session_token?: string
+          upload_count?: number | null
+          uploaded_files?: string[] | null
+          user_agent?: string | null
+          verification_code?: string | null
+          verified?: boolean | null
+        }
+        Relationships: []
+      }
+      calculation_history: {
+        Row: {
+          client_config_id: string | null
+          created_at: string
+          customer_charges: Json
+          customer_total: number
+          driver_payments: Json
+          driver_total: number
+          id: string
+          input_data: Json
+          notes: string | null
+          template_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          client_config_id?: string | null
+          created_at?: string
+          customer_charges: Json
+          customer_total: number
+          driver_payments: Json
+          driver_total: number
+          id: string
+          input_data: Json
+          notes?: string | null
+          template_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          client_config_id?: string | null
+          created_at?: string
+          customer_charges?: Json
+          customer_total?: number
+          driver_payments?: Json
+          driver_total?: number
+          id?: string
+          input_data?: Json
+          notes?: string | null
+          template_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      calculator_templates: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id: string
+          is_active?: boolean
+          name: string
+          updated_at: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       catering_requests: {
         Row: {
@@ -181,7 +394,7 @@ export type Database = {
           guid?: string | null
           headcount?: number | null
           hoursNeeded?: number | null
-          id: string
+          id?: string
           image?: string | null
           needHost?: Database["public"]["Enums"]["CateringNeedHost"]
           numberOfHosts?: number | null
@@ -194,7 +407,7 @@ export type Database = {
           specialNotes?: string | null
           status?: Database["public"]["Enums"]["CateringStatus"]
           tip?: number | null
-          updatedAt: string
+          updatedAt?: string
           userId: string
         }
         Update: {
@@ -226,167 +439,103 @@ export type Database = {
           updatedAt?: string
           userId?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "catering_requests_deliveryAddressId_fkey"
-            columns: ["deliveryAddressId"]
-            isOneToOne: false
-            referencedRelation: "addresses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "catering_requests_pickupAddressId_fkey"
-            columns: ["pickupAddressId"]
-            isOneToOne: false
-            referencedRelation: "addresses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "catering_requests_pricingTierId_fkey"
-            columns: ["pricingTierId"]
-            isOneToOne: false
-            referencedRelation: "pricing_tiers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "catering_requests_userId_fkey"
-            columns: ["userId"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      calculator_templates: {
-        Row: {
-          id: string
-          name: string
-          description: string | null
-          is_active: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id: string
-          name: string
-          description?: string | null
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          description?: string | null
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
         Relationships: []
       }
       client_configurations: {
         Row: {
-          id: string
-          client_id: string | null
-          template_id: string
-          client_name: string
-          rule_overrides: Json
           area_rules: Json
-          is_active: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id: string
-          client_id?: string | null
-          template_id: string
+          client_id: string | null
           client_name: string
-          rule_overrides?: Json
-          area_rules?: Json
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          client_id?: string | null
-          template_id?: string
-          client_name?: string
-          rule_overrides?: Json
-          area_rules?: Json
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "client_configurations_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_configurations_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "calculator_templates"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      pricing_rules: {
-        Row: {
-          id: string
-          template_id: string
-          rule_type: string
-          rule_name: string
-          base_amount: number | null
-          per_unit_amount: number | null
-          threshold_value: number | null
-          threshold_type: string | null
-          applies_when: string | null
-          priority: number
           created_at: string
+          id: string
+          is_active: boolean
+          rule_overrides: Json
+          template_id: string
           updated_at: string
         }
         Insert: {
-          id: string
-          template_id: string
-          rule_type: string
-          rule_name: string
-          base_amount?: number | null
-          per_unit_amount?: number | null
-          threshold_value?: number | null
-          threshold_type?: string | null
-          applies_when?: string | null
-          priority?: number
+          area_rules?: Json
+          client_id?: string | null
+          client_name: string
           created_at?: string
-          updated_at?: string
+          id: string
+          is_active?: boolean
+          rule_overrides?: Json
+          template_id: string
+          updated_at: string
         }
         Update: {
-          id?: string
-          template_id?: string
-          rule_type?: string
-          rule_name?: string
-          base_amount?: number | null
-          per_unit_amount?: number | null
-          threshold_value?: number | null
-          threshold_type?: string | null
-          applies_when?: string | null
-          priority?: number
+          area_rules?: Json
+          client_id?: string | null
+          client_name?: string
           created_at?: string
+          id?: string
+          is_active?: boolean
+          rule_overrides?: Json
+          template_id?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "pricing_rules_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "calculator_templates"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
+      }
+      delivery_configurations: {
+        Row: {
+          bridge_toll_settings: Json
+          client_name: string
+          config_id: string
+          created_at: string
+          created_by: string | null
+          custom_settings: Json | null
+          daily_drive_discounts: Json
+          description: string | null
+          distance_threshold: number
+          driver_pay_settings: Json
+          id: string
+          is_active: boolean
+          mileage_rate: number
+          notes: string | null
+          pricing_tiers: Json
+          updated_at: string
+          vendor_name: string
+        }
+        Insert: {
+          bridge_toll_settings: Json
+          client_name: string
+          config_id: string
+          created_at?: string
+          created_by?: string | null
+          custom_settings?: Json | null
+          daily_drive_discounts: Json
+          description?: string | null
+          distance_threshold: number
+          driver_pay_settings: Json
+          id?: string
+          is_active?: boolean
+          mileage_rate: number
+          notes?: string | null
+          pricing_tiers: Json
+          updated_at?: string
+          vendor_name: string
+        }
+        Update: {
+          bridge_toll_settings?: Json
+          client_name?: string
+          config_id?: string
+          created_at?: string
+          created_by?: string | null
+          custom_settings?: Json | null
+          daily_drive_discounts?: Json
+          description?: string | null
+          distance_threshold?: number
+          driver_pay_settings?: Json
+          id?: string
+          is_active?: boolean
+          mileage_rate?: number
+          notes?: string | null
+          pricing_tiers?: Json
+          updated_at?: string
+          vendor_name?: string
+        }
+        Relationships: []
       }
       dispatches: {
         Row: {
@@ -402,9 +551,9 @@ export type Database = {
           cateringRequestId?: string | null
           createdAt?: string
           driverId?: string | null
-          id: string
+          id?: string
           onDemandId?: string | null
-          updatedAt: string
+          updatedAt?: string
           userId?: string | null
         }
         Update: {
@@ -416,42 +565,14 @@ export type Database = {
           updatedAt?: string
           userId?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "dispatches_cateringRequestId_fkey"
-            columns: ["cateringRequestId"]
-            isOneToOne: false
-            referencedRelation: "catering_requests"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dispatches_driverId_fkey"
-            columns: ["driverId"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dispatches_onDemandId_fkey"
-            columns: ["onDemandId"]
-            isOneToOne: false
-            referencedRelation: "on_demand_requests"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dispatches_userId_fkey"
-            columns: ["userId"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       file_uploads: {
         Row: {
           category: string | null
           cateringRequestId: string | null
           fileName: string
+          filePath: string | null
           fileSize: number
           fileType: string
           fileUrl: string
@@ -467,14 +588,15 @@ export type Database = {
           category?: string | null
           cateringRequestId?: string | null
           fileName: string
+          filePath?: string | null
           fileSize: number
           fileType: string
           fileUrl: string
-          id: string
+          id?: string
           isTemporary?: boolean
           jobApplicationId?: string | null
           onDemandId?: string | null
-          updatedAt: string
+          updatedAt?: string
           uploadedAt?: string
           userId?: string | null
         }
@@ -482,6 +604,7 @@ export type Database = {
           category?: string | null
           cateringRequestId?: string | null
           fileName?: string
+          filePath?: string | null
           fileSize?: number
           fileType?: string
           fileUrl?: string
@@ -493,36 +616,7 @@ export type Database = {
           uploadedAt?: string
           userId?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "file_uploads_cateringRequestId_fkey"
-            columns: ["cateringRequestId"]
-            isOneToOne: false
-            referencedRelation: "catering_requests"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "file_uploads_jobApplicationId_fkey"
-            columns: ["jobApplicationId"]
-            isOneToOne: false
-            referencedRelation: "job_applications"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "file_uploads_onDemandId_fkey"
-            columns: ["onDemandId"]
-            isOneToOne: false
-            referencedRelation: "on_demand_requests"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "file_uploads_userId_fkey"
-            columns: ["userId"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       form_submissions: {
         Row: {
@@ -550,11 +644,11 @@ export type Database = {
           email: string
           formType: Database["public"]["Enums"]["FormType"]
           frequency: string
-          id: string
+          id?: string
           phone: string
           pickupAddress: Json
           specifications: string
-          updatedAt: string
+          updatedAt?: string
           website: string
         }
         Update: {
@@ -574,80 +668,6 @@ export type Database = {
           website?: string
         }
         Relationships: []
-      }
-      application_sessions: {
-        Row: {
-          id: string
-          email: string | null
-          first_name: string | null
-          last_name: string | null
-          role: string | null
-          verification_code: string | null
-          code_expires_at: string | null
-          verified: boolean
-          session_token: string
-          session_expires_at: string
-          uploaded_files: string[]
-          upload_count: number
-          max_uploads: number
-          ip_address: string | null
-          user_agent: string | null
-          created_at: string
-          last_activity_at: string
-          completed: boolean
-          job_application_id: string | null
-        }
-        Insert: {
-          id?: string
-          email?: string | null
-          first_name?: string | null
-          last_name?: string | null
-          role?: string | null
-          verification_code?: string | null
-          code_expires_at?: string | null
-          verified?: boolean
-          session_token: string
-          session_expires_at: string
-          uploaded_files?: string[]
-          upload_count?: number
-          max_uploads?: number
-          ip_address?: string | null
-          user_agent?: string | null
-          created_at?: string
-          last_activity_at?: string
-          completed?: boolean
-          job_application_id?: string | null
-        }
-        Update: {
-          id?: string
-          email?: string | null
-          first_name?: string | null
-          last_name?: string | null
-          role?: string | null
-          verification_code?: string | null
-          code_expires_at?: string | null
-          verified?: boolean
-          session_token?: string
-          session_expires_at?: string
-          uploaded_files?: string[]
-          upload_count?: number
-          max_uploads?: number
-          ip_address?: string | null
-          user_agent?: string | null
-          created_at?: string
-          last_activity_at?: string
-          completed?: boolean
-          job_application_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "application_sessions_job_application_id_fkey"
-            columns: ["job_application_id"]
-            isOneToOne: false
-            referencedRelation: "job_applications"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       job_applications: {
         Row: {
@@ -697,7 +717,7 @@ export type Database = {
           firstName: string
           foodHandlerFilePath?: string | null
           hipaaFilePath?: string | null
-          id: string
+          id?: string
           insuranceFilePath?: string | null
           lastName: string
           phone?: string | null
@@ -706,7 +726,7 @@ export type Database = {
           resumeFilePath?: string | null
           skills?: string | null
           status?: Database["public"]["Enums"]["ApplicationStatus"]
-          updatedAt: string
+          updatedAt?: string
           vehicleRegFilePath?: string | null
           workExperience?: string | null
         }
@@ -740,15 +760,7 @@ export type Database = {
           vehicleRegFilePath?: string | null
           workExperience?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "job_applications_profileId_fkey"
-            columns: ["profileId"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       lead_captures: {
         Row: {
@@ -765,11 +777,11 @@ export type Database = {
           createdAt?: string
           email: string
           firstName: string
-          id: string
+          id?: string
           industry: string
           lastName: string
           newsletterConsent?: boolean
-          updatedAt: string
+          updatedAt?: string
         }
         Update: {
           createdAt?: string
@@ -824,7 +836,7 @@ export type Database = {
           guid?: string | null
           height?: number | null
           hoursNeeded?: number | null
-          id: string
+          id?: string
           image?: string | null
           itemDelivered?: string | null
           length?: number | null
@@ -836,7 +848,7 @@ export type Database = {
           specialNotes?: string | null
           status?: Database["public"]["Enums"]["OnDemandStatus"]
           tip?: number | null
-          updatedAt: string
+          updatedAt?: string
           userId: string
           vehicleType?: Database["public"]["Enums"]["VehicleType"]
           weight?: number | null
@@ -871,29 +883,52 @@ export type Database = {
           weight?: number | null
           width?: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "on_demand_requests_deliveryAddressId_fkey"
-            columns: ["deliveryAddressId"]
-            isOneToOne: false
-            referencedRelation: "addresses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "on_demand_requests_pickupAddressId_fkey"
-            columns: ["pickupAddressId"]
-            isOneToOne: false
-            referencedRelation: "addresses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "on_demand_requests_userId_fkey"
-            columns: ["userId"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
+      }
+      pricing_rules: {
+        Row: {
+          applies_when: string | null
+          base_amount: number | null
+          created_at: string
+          id: string
+          per_unit_amount: number | null
+          priority: number
+          rule_name: string
+          rule_type: string
+          template_id: string
+          threshold_type: string | null
+          threshold_value: number | null
+          updated_at: string
+        }
+        Insert: {
+          applies_when?: string | null
+          base_amount?: number | null
+          created_at?: string
+          id: string
+          per_unit_amount?: number | null
+          priority?: number
+          rule_name: string
+          rule_type: string
+          template_id: string
+          threshold_type?: string | null
+          threshold_value?: number | null
+          updated_at: string
+        }
+        Update: {
+          applies_when?: string | null
+          base_amount?: number | null
+          created_at?: string
+          id?: string
+          per_unit_amount?: number | null
+          priority?: number
+          rule_name?: string
+          rule_type?: string
+          template_id?: string
+          threshold_type?: string | null
+          threshold_value?: number | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       pricing_tiers: {
         Row: {
@@ -912,7 +947,7 @@ export type Database = {
         }
         Insert: {
           createdAt?: string
-          id: string
+          id?: string
           isActive?: boolean
           maxFoodCost?: number | null
           maxHeadCount?: number | null
@@ -922,7 +957,7 @@ export type Database = {
           percentageWithTip?: number | null
           priceWithoutTip?: number | null
           priceWithTip?: number | null
-          updatedAt: string
+          updatedAt?: string
         }
         Update: {
           createdAt?: string
@@ -991,7 +1026,7 @@ export type Database = {
           frequency?: string | null
           guid?: string | null
           headCount?: number | null
-          id: string
+          id?: string
           image?: string | null
           isTemporaryPassword?: boolean
           locationNumber?: string | null
@@ -1005,7 +1040,7 @@ export type Database = {
           street2?: string | null
           timeNeeded?: string | null
           type?: Database["public"]["Enums"]["UserType"]
-          updatedAt: string
+          updatedAt?: string
           website?: string | null
           zip?: string | null
         }
@@ -1045,13 +1080,70 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "profiles_deletedBy_fkey"
+            foreignKeyName: "profiles_deletedby_fkey"
             columns: ["deletedBy"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
+      }
+      quarantine_logs: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number
+          file_type: string
+          id: string
+          quarantine_path: string
+          quarantined_at: string
+          reason: string
+          review_notes: string | null
+          review_status: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          scan_results: Json | null
+          threat_level: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size: number
+          file_type: string
+          id?: string
+          quarantine_path: string
+          quarantined_at?: string
+          reason: string
+          review_notes?: string | null
+          review_status?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scan_results?: Json | null
+          threat_level: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          quarantine_path?: string
+          quarantined_at?: string
+          reason?: string
+          review_notes?: string | null
+          review_status?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scan_results?: Json | null
+          threat_level?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
       sessions: {
         Row: {
@@ -1062,7 +1154,7 @@ export type Database = {
         }
         Insert: {
           expires: string
-          id: string
+          id?: string
           sessionToken: string
           userId: string
         }
@@ -1072,55 +1164,110 @@ export type Database = {
           sessionToken?: string
           userId?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "sessions_userId_fkey"
-            columns: ["userId"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
+      }
+      spatial_ref_sys: {
+        Row: {
+          auth_name: string | null
+          auth_srid: number | null
+          proj4text: string | null
+          srid: number
+          srtext: string | null
+        }
+        Insert: {
+          auth_name?: string | null
+          auth_srid?: number | null
+          proj4text?: string | null
+          srid: number
+          srtext?: string | null
+        }
+        Update: {
+          auth_name?: string | null
+          auth_srid?: number | null
+          proj4text?: string | null
+          srid?: number
+          srtext?: string | null
+        }
+        Relationships: []
       }
       testimonials: {
         Row: {
-          category: string
+          category: Database["public"]["Enums"]["TestimonialCategory"]
           content: string
-          created_at: string | null
+          created_at: string
           id: string
           image: string | null
-          is_active: boolean | null
+          is_active: boolean
           name: string
-          rating: number | null
+          rating: number
           role: string | null
-          sort_order: number | null
-          updated_at: string | null
+          sort_order: number
+          updated_at: string
         }
         Insert: {
-          category?: string
+          category?: Database["public"]["Enums"]["TestimonialCategory"]
           content: string
-          created_at?: string | null
-          id?: string
+          created_at?: string
+          id: string
           image?: string | null
-          is_active?: boolean | null
+          is_active?: boolean
           name: string
-          rating?: number | null
+          rating?: number
           role?: string | null
-          sort_order?: number | null
-          updated_at?: string | null
+          sort_order?: number
+          updated_at: string
         }
         Update: {
-          category?: string
+          category?: Database["public"]["Enums"]["TestimonialCategory"]
           content?: string
-          created_at?: string | null
+          created_at?: string
           id?: string
           image?: string | null
-          is_active?: boolean | null
+          is_active?: boolean
           name?: string
-          rating?: number | null
+          rating?: number
           role?: string | null
-          sort_order?: number | null
-          updated_at?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      upload_errors: {
+        Row: {
+          correlationId: string
+          details: string | null
+          errorType: string
+          id: string
+          message: string
+          resolved: boolean
+          retryable: boolean
+          timestamp: string
+          userId: string | null
+          userMessage: string
+        }
+        Insert: {
+          correlationId: string
+          details?: string | null
+          errorType: string
+          id?: string
+          message: string
+          resolved?: boolean
+          retryable?: boolean
+          timestamp?: string
+          userId?: string | null
+          userMessage: string
+        }
+        Update: {
+          correlationId?: string
+          details?: string | null
+          errorType?: string
+          id?: string
+          message?: string
+          resolved?: boolean
+          retryable?: boolean
+          timestamp?: string
+          userId?: string | null
+          userMessage?: string
         }
         Relationships: []
       }
@@ -1138,9 +1285,9 @@ export type Database = {
           addressId: string
           alias?: string | null
           createdAt?: string
-          id: string
+          id?: string
           isDefault?: boolean
-          updatedAt: string
+          updatedAt?: string
           userId: string
         }
         Update: {
@@ -1152,22 +1299,7 @@ export type Database = {
           updatedAt?: string
           userId?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_addresses_addressId_fkey"
-            columns: ["addressId"]
-            isOneToOne: false
-            referencedRelation: "addresses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_addresses_userId_fkey"
-            columns: ["userId"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_audits: {
         Row: {
@@ -1184,7 +1316,7 @@ export type Database = {
           action: string
           changes?: Json | null
           createdAt?: string
-          id: string
+          id?: string
           metadata?: Json | null
           performedBy?: string | null
           reason?: string | null
@@ -1202,14 +1334,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "user_audits_performedBy_fkey"
+            foreignKeyName: "user_audits_performedby_fkey"
             columns: ["performedBy"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "user_audits_userId_fkey"
+            foreignKeyName: "user_audits_userid_fkey"
             columns: ["userId"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -1226,7 +1358,7 @@ export type Database = {
         }
         Insert: {
           expires: string
-          id: string
+          id?: string
           identifier: string
           token: string
         }
@@ -1273,17 +1405,64 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      geography_columns: {
+        Row: {
+          coord_dimension: number | null
+          f_geography_column: unknown
+          f_table_catalog: unknown
+          f_table_name: unknown
+          f_table_schema: unknown
+          srid: number | null
+          type: string | null
+        }
+        Relationships: []
+      }
+      geometry_columns: {
+        Row: {
+          coord_dimension: number | null
+          f_geometry_column: unknown
+          f_table_catalog: string | null
+          f_table_name: unknown
+          f_table_schema: unknown
+          srid: number | null
+          type: string | null
+        }
+        Insert: {
+          coord_dimension?: number | null
+          f_geometry_column?: unknown
+          f_table_catalog?: string | null
+          f_table_name?: unknown
+          f_table_schema?: unknown
+          srid?: number | null
+          type?: string | null
+        }
+        Update: {
+          coord_dimension?: number | null
+          f_geometry_column?: unknown
+          f_table_catalog?: string | null
+          f_table_name?: unknown
+          f_table_schema?: unknown
+          srid?: number | null
+          type?: string | null
+        }
+        Relationships: []
+      }
+      upload_error_stats: {
+        Row: {
+          affected_users: number | null
+          avg_hours_to_resolve: number | null
+          errorType: string | null
+          first_occurrence: string | null
+          last_occurrence: string | null
+          retryable_count: number | null
+          total_count: number | null
+          unresolved_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      increment_session_upload: {
-        Args: {
-          p_session_id: string
-          p_file_path: string
-          p_session_token: string
-        }
-        Returns: undefined
-      }
+      [_ in never]: never
     }
     Enums: {
       ApplicationStatus: "PENDING" | "APPROVED" | "REJECTED" | "INTERVIEWING"
@@ -1313,6 +1492,7 @@ export type Database = {
         | "CONFIRMED"
         | "IN_PROGRESS"
         | "DELIVERED"
+      TestimonialCategory: "CLIENTS" | "VENDORS" | "DRIVERS"
       UserStatus: "ACTIVE" | "PENDING" | "DELETED"
       UserType:
         | "VENDOR"
@@ -1329,33 +1509,27 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type PublicSchema = Database[keyof Omit<Database, "__InternalSupabase">]
 
 export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+  PublicTableNameOrOptions extends
+    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+        Database[PublicTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
+        PublicSchema["Views"])
+    ? (PublicSchema["Tables"] &
+        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -1363,24 +1537,20 @@ export type Tables<
     : never
 
 export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  PublicTableNameOrOptions extends
+    | keyof PublicSchema["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -1388,24 +1558,20 @@ export type TablesInsert<
     : never
 
 export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  PublicTableNameOrOptions extends
+    | keyof PublicSchema["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -1413,82 +1579,14 @@ export type TablesUpdate<
     : never
 
 export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+  PublicEnumNameOrOptions extends
+    | keyof PublicSchema["Enums"]
+    | { schema: keyof Database },
+  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+> = PublicEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
+    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
     : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
-
-export const Constants = {
-  public: {
-    Enums: {
-      ApplicationStatus: ["PENDING", "APPROVED", "REJECTED", "INTERVIEWING"],
-      CateringNeedHost: ["YES", "NO"],
-      CateringStatus: [
-        "ACTIVE",
-        "ASSIGNED",
-        "CANCELLED",
-        "COMPLETED",
-        "PENDING",
-        "CONFIRMED",
-        "IN_PROGRESS",
-        "DELIVERED",
-      ],
-      DriverStatus: [
-        "ARRIVED_AT_VENDOR",
-        "EN_ROUTE_TO_CLIENT",
-        "ARRIVED_TO_CLIENT",
-        "ASSIGNED",
-        "COMPLETED",
-      ],
-      FormType: ["FOOD", "FLOWER", "BAKERY", "SPECIALTY"],
-      OnDemandStatus: [
-        "ACTIVE",
-        "ASSIGNED",
-        "CANCELLED",
-        "COMPLETED",
-        "PENDING",
-        "CONFIRMED",
-        "IN_PROGRESS",
-        "DELIVERED",
-      ],
-      UserStatus: ["ACTIVE", "PENDING", "DELETED"],
-      UserType: [
-        "VENDOR",
-        "CLIENT",
-        "DRIVER",
-        "ADMIN",
-        "HELPDESK",
-        "SUPER_ADMIN",
-      ],
-      VehicleType: ["CAR", "VAN", "TRUCK"],
-    },
-  },
-} as const

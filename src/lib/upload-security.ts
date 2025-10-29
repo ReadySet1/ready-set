@@ -1,6 +1,7 @@
 // src/lib/upload-security.ts
 import { createClient } from "@/utils/supabase/server";
 import { UploadError, SecurityScanResult } from "@/types/upload";
+import type { TablesInsert } from "@/types/supabase";
 
 export interface QuarantineFile {
   id: string;
@@ -110,10 +111,8 @@ export class UploadSecurityManager {
         }
 
         // Log quarantine event to database
-        // Note: Type assertion used because quarantine_logs table is created via migration
-        // and types will be regenerated after migration is applied
         try {
-          await (supabase as any).from('quarantine_logs').insert({
+          await supabase.from('quarantine_logs').insert<TablesInsert<'quarantine_logs'>>({
             file_name: file.name,
             file_type: file.type,
             file_size: file.size,
@@ -410,6 +409,9 @@ export class UploadSecurityManager {
     const now = Date.now();
     let cleanedCount = 0;
 
+    // Note: Deleting from a Map during iteration is safe per ECMAScript specification.
+    // Map.entries() returns an iterator that handles modifications during iteration correctly.
+    // This is unlike some other languages/collections where deletion during iteration causes issues.
     for (const [key, limit] of this.RATE_LIMITS.entries()) {
       // Remove entries that are older than 2x their window size
       if (now - limit.windowStart > limit.windowSize * 2) {

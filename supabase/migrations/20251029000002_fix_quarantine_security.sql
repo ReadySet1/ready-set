@@ -1,8 +1,15 @@
 -- Fix quarantine security: Add ON DELETE behavior and improve RLS policies
 -- This migration fixes issues identified in code review for PR #109
 
+-- CONTEXT: This migration runs after 20251029000001_add_quarantine_system.sql
+-- The first migration correctly included "ON DELETE SET NULL" in the table definition (line 60),
+-- but did not explicitly create named foreign key constraints. This migration explicitly creates
+-- named constraints with ON DELETE SET NULL to ensure they are properly tracked and can be
+-- modified in the future if needed. While this recreates behavior that was already present,
+-- it makes the constraints explicit and manageable.
+
 -- 1. Fix foreign key constraints to include ON DELETE SET NULL
--- First, we need to drop the existing constraints and recreate them with ON DELETE SET NULL
+-- First, we need to drop any existing constraints and recreate them with explicit names
 
 -- Drop existing foreign key constraints
 ALTER TABLE IF EXISTS public.quarantine_logs

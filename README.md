@@ -81,6 +81,55 @@ This project implements comprehensive security measures:
 - **Comprehensive test coverage** for XSS attack vectors
 - Protection against script injection, event handlers, and malicious URLs
 
+## 🕐 Automated Maintenance (Vercel Cron)
+
+This project uses Vercel Cron Jobs for scheduled maintenance tasks:
+
+### Quarantine Cleanup Cron Job
+
+**Schedule:** Daily at 2 AM UTC (configured in `vercel.json`)
+**Endpoint:** `/api/admin/quarantine-cleanup`
+**Purpose:** Automatically clean up quarantined files and expired rate limit entries
+
+#### Security Configuration
+
+The cron endpoint is secured using the `CRON_SECRET` environment variable:
+
+1. **Generate a secure secret:**
+   ```bash
+   # Using Node.js
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+   # Using OpenSSL
+   openssl rand -base64 32
+   ```
+
+2. **Configure in Vercel:**
+   - Go to your Vercel project → Settings → Environment Variables
+   - Add variable name: `CRON_SECRET`
+   - Set the generated secret as the value
+   - Select "Production" environment (and "Preview" if needed)
+   - Save changes
+
+3. **Vercel automatically passes this secret** in the `Authorization` header when invoking cron jobs
+
+#### Manual Triggering
+
+Admins can manually trigger cleanup by accessing the endpoint:
+- The endpoint accepts both GET and POST requests
+- Admin authentication is required when triggered manually
+- Returns JSON with cleanup statistics (files cleaned, rate limits cleared, duration)
+
+#### Monitoring
+
+Check Vercel Dashboard → Your Project → Cron Jobs to view:
+- Execution history
+- Success/failure status
+- Execution duration
+- Error logs (if any)
+
+For more details, see `src/app/api/admin/quarantine-cleanup/route.ts`
+
 ## 🔧 Development
 
 This project follows Next.js and TypeScript best practices with:
