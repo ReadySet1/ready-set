@@ -153,11 +153,20 @@ export class InputSanitizer {
 
   /**
    * Sanitize SQL-like input (basic prevention)
+   * ⚠️  WARNING: This is NOT a substitute for parameterized queries!
+   * ⚠️  Always use proper SQL parameterization in your database layer.
+   * ⚠️  This function is only for basic input cleaning and should not be relied upon for security.
    */
   static sanitizeSqlInput(input: string): string {
+    // Escape dangerous characters instead of removing them to avoid incomplete sanitization
+    // This prevents issues where removing characters in sequence can create new attack vectors
     return input
-      .replace(/[';\\]/g, '') // Remove quotes and semicolons
-      .replace(/(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION|SCRIPT)\b)/gi, '') // Remove SQL keywords
+      .replace(/\\/g, '\\\\') // Escape backslashes first to prevent escape sequence issues
+      .replace(/'/g, "''") // Escape single quotes for SQL (standard SQL escape)
+      .replace(/;/g, '') // Remove semicolons to prevent statement chaining
+      .replace(/--/g, '') // Remove SQL comment syntax
+      .replace(/\/\*/g, '') // Remove block comment start
+      .replace(/\*\//g, '') // Remove block comment end
       .trim();
   }
 

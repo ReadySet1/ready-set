@@ -1,5 +1,6 @@
 // src/components/Email/DownloadEmailTemplate.tsx
 import * as React from 'react';
+import { encode } from 'he';
 
 interface DownloadEmailTemplateProps {
   firstName: string;
@@ -10,17 +11,34 @@ interface DownloadEmailTemplateProps {
 
 /**
  * Validates that a URL is safe for use in email templates
- * Only allows http:// and https:// protocols to prevent XSS attacks
+ * - Only allows http:// and https:// protocols to prevent XSS attacks
+ * - Only allows specific whitelisted hostnames to prevent URL redirection attacks
+ * - Encodes URL for safe HTML attribute usage
  */
 const validateDownloadUrl = (url: string): string => {
   try {
     const parsedUrl = new URL(url);
-    // Only allow http and https protocols
+
+    // Protocol validation: Only allow http and https protocols
     if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
       console.error(`Blocked unsafe URL protocol: ${parsedUrl.protocol}`);
       return '#'; // Return safe default
     }
-    return url;
+
+    // Hostname allowlist: Only allow trusted domains
+    const allowedHosts = [
+      'ready-set.co',
+      'www.ready-set.co',
+      'jdjlkt28jx.ufs.sh', // Uploadfly file storage for resources
+    ];
+
+    if (!allowedHosts.includes(parsedUrl.hostname)) {
+      console.error(`Blocked unsafe hostname in download URL: ${parsedUrl.hostname}`);
+      return '#'; // Return safe default
+    }
+
+    // HTML attribute encoding: Encode for safe use in href attribute
+    return encode(url, { useNamedReferences: true, allowUnsafeSymbols: false });
   } catch (error) {
     console.error('Invalid URL provided:', error);
     return '#'; // Return safe default for invalid URLs

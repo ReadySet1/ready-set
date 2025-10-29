@@ -35,7 +35,6 @@ export const sendDownloadEmail = async (
   userEmail: string,
   firstName: string,
   resourceSlug: ResourceSlug,
-  resourceUrl?: string, // Add optional resourceUrl parameter
 ) => {
   try {
     // Input validation
@@ -44,13 +43,13 @@ export const sendDownloadEmail = async (
     }
 
     const resource = RESOURCE_MAP[resourceSlug];
-    if (!resource && !resourceUrl) {
-      throw new Error(`Resource not found or missing download URL: ${resourceSlug}`);
+    if (!resource) {
+      throw new Error(`Resource not found: ${resourceSlug}`);
     }
 
-    // Use the provided resourceUrl if available, otherwise fall back to the resource's downloadUrl
-    const downloadUrl = resourceUrl || (resource?.downloadUrl);
-    
+    // Only use allowed (pre-registered) download URLs from RESOURCE_MAP
+    const downloadUrl = resource.downloadUrl;
+
     if (!downloadUrl) {
       throw new Error(`No download URL available for resource: ${resourceSlug}`);
     }

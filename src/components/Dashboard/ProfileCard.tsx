@@ -129,10 +129,21 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ control, errors }) => {
             defaultValue=""
             rules={{
               required: "Email is required",
-              pattern: {
-                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                message: "Invalid email address",
-              },
+              validate: {
+                validEmail: (value: string) => {
+                  // Use simple validation to avoid ReDoS vulnerability
+                  // Checks basic email format: something@something.something
+                  if (!value) return "Email is required";
+                  const emailParts = value.split('@');
+                  if (emailParts.length !== 2) return "Invalid email address";
+                  const [localPart, domainPart] = emailParts;
+                  if (!localPart || !domainPart) return "Invalid email address";
+                  if (!domainPart.includes('.')) return "Invalid email address";
+                  const domainParts = domainPart.split('.');
+                  if (domainParts.some(part => !part)) return "Invalid email address";
+                  return true;
+                }
+              }
             }}
             render={({
               field: { value, ...fieldProps },

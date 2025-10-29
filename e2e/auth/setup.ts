@@ -90,11 +90,32 @@ async function authenticate(
     await page.click('button[type="submit"]');
 
     // Wait for successful navigation (any authenticated route)
-    console.log('  → Waiting for authentication...');
-    await page.waitForURL(/\/(admin|client|vendor|dashboard)/, {
-      timeout: 15000,
-      waitUntil: 'networkidle',
-    });
+    // Use longer timeout in CI environments due to network delays
+    const isCI = process.env.CI === 'true';
+    const timeout = isCI ? 30000 : 15000;
+    console.log(`  → Waiting for authentication (timeout: ${timeout}ms, isCI: ${isCI})...`);
+
+    try {
+      await page.waitForURL(/\/(admin|client|vendor|dashboard)/, {
+        timeout,
+        waitUntil: 'networkidle',
+      });
+    } catch (error) {
+      // Enhanced error logging for debugging
+      const currentURL = page.url();
+      console.error(`  ❌ Authentication timeout after ${timeout}ms`);
+      console.error(`  Current URL: ${currentURL}`);
+      console.error(`  Expected URL pattern: /(admin|client|vendor|dashboard)/`);
+
+      // Take screenshot for debugging (only in CI)
+      if (isCI) {
+        const screenshotPath = path.join(authDir, `auth-failure-${role.toLowerCase()}.png`);
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+        console.error(`  📸 Screenshot saved to: ${path.relative(process.cwd(), screenshotPath)}`);
+      }
+
+      throw error;
+    }
 
     console.log(`  ✅ ${role} authenticated successfully`);
 

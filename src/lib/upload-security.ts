@@ -139,16 +139,21 @@ export class UploadSecurityManager {
     const threats: string[] = [];
     let score = 0;
 
-    // Basic pattern matching for malicious content
+    // Pattern matching for malicious content detection
+    // NOTE: These patterns are for DETECTION only, not sanitization
+    // For actual sanitization, use DOMPurify or similar libraries
     const maliciousPatterns = [
-      // Script injection attempts
-      /<script[^>]*>.*?<\/script>/gi,
-      /javascript:/gi,
-      /vbscript:/gi,
-      /onload\s*=/gi,
-      /onerror\s*=/gi,
-      /onclick\s*=/gi,
-      /<iframe[^>]*>.*?<\/iframe>/gi,
+      // Script injection attempts - improved to catch more variants
+      /<script[\s\S]*?>/gi, // Opening script tag with any attributes/whitespace
+      /<\/script>/gi, // Closing script tag
+      /javascript\s*:/gi, // JavaScript protocol (with optional spaces)
+      /vbscript\s*:/gi, // VBScript protocol
+      /data\s*:.*?script/gi, // Data URI with script
+      /on\w+\s*=/gi, // Any event handler (onload, onerror, onclick, etc.)
+      /<iframe[\s\S]*?>/gi, // iframe tags with any content
+      /<\/iframe>/gi, // Closing iframe tag
+      /<object[\s\S]*?>/gi, // Object tags
+      /<embed[\s\S]*?>/gi, // Embed tags
 
       // File inclusion attacks
       /<\?php/gi,
