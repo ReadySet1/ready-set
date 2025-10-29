@@ -83,10 +83,10 @@ export const CarrierDetails: React.FC<CarrierDetailsProps> = ({ carrierId }) => 
           setStats(statsData);
         }
       } catch (error) {
-        console.error('Failed to load carrier stats:', error);
+        // Error silently handled - stats will be null
       }
     } catch (error) {
-      console.error('Error loading carrier data:', error);
+      // Error silently handled - will show loading state
     } finally {
       setLoading(false);
     }
@@ -101,7 +101,7 @@ export const CarrierDetails: React.FC<CarrierDetailsProps> = ({ carrierId }) => 
         error: 'Test failed',
       });
     } catch (error) {
-      console.error('Error testing connectivity:', error);
+      // Error silently handled - connectivity will show last known state
     } finally {
       setTesting(false);
     }

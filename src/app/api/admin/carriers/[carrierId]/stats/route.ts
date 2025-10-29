@@ -136,7 +136,7 @@ export async function GET(
           webhookSuccess = 99; // Deterministic fallback - replace with real tracking
         }
       } catch (error) {
-        console.error('Error calculating webhook success rate:', error);
+        // Error silently handled - use default fallback
         webhookSuccess = 95; // Default fallback
       }
     }
@@ -146,7 +146,7 @@ export async function GET(
       activeOrders,
       todayOrders,
       webhookSuccess,
-      recentOrders: recentOrders.map((order: any) => ({
+      recentOrders: recentOrders.map((order) => ({
         id: order.id,
         orderNumber: order.orderNumber,
         status: order.status,
@@ -158,7 +158,7 @@ export async function GET(
     return NextResponse.json(stats);
 
   } catch (error) {
-    console.error('Error fetching carrier stats:', error);
+    // Error handled with generic response
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -203,7 +203,7 @@ export async function POST(
     return NextResponse.json(mockMetrics);
 
   } catch (error) {
-    console.error('Error fetching webhook metrics:', error);
+    // Error handled with generic response
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

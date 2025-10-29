@@ -163,13 +163,11 @@ export class CarrierService {
           };
         } else {
           lastError = `${carrier.name} API returned error response`;
-          console.warn(`${carrier.name} webhook logical failure (attempt ${attempt}/${carrier.retryPolicy.maxAttempts})`);
           response = result;
         }
       } catch (error) {
         lastError = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`${carrier.name} webhook attempt ${attempt}/${carrier.retryPolicy.maxAttempts} failed:`, lastError);
-        
+
         if (this.isNonRetryableError(error)) {
           break;
         }
@@ -182,8 +180,6 @@ export class CarrierService {
       }
     }
 
-    console.error(`${carrier.name} webhook failed after ${carrier.retryPolicy.maxAttempts} attempts. Last error: ${lastError}`);
-    
     return {
       success: false,
       attempts: carrier.retryPolicy.maxAttempts,

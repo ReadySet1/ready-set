@@ -64,7 +64,7 @@ export const CarrierOverview: React.FC = () => {
             return await response.json();
           }
         } catch (error) {
-          console.error(`Failed to load stats for ${config.id}:`, error);
+          // Error silently handled - will use defaults
         }
         return {
           totalOrders: 0,
@@ -88,7 +88,7 @@ export const CarrierOverview: React.FC = () => {
       setCarriers(carrierData);
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('Error loading carrier data:', error);
+      // Error silently handled - will show empty state
     } finally {
       setLoading(false);
     }
@@ -98,7 +98,7 @@ export const CarrierOverview: React.FC = () => {
     setTesting(true);
     try {
       const connectivityResults = await CarrierService.testConnections();
-      
+
       setCarriers(prev => prev.map(carrier => ({
         ...carrier,
         connectivity: connectivityResults[carrier.config.id] || {
@@ -106,10 +106,10 @@ export const CarrierOverview: React.FC = () => {
           error: 'Test failed',
         },
       })));
-      
+
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('Error testing connectivity:', error);
+      // Error silently handled - will keep previous connectivity state
     } finally {
       setTesting(false);
     }

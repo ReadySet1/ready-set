@@ -13,7 +13,7 @@
 //   - BroadcastChannel is optional and can be disabled via config
 //   - Server-side rendering is fully supported with appropriate checks
 
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
 import {
   EnhancedSession,
@@ -135,7 +135,7 @@ function compareFingerprints(fp1: SessionFingerprint, fp2: SessionFingerprint): 
 // Enhanced session manager class
 export class EnhancedSessionManager implements SessionManager {
   private config: AuthContextConfig;
-  private supabase: any;
+  private supabase!: SupabaseClient; // Definite assignment assertion - initialized in initializeSupabase()
   private currentSession: EnhancedSession | null = null;
   private refreshTimer: NodeJS.Timeout | null = null;
   private activityTimer: NodeJS.Timeout | null = null;
@@ -234,7 +234,7 @@ export class EnhancedSessionManager implements SessionManager {
     }
   }
 
-  private broadcastMessage(type: AuthSyncEvent, payload: any = {}) {
+  private broadcastMessage(type: AuthSyncEvent, payload: Record<string, unknown> = {}) {
     if (!this.broadcastChannel) return;
 
     const message: AuthSyncMessage = {
@@ -371,7 +371,7 @@ export class EnhancedSessionManager implements SessionManager {
       // Get current session from Supabase
       const { data, error } = await this.supabase.auth.refreshSession();
 
-      if (error || !data.session) {
+      if (error || !data.session || !data.user) {
         throw new AuthError(
           AuthErrorType.REFRESH_FAILED,
           'Failed to refresh session',
@@ -527,7 +527,7 @@ export class EnhancedSessionManager implements SessionManager {
     this.clearSession();
   }
 
-  private handleTokenRefreshed(payload: any) {
+  private handleTokenRefreshed(payload: Record<string, unknown>) {
     authLogger.debug('EnhancedSessionManager: Handling token refresh from other tab');
     if (payload.sessionId && this.currentSession?.id !== payload.sessionId) {
       // Update session if it's different from current
