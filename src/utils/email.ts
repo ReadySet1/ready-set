@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { sendEmailWithResilience } from './email-resilience';
 
 type EmailPayload = {
   to: string;
@@ -15,8 +16,19 @@ const getResendClient = () => {
   return new Resend(process.env.RESEND_API_KEY);
 };
 
+/**
+ * Send an email with automatic retry, circuit breaker, and timeout handling
+ *
+ * This function wraps the Resend API call with resilience patterns:
+ * - Automatic retry with exponential backoff (3 attempts)
+ * - Circuit breaker to prevent cascading failures
+ * - 30-second timeout protection
+ * - Rate limit handling (respects Retry-After header)
+ *
+ * Part of REA-77: External API Resilience Implementation
+ */
 export const sendEmail = async (data: EmailPayload) => {
-  try {
+  return sendEmailWithResilience(async () => {
     const resend = getResendClient();
     if (!resend) {
       console.warn("⚠️  Resend client not available - skipping email");
@@ -25,18 +37,20 @@ export const sendEmail = async (data: EmailPayload) => {
 
     const fromAddress = process.env.EMAIL_FROM || 'noreply@updates.readysetllc.com';
 
-    const response = await resend.emails.send({
-      to: data.to,
-      from: fromAddress,
-      subject: data.subject,
-      html: data.html,
-    });
-        return response;
-  } catch (error: any) {
-    console.error('Error sending email:', error);
-    if (error.response) {
-      console.error(error.response.body);
+    try {
+      const response = await resend.emails.send({
+        to: data.to,
+        from: fromAddress,
+        subject: data.subject,
+        html: data.html,
+      });
+      return response;
+    } catch (error: any) {
+      console.error('Error sending email:', error);
+      if (error.response) {
+        console.error(error.response.body);
+      }
+      throw error;
     }
-    throw error;
-  }
+  });
 };

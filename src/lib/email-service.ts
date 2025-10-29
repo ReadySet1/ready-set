@@ -1,6 +1,7 @@
 // src/lib/email-service.ts
 
 import { Resend } from "resend";
+import { sendEmailWithResilience } from "@/utils/email-resilience";
 import {
   FormType,
   DeliveryFormData,
@@ -108,23 +109,21 @@ export class EmailService {
       <p>${additionalComments || "No additional comments provided."}</p>
     `;
 
-    try {
+    // Use resilience wrapper with retry, circuit breaker, and timeout
+    await sendEmailWithResilience(async () => {
       const resend = getResendClient();
       if (!resend) {
         console.warn("⚠️  Resend client not available - skipping notification email");
-        return;
+        throw new Error("Email service not configured");
       }
 
-      await resend.emails.send({
+      return await resend.emails.send({
         to: process.env.NOTIFICATION_RECIPIENT || 'info@ready-set.co',
         from: 'Ready Set Website <updates@updates.readysetllc.com>',
         subject: `New ${formTypeDisplay} Delivery Quote Request - ${companyName}`,
         html: htmlContent,
         text: htmlContent.replace(/<[^>]*>/g, ""), // Strip HTML for plain text version
       });
-    } catch (error) {
-      console.error("Error sending notification email:", error);
-      throw error;
-    }
+    });
   }
 }
