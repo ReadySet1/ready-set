@@ -7,6 +7,7 @@
  */
 
 import { UserType } from "@prisma/client";
+import * as cheerio from "cheerio";
 
 // ============================================================================
 // Type Definitions
@@ -426,11 +427,13 @@ export const extractEmailLinks = (html: string): string[] => {
 
 /**
  * Extracts plain text content from HTML (strips tags)
+ * Uses cheerio for secure HTML parsing to prevent XSS vulnerabilities
  * @param html - HTML string
  * @returns Plain text content
  */
 export const extractPlainText = (html: string): string => {
-  return html.replace(/<[^>]*>/g, "").trim();
+  const $ = cheerio.load(html);
+  return $.text().trim();
 };
 
 /**
