@@ -109,8 +109,7 @@ export async function POST(req: NextRequest) {
         await sendDownloadEmail(
           validatedData.email,
           validatedData.firstName,
-          validatedData.resourceSlug,
-          validatedData.resourceUrl
+          validatedData.resourceSlug
         );
       } catch (error) {
         // Log the error but don't throw it
