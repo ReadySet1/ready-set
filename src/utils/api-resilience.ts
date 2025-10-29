@@ -32,19 +32,60 @@ export interface CircuitBreakerState {
 }
 
 // ============================================================================
+// Error Classification Constants
+// ============================================================================
+
+/**
+ * HTTP status codes that indicate transient failures and should be retried.
+ * These errors are typically temporary and may succeed on subsequent attempts.
+ */
+export const RETRYABLE_STATUS_CODES = [429, 500, 502, 503, 504] as const;
+
+/**
+ * HTTP status codes that indicate permanent failures and should NOT be retried.
+ * These errors require user intervention or code changes to resolve.
+ */
+export const NON_RETRYABLE_STATUS_CODES = [400, 401, 403, 404] as const;
+
+/**
+ * Network error codes/messages that indicate transient failures and should be retried.
+ * These are typically connection-level issues that may resolve on retry.
+ */
+export const RETRYABLE_NETWORK_ERRORS = ['ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND'] as const;
+
+// ============================================================================
 // Default Configuration
 // ============================================================================
 
+/**
+ * Default configuration for generic API resilience (CaterValley, Google Maps, etc.).
+ *
+ * Configuration Rationale:
+ * - **Timeout (15s)**: Shorter than email APIs due to:
+ *   - Simpler request/response payloads
+ *   - APIs designed for lower latency
+ *   - Faster to fail and retry if unresponsive
+ *
+ * - **Circuit Breaker Threshold (5)**: More lenient than email because:
+ *   - External APIs may have occasional transient issues
+ *   - We want to allow more attempts before failing fast
+ *   - Less critical than user-facing email notifications
+ *
+ * - **Max Retries (3)**: Standard retry count with exponential backoff (1s, 2s, 4s)
+ *
+ * @see {@link isRetryableApiError} for error classification logic
+ * @see {@link DEFAULT_EMAIL_RESILIENCE_CONFIG} for comparison with email configuration
+ */
 export const DEFAULT_API_RESILIENCE_CONFIG: ApiResilienceConfig = {
-  timeout: 15000, // 15 seconds
+  timeout: 15000, // 15 seconds - faster timeout for APIs
   maxRetries: 3,
   baseDelay: 1000, // 1s, 2s, 4s pattern
   maxDelay: 10000, // Cap at 10 seconds
   enableCircuitBreaker: true,
   circuitBreakerThreshold: 5, // More lenient for external APIs
   circuitBreakerTimeout: 60000, // 60 seconds
-  retryableStatusCodes: [429, 500, 502, 503, 504],
-  retryableErrors: ['ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND'],
+  retryableStatusCodes: [...RETRYABLE_STATUS_CODES],
+  retryableErrors: [...RETRYABLE_NETWORK_ERRORS],
 };
 
 // ============================================================================
