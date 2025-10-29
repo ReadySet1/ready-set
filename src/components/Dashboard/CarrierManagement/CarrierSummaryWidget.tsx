@@ -1,19 +1,21 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  CheckCircle, 
-  AlertCircle, 
-  Truck, 
+import {
+  CheckCircle,
+  AlertCircle,
+  Truck,
   ExternalLink,
   TrendingUp,
-  Activity
+  Activity,
+  RefreshCw
 } from 'lucide-react';
-import { CarrierService, CarrierConfig } from '@/lib/services/carrierService';
+import { CarrierServiceClient as CarrierService, type CarrierConfig } from '@/lib/services/carrier-service-client';
 import Link from 'next/link';
+import { carrierLogger } from '@/utils/logger';
 
 interface CarrierSummary {
   name: string;
@@ -26,22 +28,26 @@ interface CarrierSummary {
 export const CarrierSummaryWidget: React.FC = () => {
   const [carriers, setCarriers] = useState<CarrierSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [totalOrders, setTotalOrders] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    loadCarrierSummary();
-  }, []);
+  const loadCarrierSummary = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
-  const loadCarrierSummary = async () => {
     try {
       const configs = CarrierService.getCarriers();
       const connectivityResults = await CarrierService.testConnections();
-      
+
       let totalTodayOrders = 0;
-      
+
       const summaryPromises = configs.map(async (config) => {
         let stats = { todayOrders: 0, activeOrders: 0 };
-        
+
         try {
           const response = await fetch(`/api/admin/carriers/${config.id}/stats`);
           if (response.ok) {
@@ -49,7 +55,8 @@ export const CarrierSummaryWidget: React.FC = () => {
             totalTodayOrders += stats.todayOrders;
           }
         } catch (error) {
-          console.error(`Failed to load stats for ${config.id}:`, error);
+          carrierLogger.error(`[CarrierSummaryWidget] Failed to load stats for carrier ${config.id}:`, error);
+          // Stats will use defaults
         }
 
         return {
@@ -64,11 +71,22 @@ export const CarrierSummaryWidget: React.FC = () => {
       const summaries = await Promise.all(summaryPromises);
       setCarriers(summaries);
       setTotalOrders(totalTodayOrders);
+      setLastUpdated(new Date());
     } catch (error) {
-      console.error('Error loading carrier summary:', error);
+      carrierLogger.error('[CarrierSummaryWidget] Error loading carrier summary:', error);
+      // Will show empty state
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  }, []); // No external dependencies
+
+  useEffect(() => {
+    loadCarrierSummary();
+  }, [loadCarrierSummary]);
+
+  const handleRefresh = () => {
+    loadCarrierSummary(true);
   };
 
   const getStatusIcon = (carrier: CarrierSummary) => {
@@ -111,15 +129,32 @@ export const CarrierSummaryWidget: React.FC = () => {
             <Truck className="h-5 w-5 text-blue-500" />
             <CardTitle className="text-base">Carrier Integrations</CardTitle>
           </div>
-          <Badge 
-            variant={connectedCarriers === totalEnabledCarriers ? "default" : "secondary"}
-            className={connectedCarriers === totalEnabledCarriers ? "bg-green-100 text-green-800" : ""}
-          >
-            {connectedCarriers}/{totalEnabledCarriers} Active
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="h-7 w-7 p-0"
+              title="Refresh carrier data"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <Badge
+              variant={connectedCarriers === totalEnabledCarriers && connectedCarriers > 0 ? "default" : "secondary"}
+              className={connectedCarriers === totalEnabledCarriers && connectedCarriers > 0 ? "bg-green-100 text-green-800" : ""}
+            >
+              {connectedCarriers}/{totalEnabledCarriers} Active
+            </Badge>
+          </div>
         </div>
-        <CardDescription className="text-sm">
-          External delivery platform connections
+        <CardDescription className="text-sm flex items-center justify-between">
+          <span>External delivery platform connections</span>
+          {lastUpdated && !loading && (
+            <span className="text-xs text-gray-500">
+              {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       

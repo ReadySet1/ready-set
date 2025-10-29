@@ -13,7 +13,7 @@
 //   - BroadcastChannel is optional and can be disabled via config
 //   - Server-side rendering is fully supported with appropriate checks
 
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
 import {
   EnhancedSession,
@@ -135,7 +135,7 @@ function compareFingerprints(fp1: SessionFingerprint, fp2: SessionFingerprint): 
 // Enhanced session manager class
 export class EnhancedSessionManager implements SessionManager {
   private config: AuthContextConfig;
-  private supabase: any;
+  private supabase!: SupabaseClient; // Definite assignment assertion - initialized in initializeSupabase()
   private currentSession: EnhancedSession | null = null;
   private refreshTimer: NodeJS.Timeout | null = null;
   private activityTimer: NodeJS.Timeout | null = null;
@@ -145,21 +145,33 @@ export class EnhancedSessionManager implements SessionManager {
   private refreshPromise: Promise<EnhancedSession | null> | null = null;
   private isRefreshing = false;
   private refreshQueue: Array<() => void> = [];
+  private isCleaningSession = false; // Prevents race conditions during concurrent session cleanup
+  private isInitialized = false; // Tracks initialization state to ensure proper cleanup
 
   constructor(config: Partial<AuthContextConfig> = {}) {
     this.config = { ...DEFAULT_AUTH_CONFIG, ...config };
     this.tabId = this.getOrGenerateTabId();
 
-    // Initialize cross-tab synchronization if enabled
-    if (this.config.enableCrossTabSync && typeof window !== 'undefined') {
-      this.initializeCrossTabSync();
+    try {
+      // Initialize cross-tab synchronization if enabled
+      if (this.config.enableCrossTabSync && typeof window !== 'undefined') {
+        this.initializeCrossTabSync();
+      }
+
+      // Initialize Supabase client
+      this.initializeSupabase();
+
+      // Start session cleanup interval
+      this.startCleanupTimer();
+
+      // Mark as fully initialized
+      this.isInitialized = true;
+    } catch (error) {
+      // Ensure cleanup happens even if initialization fails
+      authLogger.error('EnhancedSessionManager: Initialization failed, cleaning up resources', error);
+      this.destroy();
+      throw error;
     }
-
-    // Initialize Supabase client
-    this.initializeSupabase();
-
-    // Start session cleanup interval
-    this.startCleanupTimer();
   }
 
   private async initializeSupabase() {
@@ -234,7 +246,7 @@ export class EnhancedSessionManager implements SessionManager {
     }
   }
 
-  private broadcastMessage(type: AuthSyncEvent, payload: any = {}) {
+  private broadcastMessage(type: AuthSyncEvent, payload: Record<string, unknown> = {}) {
     if (!this.broadcastChannel) return;
 
     const message: AuthSyncMessage = {
@@ -371,7 +383,7 @@ export class EnhancedSessionManager implements SessionManager {
       // Get current session from Supabase
       const { data, error } = await this.supabase.auth.refreshSession();
 
-      if (error || !data.session) {
+      if (error || !data.session || !data.user) {
         throw new AuthError(
           AuthErrorType.REFRESH_FAILED,
           'Failed to refresh session',
@@ -459,7 +471,16 @@ export class EnhancedSessionManager implements SessionManager {
 
       // Check if session is expired
       if (session.expiresAt < Date.now()) {
-        this.clearStoredSession();
+        // Race condition prevention: The isCleaningSession flag prevents concurrent
+        // clearStoredSession() calls that could occur when multiple async operations
+        // (e.g., token refresh attempts, session validation checks) simultaneously
+        // detect an expired session. Without this guard, multiple operations could
+        // enter this block and attempt to clear localStorage simultaneously.
+        // The flag is set at the start of clearStoredSession() and always reset
+        // in a finally block to ensure cleanup even if localStorage operations fail.
+        if (!this.isCleaningSession) {
+          this.clearStoredSession();
+        }
         return null;
       }
 
@@ -491,9 +512,17 @@ export class EnhancedSessionManager implements SessionManager {
   private clearStoredSession() {
     if (typeof window === 'undefined') return;
 
-    localStorage.removeItem(STORAGE_KEYS.SESSION_DATA);
-    localStorage.removeItem(STORAGE_KEYS.FINGERPRINT);
-    localStorage.removeItem(STORAGE_KEYS.LAST_ACTIVITY);
+    // Set flag to prevent race conditions
+    this.isCleaningSession = true;
+
+    try {
+      localStorage.removeItem(STORAGE_KEYS.SESSION_DATA);
+      localStorage.removeItem(STORAGE_KEYS.FINGERPRINT);
+      localStorage.removeItem(STORAGE_KEYS.LAST_ACTIVITY);
+    } finally {
+      // Always reset flag, even if localStorage operations fail
+      this.isCleaningSession = false;
+    }
   }
 
   async clearSession(): Promise<void> {
@@ -527,7 +556,7 @@ export class EnhancedSessionManager implements SessionManager {
     this.clearSession();
   }
 
-  private handleTokenRefreshed(payload: any) {
+  private handleTokenRefreshed(payload: Record<string, unknown>) {
     authLogger.debug('EnhancedSessionManager: Handling token refresh from other tab');
     if (payload.sessionId && this.currentSession?.id !== payload.sessionId) {
       // Update session if it's different from current
@@ -639,7 +668,12 @@ export class EnhancedSessionManager implements SessionManager {
     if (this.cleanupTimer) clearInterval(this.cleanupTimer);
     if (this.broadcastChannel) this.broadcastChannel.close();
 
-    this.clearStoredSession();
+    // Only clear session if fully initialized
+    if (this.isInitialized) {
+      this.clearStoredSession();
+    }
+
+    this.isInitialized = false;
   }
 }
 

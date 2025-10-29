@@ -1,11 +1,16 @@
 /**
  * Carrier Statistics API
  * Provides order statistics and webhook performance metrics for carriers
+ *
+ * Authentication: Protected by API middleware (admin routes)
+ * Authorization: Admin access required
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { CarrierService } from '@/lib/services/carrierService';
+import { webhookLogger } from '@/lib/services/webhook-logger';
+import { carrierLogger } from '@/utils/logger';
 import { startOfDay, endOfDay } from 'date-fns';
 
 // Force dynamic rendering for this route
@@ -15,7 +20,7 @@ interface CarrierStats {
   totalOrders: number;
   activeOrders: number;
   todayOrders: number;
-  webhookSuccess: number;
+  webhookSuccess: number | null; // null when webhook logging not yet implemented
   recentOrders: Array<{
     id: string;
     orderNumber: string;
@@ -29,8 +34,9 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ carrierId: string }> }
 ) {
+  const { carrierId } = await context.params;
+
   try {
-    const { carrierId } = await context.params;
 
     // Validate carrier ID
     const carrier = CarrierService.getCarrier(carrierId);
@@ -106,45 +112,17 @@ export async function GET(
       }),
     ]);
 
-    // Calculate webhook success rate
-    // This is a simplified calculation - in a real implementation, you might want to track
-    // webhook attempts and failures in a separate table
-    let webhookSuccess = 100;
-
-    // If the carrier has orders, we can estimate success rate
-    if (totalOrders > 0) {
-      try {
-        // Get orders that should have had webhook updates (assigned or completed)
-        const ordersWithStatus = await prisma.cateringRequest.count({
-          where: {
-            orderNumber: {
-              startsWith: carrier.orderPrefix,
-            },
-            driverStatus: {
-              not: null,
-            },
-            deletedAt: null,
-          },
-        });
-
-        // In a real implementation, you'd track actual webhook successes/failures
-        // For now, we'll simulate a high success rate with some variation
-        if (ordersWithStatus > 0) {
-          webhookSuccess = Math.max(85, Math.min(100, 95 + Math.random() * 5));
-          webhookSuccess = Math.round(webhookSuccess);
-        }
-      } catch (error) {
-        console.error('Error calculating webhook success rate:', error);
-        webhookSuccess = 95; // Default fallback
-      }
-    }
+    // Calculate webhook success rate from webhook logs
+    // Returns null if there are no webhook attempts in the last 30 days
+    const webhookSuccessData = await webhookLogger.getSuccessRate(carrierId, 30);
+    const webhookSuccess: number | null = webhookSuccessData.successRate;
 
     const stats: CarrierStats = {
       totalOrders,
       activeOrders,
       todayOrders,
       webhookSuccess,
-      recentOrders: recentOrders.map((order: any) => ({
+      recentOrders: recentOrders.map((order) => ({
         id: order.id,
         orderNumber: order.orderNumber,
         status: order.status,
@@ -156,7 +134,7 @@ export async function GET(
     return NextResponse.json(stats);
 
   } catch (error) {
-    console.error('Error fetching carrier stats:', error);
+    carrierLogger.error(`[CarrierStats] Error fetching carrier stats for ${carrierId}:`, error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -171,8 +149,9 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ carrierId: string }> }
 ) {
+  const { carrierId } = await context.params;
+
   try {
-    const { carrierId } = await context.params;
     const { dateRange } = await request.json();
 
     const carrier = CarrierService.getCarrier(carrierId);
@@ -201,7 +180,7 @@ export async function POST(
     return NextResponse.json(mockMetrics);
 
   } catch (error) {
-    console.error('Error fetching webhook metrics:', error);
+    carrierLogger.error(`[CarrierStats] Error fetching webhook metrics for ${carrierId}:`, error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

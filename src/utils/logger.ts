@@ -46,7 +46,8 @@ class Logger {
 
   debug(message: string, ...args: any[]): void {
     if (this.shouldLog()) {
-          }
+      console.debug(message, ...args);
+    }
   }
 
   info(message: string, ...args: any[]): void {
@@ -86,6 +87,13 @@ export const uiLogger = new Logger({
   enabledInProduction: false,
   enabledInBuild: false,
   enabledInDevelopment: false,
+  enabledInTest: false,
+});
+
+export const carrierLogger = new Logger({
+  enabledInProduction: true, // Enable in production for monitoring carrier integrations
+  enabledInBuild: false,
+  enabledInDevelopment: true, // Enable in development for debugging
   enabledInTest: false,
 });
 

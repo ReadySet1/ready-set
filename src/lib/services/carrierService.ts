@@ -1,25 +1,20 @@
 /**
- * Generic Carrier Service
- * Handles multiple carrier integrations in a scalable way
+ * Server-Side Carrier Service
+ * Handles webhook execution and server-only carrier operations
+ * For client-safe operations, use carrier-service-client.ts
  */
 
 import { DriverStatus } from '@/types/prisma';
+import { carrierLogger } from '@/utils/logger';
+import { webhookLogger } from '@/lib/services/webhook-logger';
+import { CARRIER_CONFIGS, CarrierServiceClient, type CarrierConfig } from '@/lib/services/carrier-service-client';
 
-export interface CarrierConfig {
-  id: string;
-  name: string;
-  webhookUrl: string;
-  apiKey?: string;
-  enabled: boolean;
-  statusMapping: Record<DriverStatus, string | null>;
-  orderPrefix: string;
-  webhookHeaders: Record<string, string>;
-  retryPolicy: {
-    maxAttempts: number;
-    baseDelayMs: number;
-    timeoutMs: number;
-  };
-}
+// Re-export client-safe types and class for backwards compatibility
+export type { CarrierConfig } from '@/lib/services/carrier-service-client';
+export { CarrierServiceClient } from '@/lib/services/carrier-service-client';
+
+// For backwards compatibility, export client service as CarrierService
+export { CarrierServiceClient as CarrierService } from '@/lib/services/carrier-service-client';
 
 export interface WebhookPayload {
   orderNumber: string;
@@ -27,76 +22,35 @@ export interface WebhookPayload {
   metadata?: Record<string, unknown>;
 }
 
-export interface WebhookResult {
-  success: boolean;
-  attempts: number;
-  lastError?: string;
-  response?: Record<string, unknown>;
-  carrierId: string;
+// Use discriminated union for better type safety
+export type WebhookResult =
+  | {
+      success: true;
+      attempts: number;
+      response?: Record<string, unknown>;
+      carrierId: string;
+    }
+  | {
+      success: false;
+      attempts: number;
+      lastError: string; // Always defined when success is false
+      response?: Record<string, unknown>;
+      carrierId: string;
+    };
+
+/**
+ * Helper to get webhook logger instance
+ * This is wrapped to keep webhook-logger import contained to server-only code
+ */
+async function getWebhookLogger() {
+  return webhookLogger;
 }
 
-// Carrier configurations
-const CARRIER_CONFIGS: Record<string, CarrierConfig> = {
-  catervalley: {
-    id: 'catervalley',
-    name: 'CaterValley',
-    webhookUrl: process.env.CATERVALLEY_WEBHOOK_URL || 'https://api.catervalley.com/api/operation/order/update-order-status',
-    apiKey: process.env.CATERVALLEY_API_KEY,
-    enabled: true,
-    statusMapping: {
-      ASSIGNED: 'CONFIRM',
-      ARRIVED_AT_VENDOR: 'READY',
-      EN_ROUTE_TO_CLIENT: 'ON_THE_WAY',
-      ARRIVED_TO_CLIENT: 'ON_THE_WAY',
-      COMPLETED: 'COMPLETED',
-    },
-    orderPrefix: 'CV-',
-    webhookHeaders: {
-      'Content-Type': 'application/json',
-      'partner': 'ready-set',
-    },
-    retryPolicy: {
-      maxAttempts: 3,
-      baseDelayMs: 1000,
-      timeoutMs: 10000,
-    },
-  },
-  // Future carriers can be added here
-  // ubereats: {
-  //   id: 'ubereats',
-  //   name: 'Uber Eats',
-  //   webhookUrl: process.env.UBEREATS_WEBHOOK_URL,
-  //   enabled: false,
-  //   // ... other config
-  // },
-};
-
-export class CarrierService {
-  /**
-   * Get all available carrier configurations
-   */
-  static getCarriers(): CarrierConfig[] {
-    return Object.values(CARRIER_CONFIGS);
-  }
-
-  /**
-   * Get a specific carrier configuration
-   */
-  static getCarrier(carrierId: string): CarrierConfig | null {
-    return CARRIER_CONFIGS[carrierId] || null;
-  }
-
-  /**
-   * Determine which carrier an order belongs to based on order number
-   */
-  static detectCarrier(orderNumber: string): CarrierConfig | null {
-    for (const carrier of Object.values(CARRIER_CONFIGS)) {
-      if (orderNumber.startsWith(carrier.orderPrefix)) {
-        return carrier;
-      }
-    }
-    return null;
-  }
+/**
+ * Server-side webhook service
+ * Extends the client-safe service with webhook capabilities
+ */
+export class CarrierWebhookService extends CarrierServiceClient {
 
   /**
    * Send status update to appropriate carrier
@@ -107,18 +61,16 @@ export class CarrierService {
     metadata?: Record<string, unknown>
   ): Promise<WebhookResult | null> {
     const carrier = this.detectCarrier(orderNumber);
-    
+
     if (!carrier || !carrier.enabled) {
-            return null;
+      carrierLogger.error(`[CarrierService] Cannot send status update for order ${orderNumber}: carrier not found or disabled`);
+      return null;
     }
 
     const mappedStatus = carrier.statusMapping[driverStatus];
     if (!mappedStatus) {
-            return {
-        success: true,
-        attempts: 0,
-        carrierId: carrier.id,
-      };
+      carrierLogger.error(`[CarrierService] Cannot send status update for order ${orderNumber}: status '${driverStatus}' not mapped for carrier ${carrier.id}`);
+      return null;
     }
 
     
@@ -145,14 +97,26 @@ export class CarrierService {
     let response: Record<string, unknown> | undefined;
 
     for (let attempt = 1; attempt <= carrier.retryPolicy.maxAttempts; attempt++) {
+      const startTime = Date.now();
+
       try {
         const result = await this.makeWebhookRequest(carrier, payload);
-        
+        const responseTime = Date.now() - startTime;
+
         // Check if the response indicates success (carrier-specific logic)
         const isSuccess = this.isSuccessResponse(carrier, result);
-        
+
         if (isSuccess) {
-                    return {
+          // Log successful webhook
+          const logger = await getWebhookLogger();
+          await logger.logSuccess({
+            carrierId: carrier.id,
+            orderNumber: payload.orderNumber,
+            status: payload.status,
+            responseTime,
+          });
+
+          return {
             success: true,
             attempts: attempt,
             response: result,
@@ -160,13 +124,32 @@ export class CarrierService {
           };
         } else {
           lastError = `${carrier.name} API returned error response`;
-          console.warn(`${carrier.name} webhook logical failure (attempt ${attempt}/${carrier.retryPolicy.maxAttempts})`);
           response = result;
+
+          // Log failed webhook (non-success response)
+          const logger = await getWebhookLogger();
+          await logger.logFailure({
+            carrierId: carrier.id,
+            orderNumber: payload.orderNumber,
+            status: payload.status,
+            errorMessage: lastError,
+            responseTime,
+          });
         }
       } catch (error) {
+        const responseTime = Date.now() - startTime;
         lastError = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`${carrier.name} webhook attempt ${attempt}/${carrier.retryPolicy.maxAttempts} failed:`, lastError);
-        
+
+        // Log failed webhook (exception)
+        const logger = await getWebhookLogger();
+        await logger.logFailure({
+          carrierId: carrier.id,
+          orderNumber: payload.orderNumber,
+          status: payload.status,
+          errorMessage: lastError,
+          responseTime,
+        });
+
         if (this.isNonRetryableError(error)) {
           break;
         }
@@ -179,12 +162,10 @@ export class CarrierService {
       }
     }
 
-    console.error(`${carrier.name} webhook failed after ${carrier.retryPolicy.maxAttempts} attempts. Last error: ${lastError}`);
-    
     return {
       success: false,
       attempts: carrier.retryPolicy.maxAttempts,
-      lastError,
+      lastError: lastError || 'Unknown error occurred',
       response,
       carrierId: carrier.id,
     };
@@ -303,50 +284,5 @@ export class CarrierService {
         };
       }
     });
-  }
-
-  /**
-   * Test connectivity to all enabled carriers
-   */
-  static async testConnections(): Promise<Record<string, { connected: boolean; latencyMs?: number; error?: string }>> {
-    const results: Record<string, { connected: boolean; latencyMs?: number; error?: string }> = {};
-
-    const testPromises = Object.values(CARRIER_CONFIGS)
-      .filter(carrier => carrier.enabled)
-      .map(async (carrier) => {
-        const startTime = Date.now();
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
-        try {
-          const headers = { ...carrier.webhookHeaders };
-          if (carrier.apiKey) {
-            headers['x-api-key'] = carrier.apiKey;
-          }
-
-          const response = await fetch(carrier.webhookUrl, {
-            method: 'OPTIONS',
-            headers,
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-          const latencyMs = Date.now() - startTime;
-
-          results[carrier.id] = {
-            connected: response.ok,
-            latencyMs,
-          };
-        } catch (error) {
-          clearTimeout(timeoutId);
-          results[carrier.id] = {
-            connected: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          };
-        }
-      });
-
-    await Promise.all(testPromises);
-    return results;
   }
 } 

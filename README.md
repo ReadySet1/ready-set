@@ -39,6 +39,28 @@ For comprehensive documentation, setup instructions, and development guides, see
 - **Address management** with favorites and recent addresses tracking
 - **Secure file uploads** with signed URLs and comprehensive metadata storage
 - **Enhanced address selector** with search, filtering, and organization
+- **Carrier integrations** with real-time connectivity monitoring and webhook management
+
+## 🚚 Carrier Management
+
+Ready Set includes a comprehensive carrier integration system for managing multiple delivery service providers:
+
+### Features
+- **Unified Carrier Service** - Generic carrier service supporting multiple providers (CaterValley, and extensible for future carriers)
+- **Real-time Connectivity Monitoring** - Live status checks and latency monitoring for all connected carriers
+- **Automated Status Updates** - Webhook-based driver status updates with retry logic and error handling
+- **Carrier Dashboard** - Admin interface at `/admin/carriers` for monitoring and managing carrier integrations
+- **Detailed Carrier Pages** - Individual carrier details with statistics, configuration, and webhook settings
+- **Webhook Logs** - Placeholder interface for tracking webhook delivery and troubleshooting (backend implementation pending)
+
+### Architecture
+- **Carrier Service** (`src/lib/services/carrierService.ts`) - Core service for carrier operations
+- **Admin API** - RESTful API endpoints for carrier statistics and management
+- **Carrier Components** - React components for carrier overview, details, and summary widgets
+
+### Supported Carriers
+- **CaterValley** - Full integration with automated order status synchronization
+- **Extensible Design** - Easy addition of new carriers through configuration
 
 ## 🔐 Security
 
