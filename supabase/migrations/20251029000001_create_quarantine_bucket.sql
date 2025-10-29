@@ -35,8 +35,6 @@ TO service_role
 USING (bucket_id = 'quarantined-files');
 
 -- Policy 2: Authenticated users with admin role can view quarantined files
--- Note: You'll need to implement admin role checking based on your auth system
--- This is a placeholder policy that should be customized to your needs
 CREATE POLICY "Admins can view quarantined files"
 ON storage.objects
 FOR SELECT
@@ -46,8 +44,7 @@ USING (
   AND EXISTS (
     SELECT 1 FROM auth.users
     WHERE auth.users.id = auth.uid()
-    -- Add your admin role check here, e.g.:
-    -- AND auth.users.raw_app_meta_data->>'role' = 'admin'
+    AND auth.users.raw_app_meta_data->>'role' = 'admin'
   )
 );
 
@@ -60,11 +57,11 @@ CREATE TABLE IF NOT EXISTS public.quarantine_logs (
   quarantine_path TEXT NOT NULL,
   reason TEXT NOT NULL,
   threat_level TEXT NOT NULL CHECK (threat_level IN ('low', 'medium', 'high', 'critical')),
-  user_id UUID REFERENCES auth.users(id),
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   scan_results JSONB,
   quarantined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   reviewed_at TIMESTAMPTZ,
-  reviewed_by UUID REFERENCES auth.users(id),
+  reviewed_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   review_status TEXT CHECK (review_status IN ('pending', 'approved', 'rejected', 'deleted')),
   review_notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -95,7 +92,7 @@ USING (
   EXISTS (
     SELECT 1 FROM auth.users
     WHERE auth.users.id = auth.uid()
-    -- Add your admin role check here
+    AND auth.users.raw_app_meta_data->>'role' = 'admin'
   )
 );
 
@@ -107,7 +104,7 @@ USING (
   EXISTS (
     SELECT 1 FROM auth.users
     WHERE auth.users.id = auth.uid()
-    -- Add your admin role check here
+    AND auth.users.raw_app_meta_data->>'role' = 'admin'
   )
 );
 

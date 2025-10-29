@@ -28,6 +28,8 @@ export class UploadSecurityManager {
   private static readonly QUARANTINE_BUCKET = 'quarantined-files';
   private static readonly RATE_LIMITS = new Map<string, RateLimit>();
   private static readonly CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+  private static cleanupTimers: NodeJS.Timeout[] = [];
+  private static isSchedulerRunning = false;
 
   // Rate limiting configuration
   static readonly RATE_LIMITS_CONFIG = {
@@ -140,9 +142,34 @@ export class UploadSecurityManager {
   }
 
   static async scanForMaliciousContent(file: File): Promise<SecurityScanResult> {
-    const content = await file.text();
     const threats: string[] = [];
     let score = 0;
+
+    // Check file size first to prevent memory issues
+    // Files larger than 10MB are too large for full content scanning
+    const MAX_SCAN_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_SCAN_SIZE) {
+      threats.push('File too large for full content scan');
+      score += 30; // Medium threat level due to inability to fully scan
+
+      // Still perform file type and size checks below
+      // but skip the content scanning to avoid OOM
+      const isClean = false; // Can't confirm it's clean without scanning
+
+      return {
+        isClean,
+        threats,
+        score,
+        details: {
+          fileSize: file.size,
+          fileType: file.type,
+          scanPatterns: 0,
+          threatsFound: threats.length
+        }
+      };
+    }
+
+    const content = await file.text();
 
     // Pattern matching for malicious content detection
     // NOTE: These patterns are for DETECTION only, not sanitization
@@ -400,15 +427,39 @@ export class UploadSecurityManager {
 
   // Initialize periodic cleanup
   static startCleanupScheduler() {
-    // Run cleanup every 24 hours
-    setInterval(() => {
-      this.cleanupQuarantinedFiles();
-      this.cleanupExpiredRateLimits();
-    }, this.CLEANUP_INTERVAL);
+    // Don't start timers in test environment
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
 
-    // Also run rate limit cleanup more frequently (every 5 minutes)
-    setInterval(() => {
+    // Singleton guard: prevent multiple scheduler instances
+    if (this.isSchedulerRunning) {
+      console.warn('Cleanup scheduler is already running');
+      return;
+    }
+
+    this.isSchedulerRunning = true;
+
+    // Run quarantine file cleanup every 24 hours
+    const quarantineTimer = setInterval(() => {
+      this.cleanupQuarantinedFiles();
+    }, this.CLEANUP_INTERVAL);
+    this.cleanupTimers.push(quarantineTimer);
+
+    // Run rate limit cleanup more frequently (every 5 minutes)
+    const rateLimitTimer = setInterval(() => {
       this.cleanupExpiredRateLimits();
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 5 * 60 * 1000);
+    this.cleanupTimers.push(rateLimitTimer);
+
+    console.log('Cleanup scheduler started');
+  }
+
+  // Stop all cleanup timers
+  static stopCleanupScheduler() {
+    this.cleanupTimers.forEach(timer => clearInterval(timer));
+    this.cleanupTimers = [];
+    this.isSchedulerRunning = false;
+    console.log('Cleanup scheduler stopped');
   }
 }
