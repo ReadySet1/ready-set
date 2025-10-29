@@ -30,7 +30,7 @@ interface CarrierStats {
   totalOrders: number;
   activeOrders: number;
   todayOrders: number;
-  webhookSuccess: number;
+  webhookSuccess: number | null;
   recentOrders: Array<{
     id: string;
     orderNumber: string;
@@ -83,10 +83,12 @@ export const CarrierDetails: React.FC<CarrierDetailsProps> = ({ carrierId }) => 
           setStats(statsData);
         }
       } catch (error) {
-        // Error silently handled - stats will be null
+        console.error(`[CarrierDetails] Failed to load stats for carrier ${carrierId}:`, error);
+        // Stats will remain null, showing empty state
       }
     } catch (error) {
-      // Error silently handled - will show loading state
+      console.error(`[CarrierDetails] Error loading carrier data for ${carrierId}:`, error);
+      // Will show loading state or redirect
     } finally {
       setLoading(false);
     }
@@ -101,7 +103,8 @@ export const CarrierDetails: React.FC<CarrierDetailsProps> = ({ carrierId }) => 
         error: 'Test failed',
       });
     } catch (error) {
-      // Error silently handled - connectivity will show last known state
+      console.error(`[CarrierDetails] Error testing connectivity for carrier ${carrierId}:`, error);
+      // Connectivity will show last known state
     } finally {
       setTesting(false);
     }
@@ -222,7 +225,9 @@ export const CarrierDetails: React.FC<CarrierDetailsProps> = ({ carrierId }) => 
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Success Rate</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.webhookSuccess}%</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {stats.webhookSuccess !== null ? `${stats.webhookSuccess}%` : 'N/A'}
+                  </p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-green-500" />
               </div>
@@ -369,7 +374,7 @@ export const CarrierDetails: React.FC<CarrierDetailsProps> = ({ carrierId }) => 
                 </div>
               </div>
 
-              {stats && (
+              {stats && stats.webhookSuccess !== null && (
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-2">Webhook Performance</p>
                   <div className="space-y-2">

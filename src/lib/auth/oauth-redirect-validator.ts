@@ -136,11 +136,10 @@ export function generateOAuthState(): string {
       const crypto = require('crypto');
       crypto.randomFillSync(array);
     } catch (error) {
-      // Fallback to less secure but functional random generation
-      authLogger.warn('Crypto module not available, using Math.random fallback');
-      for (let i = 0; i < array.length; i++) {
-        array[i] = Math.floor(Math.random() * 256);
-      }
+      // SECURITY: Never fallback to Math.random() for OAuth state generation
+      // OAuth state parameters are critical for CSRF protection and must be cryptographically secure
+      authLogger.error('Crypto module not available - OAuth cannot proceed safely', error);
+      throw new Error('Secure random number generation unavailable - OAuth cannot proceed safely');
     }
   }
 

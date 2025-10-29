@@ -18,7 +18,7 @@ interface CarrierStats {
   totalOrders: number;
   activeOrders: number;
   todayOrders: number;
-  webhookSuccess: number;
+  webhookSuccess: number | null; // null when webhook logging not yet implemented
   recentOrders: Array<{
     id: string;
     orderNumber: string;
@@ -32,8 +32,9 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ carrierId: string }> }
 ) {
+  const { carrierId } = await context.params;
+
   try {
-    const { carrierId } = await context.params;
 
     // Validate carrier ID
     const carrier = CarrierService.getCarrier(carrierId);
@@ -110,36 +111,9 @@ export async function GET(
     ]);
 
     // Calculate webhook success rate
-    // This is a simplified calculation - in a real implementation, you might want to track
-    // webhook attempts and failures in a separate table
-    let webhookSuccess = 100;
-
-    // If the carrier has orders, we can estimate success rate
-    if (totalOrders > 0) {
-      try {
-        // Get orders that should have had webhook updates (assigned or completed)
-        const ordersWithStatus = await prisma.cateringRequest.count({
-          where: {
-            orderNumber: {
-              startsWith: carrier.orderPrefix,
-            },
-            driverStatus: {
-              not: null,
-            },
-            deletedAt: null,
-          },
-        });
-
-        // TODO: Implement proper webhook logging to track actual success/failure rates
-        // For now, use a deterministic fallback value until webhook logging is implemented
-        if (ordersWithStatus > 0) {
-          webhookSuccess = 99; // Deterministic fallback - replace with real tracking
-        }
-      } catch (error) {
-        // Error silently handled - use default fallback
-        webhookSuccess = 95; // Default fallback
-      }
-    }
+    // TODO: Implement proper webhook logging to track actual success/failure rates
+    // Until webhook logging is implemented, we return null to avoid showing misleading data
+    const webhookSuccess: number | null = null;
 
     const stats: CarrierStats = {
       totalOrders,
@@ -158,7 +132,7 @@ export async function GET(
     return NextResponse.json(stats);
 
   } catch (error) {
-    // Error handled with generic response
+    console.error(`[CarrierStats] Error fetching carrier stats for ${carrierId}:`, error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -173,8 +147,9 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ carrierId: string }> }
 ) {
+  const { carrierId } = await context.params;
+
   try {
-    const { carrierId } = await context.params;
     const { dateRange } = await request.json();
 
     const carrier = CarrierService.getCarrier(carrierId);
@@ -203,7 +178,7 @@ export async function POST(
     return NextResponse.json(mockMetrics);
 
   } catch (error) {
-    // Error handled with generic response
+    console.error(`[CarrierStats] Error fetching webhook metrics for ${carrierId}:`, error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

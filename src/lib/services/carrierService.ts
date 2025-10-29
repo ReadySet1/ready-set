@@ -110,18 +110,16 @@ export class CarrierService {
     metadata?: Record<string, unknown>
   ): Promise<WebhookResult | null> {
     const carrier = this.detectCarrier(orderNumber);
-    
+
     if (!carrier || !carrier.enabled) {
-            return null;
+      console.error(`[CarrierService] Cannot send status update for order ${orderNumber}: carrier not found or disabled`);
+      return null;
     }
 
     const mappedStatus = carrier.statusMapping[driverStatus];
     if (!mappedStatus) {
-            return {
-        success: true,
-        attempts: 0,
-        carrierId: carrier.id,
-      };
+      console.error(`[CarrierService] Cannot send status update for order ${orderNumber}: status '${driverStatus}' not mapped for carrier ${carrier.id}`);
+      return null;
     }
 
     

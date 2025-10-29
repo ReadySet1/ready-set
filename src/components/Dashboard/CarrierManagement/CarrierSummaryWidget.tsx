@@ -58,7 +58,8 @@ export const CarrierSummaryWidget: React.FC = () => {
             totalTodayOrders += stats.todayOrders;
           }
         } catch (error) {
-          // Error silently handled - stats will use defaults
+          console.error(`[CarrierSummaryWidget] Failed to load stats for carrier ${config.id}:`, error);
+          // Stats will use defaults
         }
 
         return {
@@ -75,7 +76,8 @@ export const CarrierSummaryWidget: React.FC = () => {
       setTotalOrders(totalTodayOrders);
       setLastUpdated(new Date());
     } catch (error) {
-      // Error silently handled - will show empty state
+      console.error('[CarrierSummaryWidget] Error loading carrier summary:', error);
+      // Will show empty state
     } finally {
       setLoading(false);
       setRefreshing(false);

@@ -145,6 +145,7 @@ export class EnhancedSessionManager implements SessionManager {
   private refreshPromise: Promise<EnhancedSession | null> | null = null;
   private isRefreshing = false;
   private refreshQueue: Array<() => void> = [];
+  private isCleaningSession = false; // Prevents race conditions during concurrent session cleanup
 
   constructor(config: Partial<AuthContextConfig> = {}) {
     this.config = { ...DEFAULT_AUTH_CONFIG, ...config };
@@ -459,7 +460,10 @@ export class EnhancedSessionManager implements SessionManager {
 
       // Check if session is expired
       if (session.expiresAt < Date.now()) {
-        this.clearStoredSession();
+        // Prevent race condition: only clear if not already cleaning
+        if (!this.isCleaningSession) {
+          this.clearStoredSession();
+        }
         return null;
       }
 
@@ -491,9 +495,17 @@ export class EnhancedSessionManager implements SessionManager {
   private clearStoredSession() {
     if (typeof window === 'undefined') return;
 
-    localStorage.removeItem(STORAGE_KEYS.SESSION_DATA);
-    localStorage.removeItem(STORAGE_KEYS.FINGERPRINT);
-    localStorage.removeItem(STORAGE_KEYS.LAST_ACTIVITY);
+    // Set flag to prevent race conditions
+    this.isCleaningSession = true;
+
+    try {
+      localStorage.removeItem(STORAGE_KEYS.SESSION_DATA);
+      localStorage.removeItem(STORAGE_KEYS.FINGERPRINT);
+      localStorage.removeItem(STORAGE_KEYS.LAST_ACTIVITY);
+    } finally {
+      // Always reset flag, even if localStorage operations fail
+      this.isCleaningSession = false;
+    }
   }
 
   async clearSession(): Promise<void> {

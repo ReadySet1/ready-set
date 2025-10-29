@@ -32,7 +32,7 @@ interface CarrierStatus {
     totalOrders: number;
     activeOrders: number;
     todayOrders: number;
-    webhookSuccess: number;
+    webhookSuccess: number | null;
   };
 }
 
@@ -64,13 +64,14 @@ export const CarrierOverview: React.FC = () => {
             return await response.json();
           }
         } catch (error) {
-          // Error silently handled - will use defaults
+          console.error(`[CarrierOverview] Failed to load stats for carrier ${config.id}:`, error);
+          // Will use defaults
         }
         return {
           totalOrders: 0,
           activeOrders: 0,
           todayOrders: 0,
-          webhookSuccess: 100,
+          webhookSuccess: null,
         };
       });
 
@@ -88,7 +89,8 @@ export const CarrierOverview: React.FC = () => {
       setCarriers(carrierData);
       setLastUpdated(new Date());
     } catch (error) {
-      // Error silently handled - will show empty state
+      console.error('[CarrierOverview] Error loading carrier data:', error);
+      // Will show empty state
     } finally {
       setLoading(false);
     }
@@ -109,7 +111,8 @@ export const CarrierOverview: React.FC = () => {
 
       setLastUpdated(new Date());
     } catch (error) {
-      // Error silently handled - will keep previous connectivity state
+      console.error('[CarrierOverview] Error testing connectivity:', error);
+      // Will keep previous connectivity state
     } finally {
       setTesting(false);
     }
@@ -257,9 +260,12 @@ export const CarrierOverview: React.FC = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Avg Success Rate</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {carriers.length > 0 
-                    ? Math.round(carriers.reduce((sum, c) => sum + c.stats.webhookSuccess, 0) / carriers.length)
-                    : 0}%
+                  {(() => {
+                    const validRates = carriers.filter(c => c.stats.webhookSuccess !== null);
+                    return validRates.length > 0
+                      ? `${Math.round(validRates.reduce((sum, c) => sum + (c.stats.webhookSuccess || 0), 0) / validRates.length)}%`
+                      : 'N/A';
+                  })()}
                 </p>
               </div>
               <Zap className="h-8 w-8 text-green-500" />
@@ -323,21 +329,25 @@ export const CarrierOverview: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-gray-600">Success Rate</p>
-                  <p className="font-semibold">{carrier.stats.webhookSuccess}%</p>
+                  <p className="font-semibold">
+                    {carrier.stats.webhookSuccess !== null ? `${carrier.stats.webhookSuccess}%` : 'N/A'}
+                  </p>
                 </div>
               </div>
 
               {/* Webhook Success Rate Progress */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-gray-600">
-                  <span>Webhook Success Rate</span>
-                  <span>{carrier.stats.webhookSuccess}%</span>
+              {carrier.stats.webhookSuccess !== null && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Webhook Success Rate</span>
+                    <span>{carrier.stats.webhookSuccess}%</span>
+                  </div>
+                  <Progress
+                    value={carrier.stats.webhookSuccess}
+                    className="h-2"
+                  />
                 </div>
-                <Progress 
-                  value={carrier.stats.webhookSuccess} 
-                  className="h-2"
-                />
-              </div>
+              )}
 
               {/* Actions */}
               <div className="flex gap-2 pt-2">
