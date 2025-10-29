@@ -108,8 +108,10 @@ export class UploadSecurityManager {
         }
 
         // Log quarantine event to database
+        // Note: Type assertion used because quarantine_logs table is created via migration
+        // and types will be regenerated after migration is applied
         try {
-          await supabase.from('quarantine_logs').insert({
+          await (supabase as any).from('quarantine_logs').insert({
             file_name: file.name,
             file_type: file.type,
             file_size: file.size,
