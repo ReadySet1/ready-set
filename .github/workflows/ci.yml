@@ -157,10 +157,15 @@ jobs:
         run: pnpm test:e2e
         env:
           CI: true
-          # TODO: Replace with actual Supabase test project credentials
+          # Supabase Test Project
           DATABASE_URL: ${{ secrets.TEST_DATABASE_URL || 'postgresql://test:test@localhost:5432/test_db' }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL || 'https://test.supabase.co' }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY || 'test-anon-key' }}
+          # Test User Credentials
+          TEST_CLIENT_EMAIL: ${{ secrets.TEST_CLIENT_EMAIL || 'test-client@example.com' }}
+          TEST_CLIENT_PASSWORD: ${{ secrets.TEST_CLIENT_PASSWORD || 'TestPassword123!' }}
+          TEST_VENDOR_EMAIL: ${{ secrets.TEST_VENDOR_EMAIL || 'test-vendor@example.com' }}
+          TEST_VENDOR_PASSWORD: ${{ secrets.TEST_VENDOR_PASSWORD || 'TestPassword123!' }}
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

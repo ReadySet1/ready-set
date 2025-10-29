@@ -11,26 +11,26 @@
  */
 
 import { chromium, type FullConfig } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
 import path from 'path';
 import fs from 'fs';
 
-// Test user credentials (must match test-data-setup.ts)
+// Test user credentials from environment variables
+// These should be set in .env.test (gitignored) or CI secrets
 const TEST_USERS = {
   CLIENT: {
-    email: 'test-client@example.com',
-    password: 'TestPassword123!',
+    email: process.env.TEST_CLIENT_EMAIL || 'test-client@example.com',
+    password: process.env.TEST_CLIENT_PASSWORD || 'TestPassword123!',
     role: 'CLIENT',
   },
   VENDOR: {
-    email: 'test-vendor@example.com',
-    password: 'TestPassword123!',
+    email: process.env.TEST_VENDOR_EMAIL || 'test-vendor@example.com',
+    password: process.env.TEST_VENDOR_PASSWORD || 'TestPassword123!',
     role: 'VENDOR',
   },
   // Add ADMIN when available
   // ADMIN: {
-  //   email: 'test-admin@example.com',
-  //   password: 'TestPassword123!',
+  //   email: process.env.TEST_ADMIN_EMAIL || 'test-admin@example.com',
+  //   password: process.env.TEST_ADMIN_PASSWORD || 'TestPassword123!',
   //   role: 'ADMIN',
   // },
 };
@@ -81,6 +81,13 @@ async function authenticate(
     const authFile = path.join(authDir, `${role.toLowerCase()}.json`);
     await context.storageState({ path: authFile });
     console.log(`  💾 Auth state saved to: ${path.relative(process.cwd(), authFile)}`);
+
+    // Validate the saved auth state
+    const savedState = JSON.parse(fs.readFileSync(authFile, 'utf-8'));
+    if (!savedState.cookies || savedState.cookies.length === 0) {
+      throw new Error(`Auth state for ${role} appears invalid (no cookies)`);
+    }
+    console.log(`  ✓ Auth state validated (${savedState.cookies.length} cookies saved)`);
 
     return authFile;
   } catch (error) {
@@ -133,11 +140,13 @@ export default async function globalSetup(config: FullConfig) {
     return;
   }
 
-  // Authenticate each user role
+  // Authenticate each user role in parallel for faster setup
   try {
-    for (const [role, credentials] of Object.entries(TEST_USERS)) {
-      await authenticate(baseURL, credentials.email, credentials.password, role);
-    }
+    await Promise.all(
+      Object.entries(TEST_USERS).map(([role, credentials]) =>
+        authenticate(baseURL, credentials.email, credentials.password, role)
+      )
+    );
 
     console.log('\n' + '='.repeat(60));
     console.log('✅ Authentication setup complete!');
