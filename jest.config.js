@@ -78,7 +78,7 @@ const customJestConfig = {
     }],
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(.*\\.mjs$|@supabase|isows|bufferutil|@solana|ws|@noble|tweetnacl|cheerio|resend))',
+    'node_modules/(?!(.*\\.mjs$|@supabase|isows|bufferutil|@solana|ws|@noble|tweetnacl|cheerio.*|resend|parse5|dom-serializer|domutils|htmlparser2|entities|domhandler))',
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   // Add test timeout

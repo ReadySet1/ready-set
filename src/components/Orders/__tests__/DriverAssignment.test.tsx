@@ -5,6 +5,7 @@ import {
   fireEvent,
   waitFor,
   act,
+  cleanup,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "react-hot-toast";
@@ -164,7 +165,13 @@ describe("Driver Assignment Functionality", () => {
   });
 
   afterEach(() => {
+    cleanup(); // Clean up React components
     jest.restoreAllMocks();
+    jest.clearAllTimers(); // Clear any pending timers
+    // Force garbage collection hint
+    if (global.gc) {
+      global.gc();
+    }
   });
 
   describe("Driver Assignment Dialog", () => {

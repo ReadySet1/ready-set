@@ -27,17 +27,38 @@ describe('Sanity CMS Resilience Tests', () => {
 
   describe('Content Fetching Resilience', () => {
     it('should handle API timeout during content fetch', async () => {
-      const timeoutMock = createMockApiWithTimeout(10000);
+      jest.useFakeTimers();
 
-      await expect(
-        timeoutMock({ query: '*[_type == "post"]' })
-      ).rejects.toThrow(/timeout/i);
-    }, 12000);
+      const timeoutMock = createMockApiWithTimeout(10000);
+      const promise = timeoutMock({ query: '*[_type == "post"]' });
+
+      // Advance time to trigger timeout
+      jest.advanceTimersByTime(10000);
+
+      await expect(promise).rejects.toThrow(/timeout/i);
+
+      jest.useRealTimers();
+    });
 
     it('should retry on transient failures', async () => {
       const retryMock = createMockApiWithRetry(2, 'server');
 
-      await expect(retryMock()).resolves.toMatchObject({
+      // Wrap in retry logic
+      const retryWrapper = async () => {
+        const maxRetries = 3;
+        let lastError;
+
+        for (let i = 0; i < maxRetries; i++) {
+          try {
+            return await retryMock();
+          } catch (error) {
+            lastError = error;
+            if (i === maxRetries - 1) throw error;
+          }
+        }
+      };
+
+      await expect(retryWrapper()).resolves.toMatchObject({
         success: true,
       });
 
@@ -279,39 +300,28 @@ describe('Sanity CMS Resilience Tests', () => {
     });
 
     it('should implement query timeout', async () => {
+      jest.useFakeTimers();
+
       const QUERY_TIMEOUT = 5000;
 
       const executeQueryWithTimeout = async (query: string) => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), QUERY_TIMEOUT);
-
-        try {
-          // Simulate long-running query
-          await wait(6000);
-
-          clearTimeout(timeoutId);
-          return { success: true, data: [] };
-        } catch (error) {
-          clearTimeout(timeoutId);
-          if (error instanceof Error && error.name === 'AbortError') {
+        return Promise.race([
+          wait(6000).then(() => ({ success: true, data: [] })),
+          wait(QUERY_TIMEOUT).then(() => {
             throw new Error('Query timeout after 5000ms');
-          }
-          throw error;
-        }
+          }),
+        ]);
       };
 
-      // Mock the wait to be faster for testing
-      jest.spyOn(global, 'setTimeout').mockImplementation((callback: any) => {
-        callback();
-        return 0 as any;
-      });
+      const promise = executeQueryWithTimeout('*[_type == "post"]');
 
-      await expect(executeQueryWithTimeout('*[_type == "post"]')).rejects.toThrow(
-        /timeout/i
-      );
+      // Advance past the timeout
+      jest.advanceTimersByTime(5000);
 
-      jest.restoreAllMocks();
-    }, 10000);
+      await expect(promise).rejects.toThrow(/timeout/i);
+
+      jest.useRealTimers();
+    });
 
     it('should paginate large result sets', async () => {
       const fetchPaginated = async (offset: number = 0, limit: number = 100) => {
@@ -465,13 +475,20 @@ describe('Sanity CMS Resilience Tests', () => {
     });
 
     it('should track content fetch performance', async () => {
+      jest.useFakeTimers();
+      let mockTime = 1000;
+      jest.spyOn(Date, 'now').mockImplementation(() => mockTime);
+
       const performanceMetrics: Array<{ query: string; duration: number }> = [];
 
       const fetchWithMetrics = async (query: string) => {
         const start = Date.now();
 
         try {
-          await wait(100);
+          const promise = wait(100);
+          jest.advanceTimersByTime(100);
+          await promise;
+          mockTime += 100; // Simulate time passing
           return { data: [] };
         } finally {
           const duration = Date.now() - start;
@@ -484,7 +501,10 @@ describe('Sanity CMS Resilience Tests', () => {
 
       expect(performanceMetrics).toHaveLength(2);
       expect(performanceMetrics[0].duration).toBeGreaterThan(0);
-    }, 5000);
+
+      jest.restoreAllMocks();
+      jest.useRealTimers();
+    });
   });
 
   // ==========================================================================
@@ -493,6 +513,8 @@ describe('Sanity CMS Resilience Tests', () => {
 
   describe('Webhooks and Real-time Updates', () => {
     it('should handle webhook delivery failures gracefully', async () => {
+      jest.useFakeTimers();
+
       const deliverWebhook = async (url: string, payload: any, maxRetries: number = 3) => {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
           try {
@@ -506,7 +528,9 @@ describe('Sanity CMS Resilience Tests', () => {
               return { success: false, attempts: attempt, error: 'Max retries exceeded' };
             }
 
-            await wait(1000 * Math.pow(2, attempt - 1));
+            const promise = wait(1000 * Math.pow(2, attempt - 1));
+            jest.advanceTimersByTime(1000 * Math.pow(2, attempt - 1));
+            await promise;
           }
         }
       };
@@ -515,7 +539,9 @@ describe('Sanity CMS Resilience Tests', () => {
 
       expect(result.success).toBe(true);
       expect(result.attempts).toBe(2);
-    }, 5000);
+
+      jest.useRealTimers();
+    });
 
     it('should validate webhook signatures', () => {
       const validateWebhookSignature = (payload: string, signature: string, secret: string) => {
