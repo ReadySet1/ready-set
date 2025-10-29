@@ -3,7 +3,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Truck, Building2, ExternalLink } from 'lucide-react';
-import { CarrierService } from '@/lib/services/carrierService';
+import { CarrierServiceClient as CarrierService } from '@/lib/services/carrier-service-client';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface CarrierOrdersBadgeProps {

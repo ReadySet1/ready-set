@@ -146,21 +146,32 @@ export class EnhancedSessionManager implements SessionManager {
   private isRefreshing = false;
   private refreshQueue: Array<() => void> = [];
   private isCleaningSession = false; // Prevents race conditions during concurrent session cleanup
+  private isInitialized = false; // Tracks initialization state to ensure proper cleanup
 
   constructor(config: Partial<AuthContextConfig> = {}) {
     this.config = { ...DEFAULT_AUTH_CONFIG, ...config };
     this.tabId = this.getOrGenerateTabId();
 
-    // Initialize cross-tab synchronization if enabled
-    if (this.config.enableCrossTabSync && typeof window !== 'undefined') {
-      this.initializeCrossTabSync();
+    try {
+      // Initialize cross-tab synchronization if enabled
+      if (this.config.enableCrossTabSync && typeof window !== 'undefined') {
+        this.initializeCrossTabSync();
+      }
+
+      // Initialize Supabase client
+      this.initializeSupabase();
+
+      // Start session cleanup interval
+      this.startCleanupTimer();
+
+      // Mark as fully initialized
+      this.isInitialized = true;
+    } catch (error) {
+      // Ensure cleanup happens even if initialization fails
+      authLogger.error('EnhancedSessionManager: Initialization failed, cleaning up resources', error);
+      this.destroy();
+      throw error;
     }
-
-    // Initialize Supabase client
-    this.initializeSupabase();
-
-    // Start session cleanup interval
-    this.startCleanupTimer();
   }
 
   private async initializeSupabase() {
@@ -657,7 +668,12 @@ export class EnhancedSessionManager implements SessionManager {
     if (this.cleanupTimer) clearInterval(this.cleanupTimer);
     if (this.broadcastChannel) this.broadcastChannel.close();
 
-    this.clearStoredSession();
+    // Only clear session if fully initialized
+    if (this.isInitialized) {
+      this.clearStoredSession();
+    }
+
+    this.isInitialized = false;
   }
 }
 

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
-import { CarrierService } from '@/lib/services/carrierService';
+import { CarrierService, CarrierWebhookService } from '@/lib/services/carrierService';
 import { DriverStatus } from '@/types/prisma';
 import { invalidateVendorCacheOnStatusUpdate } from '@/lib/cache/cache-invalidation';
 
@@ -126,7 +126,7 @@ export async function PATCH(
 
     // Send webhook to appropriate carrier based on order number
     try {
-      const webhookResult = await CarrierService.sendStatusUpdate(
+      const webhookResult = await CarrierWebhookService.sendStatusUpdate(
         order.orderNumber,
         validatedData.driverStatus
       );
@@ -137,7 +137,7 @@ export async function PATCH(
           webhookResults.caterValley = {
             success: webhookResult.success,
             attempts: webhookResult.attempts,
-            error: webhookResult.lastError,
+            error: webhookResult.success ? undefined : webhookResult.lastError,
           };
         }
         // Future carriers can be added here

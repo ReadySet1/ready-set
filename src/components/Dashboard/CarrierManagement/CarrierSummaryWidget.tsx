@@ -13,8 +13,9 @@ import {
   Activity,
   RefreshCw
 } from 'lucide-react';
-import { CarrierService, CarrierConfig } from '@/lib/services/carrierService';
+import { CarrierServiceClient as CarrierService, type CarrierConfig } from '@/lib/services/carrier-service-client';
 import Link from 'next/link';
+import { carrierLogger } from '@/utils/logger';
 
 interface CarrierSummary {
   name: string;
@@ -54,7 +55,7 @@ export const CarrierSummaryWidget: React.FC = () => {
             totalTodayOrders += stats.todayOrders;
           }
         } catch (error) {
-          console.error(`[CarrierSummaryWidget] Failed to load stats for carrier ${config.id}:`, error);
+          carrierLogger.error(`[CarrierSummaryWidget] Failed to load stats for carrier ${config.id}:`, error);
           // Stats will use defaults
         }
 
@@ -72,7 +73,7 @@ export const CarrierSummaryWidget: React.FC = () => {
       setTotalOrders(totalTodayOrders);
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('[CarrierSummaryWidget] Error loading carrier summary:', error);
+      carrierLogger.error('[CarrierSummaryWidget] Error loading carrier summary:', error);
       // Will show empty state
     } finally {
       setLoading(false);

@@ -17,10 +17,11 @@ import {
   TrendingUp,
   Loader2
 } from 'lucide-react';
-import { CarrierService, CarrierConfig } from '@/lib/services/carrierService';
+import { CarrierServiceClient as CarrierService, type CarrierConfig } from '@/lib/services/carrier-service-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { carrierLogger } from '@/utils/logger';
 
 interface CarrierDetailsProps {
   carrierId: string;
@@ -79,11 +80,11 @@ export const CarrierDetails: React.FC<CarrierDetailsProps> = ({ carrierId }) => 
           setStats(statsData);
         }
       } catch (error) {
-        console.error(`[CarrierDetails] Failed to load stats for carrier ${carrierId}:`, error);
+        carrierLogger.error(`[CarrierDetails] Failed to load stats for carrier ${carrierId}:`, error);
         // Stats will remain null, showing empty state
       }
     } catch (error) {
-      console.error(`[CarrierDetails] Error loading carrier data for ${carrierId}:`, error);
+      carrierLogger.error(`[CarrierDetails] Error loading carrier data for ${carrierId}:`, error);
       // Will show loading state or redirect
     } finally {
       setLoading(false);
@@ -103,7 +104,7 @@ export const CarrierDetails: React.FC<CarrierDetailsProps> = ({ carrierId }) => 
         error: 'Test failed',
       });
     } catch (error) {
-      console.error(`[CarrierDetails] Error testing connectivity for carrier ${carrierId}:`, error);
+      carrierLogger.error(`[CarrierDetails] Error testing connectivity for carrier ${carrierId}:`, error);
       // Connectivity will show last known state
     } finally {
       setTesting(false);

@@ -17,9 +17,10 @@ import {
   Loader2,
   FileText
 } from 'lucide-react';
-import { CarrierService, CarrierConfig } from '@/lib/services/carrierService';
+import { CarrierServiceClient as CarrierService, type CarrierConfig } from '@/lib/services/carrier-service-client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
+import { carrierLogger } from '@/utils/logger';
 
 interface CarrierStatus {
   config: CarrierConfig;
@@ -60,7 +61,7 @@ export const CarrierOverview: React.FC = () => {
             return await response.json();
           }
         } catch (error) {
-          console.error(`[CarrierOverview] Failed to load stats for carrier ${config.id}:`, error);
+          carrierLogger.error(`[CarrierOverview] Failed to load stats for carrier ${config.id}:`, error);
           // Will use defaults
         }
         return {
@@ -85,7 +86,7 @@ export const CarrierOverview: React.FC = () => {
       setCarriers(carrierData);
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('[CarrierOverview] Error loading carrier data:', error);
+      carrierLogger.error('[CarrierOverview] Error loading carrier data:', error);
       // Will show empty state
     } finally {
       setLoading(false);
@@ -111,7 +112,7 @@ export const CarrierOverview: React.FC = () => {
 
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('[CarrierOverview] Error testing connectivity:', error);
+      carrierLogger.error('[CarrierOverview] Error testing connectivity:', error);
       // Will keep previous connectivity state
     } finally {
       setTesting(false);
