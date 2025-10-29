@@ -198,7 +198,15 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-test-anon-key
 
 # Database
 DATABASE_URL=postgresql://user:password@host:5432/database
+
+# Test User Credentials (for authentication setup)
+TEST_CLIENT_EMAIL=test-client@example.com
+TEST_CLIENT_PASSWORD=TestPassword123!
+TEST_VENDOR_EMAIL=test-vendor@example.com
+TEST_VENDOR_PASSWORD=TestPassword123!
 ```
+
+**Security Note:** Never commit `.env.test` to version control. The `.env.test.example` file is provided as a template.
 
 ## CI/CD Integration
 
@@ -212,10 +220,35 @@ E2E tests run automatically in CI on:
 - 10-minute timeout (down from 20 minutes)
 - Uploads test reports and screenshots on failure
 
-**GitHub Secrets Required:**
-- `TEST_DATABASE_URL` - Database connection string for test project
-- `TEST_SUPABASE_URL` - Supabase test project URL
-- `TEST_SUPABASE_ANON_KEY` - Supabase test project anon key
+### Setting Up GitHub Secrets
+
+E2E tests in CI require the following GitHub secrets. To set them up:
+
+1. **Navigate to Repository Settings**
+   - Go to your repository on GitHub
+   - Click **Settings** → **Secrets and variables** → **Actions**
+
+2. **Add Repository Secrets** (click "New repository secret" for each):
+
+   | Secret Name | Description | Example |
+   |-------------|-------------|---------|
+   | `TEST_DATABASE_URL` | PostgreSQL connection string for test database | `postgresql://postgres:pass@db.xxx.supabase.co:5432/postgres` |
+   | `TEST_SUPABASE_URL` | Supabase test project URL | `https://xxxxx.supabase.co` |
+   | `TEST_SUPABASE_ANON_KEY` | Supabase test project anonymous key | `eyJhbGc...` (starts with eyJ) |
+   | `TEST_CLIENT_EMAIL` | Test client user email | `test-client@example.com` |
+   | `TEST_CLIENT_PASSWORD` | Test client user password | `TestPassword123!` |
+   | `TEST_VENDOR_EMAIL` | Test vendor user email | `test-vendor@example.com` |
+   | `TEST_VENDOR_PASSWORD` | Test vendor user password | `TestPassword123!` |
+
+3. **Verify Secrets Are Set**
+   - Secrets should appear in the list (values are hidden)
+   - Re-run failed CI workflows to test
+
+**Security Best Practices:**
+- Use strong, unique passwords for test users
+- Never expose these secrets in logs or PR comments
+- Rotate test credentials periodically
+- Use a completely separate Supabase project for testing
 
 ## Troubleshooting
 
