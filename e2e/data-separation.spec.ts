@@ -143,7 +143,7 @@ test.describe('Data Separation and Role-Based Access Control', () => {
       errors.push(error.message);
     });
 
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     expect(errors).toHaveLength(0);
   });
 
