@@ -153,6 +153,46 @@ jobs:
           NEXT_PUBLIC_SANITY_PROJECT_ID: test-project-id
           NEXT_PUBLIC_SANITY_DATASET: test
 
+      - name: Validate GitHub Secrets
+        run: |
+          echo "🔍 Validating required GitHub secrets are set..."
+          MISSING_SECRETS=()
+
+          if [ -z "${{ secrets.TEST_DATABASE_URL }}" ]; then
+            MISSING_SECRETS+=("TEST_DATABASE_URL")
+          fi
+          if [ -z "${{ secrets.TEST_SUPABASE_URL }}" ]; then
+            MISSING_SECRETS+=("TEST_SUPABASE_URL")
+          fi
+          if [ -z "${{ secrets.TEST_SUPABASE_ANON_KEY }}" ]; then
+            MISSING_SECRETS+=("TEST_SUPABASE_ANON_KEY")
+          fi
+          if [ -z "${{ secrets.TEST_CLIENT_EMAIL }}" ]; then
+            MISSING_SECRETS+=("TEST_CLIENT_EMAIL")
+          fi
+          if [ -z "${{ secrets.TEST_CLIENT_PASSWORD }}" ]; then
+            MISSING_SECRETS+=("TEST_CLIENT_PASSWORD")
+          fi
+          if [ -z "${{ secrets.TEST_VENDOR_EMAIL }}" ]; then
+            MISSING_SECRETS+=("TEST_VENDOR_EMAIL")
+          fi
+          if [ -z "${{ secrets.TEST_VENDOR_PASSWORD }}" ]; then
+            MISSING_SECRETS+=("TEST_VENDOR_PASSWORD")
+          fi
+
+          if [ ${#MISSING_SECRETS[@]} -gt 0 ]; then
+            echo "❌ ERROR: Missing required GitHub secrets:"
+            printf '  - %s\n' "${MISSING_SECRETS[@]}"
+            echo ""
+            echo "📖 Please configure these secrets in GitHub repository settings."
+            echo "   Settings → Secrets and variables → Actions → New repository secret"
+            echo ""
+            echo "See e2e/README.md for detailed setup instructions."
+            exit 1
+          fi
+
+          echo "✅ All required secrets are configured"
+
       - name: Run E2E tests
         run: pnpm test:e2e
         env:
