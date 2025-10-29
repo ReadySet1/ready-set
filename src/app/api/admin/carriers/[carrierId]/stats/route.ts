@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { CarrierService } from '@/lib/services/carrierService';
+import { webhookLogger } from '@/lib/services/webhook-logger';
+import { carrierLogger } from '@/utils/logger';
 import { startOfDay, endOfDay } from 'date-fns';
 
 // Force dynamic rendering for this route
@@ -110,10 +112,10 @@ export async function GET(
       }),
     ]);
 
-    // Calculate webhook success rate
-    // TODO: Implement proper webhook logging to track actual success/failure rates
-    // Until webhook logging is implemented, we return null to avoid showing misleading data
-    const webhookSuccess: number | null = null;
+    // Calculate webhook success rate from webhook logs
+    // Returns null if there are no webhook attempts in the last 30 days
+    const webhookSuccessData = await webhookLogger.getSuccessRate(carrierId, 30);
+    const webhookSuccess: number | null = webhookSuccessData.successRate;
 
     const stats: CarrierStats = {
       totalOrders,
@@ -132,7 +134,7 @@ export async function GET(
     return NextResponse.json(stats);
 
   } catch (error) {
-    console.error(`[CarrierStats] Error fetching carrier stats for ${carrierId}:`, error);
+    carrierLogger.error(`[CarrierStats] Error fetching carrier stats for ${carrierId}:`, error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -178,7 +180,7 @@ export async function POST(
     return NextResponse.json(mockMetrics);
 
   } catch (error) {
-    console.error(`[CarrierStats] Error fetching webhook metrics for ${carrierId}:`, error);
+    carrierLogger.error(`[CarrierStats] Error fetching webhook metrics for ${carrierId}:`, error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

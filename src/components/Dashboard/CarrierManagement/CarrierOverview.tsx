@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,11 +43,7 @@ export const CarrierOverview: React.FC = () => {
   const [testing, setTesting] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-  useEffect(() => {
-    loadCarrierData();
-  }, []);
-
-  const loadCarrierData = async () => {
+  const loadCarrierData = useCallback(async () => {
     setLoading(true);
     try {
       // Get carrier configurations
@@ -94,7 +90,11 @@ export const CarrierOverview: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // No external dependencies
+
+  useEffect(() => {
+    loadCarrierData();
+  }, [loadCarrierData]);
 
   const testConnectivity = async () => {
     setTesting(true);

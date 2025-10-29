@@ -3,6 +3,7 @@
 import { GET, POST } from '@/app/api/admin/carriers/[carrierId]/stats/route';
 import { prisma } from '@/lib/db/prisma';
 import { CarrierService } from '@/lib/services/carrierService';
+import { webhookLogger } from '@/lib/services/webhook-logger';
 import {
   createGetRequest,
   createPostRequest,
@@ -26,6 +27,12 @@ jest.mock('@/lib/services/carrierService', () => ({
   },
 }));
 
+jest.mock('@/lib/services/webhook-logger', () => ({
+  webhookLogger: {
+    getSuccessRate: jest.fn(),
+  },
+}));
+
 describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -33,7 +40,7 @@ describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', 
 
   describe('GET /api/admin/carriers/[carrierId]/stats - Get Carrier Stats', () => {
     describe('✅ Successful Retrieval', () => {
-      it('should return carrier statistics', async () => {
+      it('should return carrier statistics with webhook success rate', async () => {
         (CarrierService.getCarrier as jest.Mock).mockReturnValue({
           id: 'carrier-1',
           name: 'Test Carrier',
@@ -53,12 +60,18 @@ describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', 
         (prisma.cateringRequest.count as jest.Mock)
           .mockResolvedValueOnce(100) // totalOrders
           .mockResolvedValueOnce(25) // activeOrders
-          .mockResolvedValueOnce(5) // todayOrders
-          .mockResolvedValueOnce(80); // ordersWithStatus
+          .mockResolvedValueOnce(5); // todayOrders
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue(
           mockRecentOrders
         );
+
+        // Mock webhook logger to return 95% success rate
+        (webhookLogger.getSuccessRate as jest.Mock).mockResolvedValue({
+          totalAttempts: 100,
+          successfulAttempts: 95,
+          successRate: 95.0,
+        });
 
         const request = createGetRequest(
           'http://localhost:3000/api/admin/carriers/carrier-1/stats'
@@ -74,14 +87,13 @@ describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', 
         expect(data.totalOrders).toBe(100);
         expect(data.activeOrders).toBe(25);
         expect(data.todayOrders).toBe(5);
-        expect(data.webhookSuccess).toBeGreaterThanOrEqual(85);
-        expect(data.webhookSuccess).toBeLessThanOrEqual(100);
+        expect(data.webhookSuccess).toBe(95.0);
         expect(data.recentOrders).toHaveLength(1);
         expect(data.recentOrders[0].orderNumber).toBe('CATER-001');
         expect(data.recentOrders[0].orderTotal).toBe(5000);
       });
 
-      it('should return 100% webhook success when no orders exist', async () => {
+      it('should return null webhook success when no webhook attempts exist', async () => {
         (CarrierService.getCarrier as jest.Mock).mockReturnValue({
           id: 'carrier-2',
           orderPrefix: 'OD',
@@ -89,6 +101,13 @@ describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', 
 
         (prisma.cateringRequest.count as jest.Mock).mockResolvedValue(0);
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
+
+        // Mock webhook logger to return null when no attempts exist
+        (webhookLogger.getSuccessRate as jest.Mock).mockResolvedValue({
+          totalAttempts: 0,
+          successfulAttempts: 0,
+          successRate: null,
+        });
 
         const request = createGetRequest(
           'http://localhost:3000/api/admin/carriers/carrier-2/stats'
@@ -104,7 +123,7 @@ describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', 
         expect(data.totalOrders).toBe(0);
         expect(data.activeOrders).toBe(0);
         expect(data.todayOrders).toBe(0);
-        expect(data.webhookSuccess).toBe(100);
+        expect(data.webhookSuccess).toBeNull();
         expect(data.recentOrders).toHaveLength(0);
       });
 
@@ -136,6 +155,13 @@ describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', 
           mockOrders
         );
 
+        // Mock webhook logger
+        (webhookLogger.getSuccessRate as jest.Mock).mockResolvedValue({
+          totalAttempts: 50,
+          successfulAttempts: 48,
+          successRate: 96.0,
+        });
+
         const request = createGetRequest(
           'http://localhost:3000/api/admin/carriers/carrier-1/stats'
         );
@@ -160,6 +186,13 @@ describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', 
 
         (prisma.cateringRequest.count as jest.Mock).mockResolvedValue(100);
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
+
+        // Mock webhook logger
+        (webhookLogger.getSuccessRate as jest.Mock).mockResolvedValue({
+          totalAttempts: 100,
+          successfulAttempts: 90,
+          successRate: 90.0,
+        });
 
         const request = createGetRequest(
           'http://localhost:3000/api/admin/carriers/carrier-1/stats'
@@ -219,7 +252,7 @@ describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', 
         await expectErrorResponse(response, 500, /Internal server error/i);
       });
 
-      it('should handle webhook success calculation errors gracefully', async () => {
+      it('should return null webhook success when webhook logger fails', async () => {
         (CarrierService.getCarrier as jest.Mock).mockReturnValue({
           id: 'carrier-1',
           orderPrefix: 'CATER',
@@ -228,10 +261,16 @@ describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', 
         (prisma.cateringRequest.count as jest.Mock)
           .mockResolvedValueOnce(100) // totalOrders
           .mockResolvedValueOnce(25) // activeOrders
-          .mockResolvedValueOnce(5) // todayOrders
-          .mockRejectedValueOnce(new Error('Webhook calc error')); // ordersWithStatus fails
+          .mockResolvedValueOnce(5); // todayOrders
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
+
+        // Mock webhook logger to return null on error
+        (webhookLogger.getSuccessRate as jest.Mock).mockResolvedValue({
+          totalAttempts: 0,
+          successfulAttempts: 0,
+          successRate: null,
+        });
 
         const request = createGetRequest(
           'http://localhost:3000/api/admin/carriers/carrier-1/stats'
@@ -244,8 +283,8 @@ describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', 
         const response = await GET(request, context);
         const data = await expectSuccessResponse(response, 200);
 
-        // Should fall back to 95% webhook success
-        expect(data.webhookSuccess).toBe(95);
+        // Should return null when webhook logger fails
+        expect(data.webhookSuccess).toBeNull();
       });
     });
   });

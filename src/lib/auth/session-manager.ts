@@ -460,7 +460,13 @@ export class EnhancedSessionManager implements SessionManager {
 
       // Check if session is expired
       if (session.expiresAt < Date.now()) {
-        // Prevent race condition: only clear if not already cleaning
+        // Race condition prevention: The isCleaningSession flag prevents concurrent
+        // clearStoredSession() calls that could occur when multiple async operations
+        // (e.g., token refresh attempts, session validation checks) simultaneously
+        // detect an expired session. Without this guard, multiple operations could
+        // enter this block and attempt to clear localStorage simultaneously.
+        // The flag is set at the start of clearStoredSession() and always reset
+        // in a finally block to ensure cleanup even if localStorage operations fail.
         if (!this.isCleaningSession) {
           this.clearStoredSession();
         }

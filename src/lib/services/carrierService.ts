@@ -4,6 +4,8 @@
  */
 
 import { DriverStatus } from '@/types/prisma';
+import { webhookLogger } from '@/lib/services/webhook-logger';
+import { carrierLogger } from '@/utils/logger';
 
 export interface CarrierConfig {
   id: string;
@@ -112,13 +114,13 @@ export class CarrierService {
     const carrier = this.detectCarrier(orderNumber);
 
     if (!carrier || !carrier.enabled) {
-      console.error(`[CarrierService] Cannot send status update for order ${orderNumber}: carrier not found or disabled`);
+      carrierLogger.error(`[CarrierService] Cannot send status update for order ${orderNumber}: carrier not found or disabled`);
       return null;
     }
 
     const mappedStatus = carrier.statusMapping[driverStatus];
     if (!mappedStatus) {
-      console.error(`[CarrierService] Cannot send status update for order ${orderNumber}: status '${driverStatus}' not mapped for carrier ${carrier.id}`);
+      carrierLogger.error(`[CarrierService] Cannot send status update for order ${orderNumber}: status '${driverStatus}' not mapped for carrier ${carrier.id}`);
       return null;
     }
 
@@ -146,14 +148,25 @@ export class CarrierService {
     let response: Record<string, unknown> | undefined;
 
     for (let attempt = 1; attempt <= carrier.retryPolicy.maxAttempts; attempt++) {
+      const startTime = Date.now();
+
       try {
         const result = await this.makeWebhookRequest(carrier, payload);
-        
+        const responseTime = Date.now() - startTime;
+
         // Check if the response indicates success (carrier-specific logic)
         const isSuccess = this.isSuccessResponse(carrier, result);
-        
+
         if (isSuccess) {
-                    return {
+          // Log successful webhook
+          await webhookLogger.logSuccess({
+            carrierId: carrier.id,
+            orderNumber: payload.orderNumber,
+            status: payload.status,
+            responseTime,
+          });
+
+          return {
             success: true,
             attempts: attempt,
             response: result,
@@ -162,9 +175,28 @@ export class CarrierService {
         } else {
           lastError = `${carrier.name} API returned error response`;
           response = result;
+
+          // Log failed webhook (non-success response)
+          await webhookLogger.logFailure({
+            carrierId: carrier.id,
+            orderNumber: payload.orderNumber,
+            status: payload.status,
+            errorMessage: lastError,
+            responseTime,
+          });
         }
       } catch (error) {
+        const responseTime = Date.now() - startTime;
         lastError = error instanceof Error ? error.message : 'Unknown error';
+
+        // Log failed webhook (exception)
+        await webhookLogger.logFailure({
+          carrierId: carrier.id,
+          orderNumber: payload.orderNumber,
+          status: payload.status,
+          errorMessage: lastError,
+          responseTime,
+        });
 
         if (this.isNonRetryableError(error)) {
           break;

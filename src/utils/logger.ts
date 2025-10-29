@@ -89,6 +89,13 @@ export const uiLogger = new Logger({
   enabledInTest: false,
 });
 
+export const carrierLogger = new Logger({
+  enabledInProduction: true, // Enable in production for monitoring carrier integrations
+  enabledInBuild: false,
+  enabledInDevelopment: true, // Enable in development for debugging
+  enabledInTest: false,
+});
+
 // General logger
 export const logger = new Logger();
 

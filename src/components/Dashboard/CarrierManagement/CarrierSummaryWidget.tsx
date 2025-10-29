@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,11 +31,7 @@ export const CarrierSummaryWidget: React.FC = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    loadCarrierSummary();
-  }, []);
-
-  const loadCarrierSummary = async (isRefresh = false) => {
+  const loadCarrierSummary = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
       setRefreshing(true);
     } else {
@@ -82,7 +78,11 @@ export const CarrierSummaryWidget: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []); // No external dependencies
+
+  useEffect(() => {
+    loadCarrierSummary();
+  }, [loadCarrierSummary]);
 
   const handleRefresh = () => {
     loadCarrierSummary(true);
