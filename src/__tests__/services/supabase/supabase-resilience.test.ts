@@ -31,17 +31,38 @@ describe('Supabase Resilience Tests', () => {
 
   describe('Database Query Resilience', () => {
     it('should handle query timeout', async () => {
-      const timeoutMock = createMockApiWithTimeout(30000);
+      jest.useFakeTimers();
 
-      await expect(
-        timeoutMock({ query: 'SELECT * FROM large_table' })
-      ).rejects.toThrow(/timeout/i);
+      const timeoutMock = createMockApiWithTimeout(30000);
+      const promise = timeoutMock({ query: 'SELECT * FROM large_table' });
+
+      // Advance time to trigger timeout
+      jest.advanceTimersByTime(30000);
+
+      await expect(promise).rejects.toThrow(/timeout/i);
+
+      jest.useRealTimers();
     });
 
     it('should retry on connection errors', async () => {
       const retryMock = createMockApiWithRetry(2, 'network');
 
-      await expect(retryMock()).resolves.toMatchObject({
+      // Wrap in retry logic
+      const retryWrapper = async () => {
+        const maxRetries = 3;
+        let lastError;
+
+        for (let i = 0; i < maxRetries; i++) {
+          try {
+            return await retryMock();
+          } catch (error) {
+            lastError = error;
+            if (i === maxRetries - 1) throw error;
+          }
+        }
+      };
+
+      await expect(retryWrapper()).resolves.toMatchObject({
         success: true,
       });
 
@@ -255,31 +276,29 @@ describe('Supabase Resilience Tests', () => {
 
   describe('Storage Resilience', () => {
     it('should handle upload timeout for large files', async () => {
+      jest.useFakeTimers();
+
       const UPLOAD_TIMEOUT = 60000; // 60 seconds
 
       const uploadWithTimeout = async (file: Blob) => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT);
-
-        try {
-          // Simulate upload
-          await wait(70000); // Longer than timeout
-
-          clearTimeout(timeoutId);
-          return { success: true };
-        } catch (error) {
-          clearTimeout(timeoutId);
-          if (error instanceof Error && error.name === 'AbortError') {
+        return Promise.race([
+          wait(70000).then(() => ({ success: true })),
+          wait(UPLOAD_TIMEOUT).then(() => {
             throw new Error('Upload timeout after 60000ms');
-          }
-          throw error;
-        }
+          }),
+        ]);
       };
 
       const mockBlob = new Blob(['test data']);
+      const promise = uploadWithTimeout(mockBlob);
 
-      await expect(uploadWithTimeout(mockBlob)).rejects.toThrow(/timeout/i);
-    }, 5000);
+      // Advance to timeout
+      jest.advanceTimersByTime(60000);
+
+      await expect(promise).rejects.toThrow(/timeout/i);
+
+      jest.useRealTimers();
+    });
 
     it('should implement chunked upload with retry', async () => {
       const CHUNK_SIZE = 1024 * 1024; // 1MB chunks

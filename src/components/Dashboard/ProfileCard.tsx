@@ -162,11 +162,17 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ control, errors }) => {
             control={control}
             defaultValue=""
             rules={{
-              pattern: {
-                value:
-                  /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/,
-                message: "Invalid website URL",
-              },
+              validate: {
+                validUrl: (value: string) => {
+                  if (!value) return true; // Optional field
+                  try {
+                    new URL(value.startsWith('http') ? value : `https://${value}`);
+                    return true;
+                  } catch {
+                    return "Invalid website URL";
+                  }
+                }
+              }
             }}
             render={({
               field: { value, ...fieldProps },

@@ -127,14 +127,18 @@ export class InputSanitizer {
   }
 
   /**
-   * Sanitize text input (remove potential script injection)
+   * Sanitize text input (remove potential script injection and malicious content)
+   * Uses DOMPurify for comprehensive XSS protection
    */
   static sanitizeText(input: string): string {
-    return input
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
-      .replace(/javascript:/gi, '') // Remove javascript: URLs
-      .replace(/on\w+\s*=/gi, '') // Remove event handlers
-      .trim();
+    // Use DOMPurify with strict settings to remove all HTML tags and malicious content
+    return DOMPurify.sanitize(input, {
+      ALLOWED_TAGS: [], // Strip all HTML tags
+      ALLOWED_ATTR: [], // Strip all attributes
+      KEEP_CONTENT: true, // Keep the text content
+      FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed'], // Explicitly block dangerous tags
+      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'] // Block event handlers
+    }).trim();
   }
 
   /**

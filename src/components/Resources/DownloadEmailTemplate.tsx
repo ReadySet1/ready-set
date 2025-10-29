@@ -8,12 +8,35 @@ interface DownloadEmailTemplateProps {
   userEmail: string;
 }
 
+/**
+ * Validates that a URL is safe for use in email templates
+ * Only allows http:// and https:// protocols to prevent XSS attacks
+ */
+const validateDownloadUrl = (url: string): string => {
+  try {
+    const parsedUrl = new URL(url);
+    // Only allow http and https protocols
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      console.error(`Blocked unsafe URL protocol: ${parsedUrl.protocol}`);
+      return '#'; // Return safe default
+    }
+    return url;
+  } catch (error) {
+    console.error('Invalid URL provided:', error);
+    return '#'; // Return safe default for invalid URLs
+  }
+};
+
 export const DownloadEmailTemplate: React.FC<Readonly<DownloadEmailTemplateProps>> = ({
   firstName,
   resourceTitle,
   downloadUrl,
   userEmail,
-}) => (
+}) => {
+  // Validate URL before rendering to prevent XSS attacks
+  const safeDownloadUrl = validateDownloadUrl(downloadUrl);
+
+  return (
   <div style={{ 
     margin: 0, 
     padding: 0, 
@@ -64,7 +87,7 @@ export const DownloadEmailTemplate: React.FC<Readonly<DownloadEmailTemplateProps
                       <tbody>
                         <tr>
                           <td align="center" style={{ padding: '20px 0' }}>
-                            <a href={downloadUrl} style={{
+                            <a href={safeDownloadUrl} style={{
                               display: 'inline-block',
                               padding: '14px 30px',
                               backgroundColor: '#fbd113',
@@ -154,4 +177,5 @@ export const DownloadEmailTemplate: React.FC<Readonly<DownloadEmailTemplateProps
       </tbody>
     </table>
   </div>
-);
+  );
+};
