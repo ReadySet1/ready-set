@@ -107,22 +107,25 @@ export class UploadSecurityManager {
           return null; // Return null instead of throwing
         }
 
-        // Log quarantine event
-        const quarantineRecord: QuarantineFile = {
-          id: `${timestamp}-${randomId}`,
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-          originalPath: 'upload-attempt',
-          quarantinePath,
-          reason,
-          threatLevel,
-          userId,
-          quarantinedAt: new Date(),
-          scanResults
-        };
+        // Log quarantine event to database
+        try {
+          await supabase.from('quarantine_logs').insert({
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            quarantine_path: quarantinePath,
+            reason,
+            threat_level: threatLevel,
+            user_id: userId || null,
+            scan_results: scanResults || null,
+            review_status: 'pending'
+          });
+        } catch (dbError) {
+          console.warn('Failed to log quarantine event to database:', dbError);
+          // Continue even if logging fails
+        }
 
-        
+        console.log(`File quarantined: ${file.name} (${threatLevel} threat)`);
         return quarantinePath;
       } catch (storageError) {
         console.warn('Storage not available for quarantine, skipping:', storageError);
@@ -261,16 +264,10 @@ export class UploadSecurityManager {
         };
       }
 
-      // Skip security scanning to avoid VIRUS_ERROR issues
-      // TODO: Re-enable when storage buckets are properly configured
-      const scanResults = { isClean: true, threats: [], score: 0 };
-      const isSecure = true;
-      const quarantineRequired = false;
-
-      // Perform security scan (disabled for now)
-      // const scanResults = await this.scanForMaliciousContent(file);
-      // const isSecure = scanResults.isClean;
-      // const quarantineRequired = !isSecure && scanResults.score >= 30;
+      // Perform security scan on the file
+      const scanResults = await this.scanForMaliciousContent(file);
+      const isSecure = scanResults.isClean;
+      const quarantineRequired = !isSecure && scanResults.score >= 30;
 
       if (!isSecure) {
         let quarantined = false;
@@ -379,12 +376,37 @@ export class UploadSecurityManager {
     }
   }
 
+  // Cleanup expired rate limit entries to prevent memory leak
+  static cleanupExpiredRateLimits(): number {
+    const now = Date.now();
+    let cleanedCount = 0;
+
+    for (const [key, limit] of this.RATE_LIMITS.entries()) {
+      // Remove entries that are older than 2x their window size
+      if (now - limit.windowStart > limit.windowSize * 2) {
+        this.RATE_LIMITS.delete(key);
+        cleanedCount++;
+      }
+    }
+
+    if (cleanedCount > 0) {
+      console.log(`Cleaned up ${cleanedCount} expired rate limit entries`);
+    }
+
+    return cleanedCount;
+  }
+
   // Initialize periodic cleanup
   static startCleanupScheduler() {
     // Run cleanup every 24 hours
     setInterval(() => {
       this.cleanupQuarantinedFiles();
+      this.cleanupExpiredRateLimits();
     }, this.CLEANUP_INTERVAL);
 
-      }
+    // Also run rate limit cleanup more frequently (every 5 minutes)
+    setInterval(() => {
+      this.cleanupExpiredRateLimits();
+    }, 5 * 60 * 1000); // 5 minutes
+  }
 }
