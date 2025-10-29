@@ -115,9 +115,9 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    if: false # TODO: Temporarily disabled due to slow performance (20+ min timeout) - Re-enable after fixing in REA-23
-    timeout-minutes: 20
-    continue-on-error: true # TODO: Remove when E2E tests are fixed (REA-23)
+    # REA-47: Re-enabled after performance optimizations (20+ min → <5 min)
+    timeout-minutes: 10
+    continue-on-error: true # TODO: Remove after verifying tests pass consistently
 
     steps:
       - name: Checkout code
@@ -153,13 +153,59 @@ jobs:
           NEXT_PUBLIC_SANITY_PROJECT_ID: test-project-id
           NEXT_PUBLIC_SANITY_DATASET: test
 
+      - name: Validate GitHub Secrets
+        run: |
+          echo "🔍 Validating required GitHub secrets are set..."
+          MISSING_SECRETS=()
+
+          if [ -z "${{ secrets.TEST_DATABASE_URL }}" ]; then
+            MISSING_SECRETS+=("TEST_DATABASE_URL")
+          fi
+          if [ -z "${{ secrets.TEST_SUPABASE_URL }}" ]; then
+            MISSING_SECRETS+=("TEST_SUPABASE_URL")
+          fi
+          if [ -z "${{ secrets.TEST_SUPABASE_ANON_KEY }}" ]; then
+            MISSING_SECRETS+=("TEST_SUPABASE_ANON_KEY")
+          fi
+          if [ -z "${{ secrets.TEST_CLIENT_EMAIL }}" ]; then
+            MISSING_SECRETS+=("TEST_CLIENT_EMAIL")
+          fi
+          if [ -z "${{ secrets.TEST_CLIENT_PASSWORD }}" ]; then
+            MISSING_SECRETS+=("TEST_CLIENT_PASSWORD")
+          fi
+          if [ -z "${{ secrets.TEST_VENDOR_EMAIL }}" ]; then
+            MISSING_SECRETS+=("TEST_VENDOR_EMAIL")
+          fi
+          if [ -z "${{ secrets.TEST_VENDOR_PASSWORD }}" ]; then
+            MISSING_SECRETS+=("TEST_VENDOR_PASSWORD")
+          fi
+
+          if [ ${#MISSING_SECRETS[@]} -gt 0 ]; then
+            echo "❌ ERROR: Missing required GitHub secrets:"
+            printf '  - %s\n' "${MISSING_SECRETS[@]}"
+            echo ""
+            echo "📖 Please configure these secrets in GitHub repository settings."
+            echo "   Settings → Secrets and variables → Actions → New repository secret"
+            echo ""
+            echo "See e2e/README.md for detailed setup instructions."
+            exit 1
+          fi
+
+          echo "✅ All required secrets are configured"
+
       - name: Run E2E tests
         run: pnpm test:e2e
         env:
           CI: true
-          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
-          NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+          # Supabase Test Project (use secrets directly)
+          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+          # Test User Credentials
+          TEST_CLIENT_EMAIL: ${{ secrets.TEST_CLIENT_EMAIL }}
+          TEST_CLIENT_PASSWORD: ${{ secrets.TEST_CLIENT_PASSWORD }}
+          TEST_VENDOR_EMAIL: ${{ secrets.TEST_VENDOR_EMAIL }}
+          TEST_VENDOR_PASSWORD: ${{ secrets.TEST_VENDOR_PASSWORD }}
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

@@ -28,8 +28,8 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
       errors.push(error.message);
     });
 
-    // Wait a moment for any potential errors to appear
-    await page.waitForTimeout(1000);
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle');
 
     // Check that no JavaScript errors occurred
     expect(errors).toHaveLength(0);
@@ -144,11 +144,8 @@ test.describe('Client Dashboard QA - Regression Testing', () => {
   test('6. Data Loading States - Verify skeleton loading works', async ({ page }) => {
     await page.goto('/client');
 
-    // Wait for content to load (or skeleton to appear briefly)
-    await page.waitForTimeout(2000);
-
-    // Verify that we eventually see the actual content (not stuck in loading state)
-    await expect(page.locator('text=Active Orders')).toBeVisible();
+    // Wait for content to load - verify actual content appears (not stuck in loading state)
+    await expect(page.locator('text=Active Orders')).toBeVisible({ timeout: 10000 });
 
     // Check that no skeleton loading indicators remain visible after content loads
     // (This would be more relevant if we had a slow-loading test environment)

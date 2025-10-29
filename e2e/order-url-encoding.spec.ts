@@ -99,12 +99,11 @@ test.describe('Order URL Encoding E2E Tests', () => {
         const statusButtons = page.locator('[data-testid*="status-"], [data-testid*="driver-"], button:has-text("Update")');
         
         if (await statusButtons.first().isVisible()) {
-          // Click a status update button if available
+          // Click a status update button if available and wait for network to settle
           await statusButtons.first().click();
-          
-          // Verify that the action completes successfully
-          // This might show a success message or update the UI
-          await page.waitForTimeout(1000); // Brief wait for any updates
+
+          // Verify that the action completes successfully by waiting for network idle
+          await page.waitForLoadState('networkidle');
         }
         
         // Test navigation back to orders list
@@ -201,8 +200,9 @@ test.describe('Order URL Encoding E2E Tests', () => {
           page.on('pageerror', error => {
             errors.push(error.message);
           });
-          
-          await page.waitForTimeout(2000);
+
+          // Wait for page to be fully loaded
+          await page.waitForLoadState('networkidle');
           expect(errors).toHaveLength(0);
         }
       }
@@ -254,9 +254,10 @@ test.describe('Order URL Encoding E2E Tests', () => {
         page.on('pageerror', error => {
           errors.push(error.message);
         });
-        
-        await page.waitForTimeout(3000);
-        
+
+        // Wait for page to be fully loaded
+        await page.waitForLoadState('load');
+
         // Filter out expected network errors
         const unexpectedErrors = errors.filter(error => 
           !error.includes('fetch') && 

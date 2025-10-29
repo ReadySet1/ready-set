@@ -387,8 +387,9 @@ test.describe('User Soft Delete E2E Tests', () => {
 
       // Test search in active users
       await page.fill('input[placeholder*="Search active users"]', TEST_USER.email);
-      await page.waitForTimeout(500); // Wait for debounce
-      
+      // Wait for search results to update (debounced)
+      await page.waitForLoadState('networkidle');
+
       // Should filter results (behavior depends on actual data)
 
       // Switch to deleted users tab
@@ -399,7 +400,8 @@ test.describe('User Soft Delete E2E Tests', () => {
       
       // Test search in deleted users
       await page.fill('input[placeholder*="Search deleted users"]', 'deleted');
-      await page.waitForTimeout(500);
+      // Wait for search results to update (debounced)
+      await page.waitForLoadState('networkidle');
     });
 
     test('should filter by user type in both tabs', async ({ page }) => {
