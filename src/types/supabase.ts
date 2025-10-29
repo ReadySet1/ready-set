@@ -1238,6 +1238,39 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_logs: {
+        Row: {
+          carrier_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          order_number: string
+          response_time: number | null
+          status: string
+          success: boolean
+        }
+        Insert: {
+          carrier_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          order_number: string
+          response_time?: number | null
+          status: string
+          success: boolean
+        }
+        Update: {
+          carrier_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          order_number?: string
+          response_time?: number | null
+          status?: string
+          success?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
