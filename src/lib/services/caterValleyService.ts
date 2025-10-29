@@ -1,5 +1,7 @@
 // src/lib/services/caterValleyService.ts
 
+import { withCaterValleyResilience } from '@/utils/api-resilience';
+
 // Define allowed status values based on the CaterValley documentation
 const CATER_VALLEY_ALLOWED_STATUSES = [
   'CONFIRM',
@@ -32,6 +34,9 @@ export interface CaterValleyUpdateResult {
 /**
  * Updates the order status in the CaterValley system via their API.
  * Enhanced with better error handling for common scenarios like order not found.
+ * Includes automatic retry, circuit breaker, and timeout protection.
+ *
+ * Part of REA-77: External API Resilience Implementation
  *
  * @param orderNumber - The order number recognized by CaterValley.
  * @param status - The new status to set, must be a valid CaterValleyOrderStatus.
@@ -53,7 +58,7 @@ export async function updateCaterValleyOrderStatus(
       error: '[CaterValley Service] Invalid orderNumber provided.',
     };
   }
-  
+
   // Validate against the specific CaterValley statuses
   if (!status || !CATER_VALLEY_ALLOWED_STATUSES.includes(status)) {
     return {
@@ -63,18 +68,20 @@ export async function updateCaterValleyOrderStatus(
     };
   }
 
-  
+
   try {
-    const response = await fetch(CATER_VALLEY_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'partner': PARTNER_HEADER, // Crucial header for CaterValley
-        // Add other headers if needed, e.g., Authorization if they implement it later
-      },
-      body: JSON.stringify({ orderNumber, status }),
-      // Consider adding a timeout
-      // signal: AbortSignal.timeout(15000) // 15 seconds timeout
+    // Wrap the fetch call with resilience (retry, circuit breaker, timeout)
+    const response = await withCaterValleyResilience(async () => {
+      return await fetch(CATER_VALLEY_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'partner': PARTNER_HEADER, // Crucial header for CaterValley
+          // Add other headers if needed, e.g., Authorization if they implement it later
+        },
+        body: JSON.stringify({ orderNumber, status }),
+        // Timeout is handled by the resilience wrapper
+      });
     });
 
     // --- Enhanced Response Handling ---
