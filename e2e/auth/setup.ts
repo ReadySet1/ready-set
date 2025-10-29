@@ -116,7 +116,8 @@ export default async function globalSetup(config: FullConfig) {
     console.log(`\n📁 Created auth directory: ${path.relative(process.cwd(), authDir)}`);
   }
 
-  // Check if auth files already exist and are recent (< 1 hour old)
+  // Check if auth files already exist and are recent (< 55 minutes old)
+  // Using 55 minutes instead of 60 to provide a 5-minute buffer for race conditions
   const shouldSkip = Object.entries(TEST_USERS).every(([role]) => {
     const authFile = path.join(authDir, `${role.toLowerCase()}.json`);
     if (!fs.existsSync(authFile)) return false;
@@ -125,8 +126,8 @@ export default async function globalSetup(config: FullConfig) {
     const ageInMs = Date.now() - stats.mtimeMs;
     const ageInMinutes = Math.floor(ageInMs / 1000 / 60);
 
-    if (ageInMs < 60 * 60 * 1000) {
-      // Less than 1 hour old
+    if (ageInMs < 55 * 60 * 1000) {
+      // Less than 55 minutes old
       console.log(`\n✓ ${role} auth state is recent (${ageInMinutes}m old) - skipping`);
       return true;
     }

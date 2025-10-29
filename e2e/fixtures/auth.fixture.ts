@@ -32,8 +32,13 @@ function getAuthFile(role: string): string {
   const authFile = path.join(authDir, `${role.toLowerCase()}.json`);
   if (!fs.existsSync(authFile)) {
     throw new Error(
-      `Auth file not found for ${role}: ${authFile}\n` +
-        'Please run authentication setup first: pnpm playwright test --project=setup'
+      `Auth file not found for ${role}: ${authFile}\n\n` +
+        `Recovery options:\n` +
+        `  1. Run authentication setup: pnpm playwright test --project=setup\n` +
+        `  2. Delete old auth files and re-run: rm -rf e2e/.auth && pnpm test:e2e\n` +
+        `  3. Ensure test users exist in database: pnpm tsx e2e/test-data-setup.ts setup\n` +
+        `  4. Verify .env.test has correct credentials\n\n` +
+        `See e2e/README.md for troubleshooting details.`
     );
   }
   return authFile;
