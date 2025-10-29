@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     // Allow if: (1) Cron secret matches OR (2) User is admin
     const isAuthorized = (
       (cronSecret && authHeader === `Bearer ${cronSecret}`) ||
-      (user && (user.raw_app_meta_data as any)?.role === 'admin')
+      (user && (user.app_metadata as any)?.role === 'admin')
     );
 
     if (!isAuthorized) {
