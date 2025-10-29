@@ -72,7 +72,11 @@ export class EmailService {
       })
       .join("");
 
-    const formTypeDisplay = formType ? formType.charAt(0).toUpperCase() + formType.slice(1) : "Unknown";
+    const formTypeDisplay = formType
+      ? formType.replace(/_/g, "-").split("-").map(word =>
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join("-")
+      : "Unknown";
 
     const htmlContent = `
       <h2>New ${formTypeDisplay} Delivery Quote Request</h2>

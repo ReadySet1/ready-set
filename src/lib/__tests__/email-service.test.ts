@@ -142,7 +142,7 @@ describe("EmailService", () => {
         expect(mockResendClient.emails.send).toHaveBeenCalled();
 
         const lastCall = mockResendClient.emails.send.mock.calls[mockResendClient.emails.send.mock.calls.length - 1][0];
-        expect(lastCall.subject).toBe("New On_demand Delivery Quote Request - Test Company Inc");
+        expect(lastCall.subject).toBe("New On-Demand Delivery Quote Request - Test Company Inc");
       });
     });
 
