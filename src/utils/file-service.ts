@@ -104,11 +104,9 @@ export async function initializeStorageBuckets() {
       console.warn(`⚠️ Exception handling bucket ${defaultBucket}:`, bucketError);
     }
 
-    // Initialize security cleanup scheduler
-    if (typeof window === 'undefined') {
-      // Only run on server side
-      UploadSecurityManager.startCleanupScheduler();
-    }
+    // Note: Security cleanup (quarantined files and rate limits) is now handled by
+    // Vercel Cron job at /api/admin/quarantine-cleanup
+    // This runs daily at 2 AM UTC via vercel.json cron configuration
 
     return { success: true };
   } catch (error) {
