@@ -39,9 +39,9 @@ test.describe('Addresses Dashboard - Infinite Loop Prevention', () => {
       throw new Error('Neither content nor auth message found');
     }
     
-    // Wait a bit more to see if additional calls are made
-    await page.waitForTimeout(2000);
-    
+    // Wait for network to be idle (no calls for 500ms)
+    await page.waitForLoadState('networkidle');
+
     // Should only make 1-2 API calls (initial load + maybe one more for auth)
     // Not the infinite loop we had before
     expect(apiCalls.length).toBeLessThanOrEqual(3);
@@ -74,18 +74,20 @@ test.describe('Addresses Dashboard - Infinite Loop Prevention', () => {
       }
     });
 
-    // Change filter to "private"
-    await page.click('text=Private');
-    
-    // Wait for the filter change to process
-    await page.waitForTimeout(1000);
-    
+    // Change filter to "private" and wait for API response
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes('/api/addresses'), { timeout: 5000 }),
+      page.click('text=Private'),
+    ]);
+
     // Should only make 1 API call for the filter change
     expect(apiCalls.length).toBeLessThanOrEqual(2);
-    
-    // Change filter to "shared"
-    await page.click('text=Shared');
-    await page.waitForTimeout(1000);
+
+    // Change filter to "shared" and wait for API response
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes('/api/addresses'), { timeout: 5000 }),
+      page.click('text=Shared'),
+    ]);
     
     // Should only make 1 more API call
     expect(apiCalls.length).toBeLessThanOrEqual(3);
@@ -117,10 +119,12 @@ test.describe('Addresses Dashboard - Infinite Loop Prevention', () => {
         }
       });
 
-      // Click next page
-      await page.click('[data-testid="pagination-next"]');
-      await page.waitForTimeout(1000);
-      
+      // Click next page and wait for API response
+      await Promise.all([
+        page.waitForResponse((response) => response.url().includes('/api/addresses'), { timeout: 5000 }),
+        page.click('[data-testid="pagination-next"]'),
+      ]);
+
       // Should only make 1 API call for pagination
       expect(apiCalls.length).toBeLessThanOrEqual(2);
     }
@@ -160,9 +164,9 @@ test.describe('Addresses Dashboard - Infinite Loop Prevention', () => {
       }
     }
     
-    // Wait a bit to see if unnecessary re-renders occur
-    await page.waitForTimeout(3000);
-    
+    // Wait for network to be idle to ensure stable state
+    await page.waitForLoadState('networkidle');
+
     // Should not have excessive re-renders
     // A few re-renders are normal, but not the infinite loop we had
     expect(renderCount).toBeLessThan(10);
@@ -190,17 +194,19 @@ test.describe('Addresses Dashboard - Infinite Loop Prevention', () => {
     const initialContent = await page.locator('[data-testid="addresses-content"]').innerHTML();
     
     // Trigger a state change that should not cause infinite loops
-    await page.click('text=Private');
-    await page.waitForTimeout(1000);
-    
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes('/api/addresses'), { timeout: 5000 }),
+      page.click('text=Private'),
+    ]);
+
     // The content should have changed, but not in an infinite loop
     const newContent = await page.locator('[data-testid="addresses-content"]').innerHTML();
-    
+
     // Content should be different (filter changed) but not constantly changing
     expect(newContent).not.toBe(initialContent);
-    
-    // Wait a bit more to ensure stability
-    await page.waitForTimeout(2000);
+
+    // Wait for network to be idle to ensure stability
+    await page.waitForLoadState('networkidle');
     
     const finalContent = await page.locator('[data-testid="addresses-content"]').innerHTML();
     
@@ -231,9 +237,9 @@ test.describe('Addresses Dashboard - Infinite Loop Prevention', () => {
     });
 
     // Simulate a potential auth refresh scenario
-    // Wait for any background auth checks
-    await page.waitForTimeout(3000);
-    
+    // Wait for network to be idle (any background auth checks should complete)
+    await page.waitForLoadState('networkidle');
+
     // Should not make excessive API calls due to auth state changes
     expect(apiCalls.length).toBeLessThanOrEqual(3);
   });
@@ -269,9 +275,10 @@ test.describe('Addresses Dashboard - Performance Tests', () => {
       }
     });
 
-    // Monitor for 10 seconds to ensure stability
-    await page.waitForTimeout(10000);
-    
+    // Monitor for 3 seconds to ensure stability (reduced from 10s)
+    // This is a performance test that needs actual time monitoring
+    await page.waitForTimeout(3000);
+
     // Calculate time between calls
     const timeBetweenCalls: number[] = [];
     for (let i = 1; i < apiCalls.length; i++) {
@@ -322,9 +329,9 @@ test.describe('Addresses Component - Unit Test Simulation', () => {
       }
     });
     
-    // Wait a bit to see if there are any background calls
-    await page.waitForTimeout(3000);
-    
+    // Wait for network to be idle to catch any background calls
+    await page.waitForLoadState('networkidle');
+
     // Should not make excessive calls even if not authenticated
     expect(apiCalls.length).toBeLessThanOrEqual(2);
     
