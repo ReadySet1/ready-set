@@ -4,6 +4,12 @@
   "outputDirectory": ".next",
   "installCommand": "PRISMA_SKIP_POSTINSTALL_GENERATE=true pnpm install --frozen-lockfile",
   "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/admin/quarantine-cleanup",
+      "schedule": "0 2 * * *"
+    }
+  ],
   "env": {
     "PRISMA_SKIP_POSTINSTALL_GENERATE": "true"
   },

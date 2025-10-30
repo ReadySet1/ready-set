@@ -1,6 +1,7 @@
 // src/lib/upload-security.ts
 import { createClient } from "@/utils/supabase/server";
 import { UploadError, SecurityScanResult } from "@/types/upload";
+import type { TablesInsert, Json } from "@/types/supabase";
 
 export interface QuarantineFile {
   id: string;
@@ -24,10 +25,27 @@ export interface RateLimit {
   windowSize: number; // milliseconds
 }
 
+/**
+ * UploadSecurityManager - Handles file upload security including virus scanning,
+ * rate limiting, and quarantine management.
+ *
+ * IMPORTANT LIMITATIONS:
+ * - Rate limiting uses in-memory storage (not distributed across serverless instances)
+ * - Rate limits reset on serverless function cold starts
+ * - For production scale with multiple instances, consider Redis or database persistence
+ */
 export class UploadSecurityManager {
   private static readonly QUARANTINE_BUCKET = 'quarantined-files';
+
+  /**
+   * In-memory rate limit storage
+   * NOTE: This is NOT shared across serverless instances and resets on cold starts
+   * For distributed rate limiting, migrate to Redis or database storage
+   */
   private static readonly RATE_LIMITS = new Map<string, RateLimit>();
   private static readonly CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+  private static cleanupTimers: NodeJS.Timeout[] = [];
+  private static isSchedulerRunning = false;
 
   // Rate limiting configuration
   static readonly RATE_LIMITS_CONFIG = {
@@ -107,22 +125,25 @@ export class UploadSecurityManager {
           return null; // Return null instead of throwing
         }
 
-        // Log quarantine event
-        const quarantineRecord: QuarantineFile = {
-          id: `${timestamp}-${randomId}`,
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-          originalPath: 'upload-attempt',
-          quarantinePath,
-          reason,
-          threatLevel,
-          userId,
-          quarantinedAt: new Date(),
-          scanResults
-        };
+        // Log quarantine event to database
+        try {
+          await supabase.from('quarantine_logs').insert<TablesInsert<'quarantine_logs'>>({
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            quarantine_path: quarantinePath,
+            reason,
+            threat_level: threatLevel,
+            user_id: userId || null,
+            // Cast SecurityScanResult to Json since it contains JSON-serializable data
+            scan_results: scanResults ? (scanResults as unknown as Json) : null,
+            review_status: 'pending'
+          });
+        } catch (dbError) {
+          console.warn('Failed to log quarantine event to database:', dbError);
+          // Continue even if logging fails
+        }
 
-        
         return quarantinePath;
       } catch (storageError) {
         console.warn('Storage not available for quarantine, skipping:', storageError);
@@ -135,9 +156,34 @@ export class UploadSecurityManager {
   }
 
   static async scanForMaliciousContent(file: File): Promise<SecurityScanResult> {
-    const content = await file.text();
     const threats: string[] = [];
     let score = 0;
+
+    // Check file size first to prevent memory issues
+    // Files larger than 10MB are too large for full content scanning
+    const MAX_SCAN_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_SCAN_SIZE) {
+      threats.push('File too large for full content scan');
+      score += 30; // Medium threat level due to inability to fully scan
+
+      // Still perform file type and size checks below
+      // but skip the content scanning to avoid OOM
+      const isClean = false; // Can't confirm it's clean without scanning
+
+      return {
+        isClean,
+        threats,
+        score,
+        details: {
+          fileSize: file.size,
+          fileType: file.type,
+          scanPatterns: 0,
+          threatsFound: threats.length
+        }
+      };
+    }
+
+    const content = await file.text();
 
     // Pattern matching for malicious content detection
     // NOTE: These patterns are for DETECTION only, not sanitization
@@ -162,11 +208,13 @@ export class UploadSecurityManager {
       /<%.*%>/g,
 
       // SQL injection patterns
-      /union\s+select/gi,
-      /drop\s+table/gi,
-      /insert\s+into/gi,
-      /delete\s+from/gi,
-      /select\s+.*from/gi,
+      // NOTE: These are intentionally broad for security. For .sql files, use allowlist approach.
+      // Context: Matches SQL commands that could indicate injection attempts in uploaded content
+      /union\s+select/gi,           // SQL union-based injection
+      /drop\s+(table|database)/gi,  // Destructive SQL commands
+      /insert\s+into\s+\w+/gi,      // SQL insertion (tightened to require table name)
+      /delete\s+from\s+\w+/gi,      // SQL deletion (tightened to require table name)
+      // Removed overly broad SELECT pattern to reduce false positives in documentation
 
       // Path traversal
       /\.\.\//g,
@@ -261,16 +309,10 @@ export class UploadSecurityManager {
         };
       }
 
-      // Skip security scanning to avoid VIRUS_ERROR issues
-      // TODO: Re-enable when storage buckets are properly configured
-      const scanResults = { isClean: true, threats: [], score: 0 };
-      const isSecure = true;
-      const quarantineRequired = false;
-
-      // Perform security scan (disabled for now)
-      // const scanResults = await this.scanForMaliciousContent(file);
-      // const isSecure = scanResults.isClean;
-      // const quarantineRequired = !isSecure && scanResults.score >= 30;
+      // Perform security scan on the file
+      const scanResults = await this.scanForMaliciousContent(file);
+      const isSecure = scanResults.isClean;
+      const quarantineRequired = !isSecure && scanResults.score >= 30;
 
       if (!isSecure) {
         let quarantined = false;
@@ -379,12 +421,57 @@ export class UploadSecurityManager {
     }
   }
 
+  // Cleanup expired rate limit entries to prevent memory leak
+  static cleanupExpiredRateLimits(): number {
+    const now = Date.now();
+    let cleanedCount = 0;
+
+    // Note: Deleting from a Map during iteration is safe per ECMAScript specification.
+    // Map.entries() returns an iterator that handles modifications during iteration correctly.
+    // This is unlike some other languages/collections where deletion during iteration causes issues.
+    for (const [key, limit] of this.RATE_LIMITS.entries()) {
+      // Remove entries that are older than 2x their window size
+      if (now - limit.windowStart > limit.windowSize * 2) {
+        this.RATE_LIMITS.delete(key);
+        cleanedCount++;
+      }
+    }
+
+    return cleanedCount;
+  }
+
   // Initialize periodic cleanup
   static startCleanupScheduler() {
-    // Run cleanup every 24 hours
-    setInterval(() => {
+    // Don't start timers in test environment
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    // Singleton guard: prevent multiple scheduler instances
+    if (this.isSchedulerRunning) {
+      console.warn('Cleanup scheduler is already running');
+      return;
+    }
+
+    this.isSchedulerRunning = true;
+
+    // Run quarantine file cleanup every 24 hours
+    const quarantineTimer = setInterval(() => {
       this.cleanupQuarantinedFiles();
     }, this.CLEANUP_INTERVAL);
+    this.cleanupTimers.push(quarantineTimer);
 
-      }
+    // Run rate limit cleanup more frequently (every 5 minutes)
+    const rateLimitTimer = setInterval(() => {
+      this.cleanupExpiredRateLimits();
+    }, 5 * 60 * 1000);
+    this.cleanupTimers.push(rateLimitTimer);
+  }
+
+  // Stop all cleanup timers
+  static stopCleanupScheduler() {
+    this.cleanupTimers.forEach(timer => clearInterval(timer));
+    this.cleanupTimers = [];
+    this.isSchedulerRunning = false;
+  }
 }

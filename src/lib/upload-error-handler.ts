@@ -601,6 +601,15 @@ export class FileValidator {
     // In a real implementation, you would integrate with a virus scanning service
     // like ClamAV, VirusTotal, or a cloud-based service
 
+    // Check file size first to prevent memory issues
+    const MAX_SCAN_SIZE = 10 * 1024 * 1024; // 10MB limit for content scanning
+    if (file.size > MAX_SCAN_SIZE) {
+      return {
+        isClean: false,
+        threats: [`File too large for virus scan (${this.formatFileSize(file.size)}). Maximum scan size is 10MB.`]
+      };
+    }
+
     // For now, we'll do basic content scanning
     const content = await file.text();
     const threats: string[] = [];

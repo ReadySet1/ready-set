@@ -15,6 +15,7 @@ import {
   createMockLogger,
   wait,
 } from '../../helpers/api-resilience-helpers';
+import DOMPurify from 'isomorphic-dompurify';
 
 describe('Sanity CMS Resilience Tests', () => {
   beforeEach(() => {
@@ -403,10 +404,11 @@ describe('Sanity CMS Resilience Tests', () => {
 
     it('should sanitize content HTML', () => {
       const sanitizeHtml = (html: string) => {
-        return html
-          .replace(/<script[^>]*>.*?<\/script>/gi, '')
-          .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
-          .replace(/on\w+="[^"]*"/gi, '');
+        return DOMPurify.sanitize(html, {
+          ALLOWED_TAGS: ['p', 'b', 'i', 'em', 'strong', 'a', 'br', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div'],
+          ALLOWED_ATTR: ['href', 'target', 'rel'],
+          ALLOW_DATA_ATTR: false,
+        });
       };
 
       const dangerous = '<p>Safe</p><script>alert("xss")</script><p onclick="bad()">Click</p>';
@@ -415,6 +417,25 @@ describe('Sanity CMS Resilience Tests', () => {
       expect(safe).not.toContain('<script');
       expect(safe).not.toContain('onclick');
       expect(safe).toContain('<p>Safe</p>');
+
+      // Test for nested script tags (bypass attempt)
+      // DOMPurify correctly removes script tags and neutralizes the attack
+      const nested = '<scr<script>ipt>alert("xss")</script>';
+      const sanitizedNested = sanitizeHtml(nested);
+      expect(sanitizedNested).not.toContain('<script');
+      expect(sanitizedNested).not.toMatch(/<script[\s>]/i); // No script tag variants
+
+      // Test for spaced closing tags (bypass attempt)
+      const spaced = '<script>alert("xss")</script >';
+      const sanitizedSpaced = sanitizeHtml(spaced);
+      expect(sanitizedSpaced).not.toContain('<script');
+      expect(sanitizedSpaced).not.toMatch(/<script[\s>]/i);
+
+      // Test for single-quote event handlers (bypass attempt)
+      const singleQuote = "<p onclick='bad()'>Click</p>";
+      const sanitizedQuote = sanitizeHtml(singleQuote);
+      expect(sanitizedQuote).not.toContain('onclick');
+      expect(sanitizedQuote).toContain('Click'); // Text content preserved
     });
 
     it('should handle missing content gracefully', () => {
