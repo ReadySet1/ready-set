@@ -129,8 +129,6 @@ export function useLocationTracking(): UseLocationTrackingReturn {
         return;
       }
 
-      console.log(`Syncing ${unsyncedLocations.length} offline locations...`);
-
       let successCount = 0;
       let failureCount = 0;
 
@@ -172,8 +170,6 @@ export function useLocationTracking(): UseLocationTrackingReturn {
         }
       }
 
-      console.log(`Sync complete: ${successCount} succeeded, ${failureCount} failed`);
-
       // Update unsynced count
       const remaining = await locationStore.getUnsyncedCount();
       setUnsyncedCount(remaining);
@@ -201,7 +197,6 @@ export function useLocationTracking(): UseLocationTrackingReturn {
         await locationStore.addLocation(location);
         const count = await locationStore.getUnsyncedCount();
         setUnsyncedCount(count);
-        console.log(`Location stored offline. Total unsynced: ${count}`);
       } catch (storageError) {
         console.error('Failed to store location offline:', storageError);
       }
@@ -374,13 +369,11 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   // Monitor online/offline status
   useEffect(() => {
     const handleOnline = () => {
-      console.log('Connection restored - syncing offline locations...');
       setIsOnline(true);
       syncOfflineLocations();
     };
 
     const handleOffline = () => {
-      console.log('Connection lost - locations will be stored offline');
       setIsOnline(false);
     };
 
@@ -404,10 +397,6 @@ export function useLocationTracking(): UseLocationTrackingReturn {
         await locationStore.init();
         const count = await locationStore.getUnsyncedCount();
         setUnsyncedCount(count);
-
-        if (count > 0) {
-          console.log(`Found ${count} unsynced locations on startup`);
-        }
       } catch (error) {
         console.error('Failed to load unsynced count:', error);
       }

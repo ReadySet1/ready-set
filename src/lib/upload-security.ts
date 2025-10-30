@@ -129,7 +129,6 @@ export class UploadSecurityManager {
           // Continue even if logging fails
         }
 
-        console.log(`File quarantined: ${file.name} (${threatLevel} threat)`);
         return quarantinePath;
       } catch (storageError) {
         console.warn('Storage not available for quarantine, skipping:', storageError);
@@ -421,10 +420,6 @@ export class UploadSecurityManager {
       }
     }
 
-    if (cleanedCount > 0) {
-      console.log(`Cleaned up ${cleanedCount} expired rate limit entries`);
-    }
-
     return cleanedCount;
   }
 
@@ -454,8 +449,6 @@ export class UploadSecurityManager {
       this.cleanupExpiredRateLimits();
     }, 5 * 60 * 1000);
     this.cleanupTimers.push(rateLimitTimer);
-
-    console.log('Cleanup scheduler started');
   }
 
   // Stop all cleanup timers
@@ -463,6 +456,5 @@ export class UploadSecurityManager {
     this.cleanupTimers.forEach(timer => clearInterval(timer));
     this.cleanupTimers = [];
     this.isSchedulerRunning = false;
-    console.log('Cleanup scheduler stopped');
   }
 }

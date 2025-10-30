@@ -1,4 +1,4 @@
 export { CarrierOverview } from './CarrierOverview';
 export { CarrierOrdersBadge } from './CarrierOrdersBadge';
 export { CarrierSummaryWidget } from './CarrierSummaryWidget';
-export { CarrierDetails } from './CarrierDetails'; 
+export { CarrierDetails } from './CarrierDetails';

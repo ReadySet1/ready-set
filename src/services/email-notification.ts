@@ -195,7 +195,6 @@ export async function sendUserWelcomeEmail(data: UserRegistrationData): Promise<
         html: emailBody,
       });
     });
-    console.log(`✅ Welcome email sent successfully to ${data.email}`);
     return true;
   } catch (error) {
     console.error("❌ Error sending welcome email:", error);
@@ -353,7 +352,6 @@ export async function sendOrderNotificationToAdmin(data: OrderNotificationData):
         html: emailBody,
       });
     });
-    console.log(`✅ Order notification email sent successfully to admin for order ${data.orderNumber}`);
     return true;
   } catch (error) {
     console.error("❌ Error sending order notification email:", error);
@@ -446,7 +444,6 @@ export async function sendOrderConfirmationToCustomer(data: CustomerOrderConfirm
         html: emailBody,
       });
     });
-    console.log(`✅ Order confirmation email sent successfully to ${data.customerEmail}`);
     return true;
   } catch (error) {
     console.error("❌ Error sending order confirmation email:", error);
