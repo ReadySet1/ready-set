@@ -1,7 +1,7 @@
 // src/lib/upload-security.ts
 import { createClient } from "@/utils/supabase/server";
 import { UploadError, SecurityScanResult } from "@/types/upload";
-import type { TablesInsert } from "@/types/supabase";
+import type { TablesInsert, Json } from "@/types/supabase";
 
 export interface QuarantineFile {
   id: string;
@@ -120,7 +120,8 @@ export class UploadSecurityManager {
             reason,
             threat_level: threatLevel,
             user_id: userId || null,
-            scan_results: scanResults || null,
+            // Cast SecurityScanResult to Json since it contains JSON-serializable data
+            scan_results: scanResults ? (scanResults as unknown as Json) : null,
             review_status: 'pending'
           });
         } catch (dbError) {
