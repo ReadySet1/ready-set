@@ -25,8 +25,23 @@ export interface RateLimit {
   windowSize: number; // milliseconds
 }
 
+/**
+ * UploadSecurityManager - Handles file upload security including virus scanning,
+ * rate limiting, and quarantine management.
+ *
+ * IMPORTANT LIMITATIONS:
+ * - Rate limiting uses in-memory storage (not distributed across serverless instances)
+ * - Rate limits reset on serverless function cold starts
+ * - For production scale with multiple instances, consider Redis or database persistence
+ */
 export class UploadSecurityManager {
   private static readonly QUARANTINE_BUCKET = 'quarantined-files';
+
+  /**
+   * In-memory rate limit storage
+   * NOTE: This is NOT shared across serverless instances and resets on cold starts
+   * For distributed rate limiting, migrate to Redis or database storage
+   */
   private static readonly RATE_LIMITS = new Map<string, RateLimit>();
   private static readonly CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
   private static cleanupTimers: NodeJS.Timeout[] = [];
@@ -193,11 +208,13 @@ export class UploadSecurityManager {
       /<%.*%>/g,
 
       // SQL injection patterns
-      /union\s+select/gi,
-      /drop\s+table/gi,
-      /insert\s+into/gi,
-      /delete\s+from/gi,
-      /select\s+.*from/gi,
+      // NOTE: These are intentionally broad for security. For .sql files, use allowlist approach.
+      // Context: Matches SQL commands that could indicate injection attempts in uploaded content
+      /union\s+select/gi,           // SQL union-based injection
+      /drop\s+(table|database)/gi,  // Destructive SQL commands
+      /insert\s+into\s+\w+/gi,      // SQL insertion (tightened to require table name)
+      /delete\s+from\s+\w+/gi,      // SQL deletion (tightened to require table name)
+      // Removed overly broad SELECT pattern to reduce false positives in documentation
 
       // Path traversal
       /\.\.\//g,

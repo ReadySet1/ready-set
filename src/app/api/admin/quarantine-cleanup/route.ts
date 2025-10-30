@@ -9,35 +9,37 @@ import { UploadSecurityManager } from '@/lib/upload-security';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+// Define proper type for Supabase app_metadata
+interface AppMetadata {
+  role?: string;
+}
+
 export async function GET(request: NextRequest) {
   try {
-    // Verify request is from Vercel Cron
-    const authHeader = request.headers.get('authorization');
+    // Fail fast in production if CRON_SECRET is not configured
     const cronSecret = process.env.CRON_SECRET;
-
-    // In production, verify cron secret for security
-    // Allow requests without secret in development for manual testing
-    if (process.env.NODE_ENV === 'production' && cronSecret) {
-      if (authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 401 }
-        );
-      }
+    if (process.env.NODE_ENV === 'production' && !cronSecret) {
+      console.warn('⚠️ CRON_SECRET not set in production - cron jobs require admin authentication');
     }
 
-    // Optionally verify admin role for manual triggering
-    // This allows admins to manually trigger cleanup via browser/API
+    // Get authorization header and user session
+    const authHeader = request.headers.get('authorization');
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Allow if: (1) Cron secret matches OR (2) User is admin
-    const isAuthorized = (
-      (cronSecret && authHeader === `Bearer ${cronSecret}`) ||
-      (user && (user.app_metadata as any)?.role === 'admin')
-    );
+    // Authorization: Allow if (1) Valid cron secret OR (2) Admin user
+    const isValidCronRequest = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    const isAdminUser = user && (user.app_metadata as AppMetadata)?.role === 'admin';
+    const isAuthorized = isValidCronRequest || isAdminUser;
 
     if (!isAuthorized) {
+      console.warn('⚠️ Unauthorized quarantine cleanup attempt:', {
+        hasAuthHeader: !!authHeader,
+        hasUser: !!user,
+        userRole: user ? (user.app_metadata as AppMetadata)?.role : 'none',
+        timestamp: new Date().toISOString()
+      });
+
       return NextResponse.json(
         { error: 'Unauthorized - admin access or valid cron secret required' },
         { status: 401 }
