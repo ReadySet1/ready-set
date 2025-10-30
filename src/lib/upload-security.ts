@@ -1,7 +1,7 @@
 // src/lib/upload-security.ts
 import { createClient } from "@/utils/supabase/server";
 import { UploadError, SecurityScanResult } from "@/types/upload";
-import type { TablesInsert } from "@/types/supabase";
+import type { TablesInsert, Json } from "@/types/supabase";
 
 export interface QuarantineFile {
   id: string;
@@ -120,7 +120,8 @@ export class UploadSecurityManager {
             reason,
             threat_level: threatLevel,
             user_id: userId || null,
-            scan_results: scanResults || null,
+            // Cast SecurityScanResult to Json since it contains JSON-serializable data
+            scan_results: scanResults ? (scanResults as unknown as Json) : null,
             review_status: 'pending'
           });
         } catch (dbError) {
@@ -128,7 +129,6 @@ export class UploadSecurityManager {
           // Continue even if logging fails
         }
 
-        console.log(`File quarantined: ${file.name} (${threatLevel} threat)`);
         return quarantinePath;
       } catch (storageError) {
         console.warn('Storage not available for quarantine, skipping:', storageError);
@@ -420,10 +420,6 @@ export class UploadSecurityManager {
       }
     }
 
-    if (cleanedCount > 0) {
-      console.log(`Cleaned up ${cleanedCount} expired rate limit entries`);
-    }
-
     return cleanedCount;
   }
 
@@ -453,8 +449,6 @@ export class UploadSecurityManager {
       this.cleanupExpiredRateLimits();
     }, 5 * 60 * 1000);
     this.cleanupTimers.push(rateLimitTimer);
-
-    console.log('Cleanup scheduler started');
   }
 
   // Stop all cleanup timers
@@ -462,6 +456,5 @@ export class UploadSecurityManager {
     this.cleanupTimers.forEach(timer => clearInterval(timer));
     this.cleanupTimers = [];
     this.isSchedulerRunning = false;
-    console.log('Cleanup scheduler stopped');
   }
 }
