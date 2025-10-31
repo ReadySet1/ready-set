@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     
     // Add category filter if specified
     if (category && ['CLIENTS', 'VENDORS', 'DRIVERS'].includes(category)) {
-      query = query.eq('category', category);
+      query = query.eq('category', category as 'CLIENTS' | 'VENDORS' | 'DRIVERS');
     }
     
     // Add limit if specified
@@ -134,14 +134,14 @@ export async function POST(request: NextRequest) {
       content,
       image: body.image || null,
       rating: body.rating || 5,
-      category,
+      category: category as 'CLIENTS' | 'VENDORS' | 'DRIVERS',
       is_active: body.isActive !== undefined ? body.isActive : true,
       sort_order: body.sortOrder || 0,
     };
-    
+
     const { data: testimonial, error } = await supabase
       .from('testimonials')
-      .insert([testimonialData])
+      .insert([testimonialData as any])
       .select()
       .single();
     

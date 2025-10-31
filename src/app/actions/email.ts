@@ -91,7 +91,10 @@ const sendEmail = async (data: FormInputs) => {
 
   // Verify reCAPTCHA token (if provided)
   if (data.recaptchaToken) {
-    const recaptchaResult = await verifyRecaptchaToken(data.recaptchaToken, 0.7);
+    // Use configurable threshold (default 0.5 per Google's recommendation)
+    // 0.0 = Very likely a bot, 0.5 = Neutral, 1.0 = Very likely a human
+    const threshold = parseFloat(process.env.RECAPTCHA_MIN_SCORE || '0.5');
+    const recaptchaResult = await verifyRecaptchaToken(data.recaptchaToken, threshold);
 
     if (!recaptchaResult.success) {
       // Sanitize email in logs

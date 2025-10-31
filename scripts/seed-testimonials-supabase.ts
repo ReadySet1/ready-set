@@ -156,7 +156,7 @@ async function seedTestimonials() {
           category: testimonial.category as 'CLIENTS' | 'VENDORS' | 'DRIVERS',
           is_active: true,
           sort_order: sortOrder,
-        }])
+        } as any])
         .select()
         .single();
 

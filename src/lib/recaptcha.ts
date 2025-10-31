@@ -13,6 +13,8 @@
  * If keys are not configured, the system degrades gracefully.
  */
 
+import { authLogger } from '@/utils/logger';
+
 declare global {
   interface Window {
     grecaptcha: {
@@ -41,7 +43,7 @@ export function loadRecaptchaScript(): Promise<void> {
 
     // If no site key, skip reCAPTCHA (graceful degradation)
     if (!siteKey) {
-      console.warn('[reCAPTCHA] Site key not configured, skipping reCAPTCHA');
+      authLogger.warn('[reCAPTCHA] Site key not configured, skipping reCAPTCHA');
       resolve();
       return;
     }
@@ -59,12 +61,12 @@ export function loadRecaptchaScript(): Promise<void> {
     script.defer = true;
 
     script.onload = () => {
-      console.log('[reCAPTCHA] Script loaded successfully');
+      authLogger.info('[reCAPTCHA] Script loaded successfully');
       resolve();
     };
 
     script.onerror = () => {
-      console.error('[reCAPTCHA] Failed to load script');
+      authLogger.error('[reCAPTCHA] Failed to load script');
       reject(new Error('Failed to load reCAPTCHA script'));
     };
 
@@ -84,13 +86,13 @@ export async function executeRecaptcha(action: string): Promise<string | null> {
 
   // If no site key, return null (graceful degradation)
   if (!siteKey) {
-    console.warn('[reCAPTCHA] Site key not configured, skipping verification');
+    authLogger.warn('[reCAPTCHA] Site key not configured, skipping verification');
     return null;
   }
 
   // Check if grecaptcha is loaded
   if (typeof window.grecaptcha === 'undefined') {
-    console.error('[reCAPTCHA] grecaptcha not loaded');
+    authLogger.error('[reCAPTCHA] grecaptcha not loaded');
     return null;
   }
 
@@ -107,10 +109,10 @@ export async function executeRecaptcha(action: string): Promise<string | null> {
       });
     });
 
-    console.log('[reCAPTCHA] Token generated successfully');
+    authLogger.info('[reCAPTCHA] Token generated successfully');
     return token;
   } catch (error) {
-    console.error('[reCAPTCHA] Failed to execute:', error);
+    authLogger.error('[reCAPTCHA] Failed to execute:', { error });
     return null;
   }
 }
@@ -135,7 +137,7 @@ export async function verifyRecaptchaToken(
 
   // If no secret key, skip verification (graceful degradation)
   if (!secretKey) {
-    console.warn('[reCAPTCHA] Secret key not configured, skipping verification');
+    authLogger.warn('[reCAPTCHA] Secret key not configured, skipping verification');
     return {
       success: true,
       score: 1.0,
@@ -168,7 +170,7 @@ export async function verifyRecaptchaToken(
     const result: RecaptchaVerificationResult = await response.json();
 
     if (!result.success) {
-      console.warn('[reCAPTCHA] Verification failed:', result['error-codes']);
+      authLogger.warn('[reCAPTCHA] Verification failed', { errorCodes: result['error-codes'] });
       return {
         success: false,
         score: 0,
@@ -180,7 +182,7 @@ export async function verifyRecaptchaToken(
 
     // Check if score meets minimum threshold
     if (score < minScore) {
-      console.warn(`[reCAPTCHA] Score too low: ${score} (min: ${minScore})`);
+      authLogger.warn('[reCAPTCHA] Score too low', { score, minScore });
       return {
         success: false,
         score,
@@ -188,13 +190,13 @@ export async function verifyRecaptchaToken(
       };
     }
 
-    console.log(`[reCAPTCHA] Verification successful (score: ${score.toFixed(2)})`);
+    authLogger.info('[reCAPTCHA] Verification successful', { score: score.toFixed(2) });
     return {
       success: true,
       score,
     };
   } catch (error) {
-    console.error('[reCAPTCHA] Verification error:', error);
+    authLogger.error('[reCAPTCHA] Verification error', { error });
     return {
       success: false,
       score: 0,

@@ -5,7 +5,7 @@
  * Part of REA-92: Add Circuit Breaker Monitoring and Alerts
  *
  * AUTHENTICATION:
- * - GET endpoint: Requires authenticated user (any role)
+ * - GET endpoint: Requires elevated privileges (ADMIN, SUPER_ADMIN, SUPPORT)
  * - POST endpoint: Requires admin role (ADMIN, SUPER_ADMIN)
  */
 
@@ -64,6 +64,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: 'Unauthorized - authentication required' },
         { status: 401 }
+      );
+    }
+
+    // Authorization: Verify elevated privileges
+    const userRole = (user.app_metadata as AppMetadata)?.role;
+    const canView = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'SUPPORT';
+
+    if (!canView) {
+      apiResilienceLogger.warn('[Circuit Breaker Monitoring] Forbidden monitoring access attempt', {
+        userId: user.id,
+        userRole,
+        timestamp: new Date().toISOString(),
+      });
+
+      return NextResponse.json(
+        { error: 'Forbidden - monitoring access requires elevated privileges' },
+        { status: 403 }
       );
     }
 
