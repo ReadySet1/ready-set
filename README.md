@@ -62,6 +62,32 @@ Ready Set includes a comprehensive carrier integration system for managing multi
 - **CaterValley** - Full integration with automated order status synchronization
 - **Extensible Design** - Easy addition of new carriers through configuration
 
+## 🔄 API Resilience & Monitoring
+
+Ready Set implements comprehensive API resilience patterns to ensure reliable service delivery:
+
+### Circuit Breakers
+- **Automatic Failure Detection** - Circuit breakers monitor API health and prevent cascading failures
+- **Smart Recovery** - Half-open state testing for gradual service recovery
+- **Inactivity Auto-Reset** - Automatic reset after 5 minutes of inactivity
+- **Real-time Monitoring** - Live visibility into circuit breaker states via `/api/monitoring/circuit-breakers`
+
+### Monitoring Endpoint
+**GET** `/api/monitoring/circuit-breakers`
+- Returns comprehensive monitoring data for all circuit breakers
+- Supports filtering by name: `/api/monitoring/circuit-breakers?name=CaterValley`
+- Provides health status, metrics, and state information
+
+**POST** `/api/monitoring/circuit-breakers`
+- Manual circuit breaker reset (for emergency recovery)
+- Requires body: `{ "name": "CaterValley" }`
+
+### Features
+- **Enhanced Error Messages** - Detailed error responses with retry-after timestamps
+- **Comprehensive Metrics** - Track failure rates, state transitions, and request counts
+- **Integrated Alerting** - Critical state changes trigger alerts via the alerting system
+- **Edge Case Handling** - Robust handling of concurrent operations and race conditions
+
 ## 🔐 Security
 
 This project implements comprehensive security measures:

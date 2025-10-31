@@ -1,282 +1,154 @@
-# Bridge Migrations: Sync Production and Development Database Schemas
+# Circuit Breaker Improvements: Monitoring, Better Errors, and Edge Case Testing
 
-## 📋 Summary
+## Summary
 
-This PR adds comprehensive bridge migrations to synchronize production and development database schemas, bringing production database in alignment with development environment enhancements.
+This PR implements comprehensive improvements to our circuit breaker system, adding real-time monitoring capabilities, enhanced error messages with retry-after information, and extensive edge case testing. These improvements significantly enhance operational visibility and reliability for external API integrations, particularly the CaterValley service.
 
-### What's Being Added
+## Related Issues
 
-Two new database tables and enhanced soft-delete functionality:
+- **REA-92**: Add Circuit Breaker Monitoring and Alerts
+- **REA-93**: Better Error Messages with Retry-After Info
+- **REA-94**: Edge Case Tests for Circuit Breaker
 
-1. **User Audit System** (`user_audits` table)
-   - Complete audit trail for all profile modifications
-   - Enhanced soft-delete tracking with `deletedBy` and `deletionReason` columns
-   - Automatic audit logging via database triggers
-   - GDPR compliance and accountability tracking
+## Features/Changes
 
-2. **Upload Error Tracking** (`upload_errors` table)
-   - Centralized error logging for file upload failures
-   - Helper functions for logging and resolving errors
-   - Analytics view for monitoring and debugging
-   - Automated cleanup procedures for old errors
+### 1. Circuit Breaker Monitoring (REA-92)
 
-## 🎯 Key Features
+- **New Monitoring Endpoint**: `/api/monitoring/circuit-breakers`
+  - GET: Returns comprehensive monitoring data for all circuit breakers
+  - POST: Manual circuit breaker reset for emergency recovery
+  - Supports filtering by name: `?name=CaterValley`
+- **Monitoring Data Interface**: Added `CircuitBreakerMonitoringData` with health status, metrics, and state information
+- **Metrics Tracking**: Track total requests, failures, successes, state transitions, and failure rates
+- **Health Status Calculation**: Automatic health assessment (healthy/degraded/critical) based on state and metrics
+- **Inactivity Auto-Reset**: Circuit breakers automatically reset after 5 minutes of inactivity to prevent stuck states
+- **Alert Integration**: Critical state changes trigger alerts via the existing alerting system
 
-### User Audit System
-- **New Table**: `user_audits` with complete change tracking
-- **Enhanced Columns**: Added `deletedBy` (UUID) and `deletionReason` (TEXT) to profiles table
-- **Automatic Logging**: Triggers capture INSERT/UPDATE/DELETE operations
-- **RLS Policies**: Secure access control for audit data
-- **Backfilled Data**: Historical deletion records populated
+### 2. Enhanced Error Messages (REA-93)
 
-### Upload Error Tracking
-- **New Table**: `upload_errors` for comprehensive error logging
-- **Helper Functions**:
-  - `log_upload_error()` - Log errors with context
-  - `resolve_upload_error()` - Mark errors as resolved
-  - `cleanup_old_upload_errors()` - Automated maintenance
-- **Analytics View**: `upload_error_stats` for monitoring
-- **Indexes**: Optimized for common query patterns
+- **New Error Class**: `CircuitBreakerOpenError` with structured error information
+- **Retry-After Information**: Errors include precise retry timestamps and estimated wait times
+- **Structured Error Response**: JSON serialization with `toJSON()` for consistent API responses
+- **Helper Function**: `circuitBreakerErrorResponse()` for standardized HTTP 503 responses with Retry-After headers
 
-## 📁 Files Changed
+### 3. Comprehensive Edge Case Testing (REA-94)
 
-### Migration Files
-- `supabase/migrations/20251014220000_bridge_add_audit_system.sql` (351 lines)
-- `supabase/migrations/20251014220100_bridge_add_upload_errors_table.sql` (383 lines)
+- **26 New Tests** covering 7 critical categories:
+  1. **Concurrent Operations** (4 tests) - Parallel request handling
+  2. **Race Conditions** (3 tests) - State transition safety
+  3. **State Transition Edge Cases** (5 tests) - Boundary conditions
+  4. **Boundary Conditions** (4 tests) - Zero/max threshold scenarios
+  5. **High Load Scenarios** (4 tests) - Up to 1000 concurrent operations
+  6. **Metrics Accuracy** (3 tests) - Counter integrity
+  7. **Reset and Cleanup** (3 tests) - State reset verification
 
-### Documentation
-- `supabase/EXECUTION_PLAN.md` (577 lines) - Complete deployment runbook
-- `supabase/MIGRATION_RECONCILIATION_REPORT.md` (352 lines) - Detailed analysis
-- `supabase/README_MIGRATION_RECONCILIATION.md` (342 lines) - Quick reference
-- `supabase/VALIDATION_SQL.sql` (497 lines) - Validation queries
+### 4. Documentation Updates
 
-### Type Definitions
-- `supabase/database.types.ts` (649 lines) - Updated TypeScript types
+- **README.md**: Added comprehensive "API Resilience & Monitoring" section
+- **Inline Documentation**: Enhanced JSDoc comments throughout modified files
 
-**Total**: 3,151 lines added across 7 files
+## Testing
 
-## 🧪 Testing Performed
+### What Was Tested
 
-### Migration Validation
-✅ All migrations applied successfully to development environment
-✅ All migrations applied successfully to production environment
-✅ 11/11 validation checks passed
-✅ Zero data loss or modification
-✅ Schema synchronization confirmed
+✅ **Unit Tests**: All 26 new edge case tests pass
+✅ **Integration Tests**: Existing API resilience integration tests pass
+✅ **Linting**: No new lint errors
+✅ **Type Checking**: No new TypeScript errors
+✅ **Build**: Production build successful
 
-### Manual Testing
-✅ Profile API endpoints responding normally
-✅ User update operations trigger audit logging correctly
-✅ Soft delete operations record `deletedBy` and `deletionReason`
-✅ Upload error logging functional
-✅ RLS policies enforcing correct access control
-✅ All triggers functioning as expected
+### How to Test
 
-### Performance Testing
-✅ Response times within acceptable range (< 10% increase)
-✅ Database query performance maintained
-✅ Indexes optimized for common access patterns
+1. **Start the development server**:
+   ```bash
+   pnpm dev
+   ```
 
-## 🗃️ Database Migrations
+2. **Test monitoring endpoint**:
+   ```bash
+   # Get all circuit breakers
+   curl http://localhost:3000/api/monitoring/circuit-breakers
 
-### Migration Details
+   # Get specific circuit breaker
+   curl http://localhost:3000/api/monitoring/circuit-breakers?name=CaterValley
 
-#### 20251014220000_bridge_add_audit_system.sql
-**Purpose**: Add comprehensive audit logging system
+   # Manual reset (POST)
+   curl -X POST http://localhost:3000/api/monitoring/circuit-breakers \
+     -H "Content-Type: application/json" \
+     -d '{"name": "CaterValley"}'
+   ```
 
-**Changes**:
-- Creates `user_audits` table with columns:
-  - `id` (UUID, PK)
-  - `userId` (UUID, FK to profiles)
-  - `action` (ENUM: 'INSERT', 'UPDATE', 'DELETE')
-  - `performedBy` (UUID, FK to profiles)
-  - `changes` (JSONB)
-  - `reason` (TEXT)
-  - `metadata` (JSONB)
-  - `createdAt` (TIMESTAMP)
-- Adds to `profiles` table:
-  - `deletedBy` (UUID, FK to profiles)
-  - `deletionReason` (TEXT)
-- Creates trigger `trg_audit_profile_changes`
-- Implements RLS policies for audit data
-- Backfills historical deletion records
-- Creates 6 optimized indexes
+3. **Run edge case tests**:
+   ```bash
+   pnpm test circuit-breaker-edge-cases
+   ```
 
-**Risk Level**: LOW - Additive only, no data modification
+4. **Trigger circuit breaker** (for testing error messages):
+   - Make 3+ consecutive failed requests to CaterValley service
+   - Observe the enhanced error message with retry-after info
+   - Check monitoring endpoint for state changes
 
-#### 20251014220100_bridge_add_upload_errors_table.sql
-**Purpose**: Add centralized upload error tracking
+## Database Changes
 
-**Changes**:
-- Creates `upload_errors` table with columns:
-  - `id` (UUID, PK)
-  - `correlationId` (TEXT)
-  - `errorType` (TEXT)
-  - `message` (TEXT)
-  - `userMessage` (TEXT)
-  - `details` (JSONB)
-  - `userId` (UUID, FK to profiles)
-  - `timestamp` (TIMESTAMP)
-  - `retryable` (BOOLEAN)
-  - `resolved` (BOOLEAN)
-  - `resolvedBy` (UUID, FK to profiles)
-  - `resolvedAt` (TIMESTAMP)
-- Creates helper functions:
-  - `log_upload_error()`
-  - `resolve_upload_error()`
-  - `cleanup_old_upload_errors()`
-- Creates `upload_error_stats` view
-- Implements RLS policies
-- Creates 6 optimized indexes
+**N/A** - No database migrations or schema changes required.
 
-**Risk Level**: LOW - New table, no impact on existing functionality
+## Breaking Changes
 
-### Rollback Procedures
-Comprehensive rollback procedures documented in `EXECUTION_PLAN.md`:
-- **Option A**: SQL-based rollback (fast, < 2 minutes)
-- **Option B**: Full database restore (slow, use if Option A fails)
+**None** - All changes are backward compatible. Existing circuit breaker functionality remains unchanged.
 
-Both options tested and validated on development environment.
+## Deployment Notes
 
-## ⚠️ Breaking Changes
+### Environment Variables
 
-**None** - All changes are additive:
-- New tables don't affect existing functionality
-- New columns in `profiles` table are nullable
-- All existing queries continue to work unchanged
-- No API contract changes
+No new environment variables required. Uses existing configuration.
 
-## 🔍 Code Quality
+### Monitoring
 
-### Linter Results
-✅ ESLint passed with minor warnings:
-- 5 React Hook dependency warnings (non-blocking, pre-existing)
-- No errors
+After deployment, the monitoring endpoint will be immediately available:
+- **Production URL**: `https://your-domain.com/api/monitoring/circuit-breakers`
+- **Access**: Currently public - consider adding authentication for production
 
-### TypeScript
-✅ All type checks passed
-✅ No type errors
-✅ Database types updated and synchronized
+### Alerting
 
-### Tests
-⚠️ **Known Issue**: Test infrastructure has coverage instrumentation issue with `test-exclude` package
-- Issue is infrastructure-related, not test logic
-- Does not affect PR changes (only documentation/SQL files modified)
-- Recommended: Address test infrastructure separately
+Circuit breaker state changes will now trigger alerts via the existing alerting system. Ensure alert channels (email, Slack, etc.) are properly configured.
 
-## 📋 Reviewer Checklist
+## Reviewer Checklist
 
-### Migration Review
-- [ ] Review migration SQL for syntax and logic errors
-- [ ] Verify all new tables have appropriate RLS policies
-- [ ] Check indexes are optimized for expected query patterns
-- [ ] Confirm foreign key constraints are correct
-- [ ] Validate trigger logic for audit logging
+Technical items to verify during code review:
 
-### Documentation Review
-- [ ] Execution plan is clear and comprehensive
-- [ ] Rollback procedures are well-documented
-- [ ] Validation SQL covers all critical checks
-- [ ] TypeScript types match database schema
+- [ ] Circuit breaker monitoring endpoint returns expected data structure
+- [ ] Enhanced error messages include retry-after timestamps
+- [ ] All 26 edge case tests pass consistently
+- [ ] Metrics tracking is accurate under concurrent load
+- [ ] Inactivity auto-reset works after 5 minutes
+- [ ] Alert integration triggers on state changes
+- [ ] No console.log statements in production code (only error logging in API routes)
+- [ ] Type safety maintained throughout changes
+- [ ] Documentation accurately reflects new features
+- [ ] Manual circuit breaker reset works via POST endpoint
 
-### Security Review
-- [ ] RLS policies prevent unauthorized access
-- [ ] Audit logs capture sensitive operations
-- [ ] No sensitive data exposed in error messages
-- [ ] Foreign key constraints maintain data integrity
+## Files Modified
 
-### Deployment Review
-- [ ] Migration order is correct
-- [ ] Migrations are idempotent (can be run multiple times safely)
-- [ ] Backup procedures are documented
-- [ ] Team has been notified of changes
+- `src/utils/api-resilience.ts` - Core circuit breaker implementation (+302 lines)
+- `src/app/api/monitoring/circuit-breakers/route.ts` - New monitoring endpoint (+145 lines)
+- `src/__tests__/unit/circuit-breaker-edge-cases.test.ts` - Comprehensive test suite (+672 lines)
+- `README.md` - Documentation update (+26 lines)
 
-### Testing Verification
-- [ ] All validation checks passed on development
-- [ ] All validation checks passed on production
-- [ ] No data loss occurred
-- [ ] Application functionality unchanged
-- [ ] Performance impact is acceptable
+**Total**: +1,145 lines across 4 files
 
-## 🚀 Deployment Notes
+## Performance Impact
 
-### Pre-Deployment
-1. Schedule maintenance window (recommended: 15 minutes)
-2. Notify team of upcoming changes
-3. Create database backups (< 1 hour old)
-4. Review and execute validation SQL
+**Negligible** - All monitoring operations are lightweight:
+- Monitoring endpoint: O(n) where n = number of circuit breakers (currently 1)
+- Metrics tracking: Atomic counter updates
+- Inactivity check: Single timestamp comparison per request
 
-### Deployment
-1. Follow `EXECUTION_PLAN.md` step-by-step
-2. Apply to development first (dry-run)
-3. Validate development results
-4. Apply to production with monitoring
-5. Run post-migration validation
+## Security Considerations
 
-### Post-Deployment
-1. Monitor application logs for 24 hours
-2. Check database performance metrics
-3. Verify audit logging is working
-4. Update team documentation with new features
-5. Train support team on error tracking features
-
-## 📊 Database Impact
-
-### Before Migration
-- Production: 22 migrations
-- Development: 19 migrations
-- Missing in Prod: `user_audits`, `upload_errors` tables
-- Missing in Prod: Enhanced soft-delete columns
-
-### After Migration
-- Production: 24 migrations (✅ synchronized)
-- Development: 21 migrations (✅ synchronized)
-- Both environments: Complete audit system
-- Both environments: Upload error tracking
-
-## 🔗 Related Documentation
-
-- [Execution Plan](./supabase/EXECUTION_PLAN.md) - Complete deployment runbook
-- [Reconciliation Report](./supabase/MIGRATION_RECONCILIATION_REPORT.md) - Detailed analysis
-- [Quick Reference](./supabase/README_MIGRATION_RECONCILIATION.md) - Summary guide
-- [Validation SQL](./supabase/VALIDATION_SQL.sql) - Validation queries
-
-## 📈 Monitoring
-
-### Metrics to Watch (First 24 Hours)
-1. **Application Performance**
-   - API response times (should be < 10% increase)
-   - Database query performance
-   - Error rates in logs
-
-2. **Database Health**
-   - Connection pool usage
-   - Query execution times
-   - Table sizes (check for bloat)
-
-3. **New Feature Adoption**
-   - Audit records being created
-   - Upload errors being logged
-   - No constraint violations
-
-## ✅ Success Criteria
-
-- [x] All migrations execute without errors
-- [x] All validation checks pass
-- [x] Zero data loss
-- [x] Application functionality unchanged
-- [x] Performance impact < 10%
-- [x] RLS policies enforced correctly
-- [x] Audit logging operational
-- [x] Error tracking operational
-- [x] Rollback procedures tested
-
-## 🤝 Acknowledgments
-
-This migration reconciliation was performed with comprehensive testing and validation to ensure zero downtime and data integrity.
+- Monitoring endpoint is currently **public** - consider adding authentication before production deployment
+- Manual reset endpoint should be restricted to admin users in production
+- No sensitive data exposed in monitoring responses (only state and metrics)
 
 ---
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
+**Ready for review** ✅
