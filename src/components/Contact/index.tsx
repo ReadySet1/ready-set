@@ -2,14 +2,17 @@
 
 import sendEmail from "@/app/actions/email";
 import { useForm, SubmitHandler } from "react-hook-form";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "../ui/button";
+import { loadRecaptchaScript, executeRecaptcha } from "@/lib/recaptcha";
 
 interface FormInputs {
   name: string;
   email: string;
   phone: string;
   message: string;
+  honeypot?: string; // Hidden field for bot detection
+  recaptchaToken?: string; // reCAPTCHA token
 }
 
 interface MessageState {
@@ -27,9 +30,26 @@ const Contact = () => {
     reset,
   } = useForm<FormInputs>();
 
+  // Load reCAPTCHA script on component mount
+  useEffect(() => {
+    loadRecaptchaScript().catch((error) => {
+      console.error('[Contact Form] Failed to load reCAPTCHA:', error);
+      // Continue even if reCAPTCHA fails to load (graceful degradation)
+    });
+  }, []);
+
   const onSubmit: SubmitHandler<FormInputs> = async (data) => {
     try {
-      const result = await sendEmail(data);
+      // Execute reCAPTCHA before submitting (if configured)
+      const recaptchaToken = await executeRecaptcha('contact_form_submit');
+
+      // Add reCAPTCHA token to form data
+      const formDataWithToken = {
+        ...data,
+        recaptchaToken: recaptchaToken || undefined,
+      };
+
+      const result = await sendEmail(formDataWithToken);
       setMessage({ type: "success", text: result });
 
       setTimeout(() => {
@@ -197,6 +217,19 @@ const Contact = () => {
                   onSubmit(data);
                 })}
               >
+                {/* Honeypot field - hidden from users, bots will fill it */}
+                <div className="hidden" aria-hidden="true">
+                  <label htmlFor="website">Website (leave blank)</label>
+                  <input
+                    {...register("honeypot")}
+                    type="text"
+                    name="honeypot"
+                    id="website"
+                    tabIndex={-1}
+                    autoComplete="off"
+                  />
+                </div>
+
                 <div className="mb-[22px]">
                   <label
                     htmlFor="name"
