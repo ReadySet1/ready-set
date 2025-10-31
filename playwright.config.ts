@@ -15,7 +15,19 @@ export default defineConfig({
   workers: process.env.CI ? 2 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
-  /* Global setup for authentication - runs once before all tests */
+  /**
+   * Global setup for authentication - runs once before all tests
+   *
+   * SECURITY: This setup generates authentication files in e2e/.auth/
+   * These files contain session tokens and MUST NEVER be committed to version control.
+   *
+   * Protected by:
+   * - .gitignore includes /e2e/.auth/
+   * - CI does not cache .auth files
+   * - CI artifacts exclude .auth files
+   *
+   * For more information, see e2e/README.md Security section
+   */
   globalSetup: require.resolve('./e2e/auth/setup'),
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
