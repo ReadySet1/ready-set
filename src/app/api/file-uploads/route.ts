@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Check upload limit
-      if (session.upload_count >= session.max_uploads) {
+      if (session.upload_count !== null && session.max_uploads !== null && session.upload_count >= session.max_uploads) {
         return NextResponse.json(
           {
             error: 'Upload limit exceeded',
@@ -819,6 +819,7 @@ export async function POST(request: NextRequest) {
         // CRITICAL: This RPC function MUST exist in the database before deployment
         // Migration required: see docs/security/deployment-guide.md
         // SECURITY: Pass session token to validate ownership and prevent session hijacking
+        // @ts-ignore - RPC function not yet in generated types
         const { error: sessionUpdateError } = await supabase.rpc('increment_session_upload', {
           p_session_id: validatedSession.id,
           p_file_path: filePath,

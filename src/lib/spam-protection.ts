@@ -1,5 +1,7 @@
 // src/lib/spam-protection.ts
 
+import { isIP } from 'net';
+
 /**
  * Spam Protection System for Contact Forms
  *
@@ -64,23 +66,12 @@ export interface SpamCheckResult {
 
 /**
  * Validate if a string is a valid IPv4 or IPv6 address
+ * Uses Node.js built-in isIP function for reliable validation
  */
 function isValidIp(ip: string): boolean {
-  // IPv4 pattern
-  const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
-  // IPv6 pattern (simplified - matches most common forms)
-  const ipv6Pattern = /^([0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}$/i;
-
-  if (ipv4Pattern.test(ip)) {
-    // Validate IPv4 octets are 0-255
-    const octets = ip.split('.');
-    return octets.every(octet => {
-      const num = parseInt(octet, 10);
-      return num >= 0 && num <= 255;
-    });
-  }
-
-  return ipv6Pattern.test(ip);
+  // Use Node.js built-in isIP function
+  // Returns 4 for IPv4, 6 for IPv6, 0 for invalid
+  return isIP(ip) !== 0;
 }
 
 /**
@@ -388,6 +379,11 @@ export class SpamProtectionManager {
 
   /**
    * Start periodic cleanup scheduler
+   *
+   * IMPORTANT: In serverless environments, this must be called carefully:
+   * - Call once during module initialization, not per request
+   * - The timer will be cleared automatically on process exit
+   * - Multiple calls are safe due to singleton guard
    */
   static startCleanupScheduler() {
     // Don't start timers in test environment
@@ -401,12 +397,36 @@ export class SpamProtectionManager {
       return;
     }
 
+    // Clear any existing timer before creating new one (defensive)
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+
     this.isSchedulerRunning = true;
 
     // Run rate limit cleanup every 5 minutes
     this.cleanupTimer = setInterval(() => {
       this.cleanupExpiredRateLimits();
     }, this.CLEANUP_INTERVAL);
+
+    // Cleanup on process exit (graceful shutdown)
+    process.on('beforeExit', () => {
+      if (this.cleanupTimer) {
+        clearInterval(this.cleanupTimer);
+        this.cleanupTimer = null;
+        this.isSchedulerRunning = false;
+      }
+    });
+
+    // Also cleanup on SIGTERM (common in serverless/container environments)
+    process.on('SIGTERM', () => {
+      if (this.cleanupTimer) {
+        clearInterval(this.cleanupTimer);
+        this.cleanupTimer = null;
+        this.isSchedulerRunning = false;
+      }
+    });
 
     console.log('[SPAM] Cleanup scheduler started');
   }
