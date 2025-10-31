@@ -153,6 +153,7 @@ export class SpamProtectionManager {
   ]);
 
   // Spam patterns to detect in message content
+  // NOTE: URL counting is handled separately in calculateSpamScore() to avoid regex performance issues
   private static readonly SPAM_PATTERNS = [
     /\b(viagra|cialis|pharmacy|pills)\b/gi,
     /\b(casino|poker|gambling|lottery|jackpot)\b/gi,
@@ -161,7 +162,6 @@ export class SpamProtectionManager {
     /\b(earn \$|make \$\d+|guaranteed income)\b/gi,
     /\b(seo services|cheap seo|link building)\b/gi,
     /\b(cryptocurrency|bitcoin|investment opportunity)\b/gi,
-    /https?:\/\/[^\s]+.*https?:\/\/[^\s]+.*https?:\/\/[^\s]+/gi, // 3+ URLs
     /<script|javascript:|onclick=/gi, // XSS attempts
     /\[url=|<a href=/gi, // BBCode/HTML links
   ];
@@ -260,6 +260,7 @@ export class SpamProtectionManager {
     }
 
     // Excessive links (more than 3) (20 points)
+    // Using simple counting instead of complex regex to avoid catastrophic backtracking
     const linkCount = (data.message.match(/https?:\/\//gi) || []).length;
     if (linkCount > 3) {
       score += 20;

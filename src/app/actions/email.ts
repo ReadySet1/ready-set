@@ -218,13 +218,29 @@ const parseDelivery = (message: string) => {
   return sections;
 };
 
-// HTML templates
+/**
+ * Escape HTML special characters to prevent XSS attacks in email templates
+ * This is critical for security when inserting user input into HTML emails
+ */
+function escapeHtml(unsafe: string | null | undefined): string {
+  if (!unsafe) return '';
+
+  return unsafe
+    .toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// HTML templates with XSS protection
 const createRegistrationHTML = (data: any) => `
-  <h2>New ${data.userType} Registration</h2>
-  <p>User Type: ${data.userType}</p>
-  <p>Name: ${data.name}</p>
-  <p>Email: ${data.email}</p>
-  <p>Company: ${data.company}</p>
+  <h2>New ${escapeHtml(data.userType)} Registration</h2>
+  <p>User Type: ${escapeHtml(data.userType)}</p>
+  <p>Name: ${escapeHtml(data.name)}</p>
+  <p>Email: ${escapeHtml(data.email)}</p>
+  <p>Company: ${escapeHtml(data.company)}</p>
   <p>Please review this registration in the admin dashboard.</p>
 `;
 
@@ -233,8 +249,8 @@ const createDeliveryHTML = (sections: any) => `
   ${Object.entries(sections)
     .map(
       ([title, content]) => `
-    <h3>${title}</h3>
-    <pre>${content}</pre>
+    <h3>${escapeHtml(title)}</h3>
+    <pre>${escapeHtml(content as string)}</pre>
   `,
     )
     .join("")}
@@ -242,17 +258,17 @@ const createDeliveryHTML = (sections: any) => `
 
 const createJobHTML = (data: FormInputs) => `
   <h2>New Job Application</h2>
-  <p>Name: ${data.name}</p>
-  <p>Email: ${data.email}</p>
-  <p>Message: ${data.message}</p>
+  <p>Name: ${escapeHtml(data.name)}</p>
+  <p>Email: ${escapeHtml(data.email)}</p>
+  <p>Message: ${escapeHtml(data.message)}</p>
 `;
 
 const createGeneralHTML = (data: FormInputs) => `
   <h2>Website Message</h2>
-  <p>Name: ${data.name}</p>
-  <p>Email: ${data.email}</p>
-  ${data.phone ? `<p>Phone: ${data.phone}</p>` : ""}
-  <p>Message: ${data.message}</p>
+  <p>Name: ${escapeHtml(data.name)}</p>
+  <p>Email: ${escapeHtml(data.email)}</p>
+  ${data.phone ? `<p>Phone: ${escapeHtml(data.phone)}</p>` : ""}
+  <p>Message: ${escapeHtml(data.message)}</p>
 `;
 
 // Delivery notification functionality
