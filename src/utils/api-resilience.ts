@@ -8,6 +8,7 @@
  */
 
 import { apiResilienceLogger } from './logger';
+import { createAlert, AlertType, AlertSeverity } from '@/lib/alerting';
 
 // ============================================================================
 // Configuration Types
@@ -21,6 +22,7 @@ export interface ApiResilienceConfig {
   enableCircuitBreaker: boolean; // Enable circuit breaker (default: true)
   circuitBreakerThreshold: number; // Failures before opening (default: 5)
   circuitBreakerTimeout: number; // Time before half-open in ms (default: 60000)
+  inactivityResetTimeout: number; // Time before auto-reset on inactivity in ms (default: 300000 - 5 minutes)
   retryableStatusCodes: number[]; // HTTP status codes that should trigger retry
   retryableErrors: string[]; // Error messages/codes that should trigger retry
 }
@@ -31,6 +33,92 @@ export interface CircuitBreakerState {
   successCount: number;
   lastFailureTime?: number;
   lastAttemptTime?: number;
+}
+
+/**
+ * Comprehensive monitoring data for circuit breaker observability.
+ * Part of REA-92: Add Circuit Breaker Monitoring and Alerts
+ */
+export interface CircuitBreakerMonitoringData {
+  name: string;
+  state: 'closed' | 'open' | 'half-open';
+  failureCount: number;
+  successCount: number;
+  lastFailureTime?: string;
+  lastAttemptTime?: string;
+  nextHalfOpenTime?: string;
+  config: {
+    threshold: number;
+    timeout: number;
+    inactivityResetTimeout: number;
+  };
+  metrics: {
+    totalRequests: number;
+    totalFailures: number;
+    totalSuccesses: number;
+    openTransitions: number;
+    halfOpenTransitions: number;
+    closeTransitions: number;
+    failureRate: number;
+  };
+  health: {
+    status: 'healthy' | 'degraded' | 'critical';
+    message: string;
+  };
+}
+
+// ============================================================================
+// Custom Error Classes
+// ============================================================================
+
+/**
+ * Error thrown when circuit breaker is open and blocking requests.
+ * Includes retry-after information for better client experience.
+ *
+ * Part of REA-93: Improve Circuit Breaker Error Messages
+ */
+export class CircuitBreakerOpenError extends Error {
+  public readonly statusCode = 503;
+
+  constructor(
+    public readonly apiName: string,
+    public readonly retryAfter: Date,
+    public readonly state: CircuitBreakerState,
+    public readonly estimatedWaitMs: number
+  ) {
+    const waitSeconds = Math.ceil(estimatedWaitMs / 1000);
+    super(
+      `${apiName} circuit breaker is OPEN. ` +
+      `Service temporarily unavailable. ` +
+      `Retry after ${retryAfter.toISOString()} ` +
+      `(approximately ${waitSeconds} seconds)`
+    );
+    this.name = 'CircuitBreakerOpenError';
+
+    // Maintain proper stack trace
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, CircuitBreakerOpenError);
+    }
+  }
+
+  /**
+   * Convert error to JSON for API responses
+   */
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      statusCode: this.statusCode,
+      apiName: this.apiName,
+      retryAfter: this.retryAfter.toISOString(),
+      retryAfterSeconds: Math.ceil(this.estimatedWaitMs / 1000),
+      estimatedWaitMs: this.estimatedWaitMs,
+      circuitBreakerState: {
+        state: this.state.state,
+        failureCount: this.state.failureCount,
+      },
+    };
+  }
 }
 
 // ============================================================================
@@ -86,6 +174,7 @@ export const DEFAULT_API_RESILIENCE_CONFIG: ApiResilienceConfig = {
   enableCircuitBreaker: true,
   circuitBreakerThreshold: 5, // More lenient for external APIs
   circuitBreakerTimeout: 60000, // 60 seconds
+  inactivityResetTimeout: 300000, // 5 minutes - auto-reset circuit breaker after extended inactivity
   retryableStatusCodes: [...RETRYABLE_STATUS_CODES],
   retryableErrors: [...RETRYABLE_NETWORK_ERRORS],
 };
@@ -104,6 +193,19 @@ export class ApiCircuitBreaker {
   private config: ApiResilienceConfig;
   private name: string;
 
+  /**
+   * Metrics for monitoring and observability.
+   * Part of REA-92: Add Circuit Breaker Monitoring and Alerts
+   */
+  private metrics = {
+    totalRequests: 0,
+    totalFailures: 0,
+    totalSuccesses: 0,
+    openTransitions: 0,
+    halfOpenTransitions: 0,
+    closeTransitions: 0,
+  };
+
   constructor(name: string, config: Partial<ApiResilienceConfig> = {}) {
     this.name = name;
     this.config = { ...DEFAULT_API_RESILIENCE_CONFIG, ...config };
@@ -116,6 +218,9 @@ export class ApiCircuitBreaker {
     if (!this.config.enableCircuitBreaker) {
       return false;
     }
+
+    // Check for inactivity reset before checking state
+    this.checkInactivityReset();
 
     if (this.state.state === 'open') {
       // Check if we should transition to half-open
@@ -133,12 +238,33 @@ export class ApiCircuitBreaker {
   }
 
   /**
+   * Check if circuit breaker should auto-reset due to inactivity.
+   * Part of REA-92: Add Circuit Breaker Monitoring and Alerts
+   */
+  private checkInactivityReset(): void {
+    if (
+      this.state.lastAttemptTime &&
+      this.state.state === 'open' &&
+      Date.now() - this.state.lastAttemptTime >= this.config.inactivityResetTimeout
+    ) {
+      apiResilienceLogger.info(
+        `[${this.name} Circuit Breaker] Auto-resetting due to ${this.config.inactivityResetTimeout}ms inactivity`
+      );
+      this.reset();
+    }
+  }
+
+  /**
    * Record a successful request
    */
   recordSuccess(): void {
     if (!this.config.enableCircuitBreaker) {
       return;
     }
+
+    // Track metrics
+    this.metrics.totalRequests++;
+    this.metrics.totalSuccesses++;
 
     this.state.lastAttemptTime = Date.now();
 
@@ -162,6 +288,10 @@ export class ApiCircuitBreaker {
     if (!this.config.enableCircuitBreaker) {
       return;
     }
+
+    // Track metrics
+    this.metrics.totalRequests++;
+    this.metrics.totalFailures++;
 
     this.state.failureCount++;
     this.state.lastFailureTime = Date.now();
@@ -187,6 +317,68 @@ export class ApiCircuitBreaker {
   }
 
   /**
+   * Get comprehensive monitoring data for observability.
+   * Part of REA-92: Add Circuit Breaker Monitoring and Alerts
+   */
+  getMonitoringData(): CircuitBreakerMonitoringData {
+    const failureRate = this.metrics.totalRequests > 0
+      ? (this.metrics.totalFailures / this.metrics.totalRequests) * 100
+      : 0;
+
+    // Determine health status
+    let healthStatus: 'healthy' | 'degraded' | 'critical';
+    let healthMessage: string;
+
+    if (this.state.state === 'open') {
+      healthStatus = 'critical';
+      healthMessage = `Circuit breaker is OPEN. Service unavailable until ${
+        this.state.lastFailureTime
+          ? new Date(this.state.lastFailureTime + this.config.circuitBreakerTimeout).toISOString()
+          : 'unknown'
+      }`;
+    } else if (this.state.state === 'half-open') {
+      healthStatus = 'degraded';
+      healthMessage = 'Circuit breaker is HALF-OPEN. Testing service recovery.';
+    } else if (failureRate > 50) {
+      healthStatus = 'degraded';
+      healthMessage = `High failure rate: ${failureRate.toFixed(1)}%`;
+    } else {
+      healthStatus = 'healthy';
+      healthMessage = 'Circuit breaker is operating normally.';
+    }
+
+    return {
+      name: this.name,
+      state: this.state.state,
+      failureCount: this.state.failureCount,
+      successCount: this.state.successCount,
+      lastFailureTime: this.state.lastFailureTime
+        ? new Date(this.state.lastFailureTime).toISOString()
+        : undefined,
+      lastAttemptTime: this.state.lastAttemptTime
+        ? new Date(this.state.lastAttemptTime).toISOString()
+        : undefined,
+      nextHalfOpenTime:
+        this.state.state === 'open' && this.state.lastFailureTime
+          ? new Date(this.state.lastFailureTime + this.config.circuitBreakerTimeout).toISOString()
+          : undefined,
+      config: {
+        threshold: this.config.circuitBreakerThreshold,
+        timeout: this.config.circuitBreakerTimeout,
+        inactivityResetTimeout: this.config.inactivityResetTimeout,
+      },
+      metrics: {
+        ...this.metrics,
+        failureRate,
+      },
+      health: {
+        status: healthStatus,
+        message: healthMessage,
+      },
+    };
+  }
+
+  /**
    * Reset circuit breaker (for testing or manual intervention)
    */
   reset(): void {
@@ -198,16 +390,38 @@ export class ApiCircuitBreaker {
   }
 
   private transitionToOpen(): void {
+    this.metrics.openTransitions++;
+
+    const estimatedRecoveryTime = new Date(Date.now() + this.config.circuitBreakerTimeout);
+
     apiResilienceLogger.warn(`[${this.name} Circuit Breaker] Opening circuit after threshold failures`, {
       failureCount: this.state.failureCount,
       threshold: this.config.circuitBreakerThreshold,
     });
+
+    // Create alert for circuit breaker opening (REA-92)
+    createAlert(
+      AlertType.SERVICE_DOWN,
+      AlertSeverity.CRITICAL,
+      `${this.name} Circuit Breaker Opened`,
+      `Circuit breaker opened after ${this.state.failureCount} consecutive failures (threshold: ${this.config.circuitBreakerThreshold}). Service will attempt recovery at ${estimatedRecoveryTime.toISOString()}.`,
+      'circuit-breaker',
+      {
+        api: this.name,
+        failureCount: this.state.failureCount,
+        threshold: this.config.circuitBreakerThreshold,
+        estimatedRecoveryTime: estimatedRecoveryTime.toISOString(),
+        circuitBreakerTimeout: this.config.circuitBreakerTimeout,
+      }
+    );
 
     this.state.state = 'open';
     this.state.lastFailureTime = Date.now();
   }
 
   private transitionToHalfOpen(): void {
+    this.metrics.halfOpenTransitions++;
+
     apiResilienceLogger.info(`[${this.name} Circuit Breaker] Transitioning to half-open state`);
 
     this.state.state = 'half-open';
@@ -215,6 +429,8 @@ export class ApiCircuitBreaker {
   }
 
   private transitionToClosed(): void {
+    this.metrics.closeTransitions++;
+
     apiResilienceLogger.info(`[${this.name} Circuit Breaker] Closing circuit after recovery`);
 
     this.state.state = 'closed';
@@ -329,7 +545,19 @@ export async function withApiRetry<T>(
     try {
       // Check circuit breaker before attempting
       if (circuitBreaker.isOpen()) {
-        throw new Error(`${apiName} circuit breaker is OPEN - blocking request`);
+        const state = circuitBreaker.getState();
+        const waitTime = state.lastFailureTime
+          ? (state.lastFailureTime + fullConfig.circuitBreakerTimeout) - Date.now()
+          : fullConfig.circuitBreakerTimeout;
+
+        const retryAfter = new Date(Date.now() + Math.max(0, waitTime));
+
+        throw new CircuitBreakerOpenError(
+          apiName,
+          retryAfter,
+          state,
+          Math.max(0, waitTime)
+        );
       }
 
       // Execute operation with timeout
@@ -425,4 +653,39 @@ export async function withCaterValleyResilience<T>(
 
     throw error;
   }
+}
+
+// ============================================================================
+// HTTP Response Helpers
+// ============================================================================
+
+/**
+ * Create a properly formatted HTTP 503 response for circuit breaker errors.
+ * Includes Retry-After header for client guidance.
+ *
+ * Part of REA-93: Improve Circuit Breaker Error Messages
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   await withCaterValleyResilience(operation);
+ * } catch (error) {
+ *   if (error instanceof CircuitBreakerOpenError) {
+ *     return circuitBreakerErrorResponse(error);
+ *   }
+ *   throw error;
+ * }
+ * ```
+ */
+export function circuitBreakerErrorResponse(error: CircuitBreakerOpenError): Response {
+  const errorJson = error.toJSON();
+
+  return new Response(JSON.stringify(errorJson), {
+    status: 503,
+    headers: {
+      'Content-Type': 'application/json',
+      'Retry-After': errorJson.retryAfterSeconds.toString(),
+      'X-Circuit-Breaker-State': error.state.state,
+    },
+  });
 }
