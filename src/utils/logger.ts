@@ -111,6 +111,17 @@ export const apiResilienceLogger = new Logger({
   enabledInTest: false,
 });
 
+/**
+ * Security logger for authentication, authorization, spam protection, and security events.
+ * Always enabled in production for security monitoring and incident response.
+ */
+export const securityLogger = new Logger({
+  enabledInProduction: true, // ALWAYS enabled for security monitoring
+  enabledInBuild: false,
+  enabledInDevelopment: true,
+  enabledInTest: true, // Enable in tests for security test verification
+});
+
 // General logger
 export const logger = new Logger();
 

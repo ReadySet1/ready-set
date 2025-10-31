@@ -249,6 +249,16 @@ export class ApiCircuitBreaker {
 
   /**
    * Check if circuit breaker is open (blocking requests)
+   *
+   * ⚠️ WARNING: This method has side effects!
+   * - Checks for inactivity reset (may reset state)
+   * - May transition from open to half-open if timeout expired
+   *
+   * These side effects are intentional for automatic recovery,
+   * but callers should be aware that the circuit breaker state
+   * may change as a result of calling this method.
+   *
+   * @returns true if circuit is open (requests blocked), false otherwise
    */
   isOpen(): boolean {
     if (!this.config.enableCircuitBreaker) {
@@ -256,10 +266,12 @@ export class ApiCircuitBreaker {
     }
 
     // Check for inactivity reset before checking state
+    // NOTE: This has side effects - may reset the circuit breaker
     this.checkInactivityReset();
 
     if (this.state.state === 'open') {
       // Check if we should transition to half-open
+      // NOTE: This has side effects - may transition state
       if (
         this.state.lastFailureTime &&
         Date.now() - this.state.lastFailureTime >= this.config.circuitBreakerTimeout

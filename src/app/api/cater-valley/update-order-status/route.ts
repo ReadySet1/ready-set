@@ -67,6 +67,25 @@ export async function POST(request: NextRequest) {
 
     // 4. Handle External API Response based on the structured result
     if (!result.success) {
+      // Handle circuit breaker open (503) - Service temporarily unavailable
+      if (result.statusCode === 503) {
+        console.warn(`Circuit breaker open for CaterValley service during status update for order ${orderNumber}`);
+        return NextResponse.json(
+          {
+            message: `CaterValley service temporarily unavailable. ${result.error}`,
+            orderFound: false,
+            retryable: true,
+          },
+          {
+            status: 503,
+            headers: {
+              // Add Retry-After header (60 seconds default)
+              'Retry-After': '60',
+            },
+          }
+        );
+      }
+
       // Handle specific error cases
       if (!result.orderFound && result.statusCode === 404) {
         // Order not found in CaterValley - this is a common scenario
@@ -80,7 +99,7 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
-      
+
       // Handle validation errors
       if (result.error && (result.error.includes('Invalid orderNumber') || result.error.includes('Invalid status'))) {
         return NextResponse.json(
@@ -90,7 +109,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      
+
       // Handle other CaterValley API errors
       const statusCode = result.statusCode || 422;
       return NextResponse.json(

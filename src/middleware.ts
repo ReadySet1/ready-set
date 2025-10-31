@@ -1,7 +1,7 @@
 // src/middleware.ts
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
-import { logger } from "@/utils/logger";
+import { logger, securityLogger } from "@/utils/logger";
 import { SpamProtectionManager } from "@/lib/spam-protection";
 
 // Protected routes that require session refresh
@@ -94,7 +94,7 @@ export async function middleware(request: NextRequest) {
 
           // Log profile lookup errors (except for missing profile which is handled below)
           if (profileError) {
-            console.error('Middleware: Error fetching user profile:', profileError);
+            securityLogger.error('Middleware: Error fetching user profile:', profileError);
           }
 
           if (!profile || !['admin', 'super_admin', 'helpdesk'].includes((profile.type ?? '').toLowerCase())) {
