@@ -29,6 +29,11 @@ export interface RateLimit {
  * UploadSecurityManager - Handles file upload security including virus scanning,
  * rate limiting, and quarantine management.
  *
+ * MEMORY MANAGEMENT:
+ * - Rate limits are automatically cleaned up every 5 minutes (removes entries older than 2x window size)
+ * - Cleanup scheduler starts automatically on first rate limit check
+ * - Quarantined files are cleaned up every 24 hours (configurable retention period)
+ *
  * IMPORTANT LIMITATIONS:
  * - Rate limiting uses in-memory storage (not distributed across serverless instances)
  * - Rate limits reset on serverless function cold starts
@@ -63,6 +68,12 @@ export class UploadSecurityManager {
   };
 
   static async checkRateLimit(userId: string, action: keyof typeof UploadSecurityManager.RATE_LIMITS_CONFIG): Promise<boolean> {
+    // Auto-initialize cleanup scheduler on first rate limit check
+    // This ensures memory cleanup runs in production without manual initialization
+    if (!this.isSchedulerRunning) {
+      this.startCleanupScheduler();
+    }
+
     const config = this.RATE_LIMITS_CONFIG[action];
     const key = `${userId}:${action}`;
     const now = Date.now();

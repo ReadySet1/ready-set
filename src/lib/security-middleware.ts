@@ -230,8 +230,11 @@ export const SecurityUtils = {
 
   /**
    * Sanitize input data
+   *
+   * NOTE: SQL injection prevention should be handled via parameterized queries,
+   * not input sanitization. Use Supabase/Prisma parameterized queries exclusively.
    */
-  sanitizeInput: (data: any, type?: 'html' | 'text' | 'sql' | 'filename' | 'number') => {
+  sanitizeInput: (data: any, type?: 'html' | 'text' | 'filename' | 'number') => {
     const { InputSanitizer } = require('./validation');
     return InputSanitizer.sanitize(data, type);
   }
