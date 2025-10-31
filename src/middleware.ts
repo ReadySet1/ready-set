@@ -2,6 +2,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
 import { logger } from "@/utils/logger";
+import { SpamProtectionManager } from "@/lib/spam-protection";
 
 // Protected routes that require session refresh
 const PROTECTED_ROUTES = [
@@ -17,8 +18,21 @@ const PROTECTED_ROUTES = [
   '/profile'
 ];
 
+/**
+ * Initialize spam protection cleanup scheduler once
+ * This prevents memory leaks by cleaning up expired rate limit entries
+ */
+let isSpamProtectionInitialized = false;
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // Initialize spam protection cleanup scheduler once on first request
+  // This ensures it runs in a long-lived process (middleware context)
+  if (!isSpamProtectionInitialized) {
+    SpamProtectionManager.startCleanupScheduler();
+    isSpamProtectionInitialized = true;
+  }
 
   // Skip middleware for specific paths
   if (request.nextUrl.pathname.startsWith('/auth/callback') ||
