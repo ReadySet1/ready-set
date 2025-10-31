@@ -155,23 +155,80 @@ export class UploadSecurityManager {
     }
   }
 
+  /**
+   * Scan file in chunks for large files (5-10MB)
+   * Uses streaming approach to avoid loading entire file into memory
+   */
+  private static async scanFileInChunks(
+    file: File,
+    maliciousPatterns: RegExp[]
+  ): Promise<{ threats: string[]; score: number }> {
+    const threats: string[] = [];
+    let score = 0;
+    const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+    const decoder = new TextDecoder('utf-8', { fatal: false });
+
+    // For pattern matching across chunk boundaries, keep last 1KB of previous chunk
+    const OVERLAP_SIZE = 1024;
+    let previousChunk = '';
+
+    try {
+      const stream = file.stream();
+      const reader = stream.getReader();
+      let done = false;
+
+      while (!done) {
+        const { value, done: streamDone } = await reader.read();
+        done = streamDone;
+
+        if (value) {
+          // Decode current chunk
+          const currentChunk = decoder.decode(value, { stream: !done });
+
+          // Combine with overlap from previous chunk for pattern matching
+          const combinedContent = previousChunk + currentChunk;
+
+          // Scan combined content against patterns
+          for (const pattern of maliciousPatterns) {
+            const matches = combinedContent.match(pattern);
+            if (matches) {
+              threats.push(`Malicious pattern detected: ${pattern.source}`);
+              score += matches.length * 10;
+            }
+          }
+
+          // Keep last OVERLAP_SIZE characters for next iteration
+          if (combinedContent.length > OVERLAP_SIZE) {
+            previousChunk = combinedContent.slice(-OVERLAP_SIZE);
+          } else {
+            previousChunk = combinedContent;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error during streaming scan:', error);
+      threats.push('Error during file scan - treated as suspicious');
+      score += 50;
+    }
+
+    return { threats, score };
+  }
+
   static async scanForMaliciousContent(file: File): Promise<SecurityScanResult> {
     const threats: string[] = [];
     let score = 0;
 
+    // File size thresholds for scanning strategy
+    const MAX_SCAN_SIZE = 10 * 1024 * 1024; // 10MB - files larger than this are rejected
+    const STREAMING_THRESHOLD = 5 * 1024 * 1024; // 5MB - use streaming for files larger than this
+
     // Check file size first to prevent memory issues
-    // Files larger than 10MB are too large for full content scanning
-    const MAX_SCAN_SIZE = 10 * 1024 * 1024; // 10MB
     if (file.size > MAX_SCAN_SIZE) {
       threats.push('File too large for full content scan');
       score += 30; // Medium threat level due to inability to fully scan
 
-      // Still perform file type and size checks below
-      // but skip the content scanning to avoid OOM
-      const isClean = false; // Can't confirm it's clean without scanning
-
       return {
-        isClean,
+        isClean: false,
         threats,
         score,
         details: {
@@ -183,11 +240,7 @@ export class UploadSecurityManager {
       };
     }
 
-    const content = await file.text();
-
-    // Pattern matching for malicious content detection
-    // NOTE: These patterns are for DETECTION only, not sanitization
-    // For actual sanitization, use DOMPurify or similar libraries
+    // Define malicious patterns first (used by both scanning methods)
     const maliciousPatterns = [
       // Script injection attempts - improved to catch more variants
       /<script[\s\S]*?>/gi, // Opening script tag with any attributes/whitespace
@@ -208,13 +261,10 @@ export class UploadSecurityManager {
       /<%.*%>/g,
 
       // SQL injection patterns
-      // NOTE: These are intentionally broad for security. For .sql files, use allowlist approach.
-      // Context: Matches SQL commands that could indicate injection attempts in uploaded content
-      /union\s+select/gi,           // SQL union-based injection
-      /drop\s+(table|database)/gi,  // Destructive SQL commands
-      /insert\s+into\s+\w+/gi,      // SQL insertion (tightened to require table name)
-      /delete\s+from\s+\w+/gi,      // SQL deletion (tightened to require table name)
-      // Removed overly broad SELECT pattern to reduce false positives in documentation
+      /union\s+select/gi,
+      /drop\s+(table|database)/gi,
+      /insert\s+into\s+\w+/gi,
+      /delete\s+from\s+\w+/gi,
 
       // Path traversal
       /\.\.\//g,
@@ -228,16 +278,29 @@ export class UploadSecurityManager {
       /system\s*\(/gi,
     ];
 
-    for (const pattern of maliciousPatterns) {
-      const matches = content.match(pattern);
-      if (matches) {
-        threats.push(`Malicious pattern detected: ${pattern.source}`);
-        score += matches.length * 10;
+    // Use streaming for large files (5-10MB), in-memory for smaller files
+    let content = '';
+    if (file.size > STREAMING_THRESHOLD) {
+      // Large file: use streaming approach to avoid memory issues
+      const streamResult = await this.scanFileInChunks(file, maliciousPatterns);
+      threats.push(...streamResult.threats);
+      score += streamResult.score;
+    } else {
+      // Small file: load into memory (fast path for < 5MB files)
+      content = await file.text();
+
+      // Pattern matching for in-memory content
+      for (const pattern of maliciousPatterns) {
+        const matches = content.match(pattern);
+        if (matches) {
+          threats.push(`Malicious pattern detected: ${pattern.source}`);
+          score += matches.length * 10;
+        }
       }
     }
 
-    // File type specific checks
-    if (file.type.startsWith('text/')) {
+    // File type specific checks (only for in-memory scans where we have content)
+    if (content && file.type.startsWith('text/')) {
       // Check for executable content in text files
       if (content.includes('#!/bin/') || content.includes('#!/usr/bin/')) {
         threats.push('Executable content in text file');
@@ -245,7 +308,7 @@ export class UploadSecurityManager {
       }
     }
 
-    if (file.type.startsWith('image/')) {
+    if (content && file.type.startsWith('image/')) {
       // Check for embedded scripts in image files (steganography)
       if (content.includes('<script') || content.includes('javascript:')) {
         threats.push('Suspicious content in image file');
