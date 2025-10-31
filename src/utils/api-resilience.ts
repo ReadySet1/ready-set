@@ -59,6 +59,7 @@ export interface CircuitBreakerMonitoringData {
     openTransitions: number;
     halfOpenTransitions: number;
     closeTransitions: number;
+    autoResetCount: number;
     failureRate: number;
   };
   health: {
@@ -238,6 +239,7 @@ export class ApiCircuitBreaker {
     openTransitions: 0,
     halfOpenTransitions: 0,
     closeTransitions: 0,
+    autoResetCount: 0, // Track automatic resets due to inactivity
   };
 
   constructor(name: string, config: Partial<ApiResilienceConfig> = {}) {
@@ -274,6 +276,10 @@ export class ApiCircuitBreaker {
   /**
    * Check if circuit breaker should auto-reset due to inactivity.
    * Part of REA-92: Add Circuit Breaker Monitoring and Alerts
+   *
+   * WARNING: Auto-reset could mask ongoing issues. Monitor autoResetCount metric
+   * to detect if the circuit breaker is repeatedly auto-resetting, which may
+   * indicate persistent upstream problems rather than transient failures.
    */
   private checkInactivityReset(): void {
     if (
@@ -281,9 +287,18 @@ export class ApiCircuitBreaker {
       this.state.state === 'open' &&
       Date.now() - this.state.lastAttemptTime >= this.config.inactivityResetTimeout
     ) {
-      apiResilienceLogger.info(
-        `[${this.name} Circuit Breaker] Auto-resetting due to ${this.config.inactivityResetTimeout}ms inactivity`
+      this.metrics.autoResetCount++;
+
+      apiResilienceLogger.warn(
+        `[${this.name} Circuit Breaker] Auto-resetting due to ${this.config.inactivityResetTimeout}ms inactivity ` +
+        `(autoResetCount: ${this.metrics.autoResetCount})`,
+        {
+          inactivityPeriodMs: Date.now() - this.state.lastAttemptTime,
+          autoResetCount: this.metrics.autoResetCount,
+          previousFailureCount: this.state.failureCount,
+        }
       );
+
       this.reset();
     }
   }
@@ -389,9 +404,17 @@ export class ApiCircuitBreaker {
     } else if (this.state.state === 'half-open') {
       healthStatus = 'degraded';
       healthMessage = 'Circuit breaker is HALF-OPEN. Testing service recovery.';
+    } else if (this.metrics.autoResetCount >= 3) {
+      // WARNING: Repeated auto-resets may indicate persistent upstream issues
+      healthStatus = 'degraded';
+      healthMessage = `Circuit breaker has auto-reset ${this.metrics.autoResetCount} times due to inactivity. ` +
+        'This may indicate persistent upstream issues rather than transient failures.';
     } else if (failureRate > 50) {
       healthStatus = 'degraded';
       healthMessage = `High failure rate: ${failureRate.toFixed(1)}%`;
+    } else if (this.metrics.autoResetCount > 0) {
+      healthStatus = 'healthy';
+      healthMessage = `Circuit breaker is operating normally (${this.metrics.autoResetCount} auto-reset${this.metrics.autoResetCount > 1 ? 's' : ''}).`;
     } else {
       healthStatus = 'healthy';
       healthMessage = 'Circuit breaker is operating normally.';
@@ -589,11 +612,36 @@ export async function withApiRetry<T>(
     ...config,
   };
 
+  // CRITICAL: Check circuit breaker BEFORE retry loop for fast-fail
+  // If circuit is already open, fail immediately without attempting any retries
+  if (circuitBreaker.isOpen()) {
+    const state = circuitBreaker.getState();
+    const waitTime = state.lastFailureTime
+      ? (state.lastFailureTime + fullConfig.circuitBreakerTimeout) - Date.now()
+      : fullConfig.circuitBreakerTimeout;
+
+    const retryAfter = new Date(Date.now() + Math.max(0, waitTime));
+
+    apiResilienceLogger.warn(`[${apiName} Resilience] Circuit breaker is OPEN - failing fast without retry`, {
+      circuitState: state.state,
+      failureCount: state.failureCount,
+      retryAfter: retryAfter.toISOString(),
+    });
+
+    throw new CircuitBreakerOpenError(
+      apiName,
+      retryAfter,
+      state,
+      Math.max(0, waitTime)
+    );
+  }
+
   let lastError: any;
 
   for (let attempt = 1; attempt <= fullConfig.maxRetries; attempt++) {
     try {
-      // Check circuit breaker before attempting
+      // SECONDARY CHECK: Circuit may have opened during retry loop (concurrent failures)
+      // This catches circuits that open after we've started retrying
       if (circuitBreaker.isOpen()) {
         const state = circuitBreaker.getState();
         const waitTime = state.lastFailureTime
