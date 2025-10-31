@@ -139,8 +139,27 @@ jobs:
         run: |
           echo "🔍 Checking artifact uploads for .auth exclusion..."
 
+          # Check if ci.yml exists
+          if [ ! -f ".github/workflows/ci.yml" ]; then
+            echo "⚠️  Warning: ci.yml not found, skipping artifact check"
+            exit 0
+          fi
+
+          # Check if any artifact uploads are configured
+          if ! grep -q "upload-artifact" .github/workflows/ci.yml; then
+            echo "⚠️  Warning: No artifact uploads found in ci.yml"
+            exit 0
+          fi
+
           # Get all artifact upload configurations
-          ARTIFACT_PATHS=$(grep -A 5 "upload-artifact" .github/workflows/ci.yml | grep "path:" | awk '{print $2}' || true)
+          # Using grep to find upload-artifact sections and extract path values
+          ARTIFACT_PATHS=$(grep -A 5 "upload-artifact" .github/workflows/ci.yml | grep "path:" | awk '{print $2}')
+
+          if [ -z "$ARTIFACT_PATHS" ]; then
+            echo "⚠️  Warning: Could not extract artifact paths from ci.yml"
+            echo "This may indicate a change in the CI file structure."
+            exit 0
+          fi
 
           echo "Artifact paths configured:"
           echo "$ARTIFACT_PATHS"
@@ -156,7 +175,8 @@ jobs:
           if echo "$ARTIFACT_PATHS" | grep -q "playwright-report"; then
             echo "✅ Artifact configuration verified - .auth files are excluded"
           else
-            echo "⚠️  Warning: Could not verify artifact configuration"
+            echo "⚠️  Warning: Could not verify expected artifact patterns"
+            echo "Expected to find 'playwright-report' in artifact paths"
           fi
 
       - name: Verify e2e/README.md has security warnings
