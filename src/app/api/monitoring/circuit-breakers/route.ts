@@ -3,15 +3,30 @@
  *
  * Provides real-time visibility into circuit breaker states, metrics, and health.
  * Part of REA-92: Add Circuit Breaker Monitoring and Alerts
+ *
+ * AUTHENTICATION:
+ * - GET endpoint: Requires authenticated user (any role)
+ * - POST endpoint: Requires admin role (ADMIN, SUPER_ADMIN)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase/server';
 import { caterValleyCircuitBreaker } from '@/utils/api-resilience';
+import { apiResilienceLogger } from '@/utils/logger';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+// Define proper type for Supabase app_metadata
+interface AppMetadata {
+  role?: string;
+}
 
 /**
  * GET /api/monitoring/circuit-breakers
  *
  * Returns comprehensive monitoring data for all circuit breakers in the system.
+ * Requires authentication.
  *
  * Response format:
  * {
@@ -36,6 +51,22 @@ import { caterValleyCircuitBreaker } from '@/utils/api-resilience';
  */
 export async function GET(request: NextRequest) {
   try {
+    // Authentication: Verify user is authenticated
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      apiResilienceLogger.warn('[Circuit Breaker Monitoring] Unauthorized access attempt', {
+        hasUser: !!user,
+        timestamp: new Date().toISOString(),
+      });
+
+      return NextResponse.json(
+        { error: 'Unauthorized - authentication required' },
+        { status: 401 }
+      );
+    }
+
     // Collect monitoring data from all circuit breakers
     const circuitBreakers = [
       caterValleyCircuitBreaker.getMonitoringData(),
@@ -77,7 +108,11 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('[Circuit Breaker Monitoring] Error fetching monitoring data:', error);
+    apiResilienceLogger.error('[Circuit Breaker Monitoring] Error fetching monitoring data', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+    });
 
     return NextResponse.json(
       {
@@ -90,15 +125,48 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST /api/monitoring/circuit-breakers/reset
+ * POST /api/monitoring/circuit-breakers
  *
  * Manually reset a circuit breaker (for emergency recovery or testing).
- * Requires authentication in production.
+ * Requires admin role (ADMIN or SUPER_ADMIN).
  *
  * Body: { "name": "CaterValley" }
  */
 export async function POST(request: NextRequest) {
   try {
+    // Authentication: Verify admin user
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      apiResilienceLogger.warn('[Circuit Breaker Monitoring] Unauthorized reset attempt', {
+        hasUser: !!user,
+        timestamp: new Date().toISOString(),
+      });
+
+      return NextResponse.json(
+        { error: 'Unauthorized - authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // Authorization: Verify admin role
+    const userRole = (user.app_metadata as AppMetadata)?.role;
+    const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+
+    if (!isAdmin) {
+      apiResilienceLogger.warn('[Circuit Breaker Monitoring] Forbidden reset attempt', {
+        userId: user.id,
+        userRole,
+        timestamp: new Date().toISOString(),
+      });
+
+      return NextResponse.json(
+        { error: 'Forbidden - admin access required' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { name } = body;
 
@@ -125,13 +193,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    apiResilienceLogger.info('[Circuit Breaker Monitoring] Circuit breaker reset', {
+      name,
+      resetBy: user.id,
+      timestamp: new Date().toISOString(),
+    });
+
     return NextResponse.json({
       message: `Circuit breaker "${name}" has been reset`,
       circuitBreaker: resetCircuitBreaker,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('[Circuit Breaker Monitoring] Error resetting circuit breaker:', error);
+    apiResilienceLogger.error('[Circuit Breaker Monitoring] Error resetting circuit breaker', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+    });
 
     return NextResponse.json(
       {

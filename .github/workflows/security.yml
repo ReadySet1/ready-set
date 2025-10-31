@@ -104,6 +104,8 @@ jobs:
   e2e-auth-security:
     name: E2E Authentication Security Checks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
