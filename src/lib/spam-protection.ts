@@ -10,10 +10,37 @@
  * - Honeypot validation
  * - Monitoring and logging
  *
- * IMPORTANT LIMITATIONS:
- * - Rate limiting uses in-memory storage (not distributed)
- * - Rate limits reset on serverless function cold starts
- * - For production scale with multiple instances, consider Redis
+ * ⚠️ IMPORTANT LIMITATIONS FOR PRODUCTION:
+ *
+ * 1. MEMORY LEAK RISK:
+ *    - Cleanup scheduler must be started manually in a long-lived process
+ *    - Do NOT use in serverless functions without careful lifecycle management
+ *    - Consider using Next.js middleware or API routes with proper initialization
+ *
+ * 2. RACE CONDITIONS:
+ *    - Rate limit checks are NOT atomic in concurrent requests
+ *    - Multiple requests can bypass rate limits if processed simultaneously
+ *    - This is acceptable for basic spam protection but not for strict limits
+ *
+ * 3. NOT DISTRIBUTED:
+ *    - Rate limits are NOT shared across serverless instances
+ *    - Each instance maintains its own rate limit state
+ *    - Limits reset on function cold starts
+ *
+ * 4. PRODUCTION RECOMMENDATION:
+ *    - Use Redis with INCR for atomic, distributed rate limiting
+ *    - Implement proper request queuing
+ *    - Add comprehensive monitoring and alerting
+ *
+ * This implementation is suitable for:
+ * - Development and testing
+ * - Low-traffic applications
+ * - Additional layer of protection alongside other measures
+ *
+ * NOT suitable for:
+ * - High-traffic production applications
+ * - Strict rate limiting requirements
+ * - Distributed serverless deployments at scale
  */
 
 export interface RateLimit {
@@ -33,6 +60,56 @@ export interface SpamCheckResult {
     spamPatterns?: string[];
     honeypotTriggered?: boolean;
   };
+}
+
+/**
+ * Validate if a string is a valid IPv4 or IPv6 address
+ */
+function isValidIp(ip: string): boolean {
+  // IPv4 pattern
+  const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+  // IPv6 pattern (simplified - matches most common forms)
+  const ipv6Pattern = /^([0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}$/i;
+
+  if (ipv4Pattern.test(ip)) {
+    // Validate IPv4 octets are 0-255
+    const octets = ip.split('.');
+    return octets.every(octet => {
+      const num = parseInt(octet, 10);
+      return num >= 0 && num <= 255;
+    });
+  }
+
+  return ipv6Pattern.test(ip);
+}
+
+/**
+ * Extract and validate client IP from headers
+ *
+ * SECURITY NOTE: Only use this in environments where x-forwarded-for is set by
+ * a trusted proxy (e.g., Vercel, Cloudflare). Do NOT use with user-facing proxies.
+ *
+ * @param forwardedFor - x-forwarded-for header value
+ * @param realIp - x-real-ip header value
+ * @returns Valid IP address or 'unknown-ip' constant
+ */
+export function extractClientIp(forwardedFor: string | null, realIp: string | null): string {
+  // Try x-forwarded-for first (set by Vercel/trusted proxy)
+  if (forwardedFor) {
+    const firstIp = forwardedFor.split(',')[0]?.trim();
+    if (firstIp && isValidIp(firstIp)) {
+      return firstIp;
+    }
+  }
+
+  // Fall back to x-real-ip
+  if (realIp && isValidIp(realIp)) {
+    return realIp;
+  }
+
+  // No valid IP found - use constant identifier
+  // This prevents user-controlled values (like email) from being used for rate limiting
+  return 'unknown-ip';
 }
 
 export class SpamProtectionManager {
@@ -91,13 +168,11 @@ export class SpamProtectionManager {
 
   /**
    * Check rate limit for a given identifier (email, IP, or fingerprint)
+   *
+   * IMPORTANT: Cleanup scheduler must be started manually via startCleanupScheduler()
+   * to avoid memory leaks in serverless environments. Do NOT auto-initialize here.
    */
   static checkRateLimit(identifier: string): boolean {
-    // Auto-initialize cleanup scheduler on first rate limit check
-    if (!this.isSchedulerRunning) {
-      this.startCleanupScheduler();
-    }
-
     const now = Date.now();
     let rateLimit = this.RATE_LIMITS.get(identifier);
 
