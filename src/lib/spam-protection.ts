@@ -75,26 +75,73 @@ function isValidIp(ip: string): boolean {
 }
 
 /**
+ * Check if IP is in private/reserved range
+ * Private IPs should not be used for rate limiting from x-forwarded-for
+ */
+function isPrivateIp(ip: string): boolean {
+  // IPv4 private ranges
+  const privateV4Ranges = [
+    /^10\./,                    // 10.0.0.0/8
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // 172.16.0.0/12
+    /^192\.168\./,              // 192.168.0.0/16
+    /^127\./,                   // Loopback
+    /^169\.254\./,              // Link-local
+  ];
+
+  // IPv6 private/special ranges
+  const privateV6Ranges = [
+    /^::1$/,                    // Loopback
+    /^fe80:/,                   // Link-local
+    /^fc00:/,                   // Unique local
+    /^fd00:/,                   // Unique local
+  ];
+
+  for (const range of privateV4Ranges) {
+    if (range.test(ip)) return true;
+  }
+
+  for (const range of privateV6Ranges) {
+    if (range.test(ip)) return true;
+  }
+
+  return false;
+}
+
+/**
  * Extract and validate client IP from headers
  *
  * SECURITY NOTE: Only use this in environments where x-forwarded-for is set by
  * a trusted proxy (e.g., Vercel, Cloudflare). Do NOT use with user-facing proxies.
+ *
+ * Environment Variables:
+ * - TRUST_PROXY: Set to 'true' to trust x-forwarded-for header (default: true for Vercel/production)
+ * - Set to 'false' in development or untrusted environments
+ *
+ * DEPLOYMENT REQUIREMENTS:
+ * - Must be deployed behind a trusted proxy (Vercel, Cloudflare, AWS ALB, etc.)
+ * - Proxy must set x-forwarded-for with the real client IP
+ * - Do NOT expose this endpoint directly to the internet without a proxy
  *
  * @param forwardedFor - x-forwarded-for header value
  * @param realIp - x-real-ip header value
  * @returns Valid IP address or 'unknown-ip' constant
  */
 export function extractClientIp(forwardedFor: string | null, realIp: string | null): string {
+  // Check if we should trust proxy headers (default true for production)
+  const trustProxy = process.env.TRUST_PROXY !== 'false';
+
   // Try x-forwarded-for first (set by Vercel/trusted proxy)
-  if (forwardedFor) {
+  if (trustProxy && forwardedFor) {
     const firstIp = forwardedFor.split(',')[0]?.trim();
-    if (firstIp && isValidIp(firstIp)) {
+    if (firstIp && isValidIp(firstIp) && !isPrivateIp(firstIp)) {
       return firstIp;
+    } else if (firstIp && isPrivateIp(firstIp)) {
+      console.warn(`[SPAM] Rejected private IP from x-forwarded-for: ${firstIp.substring(0, 10)}...`);
     }
   }
 
-  // Fall back to x-real-ip
-  if (realIp && isValidIp(realIp)) {
+  // Fall back to x-real-ip (also requires trust)
+  if (trustProxy && realIp && isValidIp(realIp) && !isPrivateIp(realIp)) {
     return realIp;
   }
 
@@ -110,6 +157,9 @@ export class SpamProtectionManager {
    */
   private static readonly RATE_LIMITS = new Map<string, RateLimit>();
   private static readonly CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  private static readonly MAX_RATE_LIMIT_ENTRIES = 10000; // Safety valve to prevent unbounded growth
+  private static readonly EMERGENCY_CLEANUP_THRESHOLD = 0.9; // Trigger at 90% capacity
+  private static readonly MAX_MESSAGE_LENGTH_FOR_REGEX = 5000; // Prevent ReDoS attacks on very long messages
   private static cleanupTimer: NodeJS.Timeout | null = null;
   private static isSchedulerRunning = false;
 
@@ -168,6 +218,9 @@ export class SpamProtectionManager {
     let rateLimit = this.RATE_LIMITS.get(identifier);
 
     if (!rateLimit || now - rateLimit.windowStart > this.RATE_LIMIT_CONFIG.windowMs) {
+      // Check Map size before adding new entries (safety valve)
+      this.checkMapSize();
+
       // Reset or create new window
       rateLimit = {
         identifier,
@@ -201,8 +254,17 @@ export class SpamProtectionManager {
 
   /**
    * Scan message content for spam patterns
+   *
+   * SECURITY: Includes ReDoS protection by limiting message length for regex processing
    */
   static detectSpamPatterns(message: string): string[] {
+    // ReDoS Protection: Skip regex matching on excessively long messages
+    // Long messages are flagged by calculateSpamScore() separately
+    if (message.length > this.MAX_MESSAGE_LENGTH_FOR_REGEX) {
+      console.warn(`[SPAM] Message too long for regex matching (${message.length} chars), skipping pattern detection`);
+      return [];
+    }
+
     const detectedPatterns: string[] = [];
 
     for (const pattern of this.SPAM_PATTERNS) {
@@ -375,6 +437,50 @@ export class SpamProtectionManager {
     }
 
     return cleanedCount;
+  }
+
+  /**
+   * Emergency cleanup when approaching maximum entries
+   * Removes oldest entries to prevent unbounded Map growth
+   */
+  private static emergencyCleanup(): number {
+    const now = Date.now();
+    const entries = Array.from(this.RATE_LIMITS.entries());
+
+    // Sort by age (oldest first)
+    entries.sort((a, b) => a[1].windowStart - b[1].windowStart);
+
+    // Remove oldest 20% of entries
+    const removeCount = Math.ceil(entries.length * 0.2);
+    let removed = 0;
+
+    for (let i = 0; i < removeCount && i < entries.length; i++) {
+      const entry = entries[i];
+      if (entry) {
+        this.RATE_LIMITS.delete(entry[0]);
+        removed++;
+      }
+    }
+
+    console.warn(`[SPAM] Emergency cleanup triggered - removed ${removed} oldest rate limit entries`);
+    return removed;
+  }
+
+  /**
+   * Check if Map size is approaching limit and trigger cleanup if needed
+   */
+  private static checkMapSize(): void {
+    const currentSize = this.RATE_LIMITS.size;
+    const threshold = Math.floor(this.MAX_RATE_LIMIT_ENTRIES * this.EMERGENCY_CLEANUP_THRESHOLD);
+
+    if (currentSize >= this.MAX_RATE_LIMIT_ENTRIES) {
+      console.error(`[SPAM] CRITICAL: Rate limit Map at maximum capacity (${currentSize}/${this.MAX_RATE_LIMIT_ENTRIES})`);
+      this.emergencyCleanup();
+    } else if (currentSize >= threshold) {
+      console.warn(`[SPAM] WARNING: Rate limit Map approaching capacity (${currentSize}/${this.MAX_RATE_LIMIT_ENTRIES})`);
+      // Try regular cleanup first
+      this.cleanupExpiredRateLimits();
+    }
   }
 
   /**
