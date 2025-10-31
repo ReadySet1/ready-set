@@ -183,6 +183,40 @@ export const DEFAULT_API_RESILIENCE_CONFIG: ApiResilienceConfig = {
 // Circuit Breaker Implementation
 // ============================================================================
 
+/**
+ * Circuit Breaker Implementation
+ *
+ * ⚠️ SERVERLESS/MULTI-INSTANCE WARNING:
+ *
+ * This implementation uses in-memory state and is NOT distributed across instances.
+ *
+ * In serverless or multi-instance deployments (Vercel, AWS Lambda, etc.):
+ * - Each instance maintains separate, independent circuit breaker state
+ * - State does NOT synchronize between instances
+ * - State resets on cold starts
+ * - Circuit may open on one instance but remain closed on others
+ * - Metrics are per-instance, not system-wide
+ *
+ * This means:
+ * - The same API might be available on Instance A but blocked on Instance B
+ * - Total failure counts are distributed across instances
+ * - Circuit breakers may open at different times on different instances
+ * - Recovery (half-open → closed) happens independently per instance
+ *
+ * For distributed circuit breaking with shared state across instances,
+ * consider using:
+ * - Redis (with Redis-based circuit breaker library)
+ * - DynamoDB or other distributed state stores
+ * - External circuit breaker services (e.g., Resilience4j with distributed state)
+ *
+ * However, this per-instance approach has benefits:
+ * - No external dependencies or additional infrastructure
+ * - Zero latency for state checks
+ * - Natural load distribution (different instances may have different thresholds)
+ * - Automatic recovery on instance restart
+ *
+ * Part of REA-92, REA-93, REA-94: Circuit Breaker Improvements
+ */
 export class ApiCircuitBreaker {
   private state: CircuitBreakerState = {
     state: 'closed',
@@ -283,13 +317,29 @@ export class ApiCircuitBreaker {
 
   /**
    * Record a failed request
+   *
+   * ⚠️ NOTE ON CONCURRENCY:
+   * These state updates are NOT atomic. In serverless environments with multiple
+   * concurrent requests, there's potential for race conditions where:
+   * - Two failures happen simultaneously and both increment the counter
+   * - The final count may be inconsistent (e.g., 5 instead of 6)
+   *
+   * However, this is acceptable because:
+   * - Each instance maintains its own state (see class-level documentation)
+   * - The circuit breaker is designed to be "eventually correct"
+   * - Missing 1-2 failures won't significantly impact the protection mechanism
+   * - The threshold provides a buffer (e.g., 5 failures before opening)
+   *
+   * For applications requiring strict distributed consistency, consider:
+   * - Redis with atomic INCR operations
+   * - Distributed state management with optimistic locking
    */
   recordFailure(): void {
     if (!this.config.enableCircuitBreaker) {
       return;
     }
 
-    // Track metrics
+    // Track metrics (non-atomic operations)
     this.metrics.totalRequests++;
     this.metrics.totalFailures++;
 
