@@ -37,6 +37,14 @@ export interface RateLimit {
 export class UploadSecurityManager {
   private static readonly QUARANTINE_BUCKET = 'quarantined-files';
 
+  // File scanning configuration constants
+  /** Maximum file size that can be scanned (10MB) - files larger than this are rejected */
+  private static readonly MAX_SCAN_SIZE = 10 * 1024 * 1024;
+  /** Threshold for using streaming vs in-memory scanning (5MB) */
+  private static readonly STREAMING_THRESHOLD = 5 * 1024 * 1024;
+  /** Overlap size between chunks to catch patterns at boundaries (4KB - can detect patterns up to ~4KB) */
+  private static readonly STREAM_OVERLAP = 4096;
+
   /**
    * In-memory rate limit storage
    * NOTE: This is NOT shared across serverless instances and resets on cold starts
@@ -156,8 +164,19 @@ export class UploadSecurityManager {
   }
 
   /**
-   * Scan file in chunks for large files (5-10MB)
-   * Uses streaming approach to avoid loading entire file into memory
+   * Scans large files (5-10MB) in chunks to avoid memory issues
+   *
+   * @param file - The file to scan
+   * @param maliciousPatterns - Array of regex patterns to check for malicious content
+   * @returns Object containing detected threats and risk score
+   *
+   * @remarks
+   * - Chunk sizes are determined by the browser's stream implementation (not controlled by us)
+   * - Uses 4KB overlap between chunks to catch patterns at boundaries (can detect patterns up to ~4KB)
+   * - Streaming errors are treated as suspicious (safe default)
+   * - Maximum detectable pattern size: ~4KB (STREAM_OVERLAP constant)
+   *
+   * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream} for browser stream API details
    */
   private static async scanFileInChunks(
     file: File,
@@ -165,11 +184,13 @@ export class UploadSecurityManager {
   ): Promise<{ threats: string[]; score: number }> {
     const threats: string[] = [];
     let score = 0;
-    const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+
+    // Chunks are determined by the browser's stream implementation
+    // We process whatever chunk size the stream provides (typically varies based on browser/file size)
     const decoder = new TextDecoder('utf-8', { fatal: false });
 
-    // For pattern matching across chunk boundaries, keep last 1KB of previous chunk
-    const OVERLAP_SIZE = 1024;
+    // For pattern matching across chunk boundaries, keep overlap from previous chunk
+    // Increased to 4KB to catch larger patterns (e.g., embedded scripts, encoded payloads)
     let previousChunk = '';
 
     try {
@@ -197,9 +218,9 @@ export class UploadSecurityManager {
             }
           }
 
-          // Keep last OVERLAP_SIZE characters for next iteration
-          if (combinedContent.length > OVERLAP_SIZE) {
-            previousChunk = combinedContent.slice(-OVERLAP_SIZE);
+          // Keep last STREAM_OVERLAP characters for next iteration
+          if (combinedContent.length > this.STREAM_OVERLAP) {
+            previousChunk = combinedContent.slice(-this.STREAM_OVERLAP);
           } else {
             previousChunk = combinedContent;
           }
@@ -218,12 +239,8 @@ export class UploadSecurityManager {
     const threats: string[] = [];
     let score = 0;
 
-    // File size thresholds for scanning strategy
-    const MAX_SCAN_SIZE = 10 * 1024 * 1024; // 10MB - files larger than this are rejected
-    const STREAMING_THRESHOLD = 5 * 1024 * 1024; // 5MB - use streaming for files larger than this
-
     // Check file size first to prevent memory issues
-    if (file.size > MAX_SCAN_SIZE) {
+    if (file.size > this.MAX_SCAN_SIZE) {
       threats.push('File too large for full content scan');
       score += 30; // Medium threat level due to inability to fully scan
 
@@ -241,6 +258,7 @@ export class UploadSecurityManager {
     }
 
     // Define malicious patterns first (used by both scanning methods)
+    // Note: Using non-greedy quantifiers (.*?) to prevent ReDoS attacks
     const maliciousPatterns = [
       // Script injection attempts - improved to catch more variants
       /<script[\s\S]*?>/gi, // Opening script tag with any attributes/whitespace
@@ -254,11 +272,11 @@ export class UploadSecurityManager {
       /<object[\s\S]*?>/gi, // Object tags
       /<embed[\s\S]*?>/gi, // Embed tags
 
-      // File inclusion attacks
+      // File inclusion attacks (using non-greedy quantifiers to prevent ReDoS)
       /<\?php/gi,
       /<%/g,
-      /{{.*}}/g,
-      /<%.*%>/g,
+      /\{\{.*?\}\}/g, // Template syntax (non-greedy to prevent ReDoS)
+      /<%.*?%>/g, // ASP/JSP tags (non-greedy to prevent ReDoS)
 
       // SQL injection patterns
       /union\s+select/gi,
@@ -280,7 +298,7 @@ export class UploadSecurityManager {
 
     // Use streaming for large files (5-10MB), in-memory for smaller files
     let content = '';
-    if (file.size > STREAMING_THRESHOLD) {
+    if (file.size > this.STREAMING_THRESHOLD) {
       // Large file: use streaming approach to avoid memory issues
       const streamResult = await this.scanFileInChunks(file, maliciousPatterns);
       threats.push(...streamResult.threats);
@@ -300,6 +318,9 @@ export class UploadSecurityManager {
     }
 
     // File type specific checks (only for in-memory scans where we have content)
+    // LIMITATION: These checks only apply to files < 5MB (STREAMING_THRESHOLD)
+    // Larger files (5-10MB) only undergo pattern matching via streaming
+    // This is a performance trade-off to avoid loading large files into memory
     if (content && file.type.startsWith('text/')) {
       // Check for executable content in text files
       if (content.includes('#!/bin/') || content.includes('#!/usr/bin/')) {
