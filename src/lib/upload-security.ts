@@ -47,7 +47,39 @@ export class UploadSecurityManager {
   private static readonly MAX_SCAN_SIZE = 10 * 1024 * 1024;
   /** Threshold for using streaming vs in-memory scanning (5MB) */
   private static readonly STREAMING_THRESHOLD = 5 * 1024 * 1024;
-  /** Overlap size between chunks to catch patterns at boundaries (4KB - can detect patterns up to ~4KB) */
+  /**
+   * Overlap size between chunks to catch patterns at boundaries (4KB = 4096 bytes)
+   *
+   * RATIONALE FOR 4KB SIZE:
+   * 1. **Common Malicious Pattern Size**: Most malicious patterns (script tags, encoded payloads,
+   *    obfuscated JavaScript) are typically under 4KB. This includes:
+   *    - Base64-encoded scripts (~1-2KB typical)
+   *    - JavaScript event handlers (<1KB)
+   *    - Embedded iframe/object tags with payloads (~1-3KB)
+   *
+   * 2. **Performance Trade-off**: 4KB represents a balance between:
+   *    - Detection capability (can catch patterns split across chunk boundaries)
+   *    - Memory overhead (4KB per chunk boundary is acceptable)
+   *    - Processing time (minimal impact on scan performance)
+   *
+   * 3. **Browser Stream Chunk Sizes**: Typical browser stream chunks are 16-64KB,
+   *    so 4KB overlap represents 6-25% overhead, which is reasonable.
+   *
+   * LIMITATIONS:
+   * - Cannot detect malicious patterns larger than ~4KB that span chunk boundaries
+   * - If attackers split payloads across boundaries with >4KB separation, may not detect
+   * - For stricter security, consider increasing to 8KB or 16KB (with performance impact)
+   *
+   * THREAT MODEL:
+   * Based on OWASP Top 10 and common web attack vectors:
+   * - XSS payloads: Typically <2KB
+   * - SQL injection: Typically <1KB
+   * - File inclusion attacks: Typically <3KB
+   * - Polyglot files (valid image + script): Header + payload typically <4KB
+   *
+   * @see scanFileInChunks for usage
+   * @see https://owasp.org/www-community/attacks/ for common attack patterns
+   */
   private static readonly STREAM_OVERLAP = 4096;
 
   /**

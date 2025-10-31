@@ -1,6 +1,6 @@
 // src/lib/spam-protection.ts
 
-import { isIP } from 'net';
+import { isValidIp, isPrivateIp, extractClientIp as extractClientIpUtil } from '@/utils/ip-validation';
 
 /**
  * Spam Protection System for Contact Forms
@@ -65,90 +65,12 @@ export interface SpamCheckResult {
 }
 
 /**
- * Validate if a string is a valid IPv4 or IPv6 address
- * Uses Node.js built-in isIP function for reliable validation
+ * Re-export extractClientIp for backward compatibility.
+ * This function has been moved to @/utils/ip-validation for reusability.
+ *
+ * @deprecated Import directly from '@/utils/ip-validation' instead
  */
-function isValidIp(ip: string): boolean {
-  // Use Node.js built-in isIP function
-  // Returns 4 for IPv4, 6 for IPv6, 0 for invalid
-  return isIP(ip) !== 0;
-}
-
-/**
- * Check if IP is in private/reserved range
- * Private IPs should not be used for rate limiting from x-forwarded-for
- */
-function isPrivateIp(ip: string): boolean {
-  // IPv4 private ranges
-  const privateV4Ranges = [
-    /^10\./,                    // 10.0.0.0/8
-    /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // 172.16.0.0/12
-    /^192\.168\./,              // 192.168.0.0/16
-    /^127\./,                   // Loopback
-    /^169\.254\./,              // Link-local
-  ];
-
-  // IPv6 private/special ranges
-  const privateV6Ranges = [
-    /^::1$/,                    // Loopback
-    /^fe80:/,                   // Link-local
-    /^fc00:/,                   // Unique local
-    /^fd00:/,                   // Unique local
-  ];
-
-  for (const range of privateV4Ranges) {
-    if (range.test(ip)) return true;
-  }
-
-  for (const range of privateV6Ranges) {
-    if (range.test(ip)) return true;
-  }
-
-  return false;
-}
-
-/**
- * Extract and validate client IP from headers
- *
- * SECURITY NOTE: Only use this in environments where x-forwarded-for is set by
- * a trusted proxy (e.g., Vercel, Cloudflare). Do NOT use with user-facing proxies.
- *
- * Environment Variables:
- * - TRUST_PROXY: Set to 'true' to trust x-forwarded-for header (default: true for Vercel/production)
- * - Set to 'false' in development or untrusted environments
- *
- * DEPLOYMENT REQUIREMENTS:
- * - Must be deployed behind a trusted proxy (Vercel, Cloudflare, AWS ALB, etc.)
- * - Proxy must set x-forwarded-for with the real client IP
- * - Do NOT expose this endpoint directly to the internet without a proxy
- *
- * @param forwardedFor - x-forwarded-for header value
- * @param realIp - x-real-ip header value
- * @returns Valid IP address or 'unknown-ip' constant
- */
-export function extractClientIp(forwardedFor: string | null, realIp: string | null): string {
-  // Check if we should trust proxy headers (default true for production)
-  const trustProxy = process.env.TRUST_PROXY !== 'false';
-
-  // Try x-forwarded-for first (set by Vercel/trusted proxy)
-  if (trustProxy && forwardedFor) {
-    const firstIp = forwardedFor.split(',')[0]?.trim();
-    if (firstIp && isValidIp(firstIp) && !isPrivateIp(firstIp)) {
-      return firstIp;
-    } else if (firstIp && isPrivateIp(firstIp)) {
-      console.warn(`[SPAM] Rejected private IP from x-forwarded-for: ${firstIp.substring(0, 10)}...`);
-    }
-  }
-
-  // Fall back to x-real-ip (also requires trust)
-  if (trustProxy && realIp && isValidIp(realIp) && !isPrivateIp(realIp)) {
-    return realIp;
-  }
-
-  // No valid IP found - use constant identifier
-  // This prevents user-controlled values (like email) from being used for rate limiting
-  return 'unknown-ip';
-}
+export const extractClientIp = extractClientIpUtil;
 
 export class SpamProtectionManager {
   /**
@@ -212,6 +134,34 @@ export class SpamProtectionManager {
    *
    * IMPORTANT: Cleanup scheduler must be started manually via startCleanupScheduler()
    * to avoid memory leaks in serverless environments. Do NOT auto-initialize here.
+   *
+   * ⚠️ RACE CONDITION WARNING:
+   * This implementation uses NON-ATOMIC operations (rateLimit.count++).
+   * In high-concurrency scenarios, multiple simultaneous requests can bypass rate limits.
+   *
+   * Example race condition scenario:
+   * 1. Request A reads count=4 (under limit of 5)
+   * 2. Request B reads count=4 (under limit of 5)
+   * 3. Request A increments to 5 and is allowed
+   * 4. Request B increments to 6 and is allowed (SHOULD HAVE BEEN BLOCKED)
+   *
+   * This is acceptable for:
+   * - Basic spam protection (small variance is tolerable)
+   * - Low-traffic applications
+   * - Development environments
+   *
+   * For production with strict rate limiting, use Redis with atomic operations:
+   * ```typescript
+   * // Redis example with atomic INCR
+   * const count = await redis.incr(`rate-limit:${identifier}`);
+   * await redis.expire(`rate-limit:${identifier}`, windowSizeInSeconds);
+   * if (count > maxAttempts) {
+   *   return false; // Rate limit exceeded
+   * }
+   * ```
+   *
+   * WARNING THRESHOLD: Consider logging when approaching limit (e.g., at 80% capacity)
+   * to help detect aggressive attempts before the limit is actually exceeded.
    */
   static checkRateLimit(identifier: string): boolean {
     const now = Date.now();
@@ -219,7 +169,12 @@ export class SpamProtectionManager {
 
     if (!rateLimit || now - rateLimit.windowStart > this.RATE_LIMIT_CONFIG.windowMs) {
       // Check Map size before adding new entries (safety valve)
-      this.checkMapSize();
+      // If at maximum capacity, reject the request
+      const canAddEntry = this.checkMapSize();
+      if (!canAddEntry) {
+        console.error(`[SPAM] Cannot add new rate limit entry for ${identifier} - Map at maximum capacity`);
+        return false; // Treat as rate limit exceeded
+      }
 
       // Reset or create new window
       rateLimit = {
@@ -231,11 +186,18 @@ export class SpamProtectionManager {
       this.RATE_LIMITS.set(identifier, rateLimit);
     }
 
+    // NON-ATOMIC increment (see race condition warning in JSDoc above)
     rateLimit.count++;
+
+    // Log warning when approaching limit (helps detect aggressive attempts)
+    const utilizationPercent = (rateLimit.count / this.RATE_LIMIT_CONFIG.maxAttempts) * 100;
+    if (utilizationPercent >= 80 && utilizationPercent < 100) {
+      console.warn(`[SPAM] Rate limit at ${utilizationPercent.toFixed(0)}% for identifier ${identifier} (${rateLimit.count}/${this.RATE_LIMIT_CONFIG.maxAttempts})`);
+    }
 
     // Check if limit exceeded
     if (rateLimit.count > this.RATE_LIMIT_CONFIG.maxAttempts) {
-      console.warn(`[SPAM] Rate limit exceeded for identifier ${identifier}`);
+      console.warn(`[SPAM] Rate limit exceeded for identifier ${identifier} (${rateLimit.count}/${this.RATE_LIMIT_CONFIG.maxAttempts})`);
       return false;
     }
 
@@ -467,20 +429,37 @@ export class SpamProtectionManager {
   }
 
   /**
-   * Check if Map size is approaching limit and trigger cleanup if needed
+   * Check if Map size is approaching limit and trigger cleanup if needed.
+   * Returns false if the Map is at maximum capacity and cannot accept new entries.
+   *
+   * @returns true if new entries can be added, false if at maximum capacity
    */
-  private static checkMapSize(): void {
+  private static checkMapSize(): boolean {
     const currentSize = this.RATE_LIMITS.size;
     const threshold = Math.floor(this.MAX_RATE_LIMIT_ENTRIES * this.EMERGENCY_CLEANUP_THRESHOLD);
 
     if (currentSize >= this.MAX_RATE_LIMIT_ENTRIES) {
       console.error(`[SPAM] CRITICAL: Rate limit Map at maximum capacity (${currentSize}/${this.MAX_RATE_LIMIT_ENTRIES})`);
-      this.emergencyCleanup();
+
+      // Attempt emergency cleanup to free space
+      const removed = this.emergencyCleanup();
+
+      // Check if we freed enough space after cleanup
+      if (this.RATE_LIMITS.size >= this.MAX_RATE_LIMIT_ENTRIES) {
+        console.error(`[SPAM] CRITICAL: Emergency cleanup failed to free sufficient space. Rejecting new entries.`);
+        return false; // Prevent new entries
+      }
+
+      console.warn(`[SPAM] Emergency cleanup freed ${removed} entries. Allowing new entries.`);
+      return true;
     } else if (currentSize >= threshold) {
       console.warn(`[SPAM] WARNING: Rate limit Map approaching capacity (${currentSize}/${this.MAX_RATE_LIMIT_ENTRIES})`);
       // Try regular cleanup first
       this.cleanupExpiredRateLimits();
+      return true; // Still have space, allow new entries
     }
+
+    return true; // Below threshold, allow new entries
   }
 
   /**
@@ -488,8 +467,18 @@ export class SpamProtectionManager {
    *
    * IMPORTANT: In serverless environments, this must be called carefully:
    * - Call once during module initialization, not per request
-   * - The timer will be cleared automatically on process exit
    * - Multiple calls are safe due to singleton guard
+   *
+   * SERVERLESS/VERCEL LIMITATIONS:
+   * - Process event handlers (beforeExit, SIGTERM) do NOT work reliably in serverless
+   * - Cleanup happens automatically on cold starts when the instance is recreated
+   * - Memory is released when the function instance terminates
+   * - This is acceptable behavior for serverless deployments
+   *
+   * For production serverless deployments:
+   * - Consider using Redis with TTL for distributed rate limiting
+   * - Or use a scheduled cleanup job (e.g., Vercel Cron) for database-backed state
+   * - Current in-memory approach is suitable for low-traffic or development
    */
   static startCleanupScheduler() {
     // Don't start timers in test environment
@@ -515,24 +504,6 @@ export class SpamProtectionManager {
     this.cleanupTimer = setInterval(() => {
       this.cleanupExpiredRateLimits();
     }, this.CLEANUP_INTERVAL);
-
-    // Cleanup on process exit (graceful shutdown)
-    process.on('beforeExit', () => {
-      if (this.cleanupTimer) {
-        clearInterval(this.cleanupTimer);
-        this.cleanupTimer = null;
-        this.isSchedulerRunning = false;
-      }
-    });
-
-    // Also cleanup on SIGTERM (common in serverless/container environments)
-    process.on('SIGTERM', () => {
-      if (this.cleanupTimer) {
-        clearInterval(this.cleanupTimer);
-        this.cleanupTimer = null;
-        this.isSchedulerRunning = false;
-      }
-    });
 
     console.log('[SPAM] Cleanup scheduler started');
   }

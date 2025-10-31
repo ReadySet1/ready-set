@@ -23,6 +23,21 @@ interface AppMetadata {
 }
 
 /**
+ * Roles that have access to circuit breaker monitoring endpoints.
+ * These roles can view circuit breaker states and metrics.
+ *
+ * NOTE: Ensure these roles exist in your database schema and are properly configured
+ * in the application's role management system.
+ */
+const MONITORING_VIEWER_ROLES = ['ADMIN', 'SUPER_ADMIN', 'SUPPORT'] as const;
+
+/**
+ * Roles that can reset circuit breakers (more restrictive than viewing).
+ * These roles have elevated privileges to manually intervene in circuit breaker states.
+ */
+const MONITORING_ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN'] as const;
+
+/**
  * GET /api/monitoring/circuit-breakers
  *
  * Returns comprehensive monitoring data for all circuit breakers in the system.
@@ -69,7 +84,7 @@ export async function GET(request: NextRequest) {
 
     // Authorization: Verify elevated privileges
     const userRole = (user.app_metadata as AppMetadata)?.role;
-    const canView = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'SUPPORT';
+    const canView = userRole && MONITORING_VIEWER_ROLES.includes(userRole as any);
 
     if (!canView) {
       apiResilienceLogger.warn('[Circuit Breaker Monitoring] Forbidden monitoring access attempt', {
@@ -169,7 +184,7 @@ export async function POST(request: NextRequest) {
 
     // Authorization: Verify admin role
     const userRole = (user.app_metadata as AppMetadata)?.role;
-    const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+    const isAdmin = userRole && MONITORING_ADMIN_ROLES.includes(userRole as any);
 
     if (!isAdmin) {
       apiResilienceLogger.warn('[Circuit Breaker Monitoring] Forbidden reset attempt', {

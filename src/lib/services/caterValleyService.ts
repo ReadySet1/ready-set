@@ -1,6 +1,6 @@
 // src/lib/services/caterValleyService.ts
 
-import { withCaterValleyResilience } from '@/utils/api-resilience';
+import { withCaterValleyResilience, CircuitBreakerOpenError } from '@/utils/api-resilience';
 
 // Define allowed status values based on the CaterValley documentation
 const CATER_VALLEY_ALLOWED_STATUSES = [
@@ -170,12 +170,30 @@ export async function updateCaterValleyOrderStatus(
     };
 
   } catch (error) {
+    // Handle circuit breaker open error specially
+    if (error instanceof CircuitBreakerOpenError) {
+      console.warn(
+        `[CaterValley Service] Circuit breaker open for order ${orderNumber}:`,
+        {
+          retryAfter: error.retryAfter,
+          estimatedWaitMs: error.estimatedWaitMs,
+        }
+      );
+
+      return {
+        success: false,
+        orderFound: false, // Can't determine if order exists due to circuit breaker
+        error: error.message,
+        statusCode: 503, // Service Unavailable
+      };
+    }
+
     console.error(`[CaterValley Service] Error calling API for order ${orderNumber}:`, error);
-    
-    const errorMessage = error instanceof Error 
+
+    const errorMessage = error instanceof Error
       ? `Network/API error: ${error.message}`
       : 'An unknown error occurred while updating status.';
-    
+
     return {
       success: false,
       orderFound: false, // Can't determine if order exists due to network error

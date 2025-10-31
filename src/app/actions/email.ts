@@ -93,7 +93,18 @@ const sendEmail = async (data: FormInputs) => {
   if (data.recaptchaToken) {
     // Use configurable threshold (default 0.5 per Google's recommendation)
     // 0.0 = Very likely a bot, 0.5 = Neutral, 1.0 = Very likely a human
-    const threshold = parseFloat(process.env.RECAPTCHA_MIN_SCORE || '0.5');
+    // Validate that the threshold is between 0.0 and 1.0
+    const rawThreshold = parseFloat(process.env.RECAPTCHA_MIN_SCORE || '0.5');
+    const threshold = Math.max(0, Math.min(1, isNaN(rawThreshold) ? 0.5 : rawThreshold));
+
+    // Log warning if invalid value was configured
+    if (isNaN(rawThreshold) || rawThreshold < 0 || rawThreshold > 1) {
+      console.warn(
+        `[SECURITY] Invalid RECAPTCHA_MIN_SCORE configured: "${process.env.RECAPTCHA_MIN_SCORE}". ` +
+        `Using safe default of ${threshold}. Valid range is 0.0 to 1.0.`
+      );
+    }
+
     const recaptchaResult = await verifyRecaptchaToken(data.recaptchaToken, threshold);
 
     if (!recaptchaResult.success) {
