@@ -250,6 +250,93 @@ E2E tests in CI require the following GitHub secrets. To set them up:
 - Rotate test credentials periodically
 - Use a completely separate Supabase project for testing
 
+## Security
+
+### Authentication Files (.auth Directory)
+
+The `e2e/.auth/` directory contains sensitive session authentication files that are automatically generated during E2E test setup. **These files must NEVER be committed to version control.**
+
+#### What's in .auth files?
+
+- Session tokens and cookies from authenticated test users
+- Supabase authentication state including access tokens and refresh tokens
+- Browser storage state (localStorage, sessionStorage)
+
+#### Security Threat Model
+
+If `.auth` files are exposed (through commits, CI artifacts, or logs):
+- Attackers could gain unauthorized access to your test environment
+- Session tokens could be used to impersonate test users
+- Test data could be compromised or manipulated
+
+#### Protection Measures
+
+**✅ Already Protected:**
+- ✓ `.auth` directory is in `.gitignore` (line 14)
+- ✓ CI workflows do NOT cache `.auth` files
+- ✓ CI artifacts exclude `.auth` files (only coverage, playwright-report, test-results)
+
+**⚠️ Important Rules:**
+1. **Never commit .auth files** - They contain active session tokens
+2. **Never include .auth in artifacts** - Check CI artifact configurations
+3. **Regenerate regularly** - Delete `.auth` directory when test credentials change
+4. **Local only** - These files should only exist on local machines during test runs
+
+#### Rotation Policy
+
+Regenerate `.auth` files when:
+- Test user credentials are changed
+- Suspicious activity is detected in test environment
+- After sharing test environment access with new team members
+- As part of regular security maintenance (monthly recommended)
+
+**To regenerate:**
+```bash
+# Delete existing auth files
+rm -rf e2e/.auth
+
+# Re-run authentication setup
+pnpm playwright test --project=setup
+
+# Or run full test suite (includes setup)
+pnpm test:e2e
+```
+
+#### CI/CD Protection
+
+The CI workflow includes safeguards to prevent `.auth` file exposure:
+
+1. **No Caching**: CI does not cache the `.auth` directory
+2. **Artifact Exclusion**: Upload artifacts only include:
+   - `playwright-report/` (test results)
+   - `test-results/` (screenshots, traces)
+   - `coverage/` (code coverage)
+3. **Gitignore Verification**: Security checks verify `.auth` is in `.gitignore`
+
+#### What to Do if .auth Files Are Exposed
+
+If `.auth` files are accidentally committed or exposed:
+
+1. **Immediate Actions:**
+   - Remove the files from git history using `git filter-branch` or BFG Repo-Cleaner
+   - Rotate ALL test user credentials immediately
+   - Regenerate all `.auth` files with new credentials
+   - Review test environment logs for suspicious activity
+
+2. **Preventive Actions:**
+   - Add pre-commit hooks to block `.auth` files
+   - Conduct team training on `.auth` security
+   - Set up monitoring alerts for `.auth` in pull requests
+
+3. **Verification:**
+   ```bash
+   # Check if .auth is properly ignored
+   git check-ignore e2e/.auth
+
+   # Search git history for .auth files (should return nothing)
+   git log --all --full-history -- "e2e/.auth/*"
+   ```
+
 ## Troubleshooting
 
 ### Authentication Issues

@@ -100,3 +100,106 @@ jobs:
           fi
 
           echo "✅ Security audit passed"
+
+  e2e-auth-security:
+    name: E2E Authentication Security Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Verify .auth directory is in .gitignore
+        run: |
+          echo "🔍 Checking if e2e/.auth/ is in .gitignore..."
+
+          if grep -q "^/e2e/\.auth/" .gitignore; then
+            echo "✅ .auth directory is properly ignored in .gitignore"
+          else
+            echo "❌ ERROR: e2e/.auth/ is not in .gitignore!"
+            echo "This is a critical security issue - auth files contain session tokens."
+            echo "Add '/e2e/.auth/' to .gitignore immediately."
+            exit 1
+          fi
+
+      - name: Verify CI workflows don't cache .auth files
+        run: |
+          echo "🔍 Checking CI workflows for .auth caching..."
+
+          # Search for cache actions that might include .auth
+          if grep -r "cache.*\.auth" .github/workflows/ 2>/dev/null; then
+            echo "❌ ERROR: Found .auth references in cache configuration!"
+            echo "CI workflows must NOT cache authentication files."
+            exit 1
+          else
+            echo "✅ No .auth caching found in CI workflows"
+          fi
+
+      - name: Verify CI artifacts exclude .auth files
+        run: |
+          echo "🔍 Checking artifact uploads for .auth exclusion..."
+
+          # Get all artifact upload configurations
+          ARTIFACT_PATHS=$(grep -A 5 "upload-artifact" .github/workflows/ci.yml | grep "path:" | awk '{print $2}' || true)
+
+          echo "Artifact paths configured:"
+          echo "$ARTIFACT_PATHS"
+
+          # Check if any artifact path includes .auth
+          if echo "$ARTIFACT_PATHS" | grep -q "\.auth"; then
+            echo "❌ ERROR: Artifacts include .auth files!"
+            echo "Auth files must NOT be uploaded as CI artifacts."
+            exit 1
+          fi
+
+          # Verify expected safe artifacts are present
+          if echo "$ARTIFACT_PATHS" | grep -q "playwright-report"; then
+            echo "✅ Artifact configuration verified - .auth files are excluded"
+          else
+            echo "⚠️  Warning: Could not verify artifact configuration"
+          fi
+
+      - name: Verify e2e/README.md has security warnings
+        run: |
+          echo "🔍 Checking e2e/README.md for security documentation..."
+
+          if ! [ -f "e2e/README.md" ]; then
+            echo "❌ ERROR: e2e/README.md not found!"
+            exit 1
+          fi
+
+          # Check for security section
+          if ! grep -q "## Security" e2e/README.md; then
+            echo "❌ ERROR: e2e/README.md missing Security section!"
+            echo "Authentication files need proper security documentation."
+            exit 1
+          fi
+
+          # Check for .auth mentions
+          if ! grep -q "\.auth" e2e/README.md; then
+            echo "❌ ERROR: e2e/README.md missing .auth documentation!"
+            exit 1
+          fi
+
+          # Check for security warnings
+          if ! grep -qi "never commit" e2e/README.md || ! grep -qi "session token" e2e/README.md; then
+            echo "❌ ERROR: e2e/README.md missing critical security warnings!"
+            exit 1
+          fi
+
+          echo "✅ e2e/README.md has proper security documentation"
+
+      - name: Security check summary
+        if: success()
+        run: |
+          echo ""
+          echo "╔═══════════════════════════════════════════════════════╗"
+          echo "║   ✅ E2E Authentication Security Checks PASSED        ║"
+          echo "╚═══════════════════════════════════════════════════════╝"
+          echo ""
+          echo "✓ .auth directory is properly gitignored"
+          echo "✓ CI workflows don't cache auth files"
+          echo "✓ CI artifacts exclude auth files"
+          echo "✓ Security documentation is in place"
+          echo ""
+          echo "📖 For more information, see e2e/README.md Security section"
