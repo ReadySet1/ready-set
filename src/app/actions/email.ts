@@ -5,6 +5,9 @@ import { Resend } from "resend";
 import * as cheerio from "cheerio";
 import { sendOrderConfirmationToCustomer } from "@/services/email-notification";
 import { prisma } from "@/utils/prismaDB";
+import { SpamProtectionManager } from "@/lib/spam-protection";
+import { verifyRecaptchaToken } from "@/lib/recaptcha";
+import { headers } from "next/headers";
 
 interface FormInputs {
   name: string;
@@ -12,6 +15,8 @@ interface FormInputs {
   phone?: string;
   message: string;
   subject?: string;
+  honeypot?: string; // Hidden field for bot detection
+  recaptchaToken?: string; // reCAPTCHA token
 }
 
 // Lazy initialization to avoid build-time errors when API key is not set
@@ -24,8 +29,52 @@ const getResendClient = () => {
 };
 
 const sendEmail = async (data: FormInputs) => {
+  // Basic validation
   if (data.message.length > 1000) {
     throw new Error("Message cannot exceed 1000 characters.");
+  }
+
+  // Get client IP for rate limiting (fallback to email if IP not available)
+  const headersList = await headers();
+  const forwardedFor = headersList.get('x-forwarded-for');
+  const realIp = headersList.get('x-real-ip');
+  const clientIp = (forwardedFor ? forwardedFor.split(',')[0].trim() : null) || realIp || data.email;
+
+  // Spam protection check
+  const spamCheck = await SpamProtectionManager.checkForSpam({
+    email: data.email,
+    message: data.message,
+    name: data.name,
+    phone: data.phone,
+    honeypot: data.honeypot,
+    identifier: clientIp, // Use IP for rate limiting
+  });
+
+  if (spamCheck.isSpam) {
+    console.warn(`[SPAM BLOCKED] ${data.email} - ${spamCheck.reason} (score: ${spamCheck.score})`);
+
+    // Return generic error to avoid giving spammers feedback
+    throw new Error("Unable to send message. Please try again later or contact us directly.");
+  }
+
+  // Log spam score for monitoring (even if not spam)
+  if (spamCheck.score > 0) {
+    console.log(`[SPAM CHECK] ${data.email} - Score: ${spamCheck.score} - Allowed`);
+  }
+
+  // Verify reCAPTCHA token (if provided)
+  if (data.recaptchaToken) {
+    const recaptchaResult = await verifyRecaptchaToken(data.recaptchaToken, 0.5);
+
+    if (!recaptchaResult.success) {
+      console.warn(`[reCAPTCHA BLOCKED] ${data.email} - ${recaptchaResult.message} (score: ${recaptchaResult.score})`);
+
+      // Return generic error to avoid giving bots feedback
+      throw new Error("Unable to verify submission. Please try again.");
+    }
+
+    // Log reCAPTCHA score for monitoring
+    console.log(`[reCAPTCHA] ${data.email} - Score: ${recaptchaResult.score.toFixed(2)} - Verified`);
   }
 
   // Validate recipient address
