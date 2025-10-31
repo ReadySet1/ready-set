@@ -5,7 +5,7 @@ import { Resend } from "resend";
 import * as cheerio from "cheerio";
 import { sendOrderConfirmationToCustomer } from "@/services/email-notification";
 import { prisma } from "@/utils/prismaDB";
-import { SpamProtectionManager } from "@/lib/spam-protection";
+import { SpamProtectionManager, extractClientIp } from "@/lib/spam-protection";
 import { verifyRecaptchaToken } from "@/lib/recaptcha";
 import { headers } from "next/headers";
 
@@ -28,17 +28,34 @@ const getResendClient = () => {
   return new Resend(process.env.RESEND_API_KEY);
 };
 
+/**
+ * Sanitize email address for logging
+ * Masks the username part to prevent information disclosure in logs
+ */
+function sanitizeEmailForLogging(email: string): string {
+  const [username, domain] = email.split('@');
+  if (!username || !domain) return '[invalid-email]';
+
+  // Show first and last character of username, mask the rest
+  const sanitized = username.length > 2
+    ? `${username[0]}${'*'.repeat(username.length - 2)}${username[username.length - 1]}`
+    : '*'.repeat(username.length);
+
+  return `${sanitized}@${domain}`;
+}
+
 const sendEmail = async (data: FormInputs) => {
   // Basic validation
   if (data.message.length > 1000) {
     throw new Error("Message cannot exceed 1000 characters.");
   }
 
-  // Get client IP for rate limiting (fallback to email if IP not available)
+  // Get client IP for rate limiting
+  // SECURITY: Only trust x-forwarded-for from Vercel's trusted proxy
   const headersList = await headers();
   const forwardedFor = headersList.get('x-forwarded-for');
   const realIp = headersList.get('x-real-ip');
-  const clientIp = (forwardedFor ? forwardedFor.split(',')[0].trim() : null) || realIp || data.email;
+  const clientIp = extractClientIp(forwardedFor, realIp);
 
   // Spam protection check
   const spamCheck = await SpamProtectionManager.checkForSpam({
@@ -51,30 +68,52 @@ const sendEmail = async (data: FormInputs) => {
   });
 
   if (spamCheck.isSpam) {
-    console.warn(`[SPAM BLOCKED] ${data.email} - ${spamCheck.reason} (score: ${spamCheck.score})`);
+    // Sanitize email in logs to prevent information disclosure
+    const sanitizedEmail = process.env.NODE_ENV === 'development'
+      ? data.email
+      : sanitizeEmailForLogging(data.email);
+
+    // Log minimal information in production, detailed in development
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[SPAM BLOCKED] ${sanitizedEmail} - ${spamCheck.reason} (score: ${spamCheck.score})`);
+    } else {
+      console.warn(`[SPAM BLOCKED] IP: ${clientIp.substring(0, 10)}... Score: ${spamCheck.score}`);
+    }
 
     // Return generic error to avoid giving spammers feedback
     throw new Error("Unable to send message. Please try again later or contact us directly.");
   }
 
   // Log spam score for monitoring (even if not spam)
-  if (spamCheck.score > 0) {
+  if (spamCheck.score > 0 && process.env.NODE_ENV === 'development') {
     console.log(`[SPAM CHECK] ${data.email} - Score: ${spamCheck.score} - Allowed`);
   }
 
   // Verify reCAPTCHA token (if provided)
   if (data.recaptchaToken) {
-    const recaptchaResult = await verifyRecaptchaToken(data.recaptchaToken, 0.5);
+    const recaptchaResult = await verifyRecaptchaToken(data.recaptchaToken, 0.7);
 
     if (!recaptchaResult.success) {
-      console.warn(`[reCAPTCHA BLOCKED] ${data.email} - ${recaptchaResult.message} (score: ${recaptchaResult.score})`);
+      // Sanitize email in logs
+      const sanitizedEmail = process.env.NODE_ENV === 'development'
+        ? data.email
+        : sanitizeEmailForLogging(data.email);
+
+      // Log minimal information in production
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[reCAPTCHA BLOCKED] ${sanitizedEmail} - ${recaptchaResult.message} (score: ${recaptchaResult.score})`);
+      } else {
+        console.warn(`[reCAPTCHA BLOCKED] IP: ${clientIp.substring(0, 10)}... Score: ${recaptchaResult.score}`);
+      }
 
       // Return generic error to avoid giving bots feedback
       throw new Error("Unable to verify submission. Please try again.");
     }
 
-    // Log reCAPTCHA score for monitoring
-    console.log(`[reCAPTCHA] ${data.email} - Score: ${recaptchaResult.score.toFixed(2)} - Verified`);
+    // Log reCAPTCHA score for monitoring (development only)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[reCAPTCHA] ${data.email} - Score: ${recaptchaResult.score.toFixed(2)} - Verified`);
+    }
   }
 
   // Validate recipient address
