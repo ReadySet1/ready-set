@@ -132,9 +132,11 @@ function applyServerFilters(event: ErrorEvent): boolean {
   // Downgrade Prisma errors to warnings instead of filtering them out
   // This captures them without triggering error alerts
   if (errorValue.includes('P2002') || errorValue.includes('P2025')) {
-    // Check if the error context indicates it was handled
-    const handledContext = event.contexts?.['metadata'] as Record<string, unknown> | undefined;
-    const isHandled = handledContext?.handled === true;
+    // Check if the error was marked as handled via tags
+    const isHandled =
+      event.tags?.handled === 'true' ||
+      event.tags?.handled === true ||
+      (event.contexts?.['metadata'] as Record<string, unknown> | undefined)?.handled === true;
 
     if (isHandled) {
       // Downgrade to warning level for handled errors

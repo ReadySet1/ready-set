@@ -27,6 +27,9 @@ if (!dsn) {
     // Environment name
     environment: process.env.NODE_ENV,
 
+    // Release tracking for better error grouping and deploy tracking
+    release: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA,
+
     // Adjust this value in production, or use tracesSampler for greater control
     // Configurable via SENTRY_TRACES_SAMPLE_RATE environment variable
     // Default: 0.1 (10%) in production, 1.0 (100%) in development
