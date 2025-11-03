@@ -168,28 +168,33 @@ export function captureMessage(
 }
 
 /**
- * Start a performance transaction
+ * Start a performance span
  * Use this to track performance of specific operations
  *
  * @param name - Name of the operation
  * @param op - Operation type (e.g., 'http.server', 'db.query')
- * @returns Transaction object (call .finish() when done)
+ * @param callback - Async function to execute within the span
+ * @returns Result of the callback function
  *
  * @example
  * ```ts
- * const transaction = startTransaction('calculate_mileage', 'db.query');
- * try {
- *   await calculateMileage(shiftId);
- * } finally {
- *   transaction?.finish();
- * }
+ * const result = await startSpan('calculate_mileage', 'db.query', async () => {
+ *   return await calculateMileage(shiftId);
+ * });
  * ```
  */
-export function startTransaction(name: string, op: string) {
-  return Sentry.startTransaction({
-    name,
-    op,
-  });
+export async function startSpan<T>(
+  name: string,
+  op: string,
+  callback: () => Promise<T>
+): Promise<T> {
+  return await Sentry.startSpan(
+    {
+      name,
+      op,
+    },
+    callback
+  );
 }
 
 /**
