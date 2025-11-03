@@ -107,6 +107,34 @@ This project implements comprehensive security measures:
 - **Comprehensive test coverage** for XSS attack vectors
 - Protection against script injection, event handlers, and malicious URLs
 
+## 🔍 Error Monitoring (Sentry)
+
+Ready Set uses Sentry for comprehensive error tracking and monitoring across the entire application:
+
+### Features
+- **Real-time Error Tracking** - Automatic capture of client, server, and edge runtime errors
+- **Source Maps** - Readable stack traces with full source code context
+- **User Context** - User information attached to every error for easier debugging
+- **Breadcrumbs** - Trail of user actions leading up to errors
+- **Performance Monitoring** - Track slow API calls and database queries
+- **Session Replay** - Visual playback of user sessions where errors occurred
+- **Alert Integration** - Slack/email alerts for critical errors
+
+### Setup & Configuration
+- **Setup Guide:** [`docs/sentry-setup-guide.md`](docs/sentry-setup-guide.md) - Complete setup instructions
+- **Utilities:** `src/lib/monitoring/sentry.ts` - Helper functions for error tracking
+- **Test Endpoints:** `/test-sentry` (client) and `/api/test-sentry` (server) - Development testing only
+
+### Environment Variables
+```bash
+NEXT_PUBLIC_SENTRY_DSN=your_sentry_dsn        # Public DSN for error reporting
+SENTRY_AUTH_TOKEN=your_auth_token             # Build-time token for source maps
+SENTRY_ORG=your-org-slug                       # Sentry organization
+SENTRY_PROJECT=your-project-name               # Sentry project name
+```
+
+See [Sentry Setup Guide](docs/sentry-setup-guide.md) for detailed configuration instructions.
+
 ## 🕐 Automated Maintenance (Vercel Cron)
 
 This project uses Vercel Cron Jobs for scheduled maintenance tasks:

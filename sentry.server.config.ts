@@ -27,11 +27,6 @@ Sentry.init({
 
   // Filter server-side errors
   beforeSend(event, hint) {
-    // Log server errors for debugging
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Sentry Server Error:', event);
-    }
-
     // Ignore specific Prisma errors that are handled
     if (
       event.exception?.values?.[0]?.value?.includes('P2002') || // Unique constraint
