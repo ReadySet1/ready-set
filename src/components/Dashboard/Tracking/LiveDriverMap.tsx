@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
+import { DRIVER_STATUS_COLORS, BATTERY_STATUS_COLORS, DELIVERY_MARKER_COLOR } from '@/constants/tracking-colors';
+import { MAP_CONFIG, MARKER_CONFIG } from '@/constants/tracking-config';
 
 // Ensure Mapbox token is available
 if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
@@ -64,6 +66,8 @@ export default function LiveDriverMap({
   const [mapStyle, setMapStyle] = useState<MapStyle>('streets');
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [shouldAutoFit, setShouldAutoFit] = useState(true);
 
   // Initialize map
   useEffect(() => {
@@ -83,8 +87,8 @@ export default function LiveDriverMap({
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
         style: 'mapbox://styles/mapbox/streets-v12',
-        center: [-118.2437, 34.0522], // Los Angeles
-        zoom: compact ? 10 : 12,
+        center: MAP_CONFIG.DEFAULT_CENTER,
+        zoom: compact ? MAP_CONFIG.COMPACT_ZOOM : MAP_CONFIG.DEFAULT_ZOOM,
         attributionControl: true,
       });
 
@@ -96,6 +100,11 @@ export default function LiveDriverMap({
         maxWidth: 100,
         unit: 'imperial'
       }), 'bottom-left');
+
+      // Track user interactions (drag, zoom, rotate) to disable auto-fit
+      map.on('dragstart', () => setHasUserInteracted(true));
+      map.on('zoomstart', () => setHasUserInteracted(true));
+      map.on('rotatestart', () => setHasUserInteracted(true));
 
       map.on('load', () => {
         setMapLoaded(true);
@@ -109,6 +118,12 @@ export default function LiveDriverMap({
       mapRef.current = map;
 
       return () => {
+        // Clean up markers before removing map to prevent memory leaks
+        markersRef.current.forEach(marker => marker.remove());
+        deliveryMarkersRef.current.forEach(marker => marker.remove());
+        markersRef.current.clear();
+        deliveryMarkersRef.current.clear();
+
         map.remove();
         mapRef.current = null;
       };
@@ -133,15 +148,15 @@ export default function LiveDriverMap({
 
   // Get driver color based on status
   const getDriverColor = (driver: TrackedDriver): string => {
-    if (!driver.isOnDuty) return '#94a3b8'; // gray-400
+    if (!driver.isOnDuty) return DRIVER_STATUS_COLORS.offDuty;
 
     const recentLocation = recentLocations.find(loc => loc.driverId === driver.id);
     if (recentLocation) {
-      if (recentLocation.isMoving) return '#22c55e'; // green-500
-      if (recentLocation.activityType === 'stationary') return '#eab308'; // yellow-500
+      if (recentLocation.isMoving) return DRIVER_STATUS_COLORS.moving;
+      if (recentLocation.activityType === 'stationary') return DRIVER_STATUS_COLORS.stationary;
     }
 
-    return '#3b82f6'; // blue-500
+    return DRIVER_STATUS_COLORS.onDuty;
   };
 
   // Get battery status
@@ -167,11 +182,17 @@ export default function LiveDriverMap({
     const color = getDriverColor(driver);
     const battery = getBatteryStatus(driver.id);
 
+    const batteryColor = battery.status === 'good'
+      ? BATTERY_STATUS_COLORS.good
+      : battery.status === 'low'
+      ? BATTERY_STATUS_COLORS.low
+      : BATTERY_STATUS_COLORS.critical;
+
     el.innerHTML = `
-      <div style="position: relative; width: 32px; height: 32px;">
+      <div style="position: relative; width: ${MARKER_CONFIG.DRIVER_MARKER_SIZE}px; height: ${MARKER_CONFIG.DRIVER_MARKER_SIZE}px;">
         <div style="
-          width: 32px;
-          height: 32px;
+          width: ${MARKER_CONFIG.DRIVER_MARKER_SIZE}px;
+          height: ${MARKER_CONFIG.DRIVER_MARKER_SIZE}px;
           background-color: ${color};
           border-radius: 50%;
           border: 2px solid white;
@@ -191,7 +212,7 @@ export default function LiveDriverMap({
             right: -4px;
             width: 12px;
             height: 12px;
-            background-color: ${battery.status === 'good' ? '#22c55e' : battery.status === 'low' ? '#eab308' : '#ef4444'};
+            background-color: ${batteryColor};
             border-radius: 50%;
             border: 1px solid white;
           "></div>
@@ -206,14 +227,14 @@ export default function LiveDriverMap({
   const createDeliveryMarkerElement = (): HTMLDivElement => {
     const el = document.createElement('div');
     el.className = 'delivery-marker';
-    el.style.width = '24px';
-    el.style.height = '24px';
+    el.style.width = `${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px`;
+    el.style.height = `${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px`;
 
     el.innerHTML = `
       <div style="
-        width: 24px;
-        height: 24px;
-        background-color: #f97316;
+        width: ${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px;
+        height: ${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px;
+        background-color: ${DELIVERY_MARKER_COLOR};
         border-radius: 50%;
         border: 2px solid white;
         box-shadow: 0 2px 4px rgba(0,0,0,0.3);
@@ -223,7 +244,7 @@ export default function LiveDriverMap({
       ">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
           <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-          <circle cx="12" cy="10" r="3" fill="#f97316"/>
+          <circle cx="12" cy="10" r="3" fill="${DELIVERY_MARKER_COLOR}"/>
         </svg>
       </div>
     `;
@@ -235,6 +256,7 @@ export default function LiveDriverMap({
   const createPopupContent = (driver: TrackedDriver): string => {
     const battery = getBatteryStatus(driver.id);
     const batteryIcon = battery.status === 'good' ? '🔋' : battery.status === 'low' ? '🪫' : '⚠️';
+    const dutyColor = driver.isOnDuty ? DRIVER_STATUS_COLORS.moving : DRIVER_STATUS_COLORS.offDuty;
 
     return `
       <div style="padding: 8px; min-width: 200px;">
@@ -248,7 +270,7 @@ export default function LiveDriverMap({
             padding: 2px 8px;
             border-radius: 4px;
             font-size: 11px;
-            background-color: ${driver.isOnDuty ? '#22c55e' : '#94a3b8'};
+            background-color: ${dutyColor};
             color: white;
           ">
             ${driver.isOnDuty ? 'On Duty' : 'Off Duty'}
@@ -269,13 +291,23 @@ export default function LiveDriverMap({
     `;
   };
 
+  // Store previous driver states to detect visual changes
+  const previousDriverStatesRef = useRef<Map<string, { color: string; batteryStatus: string }>>(new Map());
+
+  // Helper function to check if marker needs recreation (visual properties changed)
+  const shouldRecreateMarker = useCallback((driver: TrackedDriver): boolean => {
+    const currentColor = getDriverColor(driver);
+    const currentBattery = getBatteryStatus(driver.id).status;
+    const previousState = previousDriverStatesRef.current.get(driver.id);
+
+    if (!previousState) return true; // First time seeing this driver
+
+    return previousState.color !== currentColor || previousState.batteryStatus !== currentBattery;
+  }, [recentLocations]); // Only depends on recentLocations as that's what affects color/battery
+
   // Update driver markers
   useEffect(() => {
     if (!mapRef.current || !mapLoaded) return;
-
-    // Helper functions are stable and don't need to be in dependencies
-    const buildDriverMarkerElement = createDriverMarkerElement;
-    const buildPopupContent = createPopupContent;
 
     const currentDriverIds = new Set(drivers.map(d => d.id));
 
@@ -284,6 +316,7 @@ export default function LiveDriverMap({
       if (!currentDriverIds.has(driverId)) {
         marker.remove();
         markersRef.current.delete(driverId);
+        previousDriverStatesRef.current.delete(driverId);
       }
     });
 
@@ -293,32 +326,48 @@ export default function LiveDriverMap({
 
       const [lng, lat] = driver.lastKnownLocation.coordinates;
 
-      // Update existing marker or create new one
+      // Update existing marker
       if (markersRef.current.has(driver.id)) {
         const marker = markersRef.current.get(driver.id)!;
-        marker.setLngLat([lng, lat]);
 
-        // Remove old marker and create new one (Mapbox markers can't update elements directly)
-        marker.remove();
-        markersRef.current.delete(driver.id);
+        // Only recreate marker if visual properties changed (color, battery status)
+        if (shouldRecreateMarker(driver)) {
+          marker.remove();
+          markersRef.current.delete(driver.id);
 
-        const el = buildDriverMarkerElement(driver);
-        const popup = new mapboxgl.Popup({ offset: 25 })
-          .setHTML(buildPopupContent(driver));
+          const el = createDriverMarkerElement(driver);
+          const popup = new mapboxgl.Popup({ offset: MARKER_CONFIG.POPUP_OFFSET })
+            .setHTML(createPopupContent(driver));
 
-        const newMarker = new mapboxgl.Marker({
-          element: el,
-          anchor: 'center'
-        })
-          .setLngLat([lng, lat])
-          .setPopup(popup)
-          .addTo(mapRef.current!);
+          const newMarker = new mapboxgl.Marker({
+            element: el,
+            anchor: 'center'
+          })
+            .setLngLat([lng, lat])
+            .setPopup(popup)
+            .addTo(mapRef.current!);
 
-        markersRef.current.set(driver.id, newMarker);
+          markersRef.current.set(driver.id, newMarker);
+
+          // Update stored state
+          previousDriverStatesRef.current.set(driver.id, {
+            color: getDriverColor(driver),
+            batteryStatus: getBatteryStatus(driver.id).status
+          });
+        } else {
+          // Just update position without recreating marker (much more efficient)
+          marker.setLngLat([lng, lat]);
+          // Update popup content in case other details changed
+          const popup = marker.getPopup();
+          if (popup) {
+            popup.setHTML(createPopupContent(driver));
+          }
+        }
       } else {
-        const el = buildDriverMarkerElement(driver);
-        const popup = new mapboxgl.Popup({ offset: 25 })
-          .setHTML(buildPopupContent(driver));
+        // Create new marker
+        const el = createDriverMarkerElement(driver);
+        const popup = new mapboxgl.Popup({ offset: MARKER_CONFIG.POPUP_OFFSET })
+          .setHTML(createPopupContent(driver));
 
         const marker = new mapboxgl.Marker({
           element: el,
@@ -329,11 +378,17 @@ export default function LiveDriverMap({
           .addTo(mapRef.current!);
 
         markersRef.current.set(driver.id, marker);
+
+        // Store initial state
+        previousDriverStatesRef.current.set(driver.id, {
+          color: getDriverColor(driver),
+          batteryStatus: getBatteryStatus(driver.id).status
+        });
       }
     });
 
-    // Fit map to show all drivers
-    if (drivers.length > 0) {
+    // Auto-fit map to show all drivers only on initial load or when explicitly requested
+    if (drivers.length > 0 && shouldAutoFit && !hasUserInteracted) {
       const bounds = new mapboxgl.LngLatBounds();
 
       drivers.forEach(driver => {
@@ -345,14 +400,16 @@ export default function LiveDriverMap({
       // Only fit bounds if we have multiple drivers, otherwise it might zoom too much
       if (drivers.length > 1) {
         mapRef.current.fitBounds(bounds, {
-          padding: 50,
-          maxZoom: 15,
-          duration: 1000
+          padding: MAP_CONFIG.BOUNDS_PADDING,
+          maxZoom: MAP_CONFIG.MAX_AUTO_ZOOM,
+          duration: MAP_CONFIG.FIT_BOUNDS_DURATION
         });
       }
+
+      // Disable auto-fit after first load
+      setShouldAutoFit(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drivers, recentLocations, mapLoaded]);
+  }, [drivers, recentLocations, mapLoaded, shouldAutoFit, hasUserInteracted, shouldRecreateMarker]);
 
   // Update delivery markers
   useEffect(() => {
@@ -422,10 +479,14 @@ export default function LiveDriverMap({
     });
 
     mapRef.current.fitBounds(bounds, {
-      padding: 50,
-      maxZoom: 15,
-      duration: 1000
+      padding: MAP_CONFIG.BOUNDS_PADDING,
+      maxZoom: MAP_CONFIG.MAX_AUTO_ZOOM,
+      duration: MAP_CONFIG.FIT_BOUNDS_DURATION
     });
+
+    // Re-enable auto-fit when user explicitly clicks fit button
+    setShouldAutoFit(true);
+    setHasUserInteracted(false);
   };
 
   // Error state
