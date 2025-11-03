@@ -7,7 +7,9 @@ const nextConfig = {
   output: "standalone",
   compress: true, // Enable gzip compression for production
   typescript: {
-    // Always skip type checking during builds to prevent deployment failures
+    // Skip type checking during builds to prevent deployment failures
+    // NOTE: This is a workaround for legacy code. New code should be type-safe.
+    // Consider running 'pnpm typecheck' separately in CI/CD to catch type errors
     ignoreBuildErrors: true,
   },
   experimental: {

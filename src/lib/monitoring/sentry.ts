@@ -7,16 +7,10 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
+import type { ErrorContext, SentryUser } from './types';
 
-/**
- * User information for Sentry context
- */
-export interface SentryUser {
-  id: string;
-  email?: string;
-  role?: string;
-  name?: string;
-}
+// Re-export types for convenience
+export type { ErrorContext, SentryUser, BreadcrumbLevel, BreadcrumbCategory } from './types';
 
 /**
  * Set user context for Sentry error tracking
@@ -107,7 +101,7 @@ export function addSentryBreadcrumb(
  * Use this for caught exceptions that you still want to track
  *
  * @param error - The error to capture
- * @param context - Additional context
+ * @param context - Additional typed context for better error tracking
  *
  * @example
  * ```ts
@@ -115,8 +109,9 @@ export function addSentryBreadcrumb(
  *   await updateDelivery(deliveryId);
  * } catch (error) {
  *   captureException(error, {
- *     deliveryId,
- *     action: 'update_delivery'
+ *     action: 'update_delivery',
+ *     feature: 'deliveries',
+ *     metadata: { deliveryId }
  *   });
  *   // Handle error gracefully...
  * }
@@ -124,11 +119,31 @@ export function addSentryBreadcrumb(
  */
 export function captureException(
   error: Error | unknown,
-  context?: Record<string, unknown>
+  context?: ErrorContext
 ) {
   if (context) {
     Sentry.withScope((scope) => {
-      scope.setContext('additional', context);
+      // Set tags for better filtering in Sentry
+      if (context.action) scope.setTag('action', context.action);
+      if (context.feature) scope.setTag('feature', context.feature);
+      if (context.handled !== undefined) scope.setTag('handled', context.handled);
+
+      // Set contexts
+      if (context.component) {
+        scope.setContext('component', {
+          name: context.component,
+          stack: context.componentStack,
+        });
+      }
+
+      if (context.request) {
+        scope.setContext('request', context.request);
+      }
+
+      if (context.metadata) {
+        scope.setContext('metadata', context.metadata);
+      }
+
       Sentry.captureException(error);
     });
   } else {

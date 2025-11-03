@@ -3,74 +3,59 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from '@sentry/nextjs';
+import { createBeforeSend, CLIENT_IGNORE_ERRORS } from '@/lib/monitoring/sentry-filters';
 
-Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+// Validate DSN is configured
+const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 
-  // Environment name
-  environment: process.env.NODE_ENV,
+if (!dsn) {
+  console.warn('Sentry DSN not configured, error tracking disabled');
+  // Early exit - don't initialize Sentry if DSN is missing
+} else {
+  // Parse sample rate from environment variable or use defaults
+  const getSampleRate = (): number => {
+    if (process.env.SENTRY_TRACES_SAMPLE_RATE) {
+      const rate = parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE);
+      return isNaN(rate) ? (process.env.NODE_ENV === 'production' ? 0.1 : 1.0) : rate;
+    }
+    return process.env.NODE_ENV === 'production' ? 0.1 : 1.0;
+  };
 
-  // Adjust this value in production, or use tracesSampler for greater control
-  // 0.1 = 10% of transactions will be sent to Sentry
-  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  Sentry.init({
+    dsn,
 
-  // Setting this option to true will print useful information to the console while you're setting up Sentry.
-  debug: false,
+    // Environment name
+    environment: process.env.NODE_ENV,
 
-  // Session Replay configuration
-  replaysOnErrorSampleRate: 1.0, // Capture 100% of sessions where an error occurred
-  replaysSessionSampleRate: 0.1, // Capture 10% of all sessions for replay
+    // Adjust this value in production, or use tracesSampler for greater control
+    // Configurable via SENTRY_TRACES_SAMPLE_RATE environment variable
+    // Default: 0.1 (10%) in production, 1.0 (100%) in development
+    tracesSampleRate: getSampleRate(),
 
-  // Enable session replay
-  integrations: [
-    Sentry.replayIntegration({
-      // Mask all text content for privacy
-      maskAllText: true,
-      // Block all media elements (images, videos, audio)
-      blockAllMedia: true,
+    // Setting this option to true will print useful information to the console while you're setting up Sentry.
+    debug: false,
+
+    // Session Replay configuration
+    replaysOnErrorSampleRate: 1.0, // Capture 100% of sessions where an error occurred
+    replaysSessionSampleRate: 0.1, // Capture 10% of all sessions for replay
+
+    // Enable session replay
+    integrations: [
+      Sentry.replayIntegration({
+        // Mask all text content for privacy
+        maskAllText: true,
+        // Block all media elements (images, videos, audio)
+        blockAllMedia: true,
+      }),
+      Sentry.browserTracingIntegration(),
+    ],
+
+    // Filter out known non-critical errors using shared filtering logic
+    beforeSend: createBeforeSend({
+      includeClientFilters: true,
     }),
-    Sentry.browserTracingIntegration(),
-  ],
 
-  // Filter out known non-critical errors
-  beforeSend(event, hint) {
-    // Ignore ResizeObserver errors (common browser noise)
-    if (event.exception?.values?.[0]?.value?.includes('ResizeObserver')) {
-      return null;
-    }
-
-    // Ignore network errors (often client connectivity issues)
-    if (
-      event.exception?.values?.[0]?.value?.includes('NetworkError') ||
-      event.exception?.values?.[0]?.value?.includes('Failed to fetch')
-    ) {
-      return null;
-    }
-
-    // Ignore non-Error rejections (often from third-party libraries)
-    if (hint.originalException && typeof hint.originalException !== 'object') {
-      return null;
-    }
-
-    return event;
-  },
-
-  // Ignore specific errors
-  ignoreErrors: [
-    // Browser extensions
-    'top.GLOBALS',
-    'chrome-extension://',
-    'moz-extension://',
-    // Random plugins/extensions
-    'Can\'t find variable: ZiteReader',
-    'jigsaw is not defined',
-    'ComboSearch is not defined',
-    // Facebook blocked
-    'fb_xd_fragment',
-    // ISP optimizing proxy
-    'bmi_SafeAddOnload',
-    'EBCallBackMessageReceived',
-    // Generic error messages that are usually noise
-    'Non-Error promise rejection captured',
-  ],
-});
+    // Ignore specific errors using shared error list
+    ignoreErrors: CLIENT_IGNORE_ERRORS,
+  });
+}

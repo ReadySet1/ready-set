@@ -4,27 +4,41 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from '@sentry/nextjs';
+import { createBeforeSend } from '@/lib/monitoring/sentry-filters';
 
-Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+// Validate DSN is configured
+const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 
-  // Environment name
-  environment: process.env.NODE_ENV,
-
-  // Adjust this value in production, or use tracesSampler for greater control
-  // 0.1 = 10% of transactions will be sent to Sentry
-  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-
-  // Setting this option to true will print useful information to the console while you're setting up Sentry.
-  debug: false,
-
-  // Filter edge runtime errors
-  beforeSend(event, hint) {
-    // Ignore middleware redirects (these are normal flow, not errors)
-    if (event.exception?.values?.[0]?.value?.includes('NEXT_REDIRECT')) {
-      return null;
+if (!dsn) {
+  console.warn('Sentry DSN not configured, error tracking disabled');
+  // Early exit - don't initialize Sentry if DSN is missing
+} else {
+  // Parse sample rate from environment variable or use defaults
+  const getSampleRate = (): number => {
+    if (process.env.SENTRY_TRACES_SAMPLE_RATE) {
+      const rate = parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE);
+      return isNaN(rate) ? (process.env.NODE_ENV === 'production' ? 0.1 : 1.0) : rate;
     }
+    return process.env.NODE_ENV === 'production' ? 0.1 : 1.0;
+  };
 
-    return event;
-  },
-});
+  Sentry.init({
+    dsn,
+
+    // Environment name
+    environment: process.env.NODE_ENV,
+
+    // Adjust this value in production, or use tracesSampler for greater control
+    // Configurable via SENTRY_TRACES_SAMPLE_RATE environment variable
+    // Default: 0.1 (10%) in production, 1.0 (100%) in development
+    tracesSampleRate: getSampleRate(),
+
+    // Setting this option to true will print useful information to the console while you're setting up Sentry.
+    debug: false,
+
+    // Filter edge runtime errors using shared filtering logic
+    beforeSend: createBeforeSend({
+      includeEdgeFilters: true,
+    }),
+  });
+}

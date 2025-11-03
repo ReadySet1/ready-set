@@ -33,6 +33,8 @@ Sentry provides real-time error tracking and monitoring for the application acro
 
 ## Quick Start
 
+> **Security Note**: Never commit real Sentry credentials to version control. The `.env.example` file contains placeholder values only. Real credentials should be in `.env.local` (which is gitignored).
+
 ### 1. Create a Sentry Account
 
 1. Go to [sentry.io](https://sentry.io/) and sign up
@@ -274,14 +276,14 @@ addSentryBreadcrumb('GPS update received', {
 #### 5. Performance Monitoring
 
 ```typescript
-import { startTransaction } from '@/lib/monitoring/sentry';
+import { startSpan } from '@/lib/monitoring/sentry';
 
-const transaction = startTransaction('calculate_mileage', 'db.query');
+const span = startSpan('calculate_mileage', 'db.query');
 try {
   const mileage = await calculateShiftMileage(shiftId);
   return mileage;
 } finally {
-  transaction?.finish();
+  span?.end();
 }
 ```
 
@@ -392,6 +394,439 @@ To test in production:
 3. Remove test code before production deployment
 
 Alternative: Trigger real errors and verify they're captured.
+
+## Security & Credential Management
+
+### Understanding Sentry Credentials
+
+#### NEXT_PUBLIC_SENTRY_DSN
+- ✅ **Safe to expose** - This is the public DSN
+- Purpose: Identifies your Sentry project for error reporting
+- Can be visible in client-side code and browser DevTools
+- No security risk if exposed
+
+#### SENTRY_AUTH_TOKEN
+- ⚠️ **KEEP SECRET** - This is a sensitive token
+- Purpose: Uploads source maps during build process
+- Provides write access to your Sentry project
+- **Never commit to version control**
+- **Never expose to client-side code**
+
+### Credential Rotation Procedures
+
+If your `SENTRY_AUTH_TOKEN` has been exposed (e.g., committed to git, shared publicly):
+
+#### Step 1: Rotate the Token Immediately
+
+1. **Log in to Sentry Dashboard**
+   - Go to [sentry.io](https://sentry.io/)
+   - Navigate to **Settings** → **Auth Tokens**
+
+2. **Delete the Exposed Token**
+   - Find the token in the list
+   - Click **Revoke** or **Delete**
+   - Confirm the action
+
+3. **Create a New Token**
+   - Click **Create New Token**
+   - Name: "Source Maps Upload - [Date]"
+   - Scopes needed:
+     - `project:releases`
+     - `project:write`
+     - `org:read`
+   - Click **Create Token**
+   - **Copy the token immediately** (shown only once)
+
+#### Step 2: Update Environment Variables
+
+**Local Development:**
+```bash
+# Update .env.local with new token
+SENTRY_AUTH_TOKEN=sntryu_your_new_token_here
+```
+
+**Production (Vercel):**
+1. Go to Vercel Dashboard → Your Project
+2. Navigate to **Settings** → **Environment Variables**
+3. Find `SENTRY_AUTH_TOKEN`
+4. Click **Edit** and paste the new token
+5. Select environments: **Production**, **Preview** (optional)
+6. Click **Save**
+
+**Production (Other Platforms):**
+- **Netlify**: Site settings → Build & deploy → Environment
+- **AWS**: Update in Parameter Store or Secrets Manager
+- **Railway**: Project → Variables → Edit
+- **Render**: Dashboard → Environment → Edit
+
+#### Step 3: Verify the Update
+
+```bash
+# Trigger a new build
+git commit --allow-empty -m "Rotate Sentry token"
+git push
+
+# Check build logs for:
+# ℹ️ Sentry: Uploading source maps for release...
+# ✓ Sentry: Source maps uploaded successfully
+```
+
+#### Step 4: Clean Git History (If Committed)
+
+If the token was committed to git:
+
+**Option A: Using BFG Repo-Cleaner (Recommended)**
+```bash
+# Install BFG
+brew install bfg  # macOS
+# or download from: https://rtyley.github.io/bfg-repo-cleaner/
+
+# Clone a fresh mirror
+git clone --mirror https://github.com/yourusername/repo.git
+
+# Remove the sensitive file
+bfg --delete-files .env.local repo.git
+
+# Clean up and push
+cd repo.git
+git reflog expire --expire=now --all
+git gc --prune=now --aggressive
+git push
+```
+
+**Option B: Manual Approach**
+```bash
+# Rewrite history (WARNING: Destructive)
+git filter-branch --force --index-filter \
+  "git rm --cached --ignore-unmatch .env.local" \
+  --prune-empty --tag-name-filter cat -- --all
+
+# Force push (coordinate with team first!)
+git push origin --force --all
+```
+
+⚠️ **Important:** After cleaning git history, all team members must re-clone the repository.
+
+### Security Best Practices
+
+1. **Never Commit Credentials**
+   - Always use `.env.local` (already in `.gitignore`)
+   - Double-check `.env.example` only has placeholders
+   - Use pre-commit hooks to scan for secrets
+
+2. **Rotate Tokens Regularly**
+   - Schedule quarterly rotation
+   - Rotate immediately after team member departure
+   - Keep rotation history documented
+
+3. **Use GitHub Secret Scanning**
+   - Enable in repository settings
+   - Configure alerts for Sentry tokens
+   - Review alerts promptly
+
+4. **Limit Token Permissions**
+   - Use minimum required scopes
+   - Create separate tokens for CI/CD vs. local development
+   - Document token purpose in token name
+
+5. **Monitor Token Usage**
+   - Check Sentry → Settings → Audit Log
+   - Review source map uploads
+   - Alert on unusual activity
+
+## Advanced Integration Examples
+
+### Authentication Integration
+
+#### Next-Auth (App Router)
+```typescript
+// src/app/api/auth/[...nextauth]/route.ts
+import { setSentryUser } from '@/lib/monitoring/sentry';
+import NextAuth from 'next-auth';
+
+export const { handlers, auth } = NextAuth({
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        // Set Sentry user on login
+        setSentryUser({
+          id: user.id,
+          email: user.email || undefined,
+          role: user.role,
+          name: user.name || undefined,
+        });
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      // Update Sentry user on session refresh
+      if (session.user) {
+        setSentryUser({
+          id: session.user.id,
+          email: session.user.email || undefined,
+          role: session.user.role,
+        });
+      }
+      return session;
+    },
+  },
+});
+```
+
+#### Sign Out Handler
+```typescript
+// src/app/api/auth/signout/route.ts
+import { setSentryUser } from '@/lib/monitoring/sentry';
+
+export async function POST() {
+  // Clear Sentry user context on logout
+  setSentryUser(null);
+
+  // ... rest of signout logic
+  return NextResponse.json({ success: true });
+}
+```
+
+### API Route Integration
+
+#### Complete API Route Example
+```typescript
+// src/app/api/orders/[id]/route.ts
+import {
+  captureException,
+  addSentryBreadcrumb,
+  setSentryContext,
+  startSpan,
+} from '@/lib/monitoring/sentry';
+
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const orderId = params.id;
+
+  try {
+    // Add breadcrumb for debugging
+    addSentryBreadcrumb('Order update started', {
+      orderId,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Set context for this request
+    setSentryContext('order', {
+      orderId,
+      action: 'update',
+    });
+
+    // Track performance
+    const result = await startSpan('update_order', 'db.query', async () => {
+      const data = await request.json();
+      return await updateOrder(orderId, data);
+    });
+
+    addSentryBreadcrumb('Order updated successfully', {
+      orderId,
+      changes: Object.keys(result),
+    });
+
+    return NextResponse.json(result);
+  } catch (error) {
+    // Capture error with rich context
+    captureException(error, {
+      orderId,
+      action: 'update_order',
+      endpoint: '/api/orders/[id]',
+      method: 'PUT',
+    });
+
+    return NextResponse.json(
+      { error: 'Failed to update order' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### React Error Boundary
+
+#### Custom Error Boundary Component
+```typescript
+// src/components/ErrorBoundary.tsx
+'use client';
+
+import { Component, ReactNode } from 'react';
+import { logErrorToSentry } from '@/lib/monitoring/sentry';
+
+interface Props {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error?: Error;
+}
+
+export class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Log to Sentry with component stack
+    logErrorToSentry(error, {
+      componentStack: errorInfo.componentStack,
+      errorBoundary: 'ErrorBoundary',
+    });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        this.props.fallback || (
+          <div className="error-container">
+            <h2>Something went wrong</h2>
+            <p>We've been notified and are looking into it.</p>
+            <button onClick={() => this.setState({ hasError: false })}>
+              Try again
+            </button>
+          </div>
+        )
+      );
+    }
+
+    return this.props.children;
+  }
+}
+```
+
+#### Usage in Layout
+```typescript
+// src/app/layout.tsx
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+export default function RootLayout({ children }: Props) {
+  return (
+    <html lang="en">
+      <body>
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
+      </body>
+    </html>
+  );
+}
+```
+
+### Server Actions Integration
+
+```typescript
+// src/app/actions/orders.ts
+'use server';
+
+import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
+
+export async function createOrder(formData: FormData) {
+  try {
+    addSentryBreadcrumb('Server action: createOrder started');
+
+    const order = await db.order.create({
+      data: {
+        // ... order data
+      },
+    });
+
+    addSentryBreadcrumb('Order created', { orderId: order.id });
+    return { success: true, orderId: order.id };
+  } catch (error) {
+    captureException(error, {
+      action: 'createOrder',
+      formDataKeys: Array.from(formData.keys()),
+    });
+
+    return { success: false, error: 'Failed to create order' };
+  }
+}
+```
+
+### Middleware Integration
+
+```typescript
+// src/middleware.ts
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { addSentryBreadcrumb, captureException } from '@/lib/monitoring/sentry';
+
+export function middleware(request: NextRequest) {
+  try {
+    // Track middleware execution
+    addSentryBreadcrumb('Middleware executed', {
+      path: request.nextUrl.pathname,
+      method: request.method,
+    });
+
+    // ... your middleware logic
+
+    return NextResponse.next();
+  } catch (error) {
+    captureException(error, {
+      middleware: true,
+      path: request.nextUrl.pathname,
+    });
+    throw error;
+  }
+}
+```
+
+### Background Job Integration
+
+```typescript
+// src/lib/jobs/processOrders.ts
+import {
+  startSpan,
+  captureException,
+  setSentryTags,
+  addSentryBreadcrumb,
+} from '@/lib/monitoring/sentry';
+
+export async function processOrders() {
+  // Tag this job
+  setSentryTags({
+    job: 'process_orders',
+    environment: process.env.NODE_ENV || 'development',
+  });
+
+  try {
+    addSentryBreadcrumb('Background job started: processOrders');
+
+    const result = await startSpan('process_orders', 'job', async () => {
+      const orders = await fetchPendingOrders();
+
+      for (const order of orders) {
+        await startSpan('process_single_order', 'job.task', async () => {
+          await processOrder(order.id);
+        });
+      }
+
+      return { processed: orders.length };
+    });
+
+    addSentryBreadcrumb('Background job completed', result);
+    return result;
+  } catch (error) {
+    captureException(error, {
+      job: 'process_orders',
+      failedAt: new Date().toISOString(),
+    });
+    throw error;
+  }
+}
+```
 
 ## Best Practices
 
