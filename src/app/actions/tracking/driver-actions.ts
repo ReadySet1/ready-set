@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { withAuth } from '@/lib/auth-middleware';
 import type { LocationUpdate, DriverShift, ShiftBreak } from '@/types/tracking';
+import { createDriverLocationChannel, type DriverLocationUpdatedPayload } from '@/lib/realtime';
+import { FEATURE_FLAGS, isFeatureEnabled } from '@/lib/feature-flags';
 
 /**
  * Start a new driver shift
@@ -469,8 +471,8 @@ export async function updateDriverLocation(
 
     // Update driver's last known location
     await prisma.$executeRawUnsafe(`
-      UPDATE drivers 
-      SET 
+      UPDATE drivers
+      SET
         last_known_location = ST_GeogFromText($2),
         last_location_update = NOW(),
         updated_at = NOW()
@@ -479,6 +481,13 @@ export async function updateDriverLocation(
       driverId,
       `POINT(${location.coordinates.lng} ${location.coordinates.lat})`
     );
+
+    // Broadcast location update via Realtime if enabled
+    // This runs in the background and doesn't block the response
+    broadcastLocationUpdate(driverId, location).catch((error) => {
+      console.error('[Realtime] Failed to broadcast location update:', error);
+      // Don't fail the request if broadcast fails
+    });
 
     return { success: true };
   } catch (error) {
@@ -559,5 +568,87 @@ export async function getDriverShiftHistory(
   } catch (error) {
     console.error('Error getting driver shift history:', error);
     return [];
+  }
+}
+
+/**
+ * Broadcast location update via Supabase Realtime
+ * This function is called after successfully updating the database
+ * and broadcasts the update to all connected admin clients.
+ *
+ * @internal - Not exported, only used by updateDriverLocation
+ */
+async function broadcastLocationUpdate(
+  driverId: string,
+  location: LocationUpdate
+): Promise<void> {
+  // Check if Realtime broadcasting is enabled
+  if (!isFeatureEnabled(FEATURE_FLAGS.USE_REALTIME_LOCATION_UPDATES)) {
+    return; // Feature flag disabled, skip broadcasting
+  }
+
+  try {
+    // Get driver info for enriched payload
+    const driver = await prisma.$queryRawUnsafe<{
+      employee_id: string;
+      vehicle_number: string | null;
+      user_id: string;
+    }[]>(`
+      SELECT d.employee_id, d.vehicle_number, d.user_id
+      FROM drivers d
+      WHERE d.id = $1::uuid
+      LIMIT 1
+    `, driverId);
+
+    if (driver.length === 0 || !driver[0]) {
+      console.warn(`[Realtime] Driver ${driverId} not found, skipping broadcast`);
+      return;
+    }
+
+    const driverInfo = driver[0];
+
+    // Get driver name from profiles
+    const profile = await prisma.$queryRawUnsafe<{
+      first_name: string | null;
+      last_name: string | null;
+    }[]>(`
+      SELECT first_name, last_name
+      FROM profiles
+      WHERE id = $1::uuid
+      LIMIT 1
+    `, driverInfo.user_id);
+
+    const driverName = profile.length > 0 && profile[0]
+      ? `${profile[0].first_name || ''} ${profile[0].last_name || ''}`.trim() || driverInfo.employee_id
+      : driverInfo.employee_id;
+
+    // Create enriched payload for admins
+    const payload: DriverLocationUpdatedPayload = {
+      driverId,
+      driverName,
+      vehicleNumber: driverInfo.vehicle_number || undefined,
+      lat: location.coordinates.lat,
+      lng: location.coordinates.lng,
+      accuracy: location.accuracy,
+      speed: location.speed || null,
+      heading: location.heading || null,
+      altitude: location.altitude || null,
+      batteryLevel: location.batteryLevel || null,
+      isMoving: location.isMoving,
+      activityType: location.activityType || null,
+      timestamp: location.timestamp.toISOString(),
+    };
+
+    // Broadcast to driver-locations channel
+    const channel = createDriverLocationChannel();
+    await channel.subscribe();
+    await channel.broadcastLocationUpdate(payload);
+    await channel.unsubscribe();
+
+    console.log(`[Realtime] Broadcasted location update for driver ${driverId}`);
+  } catch (error) {
+    // Log error but don't throw - broadcasting is not critical
+    console.error('[Realtime] Error broadcasting location update:', error);
+    throw error; // Re-throw so the catch in updateDriverLocation can log it
   }
 }
