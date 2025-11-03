@@ -133,7 +133,8 @@ function applyServerFilters(event: ErrorEvent): boolean {
   // Only filter if the error was explicitly marked as handled
   if (errorValue.includes('P2002') || errorValue.includes('P2025')) {
     // Check if the error context indicates it was handled
-    const isHandled = event.contexts?.handled === true;
+    const handledContext = event.contexts?.['metadata'] as Record<string, unknown> | undefined;
+    const isHandled = handledContext?.handled === true;
 
     // Only filter out if it was explicitly handled in application code
     if (isHandled) {
