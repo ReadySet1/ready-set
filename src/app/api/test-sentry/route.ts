@@ -94,7 +94,10 @@ export async function GET(request: Request) {
         });
     }
   } catch (error) {
-    // Let the error propagate to Sentry's automatic error capture
+    // INTENTIONAL: Rethrow to test Sentry's automatic error capture
+    // This will result in a 500 error page, which is expected for the error test case.
+    // The error will be automatically captured by Sentry's Next.js integration.
+    // This behavior verifies that unhandled errors are properly tracked in production.
     throw error;
   }
 }

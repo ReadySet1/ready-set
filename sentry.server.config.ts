@@ -3,47 +3,52 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from '@sentry/nextjs';
+import { createBeforeSend, SERVER_IGNORE_ERRORS } from '@/lib/monitoring/sentry-filters';
 
-Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+// Validate DSN is configured
+const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 
-  // Environment name
-  environment: process.env.NODE_ENV,
-
-  // Adjust this value in production, or use tracesSampler for greater control
-  // 0.1 = 10% of transactions will be sent to Sentry
-  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-
-  // Setting this option to true will print useful information to the console while you're setting up Sentry.
-  debug: false,
-
-  // Enable performance monitoring
-  integrations: [
-    // Database instrumentation
-    Sentry.prismaIntegration(),
-    // HTTP instrumentation
-    Sentry.httpIntegration(),
-  ],
-
-  // Filter server-side errors
-  beforeSend(event, hint) {
-    // Ignore specific Prisma errors that are handled
-    if (
-      event.exception?.values?.[0]?.value?.includes('P2002') || // Unique constraint
-      event.exception?.values?.[0]?.value?.includes('P2025')    // Record not found
-    ) {
-      // These are handled business logic errors, not system errors
-      return null;
+if (!dsn) {
+  console.warn('Sentry DSN not configured, error tracking disabled');
+  // Early exit - don't initialize Sentry if DSN is missing
+} else {
+  // Parse sample rate from environment variable or use defaults
+  const getSampleRate = (): number => {
+    if (process.env.SENTRY_TRACES_SAMPLE_RATE) {
+      const rate = parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE);
+      return isNaN(rate) ? (process.env.NODE_ENV === 'production' ? 0.1 : 1.0) : rate;
     }
+    return process.env.NODE_ENV === 'production' ? 0.1 : 1.0;
+  };
 
-    return event;
-  },
+  Sentry.init({
+    dsn,
 
-  // Ignore specific errors
-  ignoreErrors: [
-    // Next.js specific errors
-    'ECONNRESET',
-    'EPIPE',
-    'aborted',
-  ],
-});
+    // Environment name
+    environment: process.env.NODE_ENV,
+
+    // Adjust this value in production, or use tracesSampler for greater control
+    // Configurable via SENTRY_TRACES_SAMPLE_RATE environment variable
+    // Default: 0.1 (10%) in production, 1.0 (100%) in development
+    tracesSampleRate: getSampleRate(),
+
+    // Setting this option to true will print useful information to the console while you're setting up Sentry.
+    debug: false,
+
+    // Enable performance monitoring
+    integrations: [
+      // Database instrumentation
+      Sentry.prismaIntegration(),
+      // HTTP instrumentation
+      Sentry.httpIntegration(),
+    ],
+
+    // Filter server-side errors using shared filtering logic
+    beforeSend: createBeforeSend({
+      includeServerFilters: true,
+    }),
+
+    // Ignore specific errors using shared error list
+    ignoreErrors: SERVER_IGNORE_ERRORS,
+  });
+}
