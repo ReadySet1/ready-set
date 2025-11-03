@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { useEffect } from 'react'
+import { captureException } from '@/lib/monitoring/sentry'
 
 // Standard error props interface that follows Next.js pattern
 interface ErrorProps {
@@ -10,9 +11,15 @@ interface ErrorProps {
 }
 
 export default function Error({ error, reset }: ErrorProps) {
-  // Log the error to the console
+  // Capture the error to Sentry for monitoring
   useEffect(() => {
-    console.error('App Router Error:', error)
+    captureException(error, {
+      component: 'App Router Error Boundary',
+      metadata: {
+        digest: error.digest,
+        type: 'error.tsx'
+      }
+    })
   }, [error])
 
   return (

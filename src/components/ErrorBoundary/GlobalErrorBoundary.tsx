@@ -2,10 +2,8 @@
 "use client";
 
 import React, { Component, ErrorInfo, ReactNode } from "react";
-import {
-  createErrorBoundaryLogger,
-  collectErrorContext,
-} from "@/lib/error-logging";
+import { collectErrorContext } from "@/lib/error-logging";
+import { captureException } from "@/lib/monitoring/sentry";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, AlertTriangle, Home, Bug } from "lucide-react";
 
@@ -26,24 +24,14 @@ interface State {
 
 /**
  * Enhanced global error boundary with comprehensive error handling and reporting
+ * Integrates with Sentry for error tracking and monitoring
  */
 class GlobalErrorBoundary extends Component<Props, State> {
-  private errorLogger: (
-    error: Error,
-    errorInfo: any,
-    additionalContext?: Record<string, any>,
-  ) => void;
-
   constructor(props: Props) {
     super(props);
     this.state = {
       hasError: false,
     };
-
-    // Initialize error logger
-    this.errorLogger = createErrorBoundaryLogger(
-      props.name || "GlobalErrorBoundary",
-    );
   }
 
   static getDerivedStateFromError(error: Error): State {
@@ -65,14 +53,17 @@ class GlobalErrorBoundary extends Component<Props, State> {
       },
     });
 
-    // Log error with centralized error logging and enhanced context
-    this.errorLogger(error, errorInfo, {
-      errorBoundary: {
-        name: this.props.name || "GlobalErrorBoundary",
+    // Capture error to Sentry with comprehensive context
+    captureException(error, {
+      component: this.props.name || "GlobalErrorBoundary",
+      feature: 'error-boundary',
+      componentStack: errorInfo.componentStack || undefined,
+      metadata: {
+        boundaryName: this.props.name || "GlobalErrorBoundary",
         level: "global",
         retryCount: 0,
-      },
-      ...errorContext,
+        ...errorContext,
+      }
     });
 
     // Update state to include errorInfo
@@ -81,17 +72,14 @@ class GlobalErrorBoundary extends Component<Props, State> {
     // Call custom error handler if provided
     this.props.onError?.(error, errorInfo);
 
-    // Additional logging for debugging
-    console.group("🚨 React Global Error Boundary Caught Error");
-    console.error("Error:", error);
-    console.error("Error Info:", errorInfo);
-    console.error("Component Stack:", errorInfo.componentStack);
-    console.error("Error Context:", errorContext);
-    console.groupEnd();
-
-    // In production, you might want to send this to an error tracking service
-    if (process.env.NODE_ENV === "production") {
-      // await sendErrorToTrackingService(error, errorInfo, errorContext);
+    // Additional logging for debugging (development only)
+    if (process.env.NODE_ENV === "development") {
+      console.group("🚨 React Global Error Boundary Caught Error");
+      console.error("Error:", error);
+      console.error("Error Info:", errorInfo);
+      console.error("Component Stack:", errorInfo.componentStack);
+      console.error("Error Context:", errorContext);
+      console.groupEnd();
     }
   }
 

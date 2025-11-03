@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient as createSupabaseServerClient } from '@/utils/supabase/server';
+import { setSentryUser } from '@/lib/monitoring/sentry';
 
 // Define default home routes for each user type
 const USER_HOME_ROUTES: Record<string, string> = {
@@ -84,10 +85,17 @@ export async function GET(request: Request) {
 
           // Normalize the user type to lowercase for consistent handling
           const userTypeKey = userType.toLowerCase();
-          
+
+          // Set Sentry user context for error tracking
+          setSentryUser({
+            id: session.user.id,
+            email: session.user.email || undefined,
+            role: userType
+          });
+
           // Get the appropriate home route for this user type, fallback to next param
           const homeRoute = USER_HOME_ROUTES[userTypeKey] || next;
-          
+
           // Redirect to the appropriate dashboard
           return NextResponse.redirect(new URL(homeRoute, requestUrl.origin));
         } catch (profileError) {
