@@ -1,4 +1,5 @@
 const path = require('path');
+const { withSentryConfig } = require('@sentry/nextjs');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -119,4 +120,22 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig 
+// Sentry configuration options
+const sentryWebpackPluginOptions = {
+  // For all available options, see:
+  // https://github.com/getsentry/sentry-webpack-plugin#options
+
+  // Suppresses source map uploading logs during build
+  silent: true,
+
+  // Upload source maps to Sentry
+  // This will be enabled when SENTRY_AUTH_TOKEN is set
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  // Automatically tree-shake Sentry logger statements to reduce bundle size
+  disableLogger: true,
+};
+
+// Make sure adding Sentry options is the last code to run before exporting
+module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions);
