@@ -189,24 +189,32 @@ export function captureMessage(
  * @param name - Name of the operation
  * @param op - Operation type (e.g., 'http.server', 'db.query')
  * @param callback - Async function to execute within the span
+ * @param attributes - Optional custom attributes for better filtering/grouping
  * @returns Result of the callback function
  *
  * @example
  * ```ts
- * const result = await startSpan('calculate_mileage', 'db.query', async () => {
- *   return await calculateMileage(shiftId);
- * });
+ * const result = await startSpan(
+ *   'calculate_mileage',
+ *   'db.query',
+ *   async () => {
+ *     return await calculateMileage(shiftId);
+ *   },
+ *   { shiftId: '123', driverId: 'driver-456' }
+ * );
  * ```
  */
 export async function startSpan<T>(
   name: string,
   op: string,
-  callback: () => Promise<T>
+  callback: () => Promise<T>,
+  attributes?: Record<string, unknown>
 ): Promise<T> {
   return await Sentry.startSpan(
     {
       name,
       op,
+      attributes,
     },
     callback
   );

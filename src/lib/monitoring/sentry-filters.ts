@@ -129,20 +129,21 @@ function applyClientFilters(event: ErrorEvent, hint: EventHint): boolean {
 function applyServerFilters(event: ErrorEvent): boolean {
   const errorValue = event.exception?.values?.[0]?.value || '';
 
-  // Filter out handled Prisma errors (business logic errors, not system errors)
-  // Only filter if the error was explicitly marked as handled
+  // Downgrade Prisma errors to warnings instead of filtering them out
+  // This captures them without triggering error alerts
   if (errorValue.includes('P2002') || errorValue.includes('P2025')) {
     // Check if the error context indicates it was handled
     const handledContext = event.contexts?.['metadata'] as Record<string, unknown> | undefined;
     const isHandled = handledContext?.handled === true;
 
-    // Only filter out if it was explicitly handled in application code
     if (isHandled) {
-      return false;
+      // Downgrade to warning level for handled errors
+      event.level = 'warning';
+    } else {
+      // Keep as error for unhandled cases - might indicate a bug
+      // These could reveal race conditions, data integrity issues, or
+      // broken foreign key relationships
     }
-
-    // If not marked as handled, capture it - might indicate a bug
-    // where we didn't properly handle the constraint violation
   }
 
   return true;

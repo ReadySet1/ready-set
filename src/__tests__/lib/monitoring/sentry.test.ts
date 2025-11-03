@@ -220,7 +220,24 @@ describe('Sentry Utilities', () => {
       const result = await startSpan(name, op, callback);
 
       expect(Sentry.startSpan).toHaveBeenCalledWith(
-        { name, op },
+        { name, op, attributes: undefined },
+        callback
+      );
+      expect(result).toEqual(mockResult);
+      expect(callback).toHaveBeenCalled();
+    });
+
+    it('should start a performance span with custom attributes', async () => {
+      const name = 'calculate_mileage';
+      const op = 'db.query';
+      const attributes = { shiftId: '123', driverId: 'driver-456' };
+      const mockResult = { distance: 100 };
+      const callback = jest.fn().mockResolvedValue(mockResult);
+
+      const result = await startSpan(name, op, callback, attributes);
+
+      expect(Sentry.startSpan).toHaveBeenCalledWith(
+        { name, op, attributes },
         callback
       );
       expect(result).toEqual(mockResult);
