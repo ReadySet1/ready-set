@@ -380,8 +380,8 @@ export function useAdminRealtimeTracking(
   const isConnected =
     (isRealtimeEnabled && isRealtimeConnected && useRealtime) || sseIsConnected;
 
-  // Combine errors
-  const error = realtimeError || sseError;
+  // Combine errors - only show SSE error if Realtime is not connected
+  const error = realtimeError || (isRealtimeConnected ? null : sseError);
 
   return {
     activeDrivers,

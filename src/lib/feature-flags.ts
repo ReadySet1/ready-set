@@ -40,15 +40,15 @@ interface FeatureFlagConfig {
  */
 const DEFAULT_FLAGS: Record<FeatureFlagKey, FeatureFlagConfig> = {
   [FEATURE_FLAGS.USE_REALTIME_TRACKING]: {
-    enabled: false,
+    enabled: false, // Disabled by default - enable via environment variable
     rolloutPercentage: 0,
   },
   [FEATURE_FLAGS.USE_REALTIME_LOCATION_UPDATES]: {
-    enabled: false,
+    enabled: false, // Disabled by default - enable via environment variable
     rolloutPercentage: 0,
   },
   [FEATURE_FLAGS.USE_REALTIME_ADMIN_DASHBOARD]: {
-    enabled: false,
+    enabled: false, // Disabled by default - enable via environment variable
     rolloutPercentage: 0,
   },
   [FEATURE_FLAGS.USE_REALTIME_DRIVER_MESSAGING]: {
@@ -90,6 +90,7 @@ class FeatureFlagStore {
   private loadEnvironmentOverrides(): void {
     // NEXT_PUBLIC_FF_USE_REALTIME_TRACKING=true
     // NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES=50 (rollout percentage)
+
     Object.values(FEATURE_FLAGS).forEach((flagKey) => {
       const envKey = `NEXT_PUBLIC_FF_${flagKey.toUpperCase()}`;
       const envValue = process.env[envKey];
