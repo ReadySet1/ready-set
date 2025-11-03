@@ -31,6 +31,9 @@ process.env.CLOUDINARY_API_SECRET = 'test-api-secret';
 process.env.SANITY_PROJECT_ID = 'test-project';
 process.env.SANITY_DATASET = 'test-dataset';
 process.env.SANITY_API_TOKEN = 'test-token';
+process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN = 'pk.test.mock-mapbox-token';
+
+// Mock Mapbox GL JS - Jest will use the manual mock from src/__mocks__/mapbox-gl.ts
 
 // Fix TextEncoder/Decoder for Node 18+
 import { TextEncoder, TextDecoder } from 'util';

@@ -19,7 +19,8 @@ import {
 import { cn } from '@/lib/utils';
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 import { DRIVER_STATUS_COLORS, BATTERY_STATUS_COLORS, DELIVERY_MARKER_COLOR } from '@/constants/tracking-colors';
-import { MAP_CONFIG, MARKER_CONFIG } from '@/constants/tracking-config';
+import { MAP_CONFIG, MARKER_CONFIG, BATTERY_THRESHOLDS } from '@/constants/tracking-config';
+import { captureException, captureMessage, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 
 // Ensure Mapbox token is available
 if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
@@ -78,7 +79,11 @@ export default function LiveDriverMap({
         process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN === 'YOUR_MAPBOX_TOKEN_HERE' ||
         process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN === 'your_mapbox_access_token') {
       const errorMessage = 'Mapbox token not configured. Please add NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to your .env.local file.';
-      console.error('[LiveDriverMap]', errorMessage);
+      captureMessage(errorMessage, 'error', {
+        feature: 'live-driver-map',
+        action: 'mapbox-token-check',
+        component: 'LiveDriverMap'
+      });
       setMapError(errorMessage);
       return;
     }
@@ -97,7 +102,7 @@ export default function LiveDriverMap({
 
       // Add scale control
       map.addControl(new mapboxgl.ScaleControl({
-        maxWidth: 100,
+        maxWidth: MARKER_CONFIG.POPUP_MAX_WIDTH,
         unit: 'imperial'
       }), 'bottom-left');
 
@@ -107,11 +112,19 @@ export default function LiveDriverMap({
       map.on('rotatestart', () => setHasUserInteracted(true));
 
       map.on('load', () => {
+        addSentryBreadcrumb('Map loaded successfully', {
+          feature: 'live-driver-map',
+          compact
+        });
         setMapLoaded(true);
       });
 
       map.on('error', (e) => {
-        console.error('Mapbox error:', e);
+        captureException(e, {
+          feature: 'live-driver-map',
+          action: 'mapbox-error',
+          component: 'LiveDriverMap'
+        });
         setMapError('Failed to load map. Please check your Mapbox token.');
       });
 
@@ -128,7 +141,11 @@ export default function LiveDriverMap({
         mapRef.current = null;
       };
     } catch (error) {
-      console.error('Error initializing Mapbox:', error);
+      captureException(error, {
+        feature: 'live-driver-map',
+        action: 'map-initialization',
+        component: 'LiveDriverMap'
+      });
       setMapError('Failed to initialize map. Please check console for details.');
     }
   }, [compact]);
@@ -166,8 +183,8 @@ export default function LiveDriverMap({
 
     if (!level) return { status: 'good' };
 
-    if (level <= 15) return { level, status: 'critical' };
-    if (level <= 30) return { level, status: 'low' };
+    if (level <= BATTERY_THRESHOLDS.CRITICAL) return { level, status: 'critical' };
+    if (level <= BATTERY_THRESHOLDS.LOW) return { level, status: 'low' };
     return { level, status: 'good' };
   };
 
@@ -516,18 +533,44 @@ export default function LiveDriverMap({
   return (
     <div className={cn('relative w-full h-full rounded-lg overflow-hidden', className)}>
       {/* Map container */}
-      <div ref={mapContainerRef} className="w-full h-full" />
+      <div
+        ref={mapContainerRef}
+        className="w-full h-full"
+        role="application"
+        aria-label="Live driver tracking map"
+      />
 
       {/* Map controls */}
       {!compact && (
         <div className="absolute top-4 right-4 flex flex-col space-y-2 z-10">
-          <Button size="sm" variant="outline" className="bg-white shadow-md" onClick={zoomIn}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="bg-white shadow-md"
+            onClick={zoomIn}
+            aria-label="Zoom in"
+            title="Zoom in"
+          >
             <ZoomInIcon className="w-4 h-4" />
           </Button>
-          <Button size="sm" variant="outline" className="bg-white shadow-md" onClick={zoomOut}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="bg-white shadow-md"
+            onClick={zoomOut}
+            aria-label="Zoom out"
+            title="Zoom out"
+          >
             <ZoomOutIcon className="w-4 h-4" />
           </Button>
-          <Button size="sm" variant="outline" className="bg-white shadow-md" onClick={fitToDrivers}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="bg-white shadow-md"
+            onClick={fitToDrivers}
+            aria-label="Fit map to all drivers"
+            title="Fit map to all drivers"
+          >
             <MaximizeIcon className="w-4 h-4" />
           </Button>
           <Button
@@ -535,6 +578,7 @@ export default function LiveDriverMap({
             variant="outline"
             className="bg-white shadow-md"
             onClick={toggleMapStyle}
+            aria-label={mapStyle === 'streets' ? 'Switch to satellite view' : 'Switch to street view'}
             title="Toggle map style"
           >
             {mapStyle === 'streets' ? (
