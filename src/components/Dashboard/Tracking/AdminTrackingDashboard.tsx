@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  NavigationIcon, 
-  TruckIcon, 
-  MapPinIcon, 
+import {
+  NavigationIcon,
+  TruckIcon,
+  MapPinIcon,
   ClockIcon,
   UsersIcon,
   ActivityIcon,
@@ -19,11 +20,24 @@ import {
   RefreshCwIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import LiveDriverMap from './LiveDriverMap';
 import DriverStatusList from './DriverStatusList';
 import DeliveryAssignmentPanel from './DeliveryAssignmentPanel';
 import { useRealTimeTracking } from '@/hooks/tracking/useRealTimeTracking';
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
+
+// Dynamically import LiveDriverMap to code-split Mapbox bundle (~750KB)
+// This ensures the map library only loads when the tracking page is accessed
+const LiveDriverMap = dynamic(() => import('./LiveDriverMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full min-h-[400px]">
+      <div className="flex flex-col items-center gap-2">
+        <RefreshCwIcon className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Loading map...</p>
+      </div>
+    </div>
+  ),
+});
 
 interface AdminTrackingDashboardProps {
   className?: string;
