@@ -27,4 +27,13 @@ export const MARKER_CONFIG = {
   DELIVERY_MARKER_SIZE: 24,
   /** Popup offset from marker (in pixels) */
   POPUP_OFFSET: 25,
+  /** Maximum width of popup content (in pixels) */
+  POPUP_MAX_WIDTH: 100,
+} as const;
+
+export const BATTERY_THRESHOLDS = {
+  /** Battery level below which is considered critical (percentage) */
+  CRITICAL: 15,
+  /** Battery level below which is considered low (percentage) */
+  LOW: 30,
 } as const;
