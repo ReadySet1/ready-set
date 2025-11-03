@@ -69,7 +69,7 @@ export function setSentryUser(user: SentryUser | null) {
  * });
  * ```
  */
-export function setSentryContext(context: string, data: Record<string, any>) {
+export function setSentryContext(context: string, data: Record<string, unknown>) {
   Sentry.setContext(context, data);
 }
 
@@ -91,7 +91,7 @@ export function setSentryContext(context: string, data: Record<string, any>) {
  */
 export function addSentryBreadcrumb(
   message: string,
-  data?: Record<string, any>,
+  data?: Record<string, unknown>,
   level: 'debug' | 'info' | 'warning' | 'error' = 'info'
 ) {
   Sentry.addBreadcrumb({
@@ -124,7 +124,7 @@ export function addSentryBreadcrumb(
  */
 export function captureException(
   error: Error | unknown,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ) {
   if (context) {
     Sentry.withScope((scope) => {
@@ -155,7 +155,7 @@ export function captureException(
 export function captureMessage(
   message: string,
   level: 'info' | 'warning' | 'error' | 'debug' = 'info',
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ) {
   if (context) {
     Sentry.withScope((scope) => {
@@ -213,7 +213,7 @@ export function setSentryTags(tags: Record<string, string>) {
  * Error boundary fallback handler
  * Use this in React Error Boundaries to capture and display errors
  */
-export function logErrorToSentry(error: Error, errorInfo: any) {
+export function logErrorToSentry(error: Error, errorInfo: Record<string, unknown>) {
   Sentry.withScope((scope) => {
     scope.setContext('errorInfo', errorInfo);
     Sentry.captureException(error);
