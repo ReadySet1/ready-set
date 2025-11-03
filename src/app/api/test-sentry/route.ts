@@ -76,9 +76,11 @@ export async function GET(request: Request) {
         } catch (error) {
           captureException(error, {
             feature: 'delivery_tracking',
-            deliveryId: 'test-123',
-            driverId: 'test-driver-456',
-            testType: 'context',
+            metadata: {
+              deliveryId: 'test-123',
+              driverId: 'test-driver-456',
+              testType: 'context',
+            },
           });
         }
         return NextResponse.json({

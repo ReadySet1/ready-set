@@ -52,6 +52,9 @@ export interface SentryUser {
 
   /** Username (optional) */
   username?: string;
+
+  /** User name (optional, alias for username) */
+  name?: string;
 }
 
 /**
