@@ -71,8 +71,11 @@ export default function LiveDriverMap({
 
     // Check if Mapbox token is configured
     if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ||
-        process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN === 'YOUR_MAPBOX_TOKEN_HERE') {
-      setMapError('Mapbox token not configured. Please add NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to your .env.local file.');
+        process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN === 'YOUR_MAPBOX_TOKEN_HERE' ||
+        process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN === 'your_mapbox_access_token') {
+      const errorMessage = 'Mapbox token not configured. Please add NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to your .env.local file.';
+      console.error('[LiveDriverMap]', errorMessage);
+      setMapError(errorMessage);
       return;
     }
 
