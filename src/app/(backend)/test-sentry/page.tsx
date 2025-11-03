@@ -8,7 +8,7 @@
  *
  * @route /test-sentry
  *
- * IMPORTANT: This page should be protected or removed in production
+ * IMPORTANT: This page is disabled in production for security
  */
 
 import { useState } from 'react';
@@ -21,6 +21,18 @@ import {
 
 export default function TestSentryPage() {
   const [result, setResult] = useState<string>('');
+
+  // Production protection
+  if (process.env.NODE_ENV === 'production') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="rounded-lg bg-white p-8 shadow-lg">
+          <h1 className="mb-4 text-2xl font-bold text-red-600">Access Denied</h1>
+          <p className="text-gray-700">This page is disabled in production.</p>
+        </div>
+      </div>
+    );
+  }
 
   // Test client-side error
   const testClientError = () => {

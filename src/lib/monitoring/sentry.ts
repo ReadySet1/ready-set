@@ -126,7 +126,9 @@ export function captureException(
       // Set tags for better filtering in Sentry
       if (context.action) scope.setTag('action', context.action);
       if (context.feature) scope.setTag('feature', context.feature);
-      if (context.handled !== undefined) scope.setTag('handled', context.handled);
+      if (context.userId) scope.setTag('userId', context.userId);
+      if (context.component) scope.setTag('component', context.component);
+      if (context.handled !== undefined) scope.setTag('handled', String(context.handled));
 
       // Set contexts
       if (context.component) {
