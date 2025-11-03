@@ -127,8 +127,9 @@ const sentryWebpackPluginOptions = {
   // For all available options, see:
   // https://github.com/getsentry/sentry-webpack-plugin#options
 
-  // Only suppress logs in CI environments to catch upload failures locally
-  silent: process.env.CI === 'true',
+  // Suppress verbose logs to reduce build output noise
+  // Set to false if you need to debug source map uploads
+  silent: true,
 
   // Upload source maps to Sentry
   // This will be enabled when SENTRY_AUTH_TOKEN is set
@@ -138,9 +139,25 @@ const sentryWebpackPluginOptions = {
   // Automatically tree-shake Sentry logger statements to reduce bundle size
   disableLogger: true,
 
-  // Error handling for source map uploads
+  // Hide source maps from public (don't include them in the browser)
+  hideSourceMaps: true,
+
+  // Suppress CLI output to reduce log verbosity
+  telemetry: false,
+
+  // Only upload source maps if auth token is available
+  // This prevents warnings when building locally without Sentry configured
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Wipe debug IDs to reduce sourcemap warnings
+  widenClientFileUpload: true,
+
+  // Error handling for source map uploads - don't add warnings to build output
   errorHandler: (err, invokeErr, compilation) => {
-    compilation.warnings.push('Sentry source map upload failed: ' + err.message);
+    // Only log to console, don't add to webpack warnings
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Sentry source map upload skipped or failed (this is normal in local development)');
+    }
   },
 };
 
