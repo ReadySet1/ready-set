@@ -210,7 +210,7 @@ export async function startSpan<T>(
   name: string,
   op: string,
   callback: () => Promise<T>,
-  attributes?: Record<string, unknown>
+  attributes?: Record<string, string | number | boolean | undefined>
 ): Promise<T> {
   return await Sentry.startSpan(
     {
