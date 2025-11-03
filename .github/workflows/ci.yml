@@ -41,6 +41,58 @@ jobs:
       - name: Run TypeScript type check
         run: pnpm typecheck
 
+      - name: Validate Sentry Configuration
+        run: |
+          echo "🔍 Validating Sentry configuration..."
+
+          # Check if SENTRY_AUTH_TOKEN is set (required for source map uploads)
+          if [ -z "${{ secrets.SENTRY_AUTH_TOKEN }}" ]; then
+            echo "⚠️  WARNING: SENTRY_AUTH_TOKEN secret is not configured"
+            echo "   Source maps will not be uploaded to Sentry during builds"
+            echo "   This is not blocking but recommended for production deployments"
+            echo ""
+            echo "📖 To configure:"
+            echo "   1. Go to Settings → Secrets and variables → Actions"
+            echo "   2. Add SENTRY_AUTH_TOKEN with your Sentry auth token"
+            echo ""
+          else
+            echo "✅ SENTRY_AUTH_TOKEN is configured"
+          fi
+
+          # Validate DSN format in .env.example
+          if [ -f ".env.example" ]; then
+            if grep -q "NEXT_PUBLIC_SENTRY_DSN=" .env.example; then
+              echo "✅ Sentry DSN variable found in .env.example"
+            else
+              echo "❌ ERROR: NEXT_PUBLIC_SENTRY_DSN not found in .env.example"
+              exit 1
+            fi
+          else
+            echo "⚠️  WARNING: .env.example not found"
+          fi
+
+          # Check that Sentry config files exist
+          MISSING_FILES=()
+          if [ ! -f "sentry.client.config.ts" ]; then
+            MISSING_FILES+=("sentry.client.config.ts")
+          fi
+          if [ ! -f "sentry.server.config.ts" ]; then
+            MISSING_FILES+=("sentry.server.config.ts")
+          fi
+          if [ ! -f "sentry.edge.config.ts" ]; then
+            MISSING_FILES+=("sentry.edge.config.ts")
+          fi
+
+          if [ ${#MISSING_FILES[@]} -gt 0 ]; then
+            echo "❌ ERROR: Missing Sentry configuration files:"
+            printf '  - %s\n' "${MISSING_FILES[@]}"
+            exit 1
+          fi
+
+          echo "✅ All Sentry configuration files present"
+          echo ""
+          echo "✅ Sentry configuration validation complete"
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest

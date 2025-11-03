@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
 import { logger, securityLogger } from "@/utils/logger";
 import { SpamProtectionManager } from "@/lib/spam-protection";
+import { setSentryUser } from "@/lib/monitoring/sentry";
 
 // Protected routes that require session refresh
 const PROTECTED_ROUTES = [
@@ -67,6 +68,8 @@ export async function middleware(request: NextRequest) {
 
         // Only log authentication failures for debugging
         if (!user || error) {
+          // Clear Sentry user context on auth failure
+          setSentryUser(null);
           
           const redirectUrl = new URL(`/sign-in?returnTo=${pathname}`, request.url);
           const response = NextResponse.redirect(redirectUrl);
@@ -77,6 +80,14 @@ export async function middleware(request: NextRequest) {
           response.headers.set('x-redirect-reason', 'unauthenticated');
 
           return response;
+        }
+
+        // For non-admin protected routes, set basic Sentry user context
+        if (!pathname.startsWith('/admin')) {
+          setSentryUser({
+            id: user.id,
+            email: user.email || undefined
+          });
         }
 
         // Enhanced session validation using session manager (disabled for server-side)
@@ -96,6 +107,13 @@ export async function middleware(request: NextRequest) {
           if (profileError) {
             securityLogger.error('Middleware: Error fetching user profile:', profileError);
           }
+
+          // Set Sentry user context for error tracking (with profile information)
+          setSentryUser({
+            id: user.id,
+            email: user.email || undefined,
+            role: profile?.type
+          });
 
           if (!profile || !['admin', 'super_admin', 'helpdesk'].includes((profile.type ?? '').toLowerCase())) {
             // User is authenticated but not authorized
