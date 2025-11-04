@@ -74,7 +74,8 @@ function isNetworkError(event: ErrorEvent): boolean {
     // If it's an API call or internal request, DON'T filter it out
     // We want to track API failures
     if (url) {
-      const isApiCall = url.includes('/api/') || url.includes(process.env.NEXT_PUBLIC_APP_URL || '');
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+      const isApiCall = url.includes('/api/') || (appUrl && url.includes(appUrl));
       if (isApiCall) {
         return false; // Don't filter - we want to capture API errors
       }

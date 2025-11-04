@@ -28,6 +28,12 @@ if (!dsn) {
     environment: process.env.NODE_ENV,
 
     // Release tracking for better error grouping and deploy tracking
+    // Uses Vercel's git commit SHA environment variables for automatic release tracking
+    // For non-Vercel deployments, set NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA manually to your commit SHA
+    // This enables:
+    // - Better error grouping by release version
+    // - Deploy tracking in Sentry dashboard
+    // - Commit-specific error attribution
     release: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA,
 
     // Adjust this value in production, or use tracesSampler for greater control

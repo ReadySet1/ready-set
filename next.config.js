@@ -1,7 +1,20 @@
 const path = require('path');
 const { withSentryConfig } = require('@sentry/nextjs');
 
-/** @type {import('next').NextConfig} */
+/**
+ * Next.js Configuration
+ *
+ * Build Memory Requirements:
+ * Large builds may require increased Node.js memory allocation.
+ * Use: NODE_OPTIONS="--max-old-space-size=4096" pnpm build
+ *
+ * This is typically needed for:
+ * - Large codebases with extensive TypeScript compilation
+ * - Sentry source map uploads (can be memory-intensive)
+ * - Multiple concurrent build processes
+ *
+ * @type {import('next').NextConfig}
+ */
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
@@ -9,7 +22,9 @@ const nextConfig = {
   typescript: {
     // Skip type checking during builds to prevent deployment failures
     // NOTE: This is a workaround for legacy code. New code should be type-safe.
-    // Consider running 'pnpm typecheck' separately in CI/CD to catch type errors
+    // TypeScript validation is enforced separately in CI/CD pipeline (.github/workflows/ci.yml)
+    // The CI pipeline runs 'pnpm typecheck' which will catch and fail on type errors
+    // Consider running 'pnpm typecheck' locally before committing
     ignoreBuildErrors: true,
   },
   experimental: {

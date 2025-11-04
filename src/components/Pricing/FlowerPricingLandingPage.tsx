@@ -9,85 +9,48 @@ import {
   Globe,
   MapPin,
 } from "lucide-react";
-
-type RegionKey = "peninsula-south" | "east-bay-middle" | "peninsula-north" | "san-francisco";
-
-interface PricingRow {
-  area: string;
-  zone: string;
-  cost: string;
-  hasToll?: boolean;
-}
-
-const regionalPricing: Record<RegionKey, { name: string; data: PricingRow[] }> = {
-  "peninsula-south": {
-    name: "Peninsula South",
-    data: [
-      { area: "Peninsula South", zone: "03", cost: "$10" },
-      { area: "Peninsula North", zone: "09", cost: "$11" },
-      { area: "San Jose West", zone: "02", cost: "$12" },
-      { area: "San Francisco Area", zone: "11", cost: "$12" },
-      { area: "East Bay South", zone: "06", cost: "$12", hasToll: true },
-      { area: "East Bay Middle", zone: "07", cost: "$13", hasToll: true },
-      { area: "Peninsula Coast", zone: "10", cost: "$13" },
-      { area: "San Jose East", zone: "01", cost: "$14" },
-      { area: "East Bay Richmond", zone: "05", cost: "$15", hasToll: true },
-      { area: "East Bay Concord", zone: "04", cost: "$15", hasToll: true },
-      { area: "Marin", zone: "08", cost: "$15", hasToll: true },
-    ],
-  },
-  "east-bay-middle": {
-    name: "East Bay Middle",
-    data: [
-      { area: "East Bay Middle", zone: "07", cost: "$10" },
-      { area: "San Francisco Area", zone: "11", cost: "$11", hasToll: true },
-      { area: "East Bay South", zone: "06", cost: "$12" },
-      { area: "East Bay Richmond", zone: "05", cost: "$12" },
-      { area: "East Bay Concord", zone: "04", cost: "$12" },
-      { area: "Peninsula North", zone: "09", cost: "$13", hasToll: true },
-      { area: "Peninsula South", zone: "03", cost: "$14", hasToll: true },
-      { area: "San Jose West", zone: "02", cost: "$15", hasToll: true },
-      { area: "San Jose East", zone: "01", cost: "$15" },
-      { area: "Marin", zone: "08", cost: "$15", hasToll: true },
-      { area: "Peninsula Coast", zone: "10", cost: "$15", hasToll: true },
-    ],
-  },
-  "peninsula-north": {
-    name: "Peninsula North",
-    data: [
-      { area: "Peninsula North", zone: "09", cost: "$10" },
-      { area: "Peninsula South", zone: "03", cost: "$11" },
-      { area: "San Jose West", zone: "02", cost: "$12" },
-      { area: "San Francisco Area", zone: "11", cost: "$12" },
-      { area: "East Bay South", zone: "06", cost: "$12", hasToll: true },
-      { area: "East Bay Middle", zone: "07", cost: "$13", hasToll: true },
-      { area: "Peninsula Coast", zone: "10", cost: "$13" },
-      { area: "San Jose East", zone: "01", cost: "$14" },
-      { area: "East Bay Richmond", zone: "05", cost: "$15", hasToll: true },
-      { area: "East Bay Concord", zone: "04", cost: "$15", hasToll: true },
-      { area: "Marin", zone: "08", cost: "$15", hasToll: true },
-    ],
-  },
-  "san-francisco": {
-    name: "San Francisco Area",
-    data: [
-      { area: "San Francisco Area", zone: "11", cost: "$10" },
-      { area: "North Peninsula Area", zone: "09", cost: "$11" },
-      { area: "East Bay Oakland/Alameda Area", zone: "07", cost: "$11", hasToll: true },
-      { area: "East Bay Richmond Area", zone: "05", cost: "$12", hasToll: true },
-      { area: "Peninsula South Area", zone: "03", cost: "$12" },
-      { area: "East Bay Hayward Area", zone: "06", cost: "$13", hasToll: true },
-      { area: "Peninsula Coast Area", zone: "10", cost: "$13" },
-      { area: "San Jose West Area", zone: "02", cost: "$13" },
-      { area: "Marin Area", zone: "08", cost: "$13", hasToll: true },
-      { area: "East Bay Concord Area", zone: "04", cost: "$14", hasToll: true },
-      { area: "San Jose Area", zone: "01", cost: "$14" },
-    ],
-  },
-};
+import { regionalPricing, type RegionKey } from "@/constants/pricing";
 
 const FlowerPricingLandingPage = () => {
   const [activeTab, setActiveTab] = useState<RegionKey>("peninsula-south");
+
+  // Keyboard navigation for tabs (Arrow keys, Home, End)
+  const handleKeyDown = (event: React.KeyboardEvent, currentRegion: RegionKey) => {
+    const regions = Object.keys(regionalPricing) as RegionKey[];
+    const currentIndex = regions.indexOf(currentRegion);
+
+    let newIndex = currentIndex;
+
+    switch (event.key) {
+      case 'ArrowLeft':
+        event.preventDefault();
+        newIndex = currentIndex > 0 ? currentIndex - 1 : regions.length - 1;
+        break;
+      case 'ArrowRight':
+        event.preventDefault();
+        newIndex = currentIndex < regions.length - 1 ? currentIndex + 1 : 0;
+        break;
+      case 'Home':
+        event.preventDefault();
+        newIndex = 0;
+        break;
+      case 'End':
+        event.preventDefault();
+        newIndex = regions.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    const newRegion = regions[newIndex];
+    if (newRegion) {
+      setActiveTab(newRegion);
+
+      // Focus the newly selected tab
+      const tabButton = document.querySelector(`[data-region="${newRegion}"]`) as HTMLButtonElement;
+      tabButton?.focus();
+    }
+  };
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-gray-50 via-white to-yellow-50">
@@ -136,11 +99,23 @@ const FlowerPricingLandingPage = () => {
             transition={{ duration: 0.6, delay: 0.4 }}
             className="mt-6 flex justify-center sm:mt-8 md:mt-12"
           >
-            <div className="grid w-full max-w-4xl grid-cols-2 gap-1 rounded-lg bg-white p-1 shadow-lg md:grid-cols-4">
+            <div
+              className="grid w-full max-w-4xl grid-cols-2 gap-1 rounded-lg bg-white p-1 shadow-lg md:grid-cols-4"
+              role="tablist"
+              aria-label="Select region for pricing information"
+            >
               {(Object.keys(regionalPricing) as RegionKey[]).map((region) => (
                 <button
                   key={region}
+                  role="tab"
+                  id={`tab-${region}`}
+                  data-region={region}
+                  aria-selected={activeTab === region}
+                  aria-controls={`tabpanel-${region}`}
+                  aria-label={`View ${regionalPricing[region].name} pricing`}
+                  tabIndex={activeTab === region ? 0 : -1}
                   onClick={() => setActiveTab(region)}
+                  onKeyDown={(e) => handleKeyDown(e, region)}
                   className={`rounded-md px-3 py-2 text-sm font-semibold transition-all sm:px-4 sm:py-2.5 sm:text-base md:px-6 md:py-3 ${
                     activeTab === region
                       ? "bg-black text-white shadow-md"
@@ -178,9 +153,13 @@ const FlowerPricingLandingPage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
             className="overflow-hidden rounded-xl bg-white shadow-2xl sm:rounded-2xl"
+            role="tabpanel"
+            id={`tabpanel-${activeTab}`}
+            aria-labelledby={`tab-${activeTab}`}
+            aria-label={`Pricing table for ${regionalPricing[activeTab].name}`}
           >
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full" aria-label={`${regionalPricing[activeTab].name} delivery pricing by zone`}>
                 <thead>
                   <tr className="bg-gradient-to-r from-gray-900 via-black to-gray-900 text-white">
                     <th className="border-r border-white/20 px-3 py-3 text-left text-sm font-bold sm:px-4 sm:py-4 md:px-6 md:py-5 md:text-base lg:text-lg">
@@ -241,7 +220,7 @@ const FlowerPricingLandingPage = () => {
                   If order is less than 10 packages, additional fee will apply based on originating pick-up zone.
                 </li>
                 <li className="text-sm text-white/90 sm:text-base">
-                  Fees is based on delivery zone, packages may have multiple zones in a route.
+                  Fees are based on delivery zone, packages may have multiple zones in a route.
                 </li>
                 <li className="text-sm text-white/90 sm:text-base">
                   Toll will be charge regardless of direction of the bridges crossed, only 1 toll charged per route.
