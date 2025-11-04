@@ -107,3 +107,7 @@ test-results/
 # Documentation markdown files
 docs/markdown/
 .vercel
+
+# Test/debug files (not for production)
+src/app/(site)/pricing-flowers/test-page.tsx
+src/components/Pricing/FlowerPricingLandingPageSimple.tsx
