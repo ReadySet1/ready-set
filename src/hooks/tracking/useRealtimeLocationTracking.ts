@@ -3,17 +3,33 @@
  *
  * Extends useLocationTracking to broadcast location updates via Supabase Realtime.
  * Falls back to REST API if Realtime is unavailable or disabled.
+ *
+ * Usage:
+ * ```tsx
+ * const {
+ *   currentLocation,
+ *   isTracking,
+ *   isRealtimeConnected,
+ *   connectionMode,
+ *   startTracking,
+ *   stopTracking,
+ * } = useRealtimeLocationTracking({
+ *   enableRealtimeBroadcast: true,
+ *   onRealtimeConnect: () => console.log('Connected!'),
+ * });
+ * ```
  */
 
 'use client';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useLocationTracking } from './useLocationTracking';
+import { createClient } from '@/utils/supabase/client';
 import {
   createDriverLocationChannel,
   type DriverLocationChannel,
-  type DriverLocationPayload,
 } from '@/lib/realtime';
+import type { LocationUpdate } from '@/types/tracking';
 import {
   FEATURE_FLAGS,
   isFeatureEnabled,
@@ -46,6 +62,12 @@ interface UseRealtimeLocationTrackingOptions {
    * If false, only uses REST API (useful for testing)
    */
   enableRealtimeBroadcast?: boolean;
+
+  /**
+   * Driver ID for channel identification
+   * If not provided, will attempt to get from session
+   */
+  driverId?: string;
 }
 
 interface UseRealtimeLocationTrackingReturn
@@ -75,9 +97,10 @@ export function useRealtimeLocationTracking(
     onRealtimeDisconnect,
     onRealtimeError,
     enableRealtimeBroadcast = true,
+    driverId,
   } = options;
 
-  // Use the existing location tracking hook
+  // Use the existing location tracking hook (handles REST API sync)
   const locationTracking = useLocationTracking();
   const { currentLocation, isTracking } = locationTracking;
 
@@ -95,19 +118,23 @@ export function useRealtimeLocationTracking(
   // Realtime channel reference
   const channelRef = useRef<DriverLocationChannel | null>(null);
   const lastBroadcastRef = useRef<string | null>(null);
+  const supabaseRef = useRef(createClient());
 
   /**
    * Initialize Realtime channel
    */
   const initializeRealtime = useCallback(async () => {
-    if (!isRealtimeEnabled) {
+    if (!isRealtimeEnabled || channelRef.current) {
       return;
     }
 
     try {
-      const channel = createDriverLocationChannel();
+      const supabase = supabaseRef.current;
 
-      await channel.subscribe({
+      // Create channel with configuration
+      const channel = createDriverLocationChannel(supabase, {
+        driverId: driverId || currentLocation?.driverId,
+        presence: true, // Enable presence tracking for drivers
         onConnect: () => {
           setIsRealtimeConnected(true);
           setConnectionMode('realtime');
@@ -121,21 +148,27 @@ export function useRealtimeLocationTracking(
           console.log('[Realtime] Location channel disconnected');
         },
         onError: (error) => {
-          setIsRealtimeConnected(false);
-          setConnectionMode('rest');
+          console.error('[Realtime] Channel error:', error);
           onRealtimeError?.(error);
-          console.error('[Realtime] Location channel error:', error);
+          // Don't change connection status on errors - let reconnection logic handle it
         },
       });
 
+      // Connect to channel
+      await channel.connect();
       channelRef.current = channel;
+
+      console.log('[Realtime] Location channel initialized');
     } catch (error) {
       console.error('[Realtime] Failed to initialize location channel:', error);
       setConnectionMode('rest');
+      setIsRealtimeConnected(false);
       onRealtimeError?.(error as Error);
     }
   }, [
     isRealtimeEnabled,
+    currentLocation?.driverId,
+    driverId,
     onRealtimeConnect,
     onRealtimeDisconnect,
     onRealtimeError,
@@ -147,9 +180,9 @@ export function useRealtimeLocationTracking(
   const cleanupRealtime = useCallback(async () => {
     if (channelRef.current) {
       try {
-        await channelRef.current.unsubscribe();
+        await channelRef.current.disconnect();
       } catch (error) {
-        console.error('[Realtime] Error unsubscribing from channel:', error);
+        console.error('[Realtime] Error disconnecting from channel:', error);
       }
       channelRef.current = null;
       setIsRealtimeConnected(false);
@@ -161,7 +194,7 @@ export function useRealtimeLocationTracking(
    * Broadcast location update via Realtime
    */
   const broadcastLocation = useCallback(
-    async (location: NonNullable<typeof currentLocation>) => {
+    async (location: LocationUpdate) => {
       if (!channelRef.current || !isRealtimeConnected) {
         return false;
       }
@@ -173,35 +206,26 @@ export function useRealtimeLocationTracking(
           return true;
         }
 
-        const payload: DriverLocationPayload = {
-          lat: location.coordinates.lat,
-          lng: location.coordinates.lng,
-          accuracy: location.accuracy,
-          speed: location.speed || null,
-          heading: location.heading || null,
-          altitude: location.altitude || null,
-          batteryLevel: location.batteryLevel || null,
-          isMoving: location.isMoving,
-          activityType: location.activityType || null,
-          timestamp: location.timestamp.toISOString(),
-        };
-
-        await channelRef.current.sendLocationUpdate(payload);
+        // Broadcast via Realtime channel
+        await channelRef.current.broadcastLocation(location);
         lastBroadcastRef.current = locationKey;
+
+        console.log('[Realtime] Location broadcasted successfully');
         return true;
       } catch (error) {
         console.error('[Realtime] Failed to broadcast location:', error);
+        onRealtimeError?.(error as Error);
         return false;
       }
     },
-    [isRealtimeConnected],
+    [isRealtimeConnected, onRealtimeError],
   );
 
   /**
-   * Initialize Realtime on mount if enabled
+   * Initialize Realtime on mount if enabled and tracking
    */
   useEffect(() => {
-    if (isRealtimeEnabled && isTracking) {
+    if (isRealtimeEnabled && isTracking && !channelRef.current) {
       initializeRealtime();
     }
 
@@ -212,26 +236,30 @@ export function useRealtimeLocationTracking(
 
   /**
    * Broadcast location updates when they change
+   * This runs AFTER the REST API sync (handled by useLocationTracking)
    */
   useEffect(() => {
-    if (!currentLocation || !isTracking || !isRealtimeEnabled) {
+    if (!currentLocation || !isTracking || !isRealtimeEnabled || !isRealtimeConnected) {
       return;
     }
 
-    // Attempt to broadcast via Realtime
+    // Attempt to broadcast via Realtime (non-blocking)
+    // REST fallback is already handled by useLocationTracking
     broadcastLocation(currentLocation).catch((error) => {
       console.error('[Realtime] Failed to broadcast location update:', error);
-      // REST fallback is handled by the base useLocationTracking hook
     });
-  }, [currentLocation, isTracking, isRealtimeEnabled, broadcastLocation]);
+  }, [currentLocation, isTracking, isRealtimeEnabled, isRealtimeConnected, broadcastLocation]);
 
   /**
    * Handle Realtime feature flag changes
+   * Disconnect if disabled, connect if enabled
    */
   useEffect(() => {
     if (!isRealtimeEnabled && channelRef.current) {
+      // Feature disabled - cleanup
       cleanupRealtime();
     } else if (isRealtimeEnabled && !channelRef.current && isTracking) {
+      // Feature enabled and tracking active - initialize
       initializeRealtime();
     }
   }, [isRealtimeEnabled, isTracking, initializeRealtime, cleanupRealtime]);
@@ -242,12 +270,34 @@ export function useRealtimeLocationTracking(
   useEffect(() => {
     if (isRealtimeEnabled && isRealtimeConnected) {
       setConnectionMode('realtime');
-    } else if (isRealtimeEnabled && !isRealtimeConnected) {
+    } else if (isRealtimeEnabled && !isRealtimeConnected && isTracking) {
       setConnectionMode('hybrid'); // Attempting Realtime, falling back to REST
     } else {
       setConnectionMode('rest');
     }
-  }, [isRealtimeEnabled, isRealtimeConnected]);
+  }, [isRealtimeEnabled, isRealtimeConnected, isTracking]);
+
+  /**
+   * Handle page visibility to optimize battery/bandwidth
+   */
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && channelRef.current && isRealtimeConnected) {
+        // Optionally reduce broadcast frequency when in background
+        // For now, keep channel open but rely on watchPosition's reduced frequency
+        console.log('[Realtime] Page hidden, maintaining connection');
+      } else if (!document.hidden && isRealtimeEnabled && !channelRef.current && isTracking) {
+        // Page visible again - reconnect if needed
+        console.log('[Realtime] Page visible, checking connection');
+        initializeRealtime();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isRealtimeEnabled, isRealtimeConnected, isTracking, initializeRealtime]);
 
   return {
     ...locationTracking,
