@@ -4,6 +4,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mapbox GL JS styles - Required for maps */
+@import 'mapbox-gl/dist/mapbox-gl.css';
+
 @font-face {
   font-family: 'Kabel';
   src: url('/fonts/KabelC-Demi.otf') format('opentype');

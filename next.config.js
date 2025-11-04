@@ -1,12 +1,30 @@
 const path = require('path');
+const { withSentryConfig } = require('@sentry/nextjs');
 
-/** @type {import('next').NextConfig} */
+/**
+ * Next.js Configuration
+ *
+ * Build Memory Requirements:
+ * Large builds may require increased Node.js memory allocation.
+ * Use: NODE_OPTIONS="--max-old-space-size=4096" pnpm build
+ *
+ * This is typically needed for:
+ * - Large codebases with extensive TypeScript compilation
+ * - Sentry source map uploads (can be memory-intensive)
+ * - Multiple concurrent build processes
+ *
+ * @type {import('next').NextConfig}
+ */
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
   compress: true, // Enable gzip compression for production
   typescript: {
-    // Always skip type checking during builds to prevent deployment failures
+    // Skip type checking during builds to prevent deployment failures
+    // NOTE: This is a workaround for legacy code. New code should be type-safe.
+    // TypeScript validation is enforced separately in CI/CD pipeline (.github/workflows/ci.yml)
+    // The CI pipeline runs 'pnpm typecheck' which will catch and fail on type errors
+    // Consider running 'pnpm typecheck' locally before committing
     ignoreBuildErrors: true,
   },
   experimental: {
@@ -119,4 +137,44 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig 
+// Sentry configuration options
+const sentryWebpackPluginOptions = {
+  // For all available options, see:
+  // https://github.com/getsentry/sentry-webpack-plugin#options
+
+  // Suppress verbose logs to reduce build output noise
+  // Set to false if you need to debug source map uploads
+  silent: true,
+
+  // Upload source maps to Sentry
+  // This will be enabled when SENTRY_AUTH_TOKEN is set
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  // Automatically tree-shake Sentry logger statements to reduce bundle size
+  disableLogger: true,
+
+  // Hide source maps from public (don't include them in the browser)
+  hideSourceMaps: true,
+
+  // Suppress CLI output to reduce log verbosity
+  telemetry: false,
+
+  // Only upload source maps if auth token is available
+  // This prevents warnings when building locally without Sentry configured
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Wipe debug IDs to reduce sourcemap warnings
+  widenClientFileUpload: true,
+
+  // Error handling for source map uploads - don't add warnings to build output
+  errorHandler: (err, invokeErr, compilation) => {
+    // Only log to console, don't add to webpack warnings
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Sentry source map upload skipped or failed (this is normal in local development)');
+    }
+  },
+};
+
+// Make sure adding Sentry options is the last code to run before exporting
+module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions);
