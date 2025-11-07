@@ -8,19 +8,14 @@
 import { z } from 'zod';
 import { InputSanitizer } from '../validation';
 import { REALTIME_EVENTS } from './types';
+import { PAYLOAD_CONFIG } from '@/constants/realtime-config';
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
-// Maximum payload size in bytes (64KB)
-export const MAX_PAYLOAD_SIZE = 64 * 1024;
-
-// Maximum string lengths
-const MAX_STRING_LENGTH = 1000;
-const MAX_MESSAGE_LENGTH = 2000;
-const MAX_ID_LENGTH = 255;
-const MAX_ADDRESS_LENGTH = 500;
+// Re-export MAX_PAYLOAD_SIZE for backward compatibility
+export const MAX_PAYLOAD_SIZE = PAYLOAD_CONFIG.MAX_PAYLOAD_SIZE;
 
 // ============================================================================
 // Base Schemas
@@ -48,7 +43,7 @@ const LocationSchema = CoordinateSchema.extend({
   address: z
     .string()
     .min(1, 'Address is required')
-    .max(MAX_ADDRESS_LENGTH, `Address must not exceed ${MAX_ADDRESS_LENGTH} characters`)
+    .max(PAYLOAD_CONFIG.MAX_ADDRESS_LENGTH, `Address must not exceed ${PAYLOAD_CONFIG.MAX_ADDRESS_LENGTH} characters`)
     .transform((val) => InputSanitizer.sanitizeText(val)),
 });
 
@@ -65,12 +60,12 @@ const TimestampSchema = z
 const UUIDSchema = z
   .string()
   .uuid({ message: 'Must be a valid UUID' })
-  .max(MAX_ID_LENGTH);
+  .max(PAYLOAD_CONFIG.MAX_ID_LENGTH);
 
 /**
  * Sanitized string schema
  */
-const SanitizedStringSchema = (maxLength: number = MAX_STRING_LENGTH) =>
+const SanitizedStringSchema = (maxLength: number = PAYLOAD_CONFIG.MAX_STRING_LENGTH) =>
   z
     .string()
     .min(1, 'String cannot be empty')
@@ -128,8 +123,8 @@ export const DriverLocationPayloadSchema = z.object({
 
 export const DriverLocationUpdatedPayloadSchema = DriverLocationPayloadSchema.extend({
   driverId: UUIDSchema,
-  driverName: SanitizedStringSchema(MAX_STRING_LENGTH).optional(),
-  vehicleNumber: SanitizedStringSchema(MAX_STRING_LENGTH).optional(),
+  driverName: SanitizedStringSchema(PAYLOAD_CONFIG.MAX_STRING_LENGTH).optional(),
+  vehicleNumber: SanitizedStringSchema(PAYLOAD_CONFIG.MAX_STRING_LENGTH).optional(),
 });
 
 // ============================================================================
@@ -148,7 +143,7 @@ export const DriverStatusPayloadSchema = z.object({
 
 export const DriverStatusUpdatedPayloadSchema = DriverStatusPayloadSchema.extend({
   driverId: UUIDSchema,
-  driverName: SanitizedStringSchema(MAX_STRING_LENGTH).optional(),
+  driverName: SanitizedStringSchema(PAYLOAD_CONFIG.MAX_STRING_LENGTH).optional(),
 });
 
 // ============================================================================
@@ -166,12 +161,12 @@ export const DeliveryAssignmentPayloadSchema = z.object({
   deliveryLocation: LocationSchema,
   estimatedArrival: TimestampSchema.optional(),
   priority: DeliveryPrioritySchema.optional(),
-  notes: SanitizedStringSchema(MAX_MESSAGE_LENGTH).optional(),
+  notes: SanitizedStringSchema(PAYLOAD_CONFIG.MAX_MESSAGE_LENGTH).optional(),
 });
 
 export const DeliveryAssignedPayloadSchema = DeliveryAssignmentPayloadSchema.extend({
   assignedBy: UUIDSchema,
-  assignedByName: SanitizedStringSchema(MAX_STRING_LENGTH),
+  assignedByName: SanitizedStringSchema(PAYLOAD_CONFIG.MAX_STRING_LENGTH),
   assignedAt: TimestampSchema,
 });
 
@@ -182,7 +177,7 @@ export const DeliveryAssignedPayloadSchema = DeliveryAssignmentPayloadSchema.ext
 const MessagePrioritySchema = z.enum(['info', 'warning', 'urgent']);
 
 export const AdminMessagePayloadSchema = z.object({
-  message: SanitizedStringSchema(MAX_MESSAGE_LENGTH),
+  message: SanitizedStringSchema(PAYLOAD_CONFIG.MAX_MESSAGE_LENGTH),
   targetDriverId: UUIDSchema.optional(),
   priority: MessagePrioritySchema.optional(),
   actionRequired: z.boolean().optional(),
@@ -190,7 +185,7 @@ export const AdminMessagePayloadSchema = z.object({
 
 export const AdminMessageReceivedPayloadSchema = AdminMessagePayloadSchema.extend({
   adminId: UUIDSchema,
-  adminName: SanitizedStringSchema(MAX_STRING_LENGTH),
+  adminName: SanitizedStringSchema(PAYLOAD_CONFIG.MAX_STRING_LENGTH),
   sentAt: TimestampSchema,
   messageId: UUIDSchema,
 });
@@ -212,9 +207,9 @@ const UserTypeSchema = z.enum(['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK']);
 export const PresenceStateSchema = z.object({
   userId: UUIDSchema,
   userType: UserTypeSchema,
-  userName: SanitizedStringSchema(MAX_STRING_LENGTH).optional(),
+  userName: SanitizedStringSchema(PAYLOAD_CONFIG.MAX_STRING_LENGTH).optional(),
   driverId: UUIDSchema.optional(),
-  vehicleNumber: SanitizedStringSchema(MAX_STRING_LENGTH).optional(),
+  vehicleNumber: SanitizedStringSchema(PAYLOAD_CONFIG.MAX_STRING_LENGTH).optional(),
   onlineAt: TimestampSchema,
 });
 
@@ -298,8 +293,8 @@ export function validatePayload<T>(eventName: string, payload: unknown): T {
   const result = schema.safeParse(payload);
 
   if (!result.success) {
-    const errorMessages = result.error.errors
-      .map((err) => `${err.path.join('.')}: ${err.message}`)
+    const errorMessages = result.error.issues
+      .map((err: { path: (string | number)[]; message: string }) => `${err.path.join('.')}: ${err.message}`)
       .join(', ');
 
     throw new PayloadValidationError(

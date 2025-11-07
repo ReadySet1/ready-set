@@ -30,6 +30,29 @@ import {
 import { realtimeLogger } from '../logging/realtime-logger';
 
 // ============================================================================
+// Type Definitions
+// ============================================================================
+
+/**
+ * Extended Phoenix Channel interface
+ *
+ * Phoenix Channels (underlying Supabase Realtime) provides an `off()` method
+ * for removing event listeners, but @supabase/supabase-js types don't expose it.
+ * This interface adds the missing type definition.
+ *
+ * @see https://hexdocs.pm/phoenix/js/
+ */
+interface PhoenixChannel extends RealtimeChannel {
+  /**
+   * Remove an event listener from the channel
+   * @param event - Event type (e.g., 'broadcast', 'presence')
+   * @param filter - Event filter (e.g., { event: 'location:updated' })
+   * @param callback - Callback function to remove
+   */
+  off(event: string, filter: Record<string, unknown>, callback: (...args: unknown[]) => void): void;
+}
+
+// ============================================================================
 // Driver Location Channel
 // ============================================================================
 
@@ -37,7 +60,7 @@ export class DriverLocationChannel {
   private channel: RealtimeChannel | null = null;
   private client = getRealtimeClient();
   private eventHandlers: Map<string, RealtimeEventHandler> = new Map();
-  private listenerRefs: Map<string, Function> = new Map(); // Store listener references for cleanup
+  private listenerRefs: Map<string, (...args: unknown[]) => void> = new Map(); // Store listener references for cleanup
 
   /**
    * Subscribe to driver location updates
@@ -115,13 +138,16 @@ export class DriverLocationChannel {
 
   /**
    * Remove event listener with improved error handling
+   *
+   * Note: Uses PhoenixChannel interface to access off() method not exposed by @supabase/supabase-js types.
+   * This is safe because Supabase Realtime is built on Phoenix Channels which provides this method.
    */
   off(eventName: RealtimeEventName): void {
     const listener = this.listenerRefs.get(eventName);
     if (listener && this.channel) {
       try {
-        // Phoenix Channels has off() but @supabase/supabase-js types don't expose it
-        const channel = this.channel as any;
+        // Type assertion to PhoenixChannel to access off() method
+        const channel = this.channel as PhoenixChannel;
         if (typeof channel.off === 'function') {
           channel.off('broadcast', { event: eventName }, listener);
         } else {
@@ -167,7 +193,7 @@ export class DriverStatusChannel {
   private channel: RealtimeChannel | null = null;
   private client = getRealtimeClient();
   private eventHandlers: Map<string, RealtimeEventHandler> = new Map();
-  private listenerRefs: Map<string, Function> = new Map(); // Store listener references for cleanup
+  private listenerRefs: Map<string, (...args: unknown[]) => void> = new Map(); // Store listener references for cleanup
 
   /**
    * Subscribe to driver status updates
@@ -229,7 +255,7 @@ export class DriverStatusChannel {
   /**
    * Listen to specific events
    */
-  on<T = any>(eventName: RealtimeEventName, handler: RealtimeEventHandler<T>): void {
+  on<T = MessagePayload>(eventName: RealtimeEventName, handler: RealtimeEventHandler<T>): void {
     if (!this.channel) {
       throw new RealtimeConnectionError(
         'Channel not subscribed. Call subscribe() first.',
@@ -278,13 +304,15 @@ export class DriverStatusChannel {
 
   /**
    * Remove event listener
+   *
+   * Note: Uses PhoenixChannel interface to access off() method not exposed by @supabase/supabase-js types.
+   * This is safe because Supabase Realtime is built on Phoenix Channels which provides this method.
    */
   off(eventName: RealtimeEventName): void {
     const listener = this.listenerRefs.get(eventName);
     if (listener && this.channel) {
-      // Actually remove the listener from the channel
-      // Note: Phoenix Channels has off() but @supabase/supabase-js types don't expose it
-      (this.channel as any).off('broadcast', { event: eventName }, listener);
+      // Type assertion to PhoenixChannel to access off() method
+      (this.channel as PhoenixChannel).off('broadcast', { event: eventName }, listener);
     }
     this.listenerRefs.delete(eventName);
     this.eventHandlers.delete(eventName);
@@ -316,7 +344,7 @@ export class AdminCommandsChannel {
   private channel: RealtimeChannel | null = null;
   private client = getRealtimeClient();
   private eventHandlers: Map<string, RealtimeEventHandler> = new Map();
-  private listenerRefs: Map<string, Function> = new Map(); // Store listener references for cleanup
+  private listenerRefs: Map<string, (...args: unknown[]) => void> = new Map(); // Store listener references for cleanup
 
   /**
    * Subscribe to admin commands
@@ -391,7 +419,7 @@ export class AdminCommandsChannel {
   /**
    * Listen to specific events
    */
-  on<T = any>(eventName: RealtimeEventName, handler: RealtimeEventHandler<T>): void {
+  on<T = MessagePayload>(eventName: RealtimeEventName, handler: RealtimeEventHandler<T>): void {
     if (!this.channel) {
       throw new RealtimeConnectionError(
         'Channel not subscribed. Call subscribe() first.',
@@ -415,13 +443,15 @@ export class AdminCommandsChannel {
 
   /**
    * Remove event listener
+   *
+   * Note: Uses PhoenixChannel interface to access off() method not exposed by @supabase/supabase-js types.
+   * This is safe because Supabase Realtime is built on Phoenix Channels which provides this method.
    */
   off(eventName: RealtimeEventName): void {
     const listener = this.listenerRefs.get(eventName);
     if (listener && this.channel) {
-      // Actually remove the listener from the channel
-      // Note: Phoenix Channels has off() but @supabase/supabase-js types don't expose it
-      (this.channel as any).off('broadcast', { event: eventName }, listener);
+      // Type assertion to PhoenixChannel to access off() method
+      (this.channel as PhoenixChannel).off('broadcast', { event: eventName }, listener);
     }
     this.listenerRefs.delete(eventName);
     this.eventHandlers.delete(eventName);

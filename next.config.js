@@ -7,9 +7,6 @@ const nextConfig = {
   output: "standalone",
   compress: true, // Enable gzip compression for production
 
-  // Performance optimizations for faster builds
-  swcMinify: true, // Use SWC for faster minification
-
   typescript: {
     // Skip type checking during builds to prevent deployment failures
     // NOTE: This is a workaround for legacy code. New code should be type-safe.
@@ -20,10 +17,6 @@ const nextConfig = {
   experimental: {
     // Enable 'use cache' directive for static site generation
     useCache: true,
-    // Enable parallel server compilation for faster builds
-    parallelServerBuildTraces: true,
-    // Enable parallel server compilation
-    parallelServerCompiles: true,
     // Optimize package imports
     optimizePackageImports: ['@supabase/supabase-js', 'react-icons', 'date-fns'],
   },

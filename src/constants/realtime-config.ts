@@ -122,6 +122,46 @@ export const CACHE_CONFIG = {
 } as const;
 
 // ============================================================================
+// Payload Validation Configuration
+// ============================================================================
+
+/**
+ * Size and length limits for realtime payloads
+ * Prevents oversized messages and DoS attacks
+ */
+export const PAYLOAD_CONFIG = {
+  /**
+   * Maximum payload size in bytes (64KB)
+   * Phoenix/Supabase channel limit for broadcast messages
+   */
+  MAX_PAYLOAD_SIZE: 64 * 1024,
+
+  /**
+   * Maximum length for general string fields
+   * Reasonable limit for names, titles, etc.
+   */
+  MAX_STRING_LENGTH: 1000,
+
+  /**
+   * Maximum length for message/description fields
+   * Allows longer content without being excessive
+   */
+  MAX_MESSAGE_LENGTH: 2000,
+
+  /**
+   * Maximum length for ID fields (UUIDs, identifiers)
+   * Standard UUID is 36 chars, this allows ample room
+   */
+  MAX_ID_LENGTH: 255,
+
+  /**
+   * Maximum length for address fields
+   * Street addresses can be lengthy
+   */
+  MAX_ADDRESS_LENGTH: 500,
+} as const;
+
+// ============================================================================
 // Memory Management Configuration
 // ============================================================================
 
@@ -139,14 +179,28 @@ export const MEMORY_CONFIG = {
   /**
    * Threshold for processed locations Set cleanup
    * When size exceeds this, delete oldest entries
+   * Reduced from 1000 to 500 for more aggressive cleanup
    */
-  PROCESSED_LOCATIONS_THRESHOLD: 1000,
+  PROCESSED_LOCATIONS_THRESHOLD: 500,
 
   /**
    * Number of entries to remove during cleanup
    * Remove in batches for efficiency
+   * Increased from 100 to 250 for larger cleanup batches
    */
-  PROCESSED_LOCATIONS_CLEANUP_BATCH: 100,
+  PROCESSED_LOCATIONS_CLEANUP_BATCH: 250,
+
+  /**
+   * Time-based cleanup interval (milliseconds)
+   * Run cleanup every 15 minutes to remove old entries
+   */
+  TIME_BASED_CLEANUP_INTERVAL_MS: 15 * 60 * 1000,
+
+  /**
+   * Maximum age for location entries (milliseconds)
+   * Remove entries older than 1 hour
+   */
+  LOCATION_ENTRY_MAX_AGE_MS: 60 * 60 * 1000,
 } as const;
 
 // ============================================================================
@@ -221,6 +275,7 @@ export const REALTIME_CONFIG = {
   CONNECTION: CONNECTION_CONFIG,
   RATE_LIMIT: RATE_LIMIT_CONFIG,
   CACHE: CACHE_CONFIG,
+  PAYLOAD: PAYLOAD_CONFIG,
   MEMORY: MEMORY_CONFIG,
   FEATURE_FLAG: FEATURE_FLAG_CONFIG,
   LOCATION_TRACKING: LOCATION_TRACKING_CONFIG,

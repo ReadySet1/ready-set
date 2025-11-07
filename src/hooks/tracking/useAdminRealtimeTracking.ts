@@ -21,12 +21,7 @@ import {
 } from '@/lib/feature-flags';
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 import { realtimeLogger } from '@/lib/logging/realtime-logger';
-
-// Memory management configuration
-const PROCESSED_LOCATIONS_CONFIG = {
-  MAX_SIZE: 500, // Maximum entries before cleanup (reduced from 1000)
-  CLEANUP_SIZE: 250, // Number of entries to remove during cleanup (increased from 100)
-} as const;
+import { MEMORY_CONFIG } from '@/constants/realtime-config';
 
 interface LocationData {
   driverId: string;
@@ -247,17 +242,17 @@ export function useAdminRealtimeTracking(
 
       // Clean up old entries to prevent memory leak
       // When threshold exceeded, delete batch of oldest entries for efficiency
-      if (processedLocationsRef.current.size > PROCESSED_LOCATIONS_CONFIG.MAX_SIZE) {
+      if (processedLocationsRef.current.size > MEMORY_CONFIG.PROCESSED_LOCATIONS_THRESHOLD) {
         const entriesToDelete = Array.from(processedLocationsRef.current).slice(
           0,
-          PROCESSED_LOCATIONS_CONFIG.CLEANUP_SIZE
+          MEMORY_CONFIG.PROCESSED_LOCATIONS_CLEANUP_BATCH
         );
         entriesToDelete.forEach(key => processedLocationsRef.current.delete(key));
 
-        realtimeLogger.warn('Processed locations cleanup performed', {
-          beforeSize: processedLocationsRef.current.size + PROCESSED_LOCATIONS_CONFIG.CLEANUP_SIZE,
+        realtimeLogger.warn('Processed locations size-based cleanup performed', {
+          beforeSize: processedLocationsRef.current.size + MEMORY_CONFIG.PROCESSED_LOCATIONS_CLEANUP_BATCH,
           afterSize: processedLocationsRef.current.size,
-          removed: PROCESSED_LOCATIONS_CONFIG.CLEANUP_SIZE,
+          removed: MEMORY_CONFIG.PROCESSED_LOCATIONS_CLEANUP_BATCH,
         });
       }
 
@@ -402,6 +397,45 @@ export function useAdminRealtimeTracking(
       setConnectionMode('sse');
     }
   }, [isRealtimeEnabled, isRealtimeConnected, useRealtime]);
+
+  /**
+   * Time-based cleanup for processedLocations
+   * Removes entries older than 1 hour every 15 minutes
+   * Prevents unbounded memory growth from long-running sessions
+   */
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      const cutoffTime = now - MEMORY_CONFIG.LOCATION_ENTRY_MAX_AGE_MS;
+      let removedCount = 0;
+
+      // Iterate through all entries and remove old ones
+      processedLocationsRef.current.forEach((key) => {
+        // Key format: "driverId:timestamp"
+        const timestamp = key.split(':')[1];
+        if (timestamp) {
+          const entryTime = new Date(timestamp).getTime();
+          if (entryTime < cutoffTime) {
+            processedLocationsRef.current.delete(key);
+            removedCount++;
+          }
+        }
+      });
+
+      // Log cleanup if entries were removed
+      if (removedCount > 0) {
+        realtimeLogger.info('Processed locations time-based cleanup performed', {
+          removedCount,
+          remainingCount: processedLocationsRef.current.size,
+          cutoffAge: `${MEMORY_CONFIG.LOCATION_ENTRY_MAX_AGE_MS / (60 * 1000)} minutes`,
+        });
+      }
+    }, MEMORY_CONFIG.TIME_BASED_CLEANUP_INTERVAL_MS);
+
+    return () => {
+      clearInterval(cleanupInterval);
+    };
+  }, []);
 
   /**
    * Merge Realtime and SSE data

@@ -20,6 +20,7 @@ import {
 import { realtimeLogger } from '../logging/realtime-logger';
 import { validatePayload, PayloadValidationError, PayloadSizeError } from './schemas';
 import { locationRateLimiter, RateLimitExceededError } from '../rate-limiting/location-rate-limiter';
+import { CONNECTION_CONFIG } from '@/constants/realtime-config';
 
 // ============================================================================
 // Client Configuration
@@ -49,11 +50,15 @@ function validateEnvironment() {
     });
 
     if (!result.success) {
-      const errors = result.error.errors.map((err) => `${err.path.join('.')}: ${err.message}`).join(', ');
-      realtimeLogger.error('Invalid Supabase environment configuration', { errors });
+      const errorMessages = result.error.issues.map((err: { path: (string | number)[]; message: string }) =>
+        `${err.path.join('.')}: ${err.message}`
+      ).join(', ');
+      // Log technical details for developers/support
+      realtimeLogger.error(`Invalid Supabase environment configuration: ${errorMessages}`, { error: result.error });
+      // Show user-friendly message
       throw new RealtimeAuthenticationError(
-        `Supabase environment configuration is invalid: ${errors}. ` +
-        'Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are properly set in your .env file.'
+        'Real-time features are currently unavailable due to a configuration issue. ' +
+        'Please contact support if this persists.'
       );
     }
 
@@ -62,9 +67,12 @@ function validateEnvironment() {
     if (error instanceof RealtimeAuthenticationError) {
       throw error;
     }
-    realtimeLogger.error('Failed to validate environment variables', { error });
+    // Log technical error for developers/support
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    realtimeLogger.error(`Failed to validate environment variables: ${errorMessage}`, { error });
+    // Show user-friendly message
     throw new RealtimeAuthenticationError(
-      'Failed to load Supabase configuration. Please check your environment variables.'
+      'Real-time features are temporarily unavailable. Please try again later or contact support.'
     );
   }
 }
@@ -73,15 +81,6 @@ function validateEnvironment() {
 const env = validateEnvironment();
 const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-// Realtime configuration
-// NOTE: Heartbeat removed - Supabase Realtime has built-in WebSocket heartbeats
-const REALTIME_CONFIG = {
-  reconnectDelay: 1000, // 1 second
-  reconnectDelayMax: 5000, // 5 seconds
-  reconnectAttempts: Infinity,
-  timeout: 10000, // 10 seconds
-};
 
 // ============================================================================
 // Authorization
@@ -162,6 +161,8 @@ export class RealtimeClient {
         params: {
           eventsPerSecond: 10,
         },
+        // Connection configuration from centralized config
+        timeout: CONNECTION_CONFIG.TIMEOUT_MS,
       },
     });
   }
