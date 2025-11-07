@@ -212,38 +212,40 @@ export function useAdminRealtimeTracking(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRealtimeEnabled, onRealtimeConnect, onRealtimeDisconnect, onRealtimeError]);
 
+  // Track if component is mounted to prevent setState after unmount
+  const isMountedRef = useRef(true);
+
+  // Set mounted flag to false on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   /**
    * Cleanup Realtime channel with cancellation support
    * Prevents state updates after component unmount (race condition fix)
    */
   const cleanupRealtime = useCallback(async () => {
-    // Track if cleanup was cancelled (component unmounted during async operation)
-    let isCancelled = false;
-
     if (channelRef.current) {
       const channelToCleanup = channelRef.current;
 
       try {
         await channelToCleanup.unsubscribe();
 
-        // Only update state if not cancelled
-        if (!isCancelled) {
+        // Only update state if component is still mounted
+        if (isMountedRef.current) {
           channelRef.current = null;
           setIsRealtimeConnected(false);
           setConnectionMode('sse');
         }
       } catch (error) {
-        // Only log if not cancelled
-        if (!isCancelled) {
+        // Only log if component is still mounted
+        if (isMountedRef.current) {
           realtimeLogger.error('Admin error unsubscribing from channel', { error });
         }
       }
     }
-
-    // Return cancellation function
-    return () => {
-      isCancelled = true;
-    };
   }, []);
 
   /**

@@ -76,17 +76,30 @@ CREATE INDEX IF NOT EXISTS idx_driver_locations_deleted_at
 
 CREATE OR REPLACE FUNCTION update_driver_last_location()
 RETURNS TRIGGER AS $$
+DECLARE
+  last_update_time TIMESTAMPTZ;
 BEGIN
-  -- Update the driver's last known location when a new location is recorded
-  UPDATE drivers
-  SET
-    last_known_location = NEW.location,
-    last_location_update = NEW.recorded_at,
-    last_known_accuracy = NEW.accuracy,
-    last_known_speed = NEW.speed,
-    last_known_heading = NEW.heading,
-    updated_at = NOW()
+  -- Get the last update timestamp for this driver
+  SELECT last_location_update INTO last_update_time
+  FROM drivers
   WHERE id = NEW.driver_id;
+
+  -- Rate limit: Only update if more than 60 seconds have passed since last update
+  -- This reduces UPDATE frequency from every location insert (~every 10 seconds)
+  -- to maximum once per minute, significantly reducing database write load
+  IF last_update_time IS NULL OR
+     (NEW.recorded_at - last_update_time) > INTERVAL '60 seconds' THEN
+    -- Update the driver's last known location when a new location is recorded
+    UPDATE drivers
+    SET
+      last_known_location = NEW.location,
+      last_location_update = NEW.recorded_at,
+      last_known_accuracy = NEW.accuracy,
+      last_known_speed = NEW.speed,
+      last_known_heading = NEW.heading,
+      updated_at = NOW()
+    WHERE id = NEW.driver_id;
+  END IF;
 
   RETURN NEW;
 END;
@@ -98,61 +111,14 @@ CREATE TRIGGER trigger_update_driver_last_location
   EXECUTE FUNCTION update_driver_last_location();
 
 -- ============================================================================
--- Create function to broadcast location updates via Realtime
+-- REMOVED: Duplicate broadcast trigger
 -- ============================================================================
-
-CREATE OR REPLACE FUNCTION broadcast_driver_location()
-RETURNS TRIGGER AS $$
-DECLARE
-  driver_info RECORD;
-  payload JSON;
-BEGIN
-  -- Fetch enriched driver information
-  SELECT
-    d.id as driver_id,
-    d.employee_id,
-    d.vehicle_number,
-    p.first_name || ' ' || p.last_name as driver_name,
-    p.id as profile_id
-  INTO driver_info
-  FROM drivers d
-  LEFT JOIN profiles p ON d.profile_id = p.id
-  WHERE d.id = NEW.driver_id;
-
-  -- Build enriched payload for Realtime broadcast
-  payload := json_build_object(
-    'driverId', driver_info.driver_id,
-    'driverName', driver_info.driver_name,
-    'employeeId', driver_info.employee_id,
-    'vehicleNumber', driver_info.vehicle_number,
-    'lat', NEW.latitude,
-    'lng', NEW.longitude,
-    'location', json_build_object(
-      'lat', NEW.latitude,
-      'lng', NEW.longitude
-    ),
-    'accuracy', NEW.accuracy,
-    'speed', NEW.speed,
-    'heading', NEW.heading,
-    'altitude', NEW.altitude,
-    'recordedAt', NEW.recorded_at,
-    'source', NEW.source,
-    'batteryLevel', NEW.battery_level,
-    'isMoving', NEW.is_moving,
-    'timestamp', extract(epoch from NEW.recorded_at) * 1000
-  );
-
-  -- Broadcast to driver-locations channel
-  PERFORM pg_notify('driver-locations', payload::text);
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_broadcast_driver_location
-  AFTER INSERT ON driver_locations
-  FOR EACH ROW
-  EXECUTE FUNCTION broadcast_driver_location();
+-- This trigger was removed because:
+-- 1. It duplicates functionality in migration 20251107000008
+-- 2. It caused double pg_notify calls for every location insert
+-- 3. It leaked sensitive data (driver names) in broadcasts
+-- The trigger in migration 20251107000008 is retained as the single source
+-- of location broadcasts without security issues.
 
 -- ============================================================================
 -- Enable Row Level Security (RLS)
@@ -193,11 +159,8 @@ CREATE POLICY "Authenticated users can view all locations"
     deleted_at IS NULL
   );
 
--- Policy: Service role has full access
-CREATE POLICY "Service role has full access"
-  ON driver_locations
-  FOR ALL
-  USING (auth.jwt()->>'role' = 'service_role');
+-- REMOVED: Service role policy (redundant)
+-- Service role ALWAYS bypasses RLS in Supabase, explicit policy not needed
 
 -- ============================================================================
 -- Add helpful comments

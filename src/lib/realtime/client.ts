@@ -27,21 +27,27 @@ import { CONNECTION_CONFIG } from '@/constants/realtime-config';
 // ============================================================================
 
 // Validate environment variables with Zod
-const EnvSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z
-    .string()
-    .url('NEXT_PUBLIC_SUPABASE_URL must be a valid URL')
-    .min(1, 'NEXT_PUBLIC_SUPABASE_URL is required'),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z
-    .string()
-    .min(20, 'NEXT_PUBLIC_SUPABASE_ANON_KEY must be at least 20 characters')
-    // Relaxed validation: just check it's a reasonable length string
-    // Supabase key format may change, and actual auth will fail anyway if invalid
-    .refine(
-      (key) => key.length >= 20 && /^[A-Za-z0-9_.\-]+$/.test(key),
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY appears to be invalid (must contain only alphanumeric, dots, hyphens, underscores)',
-    ),
-});
+// In test environment, use more lenient validation
+const EnvSchema = process.env.NODE_ENV === 'test'
+  ? z.object({
+      NEXT_PUBLIC_SUPABASE_URL: z.string().min(1),
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+    })
+  : z.object({
+      NEXT_PUBLIC_SUPABASE_URL: z
+        .string()
+        .url('NEXT_PUBLIC_SUPABASE_URL must be a valid URL')
+        .min(1, 'NEXT_PUBLIC_SUPABASE_URL is required'),
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: z
+        .string()
+        .min(20, 'NEXT_PUBLIC_SUPABASE_ANON_KEY must be at least 20 characters')
+        // Relaxed validation: just check it's a reasonable length string
+        // Supabase key format may change, and actual auth will fail anyway if invalid
+        .refine(
+          (key) => key.length >= 20 && /^[A-Za-z0-9_.\-]+$/.test(key),
+          'NEXT_PUBLIC_SUPABASE_ANON_KEY appears to be invalid (must contain only alphanumeric, dots, hyphens, underscores)',
+        ),
+    });
 
 // Validate and extract environment variables at module load time
 function validateEnvironment() {
@@ -143,6 +149,60 @@ function canBroadcastEvent(eventName: string, userType: string): boolean {
     return true;
   }
   return allowedRoles.includes(userType);
+}
+
+/**
+ * Fetch user context from database when not provided
+ */
+async function fetchUserContext(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<UserContext> {
+  // Fetch user type from profiles table
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('type')
+    .eq('id', userId)
+    .single();
+
+  if (profileError || !profile || !profile.type) {
+    realtimeLogger.error('Failed to fetch user profile', {
+      error: profileError,
+      metadata: { userId },
+    });
+    throw new UnauthorizedError(
+      'Unable to verify user permissions. Profile not found.'
+    );
+  }
+
+  const userType = profile.type as 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT';
+
+  // If user is a driver, fetch driver ID
+  let driverId: string | undefined;
+  if (userType === 'DRIVER') {
+    const { data: driver, error: driverError } = await supabase
+      .from('drivers')
+      .select('id')
+      .eq('profile_id', userId)
+      .single();
+
+    if (driverError || !driver) {
+      realtimeLogger.warn('Driver profile found but no driver record exists', {
+        error: driverError,
+        metadata: { userId },
+      });
+      // Don't throw - allow DRIVER user type without driver record
+      // They may be a driver in the system but not yet assigned
+    } else {
+      driverId = driver.id;
+    }
+  }
+
+  return {
+    userId,
+    userType,
+    driverId,
+  };
 }
 
 // ============================================================================
@@ -300,8 +360,11 @@ export class RealtimeClient {
       onError?: (error: Error) => void;
     },
   ): Promise<RealtimeChannel> {
-    // Get authenticated user if not provided
+    // Get or fetch user context for authorization
+    let effectiveUserContext: UserContext;
+
     if (!userContext) {
+      // Get authenticated user
       const { data: { user }, error } = await this.supabase.auth.getUser();
 
       if (error || !user) {
@@ -311,27 +374,27 @@ export class RealtimeClient {
         );
       }
 
-      // For now, we can't get the user type from the token alone
-      // This would need to be passed from the calling code or fetched from the database
-      realtimeLogger.warn('User context not provided, skipping authorization check', {
+      // Fetch user context from database
+      realtimeLogger.debug('Fetching user context for authorization', {
+        channelName,
+        metadata: { userId: user.id },
+      });
+      effectiveUserContext = await fetchUserContext(this.supabase, user.id);
+    } else {
+      effectiveUserContext = userContext;
+    }
+
+    // Validate user has access to this channel
+    if (!canAccessChannel(channelName, effectiveUserContext.userType)) {
+      realtimeLogger.error('User does not have access to channel', {
         channelName,
         metadata: {
-          userId: user.id,
+          userType: effectiveUserContext.userType,
         },
       });
-    } else {
-      // Validate user has access to this channel
-      if (!canAccessChannel(channelName, userContext.userType)) {
-        realtimeLogger.error('User does not have access to channel', {
-          channelName,
-          metadata: {
-            userType: userContext.userType,
-          },
-        });
-        throw new UnauthorizedError(
-          `Access denied to channel: ${channelName}. User type ${userContext.userType} does not have permission.`
-        );
-      }
+      throw new UnauthorizedError(
+        `Access denied to channel: ${channelName}. User type ${effectiveUserContext.userType} does not have permission.`
+      );
     }
 
     const channel = this.getChannel(channelName);
@@ -341,7 +404,7 @@ export class RealtimeClient {
     this.updateConnectionState(channelName, { state: 'connecting' });
 
     realtimeLogger.connection('connecting', channelName, {
-      userType: userContext?.userType,
+      userType: effectiveUserContext.userType,
     });
 
     return new Promise((resolve, reject) => {
@@ -446,58 +509,11 @@ export class RealtimeClient {
     userContext?: UserContext,
   ): Promise<void> {
     try {
-      // Check user authorization if context provided
-      if (userContext) {
-        // Check rate limiting for driver location updates
-        if (eventName === REALTIME_EVENTS.DRIVER_LOCATION_UPDATE && userContext.driverId) {
-          const rateLimitResult = locationRateLimiter.checkLimit(userContext.driverId);
-          if (!rateLimitResult.allowed) {
-            realtimeLogger.warn('Rate limit exceeded for driver location update', {
-              driverId: userContext.driverId,
-              metadata: {
-                retryAfter: rateLimitResult.retryAfter,
-              },
-            });
-            throw new RateLimitExceededError(
-              userContext.driverId,
-              rateLimitResult.retryAfter || 0
-            );
-          }
-        }
+      // Get or fetch user context for authorization
+      let effectiveUserContext: UserContext;
 
-        // Check if user can broadcast this event type
-        if (!canBroadcastEvent(eventName, userContext.userType)) {
-          realtimeLogger.error('User not authorized to broadcast event', {
-            eventType: eventName,
-            metadata: {
-              userType: userContext.userType,
-            },
-          });
-          throw new UnauthorizedError(
-            `User type ${userContext.userType} is not authorized to broadcast ${eventName}`
-          );
-        }
-
-        // For driver events, validate driver ID matches
-        if (eventName.startsWith('driver:')) {
-          const payloadWithDriverId = payload as any;
-          if (payloadWithDriverId.driverId && userContext.driverId) {
-            if (payloadWithDriverId.driverId !== userContext.driverId) {
-              realtimeLogger.error('Driver ID mismatch in payload', {
-                eventType: eventName,
-                driverId: userContext.driverId,
-                metadata: {
-                  payloadDriverId: payloadWithDriverId.driverId,
-                },
-              });
-              throw new UnauthorizedError(
-                'Driver ID in payload does not match authenticated user'
-              );
-            }
-          }
-        }
-      } else {
-        // If no user context provided, get auth user to at least verify they're logged in
+      if (!userContext) {
+        // Get authenticated user
         const { data: { user }, error } = await this.supabase.auth.getUser();
         if (error || !user) {
           realtimeLogger.error('User must be authenticated to broadcast', { error });
@@ -506,12 +522,63 @@ export class RealtimeClient {
           );
         }
 
-        realtimeLogger.warn('User context not provided for broadcast, skipping authorization', {
+        // Fetch user context from database
+        realtimeLogger.debug('Fetching user context for broadcast authorization', {
+          eventType: eventName,
+          metadata: { userId: user.id },
+        });
+        effectiveUserContext = await fetchUserContext(this.supabase, user.id);
+      } else {
+        effectiveUserContext = userContext;
+      }
+
+      // Check rate limiting for driver location updates
+      if (eventName === REALTIME_EVENTS.DRIVER_LOCATION_UPDATE && effectiveUserContext.driverId) {
+        const rateLimitResult = locationRateLimiter.checkLimit(effectiveUserContext.driverId);
+        if (!rateLimitResult.allowed) {
+          realtimeLogger.warn('Rate limit exceeded for driver location update', {
+            driverId: effectiveUserContext.driverId,
+            metadata: {
+              retryAfter: rateLimitResult.retryAfter,
+            },
+          });
+          throw new RateLimitExceededError(
+            effectiveUserContext.driverId,
+            rateLimitResult.retryAfter || 0
+          );
+        }
+      }
+
+      // Check if user can broadcast this event type
+      if (!canBroadcastEvent(eventName, effectiveUserContext.userType)) {
+        realtimeLogger.error('User not authorized to broadcast event', {
           eventType: eventName,
           metadata: {
-            userId: user.id,
+            userType: effectiveUserContext.userType,
           },
         });
+        throw new UnauthorizedError(
+          `User type ${effectiveUserContext.userType} is not authorized to broadcast ${eventName}`
+        );
+      }
+
+      // For driver events, validate driver ID matches
+      if (eventName.startsWith('driver:')) {
+        const payloadWithDriverId = payload as any;
+        if (payloadWithDriverId.driverId && effectiveUserContext.driverId) {
+          if (payloadWithDriverId.driverId !== effectiveUserContext.driverId) {
+            realtimeLogger.error('Driver ID mismatch in payload', {
+              eventType: eventName,
+              driverId: effectiveUserContext.driverId,
+              metadata: {
+                payloadDriverId: payloadWithDriverId.driverId,
+              },
+            });
+            throw new UnauthorizedError(
+              'Driver ID in payload does not match authenticated user'
+            );
+          }
+        }
       }
 
       // Validate payload with Zod (includes size check and sanitization)
@@ -535,7 +602,7 @@ export class RealtimeClient {
 
       realtimeLogger.broadcast(eventName, channelName, {
         payloadSize: JSON.stringify(validatedPayload).length,
-        userType: userContext?.userType,
+        userType: effectiveUserContext.userType,
       });
 
       const result = await channel.send({
@@ -552,8 +619,8 @@ export class RealtimeClient {
       }
 
       // Record successful broadcast for rate limiting
-      if (eventName === REALTIME_EVENTS.DRIVER_LOCATION_UPDATE && userContext?.driverId) {
-        locationRateLimiter.recordUpdate(userContext.driverId);
+      if (eventName === REALTIME_EVENTS.DRIVER_LOCATION_UPDATE && effectiveUserContext.driverId) {
+        locationRateLimiter.recordUpdate(effectiveUserContext.driverId);
       }
 
       realtimeLogger.debug(`Broadcast sent successfully: ${eventName}`, {

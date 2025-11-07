@@ -257,10 +257,8 @@ CREATE POLICY "Authenticated users can view all shifts"
     deleted_at IS NULL
   );
 
-CREATE POLICY "Service role has full access to shifts"
-  ON driver_shifts
-  FOR ALL
-  USING (auth.jwt()->>'role' = 'service_role');
+-- REMOVED: Service role policy for shifts (redundant)
+-- Service role ALWAYS bypasses RLS in Supabase, explicit policy not needed
 
 -- Policies for deliveries
 CREATE POLICY "Drivers can view own deliveries"
@@ -293,10 +291,8 @@ CREATE POLICY "Authenticated users can view all deliveries"
     deleted_at IS NULL
   );
 
-CREATE POLICY "Service role has full access to deliveries"
-  ON deliveries
-  FOR ALL
-  USING (auth.jwt()->>'role' = 'service_role');
+-- REMOVED: Service role policy for deliveries (redundant)
+-- Service role ALWAYS bypasses RLS in Supabase, explicit policy not needed
 
 -- ============================================================================
 -- Add helpful comments

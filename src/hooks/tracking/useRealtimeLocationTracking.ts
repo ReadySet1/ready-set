@@ -121,6 +121,15 @@ export function useRealtimeLocationTracking(
   // Realtime channel reference
   const channelRef = useRef<DriverLocationChannel | null>(null);
   const lastBroadcastRef = useRef<string | null>(null);
+  // Track if component is mounted to prevent setState after unmount
+  const isMountedRef = useRef(true);
+
+  // Set mounted flag to false on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   /**
    * Initialize Realtime channel
@@ -172,17 +181,24 @@ export function useRealtimeLocationTracking(
 
   /**
    * Cleanup Realtime channel
+   * Prevents state updates after component unmount
    */
   const cleanupRealtime = useCallback(async () => {
     if (channelRef.current) {
       try {
         await channelRef.current.unsubscribe();
       } catch (error) {
-        realtimeLogger.error('Error disconnecting from channel', { error });
+        // Only log if component is still mounted
+        if (isMountedRef.current) {
+          realtimeLogger.error('Error disconnecting from channel', { error });
+        }
       }
-      channelRef.current = null;
-      setIsRealtimeConnected(false);
-      setConnectionMode('rest');
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        channelRef.current = null;
+        setIsRealtimeConnected(false);
+        setConnectionMode('rest');
+      }
     }
   }, []);
 

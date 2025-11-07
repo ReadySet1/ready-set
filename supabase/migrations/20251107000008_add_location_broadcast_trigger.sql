@@ -21,7 +21,8 @@
 CREATE OR REPLACE FUNCTION notify_driver_location_update()
 RETURNS TRIGGER
 LANGUAGE plpgsql
-SECURITY DEFINER
+-- SECURITY DEFINER removed - function doesn't need elevated privileges
+-- Running with invoker's permissions is more secure and appropriate
 SET search_path = public
 AS $$
 DECLARE

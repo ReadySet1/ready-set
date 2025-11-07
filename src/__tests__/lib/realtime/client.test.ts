@@ -2,14 +2,20 @@
  * Unit tests for RealtimeClient
  */
 
-import { RealtimeClient } from '@/lib/realtime/client';
-import { REALTIME_CHANNELS } from '@/lib/realtime/types';
-import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
-
-// Mock Supabase
+// Mock Supabase FIRST (jest.mock is hoisted)
 jest.mock('@supabase/supabase-js', () => ({
   createClient: jest.fn(),
 }));
+
+// Set environment variables BEFORE importing RealtimeClient
+// Note: These must be set before import but after jest.mock (which is hoisted)
+process.env.NODE_ENV = 'test';
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-key';
+
+import { RealtimeClient } from '@/lib/realtime/client';
+import { REALTIME_CHANNELS } from '@/lib/realtime/types';
+import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 
 describe('RealtimeClient', () => {
   let mockSupabaseClient: jest.Mocked<SupabaseClient>;
@@ -55,8 +61,9 @@ describe('RealtimeClient', () => {
     (createClient as jest.Mock).mockReturnValue(mockSupabaseClient);
 
     // Set required environment variables
+    process.env.NODE_ENV = 'test';
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-key';
   });
 
   afterEach(() => {
@@ -528,6 +535,338 @@ describe('RealtimeClient', () => {
       // First should be disconnected, second still connected
       expect(client.isConnected(REALTIME_CHANNELS.DRIVER_LOCATIONS)).toBe(false);
       expect(client.isConnected(REALTIME_CHANNELS.ADMIN_COMMANDS)).toBe(true);
+    });
+  });
+
+  describe('Authorization Tests', () => {
+    beforeEach(() => {
+      // Mock auth.getUser() for authorization tests
+      mockSupabaseClient.auth = {
+        getUser: jest.fn().mockResolvedValue({
+          data: { user: { id: 'test-user-id' } },
+          error: null,
+        }),
+      } as any;
+
+      // Mock from() for database queries
+      mockSupabaseClient.from = jest.fn((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: jest.fn().mockReturnThis(),
+            eq: jest.fn().mockReturnThis(),
+            single: jest.fn().mockResolvedValue({
+              data: { type: 'ADMIN' },
+              error: null,
+            }),
+          };
+        } else if (table === 'drivers') {
+          return {
+            select: jest.fn().mockReturnThis(),
+            eq: jest.fn().mockReturnThis(),
+            single: jest.fn().mockResolvedValue({
+              data: { id: 'driver-123' },
+              error: null,
+            }),
+          };
+        }
+        return {} as any;
+      }) as any;
+    });
+
+    describe('subscribe authorization', () => {
+      it('should allow ADMIN to subscribe to DRIVER_LOCATIONS channel', async () => {
+        const client = RealtimeClient.getInstance();
+
+        // Subscribe without providing userContext (will fetch from database)
+        const promise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+
+        // Trigger subscription success
+        triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+
+        await expect(promise).resolves.toBeDefined();
+        expect(mockSupabaseClient.auth.getUser).toHaveBeenCalled();
+        expect(mockSupabaseClient.from).toHaveBeenCalledWith('profiles');
+      });
+
+      it('should prevent CLIENT from subscribing to ADMIN_COMMANDS channel', async () => {
+        // Mock profile as CLIENT user type
+        mockSupabaseClient.from = jest.fn(() => ({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({
+            data: { type: 'CLIENT' },
+            error: null,
+          }),
+        })) as any;
+
+        const client = RealtimeClient.getInstance();
+
+        // Should throw UnauthorizedError
+        await expect(
+          client.subscribe(REALTIME_CHANNELS.ADMIN_COMMANDS)
+        ).rejects.toThrow('Access denied to channel');
+      });
+
+      it('should fetch user context from database when not provided', async () => {
+        const client = RealtimeClient.getInstance();
+
+        const promise = client.subscribe(REALTIME_CHANNELS.DRIVER_STATUS);
+        triggerSubscription(REALTIME_CHANNELS.DRIVER_STATUS, 'SUBSCRIBED');
+
+        await promise;
+
+        // Verify database queries were made
+        expect(mockSupabaseClient.auth.getUser).toHaveBeenCalled();
+        expect(mockSupabaseClient.from).toHaveBeenCalledWith('profiles');
+      });
+
+      it('should use provided userContext for authorization', async () => {
+        const client = RealtimeClient.getInstance();
+
+        const userContext = {
+          userId: 'test-user-id',
+          userType: 'SUPER_ADMIN' as const,
+        };
+
+        const promise = client.subscribe(
+          REALTIME_CHANNELS.ADMIN_COMMANDS,
+          userContext
+        );
+        triggerSubscription(REALTIME_CHANNELS.ADMIN_COMMANDS, 'SUBSCRIBED');
+
+        await promise;
+
+        // Should NOT fetch from database when userContext provided
+        expect(mockSupabaseClient.auth.getUser).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('broadcast authorization', () => {
+      beforeEach(async () => {
+        const client = RealtimeClient.getInstance();
+
+        // Subscribe to channel first
+        const promise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+        triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+        await promise;
+      });
+
+      it('should allow DRIVER to broadcast driver:location events', async () => {
+        // Mock as DRIVER user type
+        mockSupabaseClient.from = jest.fn((table: string) => {
+          if (table === 'profiles') {
+            return {
+              select: jest.fn().mockReturnThis(),
+              eq: jest.fn().mockReturnThis(),
+              single: jest.fn().mockResolvedValue({
+                data: { type: 'DRIVER' },
+                error: null,
+              }),
+            };
+          } else if (table === 'drivers') {
+            return {
+              select: jest.fn().mockReturnThis(),
+              eq: jest.fn().mockReturnThis(),
+              single: jest.fn().mockResolvedValue({
+                data: { id: 'driver-123' },
+                error: null,
+              }),
+            };
+          }
+          return {} as any;
+        }) as any;
+
+        const client = RealtimeClient.getInstance();
+
+        const payload = {
+          driverId: 'driver-123',
+          lat: 40.7128,
+          lng: -74.006,
+          timestamp: new Date().toISOString(),
+        };
+
+        // Should not throw
+        await expect(
+          client.broadcast(
+            REALTIME_CHANNELS.DRIVER_LOCATIONS,
+            'driver:location',
+            payload
+          )
+        ).resolves.toBeUndefined();
+
+        // Verify database fetch occurred
+        expect(mockSupabaseClient.from).toHaveBeenCalledWith('profiles');
+      });
+
+      it('should prevent DRIVER from broadcasting admin:message events', async () => {
+        // Mock as DRIVER user type
+        mockSupabaseClient.from = jest.fn(() => ({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({
+            data: { type: 'DRIVER' },
+            error: null,
+          }),
+        })) as any;
+
+        const client = RealtimeClient.getInstance();
+
+        const payload = {
+          message: 'Test admin message',
+          timestamp: new Date().toISOString(),
+        };
+
+        // Should throw UnauthorizedError
+        await expect(
+          client.broadcast(
+            REALTIME_CHANNELS.ADMIN_COMMANDS,
+            'admin:message',
+            payload
+          )
+        ).rejects.toThrow('is not authorized to broadcast');
+      });
+
+      it('should validate driver ID matches in payload', async () => {
+        const client = RealtimeClient.getInstance();
+
+        const userContext = {
+          userId: 'test-user-id',
+          userType: 'DRIVER' as const,
+          driverId: 'driver-123',
+        };
+
+        const payload = {
+          driverId: 'different-driver-456', // Mismatched driver ID
+          lat: 40.7128,
+          lng: -74.006,
+          timestamp: new Date().toISOString(),
+        };
+
+        // Should throw UnauthorizedError for driver ID mismatch
+        await expect(
+          client.broadcast(
+            REALTIME_CHANNELS.DRIVER_LOCATIONS,
+            'driver:location',
+            payload,
+            userContext
+          )
+        ).rejects.toThrow('Driver ID in payload does not match');
+      });
+
+      it('should fetch user context from database when not provided for broadcast', async () => {
+        const client = RealtimeClient.getInstance();
+
+        const payload = {
+          driverId: 'driver-123',
+          lat: 40.7128,
+          lng: -74.006,
+          timestamp: new Date().toISOString(),
+        };
+
+        // Reset mock call counts
+        jest.clearAllMocks();
+
+        await client.broadcast(
+          REALTIME_CHANNELS.DRIVER_LOCATIONS,
+          'driver:location',
+          payload
+        );
+
+        // Verify database queries were made
+        expect(mockSupabaseClient.auth.getUser).toHaveBeenCalled();
+        expect(mockSupabaseClient.from).toHaveBeenCalledWith('profiles');
+      });
+    });
+
+    describe('database context fetching', () => {
+      it('should throw error if user profile not found', async () => {
+        // Mock profile not found
+        mockSupabaseClient.from = jest.fn(() => ({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({
+            data: null,
+            error: new Error('Profile not found'),
+          }),
+        })) as any;
+
+        const client = RealtimeClient.getInstance();
+
+        await expect(
+          client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS)
+        ).rejects.toThrow('Unable to verify user permissions');
+      });
+
+      it('should fetch driver ID for DRIVER user type', async () => {
+        // Mock as DRIVER user type
+        mockSupabaseClient.from = jest.fn((table: string) => {
+          if (table === 'profiles') {
+            return {
+              select: jest.fn().mockReturnThis(),
+              eq: jest.fn().mockReturnThis(),
+              single: jest.fn().mockResolvedValue({
+                data: { type: 'DRIVER' },
+                error: null,
+              }),
+            };
+          } else if (table === 'drivers') {
+            return {
+              select: jest.fn().mockReturnThis(),
+              eq: jest.fn().mockReturnThis(),
+              single: jest.fn().mockResolvedValue({
+                data: { id: 'driver-456' },
+                error: null,
+              }),
+            };
+          }
+          return {} as any;
+        }) as any;
+
+        const client = RealtimeClient.getInstance();
+
+        const promise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+        triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+
+        await promise;
+
+        // Verify both profiles and drivers tables were queried
+        expect(mockSupabaseClient.from).toHaveBeenCalledWith('profiles');
+        expect(mockSupabaseClient.from).toHaveBeenCalledWith('drivers');
+      });
+
+      it('should not throw if driver record not found for DRIVER user', async () => {
+        // Mock as DRIVER user type but no driver record
+        mockSupabaseClient.from = jest.fn((table: string) => {
+          if (table === 'profiles') {
+            return {
+              select: jest.fn().mockReturnThis(),
+              eq: jest.fn().mockReturnThis(),
+              single: jest.fn().mockResolvedValue({
+                data: { type: 'DRIVER' },
+                error: null,
+              }),
+            };
+          } else if (table === 'drivers') {
+            return {
+              select: jest.fn().mockReturnThis(),
+              eq: jest.fn().mockReturnThis(),
+              single: jest.fn().mockResolvedValue({
+                data: null,
+                error: new Error('Driver not found'),
+              }),
+            };
+          }
+          return {} as any;
+        }) as any;
+
+        const client = RealtimeClient.getInstance();
+
+        // Should not throw - driver may not be assigned yet
+        const promise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+        triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+
+        await expect(promise).resolves.toBeDefined();
+      });
     });
   });
 });

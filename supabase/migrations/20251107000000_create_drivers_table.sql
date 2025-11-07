@@ -53,7 +53,8 @@ CREATE TABLE IF NOT EXISTS drivers (
 -- ============================================================================
 
 -- Foreign key indexes
-CREATE INDEX IF NOT EXISTS idx_drivers_profile_id ON drivers(profile_id);
+-- REMOVED: idx_drivers_profile_id (redundant with UNIQUE constraint in migration 20251107000004)
+-- The UNIQUE constraint creates its own index automatically
 CREATE INDEX IF NOT EXISTS idx_drivers_user_id ON drivers(user_id);
 
 -- Status filters
@@ -111,11 +112,8 @@ CREATE POLICY "Authenticated users can view active drivers"
     deleted_at IS NULL
   );
 
--- Policy: Service role has full access
-CREATE POLICY "Service role has full access"
-  ON drivers
-  FOR ALL
-  USING (auth.jwt()->>'role' = 'service_role');
+-- REMOVED: Service role policy (redundant)
+-- Service role ALWAYS bypasses RLS in Supabase, explicit policy not needed
 
 -- ============================================================================
 -- Add helpful comments
