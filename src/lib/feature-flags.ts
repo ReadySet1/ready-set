@@ -232,15 +232,31 @@ export interface FeatureFlagContext {
 /**
  * Hash function for consistent user bucketing
  */
+/**
+ * Hash function for consistent user bucketing using MurmurHash3-inspired algorithm
+ * Provides better distribution than simple string hash for percentage-based feature rollouts
+ *
+ * SECURITY FIX: Previous implementation had a no-op bug (hash & hash always equals hash)
+ * This implementation uses proper bit mixing for avalanche effect
+ */
 function hashUserId(userId: string, flagKey: string): number {
-  let hash = 0;
   const input = `${userId}:${flagKey}`;
+  let hash = 0;
+
   for (let i = 0; i < input.length; i++) {
     const char = input.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32-bit integer
+    // MurmurHash3-inspired mixing with proper avalanche effect
+    hash = Math.imul(hash ^ char, 0x5bd1e995);
+    hash ^= hash >>> 15;
   }
-  return Math.abs(hash) % 100;
+
+  // Final mix for better distribution
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 0xc6a4a793);
+  hash ^= hash >>> 16;
+
+  // Use unsigned 32-bit to avoid negative numbers, then modulo 100
+  return (hash >>> 0) % 100;
 }
 
 /**
@@ -302,28 +318,41 @@ export function getEnabledFeatures(context?: FeatureFlagContext): FeatureFlagKey
 /**
  * Enable a feature flag globally
  */
-export function enableFeature(flagKey: FeatureFlagKey): void {
+/**
+ * SECURITY: Feature flag management functions removed from public exports.
+ * These functions allowed unauthorized modification of feature flags at runtime.
+ *
+ * For admin feature flag management, use the authenticated server actions in:
+ * @see src/app/actions/admin/feature-flags-admin.ts
+ *
+ * Internal helper functions below are no longer exported to prevent misuse.
+ */
+
+/**
+ * @internal - Do not export. Use server actions for admin operations.
+ */
+function enableFeature(flagKey: FeatureFlagKey): void {
   featureFlagStore.enable(flagKey);
 }
 
 /**
- * Disable a feature flag globally
+ * @internal - Do not export. Use server actions for admin operations.
  */
-export function disableFeature(flagKey: FeatureFlagKey): void {
+function disableFeature(flagKey: FeatureFlagKey): void {
   featureFlagStore.disable(flagKey);
 }
 
 /**
- * Set rollout percentage for gradual rollout
+ * @internal - Do not export. Use server actions for admin operations.
  */
-export function setFeatureRollout(flagKey: FeatureFlagKey, percentage: number): void {
+function setFeatureRollout(flagKey: FeatureFlagKey, percentage: number): void {
   featureFlagStore.setRolloutPercentage(flagKey, percentage);
 }
 
 /**
- * Enable feature for specific users
+ * @internal - Do not export. Use server actions for admin operations.
  */
-export function enableFeatureForUsers(
+function enableFeatureForUsers(
   flagKey: FeatureFlagKey,
   userIds: string[],
 ): void {
@@ -335,9 +364,9 @@ export function enableFeatureForUsers(
 }
 
 /**
- * Disable feature for specific users
+ * @internal - Do not export. Use server actions for admin operations.
  */
-export function disableFeatureForUsers(
+function disableFeatureForUsers(
   flagKey: FeatureFlagKey,
   userIds: string[],
 ): void {
@@ -349,9 +378,9 @@ export function disableFeatureForUsers(
 }
 
 /**
- * Enable feature for specific roles
+ * @internal - Do not export. Use server actions for admin operations.
  */
-export function enableFeatureForRoles(
+function enableFeatureForRoles(
   flagKey: FeatureFlagKey,
   roles: string[],
 ): void {

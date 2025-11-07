@@ -29,6 +29,7 @@ DECLARE
 BEGIN
   -- Build the payload with location data
   -- ST_X gets longitude, ST_Y gets latitude from PostGIS geometry
+  -- NOTE: activity_type column removed - table only has is_moving boolean
   payload := jsonb_build_object(
     'driverId', NEW.driver_id,
     'lat', ST_Y(NEW.location::geometry),
@@ -39,7 +40,6 @@ BEGIN
     'altitude', NEW.altitude,
     'batteryLevel', NEW.battery_level,
     'isMoving', NEW.is_moving,
-    'activityType', NEW.activity_type,
     'timestamp', NEW.recorded_at
   );
 

@@ -1,5 +1,6 @@
 /**
  * Debug endpoint to check feature flags configuration
+ * SECURITY: Admin-only access, disabled in production
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -8,10 +9,32 @@ import {
   isFeatureEnabled,
   getAllFeatureConfigs,
 } from '@/lib/feature-flags';
+import { withAuth } from '@/lib/auth-middleware';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  // Disable in production for security
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { error: 'Debug endpoint not available in production' },
+      { status: 404 }
+    );
+  }
+
+  // Require admin authentication
+  const authResult = await withAuth(request, {
+    allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
+    requireAuth: true
+  });
+
+  if (!authResult.success || authResult.response) {
+    return authResult.response || NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 403 }
+    );
+  }
+
   try {
     // Get all feature flag configurations
     const allConfigs = getAllFeatureConfigs();

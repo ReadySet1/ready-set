@@ -39,10 +39,11 @@ CREATE POLICY "Drivers can update shift status and breaks"
       SELECT id FROM drivers WHERE user_id = auth.uid()
     ) AND
     -- Prevent modification of critical fields
+    -- NOTE: Column names corrected to match actual schema
     (OLD.shift_start = NEW.shift_start OR OLD.shift_start IS NULL) AND
     (OLD.shift_end = NEW.shift_end OR OLD.shift_end IS NULL) AND
-    (OLD.total_distance_km = NEW.total_distance_km OR OLD.total_distance_km IS NULL) AND
-    (OLD.break_duration = NEW.break_duration OR OLD.break_duration IS NULL)
+    (OLD.total_distance = NEW.total_distance OR OLD.total_distance IS NULL) AND
+    (OLD.total_break_duration = NEW.total_break_duration OR OLD.total_break_duration IS NULL)
   );
 
 COMMENT ON POLICY "Drivers can update shift status and breaks" ON driver_shifts IS

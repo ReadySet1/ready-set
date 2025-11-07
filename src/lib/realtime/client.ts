@@ -417,6 +417,8 @@ export class RealtimeClient {
     await this.supabase.removeChannel(channel);
     this.channels.delete(channelName);
     this.connectionStates.delete(channelName);
+    // MEMORY LEAK FIX: Clean up LRU tracking map to prevent memory growth
+    this.channelLastUsed.delete(channelName);
   }
 
   /**

@@ -36,36 +36,38 @@ export async function startDriverShift(
       ) VALUES (
         $1::uuid,
         NOW(),
-        ST_GeogFromText($2),
+        ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
         'active',
-        $3::jsonb
+        $4::jsonb
       ) RETURNING id
-    `, 
+    `,
       driverId,
-      `POINT(${startLocation.coordinates.lng} ${startLocation.coordinates.lat})`,
+      startLocation.coordinates.lng,
+      startLocation.coordinates.lat,
       JSON.stringify(metadata)
     );
 
     // Update driver status
     await prisma.$executeRawUnsafe(`
-      UPDATE drivers 
-      SET 
+      UPDATE drivers
+      SET
         is_on_duty = true,
         current_shift_id = (
-          SELECT id FROM driver_shifts 
-          WHERE driver_id = $1::uuid 
-          AND status = 'active' 
-          ORDER BY start_time DESC 
+          SELECT id FROM driver_shifts
+          WHERE driver_id = $1::uuid
+          AND status = 'active'
+          ORDER BY start_time DESC
           LIMIT 1
         ),
         shift_start_time = NOW(),
-        last_known_location = ST_GeogFromText($2),
+        last_known_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
         last_location_update = NOW(),
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       driverId,
-      `POINT(${startLocation.coordinates.lng} ${startLocation.coordinates.lat})`
+      startLocation.coordinates.lng,
+      startLocation.coordinates.lat
     );
 
     // Get the created shift ID
@@ -130,47 +132,50 @@ export async function endDriverShift(
       const distanceResult = await prisma.$queryRawUnsafe<{ distance_km: number }[]>(`
         SELECT ST_Distance(
           ST_GeogFromText($1),
-          ST_GeogFromText($2)
+          ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography
         ) / 1000 as distance_km
       `,
         shift.start_location,
-        `POINT(${endLocation.coordinates.lng} ${endLocation.coordinates.lat})`
+        endLocation.coordinates.lng,
+        endLocation.coordinates.lat
       );
       totalDistance = distanceResult[0]?.distance_km || 0;
     }
 
     // Update shift record
     await prisma.$executeRawUnsafe(`
-      UPDATE driver_shifts 
-      SET 
+      UPDATE driver_shifts
+      SET
         end_time = NOW(),
-        end_location = ST_GeogFromText($2),
-        total_distance_km = $3::float,
+        end_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
+        total_distance_km = $4::float,
         status = 'completed',
-        metadata = metadata || $4::jsonb,
+        metadata = metadata || $5::jsonb,
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       shiftId,
-      `POINT(${endLocation.coordinates.lng} ${endLocation.coordinates.lat})`,
+      endLocation.coordinates.lng,
+      endLocation.coordinates.lat,
       totalDistance,
       JSON.stringify(metadata)
     );
 
     // Update driver status
     await prisma.$executeRawUnsafe(`
-      UPDATE drivers 
-      SET 
+      UPDATE drivers
+      SET
         is_on_duty = false,
         current_shift_id = NULL,
         shift_start_time = NULL,
-        last_known_location = ST_GeogFromText($2),
+        last_known_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
         last_location_update = NOW(),
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       shift?.driver_id,
-      `POINT(${endLocation.coordinates.lng} ${endLocation.coordinates.lat})`
+      endLocation.coordinates.lng,
+      endLocation.coordinates.lat
     );
 
     revalidatePath('/admin/tracking');
@@ -206,23 +211,43 @@ export async function startShiftBreak(
     }
 
     // Insert break record
-    await prisma.$executeRawUnsafe(`
-      INSERT INTO shift_breaks (
-        shift_id,
-        start_time,
-        break_type,
-        location
-      ) VALUES (
-        $1::uuid,
-        NOW(),
-        $2,
-        ${location ? 'ST_GeogFromText($3)' : 'NULL'}
-      )
-    `,
-      shiftId,
-      breakType,
-      location ? `POINT(${location.coordinates.lng} ${location.coordinates.lat})` : null
-    );
+    if (location) {
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO shift_breaks (
+          shift_id,
+          start_time,
+          break_type,
+          location
+        ) VALUES (
+          $1::uuid,
+          NOW(),
+          $2,
+          ST_SetSRID(ST_MakePoint($3::float, $4::float), 4326)::geography
+        )
+      `,
+        shiftId,
+        breakType,
+        location.coordinates.lng,
+        location.coordinates.lat
+      );
+    } else {
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO shift_breaks (
+          shift_id,
+          start_time,
+          break_type,
+          location
+        ) VALUES (
+          $1::uuid,
+          NOW(),
+          $2,
+          NULL
+        )
+      `,
+        shiftId,
+        breakType
+      );
+    }
 
     // Update shift status to paused
     await prisma.$executeRawUnsafe(`
@@ -438,8 +463,10 @@ export async function updateDriverLocation(
       return { success: false, error: 'Invalid driverId' };
     }
 
-    // Check rate limit (1 update per 5 seconds per driver)
-    const rateLimit = locationRateLimiter.checkLimit(driverId);
+    // Check rate limit atomically (1 update per 5 seconds per driver)
+    // SECURITY FIX: Using checkAndRecordLimit() to prevent race conditions
+    // This atomically checks AND records, preventing concurrent requests from bypassing the limit
+    const rateLimit = locationRateLimiter.checkAndRecordLimit(driverId);
     if (!rateLimit.allowed) {
       realtimeLogger.rateLimit(driverId, rateLimit.retryAfter!);
       return {
@@ -452,6 +479,8 @@ export async function updateDriverLocation(
     // NOTE: Database trigger (20251107000001_create_driver_locations_table.sql:104-155)
     // automatically broadcasts this location update via Supabase Realtime.
     // No application-level broadcasting needed.
+    // NOTE: activity_type column removed as it doesn't exist in database schema
+    // Table only has is_moving boolean field for tracking movement state
     await prisma.$executeRawUnsafe(`
       INSERT INTO driver_locations (
         driver_id,
@@ -462,30 +491,28 @@ export async function updateDriverLocation(
         altitude,
         battery_level,
         is_moving,
-        activity_type,
         recorded_at
       ) VALUES (
         $1::uuid,
-        ST_GeogFromText($2),
-        $3::float,
+        ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
         $4::float,
         $5::float,
         $6::float,
         $7::float,
-        $8::boolean,
-        $9,
+        $8::float,
+        $9::boolean,
         $10::timestamptz
       )
     `,
       driverId,
-      `POINT(${location.coordinates.lng} ${location.coordinates.lat})`,
+      location.coordinates.lng,
+      location.coordinates.lat,
       location.accuracy,
       location.speed,
       location.heading,
       location.altitude,
       location.batteryLevel,
       location.isMoving,
-      location.activityType,
       location.timestamp
     );
 
@@ -493,17 +520,18 @@ export async function updateDriverLocation(
     await prisma.$executeRawUnsafe(`
       UPDATE drivers
       SET
-        last_known_location = ST_GeogFromText($2),
+        last_known_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
         last_location_update = NOW(),
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       driverId,
-      `POINT(${location.coordinates.lng} ${location.coordinates.lat})`
+      location.coordinates.lng,
+      location.coordinates.lat
     );
 
-    // Record successful update for rate limiting
-    locationRateLimiter.recordUpdate(driverId);
+    // NOTE: Rate limit was already recorded atomically by checkAndRecordLimit()
+    // No need to call recordUpdate() here - doing so would be redundant and incorrect
 
     return { success: true };
   } catch (error) {
