@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import { InputSanitizer } from '../validation';
+import { InputSanitizer } from '@/lib/validation';
 import { REALTIME_EVENTS } from './types';
 import { PAYLOAD_CONFIG } from '@/constants/realtime-config';
 

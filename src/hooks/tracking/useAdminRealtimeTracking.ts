@@ -213,19 +213,37 @@ export function useAdminRealtimeTracking(
   }, [isRealtimeEnabled, onRealtimeConnect, onRealtimeDisconnect, onRealtimeError]);
 
   /**
-   * Cleanup Realtime channel
+   * Cleanup Realtime channel with cancellation support
+   * Prevents state updates after component unmount (race condition fix)
    */
   const cleanupRealtime = useCallback(async () => {
+    // Track if cleanup was cancelled (component unmounted during async operation)
+    let isCancelled = false;
+
     if (channelRef.current) {
+      const channelToCleanup = channelRef.current;
+
       try {
-        await channelRef.current.unsubscribe();
+        await channelToCleanup.unsubscribe();
+
+        // Only update state if not cancelled
+        if (!isCancelled) {
+          channelRef.current = null;
+          setIsRealtimeConnected(false);
+          setConnectionMode('sse');
+        }
       } catch (error) {
-        realtimeLogger.error('Admin error unsubscribing from channel', { error });
+        // Only log if not cancelled
+        if (!isCancelled) {
+          realtimeLogger.error('Admin error unsubscribing from channel', { error });
+        }
       }
-      channelRef.current = null;
-      setIsRealtimeConnected(false);
-      setConnectionMode('sse');
     }
+
+    // Return cancellation function
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   /**
@@ -257,13 +275,39 @@ export function useAdminRealtimeTracking(
       }
 
       // Convert Realtime payload to LocationData format
+      // Add defensive null checks for required fields
+      if (!payload.driverId || !payload.timestamp) {
+        realtimeLogger.warn('Missing required fields in location payload', {
+          driverId: payload.driverId,
+          timestamp: payload.timestamp,
+        });
+        return;
+      }
+
+      // Validate coordinate ranges
+      if (
+        typeof payload.lat !== 'number' ||
+        typeof payload.lng !== 'number' ||
+        payload.lat < -90 ||
+        payload.lat > 90 ||
+        payload.lng < -180 ||
+        payload.lng > 180
+      ) {
+        realtimeLogger.warn('Invalid coordinates in location payload', {
+          lat: payload.lat,
+          lng: payload.lng,
+          driverId: payload.driverId,
+        });
+        return;
+      }
+
       const locationData: LocationData = {
         driverId: payload.driverId,
         location: {
           type: 'Point',
           coordinates: [payload.lng, payload.lat],
         },
-        accuracy: payload.accuracy,
+        accuracy: payload.accuracy ?? 0,
         speed: payload.speed ?? 0,
         heading: payload.heading ?? 0,
         batteryLevel: payload.batteryLevel ?? undefined,

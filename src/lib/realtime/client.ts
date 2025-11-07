@@ -34,10 +34,12 @@ const EnvSchema = z.object({
     .min(1, 'NEXT_PUBLIC_SUPABASE_URL is required'),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z
     .string()
-    .min(1, 'NEXT_PUBLIC_SUPABASE_ANON_KEY is required')
-    .regex(
-      /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY must be a valid JWT token',
+    .min(20, 'NEXT_PUBLIC_SUPABASE_ANON_KEY must be at least 20 characters')
+    // Relaxed validation: just check it's a reasonable length string
+    // Supabase key format may change, and actual auth will fail anyway if invalid
+    .refine(
+      (key) => key.length >= 20 && /^[A-Za-z0-9_.\-]+$/.test(key),
+      'NEXT_PUBLIC_SUPABASE_ANON_KEY appears to be invalid (must contain only alphanumeric, dots, hyphens, underscores)',
     ),
 });
 
@@ -152,6 +154,7 @@ export class RealtimeClient {
   private supabase: SupabaseClient;
   private channels: Map<string, RealtimeChannel> = new Map();
   private connectionStates: Map<string, RealtimeConnectionState> = new Map();
+  private channelLastUsed: Map<string, number> = new Map(); // Track last access time for LRU eviction
   private readonly MAX_CHANNELS = 100;
 
   private constructor() {
@@ -196,24 +199,63 @@ export class RealtimeClient {
 
   /**
    * Get a channel by name, creating it if it doesn't exist
-   * Enforces MAX_CHANNELS limit to prevent memory leaks
+   * Enforces MAX_CHANNELS limit with LRU eviction
    */
   public getChannel(channelName: RealtimeChannelName): RealtimeChannel {
     const existingChannel = this.channels.get(channelName);
     if (existingChannel) {
+      // Update last used timestamp for LRU tracking
+      this.channelLastUsed.set(channelName, Date.now());
       return existingChannel;
     }
 
-    // Enforce maximum channels limit
+    // Enforce maximum channels limit with LRU eviction
     if (this.channels.size >= this.MAX_CHANNELS) {
-      realtimeLogger.error('Maximum channels exceeded', {
-        currentChannels: this.channels.size,
-        maxChannels: this.MAX_CHANNELS,
-      });
-      throw new RealtimeConnectionError(
-        `Maximum ${this.MAX_CHANNELS} channels exceeded. Please unsubscribe from unused channels.`,
-        channelName,
-      );
+      // Find the least recently used channel
+      let lruChannelName: string | null = null;
+      let oldestTime = Infinity;
+
+      for (const [name, lastUsed] of this.channelLastUsed.entries()) {
+        if (lastUsed < oldestTime) {
+          oldestTime = lastUsed;
+          lruChannelName = name;
+        }
+      }
+
+      if (lruChannelName) {
+        // Evict the LRU channel
+        realtimeLogger.warn('Evicting least recently used channel', {
+          evictedChannel: lruChannelName,
+          lastUsed: new Date(oldestTime).toISOString(),
+          currentChannels: this.channels.size,
+          maxChannels: this.MAX_CHANNELS,
+        });
+
+        // Unsubscribe and remove the LRU channel
+        const lruChannel = this.channels.get(lruChannelName);
+        if (lruChannel) {
+          lruChannel.unsubscribe().catch((error) => {
+            realtimeLogger.error('Error unsubscribing LRU channel', {
+              channel: lruChannelName,
+              error,
+            });
+          });
+        }
+
+        this.channels.delete(lruChannelName);
+        this.connectionStates.delete(lruChannelName);
+        this.channelLastUsed.delete(lruChannelName);
+      } else {
+        // Fallback: throw error if we can't find an LRU channel
+        realtimeLogger.error('Maximum channels exceeded with no LRU candidate', {
+          currentChannels: this.channels.size,
+          maxChannels: this.MAX_CHANNELS,
+        });
+        throw new RealtimeConnectionError(
+          `Maximum ${this.MAX_CHANNELS} channels exceeded. Please unsubscribe from unused channels.`,
+          channelName,
+        );
+      }
     }
 
     const channel = this.supabase.channel(channelName, {
@@ -229,6 +271,7 @@ export class RealtimeClient {
     });
 
     this.channels.set(channelName, channel);
+    this.channelLastUsed.set(channelName, Date.now()); // Track creation time for LRU
     this.initializeConnectionState(channelName);
 
     realtimeLogger.connection('Channel created', {
