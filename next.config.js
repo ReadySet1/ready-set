@@ -6,16 +6,38 @@ const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
   compress: true, // Enable gzip compression for production
+
+  // Performance optimizations for faster builds
+  swcMinify: true, // Use SWC for faster minification
+
   typescript: {
     // Skip type checking during builds to prevent deployment failures
     // NOTE: This is a workaround for legacy code. New code should be type-safe.
     // Consider running 'pnpm typecheck' separately in CI/CD to catch type errors
     ignoreBuildErrors: true,
   },
+
   experimental: {
     // Enable 'use cache' directive for static site generation
     useCache: true,
+    // Enable parallel server compilation for faster builds
+    parallelServerBuildTraces: true,
+    // Enable parallel server compilation
+    parallelServerCompiles: true,
+    // Optimize package imports
+    optimizePackageImports: ['@supabase/supabase-js', 'react-icons', 'date-fns'],
   },
+
+  // Modularize large library imports to reduce bundle size
+  modularizeImports: {
+    'react-icons': {
+      transform: 'react-icons/{{member}}',
+    },
+    'date-fns': {
+      transform: 'date-fns/{{member}}',
+    },
+  },
+
   serverExternalPackages: ['@prisma/client', 'prisma', 'jsdom'],
   skipTrailingSlashRedirect: true,
   // Ensure all API routes are treated as dynamic
@@ -23,7 +45,7 @@ const nextConfig = {
     return [];
   },
 
-  webpack: (config, { isServer, dev, isEdgeRuntime }) => {
+  webpack: (config, { isServer, dev }) => {
     // Configure externals for server-side rendering
     if (isServer) {
       config.externals = config.externals || [];
@@ -36,16 +58,13 @@ const nextConfig = {
       if (config.externals.includes('@prisma/client')) {
         config.externals = config.externals.filter(external => external !== '@prisma/client');
       }
-    }
-    
-    // Handle Prisma client during build - improved configuration
-    if (isServer) {
+
       // Force Prisma to use standard import path
       config.resolve.alias = {
         ...config.resolve.alias,
         '@prisma/client': require.resolve('@prisma/client'),
       };
-      
+
       // Ensure binary targets are properly included
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -53,12 +72,13 @@ const nextConfig = {
         path: false,
         crypto: false,
       };
-      
-      // Copy Prisma binaries for production builds
-      if (!dev) {
+
+      // PERFORMANCE: Skip Prisma binary copying on Vercel (handled automatically)
+      // This saves significant build time by avoiding file operations
+      if (!dev && !process.env.VERCEL) {
         config.plugins = config.plugins || [];
-        
-        // Add custom plugin to copy Prisma binaries
+
+        // Add custom plugin to copy Prisma binaries (only for local builds)
         const { CopyPlugin } = require('webpack').webpack || {};
         if (CopyPlugin) {
           config.plugins.push(
@@ -70,7 +90,7 @@ const nextConfig = {
                   noErrorOnMissing: true,
                 },
                 {
-                  from: path.join(__dirname, 'node_modules/prisma/libquery_engine-*.so.node'),  
+                  from: path.join(__dirname, 'node_modules/prisma/libquery_engine-*.so.node'),
                   to: path.join(__dirname, '.next/server/[name][ext]'),
                   noErrorOnMissing: true,
                 },
@@ -80,7 +100,7 @@ const nextConfig = {
         }
       }
     }
-    
+
     return config;
   },
   images: {
@@ -151,6 +171,11 @@ const sentryWebpackPluginOptions = {
 
   // Wipe debug IDs to reduce sourcemap warnings
   widenClientFileUpload: true,
+
+  // PERFORMANCE: Disable source map uploads on Vercel to speed up builds
+  // Source maps add 3-5 minutes to build time. Upload them from CI/CD instead.
+  disableServerWebpackPlugin: process.env.VERCEL === '1',
+  disableClientWebpackPlugin: process.env.VERCEL === '1',
 
   // Error handling for source map uploads - don't add warnings to build output
   errorHandler: (err, invokeErr, compilation) => {
