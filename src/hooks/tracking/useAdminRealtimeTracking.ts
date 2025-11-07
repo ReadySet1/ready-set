@@ -326,26 +326,49 @@ export function useAdminRealtimeTracking(
 
   /**
    * Initialize Realtime on mount if enabled
+   * Uses cancellation pattern to prevent race conditions
    */
   useEffect(() => {
+    let isActive = true;
+
     if (isRealtimeEnabled && useRealtime) {
-      initializeRealtime();
+      initializeRealtime().then(() => {
+        // If component unmounted or deps changed during init, cleanup
+        if (!isActive && channelRef.current) {
+          channelRef.current.unsubscribe().catch(console.error);
+          channelRef.current = null;
+        }
+      });
     }
 
     return () => {
+      isActive = false;
       cleanupRealtime();
     };
   }, [isRealtimeEnabled, useRealtime, initializeRealtime, cleanupRealtime]);
 
   /**
    * Handle Realtime feature flag or mode changes
+   * Uses cancellation pattern to prevent race conditions
    */
   useEffect(() => {
+    let isActive = true;
+
     if (!isRealtimeEnabled && channelRef.current) {
       cleanupRealtime();
     } else if (isRealtimeEnabled && !channelRef.current && useRealtime) {
-      initializeRealtime();
+      initializeRealtime().then(() => {
+        // If component unmounted or deps changed during init, cleanup
+        if (!isActive && channelRef.current) {
+          channelRef.current.unsubscribe().catch(console.error);
+          channelRef.current = null;
+        }
+      });
     }
+
+    return () => {
+      isActive = false;
+    };
   }, [isRealtimeEnabled, useRealtime, initializeRealtime, cleanupRealtime]);
 
   /**

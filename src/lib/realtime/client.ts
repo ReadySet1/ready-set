@@ -13,6 +13,8 @@ import {
   type RealtimeConnectionState,
   RealtimeConnectionError,
   RealtimeAuthenticationError,
+  RealtimeValidationError,
+  validateBroadcastPayload,
 } from './types';
 
 // ============================================================================
@@ -206,12 +208,22 @@ export class RealtimeClient {
 
   /**
    * Broadcast an event to a channel
+   * Validates payload matches event type schema before broadcasting
    */
   public async broadcast<T = any>(
     channelName: RealtimeChannelName,
     eventName: string,
     payload: T,
   ): Promise<void> {
+    // Validate payload matches event type
+    const validationResult = validateBroadcastPayload(eventName, payload);
+    if (!validationResult.success) {
+      throw new RealtimeValidationError(
+        `Invalid payload for ${eventName}: ${validationResult.error}`,
+        eventName,
+      );
+    }
+
     const channel = this.channels.get(channelName);
     if (!channel) {
       throw new RealtimeConnectionError(

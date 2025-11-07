@@ -35,6 +35,7 @@ export class DriverLocationChannel {
   private channel: RealtimeChannel | null = null;
   private client = getRealtimeClient();
   private eventHandlers: Map<string, RealtimeEventHandler> = new Map();
+  private listenerRefs: Map<string, Function> = new Map(); // Store listener references for cleanup
 
   /**
    * Subscribe to driver location updates
@@ -93,16 +94,31 @@ export class DriverLocationChannel {
       );
     }
 
+    // Remove existing listener first to prevent duplicates
+    if (this.listenerRefs.has(eventName)) {
+      this.off(eventName);
+    }
+
+    // Create listener function and store reference
+    const listener = (payload: any) => handler(payload.payload);
+    this.listenerRefs.set(eventName, listener);
     this.eventHandlers.set(eventName, handler);
-    this.channel.on('broadcast', { event: eventName }, (payload) => {
-      handler(payload.payload);
-    });
+
+    // Register listener with channel
+    this.channel.on('broadcast', { event: eventName }, listener);
   }
 
   /**
    * Remove event listener
    */
   off(eventName: RealtimeEventName): void {
+    const listener = this.listenerRefs.get(eventName);
+    if (listener && this.channel) {
+      // Actually remove the listener from the channel
+      // Note: Phoenix Channels has off() but @supabase/supabase-js types don't expose it
+      (this.channel as any).off('broadcast', { event: eventName }, listener);
+    }
+    this.listenerRefs.delete(eventName);
     this.eventHandlers.delete(eventName);
   }
 
@@ -131,6 +147,7 @@ export class DriverStatusChannel {
   private channel: RealtimeChannel | null = null;
   private client = getRealtimeClient();
   private eventHandlers: Map<string, RealtimeEventHandler> = new Map();
+  private listenerRefs: Map<string, Function> = new Map(); // Store listener references for cleanup
 
   /**
    * Subscribe to driver status updates
@@ -200,10 +217,18 @@ export class DriverStatusChannel {
       );
     }
 
+    // Remove existing listener first to prevent duplicates
+    if (this.listenerRefs.has(eventName)) {
+      this.off(eventName);
+    }
+
+    // Create listener function and store reference
+    const listener = (payload: any) => handler(payload.payload);
+    this.listenerRefs.set(eventName, listener);
     this.eventHandlers.set(eventName, handler);
-    this.channel.on('broadcast', { event: eventName }, (payload) => {
-      handler(payload.payload);
-    });
+
+    // Register listener with channel
+    this.channel.on('broadcast', { event: eventName }, listener);
   }
 
   /**
@@ -235,6 +260,13 @@ export class DriverStatusChannel {
    * Remove event listener
    */
   off(eventName: RealtimeEventName): void {
+    const listener = this.listenerRefs.get(eventName);
+    if (listener && this.channel) {
+      // Actually remove the listener from the channel
+      // Note: Phoenix Channels has off() but @supabase/supabase-js types don't expose it
+      (this.channel as any).off('broadcast', { event: eventName }, listener);
+    }
+    this.listenerRefs.delete(eventName);
     this.eventHandlers.delete(eventName);
   }
 
@@ -264,6 +296,7 @@ export class AdminCommandsChannel {
   private channel: RealtimeChannel | null = null;
   private client = getRealtimeClient();
   private eventHandlers: Map<string, RealtimeEventHandler> = new Map();
+  private listenerRefs: Map<string, Function> = new Map(); // Store listener references for cleanup
 
   /**
    * Subscribe to admin commands
@@ -346,16 +379,31 @@ export class AdminCommandsChannel {
       );
     }
 
+    // Remove existing listener first to prevent duplicates
+    if (this.listenerRefs.has(eventName)) {
+      this.off(eventName);
+    }
+
+    // Create listener function and store reference
+    const listener = (payload: any) => handler(payload.payload);
+    this.listenerRefs.set(eventName, listener);
     this.eventHandlers.set(eventName, handler);
-    this.channel.on('broadcast', { event: eventName }, (payload) => {
-      handler(payload.payload);
-    });
+
+    // Register listener with channel
+    this.channel.on('broadcast', { event: eventName }, listener);
   }
 
   /**
    * Remove event listener
    */
   off(eventName: RealtimeEventName): void {
+    const listener = this.listenerRefs.get(eventName);
+    if (listener && this.channel) {
+      // Actually remove the listener from the channel
+      // Note: Phoenix Channels has off() but @supabase/supabase-js types don't expose it
+      (this.channel as any).off('broadcast', { event: eventName }, listener);
+    }
+    this.listenerRefs.delete(eventName);
     this.eventHandlers.delete(eventName);
   }
 

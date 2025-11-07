@@ -237,21 +237,28 @@ export function useRealtimeLocationTracking(
 
   /**
    * Initialize Realtime on mount if enabled and tracking
-   * NOTE: initializeRealtime and cleanupRealtime are NOT in deps to avoid race conditions.
-   * The effect only runs when isRealtimeEnabled or isTracking changes, not on every render.
+   * Uses cancellation pattern to prevent race conditions when dependencies change
    */
   useEffect(() => {
+    let isActive = true;
+
     if (isRealtimeEnabled && isTracking && !channelRef.current) {
-      // Call initialization function
-      initializeRealtime();
+      // Call initialization function and handle race condition
+      initializeRealtime().then(() => {
+        // If component unmounted or deps changed during init, cleanup
+        if (!isActive && channelRef.current) {
+          channelRef.current.unsubscribe().catch(console.error);
+          channelRef.current = null;
+        }
+      });
     }
 
     // Cleanup on unmount or when dependencies change
     return () => {
+      isActive = false;
       cleanupRealtime();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRealtimeEnabled, isTracking]);
+  }, [isRealtimeEnabled, isTracking, initializeRealtime, cleanupRealtime]);
 
   /**
    * Broadcast location updates when they change
@@ -272,15 +279,28 @@ export function useRealtimeLocationTracking(
   /**
    * Handle Realtime feature flag changes
    * Disconnect if disabled, connect if enabled
+   * Uses cancellation pattern to prevent race conditions
    */
   useEffect(() => {
+    let isActive = true;
+
     if (!isRealtimeEnabled && channelRef.current) {
       // Feature disabled - cleanup
       cleanupRealtime();
     } else if (isRealtimeEnabled && !channelRef.current && isTracking) {
       // Feature enabled and tracking active - initialize
-      initializeRealtime();
+      initializeRealtime().then(() => {
+        // If component unmounted or deps changed during init, cleanup
+        if (!isActive && channelRef.current) {
+          channelRef.current.unsubscribe().catch(console.error);
+          channelRef.current = null;
+        }
+      });
     }
+
+    return () => {
+      isActive = false;
+    };
   }, [isRealtimeEnabled, isTracking, initializeRealtime, cleanupRealtime]);
 
   /**
@@ -298,8 +318,11 @@ export function useRealtimeLocationTracking(
 
   /**
    * Handle page visibility to optimize battery/bandwidth
+   * Uses cancellation pattern to prevent race conditions
    */
   useEffect(() => {
+    let isActive = true;
+
     const handleVisibilityChange = () => {
       if (document.hidden && channelRef.current && isRealtimeConnected) {
         // Optionally reduce broadcast frequency when in background
@@ -308,12 +331,19 @@ export function useRealtimeLocationTracking(
       } else if (!document.hidden && isRealtimeEnabled && !channelRef.current && isTracking) {
         // Page visible again - reconnect if needed
         realtimeLogger.debug('Page visible, checking connection');
-        initializeRealtime();
+        initializeRealtime().then(() => {
+          // If listener was removed during init, cleanup
+          if (!isActive && channelRef.current) {
+            channelRef.current.unsubscribe().catch(console.error);
+            channelRef.current = null;
+          }
+        });
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
+      isActive = false;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isRealtimeEnabled, isRealtimeConnected, isTracking, initializeRealtime]);

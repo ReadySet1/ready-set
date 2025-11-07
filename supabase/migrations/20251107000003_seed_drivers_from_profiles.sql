@@ -13,6 +13,7 @@
 
 INSERT INTO drivers (
   id,
+  user_id,
   profile_id,
   employee_id,
   vehicle_number,
@@ -24,6 +25,7 @@ INSERT INTO drivers (
 )
 SELECT
   gen_random_uuid() as id,
+  p.id as user_id,         -- profile.id is the auth.uid() in Supabase
   p.id as profile_id,
   -- Generate employee_id from email (e.g., 'driver-12345')
   'driver-' || SUBSTRING(p.id::text FROM 1 FOR 8) as employee_id,

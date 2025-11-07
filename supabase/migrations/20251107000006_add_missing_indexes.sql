@@ -30,25 +30,26 @@ CREATE INDEX IF NOT EXISTS idx_driver_locations_driver_moving
 COMMENT ON INDEX idx_driver_locations_driver_moving IS
   'Improves performance of queries filtering stationary vs moving drivers.';
 
--- Partial index for recent locations (last 24 hours)
--- Common query: SELECT * FROM driver_locations WHERE recorded_at > NOW() - INTERVAL '24 hours'
--- Partial indexes are smaller and faster for specific WHERE conditions
-CREATE INDEX IF NOT EXISTS idx_driver_locations_recent
-  ON driver_locations(driver_id, recorded_at DESC)
-  WHERE recorded_at > (NOW() - INTERVAL '24 hours');
+-- NOTE: Partial index with NOW() removed
+-- Partial indexes with NOW() are evaluated at creation time, not query time.
+-- This means the index would only include records from the migration timestamp,
+-- not rolling 24 hours. Use a regular composite index instead for time-based queries.
+-- Common query: SELECT * FROM driver_locations WHERE driver_id = ? ORDER BY recorded_at DESC
+CREATE INDEX IF NOT EXISTS idx_driver_locations_driver_time
+  ON driver_locations(driver_id, recorded_at DESC);
 
-COMMENT ON INDEX idx_driver_locations_recent IS
-  'Partial index for recent locations (last 24 hours). '
-  'Much smaller than full index, providing faster queries for recent data.';
+COMMENT ON INDEX idx_driver_locations_driver_time IS
+  'Composite index for driver location history queries. '
+  'Efficiently supports queries filtering by driver and sorting by time.';
 
 -- ============================================================================
 -- DRIVER_SHIFTS TABLE - Shift History and Active Shift Queries
 -- ============================================================================
 
 -- Composite index for driver shift history queries
--- Common query: SELECT * FROM driver_shifts WHERE driver_id = ? ORDER BY start_time DESC
+-- Common query: SELECT * FROM driver_shifts WHERE driver_id = ? ORDER BY shift_start DESC
 CREATE INDEX IF NOT EXISTS idx_driver_shifts_driver_start
-  ON driver_shifts(driver_id, start_time DESC);
+  ON driver_shifts(driver_id, shift_start DESC);
 
 COMMENT ON INDEX idx_driver_shifts_driver_start IS
   'Improves performance of shift history queries with chronological sorting.';
@@ -56,7 +57,7 @@ COMMENT ON INDEX idx_driver_shifts_driver_start IS
 -- Index for active shift lookups
 -- Common query: SELECT * FROM driver_shifts WHERE status = 'active' ORDER BY shift_start
 CREATE INDEX IF NOT EXISTS idx_driver_shifts_status_start
-  ON driver_shifts(status, start_time)
+  ON driver_shifts(status, shift_start)
   WHERE status IN ('active', 'on_break');
 
 COMMENT ON INDEX idx_driver_shifts_status_start IS

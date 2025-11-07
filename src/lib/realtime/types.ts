@@ -257,8 +257,191 @@ export class RealtimeAuthenticationError extends RealtimeError {
 }
 
 export class RealtimeBroadcastError extends RealtimeError {
-  constructor(message: string, channel?: string) {
+  constructor(message: string, channel?: string, public eventName?: string) {
     super(message, 'BROADCAST_ERROR', channel);
     this.name = 'RealtimeBroadcastError';
+  }
+}
+
+export class RealtimeValidationError extends RealtimeError {
+  constructor(message: string, public eventName?: string, public validationErrors?: string[]) {
+    super(message, 'VALIDATION_ERROR');
+    this.name = 'RealtimeValidationError';
+  }
+}
+
+// ============================================================================
+// Payload Validation
+// ============================================================================
+
+/**
+ * Type guard for DriverLocationPayload
+ */
+function isDriverLocationPayload(payload: unknown): payload is DriverLocationPayload {
+  if (!payload || typeof payload !== 'object') return false;
+  const p = payload as Partial<DriverLocationPayload>;
+  return (
+    typeof p.lat === 'number' &&
+    typeof p.lng === 'number' &&
+    typeof p.accuracy === 'number' &&
+    typeof p.timestamp === 'string'
+  );
+}
+
+/**
+ * Type guard for DriverLocationUpdatedPayload
+ */
+function isDriverLocationUpdatedPayload(payload: unknown): payload is DriverLocationUpdatedPayload {
+  if (!isDriverLocationPayload(payload)) return false;
+  const p = payload as Partial<DriverLocationUpdatedPayload>;
+  return typeof p.driverId === 'string';
+}
+
+/**
+ * Type guard for DriverStatusPayload
+ */
+function isDriverStatusPayload(payload: unknown): payload is DriverStatusPayload {
+  if (!payload || typeof payload !== 'object') return false;
+  const p = payload as Partial<DriverStatusPayload>;
+  const validStatuses: DriverStatus[] = ['active', 'on_break', 'off_duty', 'unavailable'];
+  return (
+    typeof p.status === 'string' &&
+    validStatuses.includes(p.status as DriverStatus) &&
+    typeof p.timestamp === 'string'
+  );
+}
+
+/**
+ * Type guard for DriverStatusUpdatedPayload
+ */
+function isDriverStatusUpdatedPayload(payload: unknown): payload is DriverStatusUpdatedPayload {
+  if (!isDriverStatusPayload(payload)) return false;
+  const p = payload as Partial<DriverStatusUpdatedPayload>;
+  return typeof p.driverId === 'string';
+}
+
+/**
+ * Type guard for DeliveryAssignmentPayload
+ */
+function isDeliveryAssignmentPayload(payload: unknown): payload is DeliveryAssignmentPayload {
+  if (!payload || typeof payload !== 'object') return false;
+  const p = payload as Partial<DeliveryAssignmentPayload>;
+  return (
+    typeof p.deliveryId === 'string' &&
+    typeof p.driverId === 'string' &&
+    p.pickupLocation !== undefined &&
+    typeof p.pickupLocation === 'object' &&
+    typeof (p.pickupLocation as any).lat === 'number' &&
+    typeof (p.pickupLocation as any).lng === 'number' &&
+    p.deliveryLocation !== undefined &&
+    typeof p.deliveryLocation === 'object' &&
+    typeof (p.deliveryLocation as any).lat === 'number' &&
+    typeof (p.deliveryLocation as any).lng === 'number'
+  );
+}
+
+/**
+ * Type guard for DeliveryAssignedPayload
+ */
+function isDeliveryAssignedPayload(payload: unknown): payload is DeliveryAssignedPayload {
+  if (!isDeliveryAssignmentPayload(payload)) return false;
+  const p = payload as Partial<DeliveryAssignedPayload>;
+  return (
+    typeof p.assignedBy === 'string' &&
+    typeof p.assignedByName === 'string' &&
+    typeof p.assignedAt === 'string'
+  );
+}
+
+/**
+ * Type guard for AdminMessagePayload
+ */
+function isAdminMessagePayload(payload: unknown): payload is AdminMessagePayload {
+  if (!payload || typeof payload !== 'object') return false;
+  const p = payload as Partial<AdminMessagePayload>;
+  return typeof p.message === 'string';
+}
+
+/**
+ * Type guard for AdminMessageReceivedPayload
+ */
+function isAdminMessageReceivedPayload(payload: unknown): payload is AdminMessageReceivedPayload {
+  if (!isAdminMessagePayload(payload)) return false;
+  const p = payload as Partial<AdminMessageReceivedPayload>;
+  return (
+    typeof p.adminId === 'string' &&
+    typeof p.adminName === 'string' &&
+    typeof p.sentAt === 'string' &&
+    typeof p.messageId === 'string'
+  );
+}
+
+/**
+ * Type guard for HeartbeatPayload
+ */
+function isHeartbeatPayload(payload: unknown): payload is HeartbeatPayload {
+  if (!payload || typeof payload !== 'object') return false;
+  const p = payload as Partial<HeartbeatPayload>;
+  return typeof p.timestamp === 'string';
+}
+
+/**
+ * Validate broadcast payload matches event type
+ * Returns validation result with success flag and error message
+ */
+export function validateBroadcastPayload(
+  eventName: string,
+  payload: unknown,
+): { success: boolean; error?: string } {
+  switch (eventName) {
+    case REALTIME_EVENTS.DRIVER_LOCATION_UPDATE:
+      return isDriverLocationPayload(payload)
+        ? { success: true }
+        : { success: false, error: 'Payload must be a valid DriverLocationPayload' };
+
+    case REALTIME_EVENTS.DRIVER_LOCATION_UPDATED:
+      return isDriverLocationUpdatedPayload(payload)
+        ? { success: true }
+        : { success: false, error: 'Payload must be a valid DriverLocationUpdatedPayload' };
+
+    case REALTIME_EVENTS.DRIVER_STATUS_UPDATE:
+      return isDriverStatusPayload(payload)
+        ? { success: true }
+        : { success: false, error: 'Payload must be a valid DriverStatusPayload' };
+
+    case REALTIME_EVENTS.DRIVER_STATUS_UPDATED:
+      return isDriverStatusUpdatedPayload(payload)
+        ? { success: true }
+        : { success: false, error: 'Payload must be a valid DriverStatusUpdatedPayload' };
+
+    case REALTIME_EVENTS.ADMIN_ASSIGN_DELIVERY:
+      return isDeliveryAssignmentPayload(payload)
+        ? { success: true }
+        : { success: false, error: 'Payload must be a valid DeliveryAssignmentPayload' };
+
+    case REALTIME_EVENTS.DELIVERY_ASSIGNED:
+      return isDeliveryAssignedPayload(payload)
+        ? { success: true }
+        : { success: false, error: 'Payload must be a valid DeliveryAssignedPayload' };
+
+    case REALTIME_EVENTS.ADMIN_MESSAGE:
+      return isAdminMessagePayload(payload)
+        ? { success: true }
+        : { success: false, error: 'Payload must be a valid AdminMessagePayload' };
+
+    case REALTIME_EVENTS.ADMIN_MESSAGE_RECEIVED:
+      return isAdminMessageReceivedPayload(payload)
+        ? { success: true }
+        : { success: false, error: 'Payload must be a valid AdminMessageReceivedPayload' };
+
+    case REALTIME_EVENTS.PING:
+    case REALTIME_EVENTS.PONG:
+      return isHeartbeatPayload(payload)
+        ? { success: true }
+        : { success: false, error: 'Payload must be a valid HeartbeatPayload' };
+
+    default:
+      // For unknown events, allow any payload (backwards compatibility)
+      return { success: true };
   }
 }

@@ -44,11 +44,20 @@ STABLE
 AS $$
 DECLARE
   user_role TEXT;
+  current_user_id UUID;
 BEGIN
-  -- Get user role from profiles table
-  SELECT user_type INTO user_role
+  -- Get current authenticated user ID
+  current_user_id := auth.uid();
+
+  -- Return false if no authenticated user
+  IF current_user_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  -- Get user role from profiles table (using correct column name "type")
+  SELECT type INTO user_role
   FROM profiles
-  WHERE id = auth.uid();
+  WHERE id = current_user_id;
 
   -- Check if user has admin role
   RETURN user_role IN ('ADMIN', 'SUPER_ADMIN', 'HELPDESK');
@@ -57,7 +66,7 @@ $$;
 
 COMMENT ON FUNCTION is_admin_user() IS
   'Helper function to check if the current user has admin privileges. '
-  'Returns true if user_type is ADMIN, SUPER_ADMIN, or HELPDESK.';
+  'Returns true if type is ADMIN, SUPER_ADMIN, or HELPDESK.';
 
 -- ============================================================================
 -- Create Restrictive Admin-Only Policies
