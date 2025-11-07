@@ -294,7 +294,7 @@ export function validatePayload<T>(eventName: string, payload: unknown): T {
 
   if (!result.success) {
     const errorMessages = result.error.issues
-      .map((err: { path: (string | number)[]; message: string }) => `${err.path.join('.')}: ${err.message}`)
+      .map((err) => `${err.path.join('.')}: ${err.message}`)
       .join(', ');
 
     throw new PayloadValidationError(

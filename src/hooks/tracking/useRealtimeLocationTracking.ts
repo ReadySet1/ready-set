@@ -196,6 +196,16 @@ export function useRealtimeLocationTracking(
       }
 
       try {
+        // Validate driver ID before broadcast
+        if (!location.driverId) {
+          realtimeLogger.warn('Missing driver ID in location update', {
+            metadata: {
+              coordinates: `${location.coordinates.lat},${location.coordinates.lng}`,
+            },
+          });
+          return false;
+        }
+
         // Prevent duplicate broadcasts
         const locationKey = `${location.coordinates.lat},${location.coordinates.lng},${location.timestamp.getTime()}`;
         if (lastBroadcastRef.current === locationKey) {
@@ -260,7 +270,10 @@ export function useRealtimeLocationTracking(
       isActive = false;
       cleanupRealtime();
     };
-  }, [isRealtimeEnabled, isTracking, initializeRealtime, cleanupRealtime]);
+    // initializeRealtime and cleanupRealtime are stable refs created with useCallback
+    // Including them in deps would cause infinite re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRealtimeEnabled, isTracking]);
 
   /**
    * Broadcast location updates when they change

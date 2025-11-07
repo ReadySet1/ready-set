@@ -17,14 +17,6 @@
  */
 export const CONNECTION_CONFIG = {
   /**
-   * Heartbeat interval (milliseconds)
-   * NOTE: Supabase has built-in WebSocket heartbeats, this is redundant.
-   * Kept for reference but should be removed in cleanup.
-   * @deprecated Use Supabase's built-in heartbeat instead
-   */
-  HEARTBEAT_INTERVAL_MS: 30000,
-
-  /**
    * Initial reconnection delay after disconnect (milliseconds)
    * Exponential backoff starts from this value: 1s → 2s → 4s → 5s (max)
    */

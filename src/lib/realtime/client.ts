@@ -52,7 +52,7 @@ function validateEnvironment() {
     });
 
     if (!result.success) {
-      const errorMessages = result.error.issues.map((err: { path: (string | number)[]; message: string }) =>
+      const errorMessages = result.error.issues.map((err) =>
         `${err.path.join('.')}: ${err.message}`
       ).join(', ');
       // Log technical details for developers/support
@@ -225,10 +225,12 @@ export class RealtimeClient {
       if (lruChannelName) {
         // Evict the LRU channel
         realtimeLogger.warn('Evicting least recently used channel', {
-          evictedChannel: lruChannelName,
-          lastUsed: new Date(oldestTime).toISOString(),
-          currentChannels: this.channels.size,
-          maxChannels: this.MAX_CHANNELS,
+          metadata: {
+            evictedChannel: lruChannelName,
+            lastUsed: new Date(oldestTime).toISOString(),
+            currentChannels: this.channels.size,
+            maxChannels: this.MAX_CHANNELS,
+          },
         });
 
         // Unsubscribe and remove the LRU channel
@@ -236,8 +238,10 @@ export class RealtimeClient {
         if (lruChannel) {
           lruChannel.unsubscribe().catch((error) => {
             realtimeLogger.error('Error unsubscribing LRU channel', {
-              channel: lruChannelName,
               error,
+              metadata: {
+                channel: lruChannelName,
+              },
             });
           });
         }
@@ -248,8 +252,10 @@ export class RealtimeClient {
       } else {
         // Fallback: throw error if we can't find an LRU channel
         realtimeLogger.error('Maximum channels exceeded with no LRU candidate', {
-          currentChannels: this.channels.size,
-          maxChannels: this.MAX_CHANNELS,
+          metadata: {
+            currentChannels: this.channels.size,
+            maxChannels: this.MAX_CHANNELS,
+          },
         });
         throw new RealtimeConnectionError(
           `Maximum ${this.MAX_CHANNELS} channels exceeded. Please unsubscribe from unused channels.`,
@@ -274,8 +280,7 @@ export class RealtimeClient {
     this.channelLastUsed.set(channelName, Date.now()); // Track creation time for LRU
     this.initializeConnectionState(channelName);
 
-    realtimeLogger.connection('Channel created', {
-      channel: channelName,
+    realtimeLogger.connection('created', channelName, {
       totalChannels: this.channels.size,
     });
 
@@ -309,15 +314,19 @@ export class RealtimeClient {
       // For now, we can't get the user type from the token alone
       // This would need to be passed from the calling code or fetched from the database
       realtimeLogger.warn('User context not provided, skipping authorization check', {
-        channel: channelName,
-        userId: user.id,
+        channelName,
+        metadata: {
+          userId: user.id,
+        },
       });
     } else {
       // Validate user has access to this channel
       if (!canAccessChannel(channelName, userContext.userType)) {
         realtimeLogger.error('User does not have access to channel', {
-          channel: channelName,
-          userType: userContext.userType,
+          channelName,
+          metadata: {
+            userType: userContext.userType,
+          },
         });
         throw new UnauthorizedError(
           `Access denied to channel: ${channelName}. User type ${userContext.userType} does not have permission.`
@@ -331,8 +340,7 @@ export class RealtimeClient {
     // Update state to connecting
     this.updateConnectionState(channelName, { state: 'connecting' });
 
-    realtimeLogger.connection('Subscribing to channel', {
-      channel: channelName,
+    realtimeLogger.connection('connecting', channelName, {
       userType: userContext?.userType,
     });
 
@@ -347,9 +355,7 @@ export class RealtimeClient {
               reconnectAttempts: 0,
             });
 
-            realtimeLogger.connection('Channel subscribed', {
-              channel: channelName,
-            });
+            realtimeLogger.connection('subscribed', channelName);
 
             // NOTE: Heartbeat removed - Supabase Realtime has built-in WebSocket heartbeats
 
@@ -367,7 +373,7 @@ export class RealtimeClient {
             });
 
             realtimeLogger.error('Channel subscription error', {
-              channel: channelName,
+              channelName,
               error: connectionError,
             });
 
@@ -385,7 +391,7 @@ export class RealtimeClient {
             });
 
             realtimeLogger.error('Channel subscription timed out', {
-              channel: channelName,
+              channelName,
             });
 
             callbacks?.onError?.(timeoutError);
@@ -395,9 +401,7 @@ export class RealtimeClient {
               state: 'disconnected',
             });
 
-            realtimeLogger.connection('Channel closed', {
-              channel: channelName,
-            });
+            realtimeLogger.connection('closed', channelName);
 
             callbacks?.onDisconnect?.();
           }
@@ -450,7 +454,9 @@ export class RealtimeClient {
           if (!rateLimitResult.allowed) {
             realtimeLogger.warn('Rate limit exceeded for driver location update', {
               driverId: userContext.driverId,
-              retryAfter: rateLimitResult.retryAfter,
+              metadata: {
+                retryAfter: rateLimitResult.retryAfter,
+              },
             });
             throw new RateLimitExceededError(
               userContext.driverId,
@@ -462,8 +468,10 @@ export class RealtimeClient {
         // Check if user can broadcast this event type
         if (!canBroadcastEvent(eventName, userContext.userType)) {
           realtimeLogger.error('User not authorized to broadcast event', {
-            eventName,
-            userType: userContext.userType,
+            eventType: eventName,
+            metadata: {
+              userType: userContext.userType,
+            },
           });
           throw new UnauthorizedError(
             `User type ${userContext.userType} is not authorized to broadcast ${eventName}`
@@ -476,9 +484,11 @@ export class RealtimeClient {
           if (payloadWithDriverId.driverId && userContext.driverId) {
             if (payloadWithDriverId.driverId !== userContext.driverId) {
               realtimeLogger.error('Driver ID mismatch in payload', {
-                eventName,
-                payloadDriverId: payloadWithDriverId.driverId,
-                contextDriverId: userContext.driverId,
+                eventType: eventName,
+                driverId: userContext.driverId,
+                metadata: {
+                  payloadDriverId: payloadWithDriverId.driverId,
+                },
               });
               throw new UnauthorizedError(
                 'Driver ID in payload does not match authenticated user'
@@ -497,8 +507,10 @@ export class RealtimeClient {
         }
 
         realtimeLogger.warn('User context not provided for broadcast, skipping authorization', {
-          eventName,
-          userId: user.id,
+          eventType: eventName,
+          metadata: {
+            userId: user.id,
+          },
         });
       }
 
@@ -521,9 +533,7 @@ export class RealtimeClient {
         );
       }
 
-      realtimeLogger.broadcast('Sending broadcast', {
-        channel: channelName,
-        event: eventName,
+      realtimeLogger.broadcast(eventName, channelName, {
         payloadSize: JSON.stringify(validatedPayload).length,
         userType: userContext?.userType,
       });
@@ -546,24 +556,30 @@ export class RealtimeClient {
         locationRateLimiter.recordUpdate(userContext.driverId);
       }
 
-      realtimeLogger.broadcast('Broadcast sent successfully', {
-        channel: channelName,
-        event: eventName,
+      realtimeLogger.debug(`Broadcast sent successfully: ${eventName}`, {
+        channelName,
+        eventType: eventName,
       });
     } catch (error) {
       if (error instanceof PayloadValidationError) {
         realtimeLogger.error('Payload validation failed', {
-          eventName,
-          errors: error.errors.errors,
+          eventType: eventName,
+          error,
+          metadata: {
+            errors: error.errors.issues,
+          },
         });
         throw new RealtimeValidationError(error.message, eventName);
       }
 
       if (error instanceof PayloadSizeError) {
         realtimeLogger.error('Payload size exceeded', {
-          eventName,
-          size: error.size,
-          maxSize: error.maxSize,
+          eventType: eventName,
+          error,
+          metadata: {
+            size: error.size,
+            maxSize: error.maxSize,
+          },
         });
         throw new RealtimeValidationError(error.message, eventName);
       }

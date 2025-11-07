@@ -15,6 +15,8 @@
  * - Thread-safe for concurrent requests (Map operations are atomic)
  */
 
+import { RATE_LIMIT_CONFIG } from '@/constants/realtime-config';
+
 export interface RateLimitResult {
   /** Whether the request is allowed */
   allowed: boolean;
@@ -23,23 +25,6 @@ export interface RateLimitResult {
   /** Human-readable message */
   message: string;
 }
-
-/**
- * Configuration for location update rate limiting
- */
-const RATE_LIMIT_CONFIG = {
-  /** Minimum time between location updates in milliseconds (5 seconds) */
-  MIN_UPDATE_INTERVAL_MS: 5 * 1000,
-
-  /** Cleanup interval in milliseconds (15 minutes) */
-  CLEANUP_INTERVAL_MS: 15 * 60 * 1000,
-
-  /** Max entries in rate limit map (safety limit) */
-  MAX_ENTRIES: 1000,
-
-  /** Consider entry stale after this duration (30 minutes) */
-  STALE_THRESHOLD_MS: 30 * 60 * 1000,
-} as const;
 
 /**
  * In-memory rate limiter for driver location updates

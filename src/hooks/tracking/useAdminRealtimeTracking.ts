@@ -268,9 +268,11 @@ export function useAdminRealtimeTracking(
         entriesToDelete.forEach(key => processedLocationsRef.current.delete(key));
 
         realtimeLogger.warn('Processed locations size-based cleanup performed', {
-          beforeSize: processedLocationsRef.current.size + MEMORY_CONFIG.PROCESSED_LOCATIONS_CLEANUP_BATCH,
-          afterSize: processedLocationsRef.current.size,
-          removed: MEMORY_CONFIG.PROCESSED_LOCATIONS_CLEANUP_BATCH,
+          metadata: {
+            beforeSize: processedLocationsRef.current.size + MEMORY_CONFIG.PROCESSED_LOCATIONS_CLEANUP_BATCH,
+            afterSize: processedLocationsRef.current.size,
+            removed: MEMORY_CONFIG.PROCESSED_LOCATIONS_CLEANUP_BATCH,
+          },
         });
       }
 
@@ -279,7 +281,9 @@ export function useAdminRealtimeTracking(
       if (!payload.driverId || !payload.timestamp) {
         realtimeLogger.warn('Missing required fields in location payload', {
           driverId: payload.driverId,
-          timestamp: payload.timestamp,
+          metadata: {
+            timestamp: payload.timestamp,
+          },
         });
         return;
       }
@@ -294,9 +298,11 @@ export function useAdminRealtimeTracking(
         payload.lng > 180
       ) {
         realtimeLogger.warn('Invalid coordinates in location payload', {
-          lat: payload.lat,
-          lng: payload.lng,
           driverId: payload.driverId,
+          metadata: {
+            lat: payload.lat,
+            lng: payload.lng,
+          },
         });
         return;
       }
@@ -401,7 +407,10 @@ export function useAdminRealtimeTracking(
       isActive = false;
       cleanupRealtime();
     };
-  }, [isRealtimeEnabled, useRealtime, initializeRealtime, cleanupRealtime]);
+    // initializeRealtime and cleanupRealtime are stable refs created with useCallback
+    // Including them in deps would cause infinite re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRealtimeEnabled, useRealtime]);
 
   /**
    * Handle Realtime feature flag or mode changes
@@ -469,9 +478,11 @@ export function useAdminRealtimeTracking(
       // Log cleanup if entries were removed
       if (removedCount > 0) {
         realtimeLogger.info('Processed locations time-based cleanup performed', {
-          removedCount,
-          remainingCount: processedLocationsRef.current.size,
-          cutoffAge: `${MEMORY_CONFIG.LOCATION_ENTRY_MAX_AGE_MS / (60 * 1000)} minutes`,
+          metadata: {
+            removedCount,
+            remainingCount: processedLocationsRef.current.size,
+            cutoffAge: `${MEMORY_CONFIG.LOCATION_ENTRY_MAX_AGE_MS / (60 * 1000)} minutes`,
+          },
         });
       }
     }, MEMORY_CONFIG.TIME_BASED_CLEANUP_INTERVAL_MS);

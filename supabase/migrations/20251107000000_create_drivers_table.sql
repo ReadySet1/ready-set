@@ -7,6 +7,10 @@
 -- Purpose: Create a dedicated drivers table to replace Profile-based driver storage
 -- This table will be used by the SSE endpoint and Realtime tracking system
 
+-- Dependencies:
+--   - auth.users table (provided by Supabase Auth)
+--   - profiles table (must exist before running this migration)
+
 -- ============================================================================
 -- Create drivers table
 -- ============================================================================

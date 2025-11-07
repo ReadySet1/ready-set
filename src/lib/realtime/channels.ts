@@ -73,6 +73,7 @@ export class DriverLocationChannel {
   }): Promise<void> {
     this.channel = await this.client.subscribe(
       REALTIME_CHANNELS.DRIVER_LOCATIONS,
+      undefined,
       {
         onConnect: callbacks?.onConnect,
         onDisconnect: callbacks?.onDisconnect,
@@ -128,12 +129,16 @@ export class DriverLocationChannel {
     }
 
     // Create listener function and store reference
-    const listener = (payload: { payload: T }) => handler(payload.payload);
+    // Wrap handler to match Phoenix channel listener signature and handle async
+    const listener = (...args: unknown[]) => {
+      const payload = (args[0] as { payload: T }) || { payload: args[0] as T };
+      void handler(payload.payload);
+    };
     this.listenerRefs.set(eventName, listener);
     this.eventHandlers.set(eventName, handler);
 
     // Register listener with channel
-    this.channel.on('broadcast', { event: eventName }, listener);
+    (this.channel as unknown as { on: (type: string, filter: { event: string }, callback: (...args: unknown[]) => void) => void }).on('broadcast', { event: eventName }, listener);
   }
 
   /**
@@ -152,15 +157,19 @@ export class DriverLocationChannel {
           channel.off('broadcast', { event: eventName }, listener);
         } else {
           realtimeLogger.warn('off() method not available on channel', {
-            eventName,
-            channel: REALTIME_CHANNELS.DRIVER_LOCATIONS,
+            metadata: {
+              eventName,
+              channel: REALTIME_CHANNELS.DRIVER_LOCATIONS,
+            },
           });
         }
       } catch (error) {
         realtimeLogger.error('Failed to remove event listener', {
-          eventName,
           error,
-          channel: REALTIME_CHANNELS.DRIVER_LOCATIONS,
+          metadata: {
+            eventName,
+            channel: REALTIME_CHANNELS.DRIVER_LOCATIONS,
+          },
         });
       }
     }
@@ -204,11 +213,15 @@ export class DriverStatusChannel {
     onDisconnect?: () => void;
     onError?: (error: Error) => void;
   }): Promise<void> {
-    this.channel = await this.client.subscribe(REALTIME_CHANNELS.DRIVER_STATUS, {
-      onConnect: callbacks?.onConnect,
-      onDisconnect: callbacks?.onDisconnect,
-      onError: callbacks?.onError,
-    });
+    this.channel = await this.client.subscribe(
+      REALTIME_CHANNELS.DRIVER_STATUS,
+      undefined,
+      {
+        onConnect: callbacks?.onConnect,
+        onDisconnect: callbacks?.onDisconnect,
+        onError: callbacks?.onError,
+      },
+    );
 
     // Set up event listeners
     if (callbacks?.onStatusUpdate) {
@@ -269,12 +282,16 @@ export class DriverStatusChannel {
     }
 
     // Create listener function and store reference
-    const listener = (payload: any) => handler(payload.payload);
+    // Wrap handler to match Phoenix channel listener signature and handle async
+    const listener = (...args: unknown[]) => {
+      const payload = (args[0] as { payload: T }) || { payload: args[0] as T };
+      void handler(payload.payload);
+    };
     this.listenerRefs.set(eventName, listener);
     this.eventHandlers.set(eventName, handler);
 
     // Register listener with channel
-    this.channel.on('broadcast', { event: eventName }, listener);
+    (this.channel as unknown as { on: (type: string, filter: { event: string }, callback: (...args: unknown[]) => void) => void }).on('broadcast', { event: eventName }, listener);
   }
 
   /**
@@ -356,11 +373,15 @@ export class AdminCommandsChannel {
     onDisconnect?: () => void;
     onError?: (error: Error) => void;
   }): Promise<void> {
-    this.channel = await this.client.subscribe(REALTIME_CHANNELS.ADMIN_COMMANDS, {
-      onConnect: callbacks?.onConnect,
-      onDisconnect: callbacks?.onDisconnect,
-      onError: callbacks?.onError,
-    });
+    this.channel = await this.client.subscribe(
+      REALTIME_CHANNELS.ADMIN_COMMANDS,
+      undefined,
+      {
+        onConnect: callbacks?.onConnect,
+        onDisconnect: callbacks?.onDisconnect,
+        onError: callbacks?.onError,
+      },
+    );
 
     // Set up event listeners
     if (callbacks?.onDeliveryAssigned) {
@@ -433,12 +454,16 @@ export class AdminCommandsChannel {
     }
 
     // Create listener function and store reference
-    const listener = (payload: any) => handler(payload.payload);
+    // Wrap handler to match Phoenix channel listener signature and handle async
+    const listener = (...args: unknown[]) => {
+      const payload = (args[0] as { payload: T }) || { payload: args[0] as T };
+      void handler(payload.payload);
+    };
     this.listenerRefs.set(eventName, listener);
     this.eventHandlers.set(eventName, handler);
 
     // Register listener with channel
-    this.channel.on('broadcast', { event: eventName }, listener);
+    (this.channel as unknown as { on: (type: string, filter: { event: string }, callback: (...args: unknown[]) => void) => void }).on('broadcast', { event: eventName }, listener);
   }
 
   /**
