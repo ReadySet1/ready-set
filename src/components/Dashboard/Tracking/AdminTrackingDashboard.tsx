@@ -77,7 +77,7 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
     if (activeDrivers.length > 0 || activeDeliveries.length > 0) {
       setLastUpdate(new Date());
     }
-  }, [activeDrivers, activeDeliveries]);
+  }, [activeDrivers.length, activeDeliveries.length]);
 
   // Auto-refresh toggle
   const toggleAutoRefresh = () => {

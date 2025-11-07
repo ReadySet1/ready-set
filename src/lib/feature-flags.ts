@@ -44,12 +44,12 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, FeatureFlagConfig> = {
     rolloutPercentage: 0,
   },
   [FEATURE_FLAGS.USE_REALTIME_LOCATION_UPDATES]: {
-    enabled: false, // Disabled by default - enable via environment variable
-    rolloutPercentage: 0,
+    enabled: true, // Enabled for testing - disable via environment variable in production
+    rolloutPercentage: 100,
   },
   [FEATURE_FLAGS.USE_REALTIME_ADMIN_DASHBOARD]: {
-    enabled: false, // Disabled by default - enable via environment variable
-    rolloutPercentage: 0,
+    enabled: true, // Enabled for testing - disable via environment variable in production
+    rolloutPercentage: 100,
   },
   [FEATURE_FLAGS.USE_REALTIME_DRIVER_MESSAGING]: {
     enabled: false,

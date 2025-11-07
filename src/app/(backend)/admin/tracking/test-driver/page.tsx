@@ -1,43 +1,78 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { createDriverLocationChannel } from '@/lib/realtime';
+import { createDriverLocationChannel, type DriverLocationChannel } from '@/lib/realtime';
 
 /**
  * Test Driver Simulator
  *
- * Simple page to simulate a driver sending location updates via WebSocket.
- * Use this to test the admin dashboard is receiving location updates.
+ * Simulates a driver traveling from Destino restaurant to TRexBio office.
+ * Use this to test the admin dashboard real-time tracking.
  */
+
+// Realistic route from Destino (103 Horne Ave) to TRexBio (681 Gateway Blvd)
+const ROUTE_WAYPOINTS = [
+  { lat: 37.7267, lng: -122.3865, name: 'Destino Restaurant (Start)' }, // 103 Horne Avenue, SF
+  { lat: 37.7250, lng: -122.3880, name: 'Turn onto Bayshore Blvd' },
+  { lat: 37.7200, lng: -122.3920, name: 'Continue on Bayshore' },
+  { lat: 37.7100, lng: -122.3950, name: 'Approaching Industrial' },
+  { lat: 37.7000, lng: -122.3970, name: 'US-101 South entrance' },
+  { lat: 37.6800, lng: -122.3980, name: 'On US-101 South' },
+  { lat: 37.6700, lng: -122.3990, name: 'Exit Gateway Blvd' },
+  { lat: 37.6600, lng: -122.3995, name: 'Turn onto Gateway Blvd' },
+  { lat: 37.6560, lng: -122.3995, name: 'TRexBio Office (End)' }, // 681 Gateway Boulevard, SSF
+];
+
 export default function TestDriverPage() {
   const [driverId, setDriverId] = useState('test-driver-001');
   const [driverName, setDriverName] = useState('Test Driver');
-  const [lat, setLat] = useState(37.7749); // San Francisco
-  const [lng, setLng] = useState(-122.4194);
-  const [speed, setSpeed] = useState(25);
+  const [speed, setSpeed] = useState(15); // m/s (about 33 mph)
   const [isConnected, setIsConnected] = useState(false);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
-  const [channel, setChannel] = useState<any>(null);
+  const [channel, setChannel] = useState<DriverLocationChannel | null>(null);
   const [messageCount, setMessageCount] = useState(0);
+  const [currentWaypoint, setCurrentWaypoint] = useState(0);
+  const [currentLocation, setCurrentLocation] = useState(ROUTE_WAYPOINTS[0]);
+  const [progress, setProgress] = useState(0); // Progress between waypoints (0-1)
+
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const connect = async () => {
     try {
       const locationChannel = createDriverLocationChannel();
 
       await locationChannel.subscribe({
-        onConnect: () => {
+        onConnect: async () => {
           console.log('[Test Driver] Connected to location channel');
           setIsConnected(true);
+
+          // Send initial location immediately so dashboard shows the driver
+          const initialLocation = currentLocation || ROUTE_WAYPOINTS[0]!;
+          await locationChannel.broadcastLocationUpdate({
+            driverId,
+            driverName,
+            lat: initialLocation.lat,
+            lng: initialLocation.lng,
+            accuracy: 10,
+            speed: 0, // Stationary at start
+            heading: 90,
+            batteryLevel: 85,
+            isMoving: false,
+            activityType: 'stationary',
+            timestamp: new Date().toISOString(),
+            vehicleNumber: 'VEH-001',
+          });
+          console.log('[Test Driver] Sent initial location');
         },
         onDisconnect: () => {
           console.log('[Test Driver] Disconnected from location channel');
           setIsConnected(false);
         },
-        onError: (error) => {
+        onError: (error: Error) => {
           console.error('[Test Driver] Connection error:', error);
           alert(`Connection error: ${error.message}`);
         },
@@ -56,67 +91,121 @@ export default function TestDriverPage() {
       setChannel(null);
       setIsConnected(false);
       setIsBroadcasting(false);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     }
   };
 
-  const sendLocationUpdate = async () => {
+  const calculateHeading = (from: typeof ROUTE_WAYPOINTS[0] | undefined, to: typeof ROUTE_WAYPOINTS[0] | undefined): number => {
+    if (!from || !to) return 0; // Default heading if waypoints missing
+    const dLon = to.lng - from.lng;
+    const dLat = to.lat - from.lat;
+    const heading = Math.atan2(dLon, dLat) * 180 / Math.PI;
+    return (heading + 360) % 360; // Normalize to 0-360
+  };
+
+  const sendLocationUpdate = async (lat: number, lng: number, heading: number, isMoving: boolean) => {
     if (!channel || !isConnected) {
-      alert('Not connected. Click Connect first.');
       return;
     }
 
     try {
-      // Use broadcastLocationUpdate instead of sendLocationUpdate
-      // This sends the event that the admin dashboard is listening for
       await channel.broadcastLocationUpdate({
         driverId,
         driverName,
         lat,
         lng,
         accuracy: 10,
-        speed,
-        heading: 90,
-        batteryLevel: 85,
-        isMoving: speed > 0,
-        activityType: speed > 5 ? 'driving' : 'stationary',
+        speed: isMoving ? speed : 0,
+        heading,
+        batteryLevel: Math.max(85 - messageCount * 0.5, 20), // Simulate battery drain
+        isMoving,
+        activityType: isMoving ? 'driving' : 'stationary',
         timestamp: new Date().toISOString(),
         vehicleNumber: 'VEH-001',
       });
 
       setMessageCount(prev => prev + 1);
-      console.log('[Test Driver] Broadcasted location update:', { driverId, lat, lng, speed });
+      console.log('[Test Driver] Location update:', { lat, lng, waypoint: currentWaypoint, progress: progress.toFixed(2) });
     } catch (error) {
       console.error('[Test Driver] Failed to send location:', error);
-      alert(`Failed to send: ${(error as Error).message}`);
     }
   };
 
   const startBroadcasting = () => {
     setIsBroadcasting(true);
 
-    const interval = setInterval(() => {
-      if (!isConnected) {
-        clearInterval(interval);
-        setIsBroadcasting(false);
-        return;
-      }
+    // Reset to start of route
+    setCurrentWaypoint(0);
+    setProgress(0);
+    setCurrentLocation(ROUTE_WAYPOINTS[0]);
 
-      // Simulate movement: move slightly north-east
-      setLat(prev => prev + 0.0001);
-      setLng(prev => prev + 0.0001);
+    intervalRef.current = setInterval(() => {
+      setProgress(prevProgress => {
+        setCurrentWaypoint(prevWaypoint => {
+          // Check if we've reached the end of the route
+          if (prevWaypoint >= ROUTE_WAYPOINTS.length - 1) {
+            console.log('[Test Driver] Route completed!');
+            if (intervalRef.current) {
+              clearInterval(intervalRef.current);
+            }
+            setIsBroadcasting(false);
+            return prevWaypoint;
+          }
 
-      sendLocationUpdate();
-    }, 2000); // Every 2 seconds
+          const from = ROUTE_WAYPOINTS[prevWaypoint]!;
+          const to = ROUTE_WAYPOINTS[prevWaypoint + 1]!;
 
-    // Store interval ID for cleanup
-    (window as any).testDriverInterval = interval;
+          // Increment progress (about 10% per update = 5 seconds per segment)
+          const newProgress = prevProgress + 0.10;
+
+          if (newProgress >= 1.0) {
+            // Move to next waypoint
+            const nextWaypoint = prevWaypoint + 1;
+            setProgress(0);
+            setCurrentLocation(to);
+
+            // Calculate heading for next segment
+            if (nextWaypoint < ROUTE_WAYPOINTS.length - 1) {
+              const heading = calculateHeading(to, ROUTE_WAYPOINTS[nextWaypoint + 1]);
+              sendLocationUpdate(to.lat, to.lng, heading, true);
+            } else {
+              // At destination, stationary
+              sendLocationUpdate(to.lat, to.lng, 0, false);
+            }
+
+            return nextWaypoint;
+          } else {
+            // Interpolate position between waypoints
+            const lat = from.lat + (to.lat - from.lat) * newProgress;
+            const lng = from.lng + (to.lng - from.lng) * newProgress;
+            const heading = calculateHeading(from, to);
+
+            setCurrentLocation({ lat, lng, name: `En route to ${to.name}` });
+            sendLocationUpdate(lat, lng, heading, true);
+
+            return prevWaypoint;
+          }
+        });
+
+        return prevProgress >= 1.0 ? 0 : prevProgress + 0.10;
+      });
+    }, 500); // Update every 0.5 seconds for smooth movement
   };
 
   const stopBroadcasting = () => {
     setIsBroadcasting(false);
-    if ((window as any).testDriverInterval) {
-      clearInterval((window as any).testDriverInterval);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
     }
+  };
+
+  const resetRoute = () => {
+    setCurrentWaypoint(0);
+    setProgress(0);
+    setCurrentLocation(ROUTE_WAYPOINTS[0]);
+    setMessageCount(0);
   };
 
   return (
@@ -125,7 +214,7 @@ export default function TestDriverPage() {
         <CardHeader>
           <CardTitle>Test Driver Simulator</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Simulate a driver sending location updates to test the admin dashboard
+            Simulates a driver traveling from Destino Restaurant to TRexBio Office
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -142,9 +231,36 @@ export default function TestDriverPage() {
               </span>
             </div>
             <div className="text-sm text-muted-foreground">
-              Messages sent: {messageCount}
+              Updates sent: {messageCount}
             </div>
           </div>
+
+          {/* Route Progress */}
+          {isConnected && (
+            <div className="p-4 bg-blue-50 rounded-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Route Progress</span>
+                <span className="text-sm text-muted-foreground">
+                  Waypoint {currentWaypoint + 1} of {ROUTE_WAYPOINTS.length}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${((currentWaypoint + progress) / ROUTE_WAYPOINTS.length) * 100}%`
+                  }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {currentLocation?.name || 'Unknown location'}
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>Lat: {currentLocation?.lat?.toFixed(6) || 'N/A'}</div>
+                <div>Lng: {currentLocation?.lng?.toFixed(6) || 'N/A'}</div>
+              </div>
+            </div>
+          )}
 
           {/* Driver Info */}
           <div className="space-y-4">
@@ -168,36 +284,14 @@ export default function TestDriverPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="lat">Latitude</Label>
-                <Input
-                  id="lat"
-                  type="number"
-                  step="0.0001"
-                  value={lat}
-                  onChange={(e) => setLat(parseFloat(e.target.value))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="lng">Longitude</Label>
-                <Input
-                  id="lng"
-                  type="number"
-                  step="0.0001"
-                  value={lng}
-                  onChange={(e) => setLng(parseFloat(e.target.value))}
-                />
-              </div>
-            </div>
-
             <div>
-              <Label htmlFor="speed">Speed (m/s)</Label>
+              <Label htmlFor="speed">Speed (m/s) - about {Math.round(speed * 2.237)} mph</Label>
               <Input
                 id="speed"
                 type="number"
                 value={speed}
                 onChange={(e) => setSpeed(parseFloat(e.target.value))}
+                disabled={isBroadcasting}
               />
             </div>
           </div>
@@ -206,7 +300,7 @@ export default function TestDriverPage() {
           <div className="space-y-2">
             {!isConnected ? (
               <Button onClick={connect} className="w-full">
-                Connect
+                Connect to Realtime
               </Button>
             ) : (
               <>
@@ -214,29 +308,30 @@ export default function TestDriverPage() {
                   Disconnect
                 </Button>
 
-                <Button
-                  onClick={sendLocationUpdate}
-                  className="w-full"
-                  disabled={isBroadcasting}
-                >
-                  Send Single Update
-                </Button>
-
                 {!isBroadcasting ? (
-                  <Button
-                    onClick={startBroadcasting}
-                    variant="secondary"
-                    className="w-full"
-                  >
-                    Start Auto-Broadcasting (Every 2s)
-                  </Button>
+                  <>
+                    <Button
+                      onClick={startBroadcasting}
+                      variant="default"
+                      className="w-full"
+                    >
+                      Start Route Simulation
+                    </Button>
+                    <Button
+                      onClick={resetRoute}
+                      variant="secondary"
+                      className="w-full"
+                    >
+                      Reset to Start
+                    </Button>
+                  </>
                 ) : (
                   <Button
                     onClick={stopBroadcasting}
                     variant="destructive"
                     className="w-full"
                   >
-                    Stop Auto-Broadcasting
+                    Stop Simulation
                   </Button>
                 )}
               </>
@@ -245,12 +340,20 @@ export default function TestDriverPage() {
 
           {/* Instructions */}
           <div className="text-sm text-muted-foreground space-y-2 pt-4 border-t">
-            <p className="font-semibold">How to test:</p>
-            <ol className="list-decimal list-inside space-y-1">
-              <li>Click "Connect" to establish WebSocket connection</li>
-              <li>Open the Admin Tracking page in another tab</li>
-              <li>Click "Start Auto-Broadcasting" to simulate driver movement</li>
-              <li>Watch the admin dashboard update in real-time</li>
+            <p className="font-semibold">Route Details:</p>
+            <ul className="list-disc list-inside space-y-1 text-xs">
+              <li>Start: Destino Restaurant (103 Horne Ave, SF 94124)</li>
+              <li>End: TRexBio Office (681 Gateway Blvd, SSF 94080)</li>
+              <li>Updates every 0.5 seconds for smooth movement</li>
+              <li>Follows {ROUTE_WAYPOINTS.length} waypoints along the route</li>
+            </ul>
+            <p className="font-semibold mt-4">How to test:</p>
+            <ol className="list-decimal list-inside space-y-1 text-xs">
+              <li>Click "Connect to Realtime" to establish WebSocket connection</li>
+              <li>Driver appears immediately on admin dashboard</li>
+              <li>Open Admin Tracking page in another tab</li>
+              <li>Click "Start Route Simulation" to begin journey</li>
+              <li>Watch the driver move in real-time on the dashboard map</li>
             </ol>
           </div>
         </CardContent>

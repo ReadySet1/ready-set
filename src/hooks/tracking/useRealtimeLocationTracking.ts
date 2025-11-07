@@ -118,7 +118,6 @@ export function useRealtimeLocationTracking(
   // Realtime channel reference
   const channelRef = useRef<DriverLocationChannel | null>(null);
   const lastBroadcastRef = useRef<string | null>(null);
-  const supabaseRef = useRef(createClient());
 
   /**
    * Initialize Realtime channel
@@ -129,12 +128,11 @@ export function useRealtimeLocationTracking(
     }
 
     try {
-      const supabase = supabaseRef.current;
+      // Create channel
+      const channel = createDriverLocationChannel();
 
-      // Create channel with configuration
-      const channel = createDriverLocationChannel(supabase, {
-        driverId: driverId || currentLocation?.driverId,
-        presence: true, // Enable presence tracking for drivers
+      // Subscribe with callbacks
+      await channel.subscribe({
         onConnect: () => {
           setIsRealtimeConnected(true);
           setConnectionMode('realtime');
@@ -147,17 +145,14 @@ export function useRealtimeLocationTracking(
           onRealtimeDisconnect?.();
           console.log('[Realtime] Location channel disconnected');
         },
-        onError: (error) => {
+        onError: (error: Error) => {
           console.error('[Realtime] Channel error:', error);
           onRealtimeError?.(error);
           // Don't change connection status on errors - let reconnection logic handle it
         },
       });
 
-      // Connect to channel
-      await channel.connect();
       channelRef.current = channel;
-
       console.log('[Realtime] Location channel initialized');
     } catch (error) {
       console.error('[Realtime] Failed to initialize location channel:', error);
@@ -167,8 +162,6 @@ export function useRealtimeLocationTracking(
     }
   }, [
     isRealtimeEnabled,
-    currentLocation?.driverId,
-    driverId,
     onRealtimeConnect,
     onRealtimeDisconnect,
     onRealtimeError,
@@ -180,7 +173,7 @@ export function useRealtimeLocationTracking(
   const cleanupRealtime = useCallback(async () => {
     if (channelRef.current) {
       try {
-        await channelRef.current.disconnect();
+        await channelRef.current.unsubscribe();
       } catch (error) {
         console.error('[Realtime] Error disconnecting from channel:', error);
       }
@@ -207,7 +200,19 @@ export function useRealtimeLocationTracking(
         }
 
         // Broadcast via Realtime channel
-        await channelRef.current.broadcastLocation(location);
+        await channelRef.current.broadcastLocationUpdate({
+          driverId: location.driverId,
+          lat: location.coordinates.lat,
+          lng: location.coordinates.lng,
+          accuracy: location.accuracy || 0,
+          speed: location.speed,
+          heading: location.heading,
+          altitude: location.altitude,
+          batteryLevel: location.batteryLevel,
+          isMoving: location.isMoving,
+          activityType: location.activityType as 'walking' | 'driving' | 'stationary' | null,
+          timestamp: location.timestamp.toISOString(),
+        });
         lastBroadcastRef.current = locationKey;
 
         console.log('[Realtime] Location broadcasted successfully');

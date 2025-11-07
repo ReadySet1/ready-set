@@ -39,10 +39,16 @@ export async function GET(request: NextRequest) {
 
         // Set up interval for sending updates
         const interval = setInterval(async () => {
+          // Check if controller is still open before processing
+          if ((controller as any).desiredSize === null) {
+            clearInterval(interval);
+            return;
+          }
+
           try {
             // Get active drivers with current locations and shifts
             const activeDrivers = await prisma.$queryRawUnsafe<any[]>(`
-              SELECT 
+              SELECT
                 d.id,
                 d.user_id,
                 d.employee_id,
@@ -54,21 +60,20 @@ export async function GET(request: NextRequest) {
                 ST_AsGeoJSON(d.last_known_location) as last_known_location_geojson,
                 d.last_location_update,
                 ds.status as shift_status,
-                ds.start_time as shift_start,
-                ds.delivery_count,
-                ds.total_distance_km,
-                COUNT(CASE WHEN del.status NOT IN ('DELIVERED', 'CANCELLED') THEN 1 END) as active_deliveries
+                ds.shift_start,
+                ds.total_distance,
+                COUNT(CASE WHEN del.status NOT IN ('delivered', 'cancelled') THEN 1 END) as active_deliveries
               FROM drivers d
               LEFT JOIN driver_shifts ds ON d.current_shift_id = ds.id
-              LEFT JOIN deliveries del ON d.id = del.driver_id
-              WHERE d.is_active = true
+              LEFT JOIN deliveries del ON d.id = del.driver_id AND del.deleted_at IS NULL
+              WHERE d.is_active = true AND d.deleted_at IS NULL
               GROUP BY d.id, ds.id
               ORDER BY d.is_on_duty DESC, d.last_location_update DESC
             `);
 
             // Get recent location updates (last 5 minutes)
             const recentLocations = await prisma.$queryRawUnsafe<any[]>(`
-              SELECT 
+              SELECT
                 dl.driver_id,
                 ST_AsGeoJSON(dl.location) as location_geojson,
                 dl.accuracy,
@@ -76,35 +81,43 @@ export async function GET(request: NextRequest) {
                 dl.heading,
                 dl.battery_level,
                 dl.is_moving,
-                dl.activity_type,
+                dl.source,
                 dl.recorded_at
               FROM driver_locations dl
               WHERE dl.recorded_at > NOW() - INTERVAL '5 minutes'
               AND dl.driver_id IN (
                 SELECT id FROM drivers WHERE is_active = true AND is_on_duty = true
               )
+              AND dl.deleted_at IS NULL
               ORDER BY dl.recorded_at DESC
             `);
 
             // Get active deliveries with status updates
             const activeDeliveries = await prisma.$queryRawUnsafe<any[]>(`
-              SELECT 
+              SELECT
                 d.id,
                 d.driver_id,
+                d.shift_id,
+                d.order_number,
                 d.status,
-                d.catering_request_id,
-                d.on_demand_id,
+                d.customer_name,
+                d.customer_phone,
+                d.pickup_address,
                 ST_AsGeoJSON(d.pickup_location) as pickup_location_geojson,
+                d.delivery_address,
                 ST_AsGeoJSON(d.delivery_location) as delivery_location_geojson,
-                d.estimated_arrival,
+                d.estimated_pickup_time,
+                d.estimated_delivery_time,
                 d.assigned_at,
-                d.started_at,
-                d.arrived_at,
-                d.completed_at,
-                d.metadata
+                d.accepted_at,
+                d.picked_up_at,
+                d.delivered_at,
+                d.priority,
+                d.delivery_instructions
               FROM deliveries d
-              WHERE d.status NOT IN ('DELIVERED', 'CANCELLED')
+              WHERE d.status NOT IN ('delivered', 'cancelled')
               AND d.driver_id IS NOT NULL
+              AND d.deleted_at IS NULL
               ORDER BY d.assigned_at DESC
             `);
 
@@ -122,13 +135,12 @@ export async function GET(request: NextRequest) {
                   isOnDuty: driver.is_on_duty,
                   shiftStartTime: driver.shift_start_time,
                   currentShiftId: driver.current_shift_id,
-                  lastKnownLocation: driver.last_known_location_geojson ? 
+                  lastKnownLocation: driver.last_known_location_geojson ?
                     JSON.parse(driver.last_known_location_geojson) : null,
                   lastLocationUpdate: driver.last_location_update,
                   shiftStatus: driver.shift_status,
                   shiftStart: driver.shift_start,
-                  deliveryCount: driver.delivery_count || 0,
-                  totalDistanceKm: driver.total_distance_km || 0,
+                  totalDistance: driver.total_distance || 0,
                   activeDeliveries: parseInt(driver.active_deliveries) || 0
                 })),
                 recentLocations: recentLocations.map(loc => ({
@@ -139,39 +151,51 @@ export async function GET(request: NextRequest) {
                   heading: loc.heading,
                   batteryLevel: loc.battery_level,
                   isMoving: loc.is_moving,
-                  activityType: loc.activity_type,
+                  source: loc.source,
                   recordedAt: loc.recorded_at
                 })),
                 activeDeliveries: activeDeliveries.map(delivery => ({
                   id: delivery.id,
                   driverId: delivery.driver_id,
+                  shiftId: delivery.shift_id,
+                  orderNumber: delivery.order_number,
                   status: delivery.status,
-                  cateringRequestId: delivery.catering_request_id,
-                  onDemandId: delivery.on_demand_id,
-                  pickupLocation: delivery.pickup_location_geojson ? 
+                  customerName: delivery.customer_name,
+                  customerPhone: delivery.customer_phone,
+                  pickupAddress: delivery.pickup_address,
+                  pickupLocation: delivery.pickup_location_geojson ?
                     JSON.parse(delivery.pickup_location_geojson) : null,
-                  deliveryLocation: delivery.delivery_location_geojson ? 
+                  deliveryAddress: delivery.delivery_address,
+                  deliveryLocation: delivery.delivery_location_geojson ?
                     JSON.parse(delivery.delivery_location_geojson) : null,
-                  estimatedArrival: delivery.estimated_arrival,
+                  estimatedPickupTime: delivery.estimated_pickup_time,
+                  estimatedDeliveryTime: delivery.estimated_delivery_time,
                   assignedAt: delivery.assigned_at,
-                  startedAt: delivery.started_at,
-                  arrivedAt: delivery.arrived_at,
-                  completedAt: delivery.completed_at,
-                  metadata: delivery.metadata
+                  acceptedAt: delivery.accepted_at,
+                  pickedUpAt: delivery.picked_up_at,
+                  deliveredAt: delivery.delivered_at,
+                  priority: delivery.priority,
+                  deliveryInstructions: delivery.delivery_instructions
                 }))
               }
             };
 
             const message = `data: ${JSON.stringify(updateData)}\n\n`;
-            controller.enqueue(new TextEncoder().encode(message));
+            // Check controller is still open before enqueueing
+            if ((controller as any).desiredSize !== null) {
+              controller.enqueue(new TextEncoder().encode(message));
+            }
           } catch (error) {
             console.error('Error in SSE update:', error);
-            const errorMessage = `data: ${JSON.stringify({
-              type: 'error',
-              message: 'Error fetching driver updates',
-              timestamp: new Date().toISOString()
-            })}\n\n`;
-            controller.enqueue(new TextEncoder().encode(errorMessage));
+            // Check controller is still open before enqueueing error
+            if ((controller as any).desiredSize !== null) {
+              const errorMessage = `data: ${JSON.stringify({
+                type: 'error',
+                message: 'Error fetching driver updates',
+                timestamp: new Date().toISOString()
+              })}\n\n`;
+              controller.enqueue(new TextEncoder().encode(errorMessage));
+            }
           }
         }, 5000); // Update every 5 seconds
 

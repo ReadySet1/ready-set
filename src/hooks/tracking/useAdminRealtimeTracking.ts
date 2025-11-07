@@ -182,13 +182,11 @@ export function useAdminRealtimeTracking(
           setConnectionMode('realtime');
           setRealtimeError(null);
           onRealtimeConnect?.();
-          console.log('[Realtime Admin] Location channel connected');
         },
         onDisconnect: () => {
           setIsRealtimeConnected(false);
           setConnectionMode('sse');
           onRealtimeDisconnect?.();
-          console.log('[Realtime Admin] Location channel disconnected, falling back to SSE');
         },
         onError: (error) => {
           setIsRealtimeConnected(false);
@@ -209,6 +207,7 @@ export function useAdminRealtimeTracking(
       setRealtimeError((error as Error).message);
       onRealtimeError?.(error as Error);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRealtimeEnabled, onRealtimeConnect, onRealtimeDisconnect, onRealtimeError]);
 
   /**
@@ -299,8 +298,6 @@ export function useAdminRealtimeTracking(
         updated.set(payload.driverId, updatedDriver);
         return updated;
       });
-
-      console.log(`[Realtime Admin] Received location update for driver ${payload.driverId}`);
     } catch (error) {
       console.error('[Realtime Admin] Error handling location update:', error);
     }
