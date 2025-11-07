@@ -247,7 +247,9 @@ export function useRealtimeLocationTracking(
       initializeRealtime().then(() => {
         // If component unmounted or deps changed during init, cleanup
         if (!isActive && channelRef.current) {
-          channelRef.current.unsubscribe().catch(console.error);
+          channelRef.current.unsubscribe().catch((error) => {
+            realtimeLogger.error('Failed to unsubscribe from channel', { error });
+          });
           channelRef.current = null;
         }
       });
@@ -292,7 +294,9 @@ export function useRealtimeLocationTracking(
       initializeRealtime().then(() => {
         // If component unmounted or deps changed during init, cleanup
         if (!isActive && channelRef.current) {
-          channelRef.current.unsubscribe().catch(console.error);
+          channelRef.current.unsubscribe().catch((error) => {
+            realtimeLogger.error('Failed to unsubscribe from channel', { error });
+          });
           channelRef.current = null;
         }
       });
@@ -334,7 +338,9 @@ export function useRealtimeLocationTracking(
         initializeRealtime().then(() => {
           // If listener was removed during init, cleanup
           if (!isActive && channelRef.current) {
-            channelRef.current.unsubscribe().catch(console.error);
+            channelRef.current.unsubscribe().catch((error) => {
+            realtimeLogger.error('Failed to unsubscribe from channel', { error });
+          });
             channelRef.current = null;
           }
         });

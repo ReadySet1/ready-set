@@ -22,6 +22,12 @@ import {
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 import { realtimeLogger } from '@/lib/logging/realtime-logger';
 
+// Memory management configuration
+const PROCESSED_LOCATIONS_CONFIG = {
+  MAX_SIZE: 500, // Maximum entries before cleanup (reduced from 1000)
+  CLEANUP_SIZE: 250, // Number of entries to remove during cleanup (increased from 100)
+} as const;
+
 interface LocationData {
   driverId: string;
   location: {
@@ -241,9 +247,18 @@ export function useAdminRealtimeTracking(
 
       // Clean up old entries to prevent memory leak
       // When threshold exceeded, delete batch of oldest entries for efficiency
-      if (processedLocationsRef.current.size > 1000) {
-        const entriesToDelete = Array.from(processedLocationsRef.current).slice(0, 100);
+      if (processedLocationsRef.current.size > PROCESSED_LOCATIONS_CONFIG.MAX_SIZE) {
+        const entriesToDelete = Array.from(processedLocationsRef.current).slice(
+          0,
+          PROCESSED_LOCATIONS_CONFIG.CLEANUP_SIZE
+        );
         entriesToDelete.forEach(key => processedLocationsRef.current.delete(key));
+
+        realtimeLogger.warn('Processed locations cleanup performed', {
+          beforeSize: processedLocationsRef.current.size + PROCESSED_LOCATIONS_CONFIG.CLEANUP_SIZE,
+          afterSize: processedLocationsRef.current.size,
+          removed: PROCESSED_LOCATIONS_CONFIG.CLEANUP_SIZE,
+        });
       }
 
       // Convert Realtime payload to LocationData format
@@ -335,7 +350,9 @@ export function useAdminRealtimeTracking(
       initializeRealtime().then(() => {
         // If component unmounted or deps changed during init, cleanup
         if (!isActive && channelRef.current) {
-          channelRef.current.unsubscribe().catch(console.error);
+          channelRef.current.unsubscribe().catch((error) => {
+            realtimeLogger.error('Failed to unsubscribe from channel', { error });
+          });
           channelRef.current = null;
         }
       });
@@ -360,7 +377,9 @@ export function useAdminRealtimeTracking(
       initializeRealtime().then(() => {
         // If component unmounted or deps changed during init, cleanup
         if (!isActive && channelRef.current) {
-          channelRef.current.unsubscribe().catch(console.error);
+          channelRef.current.unsubscribe().catch((error) => {
+            realtimeLogger.error('Failed to unsubscribe from channel', { error });
+          });
           channelRef.current = null;
         }
       });

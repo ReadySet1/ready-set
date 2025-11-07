@@ -25,7 +25,9 @@ import {
   type PresenceState,
   RealtimeConnectionError,
   RealtimeBroadcastError,
+  type MessagePayload,
 } from './types';
+import { realtimeLogger } from '../logging/realtime-logger';
 
 // ============================================================================
 // Driver Location Channel
@@ -86,7 +88,10 @@ export class DriverLocationChannel {
   /**
    * Listen to specific events
    */
-  on<T = any>(eventName: RealtimeEventName, handler: RealtimeEventHandler<T>): void {
+  on<T extends MessagePayload = MessagePayload>(
+    eventName: RealtimeEventName,
+    handler: RealtimeEventHandler<T>
+  ): void {
     if (!this.channel) {
       throw new RealtimeConnectionError(
         'Channel not subscribed. Call subscribe() first.',
@@ -100,7 +105,7 @@ export class DriverLocationChannel {
     }
 
     // Create listener function and store reference
-    const listener = (payload: any) => handler(payload.payload);
+    const listener = (payload: { payload: T }) => handler(payload.payload);
     this.listenerRefs.set(eventName, listener);
     this.eventHandlers.set(eventName, handler);
 
@@ -109,14 +114,29 @@ export class DriverLocationChannel {
   }
 
   /**
-   * Remove event listener
+   * Remove event listener with improved error handling
    */
   off(eventName: RealtimeEventName): void {
     const listener = this.listenerRefs.get(eventName);
     if (listener && this.channel) {
-      // Actually remove the listener from the channel
-      // Note: Phoenix Channels has off() but @supabase/supabase-js types don't expose it
-      (this.channel as any).off('broadcast', { event: eventName }, listener);
+      try {
+        // Phoenix Channels has off() but @supabase/supabase-js types don't expose it
+        const channel = this.channel as any;
+        if (typeof channel.off === 'function') {
+          channel.off('broadcast', { event: eventName }, listener);
+        } else {
+          realtimeLogger.warn('off() method not available on channel', {
+            eventName,
+            channel: REALTIME_CHANNELS.DRIVER_LOCATIONS,
+          });
+        }
+      } catch (error) {
+        realtimeLogger.error('Failed to remove event listener', {
+          eventName,
+          error,
+          channel: REALTIME_CHANNELS.DRIVER_LOCATIONS,
+        });
+      }
     }
     this.listenerRefs.delete(eventName);
     this.eventHandlers.delete(eventName);

@@ -55,10 +55,20 @@ export const REALTIME_EVENTS = {
 export type RealtimeEventName = (typeof REALTIME_EVENTS)[keyof typeof REALTIME_EVENTS];
 
 // ============================================================================
+// Base Payload Type
+// ============================================================================
+
+/**
+ * Base type for all message payloads
+ * All specific payload types should extend this
+ */
+export type MessagePayload = Record<string, unknown>;
+
+// ============================================================================
 // Location Update Events
 // ============================================================================
 
-export interface DriverLocationPayload {
+export interface DriverLocationPayload extends MessagePayload {
   lat: number;
   lng: number;
   accuracy: number;
