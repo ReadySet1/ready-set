@@ -407,15 +407,17 @@ export default function LiveDriverMap({
     // Auto-fit map to show all drivers only on initial load or when explicitly requested
     if (drivers.length > 0 && shouldAutoFit && !hasUserInteracted) {
       const bounds = new mapboxgl.LngLatBounds();
+      let hasValidLocation = false;
 
       drivers.forEach(driver => {
         if (driver.lastKnownLocation?.coordinates) {
           bounds.extend(driver.lastKnownLocation.coordinates as [number, number]);
+          hasValidLocation = true;
         }
       });
 
-      // Only fit bounds if we have multiple drivers, otherwise it might zoom too much
-      if (drivers.length > 1) {
+      // Only fit bounds if we have multiple drivers with valid locations
+      if (drivers.length > 1 && hasValidLocation) {
         mapRef.current.fitBounds(bounds, {
           padding: MAP_CONFIG.BOUNDS_PADDING,
           maxZoom: MAP_CONFIG.MAX_AUTO_ZOOM,

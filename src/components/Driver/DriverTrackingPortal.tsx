@@ -21,7 +21,7 @@ import {
   CheckCircleIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useLocationTracking } from '@/hooks/tracking/useLocationTracking';
+import { useRealtimeLocationTracking } from '@/hooks/tracking/useRealtimeLocationTracking';
 import { useDriverShift } from '@/hooks/tracking/useDriverShift';
 import { useDriverDeliveries } from '@/hooks/tracking/useDriverDeliveries';
 import { useOfflineQueue } from '@/hooks/tracking/useOfflineQueue';
@@ -45,8 +45,11 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
     accuracy,
     startTracking,
     stopTracking,
-    error: locationError
-  } = useLocationTracking();
+    error: locationError,
+    isRealtimeConnected,
+    isRealtimeEnabled,
+    connectionMode
+  } = useRealtimeLocationTracking();
 
   const {
     currentShift,
@@ -153,15 +156,24 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div suppressHydrationWarning className={cn('w-3 h-3 rounded-full', {
-                'bg-green-500': isMounted && isOnline,
-                'bg-red-500': isMounted && !isOnline,
-                'bg-gray-400': !isMounted
-              })} />
-              <span suppressHydrationWarning className="text-sm font-medium">
-                {isMounted ? (isOnline ? 'Online' : 'Offline') : '...'}
-              </span>
+            <div className="flex flex-col space-y-1">
+              <div className="flex items-center space-x-2">
+                <div suppressHydrationWarning className={cn('w-3 h-3 rounded-full', {
+                  'bg-green-500': isMounted && isOnline,
+                  'bg-red-500': isMounted && !isOnline,
+                  'bg-gray-400': !isMounted
+                })} />
+                <span suppressHydrationWarning className="text-sm font-medium">
+                  {isMounted ? (isOnline ? 'Online' : 'Offline') : '...'}
+                </span>
+              </div>
+              {isRealtimeEnabled && (
+                <span suppressHydrationWarning className="text-xs text-muted-foreground ml-5">
+                  {connectionMode === 'realtime' && isRealtimeConnected && '✓ Real-time connected'}
+                  {connectionMode === 'hybrid' && '⟳ Connecting to real-time...'}
+                  {connectionMode === 'rest' && 'Standard mode'}
+                </span>
+              )}
             </div>
             
             <div className="flex items-center space-x-4">

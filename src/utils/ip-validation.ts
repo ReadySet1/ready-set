@@ -1,25 +1,36 @@
 // src/utils/ip-validation.ts
 
-import { isIP } from 'net';
-
 /**
  * IP Validation Utilities
  *
  * Provides reusable IP address validation and classification functions
  * for security and rate limiting purposes.
+ *
+ * Edge Runtime Compatible: Uses regex patterns instead of Node.js net module
  */
 
 /**
+ * IPv4 validation regex
+ * Matches valid IPv4 addresses (0.0.0.0 to 255.255.255.255)
+ */
+const IPV4_REGEX = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+
+/**
+ * IPv6 validation regex
+ * Matches standard IPv6 addresses and compressed forms
+ */
+const IPV6_REGEX = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/;
+
+/**
  * Validate if a string is a valid IPv4 or IPv6 address
- * Uses Node.js built-in isIP function for reliable validation
+ * Edge Runtime compatible - uses regex instead of Node.js net module
  *
  * @param ip - The IP address string to validate
  * @returns true if valid IPv4 or IPv6, false otherwise
  */
 export function isValidIp(ip: string): boolean {
-  // Use Node.js built-in isIP function
-  // Returns 4 for IPv4, 6 for IPv6, 0 for invalid
-  return isIP(ip) !== 0;
+  if (!ip || typeof ip !== 'string') return false;
+  return IPV4_REGEX.test(ip) || IPV6_REGEX.test(ip);
 }
 
 /**

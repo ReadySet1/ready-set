@@ -22,7 +22,7 @@ import {
 import { cn } from '@/lib/utils';
 import DriverStatusList from './DriverStatusList';
 import DeliveryAssignmentPanel from './DeliveryAssignmentPanel';
-import { useRealTimeTracking } from '@/hooks/tracking/useRealTimeTracking';
+import { useAdminRealtimeTracking } from '@/hooks/tracking/useAdminRealtimeTracking';
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 
 // Dynamically import LiveDriverMap to code-split Mapbox bundle (~750KB)
@@ -50,12 +50,16 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
 
   const {
     activeDrivers,
-    recentLocations, 
+    recentLocations,
     activeDeliveries,
     isConnected,
+    isRealtimeConnected,
+    isRealtimeEnabled,
+    connectionMode,
     error,
-    reconnect
-  } = useRealTimeTracking();
+    reconnect,
+    toggleMode
+  } = useAdminRealtimeTracking();
 
   // Calculate dashboard statistics
   const stats = {
@@ -73,7 +77,7 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
     if (activeDrivers.length > 0 || activeDeliveries.length > 0) {
       setLastUpdate(new Date());
     }
-  }, [activeDrivers, activeDeliveries]);
+  }, [activeDrivers.length, activeDeliveries.length]);
 
   // Auto-refresh toggle
   const toggleAutoRefresh = () => {
@@ -111,22 +115,49 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
       {/* Connection Status & Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div className={cn('w-3 h-3 rounded-full', {
-              'bg-green-500 animate-pulse': isConnected,
-              'bg-red-500': !isConnected
-            })} />
-            <span className="text-sm font-medium">
-              {isConnected ? 'Live Data' : 'Disconnected'}
-            </span>
+          <div className="flex flex-col space-y-1">
+            <div className="flex items-center space-x-2">
+              <div className={cn('w-3 h-3 rounded-full', {
+                'bg-green-500 animate-pulse': isConnected,
+                'bg-red-500': !isConnected
+              })} />
+              <span className="text-sm font-medium">
+                {isConnected ? 'Live Data' : 'Disconnected'}
+              </span>
+            </div>
+
+            {/* Realtime connection status */}
+            {isRealtimeEnabled && (
+              <span className="text-xs text-muted-foreground ml-5">
+                {connectionMode === 'realtime' && isRealtimeConnected && '✓ Real-time WebSocket connected'}
+                {connectionMode === 'hybrid' && '⟳ Connecting to WebSocket...'}
+                {connectionMode === 'sse' && 'SSE mode (polling every 5s)'}
+              </span>
+            )}
           </div>
-          
+
           <div className="text-sm text-muted-foreground">
             Last update: {lastUpdate.toLocaleTimeString()}
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Realtime mode toggle */}
+          {isRealtimeEnabled && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleMode}
+              className={cn({
+                'bg-blue-50 border-blue-200': connectionMode === 'realtime' || connectionMode === 'hybrid',
+                'bg-gray-50': connectionMode === 'sse'
+              })}
+            >
+              <SignalIcon className="w-4 h-4 mr-2" />
+              {connectionMode === 'realtime' || connectionMode === 'hybrid' ? 'WebSocket Mode' : 'SSE Mode'}
+            </Button>
+          )}
+
           <Button
             variant="outline"
             size="sm"
@@ -139,7 +170,7 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
             <ActivityIcon className="w-4 h-4 mr-2" />
             {autoRefresh ? 'Auto Refresh On' : 'Auto Refresh Off'}
           </Button>
-          
+
           <Button
             variant="outline"
             size="sm"
@@ -149,7 +180,7 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
             <RefreshCwIcon className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          
+
           <Button
             variant="outline"
             size="sm"
