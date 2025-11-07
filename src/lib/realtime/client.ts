@@ -23,8 +23,8 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 // Realtime configuration
+// NOTE: Heartbeat removed - Supabase Realtime has built-in WebSocket heartbeats
 const REALTIME_CONFIG = {
-  heartbeatInterval: 30000, // 30 seconds
   reconnectDelay: 1000, // 1 second
   reconnectDelayMax: 5000, // 5 seconds
   reconnectAttempts: Infinity,
@@ -40,7 +40,6 @@ export class RealtimeClient {
   private supabase: SupabaseClient;
   private channels: Map<string, RealtimeChannel> = new Map();
   private connectionStates: Map<string, RealtimeConnectionState> = new Map();
-  private heartbeatIntervals: Map<string, NodeJS.Timeout> = new Map();
 
   private constructor() {
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -140,8 +139,7 @@ export class RealtimeClient {
               reconnectAttempts: 0,
             });
 
-            // Start heartbeat
-            this.startHeartbeat(channelName, channel);
+            // NOTE: Heartbeat removed - Supabase Realtime has built-in WebSocket heartbeats
 
             callbacks?.onConnect?.();
             resolve(channel);
@@ -176,7 +174,6 @@ export class RealtimeClient {
               state: 'disconnected',
             });
 
-            this.stopHeartbeat(channelName);
             callbacks?.onDisconnect?.();
           }
         });
@@ -191,8 +188,6 @@ export class RealtimeClient {
     if (!channel) {
       return;
     }
-
-    this.stopHeartbeat(channelName);
 
     await this.supabase.removeChannel(channel);
     this.channels.delete(channelName);
@@ -322,35 +317,15 @@ export class RealtimeClient {
   }
 
   /**
-   * Start heartbeat for a channel
+   * NOTE: Custom heartbeat methods removed
+   *
+   * Supabase Realtime uses Phoenix Channels which has built-in WebSocket heartbeat
+   * functionality. Custom application-level heartbeats are redundant and waste bandwidth.
+   *
+   * The WebSocket protocol itself includes ping/pong frames for connection health checking,
+   * and Phoenix Channels implements additional heartbeat logic at the protocol level.
+   * This provides more reliable connection management than application-level pings.
    */
-  private startHeartbeat(channelName: RealtimeChannelName, channel: RealtimeChannel): void {
-    // Clear existing heartbeat
-    this.stopHeartbeat(channelName);
-
-    const interval = setInterval(() => {
-      if (this.isConnected(channelName)) {
-        channel.send({
-          type: 'broadcast',
-          event: 'ping',
-          payload: { timestamp: new Date().toISOString() },
-        });
-      }
-    }, REALTIME_CONFIG.heartbeatInterval);
-
-    this.heartbeatIntervals.set(channelName, interval);
-  }
-
-  /**
-   * Stop heartbeat for a channel
-   */
-  private stopHeartbeat(channelName: RealtimeChannelName): void {
-    const interval = this.heartbeatIntervals.get(channelName);
-    if (interval) {
-      clearInterval(interval);
-      this.heartbeatIntervals.delete(channelName);
-    }
-  }
 }
 
 // ============================================================================

@@ -5,6 +5,9 @@
  * Allows enabling/disabling features for specific users or percentages.
  */
 
+import { FEATURE_FLAG_CONFIG } from '@/constants/realtime-config';
+import { realtimeLogger } from '@/lib/logging/realtime-logger';
+
 // ============================================================================
 // Feature Flag Definitions
 // ============================================================================
@@ -86,38 +89,85 @@ class FeatureFlagStore {
 
   /**
    * Load feature flag overrides from environment variables
+   * Wrapped in try-catch to prevent app crashes from malformed env vars
    */
   private loadEnvironmentOverrides(): void {
     // NEXT_PUBLIC_FF_USE_REALTIME_TRACKING=true
     // NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES=50 (rollout percentage)
 
-    Object.values(FEATURE_FLAGS).forEach((flagKey) => {
-      const envKey = `NEXT_PUBLIC_FF_${flagKey.toUpperCase()}`;
-      const envValue = process.env[envKey];
+    try {
+      Object.values(FEATURE_FLAGS).forEach((flagKey) => {
+        try {
+          const envKey = `NEXT_PUBLIC_FF_${flagKey.toUpperCase()}`;
+          const envValue = process.env[envKey];
 
-      if (envValue !== undefined) {
-        const currentConfig = this.flags.get(flagKey) || { enabled: false };
+          if (envValue === undefined) {
+            return; // No override for this flag
+          }
 
-        // If value is "true" or "false", set enabled
-        if (envValue === 'true' || envValue === 'false') {
-          this.flags.set(flagKey, {
-            ...currentConfig,
-            enabled: envValue === 'true',
-          });
-        }
-        // If value is a number, set rollout percentage
-        else {
-          const percentage = parseInt(envValue, 10);
-          if (!isNaN(percentage) && percentage >= 0 && percentage <= 100) {
+          const currentConfig = this.flags.get(flagKey) || { enabled: false };
+
+          // If value is "true" or "false", set enabled
+          if (envValue === 'true' || envValue === 'false') {
+            this.flags.set(flagKey, {
+              ...currentConfig,
+              enabled: envValue === 'true',
+            });
+            return;
+          }
+
+          // If value is a number, set rollout percentage
+          const percentage = this.parsePercentage(envValue);
+          if (percentage !== null) {
             this.flags.set(flagKey, {
               ...currentConfig,
               enabled: percentage > 0,
               rolloutPercentage: percentage,
             });
+          } else {
+            // Invalid value - log warning and use default
+            realtimeLogger.warn(`Invalid feature flag value for ${envKey}: "${envValue}"`, {
+              metadata: {
+                envKey,
+                envValue,
+                expectedFormat: 'true|false|0-100',
+              }
+            });
           }
+        } catch (error) {
+          // Log error for this specific flag but continue processing others
+          realtimeLogger.error(`Failed to load feature flag override: ${flagKey}`, {
+            error,
+            metadata: { flagKey }
+          });
         }
-      }
-    });
+      });
+    } catch (error) {
+      // Catch-all for unexpected errors
+      realtimeLogger.error('Failed to load feature flag environment overrides', {
+        error,
+        metadata: { message: 'Using default flag values' }
+      });
+      // Continue with defaults - don't crash the app
+    }
+  }
+
+  /**
+   * Parse and validate percentage value from env var
+   * Returns null if invalid
+   */
+  private parsePercentage(value: string): number | null {
+    const percentage = parseInt(value, 10);
+
+    if (isNaN(percentage)) {
+      return null; // Not a number
+    }
+
+    if (percentage < FEATURE_FLAG_CONFIG.MIN_PERCENTAGE || percentage > FEATURE_FLAG_CONFIG.MAX_PERCENTAGE) {
+      return null; // Out of valid range (0-100)
+    }
+
+    return percentage;
   }
 
   /**

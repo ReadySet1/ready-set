@@ -20,6 +20,7 @@ import {
   type FeatureFlagContext,
 } from '@/lib/feature-flags';
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
+import { realtimeLogger } from '@/lib/logging/realtime-logger';
 
 interface LocationData {
   driverId: string;
@@ -193,7 +194,7 @@ export function useAdminRealtimeTracking(
           setConnectionMode('sse');
           setRealtimeError(error.message);
           onRealtimeError?.(error);
-          console.error('[Realtime Admin] Location channel error:', error);
+          realtimeLogger.error('Admin location channel error', { error });
         },
         onLocationUpdate: (payload) => {
           handleLocationUpdate(payload);
@@ -202,7 +203,7 @@ export function useAdminRealtimeTracking(
 
       channelRef.current = channel;
     } catch (error) {
-      console.error('[Realtime Admin] Failed to initialize location channel:', error);
+      realtimeLogger.error('Admin failed to initialize location channel', { error });
       setConnectionMode('sse');
       setRealtimeError((error as Error).message);
       onRealtimeError?.(error as Error);
@@ -218,7 +219,7 @@ export function useAdminRealtimeTracking(
       try {
         await channelRef.current.unsubscribe();
       } catch (error) {
-        console.error('[Realtime Admin] Error unsubscribing from channel:', error);
+        realtimeLogger.error('Admin error unsubscribing from channel', { error });
       }
       channelRef.current = null;
       setIsRealtimeConnected(false);
@@ -239,11 +240,10 @@ export function useAdminRealtimeTracking(
       processedLocationsRef.current.add(locationKey);
 
       // Clean up old entries to prevent memory leak
+      // When threshold exceeded, delete batch of oldest entries for efficiency
       if (processedLocationsRef.current.size > 1000) {
-        const firstKey = processedLocationsRef.current.values().next().value;
-        if (firstKey) {
-          processedLocationsRef.current.delete(firstKey);
-        }
+        const entriesToDelete = Array.from(processedLocationsRef.current).slice(0, 100);
+        entriesToDelete.forEach(key => processedLocationsRef.current.delete(key));
       }
 
       // Convert Realtime payload to LocationData format
@@ -299,7 +299,10 @@ export function useAdminRealtimeTracking(
         return updated;
       });
     } catch (error) {
-      console.error('[Realtime Admin] Error handling location update:', error);
+      realtimeLogger.error('Admin error handling location update', {
+        driverId: payload.driverId,
+        error
+      });
     }
   }, []);
 

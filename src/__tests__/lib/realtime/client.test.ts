@@ -450,92 +450,21 @@ describe('RealtimeClient', () => {
     });
   });
 
-  describe('Heartbeat Mechanism', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    it('should send heartbeat pings at regular intervals', async () => {
-      const client = RealtimeClient.getInstance();
-
-      // Subscribe to channel
-      const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
-      await subscribePromise;
-
-      // Clear initial calls
-      mockChannels.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!.send.mockClear();
-
-      // Fast-forward time by 30 seconds (heartbeat interval)
-      jest.advanceTimersByTime(30000);
-
-      expect(mockChannels.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!.send).toHaveBeenCalledWith({
-        type: 'broadcast',
-        event: 'ping',
-        payload: { timestamp: expect.any(String) },
-      });
-    });
-
-    it('should send multiple heartbeats over time', async () => {
-      const client = RealtimeClient.getInstance();
-
-      // Subscribe to channel
-      const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
-      await subscribePromise;
-
-      mockChannels.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!.send.mockClear();
-
-      // Fast-forward by 90 seconds (3 intervals)
-      jest.advanceTimersByTime(90000);
-
-      expect(mockChannels.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!.send).toHaveBeenCalledTimes(3);
-    });
-
-    it('should stop heartbeat when channel is unsubscribed', async () => {
-      const client = RealtimeClient.getInstance();
-
-      // Subscribe to channel
-      const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
-      await subscribePromise;
-
-      mockChannels.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!.send.mockClear();
-
-      // Unsubscribe
-      await client.unsubscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-
-      // Fast-forward time
-      jest.advanceTimersByTime(60000);
-
-      // No heartbeats should be sent
-      expect(mockChannels.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!.send).not.toHaveBeenCalled();
-    });
-
-    it('should not send heartbeat if channel is disconnected', async () => {
-      const client = RealtimeClient.getInstance();
-
-      // Subscribe to channel
-      const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
-      await subscribePromise;
-
-      mockChannels.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!.send.mockClear();
-
-      // Disconnect
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CLOSED');
-
-      // Fast-forward time
-      jest.advanceTimersByTime(60000);
-
-      // No heartbeats should be sent
-      expect(mockChannels.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!.send).not.toHaveBeenCalled();
-    });
-  });
+  /**
+   * NOTE: Heartbeat tests removed
+   *
+   * Custom application-level heartbeat was removed because Supabase Realtime
+   * uses Phoenix Channels which has built-in WebSocket heartbeat functionality.
+   * The WebSocket protocol itself includes ping/pong frames for connection health.
+   *
+   * Previous tests verified:
+   * - Heartbeat pings sent at regular intervals
+   * - Multiple heartbeats over time
+   * - Heartbeat stopped on unsubscribe
+   * - Heartbeat not sent when disconnected
+   *
+   * These behaviors are now handled by the underlying Supabase/Phoenix layer.
+   */
 
   describe('Supabase Client Access', () => {
     it('should provide access to Supabase client', () => {

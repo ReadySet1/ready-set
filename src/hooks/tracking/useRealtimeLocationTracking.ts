@@ -15,7 +15,9 @@
  *   stopTracking,
  * } = useRealtimeLocationTracking({
  *   enableRealtimeBroadcast: true,
- *   onRealtimeConnect: () => console.log('Connected!'),
+ *   onRealtimeConnect: () => {
+ *     // Handle connection
+ *   },
  * });
  * ```
  */
@@ -35,6 +37,7 @@ import {
   isFeatureEnabled,
   type FeatureFlagContext,
 } from '@/lib/feature-flags';
+import { realtimeLogger } from '@/lib/logging/realtime-logger';
 
 interface UseRealtimeLocationTrackingOptions {
   /**
@@ -137,25 +140,25 @@ export function useRealtimeLocationTracking(
           setIsRealtimeConnected(true);
           setConnectionMode('realtime');
           onRealtimeConnect?.();
-          console.log('[Realtime] Location channel connected');
+          realtimeLogger.connection('connected', 'driver-locations');
         },
         onDisconnect: () => {
           setIsRealtimeConnected(false);
           setConnectionMode('rest');
           onRealtimeDisconnect?.();
-          console.log('[Realtime] Location channel disconnected');
+          realtimeLogger.connection('disconnected', 'driver-locations');
         },
         onError: (error: Error) => {
-          console.error('[Realtime] Channel error:', error);
+          realtimeLogger.error('Channel error in location tracking', { error });
           onRealtimeError?.(error);
           // Don't change connection status on errors - let reconnection logic handle it
         },
       });
 
       channelRef.current = channel;
-      console.log('[Realtime] Location channel initialized');
+      realtimeLogger.connection('initialized', 'driver-locations');
     } catch (error) {
-      console.error('[Realtime] Failed to initialize location channel:', error);
+      realtimeLogger.error('Failed to initialize location channel', { error });
       setConnectionMode('rest');
       setIsRealtimeConnected(false);
       onRealtimeError?.(error as Error);
@@ -175,7 +178,7 @@ export function useRealtimeLocationTracking(
       try {
         await channelRef.current.unsubscribe();
       } catch (error) {
-        console.error('[Realtime] Error disconnecting from channel:', error);
+        realtimeLogger.error('Error disconnecting from channel', { error });
       }
       channelRef.current = null;
       setIsRealtimeConnected(false);
@@ -215,10 +218,16 @@ export function useRealtimeLocationTracking(
         });
         lastBroadcastRef.current = locationKey;
 
-        console.log('[Realtime] Location broadcasted successfully');
+        realtimeLogger.broadcast('location-update', 'driver-locations', {
+          driverId: location.driverId,
+          timestamp: location.timestamp.toISOString()
+        });
         return true;
       } catch (error) {
-        console.error('[Realtime] Failed to broadcast location:', error);
+        realtimeLogger.error('Failed to broadcast location', {
+          driverId: location.driverId,
+          error
+        });
         onRealtimeError?.(error as Error);
         return false;
       }
@@ -228,16 +237,21 @@ export function useRealtimeLocationTracking(
 
   /**
    * Initialize Realtime on mount if enabled and tracking
+   * NOTE: initializeRealtime and cleanupRealtime are NOT in deps to avoid race conditions.
+   * The effect only runs when isRealtimeEnabled or isTracking changes, not on every render.
    */
   useEffect(() => {
     if (isRealtimeEnabled && isTracking && !channelRef.current) {
+      // Call initialization function
       initializeRealtime();
     }
 
+    // Cleanup on unmount or when dependencies change
     return () => {
       cleanupRealtime();
     };
-  }, [isRealtimeEnabled, isTracking, initializeRealtime, cleanupRealtime]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRealtimeEnabled, isTracking]);
 
   /**
    * Broadcast location updates when they change
@@ -251,7 +265,7 @@ export function useRealtimeLocationTracking(
     // Attempt to broadcast via Realtime (non-blocking)
     // REST fallback is already handled by useLocationTracking
     broadcastLocation(currentLocation).catch((error) => {
-      console.error('[Realtime] Failed to broadcast location update:', error);
+      realtimeLogger.error('Failed to broadcast location update', { error });
     });
   }, [currentLocation, isTracking, isRealtimeEnabled, isRealtimeConnected, broadcastLocation]);
 
@@ -290,10 +304,10 @@ export function useRealtimeLocationTracking(
       if (document.hidden && channelRef.current && isRealtimeConnected) {
         // Optionally reduce broadcast frequency when in background
         // For now, keep channel open but rely on watchPosition's reduced frequency
-        console.log('[Realtime] Page hidden, maintaining connection');
+        realtimeLogger.debug('Page hidden, maintaining connection');
       } else if (!document.hidden && isRealtimeEnabled && !channelRef.current && isTracking) {
         // Page visible again - reconnect if needed
-        console.log('[Realtime] Page visible, checking connection');
+        realtimeLogger.debug('Page visible, checking connection');
         initializeRealtime();
       }
     };
