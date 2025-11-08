@@ -34,23 +34,11 @@ import { realtimeLogger } from '../logging/realtime-logger';
 // ============================================================================
 
 /**
- * Extended Phoenix Channel interface
+ * Type augmentation for RealtimeChannel is now in types/supabase-realtime.d.ts
+ * This provides proper TypeScript support for the off() method from Phoenix Channels.
  *
- * Phoenix Channels (underlying Supabase Realtime) provides an `off()` method
- * for removing event listeners, but @supabase/supabase-js types don't expose it.
- * This interface adds the missing type definition.
- *
- * @see https://hexdocs.pm/phoenix/js/
+ * @see types/supabase-realtime.d.ts
  */
-interface PhoenixChannel extends RealtimeChannel {
-  /**
-   * Remove an event listener from the channel
-   * @param event - Event type (e.g., 'broadcast', 'presence')
-   * @param filter - Event filter (e.g., { event: 'location:updated' })
-   * @param callback - Callback function to remove
-   */
-  off(event: string, filter: Record<string, unknown>, callback: (...args: unknown[]) => void): void;
-}
 
 // ============================================================================
 // Driver Location Channel
@@ -64,9 +52,17 @@ export class DriverLocationChannel {
 
   /**
    * Subscribe to driver location updates
+   *
+   * Supports both real-time broadcasts AND database changes:
+   * - Broadcasts: Low-latency real-time updates sent by drivers/server
+   * - Database changes: Captures ALL location inserts (even from REST API/SQL)
+   *
+   * The database trigger (migration 20251107000008) also broadcasts via pg_notify,
+   * providing historical replay capability and ensuring no updates are missed.
    */
   async subscribe(callbacks?: {
     onLocationUpdate?: RealtimeEventHandler<DriverLocationUpdatedPayload>;
+    onDatabaseInsert?: (payload: any) => void; // Database INSERT events
     onConnect?: () => void;
     onDisconnect?: () => void;
     onError?: (error: Error) => void;
@@ -81,9 +77,32 @@ export class DriverLocationChannel {
       },
     );
 
-    // Set up event listeners
+    // Set up broadcast event listeners
     if (callbacks?.onLocationUpdate) {
       this.on(REALTIME_EVENTS.DRIVER_LOCATION_UPDATED, callbacks.onLocationUpdate);
+    }
+
+    // Set up postgres_changes listener to capture database INSERTs
+    // This ensures we receive ALL location updates, even those from REST API or SQL
+    if (callbacks?.onDatabaseInsert && this.channel) {
+      this.channel
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'driver_locations',
+          },
+          (payload) => {
+            realtimeLogger.debug('Database INSERT detected', {
+              metadata: {
+                driverId: payload.new?.driver_id,
+                timestamp: payload.new?.recorded_at,
+              },
+            });
+            callbacks.onDatabaseInsert(payload.new);
+          }
+        );
     }
   }
 
@@ -144,25 +163,14 @@ export class DriverLocationChannel {
   /**
    * Remove event listener with improved error handling
    *
-   * Note: Uses PhoenixChannel interface to access off() method not exposed by @supabase/supabase-js types.
-   * This is safe because Supabase Realtime is built on Phoenix Channels which provides this method.
+   * Uses the off() method from Phoenix Channels (now properly typed via type augmentation)
    */
   off(eventName: RealtimeEventName): void {
     const listener = this.listenerRefs.get(eventName);
     if (listener && this.channel) {
       try {
-        // Type assertion to PhoenixChannel to access off() method
-        const channel = this.channel as PhoenixChannel;
-        if (typeof channel.off === 'function') {
-          channel.off('broadcast', { event: eventName }, listener);
-        } else {
-          realtimeLogger.warn('off() method not available on channel', {
-            metadata: {
-              eventName,
-              channel: REALTIME_CHANNELS.DRIVER_LOCATIONS,
-            },
-          });
-        }
+        // off() method is now properly typed via types/supabase-realtime.d.ts
+        this.channel.off('broadcast', { event: eventName }, listener);
       } catch (error) {
         realtimeLogger.error('Failed to remove event listener', {
           error,
@@ -179,11 +187,21 @@ export class DriverLocationChannel {
 
   /**
    * Unsubscribe from the channel
+   * Automatically cleans up ALL listeners to prevent memory leaks
    */
   async unsubscribe(): Promise<void> {
+    // Clean up all broadcast event listeners
+    for (const eventName of this.listenerRefs.keys()) {
+      this.off(eventName);
+    }
+
+    // Unsubscribe from channel (this also cleans up postgres_changes listeners)
     await this.client.unsubscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+
+    // Clear all references
     this.channel = null;
     this.eventHandlers.clear();
+    this.listenerRefs.clear();
   }
 
   /**
@@ -320,16 +338,25 @@ export class DriverStatusChannel {
   }
 
   /**
-   * Remove event listener
+   * Remove event listener with improved error handling
    *
-   * Note: Uses PhoenixChannel interface to access off() method not exposed by @supabase/supabase-js types.
-   * This is safe because Supabase Realtime is built on Phoenix Channels which provides this method.
+   * Uses the off() method from Phoenix Channels (now properly typed via type augmentation)
    */
   off(eventName: RealtimeEventName): void {
     const listener = this.listenerRefs.get(eventName);
     if (listener && this.channel) {
-      // Type assertion to PhoenixChannel to access off() method
-      (this.channel as PhoenixChannel).off('broadcast', { event: eventName }, listener);
+      try {
+        // off() method is now properly typed via types/supabase-realtime.d.ts
+        this.channel.off('broadcast', { event: eventName }, listener);
+      } catch (error) {
+        realtimeLogger.error('Failed to remove event listener', {
+          error,
+          metadata: {
+            eventName,
+            channel: REALTIME_CHANNELS.DRIVER_STATUS,
+          },
+        });
+      }
     }
     this.listenerRefs.delete(eventName);
     this.eventHandlers.delete(eventName);
@@ -337,12 +364,24 @@ export class DriverStatusChannel {
 
   /**
    * Unsubscribe from the channel
+   * Automatically cleans up ALL listeners to prevent memory leaks
    */
   async unsubscribe(): Promise<void> {
+    // Clean up all broadcast event listeners
+    for (const eventName of this.listenerRefs.keys()) {
+      this.off(eventName);
+    }
+
+    // Untrack presence
     await this.untrackPresence();
+
+    // Unsubscribe from channel
     await this.client.unsubscribe(REALTIME_CHANNELS.DRIVER_STATUS);
+
+    // Clear all references
     this.channel = null;
     this.eventHandlers.clear();
+    this.listenerRefs.clear();
   }
 
   /**
@@ -467,16 +506,25 @@ export class AdminCommandsChannel {
   }
 
   /**
-   * Remove event listener
+   * Remove event listener with improved error handling
    *
-   * Note: Uses PhoenixChannel interface to access off() method not exposed by @supabase/supabase-js types.
-   * This is safe because Supabase Realtime is built on Phoenix Channels which provides this method.
+   * Uses the off() method from Phoenix Channels (now properly typed via type augmentation)
    */
   off(eventName: RealtimeEventName): void {
     const listener = this.listenerRefs.get(eventName);
     if (listener && this.channel) {
-      // Type assertion to PhoenixChannel to access off() method
-      (this.channel as PhoenixChannel).off('broadcast', { event: eventName }, listener);
+      try {
+        // off() method is now properly typed via types/supabase-realtime.d.ts
+        this.channel.off('broadcast', { event: eventName }, listener);
+      } catch (error) {
+        realtimeLogger.error('Failed to remove event listener', {
+          error,
+          metadata: {
+            eventName,
+            channel: REALTIME_CHANNELS.ADMIN_COMMANDS,
+          },
+        });
+      }
     }
     this.listenerRefs.delete(eventName);
     this.eventHandlers.delete(eventName);
@@ -484,11 +532,21 @@ export class AdminCommandsChannel {
 
   /**
    * Unsubscribe from the channel
+   * Automatically cleans up ALL listeners to prevent memory leaks
    */
   async unsubscribe(): Promise<void> {
+    // Clean up all broadcast event listeners
+    for (const eventName of this.listenerRefs.keys()) {
+      this.off(eventName);
+    }
+
+    // Unsubscribe from channel
     await this.client.unsubscribe(REALTIME_CHANNELS.ADMIN_COMMANDS);
+
+    // Clear all references
     this.channel = null;
     this.eventHandlers.clear();
+    this.listenerRefs.clear();
   }
 
   /**

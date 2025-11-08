@@ -40,6 +40,10 @@ interface FeatureFlagConfig {
 
 /**
  * Default feature flag configuration
+ *
+ * PRODUCTION SAFETY: All Realtime features default to DISABLED.
+ * Enable them explicitly via environment variables (e.g., NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES=true)
+ * This prevents accidental WebSocket usage in production and ensures gradual rollout control.
  */
 const DEFAULT_FLAGS: Record<FeatureFlagKey, FeatureFlagConfig> = {
   [FEATURE_FLAGS.USE_REALTIME_TRACKING]: {
@@ -47,12 +51,12 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, FeatureFlagConfig> = {
     rolloutPercentage: 0,
   },
   [FEATURE_FLAGS.USE_REALTIME_LOCATION_UPDATES]: {
-    enabled: true, // Enabled for testing - disable via environment variable in production
-    rolloutPercentage: 100,
+    enabled: false, // PRODUCTION SAFETY: Disabled by default - enable via NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES=true
+    rolloutPercentage: 0,
   },
   [FEATURE_FLAGS.USE_REALTIME_ADMIN_DASHBOARD]: {
-    enabled: true, // Enabled for testing - disable via environment variable in production
-    rolloutPercentage: 100,
+    enabled: false, // PRODUCTION SAFETY: Disabled by default - enable via NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD=true
+    rolloutPercentage: 0,
   },
   [FEATURE_FLAGS.USE_REALTIME_DRIVER_MESSAGING]: {
     enabled: false,

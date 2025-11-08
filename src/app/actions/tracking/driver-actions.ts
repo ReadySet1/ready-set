@@ -14,6 +14,7 @@ import {
   type DriverMetadata
 } from '@/lib/cache/driver-metadata-cache';
 import { realtimeLogger } from '@/lib/logging/realtime-logger';
+import { staleLocationDetector } from '@/lib/realtime/stale-detection';
 
 /**
  * Start a new driver shift
@@ -532,6 +533,13 @@ export async function updateDriverLocation(
 
     // NOTE: Rate limit was already recorded atomically by checkAndRecordLimit()
     // No need to call recordUpdate() here - doing so would be redundant and incorrect
+
+    // Track location for stale detection (helps identify drivers who haven't sent updates in 5+ minutes)
+    staleLocationDetector.recordLocation(
+      driverId,
+      location.coordinates.lat,
+      location.coordinates.lng
+    );
 
     return { success: true };
   } catch (error) {

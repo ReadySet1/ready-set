@@ -2,6 +2,56 @@ const path = require('path');
 const { withSentryConfig } = require('@sentry/nextjs');
 
 /**
+ * Environment Variable Validation
+ *
+ * Validates required environment variables at build time to catch configuration
+ * issues early, before deployment.
+ */
+function validateEnvironmentVariables() {
+  const required = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'];
+  const missing = [];
+
+  for (const envVar of required) {
+    if (!process.env[envVar] || process.env[envVar].trim() === '') {
+      missing.push(envVar);
+    }
+  }
+
+  if (missing.length > 0) {
+    console.error('\n❌ Build Error: Missing Required Environment Variables\n');
+    console.error('The following environment variables are required but not set:\n');
+    missing.forEach(envVar => {
+      console.error(`  - ${envVar}`);
+    });
+    console.error('\n📖 To fix this:');
+    console.error('  1. Copy .env.example to .env.local');
+    console.error('  2. Fill in the required values');
+    console.error('  3. Restart the build\n');
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+
+  // Validate Supabase URL format
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (supabaseUrl && !supabaseUrl.startsWith('http')) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL must be a valid URL starting with http:// or https://');
+  }
+
+  // Validate Supabase anon key length (warn only, don't block)
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (anonKey && anonKey.length < 20) {
+    console.warn('⚠️  Warning: NEXT_PUBLIC_SUPABASE_ANON_KEY seems too short (< 20 characters)');
+    console.warn('   This may indicate a configuration error.');
+  }
+
+  console.log('✅ Environment variables validated successfully');
+}
+
+// Run validation (skip during development for better DX)
+if (process.env.NODE_ENV !== 'development' || process.env.VALIDATE_ENV === 'true') {
+  validateEnvironmentVariables();
+}
+
+/**
  * Next.js Configuration
  *
  * Build Memory Requirements:

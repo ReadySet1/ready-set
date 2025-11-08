@@ -27,8 +27,13 @@ import { CONNECTION_CONFIG } from '@/constants/realtime-config';
 // ============================================================================
 
 // Validate environment variables with Zod
-// In test environment, use more lenient validation
-const EnvSchema = process.env.NODE_ENV === 'test'
+// In test environment or build-time, use more lenient validation
+// Build-time detection: Next.js sets NEXT_PHASE during builds
+const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' ||
+                    process.env.NEXT_PHASE === 'phase-export';
+const isTestOrBuild = process.env.NODE_ENV === 'test' || isBuildTime;
+
+const EnvSchema = isTestOrBuild
   ? z.object({
       NEXT_PUBLIC_SUPABASE_URL: z.string().min(1),
       NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
@@ -418,6 +423,9 @@ export class RealtimeClient {
               reconnectAttempts: 0,
             });
 
+            // Track successful connection in metrics
+            this.recordConnection(channelName);
+
             realtimeLogger.connection('subscribed', channelName);
 
             // NOTE: Heartbeat removed - Supabase Realtime has built-in WebSocket heartbeats
@@ -434,6 +442,9 @@ export class RealtimeClient {
               state: 'error',
               error: connectionError,
             });
+
+            // Track error in metrics
+            this.recordError(channelName, connectionError);
 
             realtimeLogger.error('Channel subscription error', {
               channelName,
@@ -453,6 +464,9 @@ export class RealtimeClient {
               error: timeoutError,
             });
 
+            // Track error in metrics
+            this.recordError(channelName, timeoutError);
+
             realtimeLogger.error('Channel subscription timed out', {
               channelName,
             });
@@ -463,6 +477,9 @@ export class RealtimeClient {
             this.updateConnectionState(channelName, {
               state: 'disconnected',
             });
+
+            // Track disconnection in metrics
+            this.recordDisconnection(channelName);
 
             realtimeLogger.connection('closed', channelName);
 
@@ -480,6 +497,9 @@ export class RealtimeClient {
     if (!channel) {
       return;
     }
+
+    // Track disconnection in metrics before removing state
+    this.recordDisconnection(channelName);
 
     await this.supabase.removeChannel(channel);
     this.channels.delete(channelName);
@@ -618,6 +638,9 @@ export class RealtimeClient {
         );
       }
 
+      // Track successful message send in metrics
+      this.recordMessageSent(channelName);
+
       // Record successful broadcast for rate limiting
       if (eventName === REALTIME_EVENTS.DRIVER_LOCATION_UPDATE && effectiveUserContext.driverId) {
         locationRateLimiter.recordUpdate(effectiveUserContext.driverId);
@@ -628,6 +651,11 @@ export class RealtimeClient {
         eventType: eventName,
       });
     } catch (error) {
+      // Track error in metrics
+      if (error instanceof Error) {
+        this.recordError(channelName, error);
+      }
+
       if (error instanceof PayloadValidationError) {
         realtimeLogger.error('Payload validation failed', {
           eventType: eventName,
@@ -706,12 +734,20 @@ export class RealtimeClient {
   }
 
   /**
-   * Initialize connection state for a channel
+   * Initialize connection state for a channel with metrics
    */
   private initializeConnectionState(channelName: RealtimeChannelName): void {
     this.connectionStates.set(channelName, {
       state: 'disconnected',
       reconnectAttempts: 0,
+      metrics: {
+        totalConnections: 0,
+        totalDisconnections: 0,
+        totalErrors: 0,
+        messagesSent: 0,
+        messagesReceived: 0,
+        totalUptimeMs: 0,
+      },
     });
   }
 
@@ -727,6 +763,115 @@ export class RealtimeClient {
       ...currentState,
       ...updates,
     });
+  }
+
+  /**
+   * Record a successful connection in metrics
+   */
+  private recordConnection(channelName: RealtimeChannelName): void {
+    const state = this.getConnectionState(channelName);
+    this.updateConnectionState(channelName, {
+      metrics: {
+        ...state.metrics,
+        totalConnections: state.metrics.totalConnections + 1,
+      },
+    });
+  }
+
+  /**
+   * Record a disconnection in metrics
+   */
+  private recordDisconnection(channelName: RealtimeChannelName): void {
+    const state = this.getConnectionState(channelName);
+
+    // Calculate uptime if we have a connectedAt timestamp
+    let uptimeMs = 0;
+    if (state.connectedAt) {
+      uptimeMs = Date.now() - state.connectedAt.getTime();
+    }
+
+    this.updateConnectionState(channelName, {
+      metrics: {
+        ...state.metrics,
+        totalDisconnections: state.metrics.totalDisconnections + 1,
+        totalUptimeMs: state.metrics.totalUptimeMs + uptimeMs,
+      },
+    });
+  }
+
+  /**
+   * Record an error in metrics
+   */
+  private recordError(channelName: RealtimeChannelName, error: Error): void {
+    const state = this.getConnectionState(channelName);
+    this.updateConnectionState(channelName, {
+      metrics: {
+        ...state.metrics,
+        totalErrors: state.metrics.totalErrors + 1,
+        lastError: error,
+        lastErrorAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Record a sent message in metrics
+   */
+  private recordMessageSent(channelName: RealtimeChannelName): void {
+    const state = this.getConnectionState(channelName);
+    this.updateConnectionState(channelName, {
+      metrics: {
+        ...state.metrics,
+        messagesSent: state.metrics.messagesSent + 1,
+      },
+    });
+  }
+
+  /**
+   * Record a received message in metrics
+   */
+  private recordMessageReceived(channelName: RealtimeChannelName): void {
+    const state = this.getConnectionState(channelName);
+    this.updateConnectionState(channelName, {
+      metrics: {
+        ...state.metrics,
+        messagesReceived: state.metrics.messagesReceived + 1,
+      },
+    });
+  }
+
+  /**
+   * Get connection metrics for monitoring and debugging
+   */
+  public getConnectionMetrics(channelName: RealtimeChannelName) {
+    const state = this.getConnectionState(channelName);
+    const metrics = state.metrics;
+
+    // Calculate current session uptime if connected
+    let currentUptimeMs = metrics.totalUptimeMs;
+    if (state.state === 'connected' && state.connectedAt) {
+      currentUptimeMs += Date.now() - state.connectedAt.getTime();
+    }
+
+    // Calculate reconnection frequency (reconnects per hour)
+    const reconnectFrequency = currentUptimeMs > 0
+      ? (state.reconnectAttempts / (currentUptimeMs / (1000 * 60 * 60)))
+      : 0;
+
+    // Calculate error rate (errors per 100 messages)
+    const totalMessages = metrics.messagesSent + metrics.messagesReceived;
+    const errorRate = totalMessages > 0
+      ? (metrics.totalErrors / totalMessages) * 100
+      : 0;
+
+    return {
+      ...metrics,
+      currentUptimeMs,
+      reconnectFrequency,
+      errorRate,
+      state: state.state,
+      reconnectAttempts: state.reconnectAttempts,
+    };
   }
 
   /**

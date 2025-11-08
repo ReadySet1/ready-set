@@ -209,6 +209,30 @@ export type ConnectionState =
   | 'reconnecting'
   | 'error';
 
+/**
+ * Connection health metrics for monitoring and debugging
+ */
+export interface ConnectionMetrics {
+  /** Total number of successful connections */
+  totalConnections: number;
+  /** Total number of disconnections */
+  totalDisconnections: number;
+  /** Total number of errors encountered */
+  totalErrors: number;
+  /** Last error that occurred */
+  lastError?: Error;
+  /** Timestamp of last error */
+  lastErrorAt?: Date;
+  /** Number of messages sent */
+  messagesSent: number;
+  /** Number of messages received */
+  messagesReceived: number;
+  /** Average message latency in milliseconds (rolling average) */
+  averageLatencyMs?: number;
+  /** Total connection uptime in milliseconds */
+  totalUptimeMs: number;
+}
+
 export interface RealtimeConnectionState {
   state: ConnectionState;
   channel?: RealtimeChannel;
@@ -216,6 +240,8 @@ export interface RealtimeConnectionState {
   connectedAt?: Date;
   reconnectAttempts: number;
   lastReconnectAt?: Date;
+  /** Connection health metrics for monitoring */
+  metrics: ConnectionMetrics;
 }
 
 // ============================================================================

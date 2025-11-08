@@ -136,8 +136,8 @@ jobs:
           NODE_ENV: test
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
           NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
-          SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key-1234567890
+          SUPABASE_SERVICE_ROLE_KEY: test-service-role-key-1234567890
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
@@ -201,7 +201,7 @@ jobs:
           SKIP_TYPECHECK: 'true'
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
           NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key-1234567890
           NEXT_PUBLIC_SANITY_PROJECT_ID: test-project-id
           NEXT_PUBLIC_SANITY_DATASET: test
 
@@ -306,7 +306,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
           NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key-1234567890
           NEXT_PUBLIC_SANITY_PROJECT_ID: test-project-id
           NEXT_PUBLIC_SANITY_DATASET: test
           SKIP_ENV_VALIDATION: 'true'
