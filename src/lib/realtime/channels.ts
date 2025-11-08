@@ -100,7 +100,7 @@ export class DriverLocationChannel {
                 timestamp: payload.new?.recorded_at,
               },
             });
-            callbacks.onDatabaseInsert(payload.new);
+            callbacks.onDatabaseInsert?.(payload.new);
           }
         );
     }
@@ -192,7 +192,7 @@ export class DriverLocationChannel {
   async unsubscribe(): Promise<void> {
     // Clean up all broadcast event listeners
     for (const eventName of this.listenerRefs.keys()) {
-      this.off(eventName);
+      this.off(eventName as RealtimeEventName);
     }
 
     // Unsubscribe from channel (this also cleans up postgres_changes listeners)
@@ -369,7 +369,7 @@ export class DriverStatusChannel {
   async unsubscribe(): Promise<void> {
     // Clean up all broadcast event listeners
     for (const eventName of this.listenerRefs.keys()) {
-      this.off(eventName);
+      this.off(eventName as RealtimeEventName);
     }
 
     // Untrack presence
@@ -537,7 +537,7 @@ export class AdminCommandsChannel {
   async unsubscribe(): Promise<void> {
     // Clean up all broadcast event listeners
     for (const eventName of this.listenerRefs.keys()) {
-      this.off(eventName);
+      this.off(eventName as RealtimeEventName);
     }
 
     // Unsubscribe from channel
