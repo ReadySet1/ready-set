@@ -106,13 +106,15 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
       };
 
       eventSource.onerror = (event) => {
-        console.error('SSE connection error:', event);
-        setIsConnected(false);
-        
-        if (eventSource.readyState === EventSource.CLOSED) {
-                    scheduleReconnect();
-        } else {
+        // Only log actual errors, not normal close events
+        if (eventSource.readyState !== EventSource.CLOSED) {
+          console.error('SSE connection error:', event);
           setError('Connection error occurred');
+        }
+        setIsConnected(false);
+
+        if (eventSource.readyState === EventSource.CLOSED) {
+          scheduleReconnect();
         }
       };
 

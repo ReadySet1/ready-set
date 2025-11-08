@@ -128,8 +128,9 @@ jobs:
         run: |
           echo "🔍 Checking CI workflows for .auth caching..."
 
-          # Search for cache actions that might include .auth
-          if grep -r "cache.*\.auth" .github/workflows/ 2>/dev/null; then
+          # Search for cache actions that actually include .auth paths
+          # Look for "path:" followed by .auth to detect actual cache configurations
+          if grep -r "path:.*\.auth" .github/workflows/ 2>/dev/null | grep -v "Verify CI workflows"; then
             echo "❌ ERROR: Found .auth references in cache configuration!"
             echo "CI workflows must NOT cache authentication files."
             exit 1

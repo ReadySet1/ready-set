@@ -40,6 +40,52 @@ For comprehensive documentation, setup instructions, and development guides, see
 - **Secure file uploads** with signed URLs and comprehensive metadata storage
 - **Enhanced address selector** with search, filtering, and organization
 - **Carrier integrations** with real-time connectivity monitoring and webhook management
+- **Real-time driver tracking** with Supabase Realtime (WebSocket/Phoenix Channels)
+
+## 🔴 Real-Time Tracking
+
+Ready Set features a production-ready real-time tracking system powered by **Supabase Realtime** (Phoenix Channels) for instant driver location updates and admin dashboard synchronization.
+
+### Architecture
+- **Supabase Realtime** - WebSocket-based pub/sub using Phoenix Channels
+- **No custom server required** - Fully serverless compatible (works on Vercel)
+- **Built-in authentication** - Leverages existing Supabase auth
+- **Graceful fallback** - Automatic SSE fallback when WebSocket unavailable
+- **Feature flag controlled** - Safe gradual rollout with environment variables
+
+### Features
+- **Live Driver Locations** - Real-time position updates every 0.5-5 seconds
+- **Admin Dashboard** - Live map with active driver tracking at `/admin/tracking`
+- **Connection Modes** - Toggle between WebSocket (real-time) and SSE (polling) modes
+- **Test Simulator** - Driver simulator at `/admin/tracking/test-driver` for testing
+- **Auto-reconnection** - Smart reconnection with exponential backoff
+- **Presence Tracking** - Online/offline driver status
+- **Memory Optimized** - Deduplication and limits (max 100 recent locations)
+
+### Channels
+- `driver-locations` - Driver location broadcasts (pub/sub)
+- `driver-status` - Shift/break status updates (ready, not yet used in UI)
+- `admin-commands` - Admin → driver messaging (ready, not yet used in UI)
+
+### Testing
+```bash
+# Start test driver simulator
+# Navigate to: http://localhost:3000/admin/tracking/test-driver
+# Click "Connect to Realtime" → Driver appears on admin dashboard
+# Click "Start Route Simulation" → Watch live movement
+
+# View admin dashboard
+# Navigate to: http://localhost:3000/admin/tracking
+# Toggle between WebSocket and SSE modes
+```
+
+### Feature Flags
+Configure via environment variables:
+```bash
+NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES=true
+NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD=true
+NEXT_PUBLIC_FF_REALTIME_FALLBACK_TO_SSE=true
+```
 
 ## 🚚 Carrier Management
 

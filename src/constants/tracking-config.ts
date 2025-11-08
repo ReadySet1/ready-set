@@ -16,8 +16,8 @@ export const MAP_CONFIG = {
   MAX_AUTO_ZOOM: 15,
   /** Duration of fit bounds animation (in milliseconds) */
   FIT_BOUNDS_DURATION: 1000,
-  /** Default map center coordinates [lng, lat] - Los Angeles */
-  DEFAULT_CENTER: [-118.2437, 34.0522] as [number, number],
+  /** Default map center coordinates [lng, lat] - San Francisco */
+  DEFAULT_CENTER: [-122.4194, 37.7749] as [number, number],
 } as const;
 
 export const MARKER_CONFIG = {

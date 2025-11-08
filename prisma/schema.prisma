@@ -59,6 +59,8 @@ model Profile {
   performedAudits      UserAudit[]             @relation("UserAuditPerformer")
   clientConfigurations ClientConfiguration[]   @relation("ClientConfigurations")
   calculationHistory   CalculationHistory[]    @relation("CalculationHistory")
+  driverRecord         Driver?                 @relation("DriverProfile")
+  assignedDeliveries   Delivery[]              @relation("DeliveryAssigner")
 
   @@index([email])
   @@index([type])
@@ -664,4 +666,156 @@ model DeliveryConfiguration {
   @@index([clientName])
   @@schema("public")
   @@map("delivery_configurations")
+}
+
+// ============================================================================
+// Driver Tracking Models (REA-122)
+// ============================================================================
+
+model Driver {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String?             @db.Uuid @map("user_id")
+  profileId           String?             @unique @db.Uuid @map("profile_id")
+  employeeId          String?             @unique @map("employee_id") @db.VarChar(50)
+  vehicleNumber       String?             @map("vehicle_number") @db.VarChar(50)
+  phoneNumber         String?             @map("phone_number") @db.VarChar(20)
+  isActive            Boolean             @default(true) @map("is_active")
+  isOnDuty            Boolean             @default(false) @map("is_on_duty")
+  shiftStartTime      DateTime?           @map("shift_start_time") @db.Timestamptz(6)
+  shiftEndTime        DateTime?           @map("shift_end_time") @db.Timestamptz(6)
+  currentShiftId      String?             @map("current_shift_id") @db.Uuid
+  lastKnownLocation   Unsupported("geography(Point)")? @map("last_known_location")
+  lastLocationUpdate  DateTime?           @map("last_location_update") @db.Timestamptz(6)
+  lastKnownAccuracy   Float?              @map("last_known_accuracy")
+  lastKnownSpeed      Float?              @map("last_known_speed")
+  lastKnownHeading    Float?              @map("last_known_heading")
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt           DateTime?           @map("deleted_at") @db.Timestamptz(6)
+
+  profile             Profile?            @relation("DriverProfile", fields: [profileId], references: [id], onDelete: Cascade)
+  locations           DriverLocation[]
+  shifts              DriverShift[]
+  deliveries          Delivery[]
+
+  @@index([profileId])
+  @@index([isActive])
+  @@index([isOnDuty])
+  @@index([lastLocationUpdate])
+  @@index([deletedAt])
+  @@schema("public")
+  @@map("drivers")
+}
+
+model DriverLocation {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  driverId     String    @db.Uuid @map("driver_id")
+  location     Unsupported("geography(Point)")
+  latitude     Float
+  longitude    Float
+  accuracy     Float?
+  speed        Float?
+  heading      Float?
+  altitude     Float?
+  recordedAt   DateTime  @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  source       String?   @default("realtime") @db.VarChar(20)
+  batteryLevel Int?      @map("battery_level")
+  isMoving     Boolean?  @default(true) @map("is_moving")
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([recordedAt])
+  @@index([createdAt])
+  @@index([driverId, recordedAt])
+  @@index([source])
+  @@index([deletedAt])
+  @@schema("public")
+  @@map("driver_locations")
+}
+
+model DriverShift {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  driverId               String    @db.Uuid @map("driver_id")
+  shiftStart             DateTime  @map("shift_start") @db.Timestamptz(6)
+  shiftEnd               DateTime? @map("shift_end") @db.Timestamptz(6)
+  plannedShiftDuration   String?   @map("planned_shift_duration") // Interval type
+  actualShiftDuration    String?   @map("actual_shift_duration") // Interval type
+  status                 String    @default("scheduled") @db.VarChar(20)
+  startLocation          Unsupported("geography(Point)")? @map("start_location")
+  endLocation            Unsupported("geography(Point)")? @map("end_location")
+  startOdometer          Float?    @map("start_odometer")
+  endOdometer            Float?    @map("end_odometer")
+  totalDistance          Float?    @map("total_distance")
+  breakStart             DateTime? @map("break_start") @db.Timestamptz(6)
+  breakEnd               DateTime? @map("break_end") @db.Timestamptz(6)
+  totalBreakDuration     String?   @map("total_break_duration") // Interval type
+  notes                  String?
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt              DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  driver     Driver     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  deliveries Delivery[]
+
+  @@index([driverId])
+  @@index([status])
+  @@index([shiftStart])
+  @@index([shiftEnd])
+  @@index([driverId, status])
+  @@index([deletedAt])
+  @@schema("public")
+  @@map("driver_shifts")
+}
+
+model Delivery {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  driverId               String?   @db.Uuid @map("driver_id")
+  shiftId                String?   @db.Uuid @map("shift_id")
+  assignedBy             String?   @db.Uuid @map("assigned_by")
+  orderNumber            String?   @unique @map("order_number") @db.VarChar(100)
+  customerName           String?   @map("customer_name") @db.VarChar(255)
+  customerPhone          String?   @map("customer_phone") @db.VarChar(20)
+  pickupAddress          String?   @map("pickup_address")
+  pickupLocation         Unsupported("geography(Point)")? @map("pickup_location")
+  deliveryAddress        String    @map("delivery_address")
+  deliveryLocation       Unsupported("geography(Point)")? @map("delivery_location")
+  status                 String    @default("pending") @db.VarChar(20)
+  assignedAt             DateTime? @map("assigned_at") @db.Timestamptz(6)
+  acceptedAt             DateTime? @map("accepted_at") @db.Timestamptz(6)
+  pickedUpAt             DateTime? @map("picked_up_at") @db.Timestamptz(6)
+  deliveredAt            DateTime? @map("delivered_at") @db.Timestamptz(6)
+  cancelledAt            DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  estimatedPickupTime    DateTime? @map("estimated_pickup_time") @db.Timestamptz(6)
+  estimatedDeliveryTime  DateTime? @map("estimated_delivery_time") @db.Timestamptz(6)
+  priority               String?   @default("normal") @db.VarChar(20)
+  deliveryInstructions   String?   @map("delivery_instructions")
+  signatureRequired      Boolean?  @default(false) @map("signature_required")
+  photoRequired          Boolean?  @default(false) @map("photo_required")
+  deliverySignatureUrl   String?   @map("delivery_signature_url")
+  deliveryPhotoUrl       String?   @map("delivery_photo_url")
+  deliveryNotes          String?   @map("delivery_notes")
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt              DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  driver     Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  shift      DriverShift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  assigner   Profile?     @relation("DeliveryAssigner", fields: [assignedBy], references: [id], onDelete: SetNull)
+
+  @@index([driverId])
+  @@index([shiftId])
+  @@index([assignedBy])
+  @@index([status])
+  @@index([assignedAt])
+  @@index([deliveredAt])
+  @@index([estimatedDeliveryTime])
+  @@index([priority])
+  @@index([orderNumber])
+  @@index([driverId, status])
+  @@index([deletedAt])
+  @@schema("public")
+  @@map("deliveries")
 }
