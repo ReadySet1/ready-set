@@ -46,8 +46,14 @@ function validateEnvironmentVariables() {
   console.log('✅ Environment variables validated successfully');
 }
 
-// Run validation (skip during development for better DX)
-if (process.env.NODE_ENV !== 'development' || process.env.VALIDATE_ENV === 'true') {
+// Run validation only during actual builds, not during lint/typecheck
+// NEXT_PHASE is only set when Next.js is actually building/running
+const isBuild = process.env.NEXT_PHASE === 'phase-production-build' ||
+                process.env.NEXT_PHASE === 'phase-development-server' ||
+                process.env.VALIDATE_ENV === 'true';
+
+// Skip validation in development for better DX, and skip during lint/typecheck
+if (isBuild && process.env.NODE_ENV !== 'development') {
   validateEnvironmentVariables();
 }
 
