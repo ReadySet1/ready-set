@@ -228,8 +228,8 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
   pricingTiers: [
     // Tier 1: Small orders (≤25 headcount OR ≤$300 food cost)
     { headcountMin: 0, headcountMax: 25, foodCostMin: 0, foodCostMax: 300, regularRate: 85, within10Miles: 42.50 },
-    // Tier 2: 25-49 headcount OR $300-599 food cost
-    { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 90, within10Miles: 52.50 },
+    // Tier 2: 26-49 headcount OR $300.01-599 food cost
+    { headcountMin: 26, headcountMax: 49, foodCostMin: 300.01, foodCostMax: 599.99, regularRate: 90, within10Miles: 52.50 },
     // Tier 3: 50-74 headcount OR $600-899 food cost
     { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 110, within10Miles: 62.50 },
     // Tier 4: 75-99 headcount OR $900-1199 food cost

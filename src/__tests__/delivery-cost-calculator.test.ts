@@ -655,6 +655,23 @@ describe('Delivery Cost Calculator', () => {
       expect(result.deliveryFee).toBe(42.50);
     });
 
+    test('CaterValley: Tier 2 boundary - Exactly 26 headcount uses tier 2 rate ($52.50)', () => {
+      const input: DeliveryCostInput = {
+        headcount: 26,
+        foodCost: 350, // Use food cost in tier 2 range (300.01-599.99)
+        totalMileage: 8,
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // 26 headcount and $350 food cost both qualify for tier 2
+      expect(result.deliveryCost).toBe(52.50);
+      expect(result.totalMileagePay).toBe(0); // Within 10 miles
+      expect(result.deliveryFee).toBe(52.50);
+    });
+
     test('CaterValley: Enterprise tier (100+ headcount) uses 10% percentage-based pricing', () => {
       const input: DeliveryCostInput = {
         headcount: 150,
