@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
 import { calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
-import { calculateCaterValleyPricing } from '@/app/api/cater-valley/_lib/pricing-helper';
+import { calculateCaterValleyPricing, type PricingCalculationResult } from '@/app/api/cater-valley/_lib/pricing-helper';
 
 // Validation schema for CaterValley draft order request
 const DraftOrderSchema = z.object({
@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
     // 5. Calculate pricing with distance, bridge toll detection, and validation
     let distance: number;
     let usedFallbackDistance: boolean;
-    let pricingResult: { deliveryFee: number; deliveryCost: number; totalMileagePay: number; dailyDriveDiscount: number; bridgeToll: number };
+    let pricingResult: PricingCalculationResult['pricingResult'];
 
     try {
       const result = await calculateCaterValleyPricing({

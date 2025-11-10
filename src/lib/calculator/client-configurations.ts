@@ -259,8 +259,8 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
     autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County']
   },
 
-  createdAt: new Date('2025-01-10'),
-  updatedAt: new Date('2025-01-10'),
+  createdAt: new Date('2025-11-10'),
+  updatedAt: new Date('2025-11-10'),
   notes: 'CaterValley pricing with $42.50 minimum delivery fee as per agreement'
 };
 

@@ -8,13 +8,13 @@ import { calculateDeliveryCost } from '@/lib/calculator/delivery-cost-calculator
 import { captureException, captureMessage } from '@/lib/monitoring/sentry';
 import { getConfiguration } from '@/lib/calculator/client-configurations';
 
-interface LocationData {
+export interface LocationData {
   address: string;
   city: string;
   state: string;
 }
 
-interface PricingCalculationInput {
+export interface PricingCalculationInput {
   orderCode: string;
   pickupLocation: LocationData;
   dropOffLocation: LocationData;
@@ -23,7 +23,7 @@ interface PricingCalculationInput {
   feature: 'catervalley_webhook_draft' | 'catervalley_webhook_update';
 }
 
-interface PricingCalculationResult {
+export interface PricingCalculationResult {
   distance: number;
   usedFallbackDistance: boolean;
   numberOfBridges: number;
@@ -37,6 +37,7 @@ interface PricingCalculationResult {
 }
 
 const FALLBACK_DISTANCE_MILES = 10.1; // Conservative fallback: over 10-mile threshold
+const CATERVALLEY_STANDALONE_ORDER_DRIVES = 1; // CaterValley orders are standalone (no daily drive discounts)
 
 /**
  * Calculate pricing for a CaterValley order
@@ -98,15 +99,16 @@ export async function calculateCaterValleyPricing(
   const dropoffCity = extractCity(dropoffAddress);
   const caterValleyConfig = getConfiguration('cater-valley');
 
-  // Check if route crosses bridge (both cities in autoApplyForAreas but different cities)
+  // Check if route crosses bridge (either city in autoApplyForAreas and different cities)
   let numberOfBridges = 0;
   if (caterValleyConfig?.bridgeTollSettings.autoApplyForAreas) {
     const tollAreas = caterValleyConfig.bridgeTollSettings.autoApplyForAreas;
     const pickupInTollArea = tollAreas.includes(pickupCity);
     const dropoffInTollArea = tollAreas.includes(dropoffCity);
 
-    // If both are in toll areas and are different cities, bridge crossing likely
-    if (pickupInTollArea && dropoffInTollArea && pickupCity !== dropoffCity) {
+    // If either city is in a toll area and cities are different, bridge crossing likely
+    // Examples: SF→Oakland, SF→Fremont, Oakland→Marin, etc.
+    if (pickupCity !== dropoffCity && (pickupInTollArea || dropoffInTollArea)) {
       numberOfBridges = 1;
     }
   }
@@ -116,7 +118,7 @@ export async function calculateCaterValleyPricing(
     headcount: totalItem,
     foodCost: priceTotal,
     totalMileage: distance,
-    numberOfDrives: 1, // CaterValley orders are standalone (no daily drive discounts)
+    numberOfDrives: CATERVALLEY_STANDALONE_ORDER_DRIVES,
     requiresBridge: numberOfBridges > 0,
     clientConfigId: 'cater-valley' // Use CaterValley-specific configuration
   });
@@ -124,6 +126,15 @@ export async function calculateCaterValleyPricing(
   // 4. CRITICAL: Validate that pricing is not zero (prevent revenue loss)
   if (pricingResult.deliveryFee <= 0) {
     throw new Error('Pricing calculation error - delivery fee cannot be zero. Please contact support.');
+  }
+
+  // 5. CRITICAL: Ensure CaterValley $42.50 minimum delivery fee
+  const CATERVALLEY_MINIMUM_FEE = 42.50;
+  if (pricingResult.deliveryFee < CATERVALLEY_MINIMUM_FEE) {
+    throw new Error(
+      `Calculated delivery fee ($${pricingResult.deliveryFee.toFixed(2)}) is below CaterValley minimum of $${CATERVALLEY_MINIMUM_FEE.toFixed(2)}. ` +
+      `This may indicate a pricing configuration error.`
+    );
   }
 
   return {
