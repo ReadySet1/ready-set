@@ -15,17 +15,7 @@ import {
 } from '@/lib/rate-limiting';
 import { UploadSecurityManager } from '@/lib/upload-security';
 
-// Mock Redis for testing (in production this would be a real Redis client)
-jest.mock('redis', () => ({
-  createClient: jest.fn(() => ({
-    get: jest.fn(),
-    set: jest.fn(),
-    setex: jest.fn(),
-    incr: jest.fn(),
-    expire: jest.fn(),
-    del: jest.fn()
-  }))
-}));
+// Note: Rate limiting uses in-memory storage for tests (Redis optional in production)
 
 describe('API Security Enhancements QA', () => {
   beforeEach(() => {
