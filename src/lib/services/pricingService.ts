@@ -250,25 +250,74 @@ function estimateDistance(pickupAddress: string, dropoffAddress: string): number
 }
 
 /**
- * Extract city from address string (improved implementation)
+ * City name normalizations - maps variations to canonical names
+ * Used for consistent city matching in bridge toll and distance calculations
  */
-function extractCity(address: string): string {
+const CITY_NORMALIZATIONS: Record<string, string> = {
+  'sf': 'San Francisco',
+  'san fran': 'San Francisco',
+  'san francisco': 'San Francisco',
+  'oakland': 'Oakland',
+  'san jose': 'San Jose',
+  'palo alto': 'Palo Alto',
+  'fremont': 'Fremont',
+  'hayward': 'Hayward',
+  'concord': 'Concord',
+  'richmond': 'Richmond',
+  'berkeley': 'Berkeley',
+  'marin': 'Marin County',
+  'marin county': 'Marin County',
+  'alameda': 'Oakland', // Alameda County → Oakland for toll purposes
+  'alameda county': 'Oakland'
+};
+
+/**
+ * Extract and normalize city name from address string
+ * Exported for use in bridge toll detection and distance calculations
+ *
+ * @param address - Full address string (e.g., "123 Main St, San Francisco, CA 94102")
+ * @returns Normalized city name in Title Case (e.g., "San Francisco") or empty string if not found
+ *
+ * @example
+ * extractCity("123 Main St, SF, CA") // Returns "San Francisco"
+ * extractCity("456 Oak Ave, Oakland, CA 94607") // Returns "Oakland"
+ * extractCity("789 Bay Rd, Marin County, CA") // Returns "Marin County"
+ */
+export function extractCity(address: string): string {
+  const lowerAddress = address.toLowerCase();
+
+  // Method 1: Parse comma-separated parts (most reliable)
   const parts = address.split(',');
   if (parts.length >= 2 && parts[1]) {
-    return parts[1].trim().toLowerCase();
+    const cityPart = parts[1].trim().toLowerCase();
+    // Check for normalization
+    if (CITY_NORMALIZATIONS[cityPart]) {
+      return CITY_NORMALIZATIONS[cityPart];
+    }
+    // Return as Title Case if not in normalizations
+    return toTitleCase(parts[1].trim());
   }
-  
-  // Try to extract city from end of address
-  const addressParts = address.trim().split(/\s+/);
-  const cityKeywords = ['san francisco', 'sf', 'oakland', 'san jose', 'palo alto', 'fremont', 'hayward', 'concord', 'richmond'];
-  
-  for (const keyword of cityKeywords) {
-    if (address.includes(keyword)) {
-      return keyword;
+
+  // Method 2: Keyword matching with normalization
+  for (const [keyword, normalized] of Object.entries(CITY_NORMALIZATIONS)) {
+    if (lowerAddress.includes(keyword)) {
+      return normalized;
     }
   }
-  
+
   return '';
+}
+
+/**
+ * Convert string to Title Case
+ * Helper function for city name formatting
+ */
+function toTitleCase(str: string): string {
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 /**

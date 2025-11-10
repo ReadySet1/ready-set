@@ -236,7 +236,7 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
     { headcountMin: 175, headcountMax: 199, foodCostMin: 1900, foodCostMax: 2099.99, regularRate: 220, within10Miles: 112.50 },
     { headcountMin: 200, headcountMax: 249, foodCostMin: 2100, foodCostMax: 2299.99, regularRate: 290, within10Miles: 122.50 },
     { headcountMin: 250, headcountMax: 299, foodCostMin: 2300, foodCostMax: 2499.99, regularRate: 320, within10Miles: 132.50 },
-    { headcountMin: 300, headcountMax: null, foodCostMin: 2500, foodCostMax: null, regularRate: 0, within10Miles: 0 }
+    { headcountMin: 300, headcountMax: null, foodCostMin: 2500, foodCostMax: null, regularRate: 0, within10Miles: 0, regularRatePercent: 0.10, within10MilesPercent: 0.10 } // 10% of food cost for enterprise orders (300+ headcount)
   ],
 
   mileageRate: 3.0,

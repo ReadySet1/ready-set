@@ -70,8 +70,11 @@ export interface PricingTier {
   headcountMax: number | null;
   foodCostMin: number;
   foodCostMax: number | null;
-  regularRate: number; // >10 miles
-  within10Miles: number; // ≤10 miles
+  regularRate: number; // >10 miles (dollar amount)
+  within10Miles: number; // ≤10 miles (dollar amount)
+  // Optional: percentage-based pricing for enterprise tiers
+  regularRatePercent?: number; // Percentage of foodCost (e.g., 0.10 for 10%)
+  within10MilesPercent?: number; // Percentage of foodCost (e.g., 0.10 for 10%)
 }
 
 /**
@@ -179,8 +182,17 @@ function determinePricingTier(
   const fcTier: PricingTier = foodCostTier;
 
   // Get the actual fee amounts for comparison
-  const hcFee = isWithin10Miles ? hcTier.within10Miles : hcTier.regularRate;
-  const fcFee = isWithin10Miles ? fcTier.within10Miles : fcTier.regularRate;
+  // Handle percentage-based pricing
+  let hcFee: number;
+  let fcFee: number;
+
+  if (isWithin10Miles) {
+    hcFee = hcTier.within10MilesPercent ? foodCost * hcTier.within10MilesPercent : hcTier.within10Miles;
+    fcFee = fcTier.within10MilesPercent ? foodCost * fcTier.within10MilesPercent : fcTier.within10Miles;
+  } else {
+    hcFee = hcTier.regularRatePercent ? foodCost * hcTier.regularRatePercent : hcTier.regularRate;
+    fcFee = fcTier.regularRatePercent ? foodCost * fcTier.regularRatePercent : fcTier.regularRate;
+  }
 
   // Handle TBD tiers (fee = 0) - prefer the tier with a non-zero fee
   if (hcFee === 0 && fcFee > 0) {
@@ -261,7 +273,17 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   const tier = determinePricingTier(headcount, foodCost, config.pricingTiers, isWithin10Miles);
 
   // 3. Select delivery cost based on distance
-  const deliveryCost = isWithin10Miles ? tier.within10Miles : tier.regularRate;
+  // Check for percentage-based pricing (for enterprise tiers)
+  let deliveryCost: number;
+  if (isWithin10Miles) {
+    deliveryCost = tier.within10MilesPercent
+      ? foodCost * tier.within10MilesPercent
+      : tier.within10Miles;
+  } else {
+    deliveryCost = tier.regularRatePercent
+      ? foodCost * tier.regularRatePercent
+      : tier.regularRate;
+  }
 
   // 3. Calculate mileage pay (per mile for miles OVER threshold)
   const extraMiles = Math.max(0, totalMileage - config.distanceThreshold);
@@ -275,6 +297,15 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   const effectiveBridgeToll = requiresBridge ? (bridgeToll || config.bridgeTollSettings.defaultTollAmount) : 0;
 
   const deliveryFee = deliveryCost + effectiveMileagePay - dailyDriveDiscount + effectiveBridgeToll;
+
+  // CRITICAL: Validate that delivery cost is not zero for non-zero orders
+  // This prevents revenue loss from configuration errors
+  if (deliveryCost === 0 && (headcount > 0 || foodCost > 0)) {
+    throw new Error(
+      `Delivery cost calculation resulted in $0 for non-zero order (headcount: ${headcount}, foodCost: $${foodCost}). ` +
+      `This indicates a pricing configuration error (tier with zero rates). clientConfig: ${config.id}`
+    );
+  }
 
   return {
     deliveryCost,

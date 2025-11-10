@@ -6,8 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
-import { calculateDistance, calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
+import { calculateDistance, calculatePickupTime, isDeliveryTimeAvailable, extractCity } from '@/lib/services/pricingService';
 import { calculateDeliveryCost } from '@/lib/calculator/delivery-cost-calculator';
+import { captureException, captureMessage } from '@/lib/monitoring/sentry';
+import { getConfiguration } from '@/lib/calculator/client-configurations';
 
 // Validation schema for CaterValley update order request
 const UpdateOrderSchema = z.object({
@@ -239,13 +241,52 @@ export async function POST(request: NextRequest) {
     const dropoffAddress = `${validatedData.dropOffLocation.address}, ${validatedData.dropOffLocation.city}, ${validatedData.dropOffLocation.state}`;
 
     let distance: number;
+    let usedFallbackDistance = false;
+
     try {
       distance = await calculateDistance(pickupAddress, dropoffAddress);
     } catch (error) {
-      console.error('Distance calculation failed for CaterValley update order:', error);
+      // Track distance calculation failure in Sentry for operational visibility
+      captureException(error as Error, {
+        action: 'calculate_distance',
+        feature: 'catervalley_webhook_update',
+        metadata: {
+          orderCode: validatedData.orderCode,
+          pickupAddress: pickupAddress,
+          dropoffAddress: dropoffAddress
+        }
+      });
+
       // Use fallback distance of 5 miles to allow order to proceed
       distance = 5;
-      console.warn(`Using fallback distance of ${distance} miles for order ${validatedData.orderCode}`);
+      usedFallbackDistance = true;
+
+      // Log warning with Sentry tracking
+      const warningMessage = `Using fallback distance of ${distance} miles for CaterValley order ${validatedData.orderCode}`;
+      console.warn(warningMessage);
+      captureMessage(warningMessage, 'warning', {
+        action: 'fallback_distance_used',
+        feature: 'catervalley_webhook_update',
+        metadata: { orderCode: validatedData.orderCode, fallbackDistance: distance }
+      });
+    }
+
+    // 4b. Detect bridge toll requirement
+    const pickupCity = extractCity(pickupAddress);
+    const dropoffCity = extractCity(dropoffAddress);
+    const caterValleyConfig = getConfiguration('cater-valley');
+
+    // Check if route crosses bridge (both cities in autoApplyForAreas but different cities)
+    let numberOfBridges = 0;
+    if (caterValleyConfig?.bridgeTollSettings.autoApplyForAreas) {
+      const tollAreas = caterValleyConfig.bridgeTollSettings.autoApplyForAreas;
+      const pickupInTollArea = tollAreas.includes(pickupCity);
+      const dropoffInTollArea = tollAreas.includes(dropoffCity);
+
+      // If both are in toll areas and are different cities, bridge crossing likely
+      if (pickupInTollArea && dropoffInTollArea && pickupCity !== dropoffCity) {
+        numberOfBridges = 1;
+      }
     }
 
     // 5. Recalculate pricing using CaterValley configuration
@@ -253,8 +294,21 @@ export async function POST(request: NextRequest) {
       headcount: validatedData.totalItem,
       foodCost: validatedData.priceTotal,
       totalMileage: distance,
+      numberOfDrives: 1, // CaterValley orders are standalone (no daily drive discounts)
+      requiresBridge: numberOfBridges > 0,
       clientConfigId: 'cater-valley' // Use CaterValley-specific configuration
     });
+
+    // 5b. CRITICAL: Validate that pricing is not zero (prevent revenue loss)
+    if (pricingResult.deliveryFee <= 0) {
+      return NextResponse.json(
+        {
+          status: 'ERROR',
+          message: 'Pricing calculation error - delivery fee cannot be zero. Please contact support.',
+        },
+        { status: 422 }
+      );
+    }
 
     // 6. Update or create addresses
     const [pickupAddressRecord, deliveryAddressRecord] = await Promise.all([
@@ -280,7 +334,9 @@ export async function POST(request: NextRequest) {
         arrivalDateTime: deliveryDateTime,
         clientAttention: validatedData.dropOffLocation.recipient.name,
         pickupNotes: `CaterValley Order - Pickup from: ${validatedData.pickupLocation.name}`,
-        specialNotes: validatedData.dropOffLocation.instructions || '',
+        specialNotes: usedFallbackDistance
+          ? `${validatedData.dropOffLocation.instructions || ''}\n[FALLBACK DISTANCE: ${distance}mi - Manual review needed]`.trim()
+          : validatedData.dropOffLocation.instructions || '',
         updatedAt: new Date(),
       },
       include: {
