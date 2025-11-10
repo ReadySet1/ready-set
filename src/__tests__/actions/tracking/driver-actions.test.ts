@@ -1,5 +1,6 @@
 import { startDriverShift, endDriverShift, updateDriverLocation, pauseShift } from '@/app/actions/tracking/driver-actions';
 import { createClient } from '@/utils/supabase/server';
+import { createMockSupabaseClient } from '@/__tests__/helpers/supabase-mock-helpers';
 
 // Mock Supabase client
 jest.mock('@/utils/supabase/server', () => ({
@@ -10,21 +11,7 @@ jest.mock('@/utils/supabase/server', () => ({
 const mockCreateClient = createClient as jest.MockedFunction<typeof createClient>;
 
 describe('Driver Tracking Actions', () => {
-  const mockSupabaseClient = {
-    auth: {
-      getUser: jest.fn(),
-    },
-    from: jest.fn(() => ({
-      select: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockReturnThis(),
-      update: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn(),
-      order: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-    })),
-    rpc: jest.fn(),
-  };
+  let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
 
   const mockLocationUpdate = {
     driverId: 'driver-123',
@@ -48,7 +35,9 @@ describe('Driver Tracking Actions', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCreateClient.mockReturnValue(mockSupabaseClient as any);
+    // Use the helper to create a properly structured mock
+    mockSupabaseClient = createMockSupabaseClient();
+    mockCreateClient.mockResolvedValue(mockSupabaseClient as any);
   });
 
   describe('startDriverShift', () => {
