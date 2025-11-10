@@ -226,17 +226,16 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
   isActive: true,
 
   pricingTiers: [
-    { headcountMin: 0, headcountMax: 24, foodCostMin: 0, foodCostMax: 299.99, regularRate: 85, within10Miles: 42.50 },
+    // Tier 1: Small orders (≤25 headcount OR ≤$300 food cost)
+    { headcountMin: 0, headcountMax: 25, foodCostMin: 0, foodCostMax: 300, regularRate: 85, within10Miles: 42.50 },
+    // Tier 2: 25-49 headcount OR $300-599 food cost
     { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 90, within10Miles: 52.50 },
+    // Tier 3: 50-74 headcount OR $600-899 food cost
     { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 110, within10Miles: 62.50 },
+    // Tier 4: 75-99 headcount OR $900-1199 food cost
     { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 120, within10Miles: 72.50 },
-    { headcountMin: 100, headcountMax: 124, foodCostMin: 1200, foodCostMax: 1499.99, regularRate: 140, within10Miles: 82.50 },
-    { headcountMin: 125, headcountMax: 149, foodCostMin: 1500, foodCostMax: 1699.99, regularRate: 160, within10Miles: 92.50 },
-    { headcountMin: 150, headcountMax: 174, foodCostMin: 1700, foodCostMax: 1899.99, regularRate: 190, within10Miles: 102.50 },
-    { headcountMin: 175, headcountMax: 199, foodCostMin: 1900, foodCostMax: 2099.99, regularRate: 220, within10Miles: 112.50 },
-    { headcountMin: 200, headcountMax: 249, foodCostMin: 2100, foodCostMax: 2299.99, regularRate: 290, within10Miles: 122.50 },
-    { headcountMin: 250, headcountMax: 299, foodCostMin: 2300, foodCostMax: 2499.99, regularRate: 320, within10Miles: 132.50 },
-    { headcountMin: 300, headcountMax: null, foodCostMin: 2500, foodCostMax: null, regularRate: 0, within10Miles: 0, regularRatePercent: 0.10, within10MilesPercent: 0.10 } // 10% of food cost for enterprise orders (300+ headcount)
+    // Tier 5: 100+ headcount OR $1200+ food cost (10% percentage-based pricing)
+    { headcountMin: 100, headcountMax: null, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0, regularRatePercent: 0.10, within10MilesPercent: 0.10 }
   ],
 
   mileageRate: 3.0,

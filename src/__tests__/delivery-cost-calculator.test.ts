@@ -638,10 +638,10 @@ describe('Delivery Cost Calculator', () => {
       expect(result.deliveryFee).toBe(42.50);
     });
 
-    test('CaterValley: Enterprise tier (300+ headcount) uses 10% percentage-based pricing', () => {
+    test('CaterValley: Tier 1 boundary - Exactly 25 headcount uses tier 1 rate ($42.50)', () => {
       const input: DeliveryCostInput = {
-        headcount: 350,
-        foodCost: 5000,
+        headcount: 25,
+        foodCost: 250,
         totalMileage: 8,
         numberOfDrives: 1,
         clientConfigId: 'cater-valley'
@@ -649,16 +649,50 @@ describe('Delivery Cost Calculator', () => {
 
       const result = calculateDeliveryCost(input);
 
-      // 10% of $5000 = $500
-      expect(result.deliveryCost).toBe(500);
+      // 25 headcount should be included in tier 1 (≤25), not tier 2
+      expect(result.deliveryCost).toBe(42.50);
       expect(result.totalMileagePay).toBe(0); // Within 10 miles
-      expect(result.deliveryFee).toBe(500);
+      expect(result.deliveryFee).toBe(42.50);
+    });
+
+    test('CaterValley: Enterprise tier (100+ headcount) uses 10% percentage-based pricing', () => {
+      const input: DeliveryCostInput = {
+        headcount: 150,
+        foodCost: 2000,
+        totalMileage: 8,
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // 10% of $2000 = $200
+      expect(result.deliveryCost).toBe(200);
+      expect(result.totalMileagePay).toBe(0); // Within 10 miles
+      expect(result.deliveryFee).toBe(200);
+    });
+
+    test('CaterValley: Enterprise tier at exact threshold (100 headcount, $1200 food cost)', () => {
+      const input: DeliveryCostInput = {
+        headcount: 100,
+        foodCost: 1200,
+        totalMileage: 8,
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // 10% of $1200 = $120
+      expect(result.deliveryCost).toBe(120);
+      expect(result.totalMileagePay).toBe(0); // Within 10 miles
+      expect(result.deliveryFee).toBe(120);
     });
 
     test('CaterValley: Enterprise tier over 10 miles uses 10% percentage-based pricing', () => {
       const input: DeliveryCostInput = {
-        headcount: 300,
-        foodCost: 3000,
+        headcount: 120,
+        foodCost: 1500,
         totalMileage: 15,
         numberOfDrives: 1,
         clientConfigId: 'cater-valley'
@@ -666,19 +700,19 @@ describe('Delivery Cost Calculator', () => {
 
       const result = calculateDeliveryCost(input);
 
-      // 10% of $3000 = $300 base
+      // 10% of $1500 = $150 base
       // 5 miles over threshold × $3.00 = $15 mileage
-      expect(result.deliveryCost).toBe(300);
+      expect(result.deliveryCost).toBe(150);
       expect(result.totalMileagePay).toBe(15);
-      expect(result.deliveryFee).toBe(315);
+      expect(result.deliveryFee).toBe(165);
     });
 
     test('CaterValley: Zero-cost validation prevents $0 delivery for non-zero orders', () => {
       // This test would require a misconfigured tier, but with our fixes
-      // the tier 300+ now has percentage fields set, so it won't be zero
+      // the tier 100+ now has percentage fields set, so it won't be zero
       // Instead, test that the validation logic exists by checking a hypothetical scenario
 
-      // Note: With the current fix, tier 300+ has regularRatePercent: 0.10
+      // Note: With the current fix, tier 100+ has regularRatePercent: 0.10
       // So this test validates the safety mechanism is in place
       // If someone accidentally sets a tier to 0, it should throw an error
 
