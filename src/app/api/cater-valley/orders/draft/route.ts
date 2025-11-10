@@ -50,10 +50,10 @@ interface DraftOrderResponse {
   message?: string;
   breakdown?: {
     basePrice: number;
-    itemCountMultiplier?: number;
-    orderTotalMultiplier?: number;
-    distanceMultiplier?: number;
-    peakTimeMultiplier?: number;
+    mileageFee?: number;         // Dollar amount for mileage over 10 miles
+    dailyDriveDiscount?: number; // Dollar amount discount for multiple daily drives
+    bridgeToll?: number;         // Dollar amount for bridge toll
+    peakTimeMultiplier?: number; // Reserved for future use
   };
 }
 
@@ -214,7 +214,16 @@ export async function POST(request: NextRequest) {
     // 5. Calculate distance between pickup and dropoff
     const pickupAddress = `${validatedData.pickupLocation.address}, ${validatedData.pickupLocation.city}, ${validatedData.pickupLocation.state}`;
     const dropoffAddress = `${validatedData.dropOffLocation.address}, ${validatedData.dropOffLocation.city}, ${validatedData.dropOffLocation.state}`;
-    const distance = await calculateDistance(pickupAddress, dropoffAddress);
+
+    let distance: number;
+    try {
+      distance = await calculateDistance(pickupAddress, dropoffAddress);
+    } catch (error) {
+      console.error('Distance calculation failed for CaterValley draft order:', error);
+      // Use fallback distance of 5 miles to allow order to proceed
+      distance = 5;
+      console.warn(`Using fallback distance of ${distance} miles for order ${validatedData.orderCode}`);
+    }
 
     // 6. Calculate pricing using CaterValley configuration
     const pricingResult = calculateDeliveryCost({
@@ -271,9 +280,9 @@ export async function POST(request: NextRequest) {
       status: 'SUCCESS',
       breakdown: {
         basePrice: pricingResult.deliveryCost,
-        distanceMultiplier: pricingResult.totalMileagePay,
-        itemCountMultiplier: pricingResult.dailyDriveDiscount,
-        orderTotalMultiplier: pricingResult.bridgeToll,
+        mileageFee: pricingResult.totalMileagePay,
+        dailyDriveDiscount: pricingResult.dailyDriveDiscount,
+        bridgeToll: pricingResult.bridgeToll,
       },
     };
 

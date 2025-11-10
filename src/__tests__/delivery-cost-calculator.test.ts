@@ -586,5 +586,56 @@ describe('Delivery Cost Calculator', () => {
       // Should fallback to Ready Set Food Standard (within10Miles: 30)
       expect(result.deliveryCost).toBe(30);
     });
+
+    test('CaterValley: Edge case - Exactly 10.0 miles uses within10Miles rate', () => {
+      const input: DeliveryCostInput = {
+        headcount: 20,
+        foodCost: 250,
+        totalMileage: 10.0, // Exactly at threshold
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // At exactly 10 miles, should use within10Miles rate
+      expect(result.deliveryCost).toBe(42.50);
+      expect(result.totalMileagePay).toBe(0); // No mileage fee
+      expect(result.deliveryFee).toBe(42.50); // Just the base rate
+    });
+
+    test('CaterValley: Edge case - 10.1 miles uses regularRate plus mileage', () => {
+      const input: DeliveryCostInput = {
+        headcount: 20,
+        foodCost: 250,
+        totalMileage: 10.1, // Just over threshold
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // Over 10 miles, should use regularRate
+      expect(result.deliveryCost).toBe(85); // Regular rate for tier 1
+      expect(result.totalMileagePay).toBeCloseTo(0.30, 2); // (10.1 - 10) × $3 = $0.30
+      expect(result.deliveryFee).toBeCloseTo(85.30, 2); // $85 + $0.30
+    });
+
+    test('CaterValley: Edge case - 9.9 miles uses within10Miles rate', () => {
+      const input: DeliveryCostInput = {
+        headcount: 20,
+        foodCost: 250,
+        totalMileage: 9.9, // Just under threshold
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // Under 10 miles, should use within10Miles rate
+      expect(result.deliveryCost).toBe(42.50);
+      expect(result.totalMileagePay).toBe(0); // No mileage fee
+      expect(result.deliveryFee).toBe(42.50);
+    });
   });
 });
