@@ -164,7 +164,7 @@ export async function calculateDeliveryPrice(params: PricingParams): Promise<Pri
  * Calculate actual distance between two addresses using Google Maps API
  * This replaces the mock implementation with real distance calculation
  */
-async function calculateDistance(pickupAddress: string, dropoffAddress: string): Promise<number> {
+export async function calculateDistance(pickupAddress: string, dropoffAddress: string): Promise<number> {
   const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
   
   if (!GOOGLE_MAPS_API_KEY) {

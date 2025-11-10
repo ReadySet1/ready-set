@@ -505,4 +505,86 @@ describe('Delivery Cost Calculator', () => {
       expect(result.deliveryCost).toBe(280); // Tier 9 regular rate
     });
   });
+
+  describe('CaterValley Client Configuration', () => {
+    test('CaterValley: Minimum delivery fee of $42.50 for small orders within 10 miles', () => {
+      const input: DeliveryCostInput = {
+        headcount: 20,
+        foodCost: 250,
+        totalMileage: 5,
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // CaterValley minimum fee: $42.50 (within 10 miles)
+      expect(result.deliveryCost).toBe(42.50);
+      expect(result.deliveryFee).toBe(42.50); // No additional mileage within 10 miles
+    });
+
+    test('CaterValley: Medium order (25-49 headcount) within 10 miles shows $52.50', () => {
+      const input: DeliveryCostInput = {
+        headcount: 30,
+        foodCost: 400,
+        totalMileage: 8,
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      expect(result.deliveryCost).toBe(52.50);
+      expect(result.deliveryFee).toBe(52.50);
+    });
+
+    test('CaterValley: Small order over 10 miles uses $85.00 rate plus mileage', () => {
+      const input: DeliveryCostInput = {
+        headcount: 20,
+        foodCost: 250,
+        totalMileage: 15,
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // Over 10 miles uses regularRate of $85
+      expect(result.deliveryCost).toBe(85);
+      // Mileage: (15 - 10) × $3 = $15
+      expect(result.totalMileagePay).toBe(15);
+      // Total: $85 + $15 = $100
+      expect(result.deliveryFee).toBe(100);
+    });
+
+    test('CaterValley: Large order (50-74 headcount) within 10 miles shows $62.50', () => {
+      const input: DeliveryCostInput = {
+        headcount: 60,
+        foodCost: 700,
+        totalMileage: 7,
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      expect(result.deliveryCost).toBe(62.50);
+      expect(result.deliveryFee).toBe(62.50);
+    });
+
+    test('CaterValley: Fallback to default configuration if config not found', () => {
+      const input: DeliveryCostInput = {
+        headcount: 20,
+        foodCost: 250,
+        totalMileage: 5,
+        numberOfDrives: 1,
+        clientConfigId: 'non-existent-config'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // Should fallback to Ready Set Food Standard (within10Miles: 30)
+      expect(result.deliveryCost).toBe(30);
+    });
+  });
 });

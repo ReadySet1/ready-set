@@ -6,7 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
-import { calculateDeliveryPrice, calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
+import { calculateDistance, calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
+import { calculateDeliveryCost } from '@/lib/calculator/delivery-cost-calculator';
 
 // Validation schema for CaterValley draft order request
 const DraftOrderSchema = z.object({
@@ -210,25 +211,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Calculate pricing with updated parameters
-    const pricingResult = await calculateDeliveryPrice({
-      pickupAddress: `${validatedData.pickupLocation.address}, ${validatedData.pickupLocation.city}, ${validatedData.pickupLocation.state}`,
-      dropoffAddress: `${validatedData.dropOffLocation.address}, ${validatedData.dropOffLocation.city}, ${validatedData.dropOffLocation.state}`,
-      headCount: validatedData.totalItem, // Using totalItem as headCount
-      foodCost: validatedData.priceTotal, // Using priceTotal as foodCost
-      deliveryDate: validatedData.deliveryDate,
-      deliveryTime: validatedData.deliveryTime,
-      includeTip: true // Default to including tip for CaterValley orders
+    // 5. Calculate distance between pickup and dropoff
+    const pickupAddress = `${validatedData.pickupLocation.address}, ${validatedData.pickupLocation.city}, ${validatedData.pickupLocation.state}`;
+    const dropoffAddress = `${validatedData.dropOffLocation.address}, ${validatedData.dropOffLocation.city}, ${validatedData.dropOffLocation.state}`;
+    const distance = await calculateDistance(pickupAddress, dropoffAddress);
+
+    // 6. Calculate pricing using CaterValley configuration
+    const pricingResult = calculateDeliveryCost({
+      headcount: validatedData.totalItem,
+      foodCost: validatedData.priceTotal,
+      totalMileage: distance,
+      clientConfigId: 'cater-valley' // Use CaterValley-specific configuration
     });
 
-    // 6. Create database entities
-    const [systemUser, pickupAddress, deliveryAddress] = await Promise.all([
+    // 7. Create database entities
+    const [systemUser, pickupAddressRecord, deliveryAddressRecord] = await Promise.all([
       ensureCaterValleySystemUser(),
       ensureAddress(validatedData.pickupLocation),
       ensureAddress(validatedData.dropOffLocation),
     ]);
 
-    // 7. Create the draft order
+    // 8. Create the draft order
     // Import timezone utility for proper conversion
     const { localTimeToUtc } = await import('@/lib/utils/timezone');
     const deliveryDateTime = new Date(localTimeToUtc(validatedData.deliveryDate, validatedData.deliveryTime));
@@ -239,8 +242,8 @@ export async function POST(request: NextRequest) {
         orderNumber: `CV-${validatedData.orderCode}`,
         status: 'ACTIVE',
         userId: systemUser.id,
-        pickupAddressId: pickupAddress.id,
-        deliveryAddressId: deliveryAddress.id,
+        pickupAddressId: pickupAddressRecord.id,
+        deliveryAddressId: deliveryAddressRecord.id,
         headcount: validatedData.totalItem,
         orderTotal: validatedData.priceTotal,
         pickupDateTime: new Date(pickupTime),
@@ -259,17 +262,22 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 8. Return success response
+    // 9. Return success response
     const response: DraftOrderResponse = {
       id: draftOrder.id,
-      deliveryPrice: pricingResult.deliveryPrice,
-      totalPrice: validatedData.priceTotal + pricingResult.deliveryPrice,
+      deliveryPrice: pricingResult.deliveryFee,
+      totalPrice: validatedData.priceTotal + pricingResult.deliveryFee,
       estimatedPickupTime: pickupTime,
       status: 'SUCCESS',
-      breakdown: pricingResult.breakdown,
+      breakdown: {
+        basePrice: pricingResult.deliveryCost,
+        distanceMultiplier: pricingResult.totalMileagePay,
+        itemCountMultiplier: pricingResult.dailyDriveDiscount,
+        orderTotalMultiplier: pricingResult.bridgeToll,
+      },
     };
 
-    
+
     return NextResponse.json(response, { status: 201 });
 
   } catch (error) {

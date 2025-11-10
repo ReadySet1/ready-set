@@ -214,6 +214,58 @@ export const KASA: ClientDeliveryConfiguration = {
 };
 
 /**
+ * CaterValley Client Configuration
+ * Vendor: CaterValley
+ * Minimum delivery fee: $42.50 as per agreement between ReadySet and CaterValley
+ */
+export const CATER_VALLEY: ClientDeliveryConfiguration = {
+  id: 'cater-valley',
+  clientName: 'CaterValley',
+  vendorName: 'CaterValley',
+  description: 'CaterValley delivery pricing with $42.50 minimum delivery fee',
+  isActive: true,
+
+  pricingTiers: [
+    { headcountMin: 0, headcountMax: 24, foodCostMin: 0, foodCostMax: 299.99, regularRate: 85, within10Miles: 42.50 },
+    { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 90, within10Miles: 52.50 },
+    { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 110, within10Miles: 62.50 },
+    { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 120, within10Miles: 72.50 },
+    { headcountMin: 100, headcountMax: 124, foodCostMin: 1200, foodCostMax: 1499.99, regularRate: 140, within10Miles: 82.50 },
+    { headcountMin: 125, headcountMax: 149, foodCostMin: 1500, foodCostMax: 1699.99, regularRate: 160, within10Miles: 92.50 },
+    { headcountMin: 150, headcountMax: 174, foodCostMin: 1700, foodCostMax: 1899.99, regularRate: 190, within10Miles: 102.50 },
+    { headcountMin: 175, headcountMax: 199, foodCostMin: 1900, foodCostMax: 2099.99, regularRate: 220, within10Miles: 112.50 },
+    { headcountMin: 200, headcountMax: 249, foodCostMin: 2100, foodCostMax: 2299.99, regularRate: 290, within10Miles: 122.50 },
+    { headcountMin: 250, headcountMax: 299, foodCostMin: 2300, foodCostMax: 2499.99, regularRate: 320, within10Miles: 132.50 },
+    { headcountMin: 300, headcountMax: null, foodCostMin: 2500, foodCostMax: null, regularRate: 0, within10Miles: 0 }
+  ],
+
+  mileageRate: 3.0,
+  distanceThreshold: 10,
+
+  dailyDriveDiscounts: {
+    twoDrivers: 5,
+    threeDrivers: 10,
+    fourPlusDrivers: 15
+  },
+
+  driverPaySettings: {
+    maxPayPerDrop: 40,
+    basePayPerDrop: 23,
+    bonusPay: 10,
+    readySetFee: 70
+  },
+
+  bridgeTollSettings: {
+    defaultTollAmount: 8.00,
+    autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County']
+  },
+
+  createdAt: new Date('2025-01-10'),
+  updatedAt: new Date('2025-01-10'),
+  notes: 'CaterValley pricing with $42.50 minimum delivery fee as per agreement'
+};
+
+/**
  * Generic Template - Customizable base configuration
  */
 export const GENERIC_TEMPLATE: ClientDeliveryConfiguration = {
@@ -264,6 +316,7 @@ export const CLIENT_CONFIGURATIONS: Record<string, ClientDeliveryConfiguration> 
   'ready-set-food-standard': READY_SET_FOOD_STANDARD,
   'ready-set-food-premium': READY_SET_FOOD_PREMIUM,
   'kasa': KASA,
+  'cater-valley': CATER_VALLEY,
   'generic-template': GENERIC_TEMPLATE
 };
 
@@ -460,6 +513,7 @@ const clientConfigurations = {
   READY_SET_FOOD_STANDARD,
   READY_SET_FOOD_PREMIUM,
   KASA,
+  CATER_VALLEY,
   GENERIC_TEMPLATE,
   CLIENT_CONFIGURATIONS,
 
