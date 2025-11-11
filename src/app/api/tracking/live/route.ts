@@ -3,6 +3,22 @@ import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
 
 /**
+ * Type-safe helper to check if SSE controller is still open and accepting data
+ * @param controller - The ReadableStreamDefaultController to check
+ * @returns true if controller is open and ready to accept data
+ */
+function isControllerOpen(controller: ReadableStreamDefaultController): boolean {
+  try {
+    // desiredSize is null when the stream is closed
+    // desiredSize is a number (can be negative) when the stream is open
+    return controller.desiredSize !== null;
+  } catch {
+    // If we can't access desiredSize, assume controller is closed
+    return false;
+  }
+}
+
+/**
  * Server-Sent Events endpoint for real-time driver tracking updates
  * Provides live location data, shift status, and delivery updates to admin dashboard
  */
@@ -40,7 +56,7 @@ export async function GET(request: NextRequest) {
         // Set up interval for sending updates
         const interval = setInterval(async () => {
           // Check if controller is still open before processing
-          if ((controller as any).desiredSize === null) {
+          if (!isControllerOpen(controller)) {
             clearInterval(interval);
             return;
           }
@@ -182,10 +198,13 @@ export async function GET(request: NextRequest) {
 
             const message = `data: ${JSON.stringify(updateData)}\n\n`;
             // Check controller is still open before enqueueing
+            if (!isControllerOpen(controller)) {
+              clearInterval(interval);
+              return;
+            }
+
             try {
-              if ((controller as any).desiredSize !== null) {
-                controller.enqueue(new TextEncoder().encode(message));
-              }
+              controller.enqueue(new TextEncoder().encode(message));
             } catch (enqueueError) {
               // Controller was closed between check and enqueue - safe to ignore
               clearInterval(interval);
@@ -193,15 +212,18 @@ export async function GET(request: NextRequest) {
           } catch (error) {
             console.error('Error in SSE update:', error);
             // Check controller is still open before enqueueing error
+            if (!isControllerOpen(controller)) {
+              clearInterval(interval);
+              return;
+            }
+
             try {
-              if ((controller as any).desiredSize !== null) {
-                const errorMessage = `data: ${JSON.stringify({
-                  type: 'error',
-                  message: 'Error fetching driver updates',
-                  timestamp: new Date().toISOString()
-                })}\n\n`;
-                controller.enqueue(new TextEncoder().encode(errorMessage));
-              }
+              const errorMessage = `data: ${JSON.stringify({
+                type: 'error',
+                message: 'Error fetching driver updates',
+                timestamp: new Date().toISOString()
+              })}\n\n`;
+              controller.enqueue(new TextEncoder().encode(errorMessage));
             } catch (enqueueError) {
               // Controller was closed between check and enqueue - safe to ignore
               clearInterval(interval);
