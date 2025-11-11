@@ -54,7 +54,6 @@ export default function TestDriverPage() {
 
       await locationChannel.subscribe({
         onConnect: async () => {
-          console.log('[Test Driver] Connected to location channel');
           setIsConnected(true);
 
           // Send initial location immediately so dashboard shows the driver
@@ -73,10 +72,8 @@ export default function TestDriverPage() {
             timestamp: new Date().toISOString(),
             vehicleNumber: 'VEH-001',
           });
-          console.log('[Test Driver] Sent initial location');
         },
         onDisconnect: () => {
-          console.log('[Test Driver] Disconnected from location channel');
           setIsConnected(false);
         },
         onError: (error: Error) => {
@@ -134,7 +131,6 @@ export default function TestDriverPage() {
       });
 
       setMessageCount(prev => prev + 1);
-      console.log('[Test Driver] Location update:', { lat, lng, waypoint: currentWaypoint, progress: progress.toFixed(2) });
     } catch (error) {
       console.error('[Test Driver] Failed to send location:', error);
     }
@@ -153,7 +149,6 @@ export default function TestDriverPage() {
         setCurrentWaypoint(prevWaypoint => {
           // Check if we've reached the end of the route
           if (prevWaypoint >= ROUTE_WAYPOINTS.length - 1) {
-            console.log('[Test Driver] Route completed!');
             if (intervalRef.current) {
               clearInterval(intervalRef.current);
             }

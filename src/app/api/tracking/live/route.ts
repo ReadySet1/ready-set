@@ -43,6 +43,10 @@ export async function GET(request: NextRequest) {
     });
 
     // Create a ReadableStream for SSE
+    // Interval and cleanup function stored in outer scope so cancel() method can access them
+    let intervalId: NodeJS.Timeout | null = null;
+    let cleanupFn: (() => void) | null = null;
+
     const stream = new ReadableStream({
       start(controller) {
         // Send initial connection message
@@ -54,10 +58,10 @@ export async function GET(request: NextRequest) {
         controller.enqueue(new TextEncoder().encode(initMessage));
 
         // Set up interval for sending updates
-        const interval = setInterval(async () => {
+        intervalId = setInterval(async () => {
           // Check if controller is still open before processing
           if (!isControllerOpen(controller)) {
-            clearInterval(interval);
+            if (intervalId) clearInterval(intervalId);
             return;
           }
 
@@ -203,11 +207,11 @@ export async function GET(request: NextRequest) {
                 controller.enqueue(new TextEncoder().encode(message));
               } else {
                 // Controller already closed, cleanup interval
-                clearInterval(interval);
+                if (intervalId) clearInterval(intervalId);
               }
             } catch (enqueueError) {
               // Controller was closed during enqueue operation - cleanup and stop
-              clearInterval(interval);
+              if (intervalId) clearInterval(intervalId);
             }
           } catch (error) {
             console.error('Error in SSE update:', error);
@@ -222,18 +226,18 @@ export async function GET(request: NextRequest) {
                 controller.enqueue(new TextEncoder().encode(errorMessage));
               } else {
                 // Controller already closed, cleanup interval
-                clearInterval(interval);
+                if (intervalId) clearInterval(intervalId);
               }
             } catch (enqueueError) {
               // Controller was closed during enqueue operation - cleanup and stop
-              clearInterval(interval);
+              if (intervalId) clearInterval(intervalId);
             }
           }
         }, 5000); // Update every 5 seconds
 
         // Cleanup function
         const cleanup = () => {
-          clearInterval(interval);
+          if (intervalId) clearInterval(intervalId);
           try {
             controller.close();
           } catch (error) {
@@ -241,15 +245,23 @@ export async function GET(request: NextRequest) {
           }
         };
 
+        // Store cleanup function in outer scope for cancel() method
+        cleanupFn = cleanup;
+
         // Handle client disconnect
         request.signal.addEventListener('abort', cleanup);
-
-        // Store cleanup function for potential manual cleanup
-        (controller as any).cleanup = cleanup;
       },
 
       cancel() {
-              }
+        // Clean up interval and event listener when stream is cancelled
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+        if (cleanupFn) {
+          request.signal.removeEventListener('abort', cleanupFn);
+        }
+      }
     });
 
     return new NextResponse(stream, { headers });

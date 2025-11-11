@@ -54,12 +54,9 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, FeatureFlagConfig> = {
     enabled: false, // PRODUCTION SAFETY: Disabled by default - enable via NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES=true
     rolloutPercentage: 0,
   },
-  // PRODUCTION SAFETY: Read from environment variable with safe default
-  // If NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD is not set or invalid, defaults to disabled
-  // This prevents accidental activation in production without explicit configuration
   [FEATURE_FLAGS.USE_REALTIME_ADMIN_DASHBOARD]: {
-    enabled: process.env.NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD === 'true',
-    rolloutPercentage: process.env.NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD === 'true' ? 100 : 0,
+    enabled: false, // PRODUCTION SAFETY: Disabled by default - enable via NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD=true
+    rolloutPercentage: 0,
   },
   [FEATURE_FLAGS.USE_REALTIME_DRIVER_MESSAGING]: {
     enabled: false,
