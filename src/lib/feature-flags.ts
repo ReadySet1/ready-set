@@ -105,11 +105,6 @@ class FeatureFlagStore {
           const envKey = `NEXT_PUBLIC_FF_${flagKey.toUpperCase()}`;
           const envValue = process.env[envKey];
 
-          // DEBUG: Log all feature flag env vars
-          if (flagKey === FEATURE_FLAGS.USE_REALTIME_ADMIN_DASHBOARD) {
-            console.log('[Feature Flags] Loading:', { envKey, envValue, flagKey });
-          }
-
           if (envValue === undefined) {
             return; // No override for this flag
           }

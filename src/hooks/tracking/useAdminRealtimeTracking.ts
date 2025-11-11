@@ -163,17 +163,6 @@ export function useAdminRealtimeTracking(
     useRealtime &&
     isFeatureEnabled(FEATURE_FLAGS.USE_REALTIME_ADMIN_DASHBOARD, featureFlagContext);
 
-  // DEBUG: Log feature flag status
-  useEffect(() => {
-    console.log('[Admin Tracking] Feature flag check:', {
-      enableRealtimeReceive,
-      useRealtime,
-      featureFlagEnabled: isFeatureEnabled(FEATURE_FLAGS.USE_REALTIME_ADMIN_DASHBOARD, featureFlagContext),
-      isRealtimeEnabled,
-      flagKey: FEATURE_FLAGS.USE_REALTIME_ADMIN_DASHBOARD,
-    });
-  }, [enableRealtimeReceive, useRealtime, isRealtimeEnabled, featureFlagContext]);
-
   // Realtime channel reference
   const channelRef = useRef<DriverLocationChannel | null>(null);
   const processedLocationsRef = useRef<Set<string>>(new Set());
