@@ -28,7 +28,12 @@ const ROUTE_WAYPOINTS = [
 ];
 
 export default function TestDriverPage() {
-  const [driverId, setDriverId] = useState('test-driver-001');
+  // Generate a stable test driver UUID that persists across renders
+  const [driverId] = useState(() => {
+    // Use a valid UUID v4 format for the test driver
+    // Version 4: third group starts with 4, fourth group starts with 8-b
+    return '00000000-0000-4000-8000-000000000001'; // Test driver UUID
+  });
   const [driverName, setDriverName] = useState('Test Driver');
   const [speed, setSpeed] = useState(15); // m/s (about 33 mph)
   const [isConnected, setIsConnected] = useState(false);
@@ -265,13 +270,16 @@ export default function TestDriverPage() {
           {/* Driver Info */}
           <div className="space-y-4">
             <div>
-              <Label htmlFor="driverId">Driver ID</Label>
+              <Label htmlFor="driverId">Driver ID (Test UUID)</Label>
               <Input
                 id="driverId"
                 value={driverId}
-                onChange={(e) => setDriverId(e.target.value)}
-                disabled={isConnected}
+                disabled
+                className="font-mono text-sm"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Fixed UUID for testing purposes
+              </p>
             </div>
 
             <div>

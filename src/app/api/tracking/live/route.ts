@@ -182,19 +182,29 @@ export async function GET(request: NextRequest) {
 
             const message = `data: ${JSON.stringify(updateData)}\n\n`;
             // Check controller is still open before enqueueing
-            if ((controller as any).desiredSize !== null) {
-              controller.enqueue(new TextEncoder().encode(message));
+            try {
+              if ((controller as any).desiredSize !== null) {
+                controller.enqueue(new TextEncoder().encode(message));
+              }
+            } catch (enqueueError) {
+              // Controller was closed between check and enqueue - safe to ignore
+              clearInterval(interval);
             }
           } catch (error) {
             console.error('Error in SSE update:', error);
             // Check controller is still open before enqueueing error
-            if ((controller as any).desiredSize !== null) {
-              const errorMessage = `data: ${JSON.stringify({
-                type: 'error',
-                message: 'Error fetching driver updates',
-                timestamp: new Date().toISOString()
-              })}\n\n`;
-              controller.enqueue(new TextEncoder().encode(errorMessage));
+            try {
+              if ((controller as any).desiredSize !== null) {
+                const errorMessage = `data: ${JSON.stringify({
+                  type: 'error',
+                  message: 'Error fetching driver updates',
+                  timestamp: new Date().toISOString()
+                })}\n\n`;
+                controller.enqueue(new TextEncoder().encode(errorMessage));
+              }
+            } catch (enqueueError) {
+              // Controller was closed between check and enqueue - safe to ignore
+              clearInterval(interval);
             }
           }
         }, 5000); // Update every 5 seconds

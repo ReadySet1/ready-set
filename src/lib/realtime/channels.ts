@@ -172,13 +172,17 @@ export class DriverLocationChannel {
         // off() method is now properly typed via types/supabase-realtime.d.ts
         this.channel.off('broadcast', { event: eventName }, listener);
       } catch (error) {
-        realtimeLogger.error('Failed to remove event listener', {
-          error,
-          metadata: {
-            eventName,
-            channel: REALTIME_CHANNELS.DRIVER_LOCATIONS,
-          },
-        });
+        // Suppress error if listener was already removed - this is expected during cleanup
+        const errorMessage = (error as Error)?.message || '';
+        if (!errorMessage.includes('not found') && !errorMessage.includes('does not exist')) {
+          realtimeLogger.warn('Event listener cleanup issue (non-critical)', {
+            metadata: {
+              eventName,
+              channel: REALTIME_CHANNELS.DRIVER_LOCATIONS,
+              error: errorMessage,
+            },
+          });
+        }
       }
     }
     this.listenerRefs.delete(eventName);
@@ -349,13 +353,17 @@ export class DriverStatusChannel {
         // off() method is now properly typed via types/supabase-realtime.d.ts
         this.channel.off('broadcast', { event: eventName }, listener);
       } catch (error) {
-        realtimeLogger.error('Failed to remove event listener', {
-          error,
-          metadata: {
-            eventName,
-            channel: REALTIME_CHANNELS.DRIVER_STATUS,
-          },
-        });
+        // Suppress error if listener was already removed - this is expected during cleanup
+        const errorMessage = (error as Error)?.message || '';
+        if (!errorMessage.includes('not found') && !errorMessage.includes('does not exist')) {
+          realtimeLogger.warn('Event listener cleanup issue (non-critical)', {
+            metadata: {
+              eventName,
+              channel: REALTIME_CHANNELS.DRIVER_STATUS,
+              error: errorMessage,
+            },
+          });
+        }
       }
     }
     this.listenerRefs.delete(eventName);
@@ -517,13 +525,17 @@ export class AdminCommandsChannel {
         // off() method is now properly typed via types/supabase-realtime.d.ts
         this.channel.off('broadcast', { event: eventName }, listener);
       } catch (error) {
-        realtimeLogger.error('Failed to remove event listener', {
-          error,
-          metadata: {
-            eventName,
-            channel: REALTIME_CHANNELS.ADMIN_COMMANDS,
-          },
-        });
+        // Suppress error if listener was already removed - this is expected during cleanup
+        const errorMessage = (error as Error)?.message || '';
+        if (!errorMessage.includes('not found') && !errorMessage.includes('does not exist')) {
+          realtimeLogger.warn('Event listener cleanup issue (non-critical)', {
+            metadata: {
+              eventName,
+              channel: REALTIME_CHANNELS.ADMIN_COMMANDS,
+              error: errorMessage,
+            },
+          });
+        }
       }
     }
     this.listenerRefs.delete(eventName);
