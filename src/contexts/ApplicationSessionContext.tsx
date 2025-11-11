@@ -63,9 +63,6 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
   }) => {
     // Don't create a new session if we already have a valid one
     if (session && !isSessionExpired()) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Using existing valid session');
-      }
       return;
     }
 
@@ -108,10 +105,6 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
       // uploadToken is stored here for UX only - consider this data public
       // Future: Migrate to httpOnly cookies for real security
       storeEncryptedSession('application_session', newSession);
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Application session created:', newSession.sessionId);
-      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create session';
       setError(errorMessage);
