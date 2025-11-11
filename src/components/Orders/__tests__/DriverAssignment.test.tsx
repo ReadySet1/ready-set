@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import toast from "react-hot-toast";
+import { UserType } from "@/types/user";
 
 // Mock Next.js navigation hooks
 const mockPush = jest.fn();
