@@ -386,9 +386,11 @@ const ModernPricingLandingPage = () => {
                       <span className="text-3xl font-black text-yellow-600 sm:text-4xl">
                         {option.price}
                       </span>
-                      <span className="text-xs text-gray-500 sm:text-sm">
-                        + Delivery Fee
-                      </span>
+                      {option.title !== "Option D" && (
+                        <span className="text-xs text-gray-500 sm:text-sm">
+                          + Delivery Fee
+                        </span>
+                      )}
                     </div>
                     <div className="mb-4 rounded-lg bg-yellow-50 px-2.5 py-1.5 text-center sm:mb-5 sm:px-3 sm:py-2 md:mb-6">
                       <p className="text-xs font-semibold text-gray-700 sm:text-sm">
