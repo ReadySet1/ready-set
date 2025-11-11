@@ -310,7 +310,7 @@ export async function POST(request: NextRequest) {
         basePrice: pricingResult.deliveryCost,
         mileageFee: pricingResult.totalMileagePay,
         dailyDriveDiscount: pricingResult.dailyDriveDiscount,
-        bridgeToll: pricingResult.bridgeToll,
+        // Note: Bridge toll ($8) is NOT included - it's driver compensation paid by Ready Set
       },
     };
 
