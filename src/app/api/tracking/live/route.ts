@@ -197,35 +197,35 @@ export async function GET(request: NextRequest) {
             };
 
             const message = `data: ${JSON.stringify(updateData)}\n\n`;
-            // Check controller is still open before enqueueing
-            if (!isControllerOpen(controller)) {
-              clearInterval(interval);
-              return;
-            }
-
+            // Use try-catch to handle controller state atomically (avoids TOCTOU race condition)
             try {
-              controller.enqueue(new TextEncoder().encode(message));
+              if (controller.desiredSize !== null) {
+                controller.enqueue(new TextEncoder().encode(message));
+              } else {
+                // Controller already closed, cleanup interval
+                clearInterval(interval);
+              }
             } catch (enqueueError) {
-              // Controller was closed between check and enqueue - safe to ignore
+              // Controller was closed during enqueue operation - cleanup and stop
               clearInterval(interval);
             }
           } catch (error) {
             console.error('Error in SSE update:', error);
-            // Check controller is still open before enqueueing error
-            if (!isControllerOpen(controller)) {
-              clearInterval(interval);
-              return;
-            }
-
+            // Use try-catch to handle controller state atomically (avoids TOCTOU race condition)
             try {
-              const errorMessage = `data: ${JSON.stringify({
-                type: 'error',
-                message: 'Error fetching driver updates',
-                timestamp: new Date().toISOString()
-              })}\n\n`;
-              controller.enqueue(new TextEncoder().encode(errorMessage));
+              if (controller.desiredSize !== null) {
+                const errorMessage = `data: ${JSON.stringify({
+                  type: 'error',
+                  message: 'Error fetching driver updates',
+                  timestamp: new Date().toISOString()
+                })}\n\n`;
+                controller.enqueue(new TextEncoder().encode(errorMessage));
+              } else {
+                // Controller already closed, cleanup interval
+                clearInterval(interval);
+              }
             } catch (enqueueError) {
-              // Controller was closed between check and enqueue - safe to ignore
+              // Controller was closed during enqueue operation - cleanup and stop
               clearInterval(interval);
             }
           }

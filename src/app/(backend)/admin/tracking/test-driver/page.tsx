@@ -28,11 +28,13 @@ const ROUTE_WAYPOINTS = [
 ];
 
 export default function TestDriverPage() {
-  // Generate a stable test driver UUID that persists across renders
+  // Generate a unique test driver UUID that persists across renders
+  // Uses crypto.randomUUID() for proper UUID v4 generation
   const [driverId] = useState(() => {
-    // Use a valid UUID v4 format for the test driver
-    // Version 4: third group starts with 4, fourth group starts with 8-b
-    return '00000000-0000-4000-8000-000000000001'; // Test driver UUID
+    // Use crypto.randomUUID() for standards-compliant UUID v4
+    return typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : '00000000-0000-4000-8000-000000000001'; // Fallback for older browsers
   });
   const [driverName, setDriverName] = useState('Test Driver');
   const [speed, setSpeed] = useState(15); // m/s (about 33 mph)

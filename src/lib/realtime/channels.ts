@@ -172,14 +172,23 @@ export class DriverLocationChannel {
         // off() method is now properly typed via types/supabase-realtime.d.ts
         this.channel.off('broadcast', { event: eventName }, listener);
       } catch (error) {
-        // Suppress error if listener was already removed - this is expected during cleanup
+        // Phoenix Channels doesn't expose structured error types, so we use message matching
+        // Expected errors during cleanup (listener already removed, channel closed, etc.)
         const errorMessage = (error as Error)?.message || '';
-        if (!errorMessage.includes('not found') && !errorMessage.includes('does not exist')) {
-          realtimeLogger.warn('Event listener cleanup issue (non-critical)', {
+        const isExpectedCleanupError =
+          errorMessage.includes('not found') ||
+          errorMessage.includes('does not exist') ||
+          errorMessage.includes('already removed') ||
+          errorMessage.includes('closed');
+
+        if (!isExpectedCleanupError) {
+          // Log unexpected errors for debugging, but continue cleanup
+          realtimeLogger.warn('Unexpected error during event listener cleanup', {
             metadata: {
               eventName,
               channel: REALTIME_CHANNELS.DRIVER_LOCATIONS,
-              error: errorMessage,
+              errorMessage,
+              errorType: error?.constructor?.name || 'Unknown',
             },
           });
         }
@@ -353,14 +362,23 @@ export class DriverStatusChannel {
         // off() method is now properly typed via types/supabase-realtime.d.ts
         this.channel.off('broadcast', { event: eventName }, listener);
       } catch (error) {
-        // Suppress error if listener was already removed - this is expected during cleanup
+        // Phoenix Channels doesn't expose structured error types, so we use message matching
+        // Expected errors during cleanup (listener already removed, channel closed, etc.)
         const errorMessage = (error as Error)?.message || '';
-        if (!errorMessage.includes('not found') && !errorMessage.includes('does not exist')) {
-          realtimeLogger.warn('Event listener cleanup issue (non-critical)', {
+        const isExpectedCleanupError =
+          errorMessage.includes('not found') ||
+          errorMessage.includes('does not exist') ||
+          errorMessage.includes('already removed') ||
+          errorMessage.includes('closed');
+
+        if (!isExpectedCleanupError) {
+          // Log unexpected errors for debugging, but continue cleanup
+          realtimeLogger.warn('Unexpected error during event listener cleanup', {
             metadata: {
               eventName,
               channel: REALTIME_CHANNELS.DRIVER_STATUS,
-              error: errorMessage,
+              errorMessage,
+              errorType: error?.constructor?.name || 'Unknown',
             },
           });
         }
@@ -525,14 +543,23 @@ export class AdminCommandsChannel {
         // off() method is now properly typed via types/supabase-realtime.d.ts
         this.channel.off('broadcast', { event: eventName }, listener);
       } catch (error) {
-        // Suppress error if listener was already removed - this is expected during cleanup
+        // Phoenix Channels doesn't expose structured error types, so we use message matching
+        // Expected errors during cleanup (listener already removed, channel closed, etc.)
         const errorMessage = (error as Error)?.message || '';
-        if (!errorMessage.includes('not found') && !errorMessage.includes('does not exist')) {
-          realtimeLogger.warn('Event listener cleanup issue (non-critical)', {
+        const isExpectedCleanupError =
+          errorMessage.includes('not found') ||
+          errorMessage.includes('does not exist') ||
+          errorMessage.includes('already removed') ||
+          errorMessage.includes('closed');
+
+        if (!isExpectedCleanupError) {
+          // Log unexpected errors for debugging, but continue cleanup
+          realtimeLogger.warn('Unexpected error during event listener cleanup', {
             metadata: {
               eventName,
               channel: REALTIME_CHANNELS.ADMIN_COMMANDS,
-              error: errorMessage,
+              errorMessage,
+              errorType: error?.constructor?.name || 'Unknown',
             },
           });
         }

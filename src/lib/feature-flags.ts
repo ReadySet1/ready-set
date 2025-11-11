@@ -54,17 +54,12 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, FeatureFlagConfig> = {
     enabled: false, // PRODUCTION SAFETY: Disabled by default - enable via NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES=true
     rolloutPercentage: 0,
   },
-  // TODO: Investigate why NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD env var is not loading
-  // This feature flag is temporarily hardcoded to true for testing purposes.
-  // Before production deployment, we need to:
-  // 1. Verify .env.local contains NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD=true
-  // 2. Ensure Next.js picks up NEXT_PUBLIC_* vars (restart dev server if needed)
-  // 3. Test env var loading in both development and production builds
-  // 4. Once confirmed working, revert to: enabled: false, rolloutPercentage: 0
-  // Tracking: Create follow-up issue REA-123 or similar
+  // PRODUCTION SAFETY: Read from environment variable with safe default
+  // If NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD is not set or invalid, defaults to disabled
+  // This prevents accidental activation in production without explicit configuration
   [FEATURE_FLAGS.USE_REALTIME_ADMIN_DASHBOARD]: {
-    enabled: true, // TEMPORARY: Hardcoded to true for testing - env var not loading
-    rolloutPercentage: 100,
+    enabled: process.env.NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD === 'true',
+    rolloutPercentage: process.env.NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD === 'true' ? 100 : 0,
   },
   [FEATURE_FLAGS.USE_REALTIME_DRIVER_MESSAGING]: {
     enabled: false,
