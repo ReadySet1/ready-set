@@ -5,7 +5,7 @@
  * Provides a centralized interface for all real-time communication.
  */
 
-import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
+import { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { z } from 'zod';
 import {
   REALTIME_CHANNELS,
@@ -21,79 +21,13 @@ import { realtimeLogger } from '../logging/realtime-logger';
 import { validatePayload, PayloadValidationError, PayloadSizeError } from './schemas';
 import { locationRateLimiter, RateLimitExceededError } from '../rate-limiting/location-rate-limiter';
 import { CONNECTION_CONFIG } from '@/constants/realtime-config';
+import { createClient as createBrowserClient } from '@/utils/supabase/client';
 
 // ============================================================================
 // Client Configuration
 // ============================================================================
 
-// Validate environment variables with Zod
-// In test environment or build-time, use more lenient validation
-// Build-time detection: Next.js sets NEXT_PHASE during builds
-const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' ||
-                    process.env.NEXT_PHASE === 'phase-export';
-const isTestOrBuild = process.env.NODE_ENV === 'test' || isBuildTime;
-
-const EnvSchema = isTestOrBuild
-  ? z.object({
-      NEXT_PUBLIC_SUPABASE_URL: z.string().min(1),
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
-    })
-  : z.object({
-      NEXT_PUBLIC_SUPABASE_URL: z
-        .string()
-        .url('NEXT_PUBLIC_SUPABASE_URL must be a valid URL')
-        .min(1, 'NEXT_PUBLIC_SUPABASE_URL is required'),
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: z
-        .string()
-        .min(20, 'NEXT_PUBLIC_SUPABASE_ANON_KEY must be at least 20 characters')
-        // Relaxed validation: just check it's a reasonable length string
-        // Supabase key format may change, and actual auth will fail anyway if invalid
-        .refine(
-          (key) => key.length >= 20 && /^[A-Za-z0-9_.\-]+$/.test(key),
-          'NEXT_PUBLIC_SUPABASE_ANON_KEY appears to be invalid (must contain only alphanumeric, dots, hyphens, underscores)',
-        ),
-    });
-
-// Validate and extract environment variables at module load time
-function validateEnvironment() {
-  try {
-    const result = EnvSchema.safeParse({
-      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    });
-
-    if (!result.success) {
-      const errorMessages = result.error.issues.map((err) =>
-        `${err.path.join('.')}: ${err.message}`
-      ).join(', ');
-      // Log technical details for developers/support
-      realtimeLogger.error(`Invalid Supabase environment configuration: ${errorMessages}`, { error: result.error });
-      // Show user-friendly message
-      throw new RealtimeAuthenticationError(
-        'Real-time features are currently unavailable due to a configuration issue. ' +
-        'Please contact support if this persists.'
-      );
-    }
-
-    return result.data;
-  } catch (error) {
-    if (error instanceof RealtimeAuthenticationError) {
-      throw error;
-    }
-    // Log technical error for developers/support
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    realtimeLogger.error(`Failed to validate environment variables: ${errorMessage}`, { error });
-    // Show user-friendly message
-    throw new RealtimeAuthenticationError(
-      'Real-time features are temporarily unavailable. Please try again later or contact support.'
-    );
-  }
-}
-
-// Validate and load environment variables
-const env = validateEnvironment();
-const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Environment validation is handled by the browser client in @/utils/supabase/client
 
 // ============================================================================
 // Authorization
@@ -223,16 +157,8 @@ export class RealtimeClient {
   private readonly MAX_CHANNELS = 100;
 
   private constructor() {
-    // Environment variables are validated at module load time
-    this.supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      realtime: {
-        params: {
-          eventsPerSecond: 10,
-        },
-        // Connection configuration from centralized config
-        timeout: CONNECTION_CONFIG.TIMEOUT_MS,
-      },
-    });
+    // Use the browser client that has access to auth session cookies
+    this.supabase = createBrowserClient();
   }
 
   /**

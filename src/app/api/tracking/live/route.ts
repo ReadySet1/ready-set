@@ -3,6 +3,22 @@ import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
 
 /**
+ * Type-safe helper to check if SSE controller is still open and accepting data
+ * @param controller - The ReadableStreamDefaultController to check
+ * @returns true if controller is open and ready to accept data
+ */
+function isControllerOpen(controller: ReadableStreamDefaultController): boolean {
+  try {
+    // desiredSize is null when the stream is closed
+    // desiredSize is a number (can be negative) when the stream is open
+    return controller.desiredSize !== null;
+  } catch {
+    // If we can't access desiredSize, assume controller is closed
+    return false;
+  }
+}
+
+/**
  * Server-Sent Events endpoint for real-time driver tracking updates
  * Provides live location data, shift status, and delivery updates to admin dashboard
  */
@@ -27,6 +43,10 @@ export async function GET(request: NextRequest) {
     });
 
     // Create a ReadableStream for SSE
+    // Interval and cleanup function stored in outer scope so cancel() method can access them
+    let intervalId: NodeJS.Timeout | null = null;
+    let cleanupFn: (() => void) | null = null;
+
     const stream = new ReadableStream({
       start(controller) {
         // Send initial connection message
@@ -38,10 +58,10 @@ export async function GET(request: NextRequest) {
         controller.enqueue(new TextEncoder().encode(initMessage));
 
         // Set up interval for sending updates
-        const interval = setInterval(async () => {
+        intervalId = setInterval(async () => {
           // Check if controller is still open before processing
-          if ((controller as any).desiredSize === null) {
-            clearInterval(interval);
+          if (!isControllerOpen(controller)) {
+            if (intervalId) clearInterval(intervalId);
             return;
           }
 
@@ -181,27 +201,43 @@ export async function GET(request: NextRequest) {
             };
 
             const message = `data: ${JSON.stringify(updateData)}\n\n`;
-            // Check controller is still open before enqueueing
-            if ((controller as any).desiredSize !== null) {
-              controller.enqueue(new TextEncoder().encode(message));
+            // Use try-catch to handle controller state atomically (avoids TOCTOU race condition)
+            try {
+              if (controller.desiredSize !== null) {
+                controller.enqueue(new TextEncoder().encode(message));
+              } else {
+                // Controller already closed, cleanup interval
+                if (intervalId) clearInterval(intervalId);
+              }
+            } catch (enqueueError) {
+              // Controller was closed during enqueue operation - cleanup and stop
+              if (intervalId) clearInterval(intervalId);
             }
           } catch (error) {
             console.error('Error in SSE update:', error);
-            // Check controller is still open before enqueueing error
-            if ((controller as any).desiredSize !== null) {
-              const errorMessage = `data: ${JSON.stringify({
-                type: 'error',
-                message: 'Error fetching driver updates',
-                timestamp: new Date().toISOString()
-              })}\n\n`;
-              controller.enqueue(new TextEncoder().encode(errorMessage));
+            // Use try-catch to handle controller state atomically (avoids TOCTOU race condition)
+            try {
+              if (controller.desiredSize !== null) {
+                const errorMessage = `data: ${JSON.stringify({
+                  type: 'error',
+                  message: 'Error fetching driver updates',
+                  timestamp: new Date().toISOString()
+                })}\n\n`;
+                controller.enqueue(new TextEncoder().encode(errorMessage));
+              } else {
+                // Controller already closed, cleanup interval
+                if (intervalId) clearInterval(intervalId);
+              }
+            } catch (enqueueError) {
+              // Controller was closed during enqueue operation - cleanup and stop
+              if (intervalId) clearInterval(intervalId);
             }
           }
         }, 5000); // Update every 5 seconds
 
         // Cleanup function
         const cleanup = () => {
-          clearInterval(interval);
+          if (intervalId) clearInterval(intervalId);
           try {
             controller.close();
           } catch (error) {
@@ -209,15 +245,23 @@ export async function GET(request: NextRequest) {
           }
         };
 
+        // Store cleanup function in outer scope for cancel() method
+        cleanupFn = cleanup;
+
         // Handle client disconnect
         request.signal.addEventListener('abort', cleanup);
-
-        // Store cleanup function for potential manual cleanup
-        (controller as any).cleanup = cleanup;
       },
 
       cancel() {
-              }
+        // Clean up interval and event listener when stream is cancelled
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+        if (cleanupFn) {
+          request.signal.removeEventListener('abort', cleanupFn);
+        }
+      }
     });
 
     return new NextResponse(stream, { headers });

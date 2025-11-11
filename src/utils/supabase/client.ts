@@ -57,9 +57,9 @@ export const createClient = (): SupabaseClient => {
       supabaseInstance = createBrowserClient(supabaseUrl, supabaseAnonKey, {
         cookies: {
           get: (name: string) => getStorageCookie(name),
-          set: (name: string, value: string, options: CookieOptions) => 
+          set: (name: string, value: string, options: CookieOptions) =>
             setStorageCookie(name, value, options),
-          remove: (name: string, options: CookieOptions) => 
+          remove: (name: string, options: CookieOptions) =>
             removeStorageCookie(name, options)
         },
         auth: {
@@ -67,6 +67,12 @@ export const createClient = (): SupabaseClient => {
           detectSessionInUrl: true,
           autoRefreshToken: true,
           persistSession: true
+        },
+        realtime: {
+          params: {
+            eventsPerSecond: 10,
+          },
+          timeout: 30000, // 30 seconds
         }
       });
     } catch (error) {
