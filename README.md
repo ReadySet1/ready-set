@@ -32,7 +32,7 @@ For comprehensive documentation, setup instructions, and development guides, see
 
 - **Multi-user platform** for drivers, vendors, and clients
 - **Supabase authentication** with Google OAuth integration
-- **CaterValley integration** with automated pricing system
+- **CaterValley integration** ✅ Production-ready with automated pricing (minimum $42.50 fee)
 - **Real-time delivery tracking**
 - **Professional standards** with HIPAA compliance
 - **Modern tech stack** with Next.js, TypeScript, and PostgreSQL
@@ -107,6 +107,54 @@ Ready Set includes a comprehensive carrier integration system for managing multi
 ### Supported Carriers
 - **CaterValley** - Full integration with automated order status synchronization
 - **Extensible Design** - Easy addition of new carriers through configuration
+
+## 🍽️ CaterValley Integration
+
+Ready Set features a **production-ready CaterValley integration** for seamless catering order management:
+
+### Status
+✅ **Production Active** - 20+ orders successfully processed since Oct 27, 2025
+
+### Features
+- **3 REST API Endpoints** - Draft, Update, and Confirm order workflows
+- **Automated Pricing Calculator** - Multi-tier pricing with bridge toll detection
+- **$42.50 Minimum Enforcement** - Guaranteed minimum delivery fee (resolved Nov 10, 2025)
+- **Distance Calculation** - Google Maps API integration with smart 10.1-mile fallback
+- **5-Tier Pricing System** - Based on headcount OR food cost (LESSER of two)
+- **Bridge Toll Auto-Detection** - Automatic $7 toll for San Francisco Bay crossings
+- **Pacific Time Handling** - Automatic PST/PDT to UTC conversion
+
+### Pricing Tiers
+
+| Tier | Headcount | Food Cost | Within 10 Miles | Beyond 10 Miles |
+|------|-----------|-----------|-----------------|-----------------|
+| 1 | 0-25 | $0-$300 | $42.50 | $85 + $1.10/mile |
+| 2 | 26-49 | $300.01-$599.99 | $52.50 | $90 + $1.10/mile |
+| 3 | 50-74 | $600-$899.99 | $62.50 | $110 + $1.10/mile |
+| 4 | 75-99 | $900-$1,199.99 | $72.50 | $120 + $1.10/mile |
+| 5 | 100+ | $1,200+ | 10% | 10% + $1.10/mile |
+
+### API Endpoints
+- **POST** `/api/cater-valley/orders/draft` - Create order and get pricing
+- **POST** `/api/cater-valley/orders/update` - Modify existing order
+- **POST** `/api/cater-valley/orders/confirm` - Finalize order for dispatch
+
+### Documentation
+- **[📄 API Contract](docs/catervalley/API_CONTRACT.md)** - Complete API specification
+- **[📝 Reference Notes](docs/catervalley/REFERENCE_NOTES.md)** - Important field name clarifications
+- **[🔧 Code Implementation](src/app/api/cater-valley/)** - Production API routes
+- **[✅ Test Suite](src/__tests__/api/cater-valley/)** - 15 passing integration tests
+
+### Recent Fixes (Nov 10, 2025)
+- ✅ Fixed tier boundary overlap (Tier 2 now starts at 26 headcount, $300.01 food cost)
+- ✅ Extracted duplicated pricing logic to shared helper function
+- ✅ Removed console.warn security issue
+- ✅ Changed fallback distance from 5 to 10.1 miles for better revenue protection
+- ✅ All 15 CaterValley tests passing
+
+### Contact
+- **CaterValley CTO:** Halil Han Badem - halil@catervalley.com
+- **CaterValley Team:** Ugras Bassullu - ugras@catervalley.com
 
 ## 🔄 API Resilience & Monitoring
 

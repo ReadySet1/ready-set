@@ -214,6 +214,57 @@ export const KASA: ClientDeliveryConfiguration = {
 };
 
 /**
+ * CaterValley Client Configuration
+ * Vendor: CaterValley
+ * Minimum delivery fee: $42.50 as per agreement between ReadySet and CaterValley
+ */
+export const CATER_VALLEY: ClientDeliveryConfiguration = {
+  id: 'cater-valley',
+  clientName: 'CaterValley',
+  vendorName: 'CaterValley',
+  description: 'CaterValley delivery pricing with $42.50 minimum delivery fee',
+  isActive: true,
+
+  pricingTiers: [
+    // Tier 1: Small orders (≤25 headcount OR ≤$300 food cost)
+    { headcountMin: 0, headcountMax: 25, foodCostMin: 0, foodCostMax: 300, regularRate: 85, within10Miles: 42.50 },
+    // Tier 2: 26-49 headcount OR $300.01-599 food cost
+    { headcountMin: 26, headcountMax: 49, foodCostMin: 300.01, foodCostMax: 599.99, regularRate: 90, within10Miles: 52.50 },
+    // Tier 3: 50-74 headcount OR $600-899 food cost
+    { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 110, within10Miles: 62.50 },
+    // Tier 4: 75-99 headcount OR $900-1199 food cost
+    { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 120, within10Miles: 72.50 },
+    // Tier 5: 100+ headcount OR $1200+ food cost (10% percentage-based pricing)
+    { headcountMin: 100, headcountMax: null, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0, regularRatePercent: 0.10, within10MilesPercent: 0.10 }
+  ],
+
+  mileageRate: 3.0,
+  distanceThreshold: 10,
+
+  dailyDriveDiscounts: {
+    twoDrivers: 5,
+    threeDrivers: 10,
+    fourPlusDrivers: 15
+  },
+
+  driverPaySettings: {
+    maxPayPerDrop: 40,
+    basePayPerDrop: 23,
+    bonusPay: 10,
+    readySetFee: 70
+  },
+
+  bridgeTollSettings: {
+    defaultTollAmount: 8.00,
+    autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County']
+  },
+
+  createdAt: new Date('2025-11-10'),
+  updatedAt: new Date('2025-11-10'),
+  notes: 'CaterValley pricing with $42.50 minimum delivery fee as per agreement'
+};
+
+/**
  * Generic Template - Customizable base configuration
  */
 export const GENERIC_TEMPLATE: ClientDeliveryConfiguration = {
@@ -264,6 +315,7 @@ export const CLIENT_CONFIGURATIONS: Record<string, ClientDeliveryConfiguration> 
   'ready-set-food-standard': READY_SET_FOOD_STANDARD,
   'ready-set-food-premium': READY_SET_FOOD_PREMIUM,
   'kasa': KASA,
+  'cater-valley': CATER_VALLEY,
   'generic-template': GENERIC_TEMPLATE
 };
 
@@ -460,6 +512,7 @@ const clientConfigurations = {
   READY_SET_FOOD_STANDARD,
   READY_SET_FOOD_PREMIUM,
   KASA,
+  CATER_VALLEY,
   GENERIC_TEMPLATE,
   CLIENT_CONFIGURATIONS,
 

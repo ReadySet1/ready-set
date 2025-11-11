@@ -6,7 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
-import { calculateDeliveryPrice, calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
+import { calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
+import { calculateCaterValleyPricing, type PricingCalculationResult } from '@/app/api/cater-valley/_lib/pricing-helper';
 
 // Validation schema for CaterValley update order request
 const UpdateOrderSchema = z.object({
@@ -50,10 +51,10 @@ interface UpdateOrderResponse {
   message?: string;
   breakdown?: {
     basePrice: number;
-    itemCountMultiplier?: number;
-    orderTotalMultiplier?: number;
-    distanceMultiplier?: number;
-    peakTimeMultiplier?: number;
+    mileageFee?: number;         // Dollar amount for mileage over 10 miles
+    dailyDriveDiscount?: number; // Dollar amount discount for multiple daily drives
+    bridgeToll?: number;         // Dollar amount for bridge toll
+    peakTimeMultiplier?: number; // Reserved for future use
   };
 }
 
@@ -233,24 +234,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. Recalculate pricing with updated parameters
-    const pricingResult = await calculateDeliveryPrice({
-      pickupAddress: `${validatedData.pickupLocation.address}, ${validatedData.pickupLocation.city}, ${validatedData.pickupLocation.state}`,
-      dropoffAddress: `${validatedData.dropOffLocation.address}, ${validatedData.dropOffLocation.city}, ${validatedData.dropOffLocation.state}`,
-      headCount: validatedData.totalItem, // Using totalItem as headCount
-      foodCost: validatedData.priceTotal, // Using priceTotal as foodCost
-      deliveryDate: validatedData.deliveryDate,
-      deliveryTime: validatedData.deliveryTime,
-      includeTip: true // Default to including tip for CaterValley orders
-    });
+    // 4. Calculate pricing with distance, bridge toll detection, and validation
+    let distance: number;
+    let usedFallbackDistance: boolean;
+    let pricingResult: PricingCalculationResult['pricingResult'];
 
-    // 7. Update or create addresses
-    const [pickupAddress, deliveryAddress] = await Promise.all([
+    try {
+      const result = await calculateCaterValleyPricing({
+        orderCode: validatedData.orderCode,
+        pickupLocation: validatedData.pickupLocation,
+        dropOffLocation: validatedData.dropOffLocation,
+        totalItem: validatedData.totalItem,
+        priceTotal: validatedData.priceTotal,
+        feature: 'catervalley_webhook_update'
+      });
+
+      distance = result.distance;
+      usedFallbackDistance = result.usedFallbackDistance;
+      pricingResult = result.pricingResult;
+    } catch (error) {
+      // Pricing calculation error (e.g., zero delivery fee)
+      return NextResponse.json(
+        {
+          status: 'ERROR',
+          message: error instanceof Error ? error.message : 'Pricing calculation error',
+        },
+        { status: 422 }
+      );
+    }
+
+    // 6. Update or create addresses
+    const [pickupAddressRecord, deliveryAddressRecord] = await Promise.all([
       ensureAddress(validatedData.pickupLocation),
       ensureAddress(validatedData.dropOffLocation),
     ]);
 
-    // 8. Update the order
+    // 7. Update the order
     // Import timezone utility for proper conversion
     const { localTimeToUtc } = await import('@/lib/utils/timezone');
     const deliveryDateTime = new Date(localTimeToUtc(validatedData.deliveryDate, validatedData.deliveryTime));
@@ -260,15 +279,17 @@ export async function POST(request: NextRequest) {
       where: { id: validatedData.id },
       data: {
         orderNumber: `CV-${validatedData.orderCode}`,
-        pickupAddressId: pickupAddress.id,
-        deliveryAddressId: deliveryAddress.id,
+        pickupAddressId: pickupAddressRecord.id,
+        deliveryAddressId: deliveryAddressRecord.id,
         headcount: validatedData.totalItem,
         orderTotal: validatedData.priceTotal,
         pickupDateTime: new Date(pickupTime),
         arrivalDateTime: deliveryDateTime,
         clientAttention: validatedData.dropOffLocation.recipient.name,
         pickupNotes: `CaterValley Order - Pickup from: ${validatedData.pickupLocation.name}`,
-        specialNotes: validatedData.dropOffLocation.instructions || '',
+        specialNotes: usedFallbackDistance
+          ? `${validatedData.dropOffLocation.instructions || ''}\n[FALLBACK DISTANCE: ${distance}mi - Manual review needed]`.trim()
+          : validatedData.dropOffLocation.instructions || '',
         updatedAt: new Date(),
       },
       include: {
@@ -278,17 +299,22 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 9. Return success response
+    // 8. Return success response
     const response: UpdateOrderResponse = {
       id: updatedOrder.id,
-      deliveryPrice: pricingResult.deliveryPrice,
-      totalPrice: validatedData.priceTotal + pricingResult.deliveryPrice,
+      deliveryPrice: pricingResult.deliveryFee,
+      totalPrice: validatedData.priceTotal + pricingResult.deliveryFee,
       estimatedPickupTime: pickupTime,
       status: 'SUCCESS',
-      breakdown: pricingResult.breakdown,
+      breakdown: {
+        basePrice: pricingResult.deliveryCost,
+        mileageFee: pricingResult.totalMileagePay,
+        dailyDriveDiscount: pricingResult.dailyDriveDiscount,
+        bridgeToll: pricingResult.bridgeToll,
+      },
     };
 
-    
+
     return NextResponse.json(response, { status: 200 });
 
   } catch (error) {
