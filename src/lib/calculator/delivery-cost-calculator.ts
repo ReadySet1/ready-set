@@ -296,7 +296,13 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   const effectiveMileagePay = totalMileagePay;
   const effectiveBridgeToll = requiresBridge ? (bridgeToll || config.bridgeTollSettings.defaultTollAmount) : 0;
 
-  const deliveryFee = deliveryCost + effectiveMileagePay - dailyDriveDiscount + effectiveBridgeToll;
+  // IMPORTANT: CaterValley-specific business rule
+  // For CaterValley, bridge toll ($8) is driver compensation paid by Ready Set
+  // It should NOT be added to the customer's delivery fee
+  // Other clients may include bridge toll in their delivery fee
+  const bridgeTollForCustomer = config.clientName === 'CaterValley' ? 0 : effectiveBridgeToll;
+
+  const deliveryFee = deliveryCost + effectiveMileagePay - dailyDriveDiscount + bridgeTollForCustomer;
 
   // CRITICAL: Validate that delivery cost is not zero for non-zero orders
   // This prevents revenue loss from configuration errors
