@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Copy, CheckCircle } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
-import { toast } from "react-hot-toast";
+import toast from "react-hot-toast";
 
 type Order = {
   orderNumber: string;

@@ -7,7 +7,7 @@ import {
   act,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { toast } from "react-hot-toast";
+import toast from "react-hot-toast";
 
 // Mock Next.js navigation hooks
 const mockPush = jest.fn();
@@ -19,14 +19,6 @@ jest.mock("next/navigation", () => ({
   }),
   usePathname: () => mockPathname(),
   useParams: () => ({ order_number: "OD-12345" }),
-}));
-
-// Mock react-hot-toast
-jest.mock("react-hot-toast", () => ({
-  default: {
-    success: jest.fn(),
-    error: jest.fn(),
-  },
 }));
 
 // Mock Supabase client
