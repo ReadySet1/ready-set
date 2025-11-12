@@ -201,19 +201,18 @@ describe('Delivery Cost Calculator', () => {
 
       const result = calculateDriverPay(input);
 
-      // Expected from Coolfire data fix:
-      // Driver Max Pay Per Drop: $40.00
-      // Driver Base Pay Per Drop: $23.00 (not used in actual calculation)
-      // Driver Total Base Pay: $40.00 (ALWAYS equals max in practice)
+      // Expected with tiered driver base pay (REA-41):
+      // Headcount 28 is in 25-49 tier → Driver Base Pay: $23.00
+      // Mileage: 3.1 miles × $0.70 = $2.17 < $7 minimum → $7.00
+      // Driver Total Base Pay: $23.00 + $7.00 = $30.00
+      // Driver Bonus Pay: $10.00
+      // Total Driver Pay: $30.00 + $10.00 = $40.00
       // Ready Set Fee: $70.00
       // Ready Set Total Fee: $70.00
-      // Driver Bonus Pay: $10.00 (shown separately, NOT added to total)
-      // Total Driver Pay: $40.00 (equals max, bonus separate)
-      // % Bonus Qualified: 100.00%
 
       expect(result.driverMaxPayPerDrop).toBe(40);
-      expect(result.driverBasePayPerDrop).toBe(23);
-      expect(result.driverTotalBasePay).toBe(40); // Equals max in practice
+      expect(result.driverBasePayPerDrop).toBe(23); // Tiered rate for 25-49 headcount
+      expect(result.driverTotalBasePay).toBe(30); // $23 base + $7 mileage
       expect(result.readySetFee).toBe(70);
       expect(result.readySetAddonFee).toBe(0);
       expect(result.readySetTotalFee).toBe(70);
@@ -224,7 +223,7 @@ describe('Delivery Cost Calculator', () => {
       expect(result.totalMileagePay).toBe(7.0); // 3.1 miles × $0.70 = $2.17 < $7 minimum
     });
 
-    test('driver pay always equals max per drop', () => {
+    test('driver pay with tiered base pay (50-74 headcount)', () => {
       const input: DriverPayInput = {
         headcount: 50,
         foodCost: 800,
@@ -236,11 +235,16 @@ describe('Delivery Cost Calculator', () => {
 
       const result = calculateDriverPay(input);
 
-      // Per Coolfire data: totalDriverPay ALWAYS equals max, bonus shown separately
-      expect(result.totalDriverPay).toBe(40);
+      // With tiered driver base pay (REA-41):
+      // Headcount 50 is in 50-74 tier → Driver Base Pay: $33.00
+      // Mileage: 12 miles × $0.70 = $8.40 (> $7 minimum)
+      // Driver Total Base Pay: $33.00 + $8.40 = $41.40
+      // Driver Bonus Pay: $10.00
+      // Total Driver Pay: $41.40 + $10.00 = $51.40
+      expect(result.driverBasePayPerDrop).toBe(33); // Tiered rate for 50-74 headcount
+      expect(result.driverTotalBasePay).toBeCloseTo(41.4, 1); // $33 base + $8.40 mileage
       expect(result.driverBonusPay).toBe(10);
-      // Bonus is NOT added to total
-      expect(result.totalDriverPay).not.toBe(result.driverTotalBasePay + result.driverBonusPay);
+      expect(result.totalDriverPay).toBeCloseTo(51.4, 1); // $41.40 base + $10 bonus
     });
 
     test('no bonus when not qualified', () => {
@@ -258,8 +262,14 @@ describe('Delivery Cost Calculator', () => {
       expect(result.driverBonusPay).toBe(0);
       expect(result.bonusQualifiedPercent).toBe(0);
       expect(result.bonusQualified).toBe(false);
-      // Even without bonus, totalDriverPay equals max per drop
-      expect(result.totalDriverPay).toBe(40);
+      // With tiered driver base pay (REA-41):
+      // Headcount 30 is in 25-49 tier → Driver Base Pay: $23.00
+      // Mileage: 12 miles × $0.70 = $8.40 (> $7 minimum)
+      // Driver Total Base Pay: $23.00 + $8.40 = $31.40
+      // No bonus since not qualified
+      expect(result.driverBasePayPerDrop).toBe(23); // Tiered rate for 25-49 headcount
+      expect(result.driverTotalBasePay).toBeCloseTo(31.4, 1); // $23 base + $8.40 mileage
+      expect(result.totalDriverPay).toBeCloseTo(31.4, 1); // No bonus
     });
   });
 

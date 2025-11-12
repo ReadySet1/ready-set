@@ -31,9 +31,16 @@ export interface ClientDeliveryConfiguration {
   // Driver Pay Settings
   driverPaySettings: {
     maxPayPerDrop: number;
-    basePayPerDrop: number;
+    basePayPerDrop: number; // Flat rate for clients like HY Food Company
     bonusPay: number;
     readySetFee: number;
+    // Optional: Tiered driver base pay based on headcount (for Destino, Try Hungry)
+    driverBasePayTiers?: Array<{
+      headcountMin: number;
+      headcountMax: number | null;
+      basePay: number;
+    }>;
+    requiresManualReview?: boolean; // Flag for "case by case" scenarios
   };
 
   // Bridge Toll Settings
@@ -93,9 +100,17 @@ export const READY_SET_FOOD_STANDARD: ClientDeliveryConfiguration = {
 
   driverPaySettings: {
     maxPayPerDrop: 40,
-    basePayPerDrop: 23,
+    basePayPerDrop: 23, // Default fallback (not used when tiers are present)
     bonusPay: 10,
-    readySetFee: 70
+    readySetFee: 70,
+    // Tiered driver base pay based on headcount (from REA-41 comments)
+    driverBasePayTiers: [
+      { headcountMin: 0, headcountMax: 24, basePay: 18 },
+      { headcountMin: 25, headcountMax: 49, basePay: 23 },
+      { headcountMin: 50, headcountMax: 74, basePay: 33 },
+      { headcountMin: 75, headcountMax: 99, basePay: 43 },
+      { headcountMin: 100, headcountMax: null, basePay: 53 }
+    ]
   },
 
   bridgeTollSettings: {
@@ -265,6 +280,120 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
 };
 
 /**
+ * Try Hungry Client Configuration
+ * Vendor: Try Hungry
+ * Custom mileage rate: $2.50 after 10 miles (lower than standard $3.00)
+ * Orders with 100+ headcount require manual review ("case by case")
+ */
+export const TRY_HUNGRY: ClientDeliveryConfiguration = {
+  id: 'try-hungry',
+  clientName: 'Try Hungry',
+  vendorName: 'Try Hungry',
+  description: 'Try Hungry delivery pricing with custom $2.50 mileage rate and manual review for 100+ headcount',
+  isActive: true,
+
+  pricingTiers: [
+    // Based on headcount since food cost is not typically shared by Try Hungry
+    { headcountMin: 0, headcountMax: 24, foodCostMin: 0, foodCostMax: 299.99, regularRate: 40, within10Miles: 40 },
+    { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 50, within10Miles: 50 },
+    { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 60, within10Miles: 60 },
+    { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 70, within10Miles: 70 },
+    // 100+ headcount requires manual review
+    { headcountMin: 100, headcountMax: null, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0 }
+  ],
+
+  mileageRate: 2.5, // Custom rate: $2.50 per mile (lower than standard $3.00)
+  distanceThreshold: 10,
+
+  dailyDriveDiscounts: {
+    twoDrivers: 5,
+    threeDrivers: 10,
+    fourPlusDrivers: 15
+  },
+
+  driverPaySettings: {
+    maxPayPerDrop: 40,
+    basePayPerDrop: 18, // Default fallback (not used when tiers are present)
+    bonusPay: 10,
+    readySetFee: 70,
+    // Tiered driver base pay based on headcount
+    driverBasePayTiers: [
+      { headcountMin: 0, headcountMax: 24, basePay: 18 },
+      { headcountMin: 25, headcountMax: 49, basePay: 23 },
+      { headcountMin: 50, headcountMax: 74, basePay: 33 },
+      { headcountMin: 75, headcountMax: 99, basePay: 43 },
+      // 100+ requires manual review - will throw error in calculation
+      { headcountMin: 100, headcountMax: null, basePay: 0 }
+    ],
+    requiresManualReview: true // Flag for 100+ headcount orders
+  },
+
+  bridgeTollSettings: {
+    defaultTollAmount: 8.00,
+    autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County']
+  },
+
+  createdAt: new Date('2025-01-12'),
+  updatedAt: new Date('2025-01-12'),
+  notes: 'Try Hungry pricing from REA-41 comments. Note: 100+ headcount requires manual review (case by case).'
+};
+
+/**
+ * HY Food Company Direct Configuration
+ * Vendor: HY Food Company
+ * Flat $50 driver base pay (unique to this client)
+ * Uses same Ready Set payment tiers as Destino
+ */
+export const HY_FOOD_COMPANY_DIRECT: ClientDeliveryConfiguration = {
+  id: 'hy-food-company-direct',
+  clientName: 'HY Food Company Direct',
+  vendorName: 'HY Food Company',
+  description: 'HY Food Company pricing with flat $50 driver base pay and Destino-style Ready Set payment tiers',
+  isActive: true,
+
+  pricingTiers: [
+    // Same Ready Set payment tiers as Destino
+    { headcountMin: 0, headcountMax: 24, foodCostMin: 0, foodCostMax: 299.99, regularRate: 60, within10Miles: 30 },
+    { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 70, within10Miles: 40 },
+    { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 90, within10Miles: 60 },
+    { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 100, within10Miles: 70 },
+    { headcountMin: 100, headcountMax: 124, foodCostMin: 1200, foodCostMax: 1499.99, regularRate: 120, within10Miles: 80 },
+    { headcountMin: 125, headcountMax: 149, foodCostMin: 1500, foodCostMax: 1699.99, regularRate: 150, within10Miles: 90 },
+    { headcountMin: 150, headcountMax: 174, foodCostMin: 1700, foodCostMax: 1899.99, regularRate: 180, within10Miles: 100 },
+    { headcountMin: 175, headcountMax: 199, foodCostMin: 1900, foodCostMax: 2099.99, regularRate: 210, within10Miles: 110 },
+    { headcountMin: 200, headcountMax: 249, foodCostMin: 2100, foodCostMax: 2299.99, regularRate: 280, within10Miles: 120 },
+    { headcountMin: 250, headcountMax: 299, foodCostMin: 2300, foodCostMax: 2499.99, regularRate: 310, within10Miles: 130 },
+    { headcountMin: 300, headcountMax: null, foodCostMin: 2500, foodCostMax: null, regularRate: 0, within10Miles: 0 }
+  ],
+
+  mileageRate: 3.0,
+  distanceThreshold: 10,
+
+  dailyDriveDiscounts: {
+    twoDrivers: 5,
+    threeDrivers: 10,
+    fourPlusDrivers: 15
+  },
+
+  driverPaySettings: {
+    maxPayPerDrop: 50, // Higher cap to accommodate $50 base
+    basePayPerDrop: 50, // Flat $50 base pay (unique to HY Food Company)
+    bonusPay: 10,
+    readySetFee: 70
+    // No driverBasePayTiers - uses flat basePayPerDrop instead
+  },
+
+  bridgeTollSettings: {
+    defaultTollAmount: 8.00,
+    autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County']
+  },
+
+  createdAt: new Date('2025-01-12'),
+  updatedAt: new Date('2025-01-12'),
+  notes: 'HY Food Company Direct pricing from REA-41 comments. Unique $50 flat driver base pay.'
+};
+
+/**
  * Generic Template - Customizable base configuration
  */
 export const GENERIC_TEMPLATE: ClientDeliveryConfiguration = {
@@ -316,6 +445,8 @@ export const CLIENT_CONFIGURATIONS: Record<string, ClientDeliveryConfiguration> 
   'ready-set-food-premium': READY_SET_FOOD_PREMIUM,
   'kasa': KASA,
   'cater-valley': CATER_VALLEY,
+  'try-hungry': TRY_HUNGRY,
+  'hy-food-company-direct': HY_FOOD_COMPANY_DIRECT,
   'generic-template': GENERIC_TEMPLATE
 };
 
@@ -513,6 +644,8 @@ const clientConfigurations = {
   READY_SET_FOOD_PREMIUM,
   KASA,
   CATER_VALLEY,
+  TRY_HUNGRY,
+  HY_FOOD_COMPANY_DIRECT,
   GENERIC_TEMPLATE,
   CLIENT_CONFIGURATIONS,
 
