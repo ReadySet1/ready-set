@@ -3,6 +3,10 @@ import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
 import { validateUserNotSoftDeleted } from '@/lib/soft-delete-handlers';
 import { v4 as uuidv4 } from 'uuid';
+import { UploadErrorHandler } from '@/lib/upload-error-handler';
+import { ErrorResponse } from '@/types/upload';
+import { buildErrorResponse } from '@/lib/error-response-builder';
+import { RETRY_CONFIG } from '@/config/upload-config';
 
 export async function POST(request: NextRequest) {
     
@@ -87,16 +91,20 @@ export async function POST(request: NextRequest) {
         console.error("Storage upload error:", storageError);
       }
 
-      const response: any = {
-        error: "Failed to upload file to storage"
-      };
-
-      // Only include error details in development
-      if (process.env.NODE_ENV === 'development') {
-        response.details = storageError;
-      }
-
-      return NextResponse.json(response, { status: 500 });
+      return NextResponse.json(
+        buildErrorResponse(
+          "Failed to upload file to storage",
+          'STORAGE_ERROR',
+          {
+            retryable: true,
+            retryAfter: RETRY_CONFIG.BASE_DELAY,
+            details: {
+              originalError: storageError.message || String(storageError)
+            }
+          }
+        ),
+        { status: 500 }
+      );
     }
     
     // Get public URL for the file
@@ -145,61 +153,79 @@ export async function POST(request: NextRequest) {
         }
       });
     } catch (dbError: any) {
-      // Log detailed error info in development only
-      if (process.env.NODE_ENV === 'development') {
-        console.error("Database error:", dbError);
+      // Categorize the database error using UploadErrorHandler
+      const uploadError = UploadErrorHandler.categorizeError(dbError);
 
-        // More detailed error logging for debugging
-        if (dbError.meta) {
-          console.error("Database error metadata:", dbError.meta);
-        }
-      }
+      // Log error with full context
+      UploadErrorHandler.logError(uploadError, {
+        operation: 'fileUpload.create',
+        entityId,
+        entityType,
+        fileName: file.name,
+        fileSize: file.size,
+        category
+      });
 
-      const response: any = {
-        error: "Failed to save file metadata to database"
-      };
+      // Report error for tracking
+      await UploadErrorHandler.reportError(uploadError, userId);
 
-      // Only include error details in development
-      if (process.env.NODE_ENV === 'development') {
-        response.details = dbError.message || dbError;
-        response.code = dbError.code;
-      }
-
-      return NextResponse.json(response, { status: 500 });
+      // Build typed error response
+      return NextResponse.json(
+        buildErrorResponse(
+          "Failed to save file metadata to database",
+          uploadError.type,
+          {
+            correlationId: uploadError.correlationId || uuidv4(),
+            retryable: uploadError.retryable,
+            retryAfter: uploadError.retryAfter,
+            details: {
+              originalError: dbError.message || String(dbError)
+            },
+            diagnostics: {
+              operation: 'database_insert',
+              errorCode: dbError.code,
+              fileName: file.name
+            }
+          }
+        ),
+        { status: 500 }
+      );
     }
   } catch (error: any) {
-    // ENHANCED LOGGING: Log detailed error information in development only
-    if (process.env.NODE_ENV === 'development') {
-      console.error('=== CATERING FILE UPLOAD ERROR ===');
-      console.error('Error Type:', error?.constructor?.name || typeof error);
-      console.error('Error Message:', error?.message || String(error));
-      console.error('Error Stack:', error?.stack);
-      console.error('Error Code:', error?.code);
-      console.error('Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      console.error('==================================');
-    } else {
-      // Production: Log minimal info without sensitive details
-      console.error('Catering file upload error:', {
-        errorType: error?.constructor?.name
-      });
-    }
+    // Categorize the error using UploadErrorHandler
+    const uploadError = UploadErrorHandler.categorizeError(error);
 
-    // Build response with conditional details
-    const response: any = {
-      error: "An unexpected error occurred. Please try again or contact support if the problem persists.",
-    };
+    // Log error with full context
+    UploadErrorHandler.logError(uploadError, {
+      operation: 'catering_file_upload',
+      errorType: error?.constructor?.name,
+      errorMessage: error?.message,
+      errorCode: error?.code
+    });
 
-    // Only include sensitive details in development
-    if (process.env.NODE_ENV === 'development') {
-      response.details = error.message || error;
-      response.errorCode = error?.code;
-      response.diagnostics = {
-        operation: 'catering_file_upload',
-        errorType: error?.constructor?.name,
-        errorMessage: error?.message
-      };
-    }
+    // Report error for tracking
+    await UploadErrorHandler.reportError(uploadError);
 
-    return NextResponse.json(response, { status: 500 });
+    // Build typed error response
+    return NextResponse.json(
+      buildErrorResponse(
+        uploadError.userMessage,
+        uploadError.type,
+        {
+          correlationId: uploadError.correlationId || uuidv4(),
+          retryable: uploadError.retryable,
+          retryAfter: uploadError.retryAfter,
+          details: {
+            originalError: error?.message || String(error)
+          },
+          diagnostics: {
+            operation: 'catering_file_upload',
+            errorType: error?.constructor?.name,
+            errorCode: error?.code
+          }
+        }
+      ),
+      { status: 500 }
+    );
   }
 }

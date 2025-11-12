@@ -12,6 +12,7 @@ import {
   expectUnauthorized,
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
+import { createMockPrisma, MockPrismaClient } from '@/__tests__/helpers/prisma-mock';
 
 // Mock dependencies
 jest.mock('@/utils/supabase/server');
@@ -25,6 +26,9 @@ jest.mock('@/utils/file-service', () => ({
 }));
 
 describe('/api/file-uploads API', () => {
+  // Type-safe Prisma mock
+  let prismaMock: MockPrismaClient;
+
   const mockSupabaseClient = {
     auth: {
       getUser: jest.fn(),
@@ -41,6 +45,43 @@ describe('/api/file-uploads API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
+
+    // Initialize type-safe Prisma mock
+    prismaMock = createMockPrisma();
+
+    // DATABASE CONNECTION GUARD: Full Prisma mocking strategy
+    // We mock ALL Prisma operations to prevent accidental database connections in tests.
+    // This ensures:
+    // 1. Tests run in isolation without database dependencies
+    // 2. Tests fail fast if they try to use unmocked models
+    // 3. CI/CD pipelines don't require database connections
+    // 4. Test execution is faster (no network calls)
+
+    // Mock the fileUpload model (primary model used in these tests)
+    jest.mocked(prisma).fileUpload = prismaMock.fileUpload as any;
+
+    // DATABASE CONNECTION GUARD: Mock $queryRaw to prevent raw SQL queries
+    jest.mocked(prisma).$queryRaw = jest.fn().mockRejectedValue(
+      new Error('MOCK_ERROR: Direct database queries are not allowed in tests. Use mocked models instead.')
+    );
+
+    // DATABASE CONNECTION GUARD: Mock $executeRaw to prevent raw SQL execution
+    jest.mocked(prisma).$executeRaw = jest.fn().mockRejectedValue(
+      new Error('MOCK_ERROR: Direct database execution is not allowed in tests. Use mocked models instead.')
+    );
+
+    // DATABASE CONNECTION GUARD: Mock $connect to prevent actual connections
+    jest.mocked(prisma).$connect = jest.fn().mockRejectedValue(
+      new Error('MOCK_ERROR: Database connections are not allowed in tests. All operations should use mocks.')
+    );
+
+    // DATABASE CONNECTION GUARD: Mock $disconnect to prevent disconnect attempts
+    jest.mocked(prisma).$disconnect = jest.fn().mockResolvedValue(undefined);
+
+    // DATABASE CONNECTION GUARD: Mock $transaction to prevent transaction usage
+    jest.mocked(prisma).$transaction = jest.fn().mockRejectedValue(
+      new Error('MOCK_ERROR: Database transactions are not allowed in tests. Use mocked models instead.')
+    ) as any;
   });
 
   describe('GET /api/file-uploads - Get File URL', () => {
@@ -192,13 +233,23 @@ describe('/api/file-uploads API', () => {
           error: null,
         });
 
-        (prisma as any).fileUpload = {
-          create: jest.fn().mockResolvedValue({
-            id: 'upload-123',
-            fileName: 'document.pdf',
-            filePath: 'uploads/file-123.pdf',
-          }),
-        };
+        // Use type-safe Prisma mock
+        prismaMock.fileUpload.create.mockResolvedValue({
+          id: 'upload-123',
+          fileName: 'document.pdf',
+          filePath: 'uploads/file-123.pdf',
+          fileType: 'application/pdf',
+          fileSize: 1024,
+          fileUrl: 'https://example.com/signed-url',
+          uploadedAt: new Date(),
+          updatedAt: new Date(),
+          category: null,
+          userId: null,
+          cateringRequestId: null,
+          onDemandId: null,
+          jobApplicationId: null,
+          isTemporary: false
+        });
 
         // Create mock file
         const mockFile = new File(['file content'], 'document.pdf', {
@@ -362,11 +413,10 @@ describe('/api/file-uploads API', () => {
           error: null,
         });
 
-        (prisma as any).fileUpload = {
-          create: jest.fn().mockRejectedValue(
-            new Error('Database connection failed')
-          ),
-        };
+        // Use type-safe Prisma mock for error case
+        prismaMock.fileUpload.create.mockRejectedValue(
+          new Error('Database connection failed')
+        );
 
         const mockFile = new File(['content'], 'document.pdf', {
           type: 'application/pdf',
@@ -397,13 +447,23 @@ describe('/api/file-uploads API', () => {
           error: null,
         });
 
-        (prisma as any).fileUpload = {
-          create: jest.fn().mockResolvedValue({
-            id: 'upload-123',
-            fileName: 'resume.pdf',
-            filePath: 'job-applications/temp/session-123/file.pdf',
-          }),
-        };
+        // Use type-safe Prisma mock
+        prismaMock.fileUpload.create.mockResolvedValue({
+          id: 'upload-123',
+          fileName: 'resume.pdf',
+          filePath: 'job-applications/temp/session-123/file.pdf',
+          fileType: 'application/pdf',
+          fileSize: 1024,
+          fileUrl: 'https://example.com/signed-url',
+          uploadedAt: new Date(),
+          updatedAt: new Date(),
+          category: null,
+          userId: null,
+          cateringRequestId: null,
+          onDemandId: null,
+          jobApplicationId: null,
+          isTemporary: true
+        });
 
         const mockFile = new File(['resume content'], 'resume.pdf', {
           type: 'application/pdf',
@@ -464,13 +524,23 @@ describe('/api/file-uploads API', () => {
           error: null,
         });
 
-        (prisma as any).fileUpload = {
-          create: jest.fn().mockResolvedValue({
-            id: 'upload-123',
-            fileName: 'document.pdf',
-            filePath: 'documents/file.pdf',
-          }),
-        };
+        // Use type-safe Prisma mock
+        prismaMock.fileUpload.create.mockResolvedValue({
+          id: 'upload-123',
+          fileName: 'document.pdf',
+          filePath: 'documents/file.pdf',
+          fileType: 'application/pdf',
+          fileSize: 1024,
+          fileUrl: 'https://example.com/signed-url',
+          uploadedAt: new Date(),
+          updatedAt: new Date(),
+          category: null,
+          userId: null,
+          cateringRequestId: null,
+          onDemandId: null,
+          jobApplicationId: null,
+          isTemporary: false
+        });
 
         const mockFile = new File(['content'], 'document.pdf', {
           type: 'application/pdf',

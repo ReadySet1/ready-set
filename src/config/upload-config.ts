@@ -65,3 +65,45 @@ export const ENV_CONFIG = {
   /** Whether to enable verbose logging */
   enableVerboseLogging: process.env.NODE_ENV === 'development',
 } as const;
+
+/**
+ * Retry configuration for upload operations
+ */
+export const RETRY_CONFIG = {
+  /** Maximum number of retry attempts */
+  MAX_ATTEMPTS: 3,
+
+  /** Base delay in milliseconds before first retry */
+  BASE_DELAY: 1000, // 1 second
+
+  /** Maximum delay in milliseconds between retries */
+  MAX_DELAY: 30000, // 30 seconds
+
+  /** Exponential backoff factor */
+  BACKOFF_FACTOR: 2,
+
+  /** Whether to add random jitter to retry delays */
+  ENABLE_JITTER: true,
+} as const;
+
+/**
+ * Filename validation limits
+ */
+export const FILENAME_LIMITS = {
+  /** Maximum filename length (including extension) */
+  MAX_LENGTH: 300,
+
+  /** Minimum filename length (excluding extension) */
+  MIN_LENGTH: 1,
+} as const;
+
+/**
+ * Security scanning configuration
+ */
+export const SCAN_LIMITS = {
+  /** Maximum file size for virus scanning (10MB) */
+  MAX_SCAN_SIZE: 10 * 1024 * 1024,
+
+  /** Threshold for streaming scan vs in-memory scan (5MB) */
+  STREAMING_THRESHOLD: 5 * 1024 * 1024,
+} as const;
