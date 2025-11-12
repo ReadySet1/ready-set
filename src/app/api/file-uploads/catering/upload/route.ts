@@ -55,9 +55,11 @@ export async function POST(request: NextRequest) {
     // Validate that the user is not soft-deleted
     const userValidation = await validateUserNotSoftDeleted(userId);
     if (!userValidation.isValid) {
-      console.log("User validation failed:", userValidation.error);
-      return NextResponse.json({ 
-        error: userValidation.error 
+      if (process.env.NODE_ENV === 'development') {
+        console.log("User validation failed:", userValidation.error);
+      }
+      return NextResponse.json({
+        error: userValidation.error
       }, { status: 403 });
     }
     
@@ -81,11 +83,20 @@ export async function POST(request: NextRequest) {
       });
       
     if (storageError) {
-      console.error("Storage upload error:", storageError);
-      return NextResponse.json(
-        { error: "Failed to upload file to storage", details: storageError },
-        { status: 500 }
-      );
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Storage upload error:", storageError);
+      }
+
+      const response: any = {
+        error: "Failed to upload file to storage"
+      };
+
+      // Only include error details in development
+      if (process.env.NODE_ENV === 'development') {
+        response.details = storageError;
+      }
+
+      return NextResponse.json(response, { status: 500 });
     }
     
     // Get public URL for the file
@@ -134,21 +145,27 @@ export async function POST(request: NextRequest) {
         }
       });
     } catch (dbError: any) {
-      console.error("Database error:", dbError);
-      
-      // More detailed error logging for debugging
-      if (dbError.meta) {
-        console.error("Database error metadata:", dbError.meta);
+      // Log detailed error info in development only
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Database error:", dbError);
+
+        // More detailed error logging for debugging
+        if (dbError.meta) {
+          console.error("Database error metadata:", dbError.meta);
+        }
       }
-      
-      return NextResponse.json(
-        { 
-          error: "Failed to save file metadata to database", 
-          details: dbError.message || dbError,
-          code: dbError.code
-        },
-        { status: 500 }
-      );
+
+      const response: any = {
+        error: "Failed to save file metadata to database"
+      };
+
+      // Only include error details in development
+      if (process.env.NODE_ENV === 'development') {
+        response.details = dbError.message || dbError;
+        response.code = dbError.code;
+      }
+
+      return NextResponse.json(response, { status: 500 });
     }
   } catch (error: any) {
     // ENHANCED LOGGING: Log detailed error information in development only
