@@ -224,6 +224,39 @@ function calculateDailyDriveDiscount(numberOfDrives: number, config: ClientDeliv
   return discountPerDrive * numberOfDrives;
 }
 
+/**
+ * Determines driver base pay based on headcount using tiered system or flat rate
+ * For clients like Try Hungry with requiresManualReview, throws error for 100+ headcount
+ */
+function determineDriverBasePay(headcount: number, config: ClientDeliveryConfiguration): number {
+  // If config has tiered driver base pay, use it
+  if (config.driverPaySettings.driverBasePayTiers && config.driverPaySettings.driverBasePayTiers.length > 0) {
+    const tier = config.driverPaySettings.driverBasePayTiers.find(t => {
+      if (t.headcountMax === null) {
+        return headcount >= t.headcountMin;
+      }
+      return headcount >= t.headcountMin && headcount <= t.headcountMax;
+    });
+
+    if (!tier) {
+      throw new Error(`No driver base pay tier found for headcount: ${headcount}`);
+    }
+
+    // Check for manual review requirement
+    if (config.driverPaySettings.requiresManualReview && tier.basePay === 0 && headcount >= 100) {
+      throw new Error(
+        `Order with ${headcount} headcount requires manual review for ${config.clientName}. ` +
+        `Please contact support for pricing on orders with 100+ headcount.`
+      );
+    }
+
+    return tier.basePay;
+  }
+
+  // Otherwise, use flat base pay
+  return config.driverPaySettings.basePayPerDrop;
+}
+
 // ============================================================================
 // MAIN CALCULATION FUNCTIONS
 // ============================================================================
@@ -307,6 +340,14 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   // CRITICAL: Validate that delivery cost is not zero for non-zero orders
   // This prevents revenue loss from configuration errors
   if (deliveryCost === 0 && (headcount > 0 || foodCost > 0)) {
+    // Special case: Check if this requires manual review
+    if (config.driverPaySettings.requiresManualReview && headcount >= 100) {
+      throw new Error(
+        `Order with ${headcount} headcount requires manual review for ${config.clientName}. ` +
+        `Please contact support for pricing on orders with 100+ headcount.`
+      );
+    }
+
     throw new Error(
       `Delivery cost calculation resulted in $0 for non-zero order (headcount: ${headcount}, foodCost: $${foodCost}). ` +
       `This indicates a pricing configuration error (tier with zero rates). clientConfig: ${config.id}`
@@ -366,6 +407,7 @@ export function calculateMileagePay(totalMileage: number, clientConfigId?: strin
  */
 export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
   const {
+    headcount,
     bonusQualified,
     readySetAddonFee = 0,
     totalMileage,
@@ -379,38 +421,39 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
     ? getConfiguration(clientConfigId) || READY_SET_FOOD_STANDARD
     : READY_SET_FOOD_STANDARD;
 
-  // Step 1: Calculate driver mileage pay with $7 minimum
+  // Step 1: Determine driver base pay (tiered or flat)
+  const driverBasePay = determineDriverBasePay(headcount, config);
+
+  // Step 2: Calculate driver mileage pay with $7 minimum
   const totalMileagePay = Math.max(
     totalMileage * DRIVER_MILEAGE_RATE,
     DRIVER_MILEAGE_MINIMUM
   );
 
-  // Step 2: Driver bonus
+  // Step 3: Driver bonus
   const driverBonusPay = bonusQualified ? config.driverPaySettings.bonusPay : 0;
   const bonusQualifiedPercent = bonusQualified ? 100 : 0;
 
-  // Step 3: Calculate bridge toll
+  // Step 4: Calculate bridge toll
   const effectiveBridgeToll = requiresBridge ? (bridgeToll || config.bridgeTollSettings.defaultTollAmount) : 0;
 
-  // Step 4: Calculate base pay (subject to cap)
-  // Base pay + mileage is capped at maxPayPerDrop
-  const basePayBeforeCap = config.driverPaySettings.basePayPerDrop + totalMileagePay;
-  const cappedBasePay = Math.min(basePayBeforeCap, config.driverPaySettings.maxPayPerDrop);
+  // Step 5: Calculate Driver Total Base Pay
+  // Formula: Driver Base Pay + Mileage Pay
+  // Note: For some clients (e.g., HY Food Company), base pay is flat $50
+  // For others (e.g., Destino, Try Hungry), base pay varies by headcount tier
+  const driverTotalBasePay = driverBasePay + totalMileagePay;
 
-  // Step 5: Calculate Driver Total Pay
-  // Formula: Capped Base Pay + Bonus + Bridge Toll
-  // Example: $41.06 capped to $40.00, then + $10.00 + $8.00 = $58.00
-  // But for Ready Set Standard: $23.00 + $18.06 = $41.06, no cap applies, then + $10 + $8 = $59.06
-  const driverTotalBasePay = config.driverPaySettings.basePayPerDrop + totalMileagePay;
+  // Step 6: Calculate Driver Total Pay
+  // Formula: Total Base Pay + Bonus + Bridge Toll
   const totalDriverPay = driverTotalBasePay + driverBonusPay + effectiveBridgeToll;
 
-  // Step 6: Ready Set fees - from config
+  // Step 7: Ready Set fees - from config
   const readySetFee = input.readySetFee || config.driverPaySettings.readySetFee;
   const readySetTotalFee = readySetFee + readySetAddonFee + effectiveBridgeToll;
 
   return {
     driverMaxPayPerDrop: config.driverPaySettings.maxPayPerDrop,
-    driverBasePayPerDrop: config.driverPaySettings.basePayPerDrop,
+    driverBasePayPerDrop: driverBasePay, // Now returns actual base pay used (tiered or flat)
     driverTotalBasePay,
     totalMileage,
     mileageRate: DRIVER_MILEAGE_RATE,
