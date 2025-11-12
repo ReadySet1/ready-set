@@ -381,6 +381,9 @@ export const HY_FOOD_COMPANY_DIRECT: ClientDeliveryConfiguration = {
     bonusPay: 10,
     readySetFee: 70
     // No driverBasePayTiers - uses flat basePayPerDrop instead
+    // Note: maxPayPerDrop is set to match basePayPerDrop. If mileage is added,
+    // total could exceed this cap. This is intentional - maxPayPerDrop applies to
+    // base + mileage combined, not to the base pay alone.
   },
 
   bridgeTollSettings: {
