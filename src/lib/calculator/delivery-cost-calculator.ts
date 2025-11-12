@@ -224,12 +224,18 @@ function calculateDailyDriveDiscount(numberOfDrives: number, config: ClientDeliv
 /**
  * Checks if an order requires manual review based on client configuration
  * Separated for better single responsibility principle
+ *
+ * Security Note: Error messages are sanitized to not expose exact business thresholds
+ * Internal logging should be used for detailed debugging information
  */
 function checkManualReviewRequired(headcount: number, config: ClientDeliveryConfiguration): void {
   if (config.driverPaySettings.requiresManualReview && headcount >= MANUAL_REVIEW_HEADCOUNT_THRESHOLD) {
+    // Log detailed info internally (could be sent to logging service in production)
+    console.info(`Manual review required: headcount=${headcount}, threshold=${MANUAL_REVIEW_HEADCOUNT_THRESHOLD}, client=${config.clientName}`);
+
+    // Return sanitized message to client without exposing exact thresholds
     throw new Error(
-      `Order with ${headcount} headcount requires manual review for ${config.clientName}. ` +
-      `Please contact support for pricing on orders with ${MANUAL_REVIEW_HEADCOUNT_THRESHOLD}+ headcount.`
+      `This order requires manual review. Please contact support for a custom quote.`
     );
   }
 }
@@ -251,10 +257,7 @@ function determineDriverBasePay(headcount: number, config: ClientDeliveryConfigu
 
     // Validate tier configuration - basePay should not be 0 unless manual review is required
     if (tier.basePay === 0) {
-      // Check if this requires manual review (for clients like Try Hungry with 100+ headcount)
-      checkManualReviewRequired(headcount, config);
-
-      // If we get here and basePay is still 0, it's a configuration error
+      // First check configuration validity to avoid unreachable code
       if (!config.driverPaySettings.requiresManualReview) {
         throw new Error(
           `Invalid tier configuration: basePay is 0 for headcount ${headcount} ` +
@@ -262,6 +265,10 @@ function determineDriverBasePay(headcount: number, config: ClientDeliveryConfigu
           `This indicates a pricing configuration error.`
         );
       }
+
+      // Then check if this specific order requires manual review (will throw if it does)
+      // For clients like Try Hungry with 100+ headcount
+      checkManualReviewRequired(headcount, config);
     }
 
     return tier.basePay;
@@ -425,6 +432,12 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
     bridgeToll,
     clientConfigId
   } = input;
+
+  // Validate inputs - prevent negative values
+  if (headcount < 0) throw new Error('Headcount cannot be negative');
+  if (totalMileage < 0) throw new Error('Total mileage cannot be negative');
+  if (readySetAddonFee < 0) throw new Error('Ready Set addon fee cannot be negative');
+  if (bridgeToll !== undefined && bridgeToll < 0) throw new Error('Bridge toll cannot be negative');
 
   // Get client configuration
   const config = clientConfigId

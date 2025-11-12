@@ -1,6 +1,19 @@
 /**
  * Delivery Cost Calculator Tests
  * Tests all business rules from pricing documents
+ *
+ * Note on Magic Numbers:
+ * This test file intentionally uses hardcoded values (e.g., 18, 23, 33, 43) rather than
+ * importing them from configuration for the following reasons:
+ * 1. Tests should verify specific expected values, not just match current config
+ * 2. Configuration changes should cause test failures if behavior changes unexpectedly
+ * 3. Tests serve as documentation of actual business requirements
+ * 4. Hardcoded values make tests more explicit and easier to understand
+ *
+ * The tier values being tested come from:
+ * - READY_SET_FOOD_STANDARD.driverPaySettings.driverBasePayTiers
+ * - TRY_HUNGRY.driverPaySettings.driverBasePayTiers
+ * - HY_FOOD_COMPANY_DIRECT.driverPaySettings (flat $50 rate)
  */
 
 import {
@@ -966,8 +979,9 @@ describe('Delivery Cost Calculator', () => {
           clientConfigId: 'try-hungry'
         };
 
-        expect(() => calculateDriverPay(input)).toThrow('requires manual review');
-        expect(() => calculateDriverPay(input)).toThrow('100+ headcount');
+        // Error message is sanitized to not expose business logic thresholds
+        expect(() => calculateDriverPay(input)).toThrow('This order requires manual review');
+        expect(() => calculateDriverPay(input)).toThrow('contact support for a custom quote');
       });
 
       test('throws error for 150 headcount requiring manual review', () => {
@@ -979,8 +993,9 @@ describe('Delivery Cost Calculator', () => {
           clientConfigId: 'try-hungry'
         };
 
-        expect(() => calculateDriverPay(input)).toThrow('requires manual review');
-        expect(() => calculateDriverPay(input)).toThrow('Try Hungry');
+        // Error message is sanitized to not expose business logic thresholds or client names
+        expect(() => calculateDriverPay(input)).toThrow('This order requires manual review');
+        expect(() => calculateDriverPay(input)).toThrow('contact support for a custom quote');
       });
 
       test('handles edge case: zero headcount', () => {
@@ -997,6 +1012,46 @@ describe('Delivery Cost Calculator', () => {
         // Should use 0-24 tier
         expect(result.driverBasePayPerDrop).toBe(18);
         expect(result.driverTotalBasePay).toBe(25); // $18 + $7 minimum
+      });
+
+      test('concurrent conditions: 100 headcount with multiple edge cases', () => {
+        // Test interaction between manual review and other business rules
+        const input: DriverPayInput = {
+          headcount: 100, // Triggers manual review
+          foodCost: 1200,
+          totalMileage: 0, // Edge case: no mileage
+          bonusQualified: true, // Edge case: bonus should not be calculated
+          requiresBridge: true, // Edge case: bridge toll should not be calculated
+          clientConfigId: 'try-hungry'
+        };
+
+        // Manual review should throw before any other calculations
+        expect(() => calculateDriverPay(input)).toThrow('This order requires manual review');
+        expect(() => calculateDriverPay(input)).toThrow('contact support for a custom quote');
+      });
+
+      test('validates negative values are rejected', () => {
+        const input: DriverPayInput = {
+          headcount: -10, // Negative headcount
+          foodCost: 200,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        expect(() => calculateDriverPay(input)).toThrow('Headcount cannot be negative');
+      });
+
+      test('validates negative mileage is rejected', () => {
+        const input: DriverPayInput = {
+          headcount: 30,
+          foodCost: 400,
+          totalMileage: -5, // Negative mileage
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        expect(() => calculateDriverPay(input)).toThrow('Total mileage cannot be negative');
       });
     });
 
