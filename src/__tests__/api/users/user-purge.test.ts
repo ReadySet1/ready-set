@@ -205,7 +205,7 @@ describe('/api/users/[userId]/purge API', () => {
         );
 
         const response = await DELETE(request);
-        await expectUnauthorized(response, /Authentication required/i);
+        await expectUnauthorized(response, /Unauthorized.*Authentication required/i);
       });
 
       it('should return 401 when auth token is invalid', async () => {
@@ -257,7 +257,7 @@ describe('/api/users/[userId]/purge API', () => {
         const response = await DELETE(request);
         await expectForbidden(
           response,
-          /Only Super Admin can permanently delete users/i
+          /Forbidden.*Only Super Admin can permanently delete users/i
         );
       });
 
