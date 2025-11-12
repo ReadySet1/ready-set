@@ -151,29 +151,38 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error: any) {
-    // ENHANCED LOGGING: Log detailed error information
-    // Note: Some variables may be undefined if error occurred during early parsing
-    console.error('=== CATERING FILE UPLOAD ERROR ===');
-    console.error('Error Type:', error?.constructor?.name || typeof error);
-    console.error('Error Message:', error?.message || String(error));
-    console.error('Error Stack:', error?.stack);
-    console.error('Error Code:', error?.code);
-    console.error('Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-    console.error('==================================');
+    // ENHANCED LOGGING: Log detailed error information in development only
+    if (process.env.NODE_ENV === 'development') {
+      console.error('=== CATERING FILE UPLOAD ERROR ===');
+      console.error('Error Type:', error?.constructor?.name || typeof error);
+      console.error('Error Message:', error?.message || String(error));
+      console.error('Error Stack:', error?.stack);
+      console.error('Error Code:', error?.code);
+      console.error('Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.error('==================================');
+    } else {
+      // Production: Log minimal info without sensitive details
+      console.error('Catering file upload error:', {
+        errorType: error?.constructor?.name
+      });
+    }
 
-    return NextResponse.json(
-      {
-        error: "An unexpected error occurred. Please try again or contact support if the problem persists.",
-        details: error.message || error,
-        errorCode: error?.code,
-        // Enhanced diagnostics for debugging
-        diagnostics: {
-          operation: 'catering_file_upload',
-          errorType: error?.constructor?.name,
-          errorMessage: error?.message
-        }
-      },
-      { status: 500 }
-    );
+    // Build response with conditional details
+    const response: any = {
+      error: "An unexpected error occurred. Please try again or contact support if the problem persists.",
+    };
+
+    // Only include sensitive details in development
+    if (process.env.NODE_ENV === 'development') {
+      response.details = error.message || error;
+      response.errorCode = error?.code;
+      response.diagnostics = {
+        operation: 'catering_file_upload',
+        errorType: error?.constructor?.name,
+        errorMessage: error?.message
+      };
+    }
+
+    return NextResponse.json(response, { status: 500 });
   }
 }

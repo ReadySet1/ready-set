@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from '@/utils/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
 import { cookies } from 'next/headers';
 import { UploadSecurityManager } from '@/lib/upload-security';
+import { UPLOAD_LIMITS, ALLOWED_MIME_TYPES } from '@/config/upload-config';
 
 // File metadata type
 export interface FileMetadata {
@@ -47,26 +48,8 @@ export async function initializeStorageBuckets() {
         // Create the bucket if it doesn't exist
         const { error: createError } = await supabase.storage.createBucket(defaultBucket, {
           public: false,
-          fileSizeLimit: 50 * 1024 * 1024, // 50MB (matching config.toml)
-          allowedMimeTypes: [
-            // Images
-            'image/jpeg',
-            'image/jpg',
-            'image/png',
-            'image/gif',
-            'image/webp',
-            // Documents
-            'application/pdf',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.ms-powerpoint',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            // Text files
-            'text/plain',
-            'text/csv',
-          ],
+          fileSizeLimit: UPLOAD_LIMITS.BUCKET_SIZE_LIMIT,
+          allowedMimeTypes: [...ALLOWED_MIME_TYPES],
         });
 
         if (createError) {
@@ -78,26 +61,8 @@ export async function initializeStorageBuckets() {
         // Bucket exists, update it to ensure correct MIME type configuration
         const { error: updateError } = await supabase.storage.updateBucket(defaultBucket, {
           public: false,
-          fileSizeLimit: 50 * 1024 * 1024, // 50MB
-          allowedMimeTypes: [
-            // Images
-            'image/jpeg',
-            'image/jpg',
-            'image/png',
-            'image/gif',
-            'image/webp',
-            // Documents
-            'application/pdf',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.ms-powerpoint',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            // Text files
-            'text/plain',
-            'text/csv',
-          ],
+          fileSizeLimit: UPLOAD_LIMITS.BUCKET_SIZE_LIMIT,
+          allowedMimeTypes: [...ALLOWED_MIME_TYPES],
         });
 
         if (updateError) {
