@@ -376,14 +376,14 @@ export const HY_FOOD_COMPANY_DIRECT: ClientDeliveryConfiguration = {
   },
 
   driverPaySettings: {
-    maxPayPerDrop: 50, // Higher cap to accommodate $50 base
+    maxPayPerDrop: 50, // Cap enforced on base + mileage combined
     basePayPerDrop: 50, // Flat $50 base pay (unique to HY Food Company)
     bonusPay: 10,
     readySetFee: 70
     // No driverBasePayTiers - uses flat basePayPerDrop instead
-    // Note: maxPayPerDrop is set to match basePayPerDrop. If mileage is added,
-    // total could exceed this cap. This is intentional - maxPayPerDrop applies to
-    // base + mileage combined, not to the base pay alone.
+    // Note: maxPayPerDrop caps base + mileage at $50. With $50 base + mileage,
+    // the total base pay is capped at $50 (enforced in delivery-cost-calculator.ts).
+    // Bonus and bridge tolls are added AFTER the cap and are not subject to it.
   },
 
   bridgeTollSettings: {
