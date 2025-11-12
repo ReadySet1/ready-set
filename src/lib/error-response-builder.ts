@@ -35,11 +35,14 @@ export interface BuildErrorResponseOptions {
  * - Include correlation IDs for tracking
  * - Only expose sensitive details in development
  * - Follow the ErrorResponse type contract
+ * - Validate inputs to prevent malformed responses
  *
- * @param message - User-friendly error message
+ * @param message - User-friendly error message (must be non-empty string)
  * @param type - Error type identifier (e.g., 'STORAGE_ERROR', 'VALIDATION_ERROR')
  * @param options - Additional error response options
  * @returns Structured error response object
+ * @throws {Error} If message is empty or not a string
+ * @throws {Error} If type is empty or not a string
  *
  * @example
  * ```typescript
@@ -63,6 +66,24 @@ export function buildErrorResponse(
   type: string,
   options: BuildErrorResponseOptions = {}
 ): ErrorResponse {
+  // INPUT VALIDATION: Ensure message is a non-empty string
+  if (typeof message !== 'string' || message.trim() === '') {
+    console.error('[ERROR_RESPONSE_BUILDER] Invalid message parameter:', { message, type });
+    throw new Error('buildErrorResponse: message must be a non-empty string');
+  }
+
+  // INPUT VALIDATION: Ensure type is a non-empty string
+  if (typeof type !== 'string' || type.trim() === '') {
+    console.error('[ERROR_RESPONSE_BUILDER] Invalid type parameter:', { message, type });
+    throw new Error('buildErrorResponse: type must be a non-empty string');
+  }
+
+  // INPUT VALIDATION: Ensure retryAfter is a positive number if provided
+  if (options.retryAfter !== undefined && (typeof options.retryAfter !== 'number' || options.retryAfter < 0)) {
+    console.error('[ERROR_RESPONSE_BUILDER] Invalid retryAfter parameter:', { retryAfter: options.retryAfter });
+    throw new Error('buildErrorResponse: retryAfter must be a positive number');
+  }
+
   const {
     correlationId = uuidv4(),
     retryable,
@@ -72,8 +93,8 @@ export function buildErrorResponse(
   } = options;
 
   const response: ErrorResponse = {
-    error: message,
-    errorType: type,
+    error: message.trim(),
+    errorType: type.trim(),
     correlationId,
     retryable,
     retryAfter,
