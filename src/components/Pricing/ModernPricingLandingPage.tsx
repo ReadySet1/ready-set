@@ -27,6 +27,7 @@ interface HostingOption {
   features: string[];
   maxHeadcount: string;
   popular?: boolean;
+  includesDelivery?: boolean;
 }
 
 const ModernPricingLandingPage = () => {
@@ -54,6 +55,7 @@ const ModernPricingLandingPage = () => {
       subtitle: "Delivery + Basic Hosting",
       price: "$90",
       maxHeadcount: "50 Max (Rec. <35 if serving)",
+      includesDelivery: true,
       features: [
         "1 Contractor Delivery + Hosting",
         "Delivery Fee = $45/hr",
@@ -68,6 +70,7 @@ const ModernPricingLandingPage = () => {
       price: "$190",
       maxHeadcount: "100 Max",
       popular: true,
+      includesDelivery: true,
       features: [
         "2 Contractors (3rd optional >80 headcount)",
         "Pick Up & Professional Set Up",
@@ -82,6 +85,7 @@ const ModernPricingLandingPage = () => {
       subtitle: "Multi-Vendor Service",
       price: "$90",
       maxHeadcount: "100 Max",
+      includesDelivery: true,
       features: [
         "2 Contractors + 2 Delivery Fees",
         "Multiple Vendor Pick Up & Set Up",
@@ -96,6 +100,7 @@ const ModernPricingLandingPage = () => {
       subtitle: "Hosting Only",
       price: "$110",
       maxHeadcount: "50 Max per Contractor",
+      includesDelivery: false,
       features: [
         "1-3 Contractors Available",
         "Arrive 15-30 min early for prep",
@@ -386,7 +391,8 @@ const ModernPricingLandingPage = () => {
                       <span className="text-3xl font-black text-yellow-600 sm:text-4xl">
                         {option.price}
                       </span>
-                      {option.title !== "Option D" && (
+                      {/* Only show delivery fee for options that include delivery service */}
+                      {option.includesDelivery && (
                         <span className="text-xs text-gray-500 sm:text-sm">
                           + Delivery Fee
                         </span>
