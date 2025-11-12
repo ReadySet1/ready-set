@@ -577,6 +577,9 @@ export function validateConfiguration(config: ClientDeliveryConfiguration): {
       const currentTier = sortedTiers[i];
       const nextTier = sortedTiers[i + 1];
 
+      // TypeScript null checks
+      if (!currentTier || !nextTier) continue;
+
       // Check for gaps (current max + 1 should equal next min)
       if (currentTier.headcountMax !== null && nextTier.headcountMin > currentTier.headcountMax + 1) {
         errors.push(
