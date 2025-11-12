@@ -38,11 +38,6 @@ describe('/api/orders API - Main Endpoint', () => {
     jest.clearAllMocks();
   });
 
-  afterEach(() => {
-    // Clean up any pending promises or timers
-    jest.clearAllTimers();
-  });
-
   describe('GET /api/orders - List All Orders', () => {
     describe('✅ Successful Retrieval', () => {
       it('should return combined catering and on-demand orders', async () => {
