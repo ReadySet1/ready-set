@@ -523,7 +523,34 @@ export async function POST(request: NextRequest) {
     }
 
     if (storageError) {
-      logApiError(storageError, '/api/file-uploads', 'POST', { operation: 'storageUpload', allStrategiesFailed: true }, request);
+      // ENHANCED LOGGING: Log detailed storage error in development only
+      if (process.env.NODE_ENV === 'development') {
+        console.error('=== STORAGE UPLOAD ERROR ===');
+        console.error('Storage Error Message:', storageError.message);
+        console.error('Last Error:', lastError);
+        console.error('File Details:', {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          path: filePath,
+          bucket: storageBucket
+        });
+        console.error('Storage Error Object:', JSON.stringify(storageError, null, 2));
+        console.error('===========================');
+      } else {
+        // Production: Log minimal info without sensitive details
+        console.error('Storage upload error:', {
+          errorType: 'STORAGE_ERROR',
+          hasError: !!storageError
+        });
+      }
+
+      logApiError(storageError, '/api/file-uploads', 'POST', {
+        operation: 'storageUpload',
+        allStrategiesFailed: true,
+        errorMessage: storageError.message,
+        lastError: lastError ? getErrorMessage(lastError) : undefined
+      }, request);
 
       // Use enhanced error categorization
       const uploadError = UploadErrorHandler.categorizeError(storageError, file);
@@ -534,24 +561,39 @@ export async function POST(request: NextRequest) {
         filePath,
         bucket: storageBucket,
         entityId,
-        entityType
+        entityType,
+        originalStorageError: storageError.message
       });
       await UploadErrorHandler.reportError(uploadError);
 
+      // Build response with conditional details
+      const response: any = {
+        error: uploadError.userMessage,
+        errorType: uploadError.type,
+        correlationId: uploadError.correlationId,
+        retryable: uploadError.retryable,
+        retryAfter: uploadError.retryAfter,
+      };
+
+      // Only include sensitive details in development
+      if (process.env.NODE_ENV === 'development') {
+        response.details = {
+          bucket: storageBucket,
+          filePath,
+          fileName: file.name,
+          fileSize: file.size
+        };
+        response.diagnostics = {
+          operation: 'storage_upload',
+          originalError: storageError.message,
+          bucket: storageBucket,
+          filePath,
+          fileType: file.type
+        };
+      }
+
       return NextResponse.json(
-        {
-          error: uploadError.userMessage,
-          errorType: uploadError.type,
-          correlationId: uploadError.correlationId,
-          retryable: uploadError.retryable,
-          retryAfter: uploadError.retryAfter,
-          details: {
-            bucket: storageBucket,
-            filePath,
-            fileName: file.name,
-            fileSize: file.size
-          }
-        },
+        response,
         { status: uploadError.type === UploadErrorType.PERMISSION_ERROR ? 403 : 500 },
       );
     }
@@ -566,6 +608,22 @@ export async function POST(request: NextRequest) {
       .createSignedUrl(filePath, DEFAULT_SIGNED_URL_EXPIRATION);
 
     if (signedError || !signedData) {
+      // ENHANCED LOGGING: Log detailed signed URL error in development only
+      if (process.env.NODE_ENV === 'development') {
+        console.error('=== SIGNED URL GENERATION ERROR ===');
+        console.error('Error:', signedError);
+        console.error('File Path:', filePath);
+        console.error('Bucket:', storageBucket);
+        console.error('File Name:', file.name);
+        console.error('===================================');
+      } else {
+        // Production: Log minimal info without sensitive details
+        console.error('Signed URL generation error:', {
+          errorType: 'SIGNED_URL_ERROR',
+          hasError: !!signedError
+        });
+      }
+
       // Clean up uploaded file since we can't generate a secure signed URL
       await supabase.storage.from(storageBucket).remove([filePath]);
 
@@ -577,18 +635,32 @@ export async function POST(request: NextRequest) {
           operation: 'createSignedUrl',
           filePath,
           bucket: storageBucket,
-          action: 'upload_failed_and_cleaned_up'
+          action: 'upload_failed_and_cleaned_up',
+          errorDetails: signedError?.message
         },
         request
       );
 
-      return NextResponse.json(
-        {
-          error: 'Failed to generate secure file URL. Please try again or contact support if the problem persists.',
-          code: 'SIGNED_URL_GENERATION_FAILED'
-        },
-        { status: 500 }
-      );
+      const correlationId = uuidv4();
+
+      // Build response with conditional diagnostics
+      const response: any = {
+        error: 'Failed to generate secure file URL. Please try again or contact support if the problem persists.',
+        code: 'SIGNED_URL_GENERATION_FAILED',
+        correlationId
+      };
+
+      // Only include diagnostics in development
+      if (process.env.NODE_ENV === 'development') {
+        response.diagnostics = {
+          operation: 'signed_url_generation',
+          bucket: storageBucket,
+          filePath,
+          errorMessage: signedError?.message || 'No signed URL data returned'
+        };
+      }
+
+      return NextResponse.json(response, { status: 500 });
     }
 
     const finalUrl = signedData.signedUrl;
@@ -880,30 +952,73 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    logApiError(error, '/api/file-uploads', 'POST', { operation: 'fileUpload', fileName: file?.name }, request);
-
     // Use enhanced error categorization for general errors
     const uploadError = UploadErrorHandler.categorizeError(error, file);
+
+    // ENHANCED LOGGING: Log detailed error information in development only
+    if (process.env.NODE_ENV === 'development') {
+      console.error('=== FILE UPLOAD ERROR DETAILS ===');
+      console.error('Error Type:', error?.constructor?.name || typeof error);
+      console.error('Error Message:', error?.message || String(error));
+      console.error('Error Stack:', error?.stack);
+      console.error('File Details:', {
+        name: file?.name,
+        type: file?.type,
+        size: file?.size,
+        entityId,
+        entityType,
+        category
+      });
+      console.error('Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.error('================================');
+    } else {
+      // Production: Log minimal info without sensitive details
+      console.error('File upload error:', {
+        errorType: error?.constructor?.name,
+        correlationId: uploadError.correlationId
+      });
+    }
+
+    logApiError(error, '/api/file-uploads', 'POST', {
+      operation: 'fileUpload',
+      fileName: file?.name,
+      errorType: error?.constructor?.name,
+      errorCode: error?.code,
+      errorDetails: error?.message
+    }, request);
 
     // Log and report the error
     UploadErrorHandler.logError(uploadError, {
       fileName: file?.name,
       entityId,
       entityType,
-      category
+      category,
+      originalError: error?.message,
+      originalStack: error?.stack
     });
     await UploadErrorHandler.reportError(uploadError);
 
-    return NextResponse.json(
-      {
-        error: uploadError.userMessage,
-        errorType: uploadError.type,
-        correlationId: uploadError.correlationId,
-        retryable: uploadError.retryable,
-        retryAfter: uploadError.retryAfter
-      },
-      { status: 500 }
-    );
+    // Build response with conditional diagnostics
+    const response: any = {
+      error: uploadError.userMessage,
+      errorType: uploadError.type,
+      correlationId: uploadError.correlationId,
+      retryable: uploadError.retryable,
+      retryAfter: uploadError.retryAfter,
+    };
+
+    // Only include diagnostics in development
+    if (process.env.NODE_ENV === 'development') {
+      response.diagnostics = {
+        originalError: error?.message,
+        errorCode: error?.code,
+        fileName: file?.name,
+        fileType: file?.type,
+        fileSize: file?.size
+      };
+    }
+
+    return NextResponse.json(response, { status: 500 });
   }
 }
 

@@ -7,6 +7,7 @@ import {
   UploadOptions,
   FileValidationConfig
 } from '@/types/upload';
+import { UPLOAD_LIMITS, ALLOWED_MIME_TYPES, ALLOWED_EXTENSIONS, ENV_CONFIG } from '@/config/upload-config';
 
 // Default retry configuration
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
@@ -19,31 +20,15 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 
 // Default validation configuration
 export const DEFAULT_VALIDATION_CONFIG: FileValidationConfig = {
-  maxSize: 10 * 1024 * 1024, // 10MB
-  allowedTypes: [
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp',
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/plain',
-    'text/csv'
-  ],
+  maxSize: UPLOAD_LIMITS.MAX_FILE_SIZE,
+  allowedTypes: [...ALLOWED_MIME_TYPES],
   blockedTypes: [
     'application/x-executable',
     'application/x-msdownload',
     'application/x-dosexec',
     'application/octet-stream'
   ],
-  allowedExtensions: [
-    '.jpg', '.jpeg', '.png', '.gif', '.webp',
-    '.pdf', '.doc', '.docx', '.xls', '.xlsx',
-    '.txt', '.csv'
-  ],
+  allowedExtensions: [...ALLOWED_EXTENSIONS],
   blockedExtensions: [
     '.exe', '.bat', '.cmd', '.scr', '.pif',
     '.com', '.jar', '.js', '.vbs', '.ps1'
@@ -187,14 +172,47 @@ export class UploadErrorHandler {
       };
     }
 
-    // Default unknown error
+    // Default unknown error - sanitize for production
+    const errorMessage = error.message || error.toString() || 'Unknown error occurred';
+    const errorCode = error.code || error.statusCode || error.status;
+
+    // Create user message - sanitized for production, detailed for development
+    let userMessage: string;
+    if (ENV_CONFIG.isProduction) {
+      // Production: Generic message with correlation ID only
+      userMessage = 'An unexpected error occurred. Please try again or contact support if the problem persists.';
+    } else {
+      // Development: Include error details for debugging
+      userMessage = 'An unexpected error occurred';
+      if (errorCode) {
+        userMessage += ` (Code: ${errorCode})`;
+      }
+      if (errorMessage && errorMessage !== 'Unknown error occurred') {
+        userMessage += `. Details: ${errorMessage}`;
+      }
+      userMessage += '. Please try again or contact support if the problem persists.';
+    }
+
     return {
       type: UploadErrorType.UNKNOWN_ERROR,
-      message: error.message || 'Unknown error occurred',
-      userMessage: 'An unexpected error occurred. Please try again or contact support if the problem persists.',
-      details: {
-        originalMessage: error.message,
-        stack: error.stack
+      message: errorMessage,
+      userMessage,
+      details: ENV_CONFIG.isDevelopment ? {
+        originalMessage: errorMessage,
+        errorCode,
+        errorName: error.name,
+        errorConstructor: error.constructor?.name,
+        stack: error.stack,
+        // Include any additional properties from the error object (dev only)
+        ...Object.keys(error).reduce((acc, key) => {
+          if (!['message', 'stack', 'name'].includes(key)) {
+            acc[key] = error[key];
+          }
+          return acc;
+        }, {} as Record<string, any>)
+      } : {
+        // Production: Only include correlation ID
+        correlationId
       },
       retryable: true,
       retryAfter: 3000,
@@ -348,8 +366,16 @@ export class UploadErrorHandler {
   static async reportError(error: UploadError, userId?: string): Promise<void> {
     try {
       // Construct absolute URL for server-side fetch
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-      const apiUrl = `${baseUrl}/api/upload-errors`;
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
+
+      // Validate environment variable in production
+      if (ENV_CONFIG.isProduction && !baseUrl) {
+        console.warn('NEXT_PUBLIC_SITE_URL is not defined. Error reporting is disabled.');
+        return;
+      }
+
+      // Use localhost as fallback only in development
+      const apiUrl = `${baseUrl || 'http://localhost:3000'}/api/upload-errors`;
 
       // Report to error tracking service
       await fetch(apiUrl, {
@@ -369,7 +395,9 @@ export class UploadErrorHandler {
         })
       });
     } catch (reportError) {
-      console.error('Failed to report error:', reportError);
+      if (ENV_CONFIG.isDevelopment) {
+        console.error('Failed to report error:', reportError);
+      }
     }
   }
 }
@@ -450,27 +478,39 @@ export class FileValidator {
 
     // Type validation
     if (!this.isAllowedType(file, config)) {
+      // Create a user-friendly list of allowed formats
+      const allowedFormats = config.allowedExtensions
+        .map(ext => ext.replace('.', '').toUpperCase())
+        .join(', ');
+
       return UploadErrorHandler.createValidationError(
         'type',
         `File type ${file.type} is not allowed`,
-        `File type "${file.type}" is not supported. Please choose a different file.`,
+        `File type "${file.type}" is not supported. Allowed formats: ${allowedFormats}. Please choose a different file.`,
         {
           fileType: file.type,
           fileName: file.name,
-          allowedTypes: config.allowedTypes
+          allowedTypes: config.allowedTypes,
+          allowedExtensions: config.allowedExtensions
         }
       );
     }
 
     // Extension validation
     if (!this.isAllowedExtension(file, config)) {
+      const currentExtension = this.getExtension(file.name);
+      // Create a user-friendly list of allowed extensions
+      const allowedFormats = config.allowedExtensions
+        .map(ext => ext.replace('.', '').toUpperCase())
+        .join(', ');
+
       return UploadErrorHandler.createValidationError(
         'type',
         `File extension not allowed for file ${file.name}`,
-        'This file extension is not allowed. Please choose a different file.',
+        `File extension "${currentExtension}" is not allowed. Allowed formats: ${allowedFormats}. Please choose a different file.`,
         {
           fileName: file.name,
-          extension: this.getExtension(file.name),
+          extension: currentExtension,
           allowedExtensions: config.allowedExtensions
         }
       );
@@ -600,6 +640,19 @@ export class FileValidator {
     // This is a placeholder for virus scanning
     // In a real implementation, you would integrate with a virus scanning service
     // like ClamAV, VirusTotal, or a cloud-based service
+    //
+    // TODO: PERFORMANCE IMPROVEMENT NEEDED
+    // Current implementation has several issues:
+    // 1. Reads entire file into memory (will fail for large files)
+    // 2. Uses synchronous regex scanning (blocks event loop)
+    // 3. Won't scale for high-volume scenarios
+    //
+    // Recommended improvements:
+    // - Use streaming-based scanning to process files in chunks
+    // - Integrate with dedicated virus scanning service (ClamAV, AWS GuardDuty, etc.)
+    // - Implement async scanning queue for large files
+    // - Consider offloading to background worker for files > 1MB
+    // - Add caching layer for already-scanned file hashes
 
     // Check file size first to prevent memory issues
     const MAX_SCAN_SIZE = 10 * 1024 * 1024; // 10MB limit for content scanning

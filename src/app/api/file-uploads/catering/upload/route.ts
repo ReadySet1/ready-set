@@ -55,9 +55,11 @@ export async function POST(request: NextRequest) {
     // Validate that the user is not soft-deleted
     const userValidation = await validateUserNotSoftDeleted(userId);
     if (!userValidation.isValid) {
-      console.log("User validation failed:", userValidation.error);
-      return NextResponse.json({ 
-        error: userValidation.error 
+      if (process.env.NODE_ENV === 'development') {
+        console.log("User validation failed:", userValidation.error);
+      }
+      return NextResponse.json({
+        error: userValidation.error
       }, { status: 403 });
     }
     
@@ -81,11 +83,20 @@ export async function POST(request: NextRequest) {
       });
       
     if (storageError) {
-      console.error("Storage upload error:", storageError);
-      return NextResponse.json(
-        { error: "Failed to upload file to storage", details: storageError },
-        { status: 500 }
-      );
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Storage upload error:", storageError);
+      }
+
+      const response: any = {
+        error: "Failed to upload file to storage"
+      };
+
+      // Only include error details in development
+      if (process.env.NODE_ENV === 'development') {
+        response.details = storageError;
+      }
+
+      return NextResponse.json(response, { status: 500 });
     }
     
     // Get public URL for the file
@@ -134,30 +145,61 @@ export async function POST(request: NextRequest) {
         }
       });
     } catch (dbError: any) {
-      console.error("Database error:", dbError);
-      
-      // More detailed error logging for debugging
-      if (dbError.meta) {
-        console.error("Database error metadata:", dbError.meta);
+      // Log detailed error info in development only
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Database error:", dbError);
+
+        // More detailed error logging for debugging
+        if (dbError.meta) {
+          console.error("Database error metadata:", dbError.meta);
+        }
       }
-      
-      return NextResponse.json(
-        { 
-          error: "Failed to save file metadata to database", 
-          details: dbError.message || dbError,
-          code: dbError.code
-        },
-        { status: 500 }
-      );
+
+      const response: any = {
+        error: "Failed to save file metadata to database"
+      };
+
+      // Only include error details in development
+      if (process.env.NODE_ENV === 'development') {
+        response.details = dbError.message || dbError;
+        response.code = dbError.code;
+      }
+
+      return NextResponse.json(response, { status: 500 });
     }
   } catch (error: any) {
-    console.error("Unexpected error in catering file upload:", error);
-    return NextResponse.json(
-      { 
-        error: "An unexpected error occurred", 
-        details: error.message || error
-      },
-      { status: 500 }
-    );
+    // ENHANCED LOGGING: Log detailed error information in development only
+    if (process.env.NODE_ENV === 'development') {
+      console.error('=== CATERING FILE UPLOAD ERROR ===');
+      console.error('Error Type:', error?.constructor?.name || typeof error);
+      console.error('Error Message:', error?.message || String(error));
+      console.error('Error Stack:', error?.stack);
+      console.error('Error Code:', error?.code);
+      console.error('Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.error('==================================');
+    } else {
+      // Production: Log minimal info without sensitive details
+      console.error('Catering file upload error:', {
+        errorType: error?.constructor?.name
+      });
+    }
+
+    // Build response with conditional details
+    const response: any = {
+      error: "An unexpected error occurred. Please try again or contact support if the problem persists.",
+    };
+
+    // Only include sensitive details in development
+    if (process.env.NODE_ENV === 'development') {
+      response.details = error.message || error;
+      response.errorCode = error?.code;
+      response.diagnostics = {
+        operation: 'catering_file_upload',
+        errorType: error?.constructor?.name,
+        errorMessage: error?.message
+      };
+    }
+
+    return NextResponse.json(response, { status: 500 });
   }
 }
