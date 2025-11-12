@@ -132,12 +132,9 @@ function determinePricingTier(
 ): PricingTier {
   // Special case: if headcount is 0, use only food cost
   if (headcount === 0) {
-    const foodCostTier = tiers.find(tier => {
-      if (tier.foodCostMax === null) {
-        return foodCost >= tier.foodCostMin;
-      }
-      return foodCost >= tier.foodCostMin && foodCost <= tier.foodCostMax;
-    });
+    const foodCostTier = tiers.find(tier =>
+      isInTier(foodCost, tier.foodCostMin, tier.foodCostMax)
+    );
     if (!foodCostTier) {
       throw new Error('No valid pricing tier found for the given food cost');
     }
@@ -146,12 +143,9 @@ function determinePricingTier(
 
   // Special case: if food cost is 0, use only headcount
   if (foodCost === 0) {
-    const headcountTier = tiers.find(tier => {
-      if (tier.headcountMax === null) {
-        return headcount >= tier.headcountMin;
-      }
-      return headcount >= tier.headcountMin && headcount <= tier.headcountMax;
-    });
+    const headcountTier = tiers.find(tier =>
+      isInTier(headcount, tier.headcountMin, tier.headcountMax)
+    );
     if (!headcountTier) {
       throw new Error('No valid pricing tier found for the given headcount');
     }
@@ -159,20 +153,14 @@ function determinePricingTier(
   }
 
   // Find tier by headcount
-  const headcountTier = tiers.find(tier => {
-    if (tier.headcountMax === null) {
-      return headcount >= tier.headcountMin;
-    }
-    return headcount >= tier.headcountMin && headcount <= tier.headcountMax;
-  });
+  const headcountTier = tiers.find(tier =>
+    isInTier(headcount, tier.headcountMin, tier.headcountMax)
+  );
 
   // Find tier by food cost
-  const foodCostTier = tiers.find(tier => {
-    if (tier.foodCostMax === null) {
-      return foodCost >= tier.foodCostMin;
-    }
-    return foodCost >= tier.foodCostMin && foodCost <= tier.foodCostMax;
-  });
+  const foodCostTier = tiers.find(tier =>
+    isInTier(foodCost, tier.foodCostMin, tier.foodCostMax)
+  );
 
   // Default to first tier if not found
   if (!headcountTier || !foodCostTier) {
@@ -207,6 +195,14 @@ function determinePricingTier(
 }
 
 /**
+ * Checks if a value falls within a tier's min/max boundaries
+ * Extracted for better testability and reusability
+ */
+function isInTier(value: number, min: number, max: number | null): boolean {
+  return max === null ? value >= min : value >= min && value <= max;
+}
+
+/**
  * Calculates daily drive discount based on number of drives using client config
  * Returns TOTAL discount (discount per drive × number of drives)
  */
@@ -225,29 +221,46 @@ function calculateDailyDriveDiscount(numberOfDrives: number, config: ClientDeliv
 }
 
 /**
+ * Checks if an order requires manual review based on client configuration
+ * Separated for better single responsibility principle
+ */
+function checkManualReviewRequired(headcount: number, config: ClientDeliveryConfiguration): void {
+  if (config.driverPaySettings.requiresManualReview && headcount >= 100) {
+    throw new Error(
+      `Order with ${headcount} headcount requires manual review for ${config.clientName}. ` +
+      `Please contact support for pricing on orders with 100+ headcount.`
+    );
+  }
+}
+
+/**
  * Determines driver base pay based on headcount using tiered system or flat rate
- * For clients like Try Hungry with requiresManualReview, throws error for 100+ headcount
+ * Uses helper functions for tier lookup and validation
  */
 function determineDriverBasePay(headcount: number, config: ClientDeliveryConfiguration): number {
   // If config has tiered driver base pay, use it
   if (config.driverPaySettings.driverBasePayTiers && config.driverPaySettings.driverBasePayTiers.length > 0) {
-    const tier = config.driverPaySettings.driverBasePayTiers.find(t => {
-      if (t.headcountMax === null) {
-        return headcount >= t.headcountMin;
-      }
-      return headcount >= t.headcountMin && headcount <= t.headcountMax;
-    });
+    const tier = config.driverPaySettings.driverBasePayTiers.find(t =>
+      isInTier(headcount, t.headcountMin, t.headcountMax)
+    );
 
     if (!tier) {
       throw new Error(`No driver base pay tier found for headcount: ${headcount}`);
     }
 
-    // Check for manual review requirement
-    if (config.driverPaySettings.requiresManualReview && tier.basePay === 0 && headcount >= 100) {
-      throw new Error(
-        `Order with ${headcount} headcount requires manual review for ${config.clientName}. ` +
-        `Please contact support for pricing on orders with 100+ headcount.`
-      );
+    // Validate tier configuration - basePay should not be 0 unless manual review is required
+    if (tier.basePay === 0) {
+      // Check if this requires manual review (for clients like Try Hungry with 100+ headcount)
+      checkManualReviewRequired(headcount, config);
+
+      // If we get here and basePay is still 0, it's a configuration error
+      if (!config.driverPaySettings.requiresManualReview) {
+        throw new Error(
+          `Invalid tier configuration: basePay is 0 for headcount ${headcount} ` +
+          `but client ${config.clientName} does not require manual review. ` +
+          `This indicates a pricing configuration error.`
+        );
+      }
     }
 
     return tier.basePay;
@@ -341,13 +354,9 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   // This prevents revenue loss from configuration errors
   if (deliveryCost === 0 && (headcount > 0 || foodCost > 0)) {
     // Special case: Check if this requires manual review
-    if (config.driverPaySettings.requiresManualReview && headcount >= 100) {
-      throw new Error(
-        `Order with ${headcount} headcount requires manual review for ${config.clientName}. ` +
-        `Please contact support for pricing on orders with 100+ headcount.`
-      );
-    }
+    checkManualReviewRequired(headcount, config);
 
+    // If we get here, it's a configuration error (not a manual review case)
     throw new Error(
       `Delivery cost calculation resulted in $0 for non-zero order (headcount: ${headcount}, foodCost: $${foodCost}). ` +
       `This indicates a pricing configuration error (tier with zero rates). clientConfig: ${config.id}`
