@@ -154,6 +154,8 @@ export function OrderFilesManager({
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "application/vnd.ms-excel",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     ],
   });
 
@@ -265,6 +267,9 @@ export function OrderFilesManager({
             "application/vnd.ms-excel": [".xls"],
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
               [".xlsx"],
+            "application/vnd.ms-powerpoint": [".ppt"],
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+              [".pptx"],
           }}
           maxSize={5 * 1024 * 1024}
           maxFileCount={10}

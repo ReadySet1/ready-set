@@ -30,6 +30,8 @@ export const DEFAULT_VALIDATION_CONFIG: FileValidationConfig = {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'text/plain',
     'text/csv'
   ],
@@ -41,7 +43,7 @@ export const DEFAULT_VALIDATION_CONFIG: FileValidationConfig = {
   ],
   allowedExtensions: [
     '.jpg', '.jpeg', '.png', '.gif', '.webp',
-    '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
     '.txt', '.csv'
   ],
   blockedExtensions: [
@@ -187,14 +189,37 @@ export class UploadErrorHandler {
       };
     }
 
-    // Default unknown error
+    // Default unknown error - provide more context
+    const errorMessage = error.message || error.toString() || 'Unknown error occurred';
+    const errorCode = error.code || error.statusCode || error.status;
+
+    // Create a more informative user message based on available error details
+    let userMessage = 'An unexpected error occurred';
+    if (errorCode) {
+      userMessage += ` (Code: ${errorCode})`;
+    }
+    if (errorMessage && errorMessage !== 'Unknown error occurred') {
+      userMessage += `. Details: ${errorMessage}`;
+    }
+    userMessage += '. Please try again or contact support if the problem persists.';
+
     return {
       type: UploadErrorType.UNKNOWN_ERROR,
-      message: error.message || 'Unknown error occurred',
-      userMessage: 'An unexpected error occurred. Please try again or contact support if the problem persists.',
+      message: errorMessage,
+      userMessage,
       details: {
-        originalMessage: error.message,
-        stack: error.stack
+        originalMessage: errorMessage,
+        errorCode,
+        errorName: error.name,
+        errorConstructor: error.constructor?.name,
+        stack: error.stack,
+        // Include any additional properties from the error object
+        ...Object.keys(error).reduce((acc, key) => {
+          if (!['message', 'stack', 'name'].includes(key)) {
+            acc[key] = error[key];
+          }
+          return acc;
+        }, {} as Record<string, any>)
       },
       retryable: true,
       retryAfter: 3000,
@@ -450,27 +475,39 @@ export class FileValidator {
 
     // Type validation
     if (!this.isAllowedType(file, config)) {
+      // Create a user-friendly list of allowed formats
+      const allowedFormats = config.allowedExtensions
+        .map(ext => ext.replace('.', '').toUpperCase())
+        .join(', ');
+
       return UploadErrorHandler.createValidationError(
         'type',
         `File type ${file.type} is not allowed`,
-        `File type "${file.type}" is not supported. Please choose a different file.`,
+        `File type "${file.type}" is not supported. Allowed formats: ${allowedFormats}. Please choose a different file.`,
         {
           fileType: file.type,
           fileName: file.name,
-          allowedTypes: config.allowedTypes
+          allowedTypes: config.allowedTypes,
+          allowedExtensions: config.allowedExtensions
         }
       );
     }
 
     // Extension validation
     if (!this.isAllowedExtension(file, config)) {
+      const currentExtension = this.getExtension(file.name);
+      // Create a user-friendly list of allowed extensions
+      const allowedFormats = config.allowedExtensions
+        .map(ext => ext.replace('.', '').toUpperCase())
+        .join(', ');
+
       return UploadErrorHandler.createValidationError(
         'type',
         `File extension not allowed for file ${file.name}`,
-        'This file extension is not allowed. Please choose a different file.',
+        `File extension "${currentExtension}" is not allowed. Allowed formats: ${allowedFormats}. Please choose a different file.`,
         {
           fileName: file.name,
-          extension: this.getExtension(file.name),
+          extension: currentExtension,
           allowedExtensions: config.allowedExtensions
         }
       );
