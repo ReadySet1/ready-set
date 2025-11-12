@@ -103,7 +103,21 @@ const VENDOR_MILEAGE_RATE = 3.0; // $3.00 per mile (vendor charges)
 const DRIVER_MILEAGE_RATE = 0.70; // $0.70 per mile (driver pay)
 const DRIVER_MILEAGE_MINIMUM = 7.0; // $7.00 minimum for driver mileage
 const DISTANCE_THRESHOLD = 10; // miles
-const MANUAL_REVIEW_HEADCOUNT_THRESHOLD = 100; // Headcount requiring manual review for certain clients
+
+/**
+ * Headcount threshold requiring manual review for certain clients (e.g., Try Hungry).
+ *
+ * Note: This is a universal threshold (100+ headcount) that applies to any client
+ * with `requiresManualReview: true` in their configuration. While currently only
+ * Try Hungry uses this flag, the threshold is intentionally hardcoded here as:
+ * 1. It represents a consistent business rule across clients
+ * 2. Orders of 100+ people are logistically complex regardless of client
+ * 3. Client configs only need to set `requiresManualReview: true` to opt in
+ *
+ * If different clients need different thresholds in the future, consider moving
+ * this to ClientDeliveryConfiguration as `manualReviewThreshold?: number`
+ */
+const MANUAL_REVIEW_HEADCOUNT_THRESHOLD = 100;
 
 const DAILY_DRIVE_DISCOUNTS: Record<number, number> = {
   1: 0,    // Single drive = no discount
@@ -222,15 +236,28 @@ function calculateDailyDriveDiscount(numberOfDrives: number, config: ClientDeliv
 }
 
 /**
- * Checks if an order requires manual review based on client configuration
- * Separated for better single responsibility principle
+ * Checks if an order requires manual review based on client configuration.
+ * Throws a sanitized error message if manual review is required for the given headcount.
  *
- * Security Note: Error messages are sanitized to not expose exact business thresholds
- * Internal logging should be used for detailed debugging information
+ * @param headcount - Number of people to serve
+ * @param config - Client delivery configuration
+ * @throws {Error} If order requires manual review (headcount >= MANUAL_REVIEW_HEADCOUNT_THRESHOLD)
+ *
+ * @remarks
+ * Security Note: Error messages are sanitized to not expose exact business thresholds.
+ * Internal logging is used for detailed debugging information.
+ *
+ * @example
+ * ```typescript
+ * // Will throw for Try Hungry with 100+ headcount
+ * checkManualReviewRequired(100, TRY_HUNGRY);
+ * ```
  */
 function checkManualReviewRequired(headcount: number, config: ClientDeliveryConfiguration): void {
   if (config.driverPaySettings.requiresManualReview && headcount >= MANUAL_REVIEW_HEADCOUNT_THRESHOLD) {
-    // Log detailed info internally (could be sent to logging service in production)
+    // TODO: Replace console.info with proper logging service (Sentry, Winston, etc.)
+    // See: reports/console-cleanup/README.md for logging cleanup strategy
+    // This is intentionally kept for debugging until proper logging is implemented
     console.info(`Manual review required: headcount=${headcount}, threshold=${MANUAL_REVIEW_HEADCOUNT_THRESHOLD}, client=${config.clientName}`);
 
     // Return sanitized message to client without exposing exact thresholds
@@ -241,8 +268,28 @@ function checkManualReviewRequired(headcount: number, config: ClientDeliveryConf
 }
 
 /**
- * Determines driver base pay based on headcount using tiered system or flat rate
- * Uses helper functions for tier lookup and validation
+ * Determines driver base pay based on headcount using tiered system or flat rate.
+ * For clients with driverBasePayTiers, looks up the appropriate tier using O(n) search.
+ * For clients without tiers, returns the flat basePayPerDrop.
+ *
+ * @param headcount - Number of people to serve
+ * @param config - Client delivery configuration
+ * @returns Driver base pay amount in dollars
+ * @throws {Error} If no matching tier found or configuration invalid (e.g., basePay === 0)
+ *
+ * @remarks
+ * - Tier lookup is O(n) but acceptable for small tier arrays (typically 5-11 tiers)
+ * - Validates that basePay is not 0 unless manual review is explicitly required
+ * - For manual review cases, delegates to checkManualReviewRequired()
+ *
+ * @example
+ * ```typescript
+ * // Try Hungry with 30 headcount returns $23 (tier 25-49)
+ * const basePay = determineDriverBasePay(30, TRY_HUNGRY); // Returns 23
+ *
+ * // HY Food Company returns flat $50 for any headcount
+ * const basePay = determineDriverBasePay(50, HY_FOOD_COMPANY_DIRECT); // Returns 50
+ * ```
  */
 function determineDriverBasePay(headcount: number, config: ClientDeliveryConfiguration): number {
   // If config has tiered driver base pay, use it
@@ -269,6 +316,13 @@ function determineDriverBasePay(headcount: number, config: ClientDeliveryConfigu
       // Then check if this specific order requires manual review (will throw if it does)
       // For clients like Try Hungry with 100+ headcount
       checkManualReviewRequired(headcount, config);
+
+      // If we get here, manual review was not triggered but basePay is still 0
+      // This indicates a configuration error (e.g., headcount 99 with basePay 0)
+      throw new Error(
+        `Invalid configuration: basePay is 0 for headcount ${headcount} ` +
+        `and manual review was not triggered. Check tier configuration for ${config.clientName}.`
+      );
     }
 
     return tier.basePay;

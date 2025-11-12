@@ -14,6 +14,15 @@
  * - READY_SET_FOOD_STANDARD.driverPaySettings.driverBasePayTiers
  * - TRY_HUNGRY.driverPaySettings.driverBasePayTiers
  * - HY_FOOD_COMPANY_DIRECT.driverPaySettings (flat $50 rate)
+ *
+ * ⚠️ Configuration Change Protocol:
+ * If client configurations change (e.g., tier values, rates, thresholds), these tests
+ * MUST be reviewed and updated. Test failures indicate that:
+ * 1. Business logic has changed and tests need to reflect new requirements
+ * 2. Configuration changes may have unintended consequences
+ * 3. Stakeholders should verify the changes align with business goals
+ *
+ * Do not simply update test values to match new config - review the business impact first.
  */
 
 import {
