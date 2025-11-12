@@ -17,6 +17,8 @@ import { UploadSecurityManager } from "@/lib/upload-security";
 import { UploadErrorType, ErrorResponse } from "@/types/upload";
 import type { Database } from '@/types/supabase';
 import { logApiError, logDatabaseError, logAuthError } from '@/lib/error-logging';
+import { buildErrorResponse } from '@/lib/error-response-builder';
+import { RETRY_CONFIG } from '@/config/upload-config';
 
 // Type definitions for application_sessions
 type ApplicationSession = Database['public']['Tables']['application_sessions']['Row'];
@@ -316,7 +318,29 @@ export async function POST(request: NextRequest) {
 
     // Use admin client for storage operations to bypass RLS
     // This is safe because we've already authenticated the user via session validation
-    const adminSupabase = await createAdminClient();
+    let adminSupabase;
+    try {
+      adminSupabase = await createAdminClient();
+    } catch (error) {
+      console.error('Failed to create admin Supabase client:', error);
+      return NextResponse.json(
+        buildErrorResponse(
+          'Internal server configuration error',
+          'CONFIGURATION_ERROR',
+          {
+            retryable: false,
+            details: {
+              originalError: getErrorMessage(error)
+            },
+            diagnostics: {
+              operation: 'admin_client_creation',
+              critical: true
+            }
+          }
+        ),
+        { status: 500 }
+      );
+    }
 
     // Handle entity IDs in a consistent way
     // Don't add temp- prefix to IDs that already have temp_ prefix (job applications)
@@ -572,31 +596,29 @@ export async function POST(request: NextRequest) {
       await UploadErrorHandler.reportError(uploadError);
 
       // Build response with conditional details using typed interface
-      const response: ErrorResponse = {
-        error: uploadError.userMessage,
-        errorType: uploadError.type,
-        correlationId: uploadError.correlationId || uuidv4(),
-        retryable: uploadError.retryable,
-        retryAfter: uploadError.retryAfter,
-        ...(process.env.NODE_ENV === 'development' && {
-          details: {
-            bucket: storageBucket,
-            filePath,
-            fileName: file.name,
-            fileSize: file.size
-          },
-          diagnostics: {
-            operation: 'storage_upload',
-            originalError: storageError.message,
-            bucket: storageBucket,
-            filePath,
-            fileType: file.type
-          }
-        })
-      };
-
       return NextResponse.json(
-        response,
+        buildErrorResponse(
+          uploadError.userMessage,
+          uploadError.type,
+          {
+            correlationId: uploadError.correlationId || uuidv4(),
+            retryable: uploadError.retryable,
+            retryAfter: uploadError.retryAfter,
+            details: {
+              bucket: storageBucket,
+              filePath,
+              fileName: file.name,
+              fileSize: file.size
+            },
+            diagnostics: {
+              operation: 'storage_upload',
+              originalError: storageError.message,
+              bucket: storageBucket,
+              filePath,
+              fileType: file.type
+            }
+          }
+        ),
         { status: uploadError.type === UploadErrorType.PERMISSION_ERROR ? 403 : 500 },
       );
     }
@@ -647,21 +669,22 @@ export async function POST(request: NextRequest) {
       const correlationId = uuidv4();
 
       // Build response with conditional diagnostics using typed interface
-      const response: ErrorResponse = {
-        error: 'Failed to generate secure file URL. Please try again or contact support if the problem persists.',
-        errorType: 'SIGNED_URL_GENERATION_FAILED',
-        correlationId,
-        ...(process.env.NODE_ENV === 'development' && {
-          diagnostics: {
-            operation: 'signed_url_generation',
-            bucket: storageBucket,
-            filePath,
-            originalError: signedError?.message || 'No signed URL data returned'
+      return NextResponse.json(
+        buildErrorResponse(
+          'Failed to generate secure file URL. Please try again or contact support if the problem persists.',
+          'SIGNED_URL_GENERATION_FAILED',
+          {
+            correlationId,
+            diagnostics: {
+              operation: 'signed_url_generation',
+              bucket: storageBucket,
+              filePath,
+              originalError: signedError?.message || 'No signed URL data returned'
+            }
           }
-        })
-      };
-
-      return NextResponse.json(response, { status: 500 });
+        ),
+        { status: 500 }
+      );
     }
 
     const finalUrl = signedData.signedUrl;
@@ -1000,24 +1023,25 @@ export async function POST(request: NextRequest) {
     await UploadErrorHandler.reportError(uploadError);
 
     // Build response with conditional diagnostics using typed interface
-    const response: ErrorResponse = {
-      error: uploadError.userMessage,
-      errorType: uploadError.type,
-      correlationId: uploadError.correlationId || uuidv4(),
-      retryable: uploadError.retryable,
-      retryAfter: uploadError.retryAfter,
-      ...(process.env.NODE_ENV === 'development' && {
-        diagnostics: {
-          originalError: error?.message,
-          errorCode: error?.code,
-          fileName: file?.name,
-          fileType: file?.type,
-          fileSize: file?.size
+    return NextResponse.json(
+      buildErrorResponse(
+        uploadError.userMessage,
+        uploadError.type,
+        {
+          correlationId: uploadError.correlationId || uuidv4(),
+          retryable: uploadError.retryable,
+          retryAfter: uploadError.retryAfter,
+          diagnostics: {
+            originalError: error?.message,
+            errorCode: error?.code,
+            fileName: file?.name,
+            fileType: file?.type,
+            fileSize: file?.size
+          }
         }
-      })
-    };
-
-    return NextResponse.json(response, { status: 500 });
+      ),
+      { status: 500 }
+    );
   }
 }
 

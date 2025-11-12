@@ -48,7 +48,12 @@ describe('/api/file-uploads API', () => {
 
     // Initialize type-safe Prisma mock
     prismaMock = createMockPrisma();
-    // Mock the prisma module to return our mock instance
+
+    // IMPORTANT: Partial mocking strategy
+    // We only mock the fileUpload model because these tests exclusively use that model.
+    // Other Prisma models (e.g., profiles, sessions) are not accessed in these tests.
+    // If tests accidentally use other models, they would hit the real database,
+    // but this is intentional - it provides fail-fast feedback if tests are incorrectly written.
     jest.mocked(prisma).fileUpload = prismaMock.fileUpload as any;
   });
 
