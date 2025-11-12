@@ -1,38 +1,36 @@
 import { NextRequest } from 'next/server';
 
 // Mock pg Pool - the route uses PostgreSQL directly, not Supabase
+// This must be set up before the route imports to ensure the pool created
+// at module load time (route.ts line 6) uses our mock
 jest.mock('pg', () => {
-  // Create mock inside the factory to avoid hoisting issues
-  const mockQuery = jest.fn();
-  const mockConnect = jest.fn();
-  const mockEnd = jest.fn();
+  // Create the mock inside the factory to avoid hoisting issues
+  const mq = jest.fn();
 
   return {
-    Pool: jest.fn().mockImplementation(() => ({
-      query: mockQuery,
-      connect: mockConnect,
-      end: mockEnd,
+    Pool: jest.fn(() => ({
+      query: mq,
+      connect: jest.fn(),
+      end: jest.fn(),
     })),
+    // Export the mock query so we can access it in tests
+    __mockQuery: mq,
   };
 });
 
 import { GET, POST, PUT } from '@/app/api/tracking/drivers/route';
-import { Pool } from 'pg';
+import type * as pg from 'pg';
+
+// Access the mock query function
+const { __mockQuery: mockQuery } = jest.requireMock<typeof pg & { __mockQuery: jest.Mock }>('pg');
 
 describe('/api/tracking/drivers', () => {
-  let poolMock: any;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    // Get the mock pool instance created by the Pool constructor
-    const MockedPool = Pool as jest.MockedClass<typeof Pool>;
-    poolMock = MockedPool.mock.results[0]?.value;
   });
 
   describe('GET /api/tracking/drivers', () => {
-    // TODO: Fix mock implementation - poolMock is not being set correctly
-    // The test runs without crashing but gets 500 error due to mock issues
-    it.skip('returns all drivers when no query parameters', async () => {
+    it('returns all drivers when no query parameters', async () => {
       const mockDrivers = [
         {
           id: 'driver-1',
@@ -65,20 +63,22 @@ describe('/api/tracking/drivers', () => {
       ];
 
       // Mock successful pg query response
-      if (poolMock) {
-        poolMock.query.mockResolvedValue({
-          rows: mockDrivers,
-          rowCount: mockDrivers.length,
-        });
-      }
+      mockQuery.mockResolvedValue({
+        rows: mockDrivers,
+        rowCount: mockDrivers.length,
+      });
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers');
       const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.drivers).toEqual(mockDrivers);
-      expect(data.total).toBe(mockDrivers.length);
+      expect(data.success).toBe(true);
+      // Route returns { success: true, data: drivers[], pagination: {...} }
+      expect(data.data).toEqual(mockDrivers);
+      expect(data.pagination.total).toBe(mockDrivers.length);
+      expect(data.pagination.limit).toBe(50); // default limit
+      expect(data.pagination.offset).toBe(0); // default offset
     });
 
     // TODO: Update these tests to use pg.Pool mocks instead of Supabase
