@@ -523,7 +523,26 @@ export async function POST(request: NextRequest) {
     }
 
     if (storageError) {
-      logApiError(storageError, '/api/file-uploads', 'POST', { operation: 'storageUpload', allStrategiesFailed: true }, request);
+      // ENHANCED LOGGING: Log detailed storage error before categorization
+      console.error('=== STORAGE UPLOAD ERROR ===');
+      console.error('Storage Error Message:', storageError.message);
+      console.error('Last Error:', lastError);
+      console.error('File Details:', {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        path: filePath,
+        bucket: storageBucket
+      });
+      console.error('Storage Error Object:', JSON.stringify(storageError, null, 2));
+      console.error('===========================');
+
+      logApiError(storageError, '/api/file-uploads', 'POST', {
+        operation: 'storageUpload',
+        allStrategiesFailed: true,
+        errorMessage: storageError.message,
+        lastError: lastError ? getErrorMessage(lastError) : undefined
+      }, request);
 
       // Use enhanced error categorization
       const uploadError = UploadErrorHandler.categorizeError(storageError, file);
@@ -534,7 +553,8 @@ export async function POST(request: NextRequest) {
         filePath,
         bucket: storageBucket,
         entityId,
-        entityType
+        entityType,
+        originalStorageError: storageError.message
       });
       await UploadErrorHandler.reportError(uploadError);
 
@@ -550,6 +570,14 @@ export async function POST(request: NextRequest) {
             filePath,
             fileName: file.name,
             fileSize: file.size
+          },
+          // Enhanced diagnostics for debugging
+          diagnostics: {
+            operation: 'storage_upload',
+            originalError: storageError.message,
+            bucket: storageBucket,
+            filePath,
+            fileType: file.type
           }
         },
         { status: uploadError.type === UploadErrorType.PERMISSION_ERROR ? 403 : 500 },
@@ -566,6 +594,14 @@ export async function POST(request: NextRequest) {
       .createSignedUrl(filePath, DEFAULT_SIGNED_URL_EXPIRATION);
 
     if (signedError || !signedData) {
+      // ENHANCED LOGGING: Log detailed signed URL error
+      console.error('=== SIGNED URL GENERATION ERROR ===');
+      console.error('Error:', signedError);
+      console.error('File Path:', filePath);
+      console.error('Bucket:', storageBucket);
+      console.error('File Name:', file.name);
+      console.error('===================================');
+
       // Clean up uploaded file since we can't generate a secure signed URL
       await supabase.storage.from(storageBucket).remove([filePath]);
 
@@ -577,7 +613,8 @@ export async function POST(request: NextRequest) {
           operation: 'createSignedUrl',
           filePath,
           bucket: storageBucket,
-          action: 'upload_failed_and_cleaned_up'
+          action: 'upload_failed_and_cleaned_up',
+          errorDetails: signedError?.message
         },
         request
       );
@@ -585,7 +622,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: 'Failed to generate secure file URL. Please try again or contact support if the problem persists.',
-          code: 'SIGNED_URL_GENERATION_FAILED'
+          code: 'SIGNED_URL_GENERATION_FAILED',
+          correlationId: uuidv4(),
+          diagnostics: {
+            operation: 'signed_url_generation',
+            bucket: storageBucket,
+            filePath,
+            errorMessage: signedError?.message || 'No signed URL data returned'
+          }
         },
         { status: 500 }
       );
@@ -880,7 +924,29 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    logApiError(error, '/api/file-uploads', 'POST', { operation: 'fileUpload', fileName: file?.name }, request);
+    // ENHANCED LOGGING: Log detailed error information before categorization
+    console.error('=== FILE UPLOAD ERROR DETAILS ===');
+    console.error('Error Type:', error?.constructor?.name || typeof error);
+    console.error('Error Message:', error?.message || String(error));
+    console.error('Error Stack:', error?.stack);
+    console.error('File Details:', {
+      name: file?.name,
+      type: file?.type,
+      size: file?.size,
+      entityId,
+      entityType,
+      category
+    });
+    console.error('Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    console.error('================================');
+
+    logApiError(error, '/api/file-uploads', 'POST', {
+      operation: 'fileUpload',
+      fileName: file?.name,
+      errorType: error?.constructor?.name,
+      errorCode: error?.code,
+      errorDetails: error?.message
+    }, request);
 
     // Use enhanced error categorization for general errors
     const uploadError = UploadErrorHandler.categorizeError(error, file);
@@ -890,7 +956,9 @@ export async function POST(request: NextRequest) {
       fileName: file?.name,
       entityId,
       entityType,
-      category
+      category,
+      originalError: error?.message,
+      originalStack: error?.stack
     });
     await UploadErrorHandler.reportError(uploadError);
 
@@ -900,7 +968,15 @@ export async function POST(request: NextRequest) {
         errorType: uploadError.type,
         correlationId: uploadError.correlationId,
         retryable: uploadError.retryable,
-        retryAfter: uploadError.retryAfter
+        retryAfter: uploadError.retryAfter,
+        // Include diagnostic info for debugging (remove in production if needed)
+        diagnostics: {
+          originalError: error?.message,
+          errorCode: error?.code,
+          fileName: file?.name,
+          fileType: file?.type,
+          fileSize: file?.size
+        }
       },
       { status: 500 }
     );
