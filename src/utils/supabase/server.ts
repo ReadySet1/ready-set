@@ -49,8 +49,46 @@ export async function createClient() {
   )
 }
 
-// For admin operations that require elevated privileges - bypasses RLS
-// Uses the service role key directly without cookie/session management
+/**
+ * Creates a Supabase admin client with service role privileges.
+ *
+ * This client bypasses Row Level Security (RLS) and should only be used
+ * after proper authentication has been verified via the regular client.
+ *
+ * ⚠️ **SECURITY WARNING**: This client has elevated privileges and bypasses ALL RLS policies.
+ * Only use this client for operations that genuinely require admin access, and ALWAYS
+ * verify user authentication via the regular client first.
+ *
+ * @throws {Error} If SUPABASE_SERVICE_ROLE_KEY environment variable is not configured
+ * @returns {Promise<SupabaseClient<Database>>} Admin client instance with service role privileges
+ *
+ * @example
+ * ```typescript
+ * // ✅ CORRECT: Verify authentication first, then use admin client
+ * const supabase = await createClient();
+ * const { data: { user } } = await supabase.auth.getUser();
+ * if (!user) {
+ *   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+ * }
+ *
+ * // Now safe to use admin client for storage operations
+ * const adminSupabase = await createAdminClient();
+ * await adminSupabase.storage.from('bucket').upload(path, file);
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // ❌ INCORRECT: Never use admin client without authentication check
+ * const adminSupabase = await createAdminClient();
+ * await adminSupabase.storage.from('bucket').upload(path, file); // Security vulnerability!
+ * ```
+ *
+ * @remarks
+ * - Uses `SUPABASE_SERVICE_ROLE_KEY` for elevated privileges
+ * - Does not maintain session state (`persistSession: false`)
+ * - Does not auto-refresh tokens (`autoRefreshToken: false`)
+ * - Bypasses all RLS policies - use with extreme caution
+ */
 export async function createAdminClient() {
   return createSupabaseClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

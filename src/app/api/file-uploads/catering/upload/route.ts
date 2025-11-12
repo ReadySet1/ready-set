@@ -5,6 +5,8 @@ import { validateUserNotSoftDeleted } from '@/lib/soft-delete-handlers';
 import { v4 as uuidv4 } from 'uuid';
 import { UploadErrorHandler } from '@/lib/upload-error-handler';
 import { ErrorResponse } from '@/types/upload';
+import { buildErrorResponse } from '@/lib/error-response-builder';
+import { RETRY_CONFIG } from '@/config/upload-config';
 
 export async function POST(request: NextRequest) {
     
@@ -89,20 +91,20 @@ export async function POST(request: NextRequest) {
         console.error("Storage upload error:", storageError);
       }
 
-      const response: ErrorResponse = {
-        error: "Failed to upload file to storage",
-        errorType: 'STORAGE_ERROR',
-        correlationId: uuidv4(),
-        retryable: true,
-        retryAfter: 5000,
-        ...(process.env.NODE_ENV === 'development' && {
-          details: {
-            originalError: storageError.message || String(storageError)
+      return NextResponse.json(
+        buildErrorResponse(
+          "Failed to upload file to storage",
+          'STORAGE_ERROR',
+          {
+            retryable: true,
+            retryAfter: RETRY_CONFIG.BASE_DELAY,
+            details: {
+              originalError: storageError.message || String(storageError)
+            }
           }
-        })
-      };
-
-      return NextResponse.json(response, { status: 500 });
+        ),
+        { status: 500 }
+      );
     }
     
     // Get public URL for the file
@@ -168,25 +170,26 @@ export async function POST(request: NextRequest) {
       await UploadErrorHandler.reportError(uploadError, userId);
 
       // Build typed error response
-      const response: ErrorResponse = {
-        error: "Failed to save file metadata to database",
-        errorType: uploadError.type,
-        correlationId: uploadError.correlationId || uuidv4(),
-        retryable: uploadError.retryable,
-        retryAfter: uploadError.retryAfter,
-        ...(process.env.NODE_ENV === 'development' && {
-          details: {
-            originalError: dbError.message || String(dbError)
-          },
-          diagnostics: {
-            operation: 'database_insert',
-            errorCode: dbError.code,
-            fileName: file.name
+      return NextResponse.json(
+        buildErrorResponse(
+          "Failed to save file metadata to database",
+          uploadError.type,
+          {
+            correlationId: uploadError.correlationId || uuidv4(),
+            retryable: uploadError.retryable,
+            retryAfter: uploadError.retryAfter,
+            details: {
+              originalError: dbError.message || String(dbError)
+            },
+            diagnostics: {
+              operation: 'database_insert',
+              errorCode: dbError.code,
+              fileName: file.name
+            }
           }
-        })
-      };
-
-      return NextResponse.json(response, { status: 500 });
+        ),
+        { status: 500 }
+      );
     }
   } catch (error: any) {
     // Categorize the error using UploadErrorHandler
@@ -204,24 +207,25 @@ export async function POST(request: NextRequest) {
     await UploadErrorHandler.reportError(uploadError);
 
     // Build typed error response
-    const response: ErrorResponse = {
-      error: uploadError.userMessage,
-      errorType: uploadError.type,
-      correlationId: uploadError.correlationId || uuidv4(),
-      retryable: uploadError.retryable,
-      retryAfter: uploadError.retryAfter,
-      ...(process.env.NODE_ENV === 'development' && {
-        details: {
-          originalError: error?.message || String(error)
-        },
-        diagnostics: {
-          operation: 'catering_file_upload',
-          errorType: error?.constructor?.name,
-          errorCode: error?.code
+    return NextResponse.json(
+      buildErrorResponse(
+        uploadError.userMessage,
+        uploadError.type,
+        {
+          correlationId: uploadError.correlationId || uuidv4(),
+          retryable: uploadError.retryable,
+          retryAfter: uploadError.retryAfter,
+          details: {
+            originalError: error?.message || String(error)
+          },
+          diagnostics: {
+            operation: 'catering_file_upload',
+            errorType: error?.constructor?.name,
+            errorCode: error?.code
+          }
         }
-      })
-    };
-
-    return NextResponse.json(response, { status: 500 });
+      ),
+      { status: 500 }
+    );
   }
 }
