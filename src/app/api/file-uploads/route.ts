@@ -313,11 +313,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the Supabase client for authentication (user session)
+    // ===== CRITICAL: AUTHENTICATION VALIDATION =====
+    // SECURITY: We must verify user authentication BEFORE creating admin client.
+    // The admin client bypasses ALL RLS policies, so we need to ensure the request
+    // comes from either:
+    // 1. An authenticated user (for logged-in uploads), OR
+    // 2. A valid session token (for job application uploads)
+    //
+    // Why we use admin client for storage:
+    // - Storage RLS policies are too restrictive for upload operations
+    // - We need to create files in user-specific paths before the user record exists
+    // - Session-based uploads (job applications) don't have a user ID yet
+    //
+    // This is safe because:
+    // - We validate session tokens above for job applications
+    // - We validate user authentication below for other entity types
+    // - Admin client is ONLY used for storage.upload() and storage.createSignedUrl()
+    // - Database operations still use regular client with RLS
     const supabase = await createClient();
 
-    // Use admin client for storage operations to bypass RLS
-    // This is safe because we've already authenticated the user via session validation
+    // For non-job-application uploads, verify user is authenticated
+    if (entityType !== "job_application" && !category.startsWith("job-applications")) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        logAuthError(
+          authError || new Error('Unauthorized upload attempt'),
+          'file-uploads-post',
+          undefined,
+          request
+        );
+        return NextResponse.json(
+          buildErrorResponse(
+            'Authentication required',
+            'AUTH_REQUIRED',
+            {
+              retryable: false,
+              diagnostics: {
+                operation: 'user_authentication',
+                entityType,
+                category
+              }
+            }
+          ),
+          { status: 401 }
+        );
+      }
+    }
+    // Note: Job application uploads are already validated via session token above (line 126-197)
+
+    // Now that authentication is verified, safely create admin client
+    // This client bypasses RLS ONLY for storage operations (upload, createSignedUrl)
     let adminSupabase;
     try {
       adminSupabase = await createAdminClient();

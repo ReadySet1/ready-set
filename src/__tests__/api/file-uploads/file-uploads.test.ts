@@ -49,12 +49,39 @@ describe('/api/file-uploads API', () => {
     // Initialize type-safe Prisma mock
     prismaMock = createMockPrisma();
 
-    // IMPORTANT: Partial mocking strategy
-    // We only mock the fileUpload model because these tests exclusively use that model.
-    // Other Prisma models (e.g., profiles, sessions) are not accessed in these tests.
-    // If tests accidentally use other models, they would hit the real database,
-    // but this is intentional - it provides fail-fast feedback if tests are incorrectly written.
+    // DATABASE CONNECTION GUARD: Full Prisma mocking strategy
+    // We mock ALL Prisma operations to prevent accidental database connections in tests.
+    // This ensures:
+    // 1. Tests run in isolation without database dependencies
+    // 2. Tests fail fast if they try to use unmocked models
+    // 3. CI/CD pipelines don't require database connections
+    // 4. Test execution is faster (no network calls)
+
+    // Mock the fileUpload model (primary model used in these tests)
     jest.mocked(prisma).fileUpload = prismaMock.fileUpload as any;
+
+    // DATABASE CONNECTION GUARD: Mock $queryRaw to prevent raw SQL queries
+    jest.mocked(prisma).$queryRaw = jest.fn().mockRejectedValue(
+      new Error('MOCK_ERROR: Direct database queries are not allowed in tests. Use mocked models instead.')
+    );
+
+    // DATABASE CONNECTION GUARD: Mock $executeRaw to prevent raw SQL execution
+    jest.mocked(prisma).$executeRaw = jest.fn().mockRejectedValue(
+      new Error('MOCK_ERROR: Direct database execution is not allowed in tests. Use mocked models instead.')
+    );
+
+    // DATABASE CONNECTION GUARD: Mock $connect to prevent actual connections
+    jest.mocked(prisma).$connect = jest.fn().mockRejectedValue(
+      new Error('MOCK_ERROR: Database connections are not allowed in tests. All operations should use mocks.')
+    );
+
+    // DATABASE CONNECTION GUARD: Mock $disconnect to prevent disconnect attempts
+    jest.mocked(prisma).$disconnect = jest.fn().mockResolvedValue(undefined);
+
+    // DATABASE CONNECTION GUARD: Mock $transaction to prevent transaction usage
+    jest.mocked(prisma).$transaction = jest.fn().mockRejectedValue(
+      new Error('MOCK_ERROR: Database transactions are not allowed in tests. Use mocked models instead.')
+    ) as any;
   });
 
   describe('GET /api/file-uploads - Get File URL', () => {

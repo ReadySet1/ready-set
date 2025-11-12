@@ -390,6 +390,8 @@ export class UploadErrorHandler {
         // Validate environment variable in production
         if (ENV_CONFIG.isProduction && !baseUrl) {
           console.warn('NEXT_PUBLIC_SITE_URL is not defined. Error reporting is disabled.');
+          // PRODUCTION MONITORING: Log to stderr so it appears in production logs
+          console.error('[ERROR_REPORTING] Configuration error: NEXT_PUBLIC_SITE_URL is not defined');
           return;
         }
 
@@ -397,7 +399,7 @@ export class UploadErrorHandler {
         const apiUrl = `${baseUrl || 'http://localhost:3000'}/api/upload-errors`;
 
         // Report to error tracking service
-        await fetch(apiUrl, {
+        const response = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -413,17 +415,42 @@ export class UploadErrorHandler {
             retryable: error.retryable
           })
         });
+
+        // PRODUCTION MONITORING: Log failed error reporting attempts
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => 'Unable to read response');
+          console.error('[ERROR_REPORTING] Failed to report error:', {
+            correlationId: error.correlationId,
+            errorType: error.type,
+            statusCode: response.status,
+            statusText: response.statusText,
+            responseBody: errorText.substring(0, 500) // Limit log size
+          });
+        }
       } catch (reportError) {
+        // PRODUCTION MONITORING: Always log reporting failures to stderr for monitoring
+        console.error('[ERROR_REPORTING] Exception while reporting error:', {
+          correlationId: error.correlationId,
+          errorType: error.type,
+          reportingError: reportError instanceof Error ? reportError.message : String(reportError)
+        });
+
+        // Additional verbose logging in development
         if (ENV_CONFIG.isDevelopment) {
-          console.error('Failed to report error:', reportError);
+          console.error('Failed to report error (detailed):', reportError);
         }
       }
     };
 
     // Execute asynchronously without blocking (fire-and-forget pattern)
     void reportAsync().catch((err) => {
+      // PRODUCTION MONITORING: Log uncaught errors in the reporting flow
+      console.error('[ERROR_REPORTING] Uncaught error in reportAsync:', {
+        error: err instanceof Error ? err.message : String(err)
+      });
+
       if (ENV_CONFIG.isDevelopment) {
-        console.error('Error reporting failed:', err);
+        console.error('Error reporting failed (catch handler):', err);
       }
     });
   }
