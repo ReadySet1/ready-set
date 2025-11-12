@@ -924,21 +924,32 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    // ENHANCED LOGGING: Log detailed error information before categorization
-    console.error('=== FILE UPLOAD ERROR DETAILS ===');
-    console.error('Error Type:', error?.constructor?.name || typeof error);
-    console.error('Error Message:', error?.message || String(error));
-    console.error('Error Stack:', error?.stack);
-    console.error('File Details:', {
-      name: file?.name,
-      type: file?.type,
-      size: file?.size,
-      entityId,
-      entityType,
-      category
-    });
-    console.error('Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-    console.error('================================');
+    // Use enhanced error categorization for general errors
+    const uploadError = UploadErrorHandler.categorizeError(error, file);
+
+    // ENHANCED LOGGING: Log detailed error information in development only
+    if (process.env.NODE_ENV === 'development') {
+      console.error('=== FILE UPLOAD ERROR DETAILS ===');
+      console.error('Error Type:', error?.constructor?.name || typeof error);
+      console.error('Error Message:', error?.message || String(error));
+      console.error('Error Stack:', error?.stack);
+      console.error('File Details:', {
+        name: file?.name,
+        type: file?.type,
+        size: file?.size,
+        entityId,
+        entityType,
+        category
+      });
+      console.error('Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.error('================================');
+    } else {
+      // Production: Log minimal info without sensitive details
+      console.error('File upload error:', {
+        errorType: error?.constructor?.name,
+        correlationId: uploadError.correlationId
+      });
+    }
 
     logApiError(error, '/api/file-uploads', 'POST', {
       operation: 'fileUpload',
@@ -947,9 +958,6 @@ export async function POST(request: NextRequest) {
       errorCode: error?.code,
       errorDetails: error?.message
     }, request);
-
-    // Use enhanced error categorization for general errors
-    const uploadError = UploadErrorHandler.categorizeError(error, file);
 
     // Log and report the error
     UploadErrorHandler.logError(uploadError, {
@@ -962,24 +970,27 @@ export async function POST(request: NextRequest) {
     });
     await UploadErrorHandler.reportError(uploadError);
 
-    return NextResponse.json(
-      {
-        error: uploadError.userMessage,
-        errorType: uploadError.type,
-        correlationId: uploadError.correlationId,
-        retryable: uploadError.retryable,
-        retryAfter: uploadError.retryAfter,
-        // Include diagnostic info for debugging (remove in production if needed)
-        diagnostics: {
-          originalError: error?.message,
-          errorCode: error?.code,
-          fileName: file?.name,
-          fileType: file?.type,
-          fileSize: file?.size
-        }
-      },
-      { status: 500 }
-    );
+    // Build response with conditional diagnostics
+    const response: any = {
+      error: uploadError.userMessage,
+      errorType: uploadError.type,
+      correlationId: uploadError.correlationId,
+      retryable: uploadError.retryable,
+      retryAfter: uploadError.retryAfter,
+    };
+
+    // Only include diagnostics in development
+    if (process.env.NODE_ENV === 'development') {
+      response.diagnostics = {
+        originalError: error?.message,
+        errorCode: error?.code,
+        fileName: file?.name,
+        fileType: file?.type,
+        fileSize: file?.size
+      };
+    }
+
+    return NextResponse.json(response, { status: 500 });
   }
 }
 
