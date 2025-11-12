@@ -381,9 +381,12 @@ export const HY_FOOD_COMPANY_DIRECT: ClientDeliveryConfiguration = {
     bonusPay: 10,
     readySetFee: 70
     // No driverBasePayTiers - uses flat basePayPerDrop instead
-    // Note: maxPayPerDrop caps base + mileage at $50. With $50 base + mileage,
-    // the total base pay is capped at $50 (enforced in delivery-cost-calculator.ts).
+    //
+    // CRITICAL: maxPayPerDrop caps base + mileage at $50. With $50 base + any mileage,
+    // the total base pay is capped at $50 (driver loses mileage compensation).
     // Bonus and bridge tolls are added AFTER the cap and are not subject to it.
+    //
+    // See docs/BUSINESS_RULES.md for detailed explanation and examples.
   },
 
   bridgeTollSettings: {
@@ -561,6 +564,59 @@ export function validateConfiguration(config: ClientDeliveryConfiguration): {
         config.dailyDriveDiscounts.fourPlusDrivers < 0) {
       errors.push('Daily drive discounts cannot be negative');
     }
+  }
+
+  // Validate driver base pay tiers for gaps and overlaps
+  if (config.driverPaySettings?.driverBasePayTiers && config.driverPaySettings.driverBasePayTiers.length > 1) {
+    const tiers = config.driverPaySettings.driverBasePayTiers;
+
+    // Sort tiers by headcountMin for validation
+    const sortedTiers = [...tiers].sort((a, b) => a.headcountMin - b.headcountMin);
+
+    for (let i = 0; i < sortedTiers.length - 1; i++) {
+      const currentTier = sortedTiers[i];
+      const nextTier = sortedTiers[i + 1];
+
+      // Check for gaps (current max + 1 should equal next min)
+      if (currentTier.headcountMax !== null && nextTier.headcountMin > currentTier.headcountMax + 1) {
+        errors.push(
+          `Driver base pay tier gap detected: Tier ending at ${currentTier.headcountMax} ` +
+          `followed by tier starting at ${nextTier.headcountMin}. ` +
+          `Headcount ${currentTier.headcountMax + 1} to ${nextTier.headcountMin - 1} has no tier.`
+        );
+      }
+
+      // Check for overlaps (current max should be < next min)
+      if (currentTier.headcountMax !== null && currentTier.headcountMax >= nextTier.headcountMin) {
+        errors.push(
+          `Driver base pay tier overlap detected: Tier ${i + 1} (${currentTier.headcountMin}-${currentTier.headcountMax}) ` +
+          `overlaps with Tier ${i + 2} (${nextTier.headcountMin}-${nextTier.headcountMax || 'null'})`
+        );
+      }
+
+      // Validate that only the last tier can have null headcountMax
+      if (currentTier.headcountMax === null && i < sortedTiers.length - 1) {
+        errors.push(
+          `Invalid tier configuration: Only the last tier can have null headcountMax. ` +
+          `Tier ${i + 1} has null max but is not the last tier.`
+        );
+      }
+    }
+
+    // Validate basePay values
+    sortedTiers.forEach((tier, index) => {
+      if (tier.basePay < 0) {
+        errors.push(`Driver base pay tier ${index + 1}: basePay cannot be negative`);
+      }
+
+      // Warn if basePay is 0 and requiresManualReview is not set
+      if (tier.basePay === 0 && !config.driverPaySettings?.requiresManualReview) {
+        errors.push(
+          `Driver base pay tier ${index + 1}: basePay is 0 but requiresManualReview is not enabled. ` +
+          `This may cause runtime errors.`
+        );
+      }
+    });
   }
 
   return {
