@@ -333,8 +333,8 @@ export const TRY_HUNGRY: ClientDeliveryConfiguration = {
     autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County']
   },
 
-  createdAt: new Date('2025-01-12'),
-  updatedAt: new Date('2025-01-12'),
+  createdAt: new Date('2025-11-12'),
+  updatedAt: new Date('2025-11-12'),
   notes: 'Try Hungry pricing from REA-41 comments. Note: 100+ headcount requires manual review (case by case).'
 };
 
@@ -391,8 +391,8 @@ export const HY_FOOD_COMPANY_DIRECT: ClientDeliveryConfiguration = {
     autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County']
   },
 
-  createdAt: new Date('2025-01-12'),
-  updatedAt: new Date('2025-01-12'),
+  createdAt: new Date('2025-11-12'),
+  updatedAt: new Date('2025-11-12'),
   notes: 'HY Food Company Direct pricing from REA-41 comments. Unique $50 flat driver base pay.'
 };
 
