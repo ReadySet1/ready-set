@@ -7,7 +7,7 @@ import { prisma } from '@/utils/prismaDB';
 import { FileValidator, UploadErrorHandler } from '@/lib/upload-error-handler';
 import { UploadSecurityManager } from '@/lib/upload-security';
 import {
-  createPostRequest,
+  createPostRequestWithFormData,
   expectSuccessResponse,
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
@@ -24,17 +24,31 @@ jest.mock('@/utils/file-service', () => ({
 }));
 
 describe('/api/file-uploads - Office Document Formats', () => {
+  // Set NODE_ENV to development for these tests to enable detailed logging and diagnostics
+  const originalNodeEnv = process.env.NODE_ENV;
+
+  beforeAll(() => {
+    process.env.NODE_ENV = 'development';
+  });
+
+  afterAll(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  // Create a shared mock storage bucket that will be returned by from()
+  const mockStorageBucket = {
+    createSignedUrl: jest.fn(),
+    upload: jest.fn(),
+    remove: jest.fn(),
+  };
+
   const mockSupabaseClient = {
     auth: {
       getUser: jest.fn(),
       getSession: jest.fn(),
     },
     storage: {
-      from: jest.fn(() => ({
-        createSignedUrl: jest.fn(),
-        upload: jest.fn(),
-        remove: jest.fn(),
-      })),
+      from: jest.fn(() => mockStorageBucket),
     },
     from: jest.fn(),
   };
@@ -66,18 +80,21 @@ describe('/api/file-uploads - Office Document Formats', () => {
     });
 
     // Mock successful upload
-    mockSupabaseClient.storage.from().upload.mockResolvedValue({
+    mockStorageBucket.upload.mockResolvedValue({
       data: { path: 'test/path/file.pdf' },
       error: null,
     });
 
     // Mock successful signed URL generation
-    mockSupabaseClient.storage.from().createSignedUrl.mockResolvedValue({
+    mockStorageBucket.createSignedUrl.mockResolvedValue({
       data: { signedUrl: 'https://example.com/signed-url' },
       error: null,
     });
 
     // Mock database creation
+    // Note: Using 'as any' here is necessary because Prisma's generated types
+    // are very strict and difficult to mock properly in Jest. This is a standard
+    // pattern for Prisma testing.
     (prisma as any).fileUpload = {
       create: jest.fn().mockResolvedValue({
         id: 'upload-123',
@@ -95,7 +112,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'entity-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectSuccessResponse(response);
@@ -112,7 +129,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'user-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectSuccessResponse(response);
@@ -126,7 +143,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'user-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectSuccessResponse(response);
@@ -141,7 +158,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'entity-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectSuccessResponse(response);
@@ -160,7 +177,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'entity-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectSuccessResponse(response);
@@ -177,7 +194,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'entity-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectSuccessResponse(response);
@@ -196,7 +213,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'entity-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectSuccessResponse(response);
@@ -213,7 +230,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'entity-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectSuccessResponse(response);
@@ -232,7 +249,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'entity-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectSuccessResponse(response);
@@ -261,7 +278,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'user-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectErrorResponse(response, 400);
@@ -284,7 +301,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'user-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectErrorResponse(response, 400);
@@ -310,7 +327,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'user-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectErrorResponse(response, 400);
@@ -339,7 +356,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'user-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectErrorResponse(response, 403);
@@ -351,7 +368,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
 
   describe('❌ Storage Error Handling', () => {
     it('should provide detailed error when storage upload fails', async () => {
-      mockSupabaseClient.storage.from().upload.mockResolvedValue({
+      mockStorageBucket.upload.mockResolvedValue({
         data: null,
         error: { message: 'Bucket not found' },
       });
@@ -375,7 +392,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'user-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       await expectErrorResponse(response, 500);
@@ -403,7 +420,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'user-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       const data = await response.json();
@@ -411,7 +428,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
     });
 
     it('should include diagnostic information in error responses', async () => {
-      mockSupabaseClient.storage.from().upload.mockResolvedValue({
+      mockStorageBucket.upload.mockResolvedValue({
         data: null,
         error: { message: 'Upload failed' },
       });
@@ -429,7 +446,7 @@ describe('/api/file-uploads - Office Document Formats', () => {
       formData.append('entityId', 'user-123');
       formData.append('entityType', 'user');
 
-      const request = createPostRequest('http://localhost:3000/api/file-uploads', formData);
+      const request = createPostRequestWithFormData('http://localhost:3000/api/file-uploads', formData);
       const response = await POST(request);
 
       const data = await response.json();

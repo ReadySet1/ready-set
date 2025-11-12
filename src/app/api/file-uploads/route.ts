@@ -523,19 +523,27 @@ export async function POST(request: NextRequest) {
     }
 
     if (storageError) {
-      // ENHANCED LOGGING: Log detailed storage error before categorization
-      console.error('=== STORAGE UPLOAD ERROR ===');
-      console.error('Storage Error Message:', storageError.message);
-      console.error('Last Error:', lastError);
-      console.error('File Details:', {
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        path: filePath,
-        bucket: storageBucket
-      });
-      console.error('Storage Error Object:', JSON.stringify(storageError, null, 2));
-      console.error('===========================');
+      // ENHANCED LOGGING: Log detailed storage error in development only
+      if (process.env.NODE_ENV === 'development') {
+        console.error('=== STORAGE UPLOAD ERROR ===');
+        console.error('Storage Error Message:', storageError.message);
+        console.error('Last Error:', lastError);
+        console.error('File Details:', {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          path: filePath,
+          bucket: storageBucket
+        });
+        console.error('Storage Error Object:', JSON.stringify(storageError, null, 2));
+        console.error('===========================');
+      } else {
+        // Production: Log minimal info without sensitive details
+        console.error('Storage upload error:', {
+          errorType: 'STORAGE_ERROR',
+          hasError: !!storageError
+        });
+      }
 
       logApiError(storageError, '/api/file-uploads', 'POST', {
         operation: 'storageUpload',
@@ -558,28 +566,34 @@ export async function POST(request: NextRequest) {
       });
       await UploadErrorHandler.reportError(uploadError);
 
+      // Build response with conditional details
+      const response: any = {
+        error: uploadError.userMessage,
+        errorType: uploadError.type,
+        correlationId: uploadError.correlationId,
+        retryable: uploadError.retryable,
+        retryAfter: uploadError.retryAfter,
+      };
+
+      // Only include sensitive details in development
+      if (process.env.NODE_ENV === 'development') {
+        response.details = {
+          bucket: storageBucket,
+          filePath,
+          fileName: file.name,
+          fileSize: file.size
+        };
+        response.diagnostics = {
+          operation: 'storage_upload',
+          originalError: storageError.message,
+          bucket: storageBucket,
+          filePath,
+          fileType: file.type
+        };
+      }
+
       return NextResponse.json(
-        {
-          error: uploadError.userMessage,
-          errorType: uploadError.type,
-          correlationId: uploadError.correlationId,
-          retryable: uploadError.retryable,
-          retryAfter: uploadError.retryAfter,
-          details: {
-            bucket: storageBucket,
-            filePath,
-            fileName: file.name,
-            fileSize: file.size
-          },
-          // Enhanced diagnostics for debugging
-          diagnostics: {
-            operation: 'storage_upload',
-            originalError: storageError.message,
-            bucket: storageBucket,
-            filePath,
-            fileType: file.type
-          }
-        },
+        response,
         { status: uploadError.type === UploadErrorType.PERMISSION_ERROR ? 403 : 500 },
       );
     }
@@ -594,13 +608,21 @@ export async function POST(request: NextRequest) {
       .createSignedUrl(filePath, DEFAULT_SIGNED_URL_EXPIRATION);
 
     if (signedError || !signedData) {
-      // ENHANCED LOGGING: Log detailed signed URL error
-      console.error('=== SIGNED URL GENERATION ERROR ===');
-      console.error('Error:', signedError);
-      console.error('File Path:', filePath);
-      console.error('Bucket:', storageBucket);
-      console.error('File Name:', file.name);
-      console.error('===================================');
+      // ENHANCED LOGGING: Log detailed signed URL error in development only
+      if (process.env.NODE_ENV === 'development') {
+        console.error('=== SIGNED URL GENERATION ERROR ===');
+        console.error('Error:', signedError);
+        console.error('File Path:', filePath);
+        console.error('Bucket:', storageBucket);
+        console.error('File Name:', file.name);
+        console.error('===================================');
+      } else {
+        // Production: Log minimal info without sensitive details
+        console.error('Signed URL generation error:', {
+          errorType: 'SIGNED_URL_ERROR',
+          hasError: !!signedError
+        });
+      }
 
       // Clean up uploaded file since we can't generate a secure signed URL
       await supabase.storage.from(storageBucket).remove([filePath]);
@@ -619,20 +641,26 @@ export async function POST(request: NextRequest) {
         request
       );
 
-      return NextResponse.json(
-        {
-          error: 'Failed to generate secure file URL. Please try again or contact support if the problem persists.',
-          code: 'SIGNED_URL_GENERATION_FAILED',
-          correlationId: uuidv4(),
-          diagnostics: {
-            operation: 'signed_url_generation',
-            bucket: storageBucket,
-            filePath,
-            errorMessage: signedError?.message || 'No signed URL data returned'
-          }
-        },
-        { status: 500 }
-      );
+      const correlationId = uuidv4();
+
+      // Build response with conditional diagnostics
+      const response: any = {
+        error: 'Failed to generate secure file URL. Please try again or contact support if the problem persists.',
+        code: 'SIGNED_URL_GENERATION_FAILED',
+        correlationId
+      };
+
+      // Only include diagnostics in development
+      if (process.env.NODE_ENV === 'development') {
+        response.diagnostics = {
+          operation: 'signed_url_generation',
+          bucket: storageBucket,
+          filePath,
+          errorMessage: signedError?.message || 'No signed URL data returned'
+        };
+      }
+
+      return NextResponse.json(response, { status: 500 });
     }
 
     const finalUrl = signedData.signedUrl;

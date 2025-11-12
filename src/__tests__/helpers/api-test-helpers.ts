@@ -473,6 +473,33 @@ export function createPostRequest(
 }
 
 /**
+ * Creates a POST request with FormData body
+ * Use this for file upload endpoints that expect multipart/form-data
+ */
+export function createPostRequestWithFormData(
+  url: string,
+  formData: FormData,
+  additionalHeaders?: Record<string, string>
+): NextRequest {
+  const request = new NextRequest(url, {
+    method: "POST",
+    headers: {
+      // Don't set Content-Type for FormData - browser/fetch will set it with boundary
+      ...additionalHeaders,
+    },
+    body: formData as any,
+  });
+
+  // Ensure url property is set for the route handler
+  Object.defineProperty(request, 'url', { value: url, writable: true });
+
+  // Mock formData() method to return the FormData object
+  (request as any).formData = jest.fn().mockResolvedValue(formData);
+
+  return request;
+}
+
+/**
  * Creates a PATCH request with JSON body
  */
 export function createPatchRequest(
