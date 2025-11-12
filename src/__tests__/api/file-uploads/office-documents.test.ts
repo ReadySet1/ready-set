@@ -11,6 +11,7 @@ import {
   expectSuccessResponse,
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
+import { createMockPrisma, MockPrismaClient } from '@/__tests__/helpers/prisma-mock';
 
 // Mock dependencies
 jest.mock('@/utils/supabase/server');
@@ -26,6 +27,9 @@ jest.mock('@/utils/file-service', () => ({
 describe('/api/file-uploads - Office Document Formats', () => {
   // Set NODE_ENV to development for these tests to enable detailed logging and diagnostics
   const originalNodeEnv = process.env.NODE_ENV;
+
+  // Type-safe Prisma mock
+  let prismaMock: MockPrismaClient;
 
   beforeAll(() => {
     process.env.NODE_ENV = 'development';
@@ -91,17 +95,31 @@ describe('/api/file-uploads - Office Document Formats', () => {
       error: null,
     });
 
-    // Mock database creation
-    // Note: Using 'as any' here is necessary because Prisma's generated types
-    // are very strict and difficult to mock properly in Jest. This is a standard
-    // pattern for Prisma testing.
-    (prisma as any).fileUpload = {
-      create: jest.fn().mockResolvedValue({
-        id: 'upload-123',
-        fileName: 'test.pdf',
-        fileUrl: 'https://example.com/signed-url',
-      }),
-    };
+    // Initialize type-safe Prisma mock using jest-mock-extended
+    prismaMock = createMockPrisma();
+
+    // Type-safe mock assignment: Assign the fileUpload model to the mocked prisma
+    // Note: jest-mock-extended provides deep type safety for all mock operations
+    // The type assertion here is unavoidable when integrating with Jest's module mocking
+    jest.mocked(prisma).fileUpload = prismaMock.fileUpload;
+
+    // Mock database creation with full type safety (jest-mock-extended enforces correct types)
+    prismaMock.fileUpload.create.mockResolvedValue({
+      id: 'upload-123',
+      fileName: 'test.pdf',
+      fileUrl: 'https://example.com/signed-url',
+      fileType: 'application/pdf',
+      fileSize: 1024,
+      filePath: 'uploads/test.pdf',
+      uploadedAt: new Date(),
+      updatedAt: new Date(),
+      category: null,
+      userId: null,
+      cateringRequestId: null,
+      onDemandId: null,
+      jobApplicationId: null,
+      isTemporary: false
+    });
   });
 
   describe('✅ PDF Document Uploads', () => {

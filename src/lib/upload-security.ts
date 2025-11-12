@@ -2,6 +2,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { UploadError, SecurityScanResult } from "@/types/upload";
 import type { TablesInsert, Json } from "@/types/supabase";
+import { SCAN_LIMITS } from "@/config/upload-config";
 
 export interface QuarantineFile {
   id: string;
@@ -44,9 +45,9 @@ export class UploadSecurityManager {
 
   // File scanning configuration constants
   /** Maximum file size that can be scanned (10MB) - files larger than this are rejected */
-  private static readonly MAX_SCAN_SIZE = 10 * 1024 * 1024;
+  private static readonly MAX_SCAN_SIZE = SCAN_LIMITS.MAX_SCAN_SIZE;
   /** Threshold for using streaming vs in-memory scanning (5MB) */
-  private static readonly STREAMING_THRESHOLD = 5 * 1024 * 1024;
+  private static readonly STREAMING_THRESHOLD = SCAN_LIMITS.STREAMING_THRESHOLD;
   /**
    * Overlap size between chunks to catch patterns at boundaries (4KB = 4096 bytes)
    *

@@ -110,3 +110,33 @@ export interface SecurityScanResult {
   score: number;
   details?: Record<string, any>;
 }
+
+// API Error Response Types
+export interface ErrorResponseDetails {
+  bucket?: string;
+  filePath?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileType?: string;
+  originalError?: string;
+  [key: string]: any;
+}
+
+export interface ErrorResponseDiagnostics {
+  operation?: string;
+  originalError?: string;
+  bucket?: string;
+  filePath?: string;
+  fileType?: string;
+  [key: string]: any;
+}
+
+export interface ErrorResponse {
+  error: string;
+  errorType: string;
+  correlationId: string;
+  retryable?: boolean;
+  retryAfter?: number;
+  details?: ErrorResponseDetails;
+  diagnostics?: ErrorResponseDiagnostics;
+}

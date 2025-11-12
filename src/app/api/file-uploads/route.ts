@@ -14,7 +14,7 @@ import {
   DEFAULT_VALIDATION_CONFIG
 } from "@/lib/upload-error-handler";
 import { UploadSecurityManager } from "@/lib/upload-security";
-import { UploadErrorType } from "@/types/upload";
+import { UploadErrorType, ErrorResponse } from "@/types/upload";
 import type { Database } from '@/types/supabase';
 import { logApiError, logDatabaseError, logAuthError } from '@/lib/error-logging';
 
@@ -538,7 +538,7 @@ export async function POST(request: NextRequest) {
         console.error('Storage Error Object:', JSON.stringify(storageError, null, 2));
         console.error('===========================');
       } else {
-        // Production: Log minimal info without sensitive details
+        // Production: Log only error type, excluding file names, paths, sizes, and stack traces
         console.error('Storage upload error:', {
           errorType: 'STORAGE_ERROR',
           hasError: !!storageError
@@ -566,31 +566,29 @@ export async function POST(request: NextRequest) {
       });
       await UploadErrorHandler.reportError(uploadError);
 
-      // Build response with conditional details
-      const response: any = {
+      // Build response with conditional details using typed interface
+      const response: ErrorResponse = {
         error: uploadError.userMessage,
         errorType: uploadError.type,
-        correlationId: uploadError.correlationId,
+        correlationId: uploadError.correlationId || uuidv4(),
         retryable: uploadError.retryable,
         retryAfter: uploadError.retryAfter,
+        ...(process.env.NODE_ENV === 'development' && {
+          details: {
+            bucket: storageBucket,
+            filePath,
+            fileName: file.name,
+            fileSize: file.size
+          },
+          diagnostics: {
+            operation: 'storage_upload',
+            originalError: storageError.message,
+            bucket: storageBucket,
+            filePath,
+            fileType: file.type
+          }
+        })
       };
-
-      // Only include sensitive details in development
-      if (process.env.NODE_ENV === 'development') {
-        response.details = {
-          bucket: storageBucket,
-          filePath,
-          fileName: file.name,
-          fileSize: file.size
-        };
-        response.diagnostics = {
-          operation: 'storage_upload',
-          originalError: storageError.message,
-          bucket: storageBucket,
-          filePath,
-          fileType: file.type
-        };
-      }
 
       return NextResponse.json(
         response,
@@ -617,7 +615,7 @@ export async function POST(request: NextRequest) {
         console.error('File Name:', file.name);
         console.error('===================================');
       } else {
-        // Production: Log minimal info without sensitive details
+        // Production: Log only error type, excluding file paths, bucket names, and error details
         console.error('Signed URL generation error:', {
           errorType: 'SIGNED_URL_ERROR',
           hasError: !!signedError
@@ -643,22 +641,20 @@ export async function POST(request: NextRequest) {
 
       const correlationId = uuidv4();
 
-      // Build response with conditional diagnostics
-      const response: any = {
+      // Build response with conditional diagnostics using typed interface
+      const response: ErrorResponse = {
         error: 'Failed to generate secure file URL. Please try again or contact support if the problem persists.',
-        code: 'SIGNED_URL_GENERATION_FAILED',
-        correlationId
+        errorType: 'SIGNED_URL_GENERATION_FAILED',
+        correlationId,
+        ...(process.env.NODE_ENV === 'development' && {
+          diagnostics: {
+            operation: 'signed_url_generation',
+            bucket: storageBucket,
+            filePath,
+            originalError: signedError?.message || 'No signed URL data returned'
+          }
+        })
       };
-
-      // Only include diagnostics in development
-      if (process.env.NODE_ENV === 'development') {
-        response.diagnostics = {
-          operation: 'signed_url_generation',
-          bucket: storageBucket,
-          filePath,
-          errorMessage: signedError?.message || 'No signed URL data returned'
-        };
-      }
 
       return NextResponse.json(response, { status: 500 });
     }
@@ -972,7 +968,7 @@ export async function POST(request: NextRequest) {
       console.error('Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       console.error('================================');
     } else {
-      // Production: Log minimal info without sensitive details
+      // Production: Log only error type and correlation ID, excluding file details, paths, and stack traces
       console.error('File upload error:', {
         errorType: error?.constructor?.name,
         correlationId: uploadError.correlationId
@@ -998,25 +994,23 @@ export async function POST(request: NextRequest) {
     });
     await UploadErrorHandler.reportError(uploadError);
 
-    // Build response with conditional diagnostics
-    const response: any = {
+    // Build response with conditional diagnostics using typed interface
+    const response: ErrorResponse = {
       error: uploadError.userMessage,
       errorType: uploadError.type,
-      correlationId: uploadError.correlationId,
+      correlationId: uploadError.correlationId || uuidv4(),
       retryable: uploadError.retryable,
       retryAfter: uploadError.retryAfter,
+      ...(process.env.NODE_ENV === 'development' && {
+        diagnostics: {
+          originalError: error?.message,
+          errorCode: error?.code,
+          fileName: file?.name,
+          fileType: file?.type,
+          fileSize: file?.size
+        }
+      })
     };
-
-    // Only include diagnostics in development
-    if (process.env.NODE_ENV === 'development') {
-      response.diagnostics = {
-        originalError: error?.message,
-        errorCode: error?.code,
-        fileName: file?.name,
-        fileType: file?.type,
-        fileSize: file?.size
-      };
-    }
 
     return NextResponse.json(response, { status: 500 });
   }

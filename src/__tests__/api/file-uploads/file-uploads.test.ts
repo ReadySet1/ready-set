@@ -12,6 +12,7 @@ import {
   expectUnauthorized,
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
+import { createMockPrisma, MockPrismaClient } from '@/__tests__/helpers/prisma-mock';
 
 // Mock dependencies
 jest.mock('@/utils/supabase/server');
@@ -25,6 +26,9 @@ jest.mock('@/utils/file-service', () => ({
 }));
 
 describe('/api/file-uploads API', () => {
+  // Type-safe Prisma mock
+  let prismaMock: MockPrismaClient;
+
   const mockSupabaseClient = {
     auth: {
       getUser: jest.fn(),
@@ -41,6 +45,11 @@ describe('/api/file-uploads API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
+
+    // Initialize type-safe Prisma mock
+    prismaMock = createMockPrisma();
+    // Mock the prisma module to return our mock instance
+    jest.mocked(prisma).fileUpload = prismaMock.fileUpload as any;
   });
 
   describe('GET /api/file-uploads - Get File URL', () => {
@@ -192,13 +201,23 @@ describe('/api/file-uploads API', () => {
           error: null,
         });
 
-        (prisma as any).fileUpload = {
-          create: jest.fn().mockResolvedValue({
-            id: 'upload-123',
-            fileName: 'document.pdf',
-            filePath: 'uploads/file-123.pdf',
-          }),
-        };
+        // Use type-safe Prisma mock
+        prismaMock.fileUpload.create.mockResolvedValue({
+          id: 'upload-123',
+          fileName: 'document.pdf',
+          filePath: 'uploads/file-123.pdf',
+          fileType: 'application/pdf',
+          fileSize: 1024,
+          fileUrl: 'https://example.com/signed-url',
+          uploadedAt: new Date(),
+          updatedAt: new Date(),
+          category: null,
+          userId: null,
+          cateringRequestId: null,
+          onDemandId: null,
+          jobApplicationId: null,
+          isTemporary: false
+        });
 
         // Create mock file
         const mockFile = new File(['file content'], 'document.pdf', {
@@ -362,11 +381,10 @@ describe('/api/file-uploads API', () => {
           error: null,
         });
 
-        (prisma as any).fileUpload = {
-          create: jest.fn().mockRejectedValue(
-            new Error('Database connection failed')
-          ),
-        };
+        // Use type-safe Prisma mock for error case
+        prismaMock.fileUpload.create.mockRejectedValue(
+          new Error('Database connection failed')
+        );
 
         const mockFile = new File(['content'], 'document.pdf', {
           type: 'application/pdf',
@@ -397,13 +415,23 @@ describe('/api/file-uploads API', () => {
           error: null,
         });
 
-        (prisma as any).fileUpload = {
-          create: jest.fn().mockResolvedValue({
-            id: 'upload-123',
-            fileName: 'resume.pdf',
-            filePath: 'job-applications/temp/session-123/file.pdf',
-          }),
-        };
+        // Use type-safe Prisma mock
+        prismaMock.fileUpload.create.mockResolvedValue({
+          id: 'upload-123',
+          fileName: 'resume.pdf',
+          filePath: 'job-applications/temp/session-123/file.pdf',
+          fileType: 'application/pdf',
+          fileSize: 1024,
+          fileUrl: 'https://example.com/signed-url',
+          uploadedAt: new Date(),
+          updatedAt: new Date(),
+          category: null,
+          userId: null,
+          cateringRequestId: null,
+          onDemandId: null,
+          jobApplicationId: null,
+          isTemporary: true
+        });
 
         const mockFile = new File(['resume content'], 'resume.pdf', {
           type: 'application/pdf',
@@ -464,13 +492,23 @@ describe('/api/file-uploads API', () => {
           error: null,
         });
 
-        (prisma as any).fileUpload = {
-          create: jest.fn().mockResolvedValue({
-            id: 'upload-123',
-            fileName: 'document.pdf',
-            filePath: 'documents/file.pdf',
-          }),
-        };
+        // Use type-safe Prisma mock
+        prismaMock.fileUpload.create.mockResolvedValue({
+          id: 'upload-123',
+          fileName: 'document.pdf',
+          filePath: 'documents/file.pdf',
+          fileType: 'application/pdf',
+          fileSize: 1024,
+          fileUrl: 'https://example.com/signed-url',
+          uploadedAt: new Date(),
+          updatedAt: new Date(),
+          category: null,
+          userId: null,
+          cateringRequestId: null,
+          onDemandId: null,
+          jobApplicationId: null,
+          isTemporary: false
+        });
 
         const mockFile = new File(['content'], 'document.pdf', {
           type: 'application/pdf',
