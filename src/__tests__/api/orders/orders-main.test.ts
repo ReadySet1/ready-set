@@ -10,6 +10,9 @@ import {
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
 
+// Set test timeout to prevent worker crashes
+jest.setTimeout(10000);
+
 // Mock dependencies
 jest.mock('@/utils/api-auth');
 jest.mock('@/utils/prismaDB', () => ({
@@ -33,6 +36,11 @@ jest.mock('@/app/actions/email', () => ({
 describe('/api/orders API - Main Endpoint', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    // Clean up any pending promises or timers
+    jest.clearAllTimers();
   });
 
   describe('GET /api/orders - List All Orders', () => {

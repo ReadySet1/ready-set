@@ -278,15 +278,15 @@ export async function expectErrorResponse(
 /**
  * Asserts that a response is unauthorized (401)
  */
-export async function expectUnauthorized(response: Response, message?: string): Promise<any> {
+export async function expectUnauthorized(response: Response, message?: string | RegExp): Promise<any> {
   return expectErrorResponse(response, 401, message);
 }
 
 /**
  * Asserts that a response is forbidden (403)
  */
-export async function expectForbidden(response: Response): Promise<any> {
-  return expectErrorResponse(response, 403);
+export async function expectForbidden(response: Response, message?: string | RegExp): Promise<any> {
+  return expectErrorResponse(response, 403, message);
 }
 
 /**
