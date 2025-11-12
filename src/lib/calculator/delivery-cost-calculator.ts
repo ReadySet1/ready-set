@@ -103,6 +103,7 @@ const VENDOR_MILEAGE_RATE = 3.0; // $3.00 per mile (vendor charges)
 const DRIVER_MILEAGE_RATE = 0.70; // $0.70 per mile (driver pay)
 const DRIVER_MILEAGE_MINIMUM = 7.0; // $7.00 minimum for driver mileage
 const DISTANCE_THRESHOLD = 10; // miles
+const MANUAL_REVIEW_HEADCOUNT_THRESHOLD = 100; // Headcount requiring manual review for certain clients
 
 const DAILY_DRIVE_DISCOUNTS: Record<number, number> = {
   1: 0,    // Single drive = no discount
@@ -225,10 +226,10 @@ function calculateDailyDriveDiscount(numberOfDrives: number, config: ClientDeliv
  * Separated for better single responsibility principle
  */
 function checkManualReviewRequired(headcount: number, config: ClientDeliveryConfiguration): void {
-  if (config.driverPaySettings.requiresManualReview && headcount >= 100) {
+  if (config.driverPaySettings.requiresManualReview && headcount >= MANUAL_REVIEW_HEADCOUNT_THRESHOLD) {
     throw new Error(
       `Order with ${headcount} headcount requires manual review for ${config.clientName}. ` +
-      `Please contact support for pricing on orders with 100+ headcount.`
+      `Please contact support for pricing on orders with ${MANUAL_REVIEW_HEADCOUNT_THRESHOLD}+ headcount.`
     );
   }
 }
@@ -447,10 +448,14 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
   const effectiveBridgeToll = requiresBridge ? (bridgeToll || config.bridgeTollSettings.defaultTollAmount) : 0;
 
   // Step 5: Calculate Driver Total Base Pay
-  // Formula: Driver Base Pay + Mileage Pay
+  // Formula: Driver Base Pay + Mileage Pay (capped at maxPayPerDrop)
   // Note: For some clients (e.g., HY Food Company), base pay is flat $50
   // For others (e.g., Destino, Try Hungry), base pay varies by headcount tier
-  const driverTotalBasePay = driverBasePay + totalMileagePay;
+  // The cap applies to base + mileage combined
+  const driverTotalBasePay = Math.min(
+    driverBasePay + totalMileagePay,
+    config.driverPaySettings.maxPayPerDrop
+  );
 
   // Step 6: Calculate Driver Total Pay
   // Formula: Total Base Pay + Bonus + Bridge Toll
