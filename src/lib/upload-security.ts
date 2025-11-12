@@ -318,9 +318,11 @@ export class UploadSecurityManager {
 
       // File inclusion attacks (using non-greedy quantifiers to prevent ReDoS)
       /<\?php/gi,
-      /<%/g,
+      // NOTE: Removed /<%/g pattern as it causes false positives with PDF files
+      // PDFs legitimately contain <% in their binary content/metadata
+      // The more specific /<%.*?%>/g pattern below catches actual server-side code
       /\{\{.*?\}\}/g, // Template syntax (non-greedy to prevent ReDoS)
-      /<%.*?%>/g, // ASP/JSP tags (non-greedy to prevent ReDoS)
+      /<%.*?%>/g, // ASP/JSP server-side tags (non-greedy to prevent ReDoS)
 
       // SQL injection patterns
       /union\s+select/gi,

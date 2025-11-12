@@ -1,7 +1,7 @@
 // src/app/api/file-uploads/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { createClient, createAdminClient } from "@/utils/supabase/server";
 import { STORAGE_BUCKETS, initializeStorageBuckets, diagnoseStorageIssues } from "@/utils/file-service";
 import { DEFAULT_SIGNED_URL_EXPIRATION } from "@/config/file-config";
 import { prisma } from "@/utils/prismaDB";
@@ -311,8 +311,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the Supabase client for storage
+    // Get the Supabase client for authentication (user session)
     const supabase = await createClient();
+
+    // Use admin client for storage operations to bypass RLS
+    // This is safe because we've already authenticated the user via session validation
+    const adminSupabase = await createAdminClient();
 
     // Handle entity IDs in a consistent way
     // Don't add temp- prefix to IDs that already have temp_ prefix (job applications)
@@ -408,9 +412,9 @@ export async function POST(request: NextRequest) {
     // Simplified bucket verification - removed diagnostic call to reduce log noise
     let bucketVerified = false;
 
-    // Try to verify the bucket exists and is accessible
+    // Try to verify the bucket exists and is accessible using admin client
     try {
-      const { data, error: listError } = await supabase.storage
+      const { data, error: listError } = await adminSupabase.storage
         .from(storageBucket)
         .list();
 
@@ -420,7 +424,7 @@ export async function POST(request: NextRequest) {
         // If verification fails, try fallback to DEFAULT bucket
         if (storageBucket !== STORAGE_BUCKETS.DEFAULT) {
           storageBucket = STORAGE_BUCKETS.DEFAULT;
-          const { error: defaultError } = await supabase.storage.from(storageBucket).list();
+          const { error: defaultError } = await adminSupabase.storage.from(storageBucket).list();
           if (!defaultError) {
             bucketVerified = true;
           }
@@ -431,7 +435,7 @@ export async function POST(request: NextRequest) {
       if (storageBucket !== STORAGE_BUCKETS.DEFAULT) {
         storageBucket = STORAGE_BUCKETS.DEFAULT;
         try {
-          const { error: fallbackError } = await supabase.storage.from(storageBucket).list();
+          const { error: fallbackError } = await adminSupabase.storage.from(storageBucket).list();
           if (!fallbackError) {
             bucketVerified = true;
           }
@@ -445,10 +449,11 @@ export async function POST(request: NextRequest) {
     let storageData: any, storageError: { message?: string } | null = null;
 
     // Multiple upload strategies in case Supabase storage fails
+    // Using admin client to bypass RLS (user is already authenticated)
     const uploadStrategies = [
       // Strategy 1: Try Supabase storage with current bucket
       async () => {
-                const result = await supabase.storage
+                const result = await adminSupabase.storage
           .from(storageBucket)
           .upload(filePath, file, {
             upsert: true,
@@ -465,7 +470,7 @@ export async function POST(request: NextRequest) {
       // Strategy 2: Try with default bucket if current bucket fails
       async () => {
         if (storageBucket !== STORAGE_BUCKETS.DEFAULT) {
-                    const result = await supabase.storage
+                    const result = await adminSupabase.storage
             .from(STORAGE_BUCKETS.DEFAULT)
             .upload(filePath, file, {
               upsert: true,
@@ -596,12 +601,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate signed URL for private bucket
+    // Generate signed URL for private bucket using admin client
     // Generate signed URL - fail upload if this fails (security requirement)
     const {
       data: signedData,
       error: signedError
-    } = await supabase.storage
+    } = await adminSupabase.storage
       .from(storageBucket)
       .createSignedUrl(filePath, DEFAULT_SIGNED_URL_EXPIRATION);
 
@@ -623,7 +628,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Clean up uploaded file since we can't generate a secure signed URL
-      await supabase.storage.from(storageBucket).remove([filePath]);
+      await adminSupabase.storage.from(storageBucket).remove([filePath]);
 
       logApiError(
         signedError || new Error('No signed URL data returned'),
@@ -683,7 +688,7 @@ export async function POST(request: NextRequest) {
     // CRITICAL: Validate that file_path is always set for new uploads (security requirement)
     if (!dbData.filePath || dbData.filePath.trim() === '') {
       // This should never happen, but fail loudly if it does
-      await supabase.storage.from(storageBucket).remove([filePath]);
+      await adminSupabase.storage.from(storageBucket).remove([filePath]);
 
       logApiError(
         new Error('File path is missing or empty'),
@@ -1118,13 +1123,13 @@ export async function DELETE(request: NextRequest) {
       filePath = fileRecord.fileUrl.split('/').pop() || '';
     }
 
-    // Get Supabase client
-    const supabase = await createClient();
+    // Get Supabase admin client for storage deletion
+    const adminSupabase = await createAdminClient();
 
     // Delete from Supabase storage
     if (filePath) {
-            
-      const { error: storageError } = await supabase.storage
+
+      const { error: storageError } = await adminSupabase.storage
         .from(bucketName)
         .remove([filePath]);
 
