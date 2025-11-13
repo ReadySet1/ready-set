@@ -132,7 +132,7 @@ export async function calculateCaterValleyPricing(
   const CATERVALLEY_MINIMUM_FEE = 42.50;
   if (pricingResult.deliveryFee < CATERVALLEY_MINIMUM_FEE) {
     // Log to Sentry for investigation (configuration may need adjustment)
-    logToSentry(
+    captureMessage(
       `CaterValley delivery fee below minimum: $${pricingResult.deliveryFee.toFixed(2)} adjusted to $${CATERVALLEY_MINIMUM_FEE.toFixed(2)}`,
       'warning',
       {

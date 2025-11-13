@@ -1,0 +1,50 @@
+meta {
+  name: 3. Confirm Order
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{BASE_URL}}/orders/confirm
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "id": "{{orderId}}",
+    "isAccepted": true
+  }
+}
+
+docs {
+  # Step 3: Confirm Order
+  
+  Finalizes the order for dispatch.
+  
+  **Requires:** Order ID from Step 1
+  
+  This completes the order flow. The order will be created with an order number starting with "CV-".
+}
+
+tests {
+  test("Order confirmed successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().status).to.equal("SUCCESS");
+  });
+  
+  test("Order number starts with CV-", function() {
+    expect(res.getBody().orderNumber).to.match(/^CV-/);
+  });
+  
+  test("Order ID matches", function() {
+    expect(res.getBody().orderId).to.equal(bru.getVar("orderId"));
+  });
+}
+

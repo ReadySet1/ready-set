@@ -1,0 +1,69 @@
+meta {
+  name: Tier 5 - Enterprise (120 People)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{BASE_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "TEST-ENTERPRISE-001",
+    "deliveryDate": "2025-11-21",
+    "deliveryTime": "12:00",
+    "totalItem": 120,
+    "priceTotal": 1500.00,
+    "pickupLocation": {
+      "name": "Enterprise Caterer",
+      "address": "1000 S Market St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95113"
+    },
+    "dropOffLocation": {
+      "name": "Convention Center",
+      "address": "150 W San Carlos St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95113",
+      "recipient": {
+        "name": "Event Manager",
+        "phone": "4085550100"
+      }
+    }
+  }
+}
+
+docs {
+  # Tier 5: Enterprise Orders (100+ headcount OR $1200+ food cost)
+  
+  **Pricing:** 10% of food cost (both within and over 10 miles)
+  
+  ## Calculation
+  - 10% of $1,500 = $150.00
+  
+  This is percentage-based pricing for large enterprise events.
+}
+
+tests {
+  test("Delivery fee is 10% of food cost", function() {
+    const foodCost = 1500;
+    const expectedFee = foodCost * 0.10;
+    expect(res.getBody().deliveryPrice).to.equal(expectedFee);
+  });
+  
+  test("Delivery fee is $150", function() {
+    expect(res.getBody().deliveryPrice).to.equal(150);
+  });
+}
+

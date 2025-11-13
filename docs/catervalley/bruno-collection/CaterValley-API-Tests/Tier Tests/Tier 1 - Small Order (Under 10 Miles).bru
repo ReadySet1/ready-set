@@ -1,0 +1,61 @@
+meta {
+  name: Tier 1 - Small Order (Under 10 Miles)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{BASE_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "TEST-TIER1-001",
+    "deliveryDate": "2025-11-21",
+    "deliveryTime": "12:00",
+    "totalItem": 10,
+    "priceTotal": 150.00,
+    "pickupLocation": {
+      "name": "Small Restaurant",
+      "address": "100 S First St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95113"
+    },
+    "dropOffLocation": {
+      "name": "Nearby Office",
+      "address": "200 S Second St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95113",
+      "recipient": {
+        "name": "Office Worker",
+        "phone": "4085550100"
+      }
+    }
+  }
+}
+
+docs {
+  # Tier 1: Small Orders (≤25 headcount OR ≤$300 food cost)
+  
+  **Within 10 miles:** $42.50
+  **Over 10 miles:** $85.00 + $1.10/mile
+  
+  This test verifies Tier 1 pricing for orders within 10 miles.
+}
+
+tests {
+  test("Delivery fee is $42.50 (Tier 1)", function() {
+    expect(res.getBody().deliveryPrice).to.equal(42.50);
+  });
+}
+
