@@ -599,5 +599,33 @@ describe('POST /api/cater-valley/orders/draft - Create Draft Order', () => {
         })
       );
     });
+
+    it('should not duplicate CV- prefix if already present', async () => {
+      const dataWithCVPrefix = {
+        ...validOrderData,
+        orderCode: 'CV-TEST-002', // Already has CV- prefix
+      };
+
+      const request = new Request('http://localhost:3000/api/cater-valley/orders/draft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'test-api-key',
+          'partner': 'catervalley',
+        },
+        body: JSON.stringify(dataWithCVPrefix),
+      });
+
+      await POST(request);
+
+      // Should use CV-TEST-002, NOT CV-CV-TEST-002
+      expect(prisma.cateringRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            orderNumber: 'CV-TEST-002', // Not duplicated
+          }),
+        })
+      );
+    });
   });
 });
