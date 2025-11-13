@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { UserType, UserStatus } from "@/types/user";
-import { toast } from "react-hot-toast";
+import toast from "react-hot-toast";
 
 interface UserSettingsTabProps {
   userId: string;

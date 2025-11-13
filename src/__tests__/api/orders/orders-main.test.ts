@@ -10,6 +10,9 @@ import {
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
 
+// Set test timeout to prevent worker crashes
+jest.setTimeout(10000);
+
 // Mock dependencies
 jest.mock('@/utils/api-auth');
 jest.mock('@/utils/prismaDB', () => ({

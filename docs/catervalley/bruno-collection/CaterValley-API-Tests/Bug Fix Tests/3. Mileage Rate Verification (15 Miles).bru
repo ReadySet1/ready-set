@@ -1,0 +1,90 @@
+meta {
+  name: 3. Mileage Rate Verification (15 Miles)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{BASE_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "TEST-MILEAGE-RATE-001",
+    "deliveryDate": "2025-11-21",
+    "deliveryTime": "12:00",
+    "totalItem": 1,
+    "priceTotal": 20.00,
+    "pickupLocation": {
+      "name": "Restaurant Downtown",
+      "address": "100 W Santa Clara St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95113"
+    },
+    "dropOffLocation": {
+      "name": "Office Park",
+      "address": "3000 Cisco Way",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95134",
+      "recipient": {
+        "name": "Test User",
+        "phone": "4085550100"
+      }
+    }
+  }
+}
+
+docs {
+  # Mileage Rate Verification (15 Miles)
+  
+  **Purpose:** Verify mileage rate is $1.10/mile (not $3.00)
+  
+  **Expected:** $90.50 total (not $100)
+  
+  ## Calculation
+  - Distance: ~15 miles (5 miles over 10-mile threshold)
+  - Base: $85.00 (Tier 1 regular rate for >10 miles)
+  - Mileage: 5 miles × $1.10 = $5.50
+  - **Total: $90.50** ✅
+  
+  ## OLD (WRONG) Calculation
+  - Base: $85.00
+  - Mileage: 5 miles × $3.00 = $15.00
+  - Total: $100.00 ❌
+  
+  The difference of $9.50 confirms the correct mileage rate.
+}
+
+tests {
+  test("Status is SUCCESS", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().status).to.equal("SUCCESS");
+  });
+  
+  test("Delivery price is ~$90.50 (not $100)", function() {
+    const price = res.getBody().deliveryPrice;
+    expect(price).to.be.greaterThan(90);
+    expect(price).to.be.lessThan(92);
+  });
+  
+  test("Mileage fee is ~$5.50 (not $15.00)", function() {
+    const mileage = res.getBody().breakdown.mileageFee;
+    expect(mileage).to.be.greaterThan(5);
+    expect(mileage).to.be.lessThan(6);
+  });
+  
+  test("Base rate is $85 (Tier 1 regular)", function() {
+    expect(res.getBody().breakdown.basePrice).to.equal(85);
+  });
+}
+

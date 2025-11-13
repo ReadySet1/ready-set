@@ -1,0 +1,67 @@
+meta {
+  name: Tier 2 - Medium Order (26 People)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{BASE_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "TEST-TIER2-001",
+    "deliveryDate": "2025-11-21",
+    "deliveryTime": "12:00",
+    "totalItem": 26,
+    "priceTotal": 350.00,
+    "pickupLocation": {
+      "name": "Catering Restaurant",
+      "address": "200 S First St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95113"
+    },
+    "dropOffLocation": {
+      "name": "Corporate Office",
+      "address": "300 S Second St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95113",
+      "recipient": {
+        "name": "Office Manager",
+        "phone": "4085550100"
+      }
+    }
+  }
+}
+
+docs {
+  # Tier 2: Medium Orders (26-49 headcount OR $300.01-599.99 food cost)
+  
+  **Within 10 miles:** $52.50
+  **Over 10 miles:** $90.00 + $1.10/mile
+  
+  This test verifies Tier 2 pricing.
+}
+
+tests {
+  test("Delivery fee is $52.50 (Tier 2)", function() {
+    expect(res.getBody().deliveryPrice).to.equal(52.50);
+  });
+  
+  test("Not Tier 1 ($42.50) or bug value ($130)", function() {
+    const price = res.getBody().deliveryPrice;
+    expect(price).to.not.equal(42.50);
+    expect(price).to.not.equal(130);
+  });
+}
+

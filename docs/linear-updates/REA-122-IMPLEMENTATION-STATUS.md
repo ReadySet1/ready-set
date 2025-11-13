@@ -519,7 +519,7 @@ From the Plane issue:
 
 ### Related Issues
 - Original issue: REA-122 (Plane)
-- Testing checklist: `REALTIME_TESTING_CHECKLIST.md`
+- Testing checklist: `../testing/REALTIME_TESTING_CHECKLIST.md`
 - This report: `REA-122-IMPLEMENTATION-STATUS.md`
 
 ---

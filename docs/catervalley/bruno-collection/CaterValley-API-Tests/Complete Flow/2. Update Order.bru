@@ -1,0 +1,51 @@
+meta {
+  name: 2. Update Order
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{BASE_URL}}/orders/update
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "id": "{{orderId}}",
+    "totalItem": 2,
+    "priceTotal": 33.50
+  }
+}
+
+docs {
+  # Step 2: Update Order
+  
+  Updates the draft order with new values.
+  
+  **Requires:** Order ID from Step 1
+  
+  The delivery fee should remain $42.50 (minimum enforced).
+}
+
+tests {
+  test("Update successful", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().status).to.equal("SUCCESS");
+  });
+  
+  test("Delivery fee still $42.50 (minimum)", function() {
+    expect(res.getBody().deliveryPrice).to.equal(42.50);
+  });
+  
+  test("Total price updated", function() {
+    expect(res.getBody().totalPrice).to.equal(76.00);
+  });
+}
+

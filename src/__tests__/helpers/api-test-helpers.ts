@@ -278,15 +278,15 @@ export async function expectErrorResponse(
 /**
  * Asserts that a response is unauthorized (401)
  */
-export async function expectUnauthorized(response: Response, message?: string): Promise<any> {
+export async function expectUnauthorized(response: Response, message?: string | RegExp): Promise<any> {
   return expectErrorResponse(response, 401, message);
 }
 
 /**
  * Asserts that a response is forbidden (403)
  */
-export async function expectForbidden(response: Response): Promise<any> {
-  return expectErrorResponse(response, 403);
+export async function expectForbidden(response: Response, message?: string | RegExp): Promise<any> {
+  return expectErrorResponse(response, 403, message);
 }
 
 /**
@@ -468,6 +468,33 @@ export function createPostRequest(
 
   // Override json() method to return the body data
   (request as any).json = jest.fn().mockResolvedValue(body);
+
+  return request;
+}
+
+/**
+ * Creates a POST request with FormData body
+ * Use this for file upload endpoints that expect multipart/form-data
+ */
+export function createPostRequestWithFormData(
+  url: string,
+  formData: FormData,
+  additionalHeaders?: Record<string, string>
+): NextRequest {
+  const request = new NextRequest(url, {
+    method: "POST",
+    headers: {
+      // Don't set Content-Type for FormData - browser/fetch will set it with boundary
+      ...additionalHeaders,
+    },
+    body: formData as any,
+  });
+
+  // Ensure url property is set for the route handler
+  Object.defineProperty(request, 'url', { value: url, writable: true });
+
+  // Mock formData() method to return the FormData object
+  (request as any).formData = jest.fn().mockResolvedValue(formData);
 
   return request;
 }
