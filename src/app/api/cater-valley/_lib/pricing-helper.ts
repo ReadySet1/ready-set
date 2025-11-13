@@ -131,10 +131,26 @@ export async function calculateCaterValleyPricing(
   // 5. CRITICAL: Ensure CaterValley $42.50 minimum delivery fee
   const CATERVALLEY_MINIMUM_FEE = 42.50;
   if (pricingResult.deliveryFee < CATERVALLEY_MINIMUM_FEE) {
-    throw new Error(
-      `Calculated delivery fee ($${pricingResult.deliveryFee.toFixed(2)}) is below CaterValley minimum of $${CATERVALLEY_MINIMUM_FEE.toFixed(2)}. ` +
-      `This may indicate a pricing configuration error.`
+    // Log to Sentry for investigation (configuration may need adjustment)
+    logToSentry(
+      `CaterValley delivery fee below minimum: $${pricingResult.deliveryFee.toFixed(2)} adjusted to $${CATERVALLEY_MINIMUM_FEE.toFixed(2)}`,
+      'warning',
+      {
+        action: 'minimum_fee_adjustment',
+        feature: feature,
+        metadata: {
+          orderCode: orderCode,
+          calculatedFee: pricingResult.deliveryFee,
+          minimumFee: CATERVALLEY_MINIMUM_FEE,
+          headcount: totalItem,
+          foodCost: priceTotal,
+          distance: distance
+        }
+      }
     );
+
+    // Automatically adjust to minimum fee (don't throw error - customer shouldn't be blocked)
+    pricingResult.deliveryFee = CATERVALLEY_MINIMUM_FEE;
   }
 
   return {

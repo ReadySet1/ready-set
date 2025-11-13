@@ -5,6 +5,16 @@ import type { PricingCalculationRequest, PricingApiResponse, PricingCalculation 
 /**
  * POST /api/pricing/calculate
  * Calculate pricing based on head count, food cost, and tip status
+ * 
+ * ⚠️ WARNING: This endpoint uses the OLD PricingService which is NOT suitable for CaterValley.
+ * For CaterValley pricing calculations, use:
+ * - POST /api/cater-valley/orders/draft (for order creation)
+ * - POST /api/cater-valley/orders/update (for order updates)
+ * 
+ * This endpoint should only be used for:
+ * - Generic pricing previews
+ * - Admin tools (non-CaterValley)
+ * - Legacy calculator components
  */
 export async function POST(request: NextRequest) {
   try {

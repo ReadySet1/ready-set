@@ -10,6 +10,18 @@ import type {
 
 /**
  * Service class for handling pricing calculations and tier management
+ * 
+ * ⚠️ IMPORTANT: This service uses database pricing tiers and is NOT used for CaterValley.
+ * 
+ * CaterValley Integration Uses:
+ * - src/lib/calculator/delivery-cost-calculator.ts (calculation engine)
+ * - src/lib/calculator/client-configurations.ts (CATER_VALLEY config)
+ * - src/app/api/cater-valley/_lib/pricing-helper.ts (API integration)
+ * 
+ * This service is for:
+ * - Admin pricing tier management (database CRUD)
+ * - Generic pricing calculations (non-client-specific)
+ * - NOT for CaterValley API endpoints
  */
 export class PricingService {
   private prisma: PrismaClient;

@@ -583,10 +583,10 @@ describe('Delivery Cost Calculator', () => {
 
       // Over 10 miles uses regularRate of $85
       expect(result.deliveryCost).toBe(85);
-      // Mileage: (15 - 10) × $3 = $15
-      expect(result.totalMileagePay).toBe(15);
-      // Total: $85 + $15 = $100
-      expect(result.deliveryFee).toBe(100);
+      // Mileage: (15 - 10) × $1.10 = $5.50
+      expect(result.totalMileagePay).toBeCloseTo(5.50, 2);
+      // Total: $85 + $5.50 = $90.50
+      expect(result.deliveryFee).toBeCloseTo(90.50, 2);
     });
 
     test('CaterValley: Large order (50-74 headcount) within 10 miles shows $62.50', () => {
@@ -649,8 +649,8 @@ describe('Delivery Cost Calculator', () => {
 
       // Over 10 miles, should use regularRate
       expect(result.deliveryCost).toBe(85); // Regular rate for tier 1
-      expect(result.totalMileagePay).toBeCloseTo(0.30, 2); // (10.1 - 10) × $3 = $0.30
-      expect(result.deliveryFee).toBeCloseTo(85.30, 2); // $85 + $0.30
+      expect(result.totalMileagePay).toBeCloseTo(0.11, 2); // (10.1 - 10) × $1.10 = $0.11
+      expect(result.deliveryFee).toBeCloseTo(85.11, 2); // $85 + $0.11
     });
 
     test('CaterValley: Edge case - 9.9 miles uses within10Miles rate', () => {
@@ -750,10 +750,10 @@ describe('Delivery Cost Calculator', () => {
       const result = calculateDeliveryCost(input);
 
       // 10% of $1500 = $150 base
-      // 5 miles over threshold × $3.00 = $15 mileage
+      // 5 miles over threshold × $1.10 = $5.50 mileage
       expect(result.deliveryCost).toBe(150);
-      expect(result.totalMileagePay).toBe(15);
-      expect(result.deliveryFee).toBe(165);
+      expect(result.totalMileagePay).toBeCloseTo(5.50, 2);
+      expect(result.deliveryFee).toBeCloseTo(155.50, 2);
     });
 
     test('CaterValley: Zero-cost validation prevents $0 delivery for non-zero orders', () => {
@@ -797,6 +797,135 @@ describe('Delivery Cost Calculator', () => {
       expect(result.deliveryCost).toBe(62.50);
       expect(result.dailyDriveDiscount).toBe(0); // No discount for single drive
       expect(result.deliveryFee).toBe(62.50);
+    });
+
+    // ============================================================================
+    // BUG FIX VALIDATION: Issue reported by CaterValley client (Nov 2025)
+    // All orders were showing $130 delivery fee regardless of distance
+    // ============================================================================
+
+    test('CaterValley BUG FIX: 1.1 mile order shows $42.50 (not $130)', () => {
+      // SCENARIO: Client reported that a 1.1-mile order was showing $130 delivery fee
+      // EXPECTED: Should be $42.50 (Tier 1, within 10 miles, minimum fee)
+      const input: DeliveryCostInput = {
+        headcount: 1,
+        foodCost: 16.75, // Single item order
+        totalMileage: 1.1, // Very short distance
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // CRITICAL: Must be $42.50, NOT $130
+      expect(result.deliveryCost).toBe(42.50);
+      expect(result.totalMileagePay).toBe(0); // No mileage fee under 10 miles
+      expect(result.deliveryFee).toBe(42.50);
+      
+      // Ensure it's nowhere near $130
+      expect(result.deliveryFee).toBeLessThan(50);
+    });
+
+    test('CaterValley BUG FIX: Mileage rate is $1.10 per mile (not $3.00)', () => {
+      // SCENARIO: Mileage rate was incorrectly set to $3.00 instead of $1.10
+      // EXPECTED: 15-mile order should charge $1.10/mile for 5 extra miles = $5.50
+      const input: DeliveryCostInput = {
+        headcount: 1,
+        foodCost: 16.75,
+        totalMileage: 15, // 5 miles over threshold
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // Over 10 miles, uses regularRate (not within10Miles)
+      expect(result.deliveryCost).toBe(85); // Tier 1 regularRate
+      
+      // Mileage calculation: (15 - 10) × $1.10 = $5.50 (NOT $15.00 with old $3.00 rate)
+      expect(result.totalMileagePay).toBeCloseTo(5.50, 2);
+      
+      // Total: $85 + $5.50 = $90.50 (NOT $100 with old rate)
+      expect(result.deliveryFee).toBeCloseTo(90.50, 2);
+    });
+
+    test('CaterValley BUG FIX: Corrected mileage calculation for 15-mile order', () => {
+      // SCENARIO: Testing correct mileage rate with orders over 10 miles
+      // For Tier 1 over 10 miles: regularRate (85) + mileage
+      const input: DeliveryCostInput = {
+        headcount: 1,
+        foodCost: 16.75,
+        totalMileage: 15, // 5 miles over threshold
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // Over 10 miles, uses regularRate
+      expect(result.deliveryCost).toBe(85); // Tier 1 regularRate
+      
+      // Mileage: (15 - 10) × $1.10 = $5.50
+      expect(result.totalMileagePay).toBeCloseTo(5.50, 2);
+      
+      // Total: $85 + $5.50 = $90.50
+      expect(result.deliveryFee).toBeCloseTo(90.50, 2);
+      
+      // Ensure it's NOT using old $3.00 rate (would be $85 + $15 = $100)
+      expect(result.deliveryFee).toBeLessThan(95);
+    });
+
+    test('CaterValley BUG FIX: No short-distance orders should ever show $130', () => {
+      // SCENARIO: Verify that NO tier shows $130 for orders under 10 miles
+      // Test all tier boundaries at short distances
+      
+      const testCases = [
+        { headcount: 1, foodCost: 50, tier: 1 },
+        { headcount: 26, foodCost: 350, tier: 2 },
+        { headcount: 50, foodCost: 650, tier: 3 },
+        { headcount: 75, foodCost: 950, tier: 4 },
+      ];
+
+      testCases.forEach(({ headcount, foodCost, tier }) => {
+        const input: DeliveryCostInput = {
+          headcount,
+          foodCost,
+          totalMileage: 5, // Well under 10 miles
+          numberOfDrives: 1,
+          clientConfigId: 'cater-valley'
+        };
+
+        const result = calculateDeliveryCost(input);
+
+        // CRITICAL: No order under 10 miles should be anywhere near $130
+        expect(result.deliveryFee).toBeLessThan(130);
+        expect(result.deliveryFee).toBeGreaterThanOrEqual(42.50); // Minimum fee
+        
+        // Log for debugging
+        if (result.deliveryFee >= 100) {
+          throw new Error(
+            `Tier ${tier} showing $${result.deliveryFee} for ${headcount} people, $${foodCost} food cost at 5 miles. ` +
+            `This should be less than $100 for short distances.`
+          );
+        }
+      });
+    });
+
+    test('CaterValley BUG FIX: Minimum $42.50 fee is always enforced', () => {
+      // SCENARIO: Very low cost/headcount orders should still have $42.50 minimum
+      const input: DeliveryCostInput = {
+        headcount: 1,
+        foodCost: 10, // Very low cost
+        totalMileage: 1,
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // Even for very small orders, minimum is $42.50
+      expect(result.deliveryFee).toBeGreaterThanOrEqual(42.50);
+      expect(result.deliveryFee).toBe(42.50); // Should be exactly minimum
     });
 
     describe('Try Hungry Configuration', () => {
