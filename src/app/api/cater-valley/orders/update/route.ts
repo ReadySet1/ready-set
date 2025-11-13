@@ -290,6 +290,9 @@ export async function POST(request: NextRequest) {
         specialNotes: usedFallbackDistance
           ? `${validatedData.dropOffLocation.instructions || ''}\n[FALLBACK DISTANCE: ${distance}mi - Manual review needed]`.trim()
           : validatedData.dropOffLocation.instructions || '',
+        // Update delivery cost and distance for transparency
+        deliveryCost: pricingResult.deliveryFee,
+        deliveryDistance: distance,
         updatedAt: new Date(),
       },
       include: {

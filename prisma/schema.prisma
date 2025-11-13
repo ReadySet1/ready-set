@@ -203,6 +203,8 @@ model CateringRequest {
   tip               Decimal?         @default(0.00) @db.Decimal(10, 2)
   appliedDiscount   Decimal?         @db.Decimal(10, 2)
   pricingTierId     String?          @db.Uuid
+  deliveryCost      Decimal?         @db.Decimal(10, 2)
+  deliveryDistance  Decimal?         @db.Decimal(10, 2)
   createdAt         DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt         DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
   driverStatus      DriverStatus?

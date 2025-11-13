@@ -2,6 +2,20 @@
  * Updated Pricing Service for CaterValley Integration
  * Implements the new distance-based and head count-based pricing structure
  * URGENT: Updated to address financial losses on deliveries
+ * 
+ * ⚠️ WARNING: This pricing service is DEPRECATED for CaterValley orders.
+ * CaterValley orders MUST use the new delivery-cost-calculator system:
+ * - File: src/lib/calculator/delivery-cost-calculator.ts
+ * - Config: src/lib/calculator/client-configurations.ts (CATER_VALLEY)
+ * - Helper: src/app/api/cater-valley/_lib/pricing-helper.ts
+ * 
+ * This old system has incorrect pricing tiers including $130 rates that do NOT
+ * match the CaterValley API contract. Using this system will cause overcharging.
+ * 
+ * USE CASES FOR THIS FILE:
+ * - Generic pricing calculations (non-CaterValley)
+ * - Legacy admin tools
+ * - DO NOT USE for CaterValley API endpoints
  */
 
 import { localTimeToUtc, utcToLocalTime } from '@/lib/utils/timezone';

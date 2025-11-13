@@ -7,43 +7,36 @@ import {
   UploadOptions,
   FileValidationConfig
 } from '@/types/upload';
+import {
+  UPLOAD_LIMITS,
+  ALLOWED_MIME_TYPES,
+  ALLOWED_EXTENSIONS,
+  ENV_CONFIG,
+  RETRY_CONFIG,
+  FILENAME_LIMITS,
+  SCAN_LIMITS
+} from '@/config/upload-config';
 
-// Default retry configuration
+// Default retry configuration (using centralized constants)
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxAttempts: 3,
-  baseDelay: 1000, // 1 second
-  maxDelay: 30000, // 30 seconds
-  backoffFactor: 2,
-  jitter: true
+  maxAttempts: RETRY_CONFIG.MAX_ATTEMPTS,
+  baseDelay: RETRY_CONFIG.BASE_DELAY,
+  maxDelay: RETRY_CONFIG.MAX_DELAY,
+  backoffFactor: RETRY_CONFIG.BACKOFF_FACTOR,
+  jitter: RETRY_CONFIG.ENABLE_JITTER
 };
 
 // Default validation configuration
 export const DEFAULT_VALIDATION_CONFIG: FileValidationConfig = {
-  maxSize: 10 * 1024 * 1024, // 10MB
-  allowedTypes: [
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp',
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/plain',
-    'text/csv'
-  ],
+  maxSize: UPLOAD_LIMITS.MAX_FILE_SIZE,
+  allowedTypes: [...ALLOWED_MIME_TYPES],
   blockedTypes: [
     'application/x-executable',
     'application/x-msdownload',
     'application/x-dosexec',
     'application/octet-stream'
   ],
-  allowedExtensions: [
-    '.jpg', '.jpeg', '.png', '.gif', '.webp',
-    '.pdf', '.doc', '.docx', '.xls', '.xlsx',
-    '.txt', '.csv'
-  ],
+  allowedExtensions: [...ALLOWED_EXTENSIONS],
   blockedExtensions: [
     '.exe', '.bat', '.cmd', '.scr', '.pif',
     '.com', '.jar', '.js', '.vbs', '.ps1'
@@ -187,14 +180,48 @@ export class UploadErrorHandler {
       };
     }
 
-    // Default unknown error
+    // Default unknown error - sanitize for production
+    const errorMessage = error.message || error.toString() || 'Unknown error occurred';
+    const errorCode = error.code || error.statusCode || error.status;
+
+    // Create user message - sanitized for production, detailed for development
+    let userMessage: string;
+    if (ENV_CONFIG.isProduction) {
+      // Production: Generic message with correlation ID only
+      userMessage = 'An unexpected error occurred. Please try again or contact support if the problem persists.';
+    } else {
+      // Development: Include error details for debugging using template literals
+      const errorParts = ['An unexpected error occurred'];
+      if (errorCode) {
+        errorParts.push(`(Code: ${errorCode})`);
+      }
+      if (errorMessage && errorMessage !== 'Unknown error occurred') {
+        errorParts.push(`Details: ${errorMessage}`);
+      }
+      errorParts.push('Please try again or contact support if the problem persists');
+      userMessage = errorParts.join('. ') + '.';
+    }
+
     return {
       type: UploadErrorType.UNKNOWN_ERROR,
-      message: error.message || 'Unknown error occurred',
-      userMessage: 'An unexpected error occurred. Please try again or contact support if the problem persists.',
-      details: {
-        originalMessage: error.message,
-        stack: error.stack
+      message: errorMessage,
+      userMessage,
+      details: ENV_CONFIG.isDevelopment ? {
+        originalMessage: errorMessage,
+        errorCode,
+        errorName: error.name,
+        errorConstructor: error.constructor?.name,
+        stack: error.stack,
+        // Include any additional properties from the error object (dev only)
+        ...Object.keys(error).reduce((acc, key) => {
+          if (!['message', 'stack', 'name'].includes(key)) {
+            acc[key] = error[key];
+          }
+          return acc;
+        }, {} as Record<string, any>)
+      } : {
+        // Production: Only include correlation ID
+        correlationId
       },
       retryable: true,
       retryAfter: 3000,
@@ -327,50 +354,105 @@ export class UploadErrorHandler {
   }
 
   static logError(error: UploadError, context?: Record<string, any>): void {
-    const logData = {
-      correlationId: error.correlationId,
-      type: error.type,
-      message: error.message,
-      userMessage: error.userMessage,
-      retryable: error.retryable,
-      timestamp: error.timestamp.toISOString(),
-      context,
-      stack: error.originalError?.stack
-    };
-
-    // Log to console for development
-    console.error('Upload Error:', logData);
-
-    // In production, you would send this to your logging service
-    // Example: await logToService('upload-error', logData);
+    // Environment-aware logging to prevent sensitive data exposure in production
+    if (ENV_CONFIG.isDevelopment) {
+      // Development: Log full error details including stack traces
+      const logData = {
+        correlationId: error.correlationId,
+        type: error.type,
+        message: error.message,
+        userMessage: error.userMessage,
+        retryable: error.retryable,
+        timestamp: error.timestamp.toISOString(),
+        context,
+        stack: error.originalError?.stack
+      };
+      console.error('Upload Error:', logData);
+    } else {
+      // Production: Log only correlation ID and error type, excluding file names, paths, user data, and stack traces
+      console.error('Upload Error:', {
+        correlationId: error.correlationId,
+        type: error.type
+      });
+      // In production, send detailed errors to your logging service instead
+      // Example: await logToService('upload-error', error);
+    }
   }
 
   static async reportError(error: UploadError, userId?: string): Promise<void> {
-    try {
-      // Construct absolute URL for server-side fetch
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-      const apiUrl = `${baseUrl}/api/upload-errors`;
+    // Fire-and-forget error reporting to avoid blocking the upload response
+    // Don't await the fetch call - let it run in the background
+    const reportAsync = async () => {
+      try {
+        // Construct absolute URL for server-side fetch
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
-      // Report to error tracking service
-      await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+        // Validate environment variable in production
+        if (ENV_CONFIG.isProduction && !baseUrl) {
+          console.warn('NEXT_PUBLIC_SITE_URL is not defined. Error reporting is disabled.');
+          // PRODUCTION MONITORING: Log to stderr so it appears in production logs
+          console.error('[ERROR_REPORTING] Configuration error: NEXT_PUBLIC_SITE_URL is not defined');
+          return;
+        }
+
+        // Use localhost as fallback only in development
+        const apiUrl = `${baseUrl || 'http://localhost:3000'}/api/upload-errors`;
+
+        // Report to error tracking service
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            correlationId: error.correlationId,
+            errorType: error.type,
+            message: error.message,
+            userMessage: error.userMessage,
+            details: error.details,
+            userId,
+            timestamp: error.timestamp.toISOString(),
+            retryable: error.retryable
+          })
+        });
+
+        // PRODUCTION MONITORING: Log failed error reporting attempts
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => 'Unable to read response');
+          console.error('[ERROR_REPORTING] Failed to report error:', {
+            correlationId: error.correlationId,
+            errorType: error.type,
+            statusCode: response.status,
+            statusText: response.statusText,
+            responseBody: errorText.substring(0, 500) // Limit log size
+          });
+        }
+      } catch (reportError) {
+        // PRODUCTION MONITORING: Always log reporting failures to stderr for monitoring
+        console.error('[ERROR_REPORTING] Exception while reporting error:', {
           correlationId: error.correlationId,
           errorType: error.type,
-          message: error.message,
-          userMessage: error.userMessage,
-          details: error.details,
-          userId,
-          timestamp: error.timestamp.toISOString(),
-          retryable: error.retryable
-        })
+          reportingError: reportError instanceof Error ? reportError.message : String(reportError)
+        });
+
+        // Additional verbose logging in development
+        if (ENV_CONFIG.isDevelopment) {
+          console.error('Failed to report error (detailed):', reportError);
+        }
+      }
+    };
+
+    // Execute asynchronously without blocking (fire-and-forget pattern)
+    void reportAsync().catch((err) => {
+      // PRODUCTION MONITORING: Log uncaught errors in the reporting flow
+      console.error('[ERROR_REPORTING] Uncaught error in reportAsync:', {
+        error: err instanceof Error ? err.message : String(err)
       });
-    } catch (reportError) {
-      console.error('Failed to report error:', reportError);
-    }
+
+      if (ENV_CONFIG.isDevelopment) {
+        console.error('Error reporting failed (catch handler):', err);
+      }
+    });
   }
 }
 
@@ -450,27 +532,39 @@ export class FileValidator {
 
     // Type validation
     if (!this.isAllowedType(file, config)) {
+      // Create a user-friendly list of allowed formats
+      const allowedFormats = config.allowedExtensions
+        .map(ext => ext.replace('.', '').toUpperCase())
+        .join(', ');
+
       return UploadErrorHandler.createValidationError(
         'type',
         `File type ${file.type} is not allowed`,
-        `File type "${file.type}" is not supported. Please choose a different file.`,
+        `File type "${file.type}" is not supported. Allowed formats: ${allowedFormats}. Please choose a different file.`,
         {
           fileType: file.type,
           fileName: file.name,
-          allowedTypes: config.allowedTypes
+          allowedTypes: config.allowedTypes,
+          allowedExtensions: config.allowedExtensions
         }
       );
     }
 
     // Extension validation
     if (!this.isAllowedExtension(file, config)) {
+      const currentExtension = this.getExtension(file.name);
+      // Create a user-friendly list of allowed extensions
+      const allowedFormats = config.allowedExtensions
+        .map(ext => ext.replace('.', '').toUpperCase())
+        .join(', ');
+
       return UploadErrorHandler.createValidationError(
         'type',
         `File extension not allowed for file ${file.name}`,
-        'This file extension is not allowed. Please choose a different file.',
+        `File extension "${currentExtension}" is not allowed. Allowed formats: ${allowedFormats}. Please choose a different file.`,
         {
           fileName: file.name,
-          extension: this.getExtension(file.name),
+          extension: currentExtension,
           allowedExtensions: config.allowedExtensions
         }
       );
@@ -536,8 +630,8 @@ export class FileValidator {
 
   private static isValidFilename(filename: string, config: FileValidationConfig): boolean {
     if (config.sanitizeFilename) {
-      // Check length - allow slightly longer filenames (300 chars instead of 255)
-      if (filename.length > 300) {
+      // Check length using centralized constant
+      if (filename.length > FILENAME_LIMITS.MAX_LENGTH) {
         return false;
       }
 
@@ -577,9 +671,9 @@ export class FileValidator {
     // Combine name and extension
     let sanitized = sanitizedName + extension;
 
-    // Truncate if too long (allow up to 300 chars)
-    if (sanitized.length > 300) {
-      const maxNameLength = 295 - extension.length;
+    // Truncate if too long using centralized constant
+    if (sanitized.length > FILENAME_LIMITS.MAX_LENGTH) {
+      const maxNameLength = FILENAME_LIMITS.MAX_LENGTH - 5 - extension.length;
       sanitized = sanitizedName.substring(0, maxNameLength) + extension;
     }
 
@@ -596,45 +690,7 @@ export class FileValidator {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
-  static async scanForVirus(file: File): Promise<{ isClean: boolean; threats: string[] }> {
-    // This is a placeholder for virus scanning
-    // In a real implementation, you would integrate with a virus scanning service
-    // like ClamAV, VirusTotal, or a cloud-based service
-
-    // Check file size first to prevent memory issues
-    const MAX_SCAN_SIZE = 10 * 1024 * 1024; // 10MB limit for content scanning
-    if (file.size > MAX_SCAN_SIZE) {
-      return {
-        isClean: false,
-        threats: [`File too large for virus scan (${this.formatFileSize(file.size)}). Maximum scan size is 10MB.`]
-      };
-    }
-
-    // For now, we'll do basic content scanning
-    const content = await file.text();
-    const threats: string[] = [];
-
-    // Check for suspicious patterns
-    const suspiciousPatterns = [
-      /<script/i,
-      /javascript:/i,
-      /vbscript:/i,
-      /onload=/i,
-      /onerror=/i,
-      /eval\(/i,
-      /exec\(/i,
-      /system\(/i
-    ];
-
-    for (const pattern of suspiciousPatterns) {
-      if (pattern.test(content)) {
-        threats.push(`Suspicious pattern detected: ${pattern.source}`);
-      }
-    }
-
-    return {
-      isClean: threats.length === 0,
-      threats
-    };
-  }
+  // NOTE: Virus scanning functionality has been moved to src/lib/upload-security.ts
+  // The upload-security.ts implementation uses streaming for better performance
+  // and handles binary files correctly. Use that implementation instead.
 }

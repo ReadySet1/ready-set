@@ -1,154 +1,191 @@
-# Circuit Breaker Improvements: Monitoring, Better Errors, and Edge Case Testing
+# PR: Merge development into main
 
 ## Summary
 
-This PR implements comprehensive improvements to our circuit breaker system, adding real-time monitoring capabilities, enhanced error messages with retry-after information, and extensive edge case testing. These improvements significantly enhance operational visibility and reliability for external API integrations, particularly the CaterValley service.
+This PR merges 18 commits from the `development` branch into `main`, bringing critical security fixes, new features, and improvements to production.
 
-## Related Issues
+**Key Features:**
+- File upload security fixes and PowerPoint support (REA-53)
+- Client-specific calculator configurations with tiered driver pay (REA-41)
+- CaterValley delivery fee calculation fixes
+- Test improvements (REA-177)
 
-- **REA-92**: Add Circuit Breaker Monitoring and Alerts
-- **REA-93**: Better Error Messages with Retry-After Info
-- **REA-94**: Edge Case Tests for Circuit Breaker
+**Related Issues:**
+- REA-53: Document upload security fixes
+- REA-41: Calculator client configurations
+- REA-177: Test improvements
 
 ## Features/Changes
 
-### 1. Circuit Breaker Monitoring (REA-92)
+### REA-53: Document Upload Security Fixes
+- ✅ Fixed RLS policy violations causing upload failures
+- ✅ Added PowerPoint (PPT/PPTX) file support
+- ✅ Enhanced security scanning and error handling
+- ✅ Improved PDF detection (reduced false positives)
+- ✅ Added comprehensive error logging and reporting
+- ✅ Created file uploader storage bucket migration
 
-- **New Monitoring Endpoint**: `/api/monitoring/circuit-breakers`
-  - GET: Returns comprehensive monitoring data for all circuit breakers
-  - POST: Manual circuit breaker reset for emergency recovery
-  - Supports filtering by name: `?name=CaterValley`
-- **Monitoring Data Interface**: Added `CircuitBreakerMonitoringData` with health status, metrics, and state information
-- **Metrics Tracking**: Track total requests, failures, successes, state transitions, and failure rates
-- **Health Status Calculation**: Automatic health assessment (healthy/degraded/critical) based on state and metrics
-- **Inactivity Auto-Reset**: Circuit breakers automatically reset after 5 minutes of inactivity to prevent stuck states
-- **Alert Integration**: Critical state changes trigger alerts via the existing alerting system
+### REA-41: Calculator Client Configurations
+- ✅ Added client-specific delivery cost configurations
+- ✅ Implemented tiered driver pay system
+- ✅ Added support for custom mileage rates per client
+- ✅ Implemented manual review thresholds
+- ✅ Added bridge toll support with auto-detection
+- ✅ Enhanced calculator with null safety checks
 
-### 2. Enhanced Error Messages (REA-93)
+### REA-177: Test Improvements
+- ✅ Applied high-impact quick wins for test reliability
+- ✅ Fixed test mocking issues
+- ✅ Improved test coverage
 
-- **New Error Class**: `CircuitBreakerOpenError` with structured error information
-- **Retry-After Information**: Errors include precise retry timestamps and estimated wait times
-- **Structured Error Response**: JSON serialization with `toJSON()` for consistent API responses
-- **Helper Function**: `circuitBreakerErrorResponse()` for standardized HTTP 503 responses with Retry-After headers
+### CaterValley Integration
+- ✅ Fixed delivery fee calculation bugs
+- ✅ Added delivery cost and distance transparency
+- ✅ Enhanced error handling and logging
 
-### 3. Comprehensive Edge Case Testing (REA-94)
-
-- **26 New Tests** covering 7 critical categories:
-  1. **Concurrent Operations** (4 tests) - Parallel request handling
-  2. **Race Conditions** (3 tests) - State transition safety
-  3. **State Transition Edge Cases** (5 tests) - Boundary conditions
-  4. **Boundary Conditions** (4 tests) - Zero/max threshold scenarios
-  5. **High Load Scenarios** (4 tests) - Up to 1000 concurrent operations
-  6. **Metrics Accuracy** (3 tests) - Counter integrity
-  7. **Reset and Cleanup** (3 tests) - State reset verification
-
-### 4. Documentation Updates
-
-- **README.md**: Added comprehensive "API Resilience & Monitoring" section
-- **Inline Documentation**: Enhanced JSDoc comments throughout modified files
+### Other Improvements
+- ✅ Comprehensive code quality improvements
+- ✅ Documentation updates
+- ✅ Removed unused files
 
 ## Testing
 
-### What Was Tested
+### Unit Tests
+- ✅ **delivery-cost-calculator.test.ts**: 75/75 tests passing
+- ✅ **file-uploads.test.ts**: Core functionality tests passing
+- ⚠️ Some pre-existing test failures unrelated to this branch
 
-✅ **Unit Tests**: All 26 new edge case tests pass
-✅ **Integration Tests**: Existing API resilience integration tests pass
-✅ **Linting**: No new lint errors
-✅ **Type Checking**: No new TypeScript errors
-✅ **Build**: Production build successful
+### Integration Tests
+- ✅ File upload integration tests passing
+- ✅ Calculator integration tests passing
 
-### How to Test
+### E2E Tests
+- ✅ Order flow tests passing
+- ✅ Authentication flow tests passing
 
-1. **Start the development server**:
-   ```bash
-   pnpm dev
-   ```
-
-2. **Test monitoring endpoint**:
-   ```bash
-   # Get all circuit breakers
-   curl http://localhost:3000/api/monitoring/circuit-breakers
-
-   # Get specific circuit breaker
-   curl http://localhost:3000/api/monitoring/circuit-breakers?name=CaterValley
-
-   # Manual reset (POST)
-   curl -X POST http://localhost:3000/api/monitoring/circuit-breakers \
-     -H "Content-Type: application/json" \
-     -d '{"name": "CaterValley"}'
-   ```
-
-3. **Run edge case tests**:
-   ```bash
-   pnpm test circuit-breaker-edge-cases
-   ```
-
-4. **Trigger circuit breaker** (for testing error messages):
-   - Make 3+ consecutive failed requests to CaterValley service
-   - Observe the enhanced error message with retry-after info
-   - Check monitoring endpoint for state changes
+### Manual Testing
+- ✅ File upload functionality (including PowerPoint)
+- ✅ Calculator configurations
+- ✅ CaterValley delivery fee calculations
+- ✅ Order creation/update flows
 
 ## Database Changes
 
-**N/A** - No database migrations or schema changes required.
+### Migrations Applied
+1. **`add-delivery-cost-distance-to-catering-requests.sql`**
+   - Adds `deliveryCost` and `deliveryDistance` columns to `catering_requests` table
+   - Creates indexes for reporting
+   - **Status**: Already applied to production ✅
+   - **Rollback**: 
+     ```sql
+     ALTER TABLE public.catering_requests 
+     DROP COLUMN IF EXISTS "deliveryCost", 
+     DROP COLUMN IF EXISTS "deliveryDistance";
+     ```
+
+2. **`20251112000000_create_file_uploader_bucket.sql`**
+   - Creates `fileUploader` storage bucket
+   - Sets MIME type restrictions
+   - **Status**: Already applied to production ✅
+   - **Rollback**: 
+     ```sql
+     DELETE FROM storage.buckets WHERE id = 'fileUploader';
+     ```
+
+### Prisma Schema Updates
+- Updated schema to match database changes
+- Run `prisma generate` after merge
+
+### Migration Notes
+- Both migrations are idempotent (use `IF NOT EXISTS`/`ON CONFLICT`)
+- Migrations already applied to production
+- No manual steps required
 
 ## Breaking Changes
 
-**None** - All changes are backward compatible. Existing circuit breaker functionality remains unchanged.
+**None** - All changes are backward compatible.
+
+- API endpoints remain unchanged
+- Database schema changes are additive only
+- No deprecated features removed
 
 ## Deployment Notes
 
+### Pre-Deployment Checklist
+- [x] Database migrations reviewed and verified
+- [x] Environment variables documented
+- [x] Build passes successfully
+- [x] Key tests passing
+
 ### Environment Variables
+No new required environment variables. Optional variables:
+- `CATERVALLEY_WEBHOOK_URL` (optional, has default)
+- `CATERVALLEY_API_KEY` (optional)
+- `GOOGLE_MAPS_API_KEY` (required for distance calculations)
 
-No new environment variables required. Uses existing configuration.
+### Post-Deployment Steps
+1. Verify migrations applied successfully (already done)
+2. Run `prisma generate` to update Prisma client
+3. Monitor file upload functionality
+4. Monitor CaterValley webhook deliveries
+5. Check Sentry for any errors
 
-### Monitoring
-
-After deployment, the monitoring endpoint will be immediately available:
-- **Production URL**: `https://your-domain.com/api/monitoring/circuit-breakers`
-- **Access**: Currently public - consider adding authentication for production
-
-### Alerting
-
-Circuit breaker state changes will now trigger alerts via the existing alerting system. Ensure alert channels (email, Slack, etc.) are properly configured.
+### Rollback Procedure
+1. **Code Rollback**: Revert merge commit
+2. **Database Rollback**: 
+   - Columns can be dropped if needed (see migration rollback SQL above)
+   - Bucket deletion only if no files exist
+3. **Monitoring**: Check Sentry/error logs for issues
 
 ## Reviewer Checklist
 
-Technical items to verify during code review:
+- [ ] Code follows TypeScript/Next.js best practices
+- [ ] Tests pass and cover new functionality
+- [ ] No security vulnerabilities introduced
+- [ ] Documentation is updated
+- [ ] Performance impact acceptable
+- [ ] Migrations are safe and idempotent
+- [ ] No breaking changes introduced
 
-- [ ] Circuit breaker monitoring endpoint returns expected data structure
-- [ ] Enhanced error messages include retry-after timestamps
-- [ ] All 26 edge case tests pass consistently
-- [ ] Metrics tracking is accurate under concurrent load
-- [ ] Inactivity auto-reset works after 5 minutes
-- [ ] Alert integration triggers on state changes
-- [ ] No console.log statements in production code (only error logging in API routes)
-- [ ] Type safety maintained throughout changes
-- [ ] Documentation accurately reflects new features
-- [ ] Manual circuit breaker reset works via POST endpoint
+## Files Changed
 
-## Files Modified
+### Key Files
+- `src/app/api/file-uploads/route.ts` - Enhanced upload security
+- `src/app/api/file-uploads/catering/upload/route.ts` - Catering upload endpoint
+- `src/lib/calculator/delivery-cost-calculator.ts` - Calculator improvements
+- `src/lib/calculator/client-configurations.ts` - Client configurations
+- `src/lib/upload-error-handler.ts` - Enhanced error handling
+- `migrations/add-delivery-cost-distance-to-catering-requests.sql` - Migration
+- `supabase/migrations/20251112000000_create_file_uploader_bucket.sql` - Migration
 
-- `src/utils/api-resilience.ts` - Core circuit breaker implementation (+302 lines)
-- `src/app/api/monitoring/circuit-breakers/route.ts` - New monitoring endpoint (+145 lines)
-- `src/__tests__/unit/circuit-breaker-edge-cases.test.ts` - Comprehensive test suite (+672 lines)
-- `README.md` - Documentation update (+26 lines)
+### Documentation
+- `docs/api/FILE_UPLOAD_API.md` - File upload API documentation
+- `docs/api/CALCULATOR_API.md` - Calculator API documentation
+- `docs/api/CATERVALLEY_WEBHOOK_API.md` - CaterValley webhook API documentation
+- `docs/migrations/MIGRATION_REVIEW_202501.md` - Migration review
+- `docs/CODE_QUALITY_REVIEW_202501.md` - Code quality review
+- `docs/TEST_RESULTS_202501.md` - Test results summary
 
-**Total**: +1,145 lines across 4 files
+## Risk Assessment
 
-## Performance Impact
+### Low Risk
+- ✅ Test improvements (REA-177)
+- ✅ Documentation updates
+- ✅ Code quality improvements
 
-**Negligible** - All monitoring operations are lightweight:
-- Monitoring endpoint: O(n) where n = number of circuit breakers (currently 1)
-- Metrics tracking: Atomic counter updates
-- Inactivity check: Single timestamp comparison per request
+### Medium Risk
+- ⚠️ File upload security changes (REA-53) - requires monitoring
+- ⚠️ Calculator configuration changes (REA-41) - requires verification
 
-## Security Considerations
+### High Risk
+- ⚠️ Database migrations - already applied, but monitor for issues
+- ⚠️ CaterValley integration changes - requires webhook monitoring
 
-- Monitoring endpoint is currently **public** - consider adding authentication before production deployment
-- Manual reset endpoint should be restricted to admin users in production
-- No sensitive data exposed in monitoring responses (only state and metrics)
+## Additional Notes
 
----
+- Branch rebased onto main (18 commits, 0 behind)
+- All migrations already applied to production
+- Pre-existing test failures documented (unrelated to this branch)
+- Console.logs reviewed and approved (properly guarded)
+- TODOs reviewed (non-blocking improvements)
 
-**Ready for review** ✅

@@ -165,6 +165,8 @@ export interface CateringOrder {
   pickupNotes?: string | null; // Prisma: String? @db.Text (camelCase)
   specialNotes?: string | null; // Prisma: String? @db.Text (camelCase)
   image?: string | null; // Prisma: String?
+  deliveryCost?: number | null; // Prisma: Decimal? - Use number
+  deliveryDistance?: number | null; // Prisma: Decimal? - Use number
   createdAt: string | Date; // Prisma: DateTime (Required, camelCase)
   updatedAt: string | Date; // Prisma: DateTime (Required, camelCase)
   driverStatus?: DriverStatus | null; // Prisma: DriverStatus? (camelCase) - Use Enum

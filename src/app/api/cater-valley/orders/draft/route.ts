@@ -270,6 +270,9 @@ export async function POST(request: NextRequest) {
           ? `${validatedData.dropOffLocation.instructions || ''}\n[FALLBACK DISTANCE: ${distance}mi - Manual review needed]`.trim()
           : validatedData.dropOffLocation.instructions || '',
         brokerage: 'CaterValley',
+        // Store delivery cost and distance for transparency
+        deliveryCost: pricingResult.deliveryFee,
+        deliveryDistance: distance,
         // Store additional metadata in a JSON field if your schema supports it
         guid: `cv-${validatedData.orderCode}-${Date.now()}`,
       },
