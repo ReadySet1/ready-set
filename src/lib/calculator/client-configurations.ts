@@ -253,7 +253,10 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
     { headcountMin: 100, headcountMax: null, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0, regularRatePercent: 0.10, within10MilesPercent: 0.10 }
   ],
 
-  mileageRate: 3.0,
+  // CRITICAL: CaterValley mileage rate is $1.10 per mile (not standard $3.00)
+  // Applied to miles OVER the distanceThreshold (10 miles)
+  // Per API contract: https://readysetllc.com/api/cater-valley (see API_CONTRACT.md)
+  mileageRate: 1.10,
   distanceThreshold: 10,
 
   dailyDriveDiscounts: {

@@ -38,7 +38,7 @@ This document tracks all GitHub security alerts and provides a systematic approa
 - **Fix**: Updated form-data from 4.0.3 → 4.0.4 via pnpm override
 - **Time Taken**: 2 hours
 - **GitHub**: [Alert #2](https://github.com/ReadySet1/ready-set/security/dependabot/2)
-- **Documentation**: [Fix Details](./docs/security-fixes/REA-156-form-data-fix.md)
+- **Documentation**: [Fix Details](../security-fixes/REA-156-form-data-fix.md)
 
 ### 2. ✅ axios DoS Vulnerability
 - **Type**: Dependabot
@@ -59,7 +59,7 @@ This document tracks all GitHub security alerts and provides a systematic approa
 - **Time Taken**: 2 hours
 - **GitHub**: [Alert #7](https://github.com/ReadySet1/ready-set/security/dependabot/7), [Alert #8](https://github.com/ReadySet1/ready-set/security/dependabot/8)
 - **Branch**: `security/high-severity-dependabot-fixes`
-- **Documentation**: [Fix Details](./docs/security-fixes/HIGH-SEVERITY-axios-tarfs-fixes.md)
+- **Documentation**: [Fix Details](../security-fixes/HIGH-SEVERITY-axios-tarfs-fixes.md)
 
 ## 🔍 CodeQL Issues (High Priority)
 
