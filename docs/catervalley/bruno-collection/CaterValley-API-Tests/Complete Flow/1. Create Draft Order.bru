@@ -1,0 +1,77 @@
+meta {
+  name: 1. Create Draft Order
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{BASE_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "TEST-FLOW-{{$timestamp}}",
+    "deliveryDate": "2025-11-21",
+    "deliveryTime": "11:45",
+    "totalItem": 1,
+    "priceTotal": 16.75,
+    "pickupLocation": {
+      "name": "Thai Chili Express",
+      "address": "304 E Santa Clara St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95112",
+      "phone": "(408) 555-0100"
+    },
+    "dropOffLocation": {
+      "name": "Grace Deli & Cafe",
+      "address": "303 S Almaden Blvd Ste 16",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95110",
+      "instructions": "Leave at front desk",
+      "recipient": {
+        "name": "Demo Account",
+        "phone": "4085550200"
+      }
+    }
+  }
+}
+
+docs {
+  # Step 1: Create Draft Order
+  
+  This is the first step in the complete order flow.
+  
+  Save the `id` from the response to use in the next steps.
+}
+
+tests {
+  test("Order created successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().status).to.equal("SUCCESS");
+  });
+  
+  test("Order ID is present", function() {
+    expect(res.getBody().id).to.be.a('string');
+    expect(res.getBody().id).to.have.lengthOf.above(0);
+  });
+  
+  test("Delivery fee is $42.50", function() {
+    expect(res.getBody().deliveryPrice).to.equal(42.50);
+  });
+}
+
+script:post-response {
+  // Save order ID for next request
+  bru.setVar("orderId", res.getBody().id);
+}
+

@@ -161,6 +161,8 @@ export interface CateringRequest extends BaseOrder {
   numberOfHosts?: number | null; // Prisma: Int? (camelCase)
   appliedDiscount?: number | null; // Prisma: Decimal?
   pricingTierId?: string | null; // Prisma: String?
+  deliveryCost?: PrismaDecimal | null; // Prisma: Decimal?
+  deliveryDistance?: PrismaDecimal | null; // Prisma: Decimal?
 }
 
 // Updated OnDemand interface (based on Prisma OnDemand)

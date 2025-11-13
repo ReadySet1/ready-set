@@ -361,6 +361,8 @@ export type Database = {
           createdAt: string
           deletedAt: string | null
           deliveryAddressId: string
+          deliveryCost: number | null
+          deliveryDistance: number | null
           driverStatus: Database["public"]["Enums"]["DriverStatus"] | null
           guid: string | null
           headcount: number | null
@@ -390,6 +392,8 @@ export type Database = {
           createdAt?: string
           deletedAt?: string | null
           deliveryAddressId: string
+          deliveryCost?: number | null
+          deliveryDistance?: number | null
           driverStatus?: Database["public"]["Enums"]["DriverStatus"] | null
           guid?: string | null
           headcount?: number | null
@@ -419,6 +423,8 @@ export type Database = {
           createdAt?: string
           deletedAt?: string | null
           deliveryAddressId?: string
+          deliveryCost?: number | null
+          deliveryDistance?: number | null
           driverStatus?: Database["public"]["Enums"]["DriverStatus"] | null
           guid?: string | null
           headcount?: number | null
