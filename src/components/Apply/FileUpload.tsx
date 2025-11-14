@@ -93,7 +93,7 @@ export function FileUpload({
             accept={accept}
             onChange={handleFileChange}
             disabled={isUploading}
-            className="w-full h-12 cursor-pointer border-2 border-dashed border-slate-300 hover:border-yellow-400 focus:border-yellow-500 transition-colors rounded-xl bg-slate-50 hover:bg-yellow-50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-100 file:text-yellow-700 hover:file:bg-yellow-200"
+            className="w-full h-12 cursor-pointer border-2 border-dashed border-slate-300 hover:border-amber-300 focus:border-amber-300 transition-colors rounded-xl bg-slate-50 hover:bg-amber-50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
             <Upload className="h-5 w-5 text-slate-400" />
@@ -103,7 +103,7 @@ export function FileUpload({
         <div className="flex items-center gap-3 p-4 border-2 border-slate-200 rounded-xl bg-white shadow-sm">
           <div className="flex-shrink-0">
             {isUploading && progress !== 100 ? (
-              <Loader2 className="h-6 w-6 animate-spin text-yellow-500" />
+              <Loader2 className="h-6 w-6 animate-spin text-amber-300" />
             ) : (
               <FileCheck className="h-6 w-6 text-green-600" />
             )}
