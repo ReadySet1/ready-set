@@ -247,14 +247,14 @@
   "resolutions": {
     "abab": "^2.0.6",
     "debug": "^4.4.0",
-    "glob": "^10.4.5",
+    "glob": "11.1.0",
     "uuid": "^9.0.1",
     "rimraf": "^5.0.10"
   },
   "pnpm": {
     "overrides": {
       "path-to-regexp": "^8.0.0",
-      "glob": "11.0.0",
+      "glob": "11.1.0",
       "rimraf": "6.0.1",
       "uuid": "11.0.3",
       "semver": "^7.5.2",
