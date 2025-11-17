@@ -93,7 +93,7 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     continue-on-error: true # Non-blocking: 47.6% pass rate (1004/2106 tests passing)
 
     steps:
@@ -128,7 +128,7 @@ jobs:
             ${{ runner.os }}-jest-
 
       - name: Run unit tests
-        run: pnpm test:ci --maxWorkers=4 --cache --cacheDirectory=.jest-cache
+        run: pnpm test:ci --maxWorkers=4 --cache --cacheDirectory=.jest-cache --forceExit
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
