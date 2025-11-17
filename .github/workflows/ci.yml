@@ -71,25 +71,22 @@ jobs:
             echo "⚠️  WARNING: .env.example not found"
           fi
 
-          # Check that Sentry config files exist
+          # Check that Sentry instrumentation files exist
           MISSING_FILES=()
-          if [ ! -f "sentry.client.config.ts" ]; then
-            MISSING_FILES+=("sentry.client.config.ts")
+          if [ ! -f "instrumentation.ts" ]; then
+            MISSING_FILES+=("instrumentation.ts")
           fi
-          if [ ! -f "sentry.server.config.ts" ]; then
-            MISSING_FILES+=("sentry.server.config.ts")
-          fi
-          if [ ! -f "sentry.edge.config.ts" ]; then
-            MISSING_FILES+=("sentry.edge.config.ts")
+          if [ ! -f "instrumentation-client.ts" ]; then
+            MISSING_FILES+=("instrumentation-client.ts")
           fi
 
           if [ ${#MISSING_FILES[@]} -gt 0 ]; then
-            echo "❌ ERROR: Missing Sentry configuration files:"
+            echo "❌ ERROR: Missing Sentry instrumentation files:"
             printf '  - %s\n' "${MISSING_FILES[@]}"
             exit 1
           fi
 
-          echo "✅ All Sentry configuration files present"
+          echo "✅ All Sentry instrumentation files present"
           echo ""
           echo "✅ Sentry configuration validation complete"
 
