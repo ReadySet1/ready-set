@@ -18,7 +18,7 @@ headers {
 
 body:json {
   {
-    "orderCode": "TEST-SHORT-DISTANCE-001",
+    "orderCode": "TEST-SHORT-DISTANCE-002",
     "deliveryDate": "2025-11-21",
     "deliveryTime": "11:45",
     "totalItem": 1,
@@ -46,22 +46,6 @@ body:json {
   }
 }
 
-docs {
-  # Client's Reported Issue (1.1 Miles)
-  
-  **Purpose:** Verify the exact scenario reported by the client
-  
-  **Expected:** $42.50 (was showing $130)
-  
-  ## Validation Checklist
-  - [ ] `deliveryPrice` is **$42.50** (not $130)
-  - [ ] `mileageFee` is **$0** (within 10 miles)
-  - [ ] `status` is **"SUCCESS"**
-  - [ ] Order can be created without errors
-  
-  This is the EXACT scenario the client reported with the $130 bug.
-}
-
 tests {
   test("Status is SUCCESS", function() {
     expect(res.getStatus()).to.equal(200);
@@ -81,3 +65,18 @@ tests {
   });
 }
 
+docs {
+  # Client's Reported Issue (1.1 Miles)
+  
+  **Purpose:** Verify the exact scenario reported by the client
+  
+  **Expected:** $42.50 (was showing $130)
+  
+  ## Validation Checklist
+  - [ ] `deliveryPrice` is **$42.50** (not $130)
+  - [ ] `mileageFee` is **$0** (within 10 miles)
+  - [ ] `status` is **"SUCCESS"**
+  - [ ] Order can be created without errors
+  
+  This is the EXACT scenario the client reported with the $130 bug.
+}
