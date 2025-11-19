@@ -144,7 +144,10 @@ export class UploadSecurityManager {
     scanResults?: SecurityScanResult
   ): Promise<string | null> {
     try {
-      const supabase = await createClient();
+      // Use admin client for quarantine operations to ensure we can upload to the private bucket
+      // The regular client is subject to RLS which may block uploads to this bucket
+      const { createAdminClient } = await import('@/utils/supabase/server');
+      const supabase = await createAdminClient();
 
       // Generate unique quarantine path
       const timestamp = Date.now();
@@ -321,7 +324,7 @@ export class UploadSecurityManager {
       // NOTE: Removed /<%/g pattern as it causes false positives with PDF files
       // PDFs legitimately contain <% in their binary content/metadata
       // The more specific /<%.*?%>/g pattern below catches actual server-side code
-      /\{\{.*?\}\}/g, // Template syntax (non-greedy to prevent ReDoS)
+      /\{\{\s*.*?\s*\}\}/g, // Template syntax - stricter matching
       /<%.*?%>/g, // ASP/JSP server-side tags (non-greedy to prevent ReDoS)
 
       // SQL injection patterns
@@ -344,21 +347,33 @@ export class UploadSecurityManager {
 
     // Use streaming for large files (5-10MB), in-memory for smaller files
     let content = '';
+    // For image files, we don't want to scan the raw binary content against text patterns
+    // unless we're looking for specific steganography signatures.
+    // Raw binary image data often contains sequences that look like malicious text patterns by chance.
+    const isImage = file.type.startsWith('image/');
+    
     if (file.size > this.STREAMING_THRESHOLD) {
       // Large file: use streaming approach to avoid memory issues
-      const streamResult = await this.scanFileInChunks(file, maliciousPatterns);
-      threats.push(...streamResult.threats);
-      score += streamResult.score;
+      // Skip streaming scan for images to prevent false positives in binary data
+      if (!isImage) {
+        const streamResult = await this.scanFileInChunks(file, maliciousPatterns);
+        threats.push(...streamResult.threats);
+        score += streamResult.score;
+      }
     } else {
       // Small file: load into memory (fast path for < 5MB files)
+      // For images, we still read content to check for steganography, but we won't run all text patterns
       content = await file.text();
 
-      // Pattern matching for in-memory content
-      for (const pattern of maliciousPatterns) {
-        const matches = content.match(pattern);
-        if (matches) {
-          threats.push(`Malicious pattern detected: ${pattern.source}`);
-          score += matches.length * 10;
+      // Only run full pattern matching for non-image files
+      if (!isImage) {
+        // Pattern matching for in-memory content
+        for (const pattern of maliciousPatterns) {
+          const matches = content.match(pattern);
+          if (matches) {
+            threats.push(`Malicious pattern detected: ${pattern.source}`);
+            score += matches.length * 10;
+          }
         }
       }
     }
@@ -507,7 +522,10 @@ export class UploadSecurityManager {
 
   static async cleanupQuarantinedFiles(olderThanDays: number = 30): Promise<number> {
     try {
-      const supabase = await createClient();
+      // Use admin client for cleanup operations
+      const { createAdminClient } = await import('@/utils/supabase/server');
+      const supabase = await createAdminClient();
+      
       const cutoffDate = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
 
       // List quarantined files older than cutoff

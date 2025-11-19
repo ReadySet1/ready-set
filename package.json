@@ -8,7 +8,7 @@
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "dev": "next dev",
+    "dev": "cross-env NODE_OPTIONS='--max-old-space-size=4096' next dev",
     "build": "prisma generate && next build",
     "build:no-typecheck": "SKIP_TYPECHECK=true prisma generate && next build",
     "build:custom": "node scripts/build-without-prisma-collect.js",

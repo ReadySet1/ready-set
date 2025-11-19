@@ -228,10 +228,17 @@ export async function POST(request: NextRequest) {
       Date.now() + SESSION_DURATION_HOURS * 60 * 60 * 1000
     );
 
+    // Define return type for the RPC function
+    interface CreateSessionRpcResponse {
+      id: string;
+      session_token: string;
+      session_expires_at: string;
+    }
+
     // Use RPC function to create session bypassing RLS
     // This ensures reliable session creation for anonymous users
-    // @ts-ignore - RPC function exists in DB but types are not generated yet
-    const { data: rpcData, error } = await supabase.rpc('create_application_session', {
+    // Casting supabase client to any to bypass strict RPC name checking until types are regenerated
+    const { data: rpcData, error } = await (supabase as any).rpc('create_application_session', {
       p_email: body.email,
       p_first_name: body.firstName,
       p_last_name: body.lastName,
@@ -241,7 +248,7 @@ export async function POST(request: NextRequest) {
       p_ip_address: ipAddress,
       p_user_agent: userAgent,
       p_max_uploads: MAX_UPLOADS_PER_SESSION
-    });
+    }) as { data: CreateSessionRpcResponse | null, error: any };
 
     if (error) {
       logDatabaseError(error, 'createSession', { email: body.email, role: body.role });
@@ -252,7 +259,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Cast the returned JSONB to our expected type
-    const session = rpcData as unknown as { id: string; session_token: string; session_expires_at: string };
+    const session = rpcData as CreateSessionRpcResponse;
 
     // For now, return the session token directly
     // In phase 2, we'll send a verification email and return session ID only
@@ -278,7 +285,11 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    // Use admin client for session validation to bypass RLS
+    // The session token itself is the authorization credential
+    const { createAdminClient } = await import('@/utils/supabase/server');
+    const supabase = await createAdminClient();
+    
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('id');
     const sessionToken = request.headers.get('x-upload-token');
