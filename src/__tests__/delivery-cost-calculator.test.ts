@@ -583,10 +583,10 @@ describe('Delivery Cost Calculator', () => {
 
       // Over 10 miles uses regularRate of $85
       expect(result.deliveryCost).toBe(85);
-      // Mileage: (15 - 10) × $1.10 = $5.50
-      expect(result.totalMileagePay).toBeCloseTo(5.50, 2);
-      // Total: $85 + $5.50 = $90.50
-      expect(result.deliveryFee).toBeCloseTo(90.50, 2);
+      // Mileage: (15 - 10) × $3.00 = $15.00
+      expect(result.totalMileagePay).toBeCloseTo(15.00, 2);
+      // Total: $85 + $15.00 = $100.00
+      expect(result.deliveryFee).toBeCloseTo(100.00, 2);
     });
 
     test('CaterValley: Large order (50-74 headcount) within 10 miles shows $62.50', () => {
@@ -649,8 +649,8 @@ describe('Delivery Cost Calculator', () => {
 
       // Over 10 miles, should use regularRate
       expect(result.deliveryCost).toBe(85); // Regular rate for tier 1
-      expect(result.totalMileagePay).toBeCloseTo(0.11, 2); // (10.1 - 10) × $1.10 = $0.11
-      expect(result.deliveryFee).toBeCloseTo(85.11, 2); // $85 + $0.11
+      expect(result.totalMileagePay).toBeCloseTo(0.30, 2); // (10.1 - 10) × $3.00 = $0.30
+      expect(result.deliveryFee).toBeCloseTo(85.30, 2); // $85 + $0.30
     });
 
     test('CaterValley: Edge case - 9.9 miles uses within10Miles rate', () => {
@@ -750,10 +750,10 @@ describe('Delivery Cost Calculator', () => {
       const result = calculateDeliveryCost(input);
 
       // 10% of $1500 = $150 base
-      // 5 miles over threshold × $1.10 = $5.50 mileage
+      // 5 miles over threshold × $3.00 = $15.00 mileage
       expect(result.deliveryCost).toBe(150);
-      expect(result.totalMileagePay).toBeCloseTo(5.50, 2);
-      expect(result.deliveryFee).toBeCloseTo(155.50, 2);
+      expect(result.totalMileagePay).toBeCloseTo(15.00, 2);
+      expect(result.deliveryFee).toBeCloseTo(165.00, 2);
     });
 
     test('CaterValley: Zero-cost validation prevents $0 delivery for non-zero orders', () => {
@@ -826,9 +826,9 @@ describe('Delivery Cost Calculator', () => {
       expect(result.deliveryFee).toBeLessThan(50);
     });
 
-    test('CaterValley BUG FIX: Mileage rate is $1.10 per mile (not $3.00)', () => {
-      // SCENARIO: Mileage rate was incorrectly set to $3.00 instead of $1.10
-      // EXPECTED: 15-mile order should charge $1.10/mile for 5 extra miles = $5.50
+    test('CaterValley BUG FIX: Mileage rate is $3.00 per mile (official rate)', () => {
+      // SCENARIO: Verify correct mileage rate per official CaterValley pricing chart
+      // EXPECTED: 15-mile order should charge $3.00/mile for 5 extra miles = $15.00
       const input: DeliveryCostInput = {
         headcount: 1,
         foodCost: 16.75,
@@ -842,11 +842,11 @@ describe('Delivery Cost Calculator', () => {
       // Over 10 miles, uses regularRate (not within10Miles)
       expect(result.deliveryCost).toBe(85); // Tier 1 regularRate
       
-      // Mileage calculation: (15 - 10) × $1.10 = $5.50 (NOT $15.00 with old $3.00 rate)
-      expect(result.totalMileagePay).toBeCloseTo(5.50, 2);
+      // Mileage calculation: (15 - 10) × $3.00 = $15.00
+      expect(result.totalMileagePay).toBeCloseTo(15.00, 2);
       
-      // Total: $85 + $5.50 = $90.50 (NOT $100 with old rate)
-      expect(result.deliveryFee).toBeCloseTo(90.50, 2);
+      // Total: $85 + $15.00 = $100.00
+      expect(result.deliveryFee).toBeCloseTo(100.00, 2);
     });
 
     test('CaterValley BUG FIX: Corrected mileage calculation for 15-mile order', () => {
@@ -865,14 +865,14 @@ describe('Delivery Cost Calculator', () => {
       // Over 10 miles, uses regularRate
       expect(result.deliveryCost).toBe(85); // Tier 1 regularRate
       
-      // Mileage: (15 - 10) × $1.10 = $5.50
-      expect(result.totalMileagePay).toBeCloseTo(5.50, 2);
+      // Mileage: (15 - 10) × $3.00 = $15.00
+      expect(result.totalMileagePay).toBeCloseTo(15.00, 2);
       
-      // Total: $85 + $5.50 = $90.50
-      expect(result.deliveryFee).toBeCloseTo(90.50, 2);
+      // Total: $85 + $15.00 = $100.00
+      expect(result.deliveryFee).toBeCloseTo(100.00, 2);
       
-      // Ensure it's NOT using old $3.00 rate (would be $85 + $15 = $100)
-      expect(result.deliveryFee).toBeLessThan(95);
+      // Verify calculation is correct per official pricing chart
+      expect(result.deliveryFee).toBe(100);
     });
 
     test('CaterValley BUG FIX: No short-distance orders should ever show $130', () => {
