@@ -1,6 +1,6 @@
 // src/app/api/application-sessions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/utils/supabase/server';
+import { createClient } from '@/utils/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import { z } from 'zod';
@@ -228,27 +228,20 @@ export async function POST(request: NextRequest) {
       Date.now() + SESSION_DURATION_HOURS * 60 * 60 * 1000
     );
 
-    // Create session record with proper typing
-    const sessionData: ApplicationSessionInsert = {
-      email: body.email,
-      first_name: body.firstName,
-      last_name: body.lastName,
-      role: body.role,
-      session_token: sessionToken,
-      session_expires_at: sessionExpiresAt.toISOString(),
-      ip_address: ipAddress,
-      user_agent: userAgent,
-      upload_count: 0,
-      max_uploads: MAX_UPLOADS_PER_SESSION,
-      verified: false,
-      completed: false
-    };
-
-    const { data: session, error } = await supabase
-      .from('application_sessions')
-      .insert(sessionData)
-      .select('id, session_token, session_expires_at')
-      .single<Pick<ApplicationSession, 'id' | 'session_token' | 'session_expires_at'>>();
+    // Use RPC function to create session bypassing RLS
+    // This ensures reliable session creation for anonymous users
+    // @ts-ignore - RPC function exists in DB but types are not generated yet
+    const { data: rpcData, error } = await supabase.rpc('create_application_session', {
+      p_email: body.email,
+      p_first_name: body.firstName,
+      p_last_name: body.lastName,
+      p_role: body.role,
+      p_session_token: sessionToken,
+      p_session_expires_at: sessionExpiresAt.toISOString(),
+      p_ip_address: ipAddress,
+      p_user_agent: userAgent,
+      p_max_uploads: MAX_UPLOADS_PER_SESSION
+    });
 
     if (error) {
       logDatabaseError(error, 'createSession', { email: body.email, role: body.role });
@@ -257,6 +250,9 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Cast the returned JSONB to our expected type
+    const session = rpcData as unknown as { id: string; session_token: string; session_expires_at: string };
 
     // For now, return the session token directly
     // In phase 2, we'll send a verification email and return session ID only
