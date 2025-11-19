@@ -13,23 +13,18 @@ import { DeletedUserFilters } from '@/services/userSoftDeleteService';
  * - Returns paginated results with user details and deletion information
  */
 export async function GET(request: NextRequest) {
-  console.log(`[GET /api/users/deleted] Request received for URL: ${request.url}`);
-  
   try {
     // Authentication
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      console.error("[GET /api/users/deleted] Authentication required:", authError);
       return NextResponse.json(
         { error: 'Unauthorized: Authentication required' },
         { status: 401 }
       );
     }
     
-    console.log(`[GET /api/users/deleted] Authenticated user ID: ${user.id}`);
-
     // Check permissions - only ADMIN, SUPER_ADMIN, and HELPDESK can view deleted users
     let requesterProfile;
     
@@ -38,7 +33,6 @@ export async function GET(request: NextRequest) {
         where: { id: user.id },
         select: { type: true }
       });
-      console.log(`[GET /api/users/deleted] Requester profile fetched:`, requesterProfile);
       
       const isAdminOrHelpdesk =
         requesterProfile?.type === UserType.ADMIN ||
@@ -46,7 +40,6 @@ export async function GET(request: NextRequest) {
         requesterProfile?.type === UserType.HELPDESK;
 
       if (!isAdminOrHelpdesk) {
-        console.log(`[GET /api/users/deleted] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to view deleted users.`);
         return NextResponse.json(
           { error: 'Forbidden: Only Admin, Super Admin, or Helpdesk can view deleted users' },
           { status: 403 }
@@ -76,20 +69,17 @@ export async function GET(request: NextRequest) {
       filters.deletedBefore = new Date(searchParams.get('deletedBefore')!);
     }
 
-    console.log(`[GET /api/users/deleted] Filters:`, filters);
-
     // Import the soft delete service
     const { userSoftDeleteService } = await import('@/services/userSoftDeleteService');
     
     // Get deleted users
     const result = await userSoftDeleteService.getDeletedUsers(filters);
     
-    console.log(`[GET /api/users/deleted] Found ${result.users.length} deleted users out of ${result.pagination.totalCount} total`);
-    
     return NextResponse.json({
       message: 'Deleted users retrieved successfully',
-      data: result.users,
-      pagination: result.pagination,
+      users: result.users,
+      ...result.pagination,
+      currentPage: result.pagination.page,
       filters: {
         applied: filters,
         available: {

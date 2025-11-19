@@ -1,7 +1,7 @@
 // src/components/Dashboard/UserView/UserProfileTabs.tsx
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserFormValues } from "./types";
+import { UserFormValues, UploadHooks } from "./types";
 import { Control } from "react-hook-form";
 import ProfileTab from "./Tabs/ProfileTab";
 import AddressTab from "./Tabs/AddressTab";
@@ -16,6 +16,8 @@ interface UserProfileTabsProps {
   control: Control<UserFormValues>;
   refreshTrigger: number;
   isUserProfile?: boolean;
+  uploadHooks: UploadHooks;
+  setRefreshTrigger: React.Dispatch<React.SetStateAction<number>>;
 }
 
 export default function UserProfileTabs({
@@ -25,7 +27,9 @@ export default function UserProfileTabs({
   watchedValues,
   control,
   refreshTrigger,
-  isUserProfile = false
+  isUserProfile = false,
+  uploadHooks,
+  setRefreshTrigger
 }: UserProfileTabsProps) {
   return (
     <Tabs
@@ -87,9 +91,15 @@ export default function UserProfileTabs({
         />
       </TabsContent>
 
-            {/* Files Tab */}
+      {/* Files Tab */}
       <TabsContent value="files" className="m-0 p-6">
-        <FilesTab userId={userId} refreshTrigger={refreshTrigger} />
+        <FilesTab 
+          userId={userId} 
+          refreshTrigger={refreshTrigger}
+          uploadHooks={uploadHooks}
+          userType={watchedValues.type ?? "client"}
+          setRefreshTrigger={setRefreshTrigger}
+        />
       </TabsContent>
     </Tabs>
   );
