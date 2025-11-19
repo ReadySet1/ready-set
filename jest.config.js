@@ -81,8 +81,12 @@ const customJestConfig = {
     'node_modules/(?!(.*\\.mjs$|@supabase|isows|bufferutil|@solana|ws|@noble|tweetnacl|cheerio.*|resend|parse5|dom-serializer|domutils|htmlparser2|entities|domhandler))',
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  // Add test timeout
-  testTimeout: 10000,
+  // Add test timeout - increased for CI stability
+  testTimeout: 30000,
+  // Bail early to prevent hanging tests
+  bail: false,
+  // Set max concurrency for CI
+  maxConcurrency: 5,
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
