@@ -33,6 +33,7 @@ This project uses **Supabase Auth** as the sole authentication provider, providi
 - ✅ Magic link authentication
 - ✅ Secure password hashing
 - ✅ Session management with JWT tokens
+- ✅ **Anonymous Application Sessions**: Secure, rate-limited sessions for job applicants (REA-191)
 
 ### Security Features
 
@@ -49,6 +50,22 @@ This project uses **Supabase Auth** as the sole authentication provider, providi
 - ✅ Social login options
 - ✅ Passwordless authentication
 - ✅ Responsive authentication UI
+
+## Anonymous Application Sessions
+
+To support job applications without requiring account creation, the system implements a specialized anonymous session mechanism:
+
+- **Architecture**:
+  - Custom `application_sessions` table in PostgreSQL
+  - RPC-based secure creation (`create_application_session`)
+  - Row Level Security (RLS) policies protecting session data
+  - Rate limiting (5 sessions per hour per IP)
+
+- **Security**:
+  - Sessions identified by UUID and secure `session_token`
+  - Automatic expiration (2 hours)
+  - Upload tokens for authorized file submissions
+  - Client-side session encryption
 
 ## Environment Variables
 
@@ -81,6 +98,10 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 - `/api/users/[userId]` - User CRUD operations
 - `/api/users/[userId]/change-role` - Role management
 - `/api/users/updateUserStatus` - Status updates
+
+### Anonymous Sessions
+
+- `/api/application-sessions` - Create and manage application sessions
 
 ## Middleware Protection
 
