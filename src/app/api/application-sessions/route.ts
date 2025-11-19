@@ -244,10 +244,7 @@ export async function POST(request: NextRequest) {
       completed: false
     };
 
-    // Use admin client to bypass RLS for session creation
-    // This is safe because we've already validated input and checked rate limits
-    const adminSupabase = await createAdminClient();
-    const { data: session, error } = await adminSupabase
+    const { data: session, error } = await supabase
       .from('application_sessions')
       .insert(sessionData)
       .select('id, session_token, session_expires_at')
