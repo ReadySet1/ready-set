@@ -38,6 +38,7 @@ For comprehensive documentation, setup instructions, and development guides, see
 - **Modern tech stack** with Next.js, TypeScript, and PostgreSQL
 - **Address management** with favorites and recent addresses tracking
 - **Secure file uploads** with signed URLs, PowerPoint support, and comprehensive metadata storage (REA-53)
+- **Anonymous Application Sessions** allowing secure, rate-limited file uploads for job applicants without account creation (REA-191)
 - **Client-specific calculator configurations** with tiered driver pay (REA-41)
 - **Enhanced address selector** with search, filtering, and organization
 - **Carrier integrations** with real-time connectivity monitoring and webhook management

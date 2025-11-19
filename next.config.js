@@ -238,8 +238,8 @@ const sentryWebpackPluginOptions = {
 
   // PERFORMANCE: Disable source map uploads on Vercel to speed up builds
   // Source maps add 3-5 minutes to build time. Upload them from CI/CD instead.
-  disableServerWebpackPlugin: process.env.VERCEL === '1',
-  disableClientWebpackPlugin: process.env.VERCEL === '1',
+  disableServerWebpackPlugin: process.env.VERCEL === '1' || process.env.NODE_ENV === 'development',
+  disableClientWebpackPlugin: process.env.VERCEL === '1' || process.env.NODE_ENV === 'development',
 
   // Error handling for source map uploads - don't add warnings to build output
   errorHandler: (err, invokeErr, compilation) => {
