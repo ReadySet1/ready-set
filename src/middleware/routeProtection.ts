@@ -70,7 +70,6 @@ export async function protectRoutes(request: Request) {
 
     // Check if user account has been soft-deleted
     if (profile.deletedAt) {
-      console.log(`Access attempt by soft-deleted user: ${user.id}`);
       // Sign out the user and redirect to sign-in with error message
       await supabase.auth.signOut();
       const url = new URL('/sign-in', request.url);
