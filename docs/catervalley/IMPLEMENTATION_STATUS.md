@@ -92,16 +92,16 @@ The CaterValley integration is **fully operational and production-ready** with 2
 
 | Tier | Trigger Condition | Within 10 Miles | Beyond 10 Miles |
 |------|------------------|-----------------|-----------------|
-| 1 | ≤25 people OR ≤$300 | $42.50 | $85 + $1.10/mile |
-| 2 | 26-49 people OR $300.01-599.99 | $52.50 | $90 + $1.10/mile |
-| 3 | 50-74 people OR $600-899.99 | $62.50 | $110 + $1.10/mile |
-| 4 | 75-99 people OR $900-1,199.99 | $72.50 | $120 + $1.10/mile |
-| 5 | ≥100 people OR ≥$1,200 | 10% of food cost | 10% + $1.10/mile |
+| 1 | ≤25 people OR ≤$300 | $42.50 | $85 + $3.00/mile |
+| 2 | 26-49 people OR $300.01-599.99 | $52.50 | $90 + $3.00/mile |
+| 3 | 50-74 people OR $600-899.99 | $62.50 | $110 + $3.00/mile |
+| 4 | 75-99 people OR $900-1,199.99 | $72.50 | $120 + $3.00/mile |
+| 5 | ≥100 people OR ≥$1,200 | 10% of food cost | 10% + $3.00/mile |
 
 **Pricing Logic:** Uses "LESSER FEE" rule - whichever tier (headcount or food cost) results in lower fee
 
 #### Additional Charges
-- **Mileage:** $1.10 per mile beyond distance threshold
+- **Mileage:** $3.00 per mile beyond distance threshold (10 miles) - per official pricing chart
 - **Fallback Distance:** 10.1 miles (when Google Maps API fails)
 
 **Bridge Toll Note:** $8.00 bridge toll is auto-detected for San Francisco Bay crossings but is **NOT charged** to CaterValley. It is driver compensation paid by Ready Set.

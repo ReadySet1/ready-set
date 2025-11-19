@@ -6,6 +6,16 @@
 
 ---
 
+## ⚠️ CORRECTION NOTE - November 19, 2025
+
+**IMPORTANT:** This document incorrectly stated that the mileage rate should be $1.10 per mile. This was an error in the original fix.
+
+Per the official CaterValley Terms & Pricing Chart, the correct mileage rate is **$3.00 per mile** after 10 miles. The original configuration of $3.00 was actually correct. The mileage rate has been restored to $3.00 as of November 19, 2025.
+
+See `OFFICIAL_PRICING_CHART.md` for the authoritative pricing documentation.
+
+---
+
 ## Problem Description
 
 Client reported that three test orders all showed **$130 delivery fee** regardless of distance, including one order that was only **1.1 miles** apart between pickup and delivery locations.
@@ -17,12 +27,12 @@ Client reported that three test orders all showed **$130 delivery fee** regardle
 
 ## Root Cause Analysis
 
-### Issue 1: Incorrect Mileage Rate ❌
+### Issue 1: Incorrect Mileage Rate ❌ [CORRECTION: This was NOT actually an issue]
 **Location:** `src/lib/calculator/client-configurations.ts` (line 256)
 
-- **Problem:** `mileageRate: 3.0` (wrong)
-- **Should be:** `mileageRate: 1.10` per API contract
-- **Impact:** Overcharging by $1.90 per mile over 10 miles
+- **Original Assessment:** `mileageRate: 3.0` (thought to be wrong)
+- **Correction (Nov 19, 2025):** `mileageRate: 3.0` is actually **CORRECT** per official pricing chart
+- **Note:** The mileage rate of $3.00 per mile is the official rate and has been restored
 
 ### Issue 2: Minimum Fee Error Handling ❌
 **Location:** `src/app/api/cater-valley/_lib/pricing-helper.ts` (lines 131-138)
@@ -35,23 +45,25 @@ Client reported that three test orders all showed **$130 delivery fee** regardle
 
 ## Fixes Implemented
 
-### ✅ Fix 1: Corrected Mileage Rate
+### ✅ Fix 1: Mileage Rate [CORRECTED Nov 19, 2025]
 **File:** `src/lib/calculator/client-configurations.ts`
 
 ```typescript
-// BEFORE (WRONG)
+// ORIGINAL (Actually CORRECT)
 mileageRate: 3.0,
 
-// AFTER (CORRECT)
-// CRITICAL: CaterValley mileage rate is $1.10 per mile (not standard $3.00)
-// Applied to miles OVER the distanceThreshold (10 miles)
-// Per API contract: https://readysetllc.com/api/cater-valley (see API_CONTRACT.md)
+// MISTAKEN "FIX" on Nov 13 (WRONG)
 mileageRate: 1.10,
+
+// RESTORED CORRECT VALUE (Nov 19, 2025)
+// CRITICAL: CaterValley mileage rate is $3.00 per mile after 10 miles
+// Per official Terms & Pricing Chart from CaterValley
+mileageRate: 3.0,
 ```
 
 **Impact:**
-- 15-mile order: Now charges $5.50 for 5 extra miles (was $15.00)
-- Total savings: $9.50 per order over 10 miles
+- 15-mile order: Charges $15.00 for 5 extra miles (correct per official pricing)
+- The original $3.00 rate was correct all along
 
 ### ✅ Fix 2: Minimum Fee Enforcement
 **File:** `src/app/api/cater-valley/_lib/pricing-helper.ts`
@@ -90,12 +102,12 @@ Added warning comments to old pricing system files:
 
 Added 5 new bug fix validation tests:
 1. **1.1 mile order shows $42.50 (not $130)** ✅
-2. **Mileage rate is $1.10/mile (not $3.00)** ✅
-3. **15-mile order calculation** ✅
+2. **Mileage rate is $3.00/mile (official rate)** ✅ [Updated Nov 19, 2025]
+3. **15-mile order calculation** ✅ [Updated Nov 19, 2025]
 4. **No short-distance orders show $130** ✅
 5. **Minimum $42.50 fee always enforced** ✅
 
-Updated 4 existing tests to reflect new mileage rate.
+Updated tests to reflect correct $3.00 mileage rate (Nov 19, 2025).
 
 **Result:** All 75 tests passing ✅
 
@@ -126,8 +138,8 @@ Updated 4 existing tests to reflect new mileage rate.
 - Food Cost: $16.75
 - Distance: 15 miles (5 miles over threshold)
 - Base: $85.00 (Tier 1 regular rate)
-- Mileage: 5 × $1.10 = $5.50
-- **Fee:** $90.50 ✅ (was $100 with old rate)
+- Mileage: 5 × $3.00 = $15.00
+- **Fee:** $100.00 ✅ (correct per official pricing chart)
 
 **Example 3: Tier 2 Short Distance**
 - Headcount: 26
@@ -146,7 +158,7 @@ All fixes align with the official CaterValley API contract:
 | Requirement | Status |
 |-------------|--------|
 | Minimum fee: $42.50 | ✅ Enforced |
-| Mileage rate: $1.10/mile | ✅ Corrected |
+| Mileage rate: $3.00/mile | ✅ Correct (restored Nov 19) |
 | Tier 1 within 10 miles: $42.50 | ✅ Working |
 | Tier 2 within 10 miles: $52.50 | ✅ Working |
 | Tier 3 within 10 miles: $62.50 | ✅ Working |
@@ -158,8 +170,8 @@ All fixes align with the official CaterValley API contract:
 ## Files Modified
 
 1. **`src/lib/calculator/client-configurations.ts`**
-   - Changed mileageRate from 3.0 to 1.10
-   - Added detailed comment explaining the rate
+   - [CORRECTED Nov 19] Mileage rate restored to 3.0 (official rate)
+   - Added detailed comment referencing official pricing chart
 
 2. **`src/app/api/cater-valley/_lib/pricing-helper.ts`**
    - Changed minimum fee enforcement from error to auto-adjustment
@@ -176,7 +188,7 @@ All fixes align with the official CaterValley API contract:
 
 6. **`src/__tests__/delivery-cost-calculator.test.ts`**
    - Added 5 new bug fix validation tests
-   - Updated 4 existing tests for new mileage rate
+   - Updated tests to reflect correct $3.00 mileage rate (Nov 19, 2025)
 
 ---
 

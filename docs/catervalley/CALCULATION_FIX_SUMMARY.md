@@ -6,6 +6,16 @@
 
 ---
 
+## ⚠️ CORRECTION NOTE - November 19, 2025
+
+**IMPORTANT:** This document previously stated that the mileage rate should be $1.10 per mile. This was **incorrect**. 
+
+Per the official CaterValley Terms & Pricing Chart, the correct mileage rate is **$3.00 per mile** after 10 miles. The configuration and all references have been corrected as of November 19, 2025.
+
+See `OFFICIAL_PRICING_CHART.md` for the authoritative pricing documentation.
+
+---
+
 ## Executive Summary
 
 After thorough investigation of the reported calculation issues, we discovered that **the code is working perfectly**. The problems were caused by incorrect test data in the Bruno test collection:
