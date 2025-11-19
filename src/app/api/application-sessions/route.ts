@@ -1,6 +1,6 @@
 // src/app/api/application-sessions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, createAdminClient } from '@/utils/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import { z } from 'zod';
@@ -244,7 +244,10 @@ export async function POST(request: NextRequest) {
       completed: false
     };
 
-    const { data: session, error } = await supabase
+    // Use admin client to bypass RLS for session creation
+    // This is safe because we've already validated input and checked rate limits
+    const adminSupabase = await createAdminClient();
+    const { data: session, error } = await adminSupabase
       .from('application_sessions')
       .insert(sessionData)
       .select('id, session_token, session_expires_at')
