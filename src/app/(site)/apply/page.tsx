@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import JobApplicationForm from "@/components/Apply/ApplyForm";
-import { ApplicationSessionProvider } from "@/contexts/ApplicationSessionContext";
 import {
   Truck,
   Headphones,
@@ -316,9 +315,7 @@ export default function ApplyPage() {
               </CardHeader>
               
               <CardContent className="p-8 lg:p-12">
-                <ApplicationSessionProvider>
-                  <JobApplicationForm />
-                </ApplicationSessionProvider>
+                <JobApplicationForm />
               </CardContent>
             </Card>
           </motion.div>
