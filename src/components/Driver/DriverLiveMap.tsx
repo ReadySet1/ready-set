@@ -190,7 +190,7 @@ export default function DriverLiveMap({
       if (trailRef.current.length === 1) {
         mapRef.current.easeTo({
           center: [lng, lat],
-          zoom: MAP_CONFIG.DRIVER_VIEW_ZOOM ?? 14,
+          zoom: MAP_CONFIG.MAX_AUTO_ZOOM,
           duration: MAP_CONFIG.FIT_BOUNDS_DURATION,
         });
       }
