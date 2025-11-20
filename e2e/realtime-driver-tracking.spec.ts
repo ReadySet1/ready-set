@@ -66,6 +66,5 @@ test.describe('Realtime driver tracking with simulator', () => {
     // Use a relaxed assertion to avoid flakiness when data is slow.
     await expect.soft(page.locator('text=GPS Updates').locator('xpath=..')).toBeVisible();
   });
-}
-
+});
 
