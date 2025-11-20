@@ -48,6 +48,14 @@ export default function TestDriverPage() {
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  /**
+   * Establish a Realtime connection for this simulated driver.
+   *
+   * NOTE: This uses the same Supabase channel + payload shape as the
+   * production driver apps (`DriverLocationUpdatedPayload`). The admin
+   * dashboard (`useAdminRealtimeTracking`) listens for these
+   * `driver:location:updated` events and merges them into the live map.
+   */
   const connect = async () => {
     try {
       const locationChannel = createDriverLocationChannel();
@@ -109,6 +117,13 @@ export default function TestDriverPage() {
     return (heading + 360) % 360; // Normalize to 0-360
   };
 
+  /**
+   * Broadcast a single location update to the Realtime channel.
+   *
+   * The payload intentionally matches `DriverLocationUpdatedPayload` from
+   * `@/lib/realtime/types` so that the admin dashboard can consume it
+   * without any special-casing for the simulator.
+   */
   const sendLocationUpdate = async (lat: number, lng: number, heading: number, isMoving: boolean) => {
     if (!channel || !isConnected) {
       return;

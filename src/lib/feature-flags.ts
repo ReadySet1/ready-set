@@ -71,6 +71,34 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, FeatureFlagConfig> = {
 };
 
 // ============================================================================
+// Environment Variable Mapping
+// ============================================================================
+
+/**
+ * Static mapping from feature flag keys to environment variables.
+ *
+ * IMPORTANT: Next.js only inlines environment variables on the client when they
+ * are referenced via literal property access (process.env.NEXT_PUBLIC_...).
+ *
+ * Using dynamic access (process.env[envKey]) works on the server, but returns
+ * undefined in the browser bundle. This mapping ensures that client-side code
+ * receives the correct values while still allowing us to iterate over flags.
+ */
+const FEATURE_FLAG_ENV_MAP: Record<FeatureFlagKey, string | undefined> = {
+  [FEATURE_FLAGS.USE_REALTIME_TRACKING]: process.env.NEXT_PUBLIC_FF_USE_REALTIME_TRACKING,
+  [FEATURE_FLAGS.USE_REALTIME_LOCATION_UPDATES]:
+    process.env.NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES,
+  [FEATURE_FLAGS.USE_REALTIME_ADMIN_DASHBOARD]:
+    process.env.NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD,
+  [FEATURE_FLAGS.USE_REALTIME_DRIVER_MESSAGING]:
+    process.env.NEXT_PUBLIC_FF_USE_REALTIME_DRIVER_MESSAGING,
+  [FEATURE_FLAGS.REALTIME_FALLBACK_TO_SSE]:
+    process.env.NEXT_PUBLIC_FF_REALTIME_FALLBACK_TO_SSE,
+  [FEATURE_FLAGS.REALTIME_FALLBACK_TO_REST]:
+    process.env.NEXT_PUBLIC_FF_REALTIME_FALLBACK_TO_REST,
+};
+
+// ============================================================================
 // Feature Flag Storage
 // ============================================================================
 
@@ -102,8 +130,9 @@ class FeatureFlagStore {
     try {
       Object.values(FEATURE_FLAGS).forEach((flagKey) => {
         try {
+          // Use static env mapping for client compatibility; envKey is only for logging
           const envKey = `NEXT_PUBLIC_FF_${flagKey.toUpperCase()}`;
-          const envValue = process.env[envKey];
+          const envValue = FEATURE_FLAG_ENV_MAP[flagKey];
 
           if (envValue === undefined) {
             return; // No override for this flag

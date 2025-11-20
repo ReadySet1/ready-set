@@ -99,7 +99,11 @@ interface UseAdminRealtimeTrackingReturn {
   isRealtimeConnected: boolean;
 
   /**
-   * Whether Realtime feature is enabled
+   * Whether the Realtime feature is enabled via flags/configuration.
+   *
+   * NOTE: This indicates that Realtime *can* be used for this user/role.
+   * The actual active mode (Realtime vs SSE) is determined by connectionMode
+   * and the internal user toggle (WebSocket vs SSE mode).
    */
   isRealtimeEnabled: boolean;
 
@@ -157,11 +161,19 @@ export function useAdminRealtimeTracking(
   const [realtimeDrivers, setRealtimeDrivers] = useState<Map<string, TrackedDriver>>(new Map());
   const [realtimeLocations, setRealtimeLocations] = useState<LocationData[]>([]);
 
-  // Check if Realtime is enabled via feature flags
-  const isRealtimeEnabled =
+  /**
+   * Global Realtime enablement based on feature flags and configuration.
+   * This determines whether the admin dashboard *supports* Realtime at all.
+   */
+  const isRealtimeFeatureEnabled =
     enableRealtimeReceive &&
-    useRealtime &&
     isFeatureEnabled(FEATURE_FLAGS.USE_REALTIME_ADMIN_DASHBOARD, featureFlagContext);
+
+  /**
+   * Effective Realtime enablement for the current session.
+   * Combines the global feature flag with the user's WebSocket/SSE toggle.
+   */
+  const isRealtimeEnabled = isRealtimeFeatureEnabled && useRealtime;
 
   // Realtime channel reference
   const channelRef = useRef<DriverLocationChannel | null>(null);
@@ -522,7 +534,9 @@ export function useAdminRealtimeTracking(
     activeDeliveries,
     isConnected,
     isRealtimeConnected,
-    isRealtimeEnabled,
+    // Expose global feature availability so the UI can always show the
+    // WebSocket/SSE controls when Realtime is turned on for this environment.
+    isRealtimeEnabled: isRealtimeFeatureEnabled,
     connectionMode,
     error,
     reconnect,
