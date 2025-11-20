@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
+import { captureException, captureMessage } from '@/lib/monitoring/sentry';
 
 /**
  * Type-safe helper to check if SSE controller is still open and accepting data
@@ -215,6 +216,12 @@ export async function GET(request: NextRequest) {
             }
           } catch (error) {
             console.error('Error in SSE update:', error);
+            captureException(error, {
+              action: 'sse_driver_update',
+              feature: 'admin_tracking',
+              component: 'api/tracking/live',
+              handled: true,
+            });
             // Use try-catch to handle controller state atomically (avoids TOCTOU race condition)
             try {
               if (controller.desiredSize !== null) {
@@ -264,10 +271,19 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    captureMessage('Admin tracking SSE stream started', 'info', {
+      feature: 'admin_tracking',
+    });
+
     return new NextResponse(stream, { headers });
 
   } catch (error) {
     console.error('Error setting up SSE endpoint:', error);
+    captureException(error, {
+      action: 'sse_setup',
+      feature: 'admin_tracking',
+      component: 'api/tracking/live',
+    });
     return NextResponse.json(
       { 
         success: false, 

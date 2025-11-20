@@ -27,6 +27,7 @@ import { useDriverDeliveries } from '@/hooks/tracking/useDriverDeliveries';
 import { useOfflineQueue } from '@/hooks/tracking/useOfflineQueue';
 import { DriverStatus } from '@/types/user';
 import type { LocationUpdate, DriverShift } from '@/types/tracking';
+import DriverLiveMap from '@/components/Driver/DriverLiveMap';
 
 interface DriverTrackingPortalProps {
   className?: string;
@@ -217,6 +218,50 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
         </Alert>
       )}
 
+      {/* Live Map & Current Location */}
+      {currentLocation && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <NavigationIcon className="w-5 h-5" />
+              <span>Live Map</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="h-64 rounded-lg overflow-hidden">
+              <DriverLiveMap
+                currentLocation={currentLocation}
+                activeDeliveries={activeDeliveries}
+              />
+            </div>
+
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between items-center">
+                <span>Coordinates:</span>
+                <span className="font-mono">
+                  {currentLocation.coordinates.lat.toFixed(6)},{' '}
+                  {currentLocation.coordinates.lng.toFixed(6)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Accuracy:</span>
+                <span>{Math.round(currentLocation.accuracy)}m</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Speed:</span>
+                <span>{Math.round(currentLocation.speed * 2.237)} mph</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Updated:</span>
+                <span>
+                  {new Date(currentLocation.timestamp).toLocaleTimeString()}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Shift Status Card */}
       <Card>
         <CardHeader>
@@ -330,42 +375,6 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
           )}
         </CardContent>
       </Card>
-
-      {/* Current Location Card */}
-      {currentLocation && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <NavigationIcon className="w-5 h-5" />
-              <span>Current Location</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm">Coordinates:</span>
-                <span className="text-sm font-mono">
-                  {currentLocation.coordinates.lat.toFixed(6)}, {currentLocation.coordinates.lng.toFixed(6)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm">Accuracy:</span>
-                <span className="text-sm">{Math.round(currentLocation.accuracy)}m</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm">Speed:</span>
-                <span className="text-sm">{Math.round(currentLocation.speed * 2.237)} mph</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm">Updated:</span>
-                <span className="text-sm">
-                  {new Date(currentLocation.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Active Deliveries */}
       {activeDeliveries.length > 0 && (
