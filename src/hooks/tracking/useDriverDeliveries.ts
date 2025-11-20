@@ -7,6 +7,7 @@ import {
   getDriverActiveDeliveries,
   updateDeliveryStatus as updateDeliveryStatusAction 
 } from '@/app/actions/tracking/delivery-actions';
+import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 
 interface UseDriverDeliveriesReturn {
   activeDeliveries: DeliveryTracking[];
@@ -38,6 +39,12 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
       return null;
     } catch (error) {
       console.error('Error getting driver ID:', error);
+      captureException(error, {
+        action: 'get_driver_id',
+        feature: 'driver_deliveries',
+        component: 'useDriverDeliveries',
+        handled: true,
+      });
       return null;
     }
   }, []);
@@ -59,6 +66,12 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
     } catch (error) {
       console.error('Error loading active deliveries:', error);
       setError(error instanceof Error ? error.message : 'Failed to load deliveries');
+      captureException(error, {
+        action: 'load_active_deliveries',
+        feature: 'driver_deliveries',
+        component: 'useDriverDeliveries',
+        handled: true,
+      });
     } finally {
       setLoading(false);
     }
@@ -89,10 +102,24 @@ export function useDriverDeliveries(): UseDriverDeliveriesReturn {
 
       // Reload deliveries to get updated data
       await loadActiveDeliveries();
+      addSentryBreadcrumb('Driver updated delivery status', {
+        deliveryId,
+        status,
+      });
       return true;
     } catch (error) {
       console.error('Error updating delivery status:', error);
       setError(error instanceof Error ? error.message : 'Failed to update delivery');
+      captureException(error, {
+        action: 'update_delivery_status',
+        feature: 'driver_deliveries',
+        component: 'useDriverDeliveries',
+        handled: true,
+        metadata: {
+          deliveryId,
+          status,
+        },
+      });
       return false;
     }
   }, [loadActiveDeliveries]);

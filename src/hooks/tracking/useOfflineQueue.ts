@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { OfflineCapability, OfflineLocationQueue } from '@/types/tracking';
+import type { OfflineCapability } from '@/types/tracking';
+import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 
 interface UseOfflineQueueReturn {
   offlineStatus: OfflineCapability;
@@ -42,10 +43,19 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
 
         // Enable background sync if supported
         if ('sync' in window.ServiceWorkerRegistration.prototype) {
-                  }
+          addSentryBreadcrumb('Background sync supported', {
+            feature: 'offline_queue',
+          });
+        }
 
       } catch (error) {
         console.error('Service Worker registration failed:', error);
+        captureException(error, {
+          action: 'register_service_worker',
+          feature: 'offline_queue',
+          component: 'useOfflineQueue',
+          handled: true,
+        });
       }
     }
   }, []);
@@ -70,6 +80,12 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
         });
       } catch (error) {
         console.error('Error getting queue status:', error);
+        captureException(error, {
+          action: 'get_queue_status',
+          feature: 'offline_queue',
+          component: 'useOfflineQueue',
+          handled: true,
+        });
         return 0;
       }
     }
@@ -94,6 +110,12 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
         }));
       } catch (error) {
         console.error('Background sync registration failed:', error);
+        captureException(error, {
+          action: 'background_sync_register',
+          feature: 'offline_queue',
+          component: 'useOfflineQueue',
+          handled: true,
+        });
         setOfflineStatus(prev => ({ ...prev, syncInProgress: false }));
       }
     }
