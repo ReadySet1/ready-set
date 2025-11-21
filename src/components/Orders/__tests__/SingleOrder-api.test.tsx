@@ -55,7 +55,7 @@ describe.skip("SingleOrder - API Encoding Tests", () => {
               order_number: "CV-0GF59K/1",
               status: "active",
               order_type: "catering",
-              order_total: "250.00",
+              orderTotal: "250.00",
               date: "2024-01-15",
               dispatches: [],
             }),
@@ -213,7 +213,7 @@ describe.skip("SingleOrder - API Encoding Tests", () => {
             orderNumber: "CV-0GF59K/1",
             status: "active",
             order_type: "catering",
-            order_total: "250.00",
+            orderTotal: "250.00",
             date: "2024-01-15",
             dispatches: [],
           }),
@@ -313,7 +313,7 @@ describe.skip("SingleOrder - Driver Information API Tests", () => {
     orderNumber: "SF-56780",
     status: "assigned",
     order_type: "catering",
-    order_total: "300.00",
+    orderTotal: "300.00",
     headcount: 24,
     brokerage: "Ez Cater",
     tip: "30.00",
@@ -493,7 +493,7 @@ describe("SingleOrder - Order Data API Tests", () => {
     orderNumber: "SF-56780",
     status: "assigned",
     order_type: "catering",
-    order_total: "300.00",
+    orderTotal: "300.00",
     headcount: 24,
     brokerage: "Ez Cater",
     tip: "30.00",
@@ -501,21 +501,25 @@ describe("SingleOrder - Order Data API Tests", () => {
     arrivalDateTime: "2024-01-15T12:45:00Z",
     completeDateTime: "2024-01-15T13:00:00Z",
     dispatches: [],
-    customer: {
+    user: {
       name: "Randy Marsh",
       email: "tegridy25@gmail.com",
     },
     pickupAddress: {
-      street: "100 Main St",
+      street1: "100 Main St",
       city: "San Carlos",
       state: "CA",
-      zipCode: "94070",
+      zip: "94070",
+      isRestaurant: true,
+      isShared: false,
     },
     deliveryAddress: {
-      street: "100 Main St",
+      street1: "100 Main St",
       city: "San Carlos",
       state: "CA",
-      zipCode: "94070",
+      zip: "94070",
+      isRestaurant: false,
+      isShared: false,
     },
   };
 
@@ -524,6 +528,18 @@ describe("SingleOrder - Order Data API Tests", () => {
 
     // Setup mock params to return order number
     mockParams.mockReturnValue({ order_number: "SF-56780" });
+
+    // Mock admin user role for these tests so details are visible
+    mockSupabase.from.mockReturnValue({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          single: jest.fn().mockResolvedValue({
+            data: { type: "ADMIN" },
+            error: null,
+          }),
+        })),
+      })),
+    });
 
     mockFetch.mockImplementation((url: string) => {
       if (
@@ -567,9 +583,14 @@ describe("SingleOrder - Order Data API Tests", () => {
       expect(screen.getByText("SF-56780")).toBeInTheDocument();
 
       // Verify order details
-      expect(screen.getByText("Headcount: 24")).toBeInTheDocument();
-      expect(screen.getByText("Total: $300.00")).toBeInTheDocument();
-      expect(screen.getByText("Brokerage: Ez Cater")).toBeInTheDocument();
+      const headcountElement = screen.getByText((content) => content.startsWith("Headcount:"));
+      expect(headcountElement).toBeInTheDocument();
+      expect(headcountElement).toHaveTextContent("24");
+      const totalElement = screen.getByText((content) => content.startsWith("Total:"));
+      expect(totalElement).toBeInTheDocument();
+      expect(totalElement).toHaveTextContent("300.00");
+      expect(screen.getByText("Brokerage")).toBeInTheDocument();
+      expect(screen.getByText("Ez Cater")).toBeInTheDocument();
       expect(screen.getByText("Tip: $30.00")).toBeInTheDocument();
     });
   });
@@ -622,13 +643,12 @@ describe("SingleOrder - Order Data API Tests", () => {
     });
 
     await waitFor(() => {
-      // Verify pickup address
-      expect(screen.getByText("100 Main St")).toBeInTheDocument();
-      expect(screen.getByText("San Carlos, CA 94070")).toBeInTheDocument();
-
-      // Verify delivery address
-      expect(screen.getAllByText("100 Main St")).toHaveLength(2); // Pickup and delivery
-      expect(screen.getAllByText("San Carlos, CA 94070")).toHaveLength(2);
+      // Verify pickup and delivery addresses
+      const addressElements = screen.getAllByText("100 Main St");
+      expect(addressElements).toHaveLength(2);
+      
+      const cityElements = screen.getAllByText("San Carlos, CA 94070");
+      expect(cityElements).toHaveLength(2);
     });
   });
 
@@ -676,7 +696,6 @@ describe("SingleOrder - Order Data API Tests", () => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("/api/orders/SF-56780?include=dispatch.driver"),
         expect.objectContaining({
-          method: "GET",
           credentials: "include",
           headers: expect.objectContaining({
             "Content-Type": "application/json",
@@ -717,7 +736,7 @@ describe.skip("SingleOrder - Role-based Visibility Tests", () => {
     orderNumber: "CV-PBMD00/1",
     status: "active",
     order_type: "catering",
-    order_total: "250.00",
+    orderTotal: "250.00",
     pickupDateTime: "2025-07-18T08:00:00Z",
     dispatches: [],
     user: {

@@ -274,6 +274,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       }
 
       // Fetch order details with auth header
+      console.log("Debug: fetching order from API");
       const orderResponse = await fetch(
         `/api/orders/${encodeURIComponent(orderNumber)}?include=dispatch.driver`,
         {
@@ -417,12 +418,14 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
   // Fetch order details on mount
   useEffect(() => {
+    console.log("Debug: SingleOrder mounted");
     fetchOrderDetails();
     ensureStorageBucketExists(); // Add this line to check the bucket on mount
   }, [fetchOrderDetails, ensureStorageBucketExists]);
 
   // Fetch drivers on mount - only for non-VENDOR users
   useEffect(() => {
+    console.log("Debug: Fetching drivers");
     const fetchDrivers = async () => {
       // Skip driver fetching for VENDOR users since they don't have access to driver data
       if (userRoles.isVendor) {
@@ -716,23 +719,28 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   };
 
   const fetchUserRoles = useCallback(async () => {
+    console.log("Debug: fetchUserRoles start");
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      console.log("Debug: fetchUserRoles user", user?.id);
 
       if (!user) {
         console.error("No authenticated user found");
         return;
       }
 
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from("profiles")
         .select("type")
         .eq("id", user.id)
         .single();
+      
+      console.log("Debug: fetchUserRoles profile", profile, "error", error);
 
       if (profile) {
+        console.log("Debug: setting roles", profile.type === UserType.ADMIN);
         setUserRoles({
           isAdmin: profile.type === UserType.ADMIN,
           isSuperAdmin: profile.type === UserType.SUPER_ADMIN,
