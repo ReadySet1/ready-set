@@ -1,8 +1,7 @@
 // src/services/notifications/email.ts
 // High-level delivery status email notifications built on top of SendGrid.
 // This module is server-only and should never be imported into client components.
-
-"use server";
+import "server-only";
 
 import { DriverStatus } from "@/types/user";
 import {
