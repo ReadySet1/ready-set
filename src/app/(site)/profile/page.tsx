@@ -27,12 +27,14 @@ import {
   Upload,
   Download,
   Trash2,
+  Bell,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/utils/supabase/client";
 import { useUploadFile } from "@/hooks/use-upload-file";
 import { FileUploader } from "@/components/Uploader/file-uploader";
 import { FileWithPath } from "react-dropzone";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 interface UserProfile {
   id: string;
@@ -187,6 +189,14 @@ export default function ProfilePage() {
   const [files, setFiles] = useState<UserFile[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const supabase = createClient();
+
+  const {
+    status: pushStatus,
+    error: pushError,
+    isSupported: isPushSupported,
+    enableOnThisDevice,
+    disableAllDevices,
+  } = usePushNotifications();
 
   // File upload hooks for different categories based on user type
   const driverPhotoUpload = useUploadFile({
@@ -1090,7 +1100,93 @@ export default function ProfilePage() {
 
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
+            {/* Notification Preferences */}
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 p-6">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+                  <Bell className="h-5 w-5 text-amber-500" />
+                  Notification Preferences
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Control delivery status push notifications on this device.
+                </p>
+              </div>
+              <div className="space-y-4 p-6">
+                {!isPushSupported ? (
+                  <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+                    Push notifications are not supported in this browser. For the best
+                    experience, use a modern browser like Chrome, Edge, Firefox, or Safari
+                    on a supported device.
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">
+                          Delivery status notifications
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Receive push notifications when your deliveries are assigned,
+                          en route, arrived, or completed.
+                        </p>
+                        <p className="mt-2 text-xs text-slate-500">
+                          Current status:{" "}
+                          <span className="font-semibold">
+                            {pushStatus === "enabled"
+                              ? "Enabled on this account"
+                              : pushStatus === "disabled"
+                              ? "Disabled"
+                              : pushStatus === "requesting_permission"
+                              ? "Awaiting browser permission..."
+                              : pushStatus === "error"
+                              ? "Error"
+                              : "Checking..."}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <Button
+                          type="button"
+                          onClick={enableOnThisDevice}
+                          disabled={
+                            pushStatus === "requesting_permission" ||
+                            pushStatus === "enabled"
+                          }
+                          className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          aria-label="Enable delivery status push notifications on this device"
+                        >
+                          {pushStatus === "requesting_permission"
+                            ? "Enabling..."
+                            : pushStatus === "enabled"
+                            ? "Enabled"
+                            : "Enable on this device"}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={disableAllDevices}
+                          variant="outline"
+                          className="rounded-xl border-slate-200 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          aria-label="Disable delivery status push notifications on all devices"
+                        >
+                          Disable on all devices
+                        </Button>
+                      </div>
+                    </div>
+                    {pushError && (
+                      <div
+                        role="status"
+                        className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"
+                      >
+                        {pushError}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
             {/* Account Status */}
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 p-6">
                 <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-800">

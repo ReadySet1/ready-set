@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { DispatchSystemError, trackDispatchError } from '@/utils/domain-error-tracking';
+import { sendDispatchStatusNotification } from '@/services/notifications/delivery-status';
 
 // Status update validation schema
 const statusUpdateSchema = z.object({
@@ -50,7 +51,9 @@ async function validateDriverDispatchPermission(
 }
 
 /**
- * Mock function to send notification about status update
+ * Wrapper around the unified dispatch notification service.
+ * Currently focuses on customer push notifications; email delivery
+ * remains handled by the unified email service where applicable.
  */
 async function sendStatusNotification(
   status: string,
@@ -58,18 +61,40 @@ async function sendStatusNotification(
   orderId: string,
   recipientType: 'CUSTOMER' | 'ADMIN' | 'STORE'
 ): Promise<{ success: boolean; error?: string }> {
-  // Simulate notification sending
-  await new Promise(resolve => setTimeout(resolve, 300));
-  
-  // Simulate random notification failures for testing
-  if (Math.random() < 0.1) {
+  try {
+    const result = await sendDispatchStatusNotification({
+      status,
+      dispatchId,
+      orderId,
+      recipientType,
+    });
+
+    return result;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unknown dispatch notification error';
+
+    const notificationError = new DispatchSystemError(
+      message,
+      'DRIVER_NOTIFICATION_ERROR',
+      {
+        dispatchId,
+        driverId: undefined,
+        orderId,
+        notificationDetails: {
+          type: 'status_update',
+          recipient: recipientType.toLowerCase(),
+        },
+      }
+    );
+
+    trackDispatchError(notificationError, notificationError.type, notificationError.context);
+
     return {
       success: false,
-      error: `Failed to send notification to ${recipientType.toLowerCase()}`
+      error: message,
     };
   }
-  
-  return { success: true };
 }
 
 /**
