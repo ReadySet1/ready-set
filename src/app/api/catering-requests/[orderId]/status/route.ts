@@ -8,6 +8,8 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
 import { CarrierService, CarrierWebhookService } from '@/lib/services/carrierService';
 import { DriverStatus } from '@/types/prisma';
+import { getEmailPreferencesForUser } from "@/lib/email-preferences";
+import { sendDeliveryStatusEmail } from "@/services/notifications/email";
 import { invalidateVendorCacheOnStatusUpdate } from '@/lib/cache/cache-invalidation';
 
 // Validation schema for status update request
@@ -170,7 +172,43 @@ export async function PATCH(
     // 8. Invalidate vendor cache since order status affects metrics and order lists
     invalidateVendorCacheOnStatusUpdate(order.userId, orderId);
 
-    // 9. Return success response
+    // 9. Send customer delivery-status email (best-effort)
+    try {
+      const preferences = await getEmailPreferencesForUser(order.userId);
+
+      await sendDeliveryStatusEmail({
+        driverStatus: validatedData.driverStatus,
+        details: {
+          deliveryId: updatedOrder.id,
+          orderNumber: updatedOrder.orderNumber,
+          customerEmail: order.user.email,
+          customerName: order.user.name ?? order.user.email,
+          driverName: undefined,
+          estimatedArrival: updatedOrder.arrivalDateTime
+            ? updatedOrder.arrivalDateTime.toISOString()
+            : undefined,
+          deliveryAddress: order.deliveryAddress
+            ? `${order.deliveryAddress.street1}, ${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.zip}`
+            : "",
+          trackingLink: `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://readysetllc.com"}/orders/${encodeURIComponent(
+            updatedOrder.orderNumber
+          )}`,
+          supportLink:
+            `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://readysetllc.com"}/contact`,
+        },
+        preferences: {
+          deliveryNotifications: preferences.deliveryNotifications,
+          promotionalEmails: preferences.promotionalEmails,
+        },
+      });
+    } catch (emailError) {
+      console.error("Failed to send delivery status email", {
+        orderId,
+        emailError,
+      });
+    }
+
+    // 10. Return success response
     const response: StatusUpdateResponse = {
       success: true,
       order: {
