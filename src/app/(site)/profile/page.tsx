@@ -1185,8 +1185,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Account Status */}
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 p-6">
                 <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
