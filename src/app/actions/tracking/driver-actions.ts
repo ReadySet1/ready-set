@@ -15,6 +15,10 @@ import {
 } from '@/lib/cache/driver-metadata-cache';
 import { realtimeLogger } from '@/lib/logging/realtime-logger';
 import { staleLocationDetector } from '@/lib/realtime/stale-detection';
+import {
+  calculateShiftMileage,
+  calculateShiftMileageWithBreakdown,
+} from '@/services/tracking/mileage';
 
 /**
  * Start a new driver shift
@@ -107,60 +111,91 @@ export async function endDriverShift(
   metadata: Record<string, any> = {}
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Get shift info and calculate distance
+    // Get shift info and ensure it is active before proceeding
     const shiftInfo = await prisma.$queryRawUnsafe<{
       driver_id: string;
-      start_location: string;
-      delivery_count: number;
+      status: string;
     }[]>(`
       SELECT 
         driver_id,
-        ST_AsText(start_location) as start_location,
-        delivery_count
+        status
       FROM driver_shifts 
-      WHERE id = $1::uuid AND status = 'active'
+      WHERE id = $1::uuid
     `, shiftId);
 
-    if (shiftInfo.length === 0) {
+    if (shiftInfo.length === 0 || (shiftInfo[0]?.status !== 'active' && shiftInfo[0]?.status !== 'paused')) {
       return { success: false, error: 'Active shift not found' };
     }
 
     const shift = shiftInfo[0];
 
-    // Calculate distance if not provided
-    let totalDistance = finalMileage || 0;
-    if (!finalMileage && shift?.start_location) {
-      const distanceResult = await prisma.$queryRawUnsafe<{ distance_km: number }[]>(`
-        SELECT ST_Distance(
-          ST_GeogFromText($1),
-          ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography
-        ) / 1000 as distance_km
-      `,
-        shift.start_location,
-        endLocation.coordinates.lng,
-        endLocation.coordinates.lat
-      );
-      totalDistance = distanceResult[0]?.distance_km || 0;
-    }
-
-    // Update shift record
+    // Always record the end location in the database first so that the
+    // mileage calculation window has a proper closing point.
     await prisma.$executeRawUnsafe(`
       UPDATE driver_shifts
       SET
         end_time = NOW(),
         end_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
-        total_distance_km = $4::float,
         status = 'completed',
-        metadata = metadata || $5::jsonb,
+        metadata = COALESCE(metadata, '{}'::jsonb) || $4::jsonb,
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       shiftId,
       endLocation.coordinates.lng,
       endLocation.coordinates.lat,
-      totalDistance,
-      JSON.stringify(metadata)
+      JSON.stringify({
+        ...metadata,
+        // Preserve any caller-provided finalMileage but treat it as an
+        // informational override rather than the canonical distance.
+        clientReportedMileageKm: finalMileage ?? undefined,
+      })
     );
+
+    // Calculate mileage from GPS trail. If finalMileage is provided, prefer it
+    // as the canonical total but still perform the calculation so that
+    // per-delivery breakdowns remain accurate and stored.
+    let totalKm = finalMileage ?? 0;
+    let calculationError: Error | null = null;
+
+    try {
+      if (finalMileage == null) {
+        const { totalKm: computedKm } = await calculateShiftMileage(shiftId);
+        totalKm = computedKm;
+      } else {
+        // Use the richer breakdown calculation when the client already has a
+        // trusted odometer reading; this still persists total_distance_km.
+        const { totalKm: computedKm } = await calculateShiftMileageWithBreakdown(shiftId);
+        // Keep the client-reported mileage as the primary value, but if the
+        // computation differs wildly we still log it for later analysis.
+        if (!Number.isFinite(totalKm) || totalKm <= 0) {
+          totalKm = computedKm;
+        }
+      }
+    } catch (error) {
+      calculationError = error instanceof Error ? error : new Error('Unknown mileage calculation error');
+      realtimeLogger.error('Failed to calculate shift mileage from GPS trail', {
+        driverId: shift?.driver_id,
+        error: calculationError,
+        metadata: {
+          shiftId,
+        },
+      });
+    }
+
+    // If we have a finalKm value (either provided or computed), persist it as
+    // a final safety net in case the mileage service failed before updating.
+    if (Number.isFinite(totalKm) && totalKm > 0) {
+      await prisma.$executeRawUnsafe(`
+        UPDATE driver_shifts
+        SET 
+          total_distance_km = $2::float,
+          updated_at = NOW()
+        WHERE id = $1::uuid
+      `,
+      shiftId,
+      totalKm);
+    }
 
     // Update driver status
     await prisma.$executeRawUnsafe(`
