@@ -69,17 +69,21 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredDrivers, setFilteredDrivers] = useState<Driver[]>(drivers);
+  const [filteredDrivers, setFilteredDrivers] = useState<Driver[]>(
+    Array.isArray(drivers) ? drivers : [],
+  );
   const [isAssigning, setIsAssigning] = useState(false);
   const itemsPerPage = 4; // Reduced for better mobile experience
 
   // Filter drivers when search term or drivers array changes
   useEffect(() => {
+    const safeDrivers = Array.isArray(drivers) ? drivers : [];
+
     if (searchTerm.trim() === "") {
-      setFilteredDrivers(drivers);
+      setFilteredDrivers(safeDrivers);
     } else {
       const lowercaseSearch = searchTerm.toLowerCase();
-      const filtered = drivers.filter(
+      const filtered = safeDrivers.filter(
         (driver) =>
           (driver.name?.toLowerCase().includes(lowercaseSearch) ?? false) ||
           (driver.contactNumber && driver.contactNumber.includes(searchTerm)),
@@ -92,11 +96,14 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
 
   const indexOfLastDriver = currentPage * itemsPerPage;
   const indexOfFirstDriver = indexOfLastDriver - itemsPerPage;
-  const currentDrivers = filteredDrivers.slice(
+  const safeFilteredDrivers = Array.isArray(filteredDrivers)
+    ? filteredDrivers
+    : [];
+  const currentDrivers = safeFilteredDrivers.slice(
     indexOfFirstDriver,
     indexOfLastDriver,
   );
-  const totalPages = Math.ceil(filteredDrivers.length / itemsPerPage);
+  const totalPages = Math.ceil(safeFilteredDrivers.length / itemsPerPage);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

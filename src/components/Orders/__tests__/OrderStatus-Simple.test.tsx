@@ -36,7 +36,7 @@ describe("OrderStatusCard - Change Status Feature", () => {
       render(<OrderStatusCard {...defaultProps} />);
 
       expect(screen.getByText("Current Status:")).toBeInTheDocument();
-      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
     });
 
     it("should display different status badges correctly", () => {
@@ -46,7 +46,7 @@ describe("OrderStatusCard - Change Status Feature", () => {
           initialStatus={OrderStatus.COMPLETED}
         />,
       );
-      expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
 
       rerender(
         <OrderStatusCard
@@ -54,7 +54,7 @@ describe("OrderStatusCard - Change Status Feature", () => {
           initialStatus={OrderStatus.CANCELLED}
         />,
       );
-      expect(screen.getByText("CANCELLED")).toBeInTheDocument();
+      expect(screen.getByText("Cancelled")).toBeInTheDocument();
     });
   });
 
@@ -92,7 +92,7 @@ describe("OrderStatusCard - Change Status Feature", () => {
 
       // Wait for dropdown content to appear
       await waitFor(() => {
-        expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+        expect(screen.getByText("Active")).toBeInTheDocument();
       });
     });
 
@@ -174,7 +174,7 @@ describe("OrderStatusCard - Change Status Feature", () => {
 
     it("should handle status updates", () => {
       const { rerender } = render(<OrderStatusCard {...defaultProps} />);
-      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
 
       rerender(
         <OrderStatusCard
@@ -182,7 +182,7 @@ describe("OrderStatusCard - Change Status Feature", () => {
           initialStatus={OrderStatus.COMPLETED}
         />,
       );
-      expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
     });
   });
 });

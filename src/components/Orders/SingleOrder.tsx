@@ -356,7 +356,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         const filesArray = Array.isArray(filesData)
           ? filesData
           : Object.values(filesData);
-        const transformedFiles = filesArray.map(
+        const transformedFiles = filesArray
+          .filter((file) => file !== null && typeof file === "object")
+          .map(
           (file: {
             id: string;
             fileName: string;
