@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import NewsletterSignup from "../Newsletter/newsLetterSignUp";
 
 const Footer = () => {
   return (
@@ -10,7 +9,7 @@ const Footer = () => {
     >
       <div className="container">
         <div className="-mx-4 flex flex-wrap">
-          <div className="w-full px-4 sm:w-1/2 md:w-1/2 lg:w-4/12 xl:w-3/12">
+          <div className="w-full px-4 sm:w-1/2 md:w-1/2 lg:w-3/12 xl:w-2/12">
             <div className="mb-10 w-full text-center">
               <Link href="/" className="mb-6 inline-block max-w-[160px]">
                 <Image
@@ -110,12 +109,13 @@ const Footer = () => {
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap justify-between gap-4">
-            <div className="w-full sm:w-1/2 md:w-1/2 lg:w-3/12 xl:w-2/12">
-              <div className="mb-10 w-full">
-                <h4 className="mb-9 text-lg font-semibold text-white">
-                  About Us
-                </h4>
+          <div className="w-full px-4 lg:w-9/12 xl:w-10/12">
+            <div className="-mx-4 flex flex-wrap justify-between">
+              <div className="w-full px-4 sm:w-1/2 md:w-1/2 lg:w-1/4 xl:w-1/4">
+                <div className="mb-10 w-full">
+                  <h4 className="mb-9 text-lg font-semibold text-white">
+                    About Us
+                  </h4>
                 <ul>
                   <li>
                     <Link
@@ -152,7 +152,7 @@ const Footer = () => {
                 </ul>
               </div>
             </div>
-            <div className="w-full sm:w-1/2 md:w-1/2 lg:w-3/12 xl:w-2/12">
+            <div className="w-full px-4 sm:w-1/2 md:w-1/2 lg:w-1/4 xl:w-1/4">
               <div className="mb-10 w-full">
                 <h4 className="mb-9 text-lg font-semibold text-white">
                   Features
@@ -193,7 +193,7 @@ const Footer = () => {
                 </ul>
               </div>
             </div>
-            <div className="w-full sm:w-1/2 md:w-1/2 lg:w-3/12 xl:w-2/12">
+            <div className="w-full px-4 sm:w-1/2 md:w-1/2 lg:w-1/4 xl:w-1/4">
               <div className="mb-10 w-full">
                 <h4 className="mb-9 text-lg font-semibold text-white">
                   Our Products
@@ -226,8 +226,7 @@ const Footer = () => {
                 </ul>
               </div>
             </div>
-
-            <div className="w-full sm:w-1/2 md:w-1/2 lg:w-3/12 xl:w-2/12">
+            <div className="w-full px-4 sm:w-1/2 md:w-1/2 lg:w-1/4 xl:w-1/4">
               <div className="mb-10 w-full">
                 <h4 className="mb-9 text-lg font-semibold text-white">
                   Useful Links
@@ -282,15 +281,6 @@ const Footer = () => {
                 </ul>
               </div>
             </div>
-            <div className="w-full sm:w-1/2 md:w-1/2 lg:w-3/12 xl:w-2/12">
-              <div className="mb-10 w-full">
-                <h4 className="mb-9 text-lg font-semibold text-white">
-                  Updates
-                </h4>
-                <div className="space-y-4">
-                  <NewsletterSignup />
-                </div>
-              </div>
             </div>
           </div>
         </div>
