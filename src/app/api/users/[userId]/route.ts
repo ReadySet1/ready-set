@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
 
     // Handle "new" as a special case - it's not a valid UUID
     if (userId === 'new') {
-      console.log('[GET /api/users/[userId]] Special case: userId="new", returning 404');
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -40,7 +39,6 @@ export async function GET(request: NextRequest) {
     // Validate UUID format before querying database
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(userId)) {
-      console.log(`[GET /api/users/[userId]] Invalid UUID format: ${userId}`);
       return NextResponse.json(
         { error: 'Invalid user ID format' },
         { status: 400 }
@@ -213,14 +211,11 @@ export async function PUT(
       // For update operations, validate UUID format
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(userId)) {
-        console.log(`[PUT /api/users/[userId]] Invalid UUID format: ${userId}`);
         return NextResponse.json(
           { error: 'Invalid user ID format' },
           { status: 400 }
         );
       }
-    } else {
-      console.log('[PUT /api/users/[userId]] Creating new user (userId="new" or empty id in request body)');
     }
     
     // SECURITY FIX: Remove dangerous admin panel bypass
@@ -382,8 +377,6 @@ export async function PUT(
 
     if (isCreateOperation) {
       // Create new user profile
-      console.log('[PUT /api/users/[userId]] Creating new user with email:', requestBody.email);
-
       // Check if email already exists
       const existingUser = await prisma.profile.findUnique({
         where: { email: requestBody.email }
@@ -399,11 +392,8 @@ export async function PUT(
       profile = await prisma.profile.create({
         data: profileData,
       });
-
-      console.log('[PUT /api/users/[userId]] Successfully created user with ID:', profile.id);
     } else {
       // Update existing user profile
-      console.log('[PUT /api/users/[userId]] Updating user with ID:', userId);
 
       // Check if user exists and is not soft-deleted before updating
       const existingUser = await prisma.profile.findUnique({
@@ -429,8 +419,6 @@ export async function PUT(
         where: { id: userId },
         data: profileData,
       });
-
-      console.log('[PUT /api/users/[userId]] Successfully updated user with ID:', userId);
     }
 
 
@@ -504,7 +492,6 @@ export async function PATCH(
 
     // Handle "new" as a special case - it's not a valid UUID
     if (userId === 'new') {
-      console.log('[PATCH /api/users/[userId]] Special case: userId="new", cannot update');
       return NextResponse.json(
         { error: 'Cannot update a non-existent user' },
         { status: 404 }
@@ -514,7 +501,6 @@ export async function PATCH(
     // Validate UUID format before querying database
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(userId)) {
-      console.log(`[PATCH /api/users/[userId]] Invalid UUID format: ${userId}`);
       return NextResponse.json(
         { error: 'Invalid user ID format' },
         { status: 400 }
@@ -756,7 +742,6 @@ export async function DELETE(
 
     // Handle "new" as a special case - it's not a valid UUID
     if (userId === 'new') {
-      console.log('[DELETE /api/users/[userId]] Special case: userId="new", cannot delete');
       return NextResponse.json(
         { error: 'Cannot delete a non-existent user' },
         { status: 404 }
@@ -766,7 +751,6 @@ export async function DELETE(
     // Validate UUID format before querying database
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(userId)) {
-      console.log(`[DELETE /api/users/[userId]] Invalid UUID format: ${userId}`);
       return NextResponse.json(
         { error: 'Invalid user ID format' },
         { status: 400 }

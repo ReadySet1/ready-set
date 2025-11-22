@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { DriverShift, LocationUpdate } from '@/types/tracking';
+import { captureException, addSentryBreadcrumb } from '@/lib/monitoring/sentry';
 import { 
   startDriverShift, 
   endDriverShift, 
@@ -38,6 +39,12 @@ export function useDriverShift(): UseDriverShiftReturn {
       return null;
     } catch (error) {
       console.error('Error getting driver ID:', error);
+      captureException(error, {
+        action: 'get_driver_id',
+        feature: 'driver_shift',
+        component: 'useDriverShift',
+        handled: true,
+      });
       return null;
     }
   }, []);
@@ -59,6 +66,13 @@ export function useDriverShift(): UseDriverShiftReturn {
     } catch (error) {
       console.error('Error loading active shift:', error);
       setError(error instanceof Error ? error.message : 'Failed to load shift');
+      captureException(error, {
+        action: 'load_active_shift',
+        feature: 'driver_shift',
+        component: 'useDriverShift',
+        handled: true,
+        metadata: { driverId: await getDriverId().catch(() => null) ?? undefined },
+      });
     } finally {
       setLoading(false);
     }
@@ -96,10 +110,20 @@ export function useDriverShift(): UseDriverShiftReturn {
 
       // Reload the shift data
       await loadActiveShift();
+      addSentryBreadcrumb('Driver shift started', {
+        driverId,
+        shiftId: result.shiftId ?? undefined,
+      });
       return true;
     } catch (error) {
       console.error('Error starting shift:', error);
       setError(error instanceof Error ? error.message : 'Failed to start shift');
+      captureException(error, {
+        action: 'start_shift',
+        feature: 'driver_shift',
+        component: 'useDriverShift',
+        handled: true,
+      });
       return false;
     } finally {
       setLoading(false);
@@ -122,10 +146,20 @@ export function useDriverShift(): UseDriverShiftReturn {
       }
 
       setCurrentShift(null);
+      addSentryBreadcrumb('Driver shift ended', {
+        shiftId,
+      });
       return true;
     } catch (error) {
       console.error('Error ending shift:', error);
       setError(error instanceof Error ? error.message : 'Failed to end shift');
+      captureException(error, {
+        action: 'end_shift',
+        feature: 'driver_shift',
+        component: 'useDriverShift',
+        handled: true,
+        metadata: { shiftId },
+      });
       return false;
     } finally {
       setLoading(false);

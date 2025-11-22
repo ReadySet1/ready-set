@@ -168,6 +168,14 @@ const nextConfig = {
     return config;
   },
   images: {
+    /**
+     * Configure allowed quality values for next/image.
+     *
+     * NOTE: Starting in Next.js 16, any quality passed to <Image> must be
+     * explicitly listed here, otherwise a runtime warning is emitted:
+     * https://nextjs.org/docs/messages/next-image-unconfigured-qualities
+     */
+    qualities: [75, 80, 85, 100],
     remotePatterns: [
       {
         protocol: "https",
