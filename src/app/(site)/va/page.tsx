@@ -1,4 +1,4 @@
-import ConsultationBanner from "@/components/PopUpBanner/Consultation";
+// import ConsultationBanner from "@/components/PopUpBanner/Consultation";
 import Testimonials from "@/components/Testimonials";
 import HeroHeader from "@/components/VirtualAssistant";
 import DiscoveryCallSection from "@/components/VirtualAssistant/DiscoveryCall";
@@ -80,7 +80,7 @@ export const metadata: Metadata = {
 const VirtualAssistantPage = () => {
   return (
     <main>
-      <ConsultationBanner />
+      {/* <ConsultationBanner /> */}
       {/* <ReadySetVirtualAssistantPage /> */}
       <HeroHeader />
       {/* <FeatureCarousel /> */}
