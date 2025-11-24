@@ -1,9 +1,8 @@
 // src/app/(site)/catering-deliveries/page.tsx
 import { Metadata } from "next";
-import { FormType } from "@/components/Logistics/QuoteRequest/types";
-import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
-import DeliveryPartners from "@/components/FoodDelivery/DeliveryPartners";
-import { FoodServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
+// import { FoodServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
+import CateringFeatures from "@/components/FoodDelivery/CateringFeatures";
+import CateringAbout from "@/components/FoodDelivery/CateringAbout";
 import DeliveryTerms from "@/components/FoodDelivery/DeliveryTerms";
 import HostingChecklist from "@/components/FoodDelivery/HostingChecklist";
 import MainMeal from "@/components/FoodDelivery/MainMeal";
@@ -53,8 +52,10 @@ export default function FoodPage() {
     <div className="pt-20 md:pt-24">
       <PromoPopup />
       <FoodHeader />
-      <DeliveryPartners />
-      <FoodServiceFeatures />
+      {/* <DeliveryPartners /> */}
+      {/* <FoodServiceFeatures /> */}
+      <CateringFeatures />
+      <CateringAbout />
       <DeliveryTerms />
       <HostingChecklist />
       <MainMeal />
