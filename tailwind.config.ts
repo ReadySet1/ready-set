@@ -1,5 +1,15 @@
 import type { Config } from "tailwindcss";
 
+/**
+ * Tailwind CSS Configuration
+ * 
+ * Brand Colors: See src/styles/brand-colors.ts for centralized color system
+ * - Primary brand colors: amber-300/400 (use for brand elements)
+ * - Semantic colors: yellow-400/500/600 (use for warnings, highlights)
+ * 
+ * Note: Tailwind includes amber and yellow color palettes by default.
+ * Dynamic class names are avoided - use colorClassMap from brand-colors.ts instead.
+ */
 const config: Config = {
   darkMode: ["class"],
   content: [
@@ -12,6 +22,8 @@ const config: Config = {
       colors: {
         primary: '#FBD113',
         'custom-yellow': "#ffc61a",
+        'dark-navy': '#1a202c',
+        'charcoal': '#2d3748',
       },
       keyframes: {
         "accordion-down": {
