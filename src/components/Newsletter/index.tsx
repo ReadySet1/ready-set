@@ -67,7 +67,7 @@ export const Subscribe: React.FC<SubscribeProps> = ({
     <div className={`w-full max-w-lg mx-auto p-6 ${className}`.trim()}>
       <div className="rounded-xl bg-white shadow-lg p-6 border border-gray-100">
         <div className="flex items-center gap-2 mb-4">
-          <Mail className="w-5 h-5 text-yellow-500" />
+          <Mail className="w-5 h-5 text-amber-400" />
           <h2 className="text-lg font-semibold text-gray-900">
             Stay Updated
           </h2>
@@ -86,10 +86,10 @@ export const Subscribe: React.FC<SubscribeProps> = ({
               onChange={(e) => setEmail(e.target.value)}
               disabled={status === "loading"}
               className={`w-full px-4 py-3 rounded-lg border-2 pr-12 transition-colors
-                focus:outline-none focus:ring-2 focus:ring-yellow-500/20
+                focus:outline-none focus:ring-2 focus:ring-amber-400/20
                 ${statusCode === 400 
                   ? "border-red-300 focus:border-red-500" 
-                  : "border-gray-200 focus:border-yellow-500"
+                  : "border-gray-200 focus:border-amber-400"
                 }
                 disabled:bg-gray-50 disabled:cursor-not-allowed
               `}
@@ -111,7 +111,7 @@ export const Subscribe: React.FC<SubscribeProps> = ({
             type="submit"
             disabled={status === "loading" || !email}
             className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg
-              bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-300
+              bg-amber-400 hover:bg-amber-500 disabled:bg-gray-300
               text-white font-medium transition-colors w-full"
           >
             {status === "loading" ? (

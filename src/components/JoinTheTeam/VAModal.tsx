@@ -70,28 +70,28 @@ export function VAModal() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button className="w-full rounded-xl bg-gradient-to-r from-amber-300 to-amber-300 font-semibold text-white shadow-lg transition-all duration-300 hover:from-amber-400 hover:to-amber-400 hover:shadow-xl">
+        <Button className="w-full rounded-xl bg-gradient-to-r from-amber-300 to-amber-300 font-semibold text-slate-900 shadow-lg transition-all duration-300 hover:from-amber-400 hover:to-amber-400 hover:shadow-xl">
           Learn More <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
       </DialogTrigger>
       <DialogContent className="z-[1001] mx-auto my-2 max-h-[calc(100vh-1rem)] w-[calc(100vw-1rem)] max-w-4xl overflow-y-auto rounded-2xl border-0 bg-white p-0 shadow-2xl sm:my-4 sm:max-h-[calc(100vh-2rem)] sm:w-[calc(100vw-2rem)]">
-        <DialogHeader className="relative rounded-t-2xl bg-gradient-to-r from-amber-300 to-amber-300 p-6 text-white sm:p-8">
-          <DialogClose className="absolute right-4 top-4 z-10 rounded-full bg-white/20 p-2 text-white transition-colors hover:bg-white/30">
+        <DialogHeader className="relative rounded-t-2xl bg-gradient-to-r from-amber-300 to-amber-300 p-6 text-slate-900 sm:p-8">
+          <DialogClose className="absolute right-4 top-4 z-10 rounded-full bg-slate-900/10 p-2 text-slate-900 transition-colors hover:bg-slate-900/20">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogClose>
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-              <Headphones className="h-6 w-6 text-white" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900/10 backdrop-blur-sm">
+              <Headphones className="h-6 w-6 text-slate-900" />
             </div>
-            <Badge className="bg-white/20 text-white backdrop-blur-sm hover:bg-white/30">
+            <Badge className="bg-slate-900/10 text-slate-900 backdrop-blur-sm hover:bg-slate-900/20">
               Remote Position
             </Badge>
           </div>
-          <DialogTitle className="mb-3 text-left text-2xl font-bold sm:text-3xl">
+          <DialogTitle className="mb-3 text-left text-2xl font-bold text-slate-900 sm:text-3xl">
             Virtual Assistant
           </DialogTitle>
-          <DialogDescription className="text-left text-base text-white/90 sm:text-lg">
+          <DialogDescription className="text-left text-base text-slate-800 sm:text-lg">
             Help businesses thrive while growing your career in a fully remote
             environment
           </DialogDescription>
@@ -246,12 +246,12 @@ export function VAModal() {
           </div>
 
           {/* CTA */}
-          <Card className="border-0 bg-gradient-to-r from-amber-300 to-amber-300 text-white">
+          <Card className="border-0 bg-gradient-to-r from-amber-300 to-amber-300 text-slate-900">
             <CardContent className="p-6 text-center">
-              <h4 className="mb-3 text-xl font-bold">
+              <h4 className="mb-3 text-xl font-bold text-slate-900">
                 Ready to Help Businesses Thrive?
               </h4>
-              <p className="mb-6 text-white/90">
+              <p className="mb-6 text-slate-800">
                 Join our team and help businesses achieve sustainable growth
                 while advancing your own career in a supportive remote
                 environment.

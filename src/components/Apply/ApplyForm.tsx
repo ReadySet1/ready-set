@@ -846,7 +846,7 @@ const JobApplicationForm = () => {
                 <select
                   className={`block w-full rounded-md border ${
                     errors.role ? "border-red-500" : "border-gray-300"
-                  } appearance-none bg-white px-3 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-300`}
+                  } appearance-none bg-white px-3 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400`}
                   {...register("role", {
                     required: "Please select a position",
                   })}
@@ -872,7 +872,7 @@ const JobApplicationForm = () => {
                   type="text"
                   className={`block w-full rounded-md border ${
                     errors.firstName ? "border-red-500" : "border-gray-200"
-                  } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-300`}
+                  } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400`}
                   {...register("firstName", {
                     required: "First name is required",
                     minLength: {
@@ -891,7 +891,7 @@ const JobApplicationForm = () => {
                   type="text"
                   className={`block w-full rounded-md border ${
                     errors.lastName ? "border-red-500" : "border-gray-200"
-                  } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-300`}
+                  } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400`}
                   {...register("lastName", {
                     required: "Last name is required",
                     minLength: {
@@ -913,7 +913,7 @@ const JobApplicationForm = () => {
                   type="email"
                   className={`block w-full rounded-md border ${
                     errors.email ? "border-red-500" : "border-gray-200"
-                  } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-300`}
+                  } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400`}
                   {...register("email", {
                     required: "Email is required",
                     pattern: {
@@ -934,7 +934,7 @@ const JobApplicationForm = () => {
                   type="tel"
                   className={`block w-full rounded-md border ${
                     errors.phone ? "border-red-500" : "border-gray-200"
-                  } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-300`}
+                  } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400`}
                   {...register("phone", {
                     required: "Phone number is required",
                     pattern: {
@@ -956,7 +956,7 @@ const JobApplicationForm = () => {
                 placeholder="Street Address"
                 className={`block w-full rounded-md border ${
                   errors.address?.street ? "border-red-500" : "border-gray-200"
-                } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-300`}
+                } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400`}
                 {...register("address.street", {
                   required: "Street address is required",
                 })}
@@ -972,7 +972,7 @@ const JobApplicationForm = () => {
                       errors.address?.city
                         ? "border-red-500"
                         : "border-gray-200"
-                    } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-300`}
+                    } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400`}
                     {...register("address.city", {
                       required: "City is required",
                     })}
@@ -987,7 +987,7 @@ const JobApplicationForm = () => {
                       errors.address?.state
                         ? "border-red-500"
                         : "border-gray-200"
-                    } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-300`}
+                    } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400`}
                     {...register("address.state", {
                       required: "State is required",
                     })}
@@ -1001,7 +1001,7 @@ const JobApplicationForm = () => {
                 placeholder="ZIP Code"
                 className={`block w-full rounded-md border ${
                   errors.address?.zip ? "border-red-500" : "border-gray-200"
-                } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-300`}
+                } px-4 py-2.5 text-gray-700 focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400`}
                 {...register("address.zip", {
                   required: "ZIP code is required",
                   pattern: {
@@ -1485,7 +1485,7 @@ const JobApplicationForm = () => {
             <button
               type="button"
               onClick={(e) => goToPrevStep(e)}
-              className="flex items-center rounded-md border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-amber-300"
+              className="flex items-center rounded-md border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Previous
@@ -1498,7 +1498,7 @@ const JobApplicationForm = () => {
             <button
               type="button"
               onClick={(e) => goToNextStep(e)}
-              className="flex items-center rounded-md border border-transparent bg-amber-300 px-5 py-2.5 text-sm font-medium text-white hover:bg-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-300"
+              className="flex items-center rounded-md border border-transparent bg-amber-300 px-5 py-2.5 text-sm font-medium text-white hover:bg-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400"
             >
               Next
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -1508,7 +1508,7 @@ const JobApplicationForm = () => {
               type="button"
               onClick={handleSubmit(onSubmit)}
               disabled={isSubmitting}
-              className="rounded-md border border-transparent bg-amber-300 px-5 py-2.5 text-sm font-medium text-white hover:bg-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-300 disabled:opacity-50"
+              className="rounded-md border border-transparent bg-amber-300 px-5 py-2.5 text-sm font-medium text-white hover:bg-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-50"
             >
               {isSubmitting ? "Submitting..." : "Submit Application"}
             </button>

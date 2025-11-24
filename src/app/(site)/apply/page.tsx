@@ -22,6 +22,7 @@ import { VAModal } from "@/components/JoinTheTeam/VAModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { colorClassMap } from "@/styles/brand-colors";
 
 // Animation variants
 const fadeInUp = {
@@ -70,13 +71,13 @@ export default function ApplyPage() {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/20 px-4 py-2 text-white backdrop-blur-sm"
+              className="mb-6 inline-flex items-center gap-2 rounded-full bg-slate-900/10 px-4 py-2 text-slate-900 backdrop-blur-sm"
             >
               <Briefcase className="h-4 w-4" />
               <span className="text-sm font-medium">Now Hiring</span>
             </motion.div>
 
-            <h1 className="mb-6 text-4xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl">
+            <h1 className="mb-6 text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
               Join Our{" "}
               <span className="bg-gradient-to-r from-orange-500 to-orange-500 bg-clip-text text-transparent">
                 Amazing
@@ -84,7 +85,7 @@ export default function ApplyPage() {
               Team
             </h1>
 
-            <p className="mx-auto mb-8 max-w-2xl text-lg text-white/90 sm:text-xl">
+            <p className="mx-auto mb-8 max-w-2xl text-lg text-slate-800 sm:text-xl">
               Be part of something extraordinary. We&apos;re building the future
               of business solutions and looking for passionate people to join
               our journey.
@@ -98,20 +99,20 @@ export default function ApplyPage() {
             >
               <Button
                 size="lg"
-                className="rounded-xl bg-white px-8 py-3 font-semibold text-amber-300 shadow-xl transition-all duration-300 hover:bg-gray-50 hover:shadow-2xl"
+                className="rounded-xl bg-white px-8 py-3 font-semibold text-dark-navy shadow-xl transition-all duration-300 hover:bg-gray-50 hover:shadow-2xl"
                 onClick={() =>
                   document
                     .getElementById("apply-now")
                     ?.scrollIntoView({ behavior: "smooth" })
                 }
               >
-                Apply Now <ArrowRight className="ml-2 h-5 w-5" />
+                Apply Now <ArrowRight className="ml-2 h-5 w-5 text-dark-navy" />
               </Button>
 
               <Button
                 variant="outline"
                 size="lg"
-                className="rounded-xl border-white/50 bg-white/10 px-8 py-3 font-semibold text-white shadow-lg backdrop-blur-sm hover:bg-white/20"
+                className="rounded-xl border-slate-900/30 bg-slate-900/10 px-8 py-3 font-semibold text-slate-900 shadow-lg backdrop-blur-sm hover:bg-slate-900/20"
                 onClick={() =>
                   document
                     .getElementById("positions")
@@ -137,8 +138,8 @@ export default function ApplyPage() {
           }}
           className="absolute left-10 top-20 hidden lg:block"
         >
-          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm">
-            <Truck className="h-10 w-10 text-white/70" />
+          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-slate-900/10 backdrop-blur-sm">
+            <Truck className="h-10 w-10 text-slate-900/70" />
           </div>
         </motion.div>
 
@@ -155,8 +156,8 @@ export default function ApplyPage() {
           }}
           className="absolute right-10 top-32 hidden lg:block"
         >
-          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm">
-            <Headphones className="h-8 w-8 text-white/70" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-900/10 backdrop-blur-sm">
+            <Headphones className="h-8 w-8 text-slate-900/70" />
           </div>
         </motion.div>
       </motion.section>
@@ -200,7 +201,7 @@ export default function ApplyPage() {
                 <CardHeader className="pb-4">
                   <div className="flex items-start justify-between">
                     <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 to-amber-300 transition-transform duration-300 group-hover:scale-110">
-                      <Truck className="h-7 w-7 text-white" />
+                      <Truck className="h-7 w-7 text-slate-900" />
                     </div>
                     <Badge className="bg-green-100 text-green-700 hover:bg-green-200">
                       Multiple Openings
@@ -248,7 +249,7 @@ export default function ApplyPage() {
                 <CardHeader className="pb-4">
                   <div className="flex items-start justify-between">
                     <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 to-amber-300 transition-transform duration-300 group-hover:scale-110">
-                      <Headphones className="h-7 w-7 text-white" />
+                      <Headphones className="h-7 w-7 text-slate-900" />
                     </div>
                     <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200">
                       Remote
@@ -314,20 +315,20 @@ export default function ApplyPage() {
         <div className="container relative mx-auto px-6">
           <motion.div {...fadeInUp} className="mx-auto max-w-4xl">
             <Card className="overflow-hidden border-0 bg-white/80 shadow-2xl backdrop-blur-sm">
-              <CardHeader className="bg-gradient-to-r from-amber-300 to-amber-300 pb-8 text-center text-white">
+              <CardHeader className="bg-gradient-to-r from-amber-300 to-amber-300 pb-8 text-center text-slate-900">
                 <motion.div
                   initial={{ scale: 0 }}
                   whileInView={{ scale: 1 }}
                   transition={{ duration: 0.5 }}
                   viewport={{ once: true }}
-                  className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm"
+                  className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-900/10 backdrop-blur-sm"
                 >
-                  <Briefcase className="h-8 w-8 text-white" />
+                  <Briefcase className="h-8 w-8 text-slate-900" />
                 </motion.div>
-                <CardTitle className="mb-3 text-3xl font-bold">
+                <CardTitle className="mb-3 text-3xl font-bold text-slate-900">
                   Ready to Apply?
                 </CardTitle>
-                <p className="mx-auto max-w-2xl text-lg text-white/90">
+                <p className="mx-auto max-w-2xl text-lg text-slate-800">
                   Take the first step toward joining our team. We&apos;re
                   excited to learn more about you and how you can contribute to
                   our mission.
@@ -382,31 +383,34 @@ export default function ApplyPage() {
                 title: "Competitive Compensation",
                 description:
                   "We value your contribution and compensate you fairly for your expertise and dedication.",
-                color: "yellow",
+                bgClass: colorClassMap.yellow.bg[100],
+                textClass: colorClassMap.yellow.text[600],
               },
               {
                 icon: TrendingUp,
                 title: "Growth & Development",
                 description:
                   "We're committed to your professional development with clear advancement paths and learning opportunities.",
-                color: "amber",
+                bgClass: colorClassMap.amber.bg[100],
+                textClass: colorClassMap.amber.text[600],
               },
               {
                 icon: Heart,
                 title: "Supportive Culture",
                 description:
                   "Join a collaborative environment where everyone helps each other succeed and celebrates wins together.",
-                color: "orange",
+                bgClass: colorClassMap.orange.bg[100],
+                textClass: colorClassMap.orange.text[600],
               },
             ].map((benefit, index) => (
               <motion.div key={index} variants={scaleIn}>
                 <Card className="group h-full border-0 bg-white shadow-lg transition-all duration-300 hover:shadow-xl">
                   <CardContent className="p-8 text-center">
                     <div
-                      className={`h-16 w-16 bg-${benefit.color}-100 mx-auto mb-6 flex items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110`}
+                      className={`h-16 w-16 ${benefit.bgClass} mx-auto mb-6 flex items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110`}
                     >
                       <benefit.icon
-                        className={`h-8 w-8 text-${benefit.color}-600`}
+                        className={`h-8 w-8 ${benefit.textClass}`}
                       />
                     </div>
                     <h3 className="mb-4 text-xl font-bold text-slate-800">
@@ -442,23 +446,23 @@ export default function ApplyPage() {
 
         <div className="container relative mx-auto px-6">
           <motion.div {...fadeInUp} className="mx-auto max-w-3xl text-center">
-            <h2 className="mb-6 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            <h2 className="mb-6 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
               Ready to Start Your Journey?
             </h2>
-            <p className="mb-8 text-xl text-white/90">
+            <p className="mb-8 text-xl text-slate-800">
               Don&apos;t wait – your dream career is just one application away.
               Join us and be part of something amazing.
             </p>
             <Button
               size="lg"
-              className="rounded-xl bg-white px-8 py-3 font-semibold text-amber-300 shadow-xl transition-all duration-300 hover:bg-gray-50 hover:shadow-2xl"
+              className="rounded-xl bg-white px-8 py-3 font-semibold text-dark-navy shadow-xl transition-all duration-300 hover:bg-gray-50 hover:shadow-2xl"
               onClick={() =>
                 document
                   .getElementById("apply-now")
                   ?.scrollIntoView({ behavior: "smooth" })
               }
             >
-              Apply Today <ArrowRight className="ml-2 h-5 w-5" />
+              Apply Today <ArrowRight className="ml-2 h-5 w-5 text-dark-navy" />
             </Button>
           </motion.div>
         </div>
