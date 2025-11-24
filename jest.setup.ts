@@ -574,7 +574,7 @@ jest.mock('@radix-ui/react-dialog', () => {
   const React = require('react');
 
   const createMockComponent = (name: string) => {
-    const Component = React.forwardRef<HTMLDivElement, any>(({ children, ...props }: any, ref: any) => {
+    const Component = React.forwardRef(({ children, ...props }: any, ref: any) => {
       // Filter out Radix-specific props
       const { asChild, onOpenChange, ...domProps } = props;
       return React.createElement('div', { ref, 'data-testid': `dialog-${name.toLowerCase()}`, ...domProps }, children);
@@ -600,7 +600,7 @@ jest.mock('@radix-ui/react-select', () => {
   const React = require('react');
 
   const createMockComponent = (name: string) => {
-    const Component = React.forwardRef<HTMLDivElement, any>(({ children, ...props }: any, ref: any) => {
+    const Component = React.forwardRef(({ children, ...props }: any, ref: any) => {
       // Filter out Radix-specific props
       const { asChild, onValueChange, onOpenChange, value, defaultValue, ...domProps } = props;
       return React.createElement('div', { ref, 'data-testid': `select-${name.toLowerCase()}`, ...domProps }, children);
@@ -633,7 +633,7 @@ jest.mock('@radix-ui/react-tabs', () => {
   const React = require('react');
 
   const createMockComponent = (name: string) => {
-    const Component = React.forwardRef<HTMLDivElement, any>(({ children, ...props }: any, ref: any) => {
+    const Component = React.forwardRef(({ children, ...props }: any, ref: any) => {
       // Filter out Radix-specific props
       const { asChild, onValueChange, value, defaultValue, ...domProps } = props;
       return React.createElement('div', { ref, 'data-testid': `tabs-${name.toLowerCase()}`, ...domProps }, children);
@@ -666,7 +666,7 @@ if (typeof File !== 'undefined' && typeof File.prototype !== 'undefined') {
     File.prototype.arrayBuffer = async function(): Promise<ArrayBuffer> {
       const text = await this.text();
       const encoder = new TextEncoder();
-      return encoder.encode(text).buffer;
+      return encoder.encode(text).buffer as ArrayBuffer;
     };
   }
 
@@ -722,7 +722,7 @@ if (typeof File !== 'undefined' && typeof File.prototype !== 'undefined') {
     async arrayBuffer(): Promise<ArrayBuffer> {
       const text = await this.text();
       const encoder = new TextEncoder();
-      return encoder.encode(text).buffer;
+      return encoder.encode(text).buffer as ArrayBuffer;
     }
 
     stream(): ReadableStream {
@@ -758,7 +758,7 @@ if (typeof Blob !== 'undefined' && typeof Blob.prototype !== 'undefined') {
     Blob.prototype.arrayBuffer = async function(): Promise<ArrayBuffer> {
       const text = await this.text();
       const encoder = new TextEncoder();
-      return encoder.encode(text).buffer;
+      return encoder.encode(text).buffer as ArrayBuffer;
     };
   }
 
@@ -809,7 +809,7 @@ if (typeof Blob !== 'undefined' && typeof Blob.prototype !== 'undefined') {
     async arrayBuffer(): Promise<ArrayBuffer> {
       const text = await this.text();
       const encoder = new TextEncoder();
-      return encoder.encode(text).buffer;
+      return encoder.encode(text).buffer as ArrayBuffer;
     }
 
     stream(): ReadableStream {
