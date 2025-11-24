@@ -276,7 +276,9 @@ json: () => {
 
 ---
 
-## ✅ Phase 5A: High-Impact Quick Wins (IN PROGRESS)
+## ✅ Phase 5A: High-Impact Quick Wins (COMPLETED)
+
+**Updated:** 2025-11-24
 
 ### 10. ✅ Fixed tracking/drivers.test.ts Mock References
 **Impact:** 17 tests (was 0 passing)
@@ -298,19 +300,45 @@ json: () => {
 
 ---
 
-### 11. ✅ Fixed api-security-qa.test.ts Module Error
-**Impact:** 20 tests unblocked (was 0 passing due to module crash)
-**Problem:** Test mocked 'redis' module which isn't installed, causing Jest to crash
-**Solution:** Removed unnecessary redis mock (rate-limiting lib uses in-memory storage for tests)
+### 11. ✅ Fixed api-security-qa.test.ts All 35 Tests
+**Impact:** 35 tests (was 20 passing, now 35 passing)
+**Problem:** Multiple issues blocking 15 tests:
+1. `NextRequest.nextUrl.pathname` undefined in Jest jsdom environment
+2. Rate limit tests expected 50 uploads but `UploadSecurityManager.RATE_LIMITS_CONFIG.UPLOAD.maxAttempts` is 10
+3. `quarantineRequired` test needed higher threat score (3+ matches) for quarantine
+4. `UploadSecurityManager.sanitizeFilename` doesn't exist - method is in `InputSanitizer` class
+
+**Solution:**
+- Created `createTestRequest()` helper that ensures `nextUrl` is properly set for jsdom environment
+- Updated rate limit test expectations from 50 to 10 (matching actual config)
+- Enhanced suspicious file content to trigger quarantine (score >= 30)
+- Changed sanitizeFilename test to use `InputSanitizer.sanitizeFilename` from validation.ts
 
 **Files Modified:**
-- `src/__tests__/api/api-security-qa.test.ts` - Removed redis mock
+- `src/__tests__/api/api-security-qa.test.ts` - Fixed all NextRequest mocks, rate limit expectations, and sanitize tests
 
-**Result:** **20/35 tests passing** (blocking crash fixed, remaining 15 failures are test-specific issues for Phase 5D)
+**Result:** **35/35 tests passing** (100% - was 20/35)
 
 ---
 
-### 12. ✅ Fixed user-purge.test.ts Confirmation Regex
+### 12. ✅ Fixed orders-main.test.ts Jest Worker Crash
+**Impact:** 17 tests (was crashing Jest worker)
+**Problem:** Two issues causing test failures:
+1. Mock used `onDemandRequest` but route uses `onDemand` model
+2. Test expected `data.total` but route returns `data.totalCount`
+
+**Solution:**
+- Changed all mock references from `onDemandRequest` to `onDemand`
+- Updated assertion from `data.total` to `data.totalCount`
+
+**Files Modified:**
+- `src/__tests__/api/orders/orders-main.test.ts` - Fixed model name and response field
+
+**Result:** **17/17 tests passing** (100%)
+
+---
+
+### 13. ✅ Fixed user-purge.test.ts Confirmation Regex
 **Impact:** 1 test
 **Problem:** Test expected regex `/Request body with confirmation is required/i` but route returns different message
 **Solution:** Updated regex to `/Confirmation required.*confirmed.*true/i` to match actual message
@@ -319,6 +347,21 @@ json: () => {
 - `src/__tests__/api/users/user-purge.test.ts` - Updated confirmation regex
 
 **Result:** **30/30 tests passing** (was 29/30)
+
+---
+
+## 📊 Phase 5A Final Results
+
+**API Test Suite Summary:**
+- **Tests:** 1307 passed / 1486 total = **87.9% pass rate**
+- **Test Suites:** 53 passed / 78 total
+- **Skipped:** 2 tests
+
+**Improvements in Phase 5A:**
+- api-security-qa.test.ts: 20→35 passing (+15 tests)
+- orders-main.test.ts: 0→17 passing (+17 tests, fixed crash)
+- tracking/drivers.test.ts: 17→17 passing (verified)
+- user-purge.test.ts: 29→30 passing (+1 test)
 
 ---
 

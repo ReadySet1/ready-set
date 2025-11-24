@@ -17,7 +17,7 @@ jest.mock('@/utils/prismaDB', () => ({
     cateringRequest: {
       findMany: jest.fn(),
     },
-    onDemandRequest: {
+    onDemand: {
       findMany: jest.fn(),
     },
   },
@@ -110,7 +110,7 @@ describe('/api/orders API - Main Endpoint', () => {
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue(
           mockCateringOrders
         );
-        (prisma.onDemandRequest.findMany as jest.Mock).mockResolvedValue(
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue(
           mockOnDemandOrders
         );
 
@@ -120,7 +120,7 @@ describe('/api/orders API - Main Endpoint', () => {
         const data = await expectSuccessResponse(response, 200);
 
         expect(data.orders).toHaveLength(2);
-        expect(data.total).toBe(2);
+        expect(data.totalCount).toBe(2);
 
         // Verify both types of orders are included
         const cateringOrder = data.orders.find((o: any) => o.type === 'catering');
@@ -139,7 +139,7 @@ describe('/api/orders API - Main Endpoint', () => {
         });
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
-        (prisma.onDemandRequest.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/orders?take=20&skip=10'
@@ -154,7 +154,7 @@ describe('/api/orders API - Main Endpoint', () => {
             skip: 10,
           })
         );
-        expect(prisma.onDemandRequest.findMany).toHaveBeenCalledWith(
+        expect(prisma.onDemand.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             take: 20,
             skip: 10,
@@ -169,7 +169,7 @@ describe('/api/orders API - Main Endpoint', () => {
         });
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
-        (prisma.onDemandRequest.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/orders?status=PENDING'
@@ -185,7 +185,7 @@ describe('/api/orders API - Main Endpoint', () => {
             }),
           })
         );
-        expect(prisma.onDemandRequest.findMany).toHaveBeenCalledWith(
+        expect(prisma.onDemand.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({
               status: 'PENDING',
@@ -201,7 +201,7 @@ describe('/api/orders API - Main Endpoint', () => {
         });
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
-        (prisma.onDemandRequest.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/orders?search=CAT-001'
@@ -230,7 +230,7 @@ describe('/api/orders API - Main Endpoint', () => {
         });
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
-        (prisma.onDemandRequest.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/orders?search=John'
@@ -263,7 +263,7 @@ describe('/api/orders API - Main Endpoint', () => {
         });
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
-        (prisma.onDemandRequest.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/orders?search=john@example.com'
@@ -296,7 +296,7 @@ describe('/api/orders API - Main Endpoint', () => {
         });
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
-        (prisma.onDemandRequest.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/orders?sortBy=orderTotal&sortOrder=asc'
@@ -312,7 +312,7 @@ describe('/api/orders API - Main Endpoint', () => {
             },
           })
         );
-        expect(prisma.onDemandRequest.findMany).toHaveBeenCalledWith(
+        expect(prisma.onDemand.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             orderBy: {
               orderTotal: 'asc',
@@ -328,7 +328,7 @@ describe('/api/orders API - Main Endpoint', () => {
         });
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
-        (prisma.onDemandRequest.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest('http://localhost:3000/api/orders');
 
@@ -351,7 +351,7 @@ describe('/api/orders API - Main Endpoint', () => {
         });
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
-        (prisma.onDemandRequest.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest('http://localhost:3000/api/orders');
 
@@ -433,7 +433,7 @@ describe('/api/orders API - Main Endpoint', () => {
         (prisma.cateringRequest.findMany as jest.Mock).mockRejectedValue(
           new Error('Database connection failed')
         );
-        (prisma.onDemandRequest.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest('http://localhost:3000/api/orders');
 
@@ -448,7 +448,7 @@ describe('/api/orders API - Main Endpoint', () => {
         });
 
         (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
-        (prisma.onDemandRequest.findMany as jest.Mock).mockRejectedValue(
+        (prisma.onDemand.findMany as jest.Mock).mockRejectedValue(
           new Error('Database connection failed')
         );
 
@@ -492,7 +492,7 @@ describe('/api/orders API - Main Endpoint', () => {
             updatedAt: new Date(),
           },
         ]);
-        (prisma.onDemandRequest.findMany as jest.Mock).mockResolvedValue([
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([
           {
             id: 'ondemand-1',
             orderNumber: 'OD-001',
@@ -543,7 +543,7 @@ describe('/api/orders API - Main Endpoint', () => {
             fileUploads: [],
           },
         ]);
-        (prisma.onDemandRequest.findMany as jest.Mock).mockResolvedValue([
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([
           {
             id: 'ondemand-1',
             orderNumber: 'OD-001',
