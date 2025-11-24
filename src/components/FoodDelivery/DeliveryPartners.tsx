@@ -76,33 +76,36 @@ const DeliveryPartners: React.FC = () => {
             ))}
           </div>
           {/* Last logo centered */}
-          {partners.length > 8 && (
-            <motion.div
-              className="mt-8 flex justify-center md:mt-10"
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{
-                duration: 0.5,
-                delay: 0.8,
-              }}
-            >
-              <div className="relative h-24 w-full max-w-[200px] transition-transform hover:scale-105 md:h-32 lg:h-36">
-                <Image
-                  src={partners[8].image}
-                  alt={partners[8].alt}
-                  fill
-                  className="object-contain"
-                  sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 200px"
-                  onError={(e) => {
-                    // Hide image if it fails to load
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = "none";
-                  }}
-                />
-              </div>
-            </motion.div>
-          )}
+          {(() => {
+            const lastPartner = partners[8];
+            return lastPartner ? (
+              <motion.div
+                className="mt-8 flex justify-center md:mt-10"
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{
+                  duration: 0.5,
+                  delay: 0.8,
+                }}
+              >
+                <div className="relative h-24 w-full max-w-[200px] transition-transform hover:scale-105 md:h-32 lg:h-36">
+                  <Image
+                    src={lastPartner.image}
+                    alt={lastPartner.alt}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 200px"
+                    onError={(e) => {
+                      // Hide image if it fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = "none";
+                    }}
+                  />
+                </div>
+              </motion.div>
+            ) : null;
+          })()}
         </div>
       </div>
     </div>
