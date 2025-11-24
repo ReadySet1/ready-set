@@ -111,7 +111,7 @@
     "@sanity/types": "^4.10.3",
     "@sanity/vision": "^4.10.3",
     "@sendgrid/client": "^8.1.6",
-    "@sentry/nextjs": "^10.22.0",
+    "@sentry/nextjs": "^10.27.0",
     "@stripe/react-stripe-js": "^5.2.0",
     "@stripe/stripe-js": "^8.1.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
