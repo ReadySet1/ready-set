@@ -3,12 +3,15 @@ import { Metadata } from "next";
 // import { FoodServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
 import CateringFeatures from "@/components/FoodDelivery/CateringFeatures";
 import CateringAbout from "@/components/FoodDelivery/CateringAbout";
-import DeliveryTerms from "@/components/FoodDelivery/DeliveryTerms";
+import DeliveryPartners from "@/components/FoodDelivery/DeliveryPartners";
+// import FoodGallery from "@/components/FoodDelivery/FoodGallery";
+// import DeliveryTerms from "@/components/FoodDelivery/DeliveryTerms";
 import HostingChecklist from "@/components/FoodDelivery/HostingChecklist";
 import MainMeal from "@/components/FoodDelivery/MainMeal";
 import FoodHeader from "@/components/FoodDelivery/FoodHeader";
 import PromoPopup from "@/components/PopUpBanner/PromoPopup";
 import CateringStats from "@/components/FoodDelivery/CateringStats";
+import CateringContact from "@/components/FoodDelivery/CateringContact";
 
 export const metadata: Metadata = {
   title: "Food Delivery Services for Events | Ready Set",
@@ -56,10 +59,13 @@ export default function FoodPage() {
       {/* <FoodServiceFeatures /> */}
       <CateringFeatures />
       <CateringAbout />
-      <DeliveryTerms />
-      <HostingChecklist />
-      <MainMeal />
-      <CateringStats />
+      {/* <DeliveryPartners /> */}
+      {/* <FoodGallery /> */}
+      {/* <DeliveryTerms /> */}
+      {/* <HostingChecklist /> */}
+      {/* <MainMeal /> */}
+      {/* <CateringStats /> */}
+      <CateringContact />
     </div>
   );
 }
