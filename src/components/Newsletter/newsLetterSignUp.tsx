@@ -42,15 +42,15 @@ const NewsletterSignup = () => {
             placeholder="Enter your email"
             required
             disabled={status === "loading"}
-            className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
+            className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-amber-300"
           />
           <button
             type="submit"
             disabled={status === "loading"}
-            className={`px-4 py-2 text-sm text-white rounded-r-md focus:outline-none focus:ring-2 focus:ring-yellow-500 ${
+            className={`px-4 py-2 text-sm font-semibold text-white rounded-r-md focus:outline-none focus:ring-2 focus:ring-amber-300 ${
               status === "loading" 
-                ? "bg-yellow-400 cursor-not-allowed" 
-                : "bg-yellow-600 hover:bg-yellow-700"
+                ? "bg-amber-300 cursor-not-allowed opacity-75" 
+                : "bg-amber-300 hover:bg-amber-400"
             }`}
           >
             {status === "loading" ? "Subscribing..." : "Subscribe"}
