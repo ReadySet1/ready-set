@@ -15,6 +15,8 @@ import { v4 as uuidv4 } from "uuid";
 import { motion } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import { useApplicationSession } from "@/contexts/ApplicationSessionContext";
+import { logger } from "@/utils/logger";
+import { captureException } from "@/lib/monitoring/sentry";
 
 // Helper to generate accept string from allowed file types
 const generateAcceptString = (types: string[]): string => types.join(",");
@@ -364,9 +366,15 @@ const JobApplicationForm = () => {
     // Only create session if we have all required info and don't already have a valid session
     if (email && firstName && lastName && role && !session) {
       createSession({ email, firstName, lastName, role }).catch(err => {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Failed to create session:', err);
-        }
+        // Log error and send to Sentry for monitoring
+        logger.error('Failed to create application session:', err);
+        captureException(err, {
+          feature: 'job-application',
+          action: 'create_session',
+          component: 'ApplyForm',
+          metadata: { email, role },
+          handled: true,
+        });
         // Session creation failure is logged but non-blocking
       });
     }
@@ -382,7 +390,14 @@ const JobApplicationForm = () => {
     // Get the fields for the current step
     const currentStepData = FORM_STEPS[currentStep - 1];
     if (!currentStepData) {
-      console.error('Invalid step:', currentStep);
+      logger.error('Invalid step navigation attempted:', { currentStep, totalSteps: FORM_STEPS.length });
+      captureException(new Error('Invalid form step'), {
+        feature: 'job-application',
+        action: 'navigate_step',
+        component: 'ApplyForm',
+        metadata: { currentStep, totalSteps: FORM_STEPS.length },
+        handled: true,
+      });
       return;
     }
     const currentStepFields = currentStepData.fields;
@@ -566,7 +581,14 @@ const JobApplicationForm = () => {
         try {
           await markSessionCompleted(responseData.id);
         } catch (sessionError) {
-          console.error('Failed to mark session as completed:', sessionError);
+          logger.error('Failed to mark application session as completed:', sessionError);
+          captureException(sessionError, {
+            feature: 'job-application',
+            action: 'mark_session_completed',
+            component: 'ApplyForm',
+            metadata: { applicationId: responseData.id },
+            handled: true,
+          });
           // Non-blocking - don't prevent showing success to user
         }
       }
@@ -591,7 +613,20 @@ const JobApplicationForm = () => {
       // Set application as submitted to show success message
       setIsSubmitted(true);
     } catch (error) {
-      console.error("Submission error:", error);
+      // Log error and send to Sentry with full context
+      logger.error("Job application submission failed:", error);
+      captureException(error, {
+        feature: 'job-application',
+        action: 'submit_application',
+        component: 'ApplyForm',
+        metadata: {
+          role: watch("role"),
+          hasResume: resumeUpload.uploadedFiles.length > 0,
+          hasDriverDocs: licenseUpload.uploadedFiles.length > 0,
+        },
+        handled: true,
+      });
+      
       toast({
         title: "Error",
         description:
