@@ -45,13 +45,6 @@ jest.mock("@/components/VirtualAssistant/VAProjects", () => {
   };
 });
 
-// Mock the ConsultationBanner component to ensure it's not rendered
-jest.mock("@/components/PopUpBanner/Consultation", () => {
-  return function ConsultationBanner() {
-    return <div data-testid="consultation-banner">ConsultationBanner Component</div>;
-  };
-});
-
 // Mock commented out components (these don't exist but are referenced in comments)
 // Note: These components are commented out in the actual page, so we don't need to mock them
 

@@ -8,7 +8,6 @@ import DeliveryTerms from "@/components/FoodDelivery/DeliveryTerms";
 import HostingChecklist from "@/components/FoodDelivery/HostingChecklist";
 import MainMeal from "@/components/FoodDelivery/MainMeal";
 import FoodHeader from "@/components/FoodDelivery/FoodHeader";
-// import PromoPopup from "@/components/PopUpBanner/PromoPopup";
 import CateringStats from "@/components/FoodDelivery/CateringStats";
 
 export const metadata: Metadata = {
@@ -51,7 +50,6 @@ export const metadata: Metadata = {
 export default function FoodPage() {
   return (
     <div className="pt-20 md:pt-24">
-      {/* <PromoPopup /> */}
       <FoodHeader />
       <DeliveryPartners />
       <FoodServiceFeatures />

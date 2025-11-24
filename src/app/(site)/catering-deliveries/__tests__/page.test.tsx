@@ -47,13 +47,6 @@ jest.mock("@/components/FoodDelivery/CateringStats", () => {
   };
 });
 
-// Mock the PromoPopup component to ensure it's not rendered
-jest.mock("@/components/PopUpBanner/PromoPopup", () => {
-  return function PromoPopup() {
-    return <div data-testid="promo-popup">PromoPopup Component</div>;
-  };
-});
-
 // Mock unused imports to ensure they don't affect the test
 jest.mock("@/components/Logistics/QuoteRequest/types", () => ({
   FormType: {},

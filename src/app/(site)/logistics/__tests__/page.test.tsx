@@ -60,13 +60,6 @@ jest.mock("@/components/Logistics/SpecialtyDelivery", () => {
   };
 });
 
-// Mock the PromoPopup component to ensure it's not rendered
-jest.mock("@/components/PopUpBanner/PromoPopup", () => {
-  return function PromoPopup() {
-    return <div data-testid="promo-popup">PromoPopup Component</div>;
-  };
-});
-
 describe("LogisticsPage", () => {
   describe("Component Rendering", () => {
     it("renders the page successfully", () => {
