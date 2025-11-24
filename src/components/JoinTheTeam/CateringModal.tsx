@@ -97,7 +97,7 @@ export function CateringModal() {
               </p>
               <div className="flex items-center gap-2 text-sm text-amber-700">
                 <Star className="h-4 w-4" />
-                <span className="font-medium">Trusted by 500+ restaurants</span>
+                <span className="font-medium">Trusted by 350+ restaurants</span>
               </div>
             </CardContent>
           </Card>
