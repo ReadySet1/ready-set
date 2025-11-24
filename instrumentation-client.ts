@@ -1,5 +1,6 @@
-// This file configures the initialization of Sentry on the client.
-// The config you add here will be used whenever a users loads a page in their browser.
+// This file configures the initialization of Sentry on the client (browser).
+// Next.js will automatically load this when using the App Router via the
+// `instrumentation-client.ts` file convention.
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from '@sentry/nextjs';
@@ -68,3 +69,11 @@ if (!dsn) {
     ignoreErrors: CLIENT_IGNORE_ERRORS,
   });
 }
+
+// Required by Sentry to instrument client-side navigations in Next.js App Router.
+// This hooks into router transitions so navigation performance and errors
+// can be correlated with route changes.
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+
+
+

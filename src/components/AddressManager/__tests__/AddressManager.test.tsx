@@ -87,10 +87,21 @@ describe("AddressManager Refresh Functionality", () => {
       error: null,
     });
 
-    // Mock successful address fetch
+    // Mock successful address fetch with pagination
     (fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(mockAddresses),
+      json: () =>
+        Promise.resolve({
+          addresses: mockAddresses,
+          pagination: {
+            currentPage: 1,
+            totalPages: 1,
+            totalCount: mockAddresses.length,
+            hasNextPage: false,
+            hasPrevPage: false,
+            limit: 5,
+          },
+        }),
     });
   });
 
@@ -111,7 +122,7 @@ describe("AddressManager Refresh Functionality", () => {
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        "/api/addresses?filter=all",
+        "/api/addresses?filter=all&page=1&limit=5",
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: "Bearer mock-token",
@@ -170,7 +181,18 @@ describe("AddressManager Refresh Functionality", () => {
 
     (fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(newMockAddresses),
+      json: () =>
+        Promise.resolve({
+          addresses: newMockAddresses,
+          pagination: {
+            currentPage: 1,
+            totalPages: 1,
+            totalCount: newMockAddresses.length,
+            hasNextPage: false,
+            hasPrevPage: false,
+            limit: 5,
+          },
+        }),
     });
 
     // Call refresh function
@@ -182,7 +204,7 @@ describe("AddressManager Refresh Functionality", () => {
     // Verify addresses are refetched
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        "/api/addresses?filter=all",
+        "/api/addresses?filter=all&page=1&limit=5",
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: "Bearer mock-token",

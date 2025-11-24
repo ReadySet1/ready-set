@@ -93,7 +93,7 @@ export function FileUpload({
             accept={accept}
             onChange={handleFileChange}
             disabled={isUploading}
-            className="w-full h-12 cursor-pointer border-2 border-dashed border-slate-300 hover:border-amber-300 focus:border-amber-300 transition-colors rounded-xl bg-slate-50 hover:bg-amber-50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200"
+            className="w-full h-12 cursor-pointer border-2 border-dashed border-slate-300 hover:border-amber-300 focus:border-amber-300 transition-colors rounded-xl bg-slate-50 hover:bg-amber-50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 py-1"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
             <Upload className="h-5 w-5 text-slate-400" />

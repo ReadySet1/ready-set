@@ -137,8 +137,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Validate session
-      const supabase = await createClient();
-      const { data: session, error: sessionError } = await supabase
+      // Use admin client to look up session by token (bypassing RLS since the token IS the credential)
+      const sessionValidator = await createAdminClient();
+      const { data: session, error: sessionError } = await sessionValidator
         .from('application_sessions')
         .select('id, session_token, session_expires_at, upload_count, max_uploads, completed')
         .eq('session_token', sessionToken)
@@ -961,8 +962,8 @@ export async function POST(request: NextRequest) {
         // CRITICAL: This RPC function MUST exist in the database before deployment
         // Migration required: see docs/security/deployment-guide.md
         // SECURITY: Pass session token to validate ownership and prevent session hijacking
-        // @ts-ignore - RPC function not yet in generated types
-        const { error: sessionUpdateError } = await supabase.rpc('increment_session_upload', {
+        // Casting supabase to any to bypass strict RPC name checking until types are regenerated
+        const { error: sessionUpdateError } = await (supabase as any).rpc('increment_session_upload', {
           p_session_id: validatedSession.id,
           p_file_path: filePath,
           p_session_token: validatedSession.session_token

@@ -123,6 +123,31 @@ export async function calculateCaterValleyPricing(
     clientConfigId: 'cater-valley' // Use CaterValley-specific configuration
   });
 
+  // Log pricing calculation details for debugging
+  captureMessage(
+    `CaterValley pricing calculated for order ${orderCode}`,
+    'info',
+    {
+      action: 'pricing_calculated',
+      feature: feature,
+      metadata: {
+        orderCode,
+        distance: distance.toFixed(2),
+        usedFallback: usedFallbackDistance,
+        headcount: totalItem,
+        foodCost: priceTotal,
+        numberOfBridges,
+        calculatedFee: pricingResult.deliveryFee.toFixed(2),
+        breakdown: {
+          deliveryCost: pricingResult.deliveryCost.toFixed(2),
+          mileagePay: pricingResult.totalMileagePay.toFixed(2),
+          dailyDriveDiscount: pricingResult.dailyDriveDiscount.toFixed(2),
+          bridgeToll: pricingResult.bridgeToll.toFixed(2)
+        }
+      }
+    }
+  );
+
   // 4. CRITICAL: Validate that pricing is not zero (prevent revenue loss)
   if (pricingResult.deliveryFee <= 0) {
     throw new Error('Pricing calculation error - delivery fee cannot be zero. Please contact support.');

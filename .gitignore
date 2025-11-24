@@ -1,98 +1,118 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.js
+.yarn/
 .yarn/install-state.gz
-.cursor
+.pnpm-store/
+.pnpm-debug.log*
 
-# testing
+# Testing
 /coverage
 /playwright-report/
 /test-results/
 /e2e/.auth/
 .playwright-mcp
+*.lcov
 
-# next.js
+# Next.js
 /.next/
 /out/
-
-# production
-/build
-/dist
-
-# misc
-.DS_Store
-*.pem
-.vscode/ 
-.prisma-initialized
-
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
-.env*.local
-.env
-.env*development
-
-# vercel
-.vercel/
-
-# typescript
-*.tsbuildinfo
 next-env.d.ts
 
-# Database
-backups/*
-!backups/.gitkeep
+# Production builds
+/build
+/dist
+/.vercel
+.vercel/
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
 
 # Environment Variables
-.env.local
+.env
+.env*.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.development
+.env.production
+.env.test
 .env*
 !.env.example
 
+# Database
+*.db
+*.sqlite
+*.sqlite3
+backups/*
+!backups/.gitkeep
 /backups
-
-.cursor/
-.claude/
 
 # Prisma
 .prisma-initialized
 prisma/migrations/migration_lock.toml
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-
-# IDE and Editor files
-.idea/
-.claude/
-!.claude/scripts/
-*.swp
-*.swo
-*~
-
-# OS generated files
-.DS_Store?
-ehthumbs.db
-Thumbs.db
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
 # Logs
-logs
+logs/
 *.log
 
 # Runtime data
-pids
+pids/
 *.pid
 *.seed
+*.pid.lock
+
+# Cache directories
+.cache/
+.parcel-cache/
+.turbo/
+.swc/
+.eslintcache
+.stylelintcache
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# AI/Assistant tools
+.cursor/
+.claude/
+!.claude/scripts/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Temporary folders
+tmp/
+temp/
+*.tmp
+*.temp
 
 # Optional npm cache directory
 .npm
@@ -100,15 +120,21 @@ pids
 # Optional REPL history
 .node_repl_history
 
-# Temporary folders
-tmp/
-temp/.prisma-initialized
-test-results/
+# Sanity
+.sanity/
 
-# Documentation markdown files
+# Sentry
+.sentryclirc
+
+# Documentation markdown files (if auto-generated)
 docs/markdown/
-.vercel
 
 # Test/debug files (not for production)
 src/app/(site)/pricing-flowers/test-page.tsx
 src/components/Pricing/FlowerPricingLandingPageSimple.tsx
+
+# Misc
+*.pem
+*.key
+*.cert
+*.crt

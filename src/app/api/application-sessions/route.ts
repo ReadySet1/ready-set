@@ -228,27 +228,27 @@ export async function POST(request: NextRequest) {
       Date.now() + SESSION_DURATION_HOURS * 60 * 60 * 1000
     );
 
-    // Create session record with proper typing
-    const sessionData: ApplicationSessionInsert = {
-      email: body.email,
-      first_name: body.firstName,
-      last_name: body.lastName,
-      role: body.role,
-      session_token: sessionToken,
-      session_expires_at: sessionExpiresAt.toISOString(),
-      ip_address: ipAddress,
-      user_agent: userAgent,
-      upload_count: 0,
-      max_uploads: MAX_UPLOADS_PER_SESSION,
-      verified: false,
-      completed: false
-    };
+    // Define return type for the RPC function
+    interface CreateSessionRpcResponse {
+      id: string;
+      session_token: string;
+      session_expires_at: string;
+    }
 
-    const { data: session, error } = await supabase
-      .from('application_sessions')
-      .insert(sessionData)
-      .select('id, session_token, session_expires_at')
-      .single<Pick<ApplicationSession, 'id' | 'session_token' | 'session_expires_at'>>();
+    // Use RPC function to create session bypassing RLS
+    // This ensures reliable session creation for anonymous users
+    // Casting supabase client to any to bypass strict RPC name checking until types are regenerated
+    const { data: rpcData, error } = await (supabase as any).rpc('create_application_session', {
+      p_email: body.email,
+      p_first_name: body.firstName,
+      p_last_name: body.lastName,
+      p_role: body.role,
+      p_session_token: sessionToken,
+      p_session_expires_at: sessionExpiresAt.toISOString(),
+      p_ip_address: ipAddress,
+      p_user_agent: userAgent,
+      p_max_uploads: MAX_UPLOADS_PER_SESSION
+    }) as { data: CreateSessionRpcResponse | null, error: any };
 
     if (error) {
       logDatabaseError(error, 'createSession', { email: body.email, role: body.role });
@@ -257,6 +257,9 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Cast the returned JSONB to our expected type
+    const session = rpcData as CreateSessionRpcResponse;
 
     // For now, return the session token directly
     // In phase 2, we'll send a verification email and return session ID only
@@ -282,7 +285,11 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    // Use admin client for session validation to bypass RLS
+    // The session token itself is the authorization credential
+    const { createAdminClient } = await import('@/utils/supabase/server');
+    const supabase = await createAdminClient();
+    
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('id');
     const sessionToken = request.headers.get('x-upload-token');
