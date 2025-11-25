@@ -4,6 +4,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import * as Sentry from "@sentry/nextjs";
 import { convert } from "html-to-text";
 
 export type DeliveryEmailTemplateId =
@@ -67,9 +68,9 @@ const loadFile = (filePath: string): string => {
   } catch (error) {
     // In development/test we want a clear failure; in production this will surface
     // as a TemplateRenderError in the email service.
-    console.error("Failed to load email template file", {
-      filePath,
-      error,
+    Sentry.captureException(error, {
+      tags: { operation: "email-template-load" },
+      extra: { filePath },
     });
     throw new Error(`Email template file not found: ${filePath}`);
   }
