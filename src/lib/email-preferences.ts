@@ -1,6 +1,7 @@
 // src/lib/email-preferences.ts
 // Domain helpers for loading and updating email notification preferences.
 
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/db/prisma";
 
 export interface EmailPreferences {
@@ -34,7 +35,10 @@ export async function getEmailPreferencesForUser(
       promotionalEmails: preferences.promotionalEmails,
     };
   } catch (error) {
-    console.error("Failed to load email preferences", { userId, error });
+    Sentry.captureException(error, {
+      tags: { operation: "email-preferences-load" },
+      extra: { userId },
+    });
     return DEFAULT_PREFERENCES;
   }
 }

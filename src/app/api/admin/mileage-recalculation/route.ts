@@ -3,6 +3,7 @@
 // Configured in vercel.json to run every 6 hours
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/utils/supabase/server';
 import { runDriverMileageRecalculation } from '@/jobs/driverMileageRecalculation';
 
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     // Fail fast in production if CRON_SECRET is not configured
     const cronSecret = process.env.CRON_SECRET;
     if (process.env.NODE_ENV === 'production' && !cronSecret) {
-      console.warn('⚠️ CRON_SECRET not set in production - cron jobs require admin authentication');
+      Sentry.captureMessage('CRON_SECRET not set in production - cron jobs require admin authentication', 'warning');
     }
 
     // Get authorization header and user session
@@ -34,11 +35,13 @@ export async function GET(request: NextRequest) {
     const isAuthorized = isValidCronRequest || isAdminUser || isSuperAdmin;
 
     if (!isAuthorized) {
-      console.warn('⚠️ Unauthorized mileage recalculation attempt:', {
-        hasAuthHeader: !!authHeader,
-        hasUser: !!user,
-        userRole: user ? (user.app_metadata as AppMetadata)?.role : 'none',
-        timestamp: new Date().toISOString()
+      Sentry.captureMessage('Unauthorized mileage recalculation attempt', {
+        level: 'warning',
+        extra: {
+          hasAuthHeader: !!authHeader,
+          hasUser: !!user,
+          userRole: user ? (user.app_metadata as AppMetadata)?.role : 'none',
+        },
       });
 
       return NextResponse.json(
@@ -67,14 +70,11 @@ export async function GET(request: NextRequest) {
       message: `Recalculated mileage for ${result.processed} shifts${result.errors.length > 0 ? ` with ${result.errors.length} errors` : ''}`
     };
 
-    console.log('✅ Mileage recalculation completed:', {
-      ...response,
-      errors: result.errors.length > 0 ? result.errors.slice(0, 5) : undefined // Log max 5 errors
-    });
-
     return NextResponse.json(response, { status: result.success ? 200 : 207 });
   } catch (error) {
-    console.error('❌ Mileage recalculation failed:', error);
+    Sentry.captureException(error, {
+      tags: { operation: 'mileage-recalculation' },
+    });
 
     return NextResponse.json(
       {

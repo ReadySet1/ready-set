@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import * as Sentry from '@sentry/nextjs';
 import { prisma } from '@/utils/prismaDB';
 
 /**
@@ -92,14 +93,27 @@ async function calculateWindowDistanceKm(
 
   // Warn if high percentage of points were filtered due to poor accuracy
   if (totalPoints > 0 && filteredPoints / totalPoints > HIGH_FILTER_RATE_THRESHOLD) {
-    console.warn(
-      `[Mileage] High GPS filter rate for driver ${driverId}: ${filteredPoints}/${totalPoints} points filtered due to poor accuracy`
-    );
+    Sentry.captureMessage('High GPS filter rate for driver', {
+      level: 'warning',
+      extra: {
+        driverId,
+        filteredPoints,
+        totalPoints,
+        filterRate: filteredPoints / totalPoints,
+      },
+    });
   }
 
   // Warn if no GPS data available
   if (totalPoints === 0) {
-    console.warn(`[Mileage] No GPS data for driver ${driverId} between ${startTime.toISOString()} and ${endTime.toISOString()}`);
+    Sentry.captureMessage('No GPS data for driver in time window', {
+      level: 'warning',
+      extra: {
+        driverId,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+      },
+    });
   }
 
   const rows = await prisma.$queryRawUnsafe<{ total_km: number | null }[]>(`
@@ -208,7 +222,14 @@ export async function calculateShiftMileage(shiftId: string): Promise<ShiftMilea
 
   // Warn if mileage seems unrealistically high
   if (totalKm > MAX_REASONABLE_SHIFT_KM) {
-    console.warn(`[Mileage] Unusually high mileage for shift ${shiftId}: ${totalKm.toFixed(2)} km`);
+    Sentry.captureMessage('Unusually high mileage for shift', {
+      level: 'warning',
+      extra: {
+        shiftId,
+        totalKm: totalKm.toFixed(2),
+        threshold: MAX_REASONABLE_SHIFT_KM,
+      },
+    });
   }
 
   await prisma.$executeRawUnsafe(
@@ -311,11 +332,15 @@ export async function calculateShiftMileageWithBreakdown(
     const breakdownSum = breakdown.reduce((acc, d) => acc + d.distanceKm, 0);
     const deviation = Math.abs(breakdownSum - totalKm) / totalKm;
     if (deviation > BREAKDOWN_DEVIATION_THRESHOLD) {
-      console.warn(
-        `[Mileage] Breakdown inconsistency for shift ${shiftId}: ` +
-        `sum of deliveries (${breakdownSum.toFixed(2)} km) differs from total (${totalKm.toFixed(2)} km) ` +
-        `by ${(deviation * 100).toFixed(1)}%`
-      );
+      Sentry.captureMessage('Mileage breakdown inconsistency for shift', {
+        level: 'warning',
+        extra: {
+          shiftId,
+          breakdownSum: breakdownSum.toFixed(2),
+          totalKm: totalKm.toFixed(2),
+          deviationPercent: (deviation * 100).toFixed(1),
+        },
+      });
     }
   }
 
