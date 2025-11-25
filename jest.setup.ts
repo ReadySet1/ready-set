@@ -39,6 +39,68 @@ process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN = 'pk.test.mock-mapbox-token';
 import { TextEncoder, TextDecoder } from 'util';
 Object.assign(global, { TextEncoder, TextDecoder });
 
+// Add ReadableStream polyfill for Node.js/Jest environment
+if (typeof ReadableStream === 'undefined') {
+  // @ts-ignore
+  global.ReadableStream = class ReadableStream {
+    private reader: any;
+
+    constructor(underlyingSource: any = {}) {
+      const { start, pull, cancel } = underlyingSource;
+      let controller: any;
+      let started = false;
+      const chunks: any[] = [];
+      let closed = false;
+
+      controller = {
+        enqueue: (chunk: any) => {
+          if (!closed) {
+            chunks.push(chunk);
+          }
+        },
+        close: () => {
+          closed = true;
+        },
+        error: (err: any) => {
+          closed = true;
+        },
+      };
+
+      this.reader = {
+        read: async () => {
+          if (!started && start) {
+            await start(controller);
+            started = true;
+          }
+
+          if (chunks.length > 0) {
+            return { value: chunks.shift(), done: false };
+          }
+
+          if (closed) {
+            return { done: true };
+          }
+
+          if (pull) {
+            await pull(controller);
+            if (chunks.length > 0) {
+              return { value: chunks.shift(), done: false };
+            }
+          }
+
+          return { done: true };
+        },
+        releaseLock: () => {},
+        cancel: cancel || (() => {}),
+      };
+    }
+
+    getReader() {
+      return this.reader;
+    }
+  } as any;
+}
+
 // Mock Next.js Image component
 jest.mock('next/image', () => ({
   __esModule: true,
@@ -76,29 +138,34 @@ beforeEach(() => {
 
 // Mock next/navigation properly
 jest.mock('next/navigation', () => ({
-  useRouter() {
-    return {
-      push: jest.fn(),
-      replace: jest.fn(),
-      refresh: jest.fn(),
-      back: jest.fn(),
-      forward: jest.fn(),
-      prefetch: jest.fn(),
-      route: '/',
-      pathname: '/',
-      query: {},
-      asPath: '/',
-    };
-  },
-  useSearchParams() {
-    return new URLSearchParams();
-  },
-  usePathname() {
-    return '/';
-  },
-  useParams() {
-    return {};
-  },
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    refresh: jest.fn(),
+    back: jest.fn(),
+    forward: jest.fn(),
+    prefetch: jest.fn(),
+    route: '/',
+    pathname: '/',
+    query: {},
+    asPath: '/',
+  })),
+  useSearchParams: jest.fn(() => {
+    const params = new URLSearchParams();
+    // Add common query parameter support
+    params.get = jest.fn((key: string) => null);
+    params.has = jest.fn((key: string) => false);
+    params.getAll = jest.fn((key: string) => []);
+    params.toString = jest.fn(() => '');
+    return params;
+  }),
+  usePathname: jest.fn(() => '/'),
+  useParams: jest.fn(() => ({})),
+  useSelectedLayoutSegment: jest.fn(() => null),
+  useSelectedLayoutSegments: jest.fn(() => []),
+  redirect: jest.fn(),
+  permanentRedirect: jest.fn(),
+  notFound: jest.fn(),
 }));
 
 // Mock next/headers globally
@@ -184,13 +251,151 @@ global.ResizeObserver = class ResizeObserver {
   unobserve() {}
 };
 
-// Mock Supabase server client
-jest.mock('@/utils/supabase/server', () => ({
-  createClient: jest.fn().mockReturnValue({
-    auth: {
-      getUser: jest.fn(),
-    },
-  }),
+// Mock Supabase server client with full query builder support
+jest.mock('@/utils/supabase/server', () => {
+  const createMockQueryBuilder = () => {
+    const mockBuilder: any = {
+      select: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+      upsert: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      neq: jest.fn().mockReturnThis(),
+      gt: jest.fn().mockReturnThis(),
+      gte: jest.fn().mockReturnThis(),
+      lt: jest.fn().mockReturnThis(),
+      lte: jest.fn().mockReturnThis(),
+      like: jest.fn().mockReturnThis(),
+      ilike: jest.fn().mockReturnThis(),
+      is: jest.fn().mockReturnThis(),
+      in: jest.fn().mockReturnThis(),
+      contains: jest.fn().mockReturnThis(),
+      containedBy: jest.fn().mockReturnThis(),
+      range: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: null, error: null }),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+      then: jest.fn((resolve) => resolve({ data: null, error: null })),
+    };
+    return mockBuilder;
+  };
+
+  return {
+    createClient: jest.fn().mockResolvedValue({
+      from: jest.fn((table: string) => createMockQueryBuilder()),
+      auth: {
+        getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
+        getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+        signInWithPassword: jest.fn().mockResolvedValue({ data: null, error: null }),
+        signOut: jest.fn().mockResolvedValue({ error: null }),
+        signUp: jest.fn().mockResolvedValue({ data: null, error: null }),
+        refreshSession: jest.fn().mockResolvedValue({ data: null, error: null }),
+      },
+      storage: {
+        from: jest.fn((bucket: string) => ({
+          upload: jest.fn().mockResolvedValue({ data: null, error: null }),
+          download: jest.fn().mockResolvedValue({ data: null, error: null }),
+          remove: jest.fn().mockResolvedValue({ data: null, error: null }),
+          list: jest.fn().mockResolvedValue({ data: [], error: null }),
+          getPublicUrl: jest.fn((path: string) => ({ data: { publicUrl: `https://example.com/${path}` } })),
+        })),
+      },
+      rpc: jest.fn().mockResolvedValue({ data: null, error: null }),
+      schema: jest.fn().mockReturnThis(),
+    }),
+    createAdminClient: jest.fn().mockResolvedValue({
+      from: jest.fn((table: string) => createMockQueryBuilder()),
+      auth: {
+        getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
+        getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+        signInWithPassword: jest.fn().mockResolvedValue({ data: null, error: null }),
+        signOut: jest.fn().mockResolvedValue({ error: null }),
+        signUp: jest.fn().mockResolvedValue({ data: null, error: null }),
+        refreshSession: jest.fn().mockResolvedValue({ data: null, error: null }),
+      },
+      storage: {
+        from: jest.fn((bucket: string) => ({
+          upload: jest.fn().mockResolvedValue({ data: null, error: null }),
+          download: jest.fn().mockResolvedValue({ data: null, error: null }),
+          remove: jest.fn().mockResolvedValue({ data: null, error: null }),
+          list: jest.fn().mockResolvedValue({ data: [], error: null }),
+          getPublicUrl: jest.fn((path: string) => ({ data: { publicUrl: `https://example.com/${path}` } })),
+        })),
+      },
+      rpc: jest.fn().mockResolvedValue({ data: null, error: null }),
+      schema: jest.fn().mockReturnThis(),
+    }),
+  };
+});
+
+// Mock Supabase client-side (browser) client
+jest.mock('@/utils/supabase/client', () => {
+  const createMockQueryBuilder = () => {
+    const mockBuilder: any = {
+      select: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+      upsert: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      neq: jest.fn().mockReturnThis(),
+      gt: jest.fn().mockReturnThis(),
+      gte: jest.fn().mockReturnThis(),
+      lt: jest.fn().mockReturnThis(),
+      lte: jest.fn().mockReturnThis(),
+      like: jest.fn().mockReturnThis(),
+      ilike: jest.fn().mockReturnThis(),
+      is: jest.fn().mockReturnThis(),
+      in: jest.fn().mockReturnThis(),
+      contains: jest.fn().mockReturnThis(),
+      containedBy: jest.fn().mockReturnThis(),
+      range: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: null, error: null }),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+      then: jest.fn((resolve) => resolve({ data: null, error: null })),
+    };
+    return mockBuilder;
+  };
+
+  return {
+    createClient: jest.fn().mockReturnValue({
+      from: jest.fn((table: string) => createMockQueryBuilder()),
+      auth: {
+        getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
+        getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+        signInWithPassword: jest.fn().mockResolvedValue({ data: null, error: null }),
+        signOut: jest.fn().mockResolvedValue({ error: null }),
+        signUp: jest.fn().mockResolvedValue({ data: null, error: null }),
+        refreshSession: jest.fn().mockResolvedValue({ data: null, error: null }),
+        onAuthStateChange: jest.fn().mockReturnValue({ data: { subscription: { unsubscribe: jest.fn() } } }),
+      },
+      storage: {
+        from: jest.fn((bucket: string) => ({
+          upload: jest.fn().mockResolvedValue({ data: null, error: null }),
+          download: jest.fn().mockResolvedValue({ data: null, error: null }),
+          remove: jest.fn().mockResolvedValue({ data: null, error: null }),
+          list: jest.fn().mockResolvedValue({ data: [], error: null }),
+          getPublicUrl: jest.fn((path: string) => ({ data: { publicUrl: `https://example.com/${path}` } })),
+        })),
+      },
+      rpc: jest.fn().mockResolvedValue({ data: null, error: null }),
+      schema: jest.fn().mockReturnThis(),
+    }),
+  };
+});
+
+// Mock auth utilities to prevent real database calls during auth middleware tests
+jest.mock('@/lib/auth', () => ({
+  getUserRole: jest.fn().mockResolvedValue(null),
+  updateUserRole: jest.fn().mockResolvedValue({ success: true }),
+  syncOAuthProfile: jest.fn().mockResolvedValue({ success: true, newProfile: false }),
+  getCurrentUser: jest.fn().mockResolvedValue(null),
 }));
 
 // Mock Prisma client
@@ -228,8 +433,14 @@ global.Request = jest.fn().mockImplementation((url, options) => ({
   url,
   method: options?.method || 'GET',
   headers: new Headers(options?.headers),
-  json: () => Promise.resolve({}),
-  text: () => Promise.resolve(''),
+  json: () => {
+    try {
+      return Promise.resolve(options?.body ? JSON.parse(options.body) : {});
+    } catch (error) {
+      return Promise.reject(new SyntaxError('Unexpected token in JSON'));
+    }
+  },
+  text: () => Promise.resolve(options?.body || ''),
 }));
 
 // @ts-ignore - Mock Response constructor for tests
@@ -329,18 +540,380 @@ jest.mock('framer-motion', () => ({
 }));
 
 // Mock react-hot-toast
-jest.mock('react-hot-toast', () => ({
-  __esModule: true,
-  default: {
-    success: jest.fn(),
-    error: jest.fn(),
-    loading: jest.fn(),
-    custom: jest.fn(),
-    promise: jest.fn(),
+jest.mock('react-hot-toast', () => {
+  const mockToastFn = jest.fn((message: any) => message);
+  const mockToast = {
+    success: mockToastFn,
+    error: mockToastFn,
+    loading: mockToastFn,
+    custom: mockToastFn,
+    promise: jest.fn(() => Promise.resolve()),
     dismiss: jest.fn(),
-  },
-  Toaster: () => null,
-}));
+    remove: jest.fn(),
+  };
+
+  return {
+    __esModule: true,
+    default: mockToast,
+    toast: mockToast,
+    Toaster: () => null,
+    useToaster: jest.fn(() => ({
+      toasts: [],
+      handlers: {
+        startPause: jest.fn(),
+        endPause: jest.fn(),
+        updateHeight: jest.fn(),
+        calculateOffset: jest.fn(),
+      },
+    })),
+  };
+});
+
+// Mock Radix UI Dialog
+jest.mock('@radix-ui/react-dialog', () => {
+  const React = require('react');
+
+  const createMockComponent = (name: string) => {
+    const Component = React.forwardRef(({ children, ...props }: any, ref: any) => {
+      // Filter out Radix-specific props
+      const { asChild, onOpenChange, ...domProps } = props;
+      return React.createElement('div', { ref, 'data-testid': `dialog-${name.toLowerCase()}`, ...domProps }, children);
+    });
+    Component.displayName = name;
+    return Component;
+  };
+
+  return {
+    Root: createMockComponent('Root'),
+    Trigger: createMockComponent('Trigger'),
+    Portal: createMockComponent('Portal'),
+    Close: createMockComponent('Close'),
+    Overlay: createMockComponent('Overlay'),
+    Content: createMockComponent('Content'),
+    Title: createMockComponent('Title'),
+    Description: createMockComponent('Description'),
+  };
+});
+
+// Mock Radix UI Select
+jest.mock('@radix-ui/react-select', () => {
+  const React = require('react');
+
+  const createMockComponent = (name: string) => {
+    const Component = React.forwardRef(({ children, ...props }: any, ref: any) => {
+      // Filter out Radix-specific props
+      const { asChild, onValueChange, onOpenChange, value, defaultValue, ...domProps } = props;
+      return React.createElement('div', { ref, 'data-testid': `select-${name.toLowerCase()}`, ...domProps }, children);
+    });
+    Component.displayName = name;
+    return Component;
+  };
+
+  return {
+    Root: createMockComponent('Root'),
+    Trigger: createMockComponent('Trigger'),
+    Value: createMockComponent('Value'),
+    Icon: createMockComponent('Icon'),
+    Portal: createMockComponent('Portal'),
+    Content: createMockComponent('Content'),
+    Viewport: createMockComponent('Viewport'),
+    Item: createMockComponent('Item'),
+    ItemText: createMockComponent('ItemText'),
+    ItemIndicator: createMockComponent('ItemIndicator'),
+    ScrollUpButton: createMockComponent('ScrollUpButton'),
+    ScrollDownButton: createMockComponent('ScrollDownButton'),
+    Group: createMockComponent('Group'),
+    Label: createMockComponent('Label'),
+    Separator: createMockComponent('Separator'),
+  };
+});
+
+// Mock Radix UI Tabs
+jest.mock('@radix-ui/react-tabs', () => {
+  const React = require('react');
+
+  const createMockComponent = (name: string) => {
+    const Component = React.forwardRef(({ children, ...props }: any, ref: any) => {
+      // Filter out Radix-specific props
+      const { asChild, onValueChange, value, defaultValue, ...domProps } = props;
+      return React.createElement('div', { ref, 'data-testid': `tabs-${name.toLowerCase()}`, ...domProps }, children);
+    });
+    Component.displayName = name;
+    return Component;
+  };
+
+  return {
+    Root: createMockComponent('Root'),
+    List: createMockComponent('List'),
+    Trigger: createMockComponent('Trigger'),
+    Content: createMockComponent('Content'),
+  };
+});
+
+// Mock File API for upload tests
+// Enhance existing File class or create new one if it doesn't exist
+if (typeof File !== 'undefined' && typeof File.prototype !== 'undefined') {
+  // File exists but may be missing methods - add them to prototype
+  if (!File.prototype.text) {
+    File.prototype.text = async function(): Promise<string> {
+      // @ts-ignore - accessing internal bits
+      const bits = this._bits || [];
+      return bits.join('');
+    };
+  }
+
+  if (!File.prototype.arrayBuffer) {
+    File.prototype.arrayBuffer = async function(): Promise<ArrayBuffer> {
+      const text = await this.text();
+      const encoder = new TextEncoder();
+      return encoder.encode(text).buffer as ArrayBuffer;
+    };
+  }
+
+  if (!File.prototype.stream) {
+    File.prototype.stream = function(): ReadableStream {
+      const file = this;
+      return new ReadableStream({
+        async start(controller) {
+          const text = await file.text();
+          controller.enqueue(new TextEncoder().encode(text));
+          controller.close();
+        },
+      });
+    };
+  }
+
+  // Wrap the original File constructor to store bits for text() method
+  const OriginalFile = global.File;
+  // @ts-ignore
+  global.File = class File extends OriginalFile {
+    _bits: any[];
+
+    constructor(bits: any[], filename: string, options: any = {}) {
+      super(bits, filename, options);
+      // Store bits for text() method to access
+      this._bits = bits;
+    }
+  };
+  // Copy static properties
+  Object.setPrototypeOf(global.File, OriginalFile);
+} else {
+  // File doesn't exist at all - create from scratch
+  // @ts-ignore
+  global.File = class File {
+    name: string;
+    type: string;
+    size: number;
+    lastModified: number;
+    _bits: any[];
+
+    constructor(bits: any[], filename: string, options: any = {}) {
+      this.name = filename;
+      this.type = options.type || '';
+      this.size = bits.reduce((acc, bit) => acc + (bit?.length || 0), 0);
+      this.lastModified = options.lastModified || Date.now();
+      this._bits = bits;
+    }
+
+    async text(): Promise<string> {
+      return this._bits.join('');
+    }
+
+    async arrayBuffer(): Promise<ArrayBuffer> {
+      const text = await this.text();
+      const encoder = new TextEncoder();
+      return encoder.encode(text).buffer as ArrayBuffer;
+    }
+
+    stream(): ReadableStream {
+      const file = this;
+      return new ReadableStream({
+        async start(controller) {
+          const text = await file.text();
+          controller.enqueue(new TextEncoder().encode(text));
+          controller.close();
+        },
+      });
+    }
+
+    slice(start?: number, end?: number, contentType?: string): Blob {
+      const slicedBits = this._bits.slice(start, end);
+      return new Blob(slicedBits, { type: contentType || this.type });
+    }
+  } as any;
+}
+
+// Mock Blob API
+if (typeof Blob !== 'undefined' && typeof Blob.prototype !== 'undefined') {
+  // Blob exists but may be missing methods - add them to prototype
+  if (!Blob.prototype.text) {
+    Blob.prototype.text = async function(): Promise<string> {
+      // @ts-ignore - accessing internal bits
+      const bits = this._bits || [];
+      return bits.join('');
+    };
+  }
+
+  if (!Blob.prototype.arrayBuffer) {
+    Blob.prototype.arrayBuffer = async function(): Promise<ArrayBuffer> {
+      const text = await this.text();
+      const encoder = new TextEncoder();
+      return encoder.encode(text).buffer as ArrayBuffer;
+    };
+  }
+
+  if (!Blob.prototype.stream) {
+    Blob.prototype.stream = function(): ReadableStream {
+      const blob = this;
+      return new ReadableStream({
+        async start(controller) {
+          const text = await blob.text();
+          controller.enqueue(new TextEncoder().encode(text));
+          controller.close();
+        },
+      });
+    };
+  }
+
+  // Wrap the original Blob constructor to store bits for text() method
+  const OriginalBlob = global.Blob;
+  // @ts-ignore
+  global.Blob = class Blob extends OriginalBlob {
+    _bits: any[];
+
+    constructor(bits: any[] = [], options: any = {}) {
+      super(bits, options);
+      // Store bits for text() method to access
+      this._bits = bits;
+    }
+  };
+  // Copy static properties
+  Object.setPrototypeOf(global.Blob, OriginalBlob);
+} else {
+  // Blob doesn't exist at all - create from scratch
+  global.Blob = class Blob {
+    type: string;
+    size: number;
+    _bits: any[];
+
+    constructor(bits: any[] = [], options: any = {}) {
+      this.type = options.type || '';
+      this._bits = bits;
+      this.size = bits.reduce((acc, bit) => acc + (bit?.length || 0), 0);
+    }
+
+    async text(): Promise<string> {
+      return this._bits.join('');
+    }
+
+    async arrayBuffer(): Promise<ArrayBuffer> {
+      const text = await this.text();
+      const encoder = new TextEncoder();
+      return encoder.encode(text).buffer as ArrayBuffer;
+    }
+
+    stream(): ReadableStream {
+      const blob = this;
+      return new ReadableStream({
+        async start(controller) {
+          const text = await blob.text();
+          controller.enqueue(new TextEncoder().encode(text));
+          controller.close();
+        },
+      });
+    }
+
+    slice(start?: number, end?: number, contentType?: string): Blob {
+      const slicedBits = this._bits.slice(start, end);
+      return new Blob(slicedBits, { type: contentType || this.type });
+    }
+  } as any;
+}
+
+// Mock FormData API
+if (typeof FormData === 'undefined') {
+  global.FormData = class FormData {
+    private data: Map<string, any[]>;
+
+    constructor() {
+      this.data = new Map();
+    }
+
+    append(name: string, value: any, filename?: string): void {
+      if (!this.data.has(name)) {
+        this.data.set(name, []);
+      }
+      this.data.get(name)!.push(value);
+    }
+
+    delete(name: string): void {
+      this.data.delete(name);
+    }
+
+    get(name: string): any {
+      const values = this.data.get(name);
+      return values ? values[0] : null;
+    }
+
+    getAll(name: string): any[] {
+      return this.data.get(name) || [];
+    }
+
+    has(name: string): boolean {
+      return this.data.has(name);
+    }
+
+    set(name: string, value: any, filename?: string): void {
+      this.data.set(name, [value]);
+    }
+
+    entries(): IterableIterator<[string, any]> {
+      const entries: [string, any][] = [];
+      this.data.forEach((values, key) => {
+        values.forEach(value => {
+          entries.push([key, value]);
+        });
+      });
+      return entries[Symbol.iterator]();
+    }
+
+    keys(): IterableIterator<string> {
+      return this.data.keys();
+    }
+
+    values(): IterableIterator<any> {
+      const values: any[] = [];
+      this.data.forEach((vals) => {
+        vals.forEach(val => values.push(val));
+      });
+      return values[Symbol.iterator]();
+    }
+
+    forEach(callback: (value: any, key: string, parent: FormData) => void): void {
+      this.data.forEach((values, key) => {
+        values.forEach(value => {
+          callback(value, key, this);
+        });
+      });
+    }
+
+    [Symbol.iterator](): IterableIterator<[string, any]> {
+      return this.entries();
+    }
+  } as any;
+}
+
+// Enhance Request mock to support formData()
+if (typeof Request !== 'undefined' && Request.prototype) {
+  const originalRequest = Request;
+  // @ts-ignore - Extending Request prototype
+  global.Request = class extends originalRequest {
+    async formData(): Promise<FormData> {
+      // Return empty FormData for tests
+      return new FormData();
+    }
+  } as any;
+}
 
 // Increase timeout for async operations
 jest.setTimeout(30000); 
