@@ -8,6 +8,10 @@
     {
       "path": "/api/admin/quarantine-cleanup",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/admin/mileage-recalculation",
+      "schedule": "0 */6 * * *"
     }
   ],
   "env": {

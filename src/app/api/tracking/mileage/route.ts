@@ -43,7 +43,7 @@ function buildCsv(rows: Array<Record<string, unknown>>): string {
     return 'driver_id,shift_id,shift_start,shift_end,total_distance_km,delivery_count\n';
   }
 
-  const headers = Object.keys(rows[0]);
+  const headers = Object.keys(rows[0]!);
   const escape = (value: unknown): string => {
     if (value === null || value === undefined) return '';
     const str = String(value);

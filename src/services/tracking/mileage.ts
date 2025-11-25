@@ -2,6 +2,25 @@ import { z } from 'zod';
 import { prisma } from '@/utils/prismaDB';
 
 /**
+ * Maximum reasonable mileage for a single shift (in km).
+ * Values exceeding this threshold trigger a warning log but are still saved.
+ * 500 km ≈ 310 miles, which is very high for a typical delivery shift.
+ */
+const MAX_REASONABLE_SHIFT_KM = 500;
+
+/**
+ * Threshold for GPS filter rate warnings.
+ * If more than this percentage of GPS points are filtered out, log a warning.
+ */
+const HIGH_FILTER_RATE_THRESHOLD = 0.5;
+
+/**
+ * Threshold for per-delivery breakdown deviation from total.
+ * If the sum of per-delivery distances differs from total by more than this, log a warning.
+ */
+const BREAKDOWN_DEVIATION_THRESHOLD = 0.2;
+
+/**
  * Internal type representing the minimal shift window needed for mileage calculation.
  * This intentionally does not rely on Prisma's generated types because the underlying
  * table has evolved via raw SQL migrations and manual changes.
@@ -53,6 +72,35 @@ async function calculateWindowDistanceKm(
   endTime: Date
 ): Promise<number> {
   assertUuid(driverId, 'driverId');
+
+  // Run diagnostic query to check GPS data quality
+  const diagnosticRows = await prisma.$queryRawUnsafe<{
+    total_points: number;
+    filtered_points: number;
+  }[]>(`
+    SELECT
+      COUNT(*) AS total_points,
+      COUNT(*) FILTER (WHERE accuracy IS NOT NULL AND accuracy > 100) AS filtered_points
+    FROM driver_locations
+    WHERE driver_id = $1::uuid
+      AND recorded_at BETWEEN $2::timestamptz AND $3::timestamptz
+      AND deleted_at IS NULL
+  `, driverId, startTime, endTime);
+
+  const totalPoints = Number(diagnosticRows[0]?.total_points ?? 0);
+  const filteredPoints = Number(diagnosticRows[0]?.filtered_points ?? 0);
+
+  // Warn if high percentage of points were filtered due to poor accuracy
+  if (totalPoints > 0 && filteredPoints / totalPoints > HIGH_FILTER_RATE_THRESHOLD) {
+    console.warn(
+      `[Mileage] High GPS filter rate for driver ${driverId}: ${filteredPoints}/${totalPoints} points filtered due to poor accuracy`
+    );
+  }
+
+  // Warn if no GPS data available
+  if (totalPoints === 0) {
+    console.warn(`[Mileage] No GPS data for driver ${driverId} between ${startTime.toISOString()} and ${endTime.toISOString()}`);
+  }
 
   const rows = await prisma.$queryRawUnsafe<{ total_km: number | null }[]>(`
     WITH ordered_points AS (
@@ -133,7 +181,7 @@ async function getShiftWindow(shiftId: string): Promise<ShiftWindow | null> {
     return null;
   }
 
-  return rows[0];
+  return rows[0] ?? null;
 }
 
 /**
@@ -157,6 +205,11 @@ export async function calculateShiftMileage(shiftId: string): Promise<ShiftMilea
     startTime,
     endTime
   );
+
+  // Warn if mileage seems unrealistically high
+  if (totalKm > MAX_REASONABLE_SHIFT_KM) {
+    console.warn(`[Mileage] Unusually high mileage for shift ${shiftId}: ${totalKm.toFixed(2)} km`);
+  }
 
   await prisma.$executeRawUnsafe(
     `
@@ -251,6 +304,19 @@ export async function calculateShiftMileageWithBreakdown(
       deliveryId: delivery.id,
       distanceKm,
     });
+  }
+
+  // Validate breakdown consistency: sum of per-delivery distances vs total
+  if (breakdown.length > 0 && totalKm > 0) {
+    const breakdownSum = breakdown.reduce((acc, d) => acc + d.distanceKm, 0);
+    const deviation = Math.abs(breakdownSum - totalKm) / totalKm;
+    if (deviation > BREAKDOWN_DEVIATION_THRESHOLD) {
+      console.warn(
+        `[Mileage] Breakdown inconsistency for shift ${shiftId}: ` +
+        `sum of deliveries (${breakdownSum.toFixed(2)} km) differs from total (${totalKm.toFixed(2)} km) ` +
+        `by ${(deviation * 100).toFixed(1)}%`
+      );
+    }
   }
 
   // Persist the total distance (km) for the shift in a single write

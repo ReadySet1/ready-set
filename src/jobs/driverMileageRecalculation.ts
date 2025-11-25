@@ -91,9 +91,11 @@ export async function runDriverMileageRecalculation(
     result.success = result.errors.length === 0;
 
     realtimeLogger.info('Driver mileage recalculation job completed', {
-      processed: result.processed,
-      errorCount: result.errors.length,
-      lookbackHours,
+      metadata: {
+        processed: result.processed,
+        errorCount: result.errors.length,
+        lookbackHours,
+      },
     });
 
     return result;
