@@ -109,24 +109,24 @@ export async function POST(request: Request) {
                 // Extract the actual bucket name from the URL
                 const bucketFromUrl = pathParts[5];
                 if (!bucketFromUrl) {
-                    console.error(`❌ [PATH DEBUG] Could not extract bucket name from URL: ${file.fileUrl}`);
+                    console.error(`Could not extract bucket name from URL: ${file.fileUrl}`);
                     continue;
                 }
                 actualBucketName = bucketFromUrl;
                 oldPath = pathParts.slice(6).join('/'); // Join the rest as the path
-            } 
+            }
             // Handle signed URLs (which use 'sign' instead of 'public')
             else if (pathParts.length > 6 && pathParts[1] === 'storage' && pathParts[4] === 'sign') {
                 const bucketFromUrl = pathParts[5];
                 if (!bucketFromUrl) {
-                    console.error(`❌ [PATH DEBUG] Could not extract bucket name from URL: ${file.fileUrl}`);
+                    console.error(`Could not extract bucket name from URL: ${file.fileUrl}`);
                     continue;
                 }
                 actualBucketName = bucketFromUrl;
                 oldPath = pathParts.slice(6).join('/'); // Join the rest as the path
             }
             else {
-                 console.error(`❌ [PATH DEBUG] Could not extract valid path from URL: ${file.fileUrl}`);
+                 console.error(`Could not extract valid path from URL: ${file.fileUrl}`);
                  continue;
             }
         } catch (e) {
@@ -160,7 +160,7 @@ export async function POST(request: Request) {
 
           if (moveError) {
             // Log the error but continue processing other files
-            console.error(`❌ [STORAGE DEBUG] Error moving file ${oldPath} to ${newPath}:`, moveError);
+            console.error(`Error moving file ${oldPath} to ${newPath}:`, moveError);
             // Potentially add logic here to mark this file as failed or retry later
             continue; // Skip updating this file record if move failed
           }
@@ -173,7 +173,7 @@ export async function POST(request: Request) {
 
           let newPublicUrl: string;
           if (signedUrlError) {
-            console.error(`❌ [URL DEBUG] Error generating signed URL:`, signedUrlError);
+            console.error(`Error generating signed URL:`, signedUrlError);
             // Fallback to public URL if signed URL fails
             const { data: urlData } = supabaseAdmin.storage.from(actualBucketName).getPublicUrl(newPath);
             newPublicUrl = urlData?.publicUrl || '';

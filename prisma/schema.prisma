@@ -61,6 +61,7 @@ model Profile {
   calculationHistory   CalculationHistory[]    @relation("CalculationHistory")
   driverRecord         Driver?                 @relation("DriverProfile")
   assignedDeliveries   Delivery[]              @relation("DeliveryAssigner")
+  emailPreferences     EmailPreferences?
 
   @@index([email])
   @@index([type])
@@ -91,6 +92,21 @@ model UserAudit {
   @@index([createdAt])
   @@schema("public")
   @@map("user_audits")
+}
+
+model EmailPreferences {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String   @unique @db.Uuid
+  deliveryNotifications Boolean  @default(true) @map("delivery_notifications")
+  promotionalEmails     Boolean  @default(false) @map("promotional_emails")
+  createdAt             DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt             DateTime @default(now()) @updatedAt @db.Timestamptz(6) @map("updated_at")
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@schema("public")
+  @@map("email_preferences")
 }
 
 model Account {

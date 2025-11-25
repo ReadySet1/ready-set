@@ -3,6 +3,7 @@
 import { GET } from '@/app/api/admin/job-applications/route';
 import { prisma, withDatabaseRetry } from '@/utils/prismaDB';
 import { createClient } from '@/utils/supabase/server';
+import { createMockSupabaseClient } from '@/__tests__/helpers/supabase-mock-helpers';
 import { ApplicationStatus } from '@/types/job-application';
 import {
   createGetRequest,
@@ -24,41 +25,28 @@ jest.mock('@/utils/prismaDB', () => ({
   withDatabaseRetry: jest.fn((callback) => callback()),
 }));
 
+const { createClient, createAdminClient } = jest.requireMock('@/utils/supabase/server');
+
 jest.mock('@/utils/supabase/server', () => ({
   createClient: jest.fn(),
+  createAdminClient: jest.fn(),
 }));
 
 describe('GET /api/admin/job-applications - List Job Applications', () => {
-  const mockSupabaseClient = {
-    auth: {
-      getUser: jest.fn(),
-    },
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          single: jest.fn(),
-        })),
-      })),
-    })),
-  };
+  let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSupabaseClient = createMockSupabaseClient();
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
+    (createAdminClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
   });
 
   describe('✅ Successful Retrieval', () => {
     beforeEach(() => {
-      const mockProfile = {
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
         data: { type: 'ADMIN' },
-      };
-
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue(mockProfile),
-          }),
-        }),
+        error: null,
       });
     });
 
@@ -290,16 +278,12 @@ describe('GET /api/admin/job-applications - List Job Applications', () => {
     it('should allow HELPDESK to access', async () => {
       mockSupabaseClient.auth.getUser.mockResolvedValue({
         data: { user: { id: 'helpdesk-123' } },
+        error: null,
       });
 
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'HELPDESK' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'HELPDESK' },
+        error: null,
       });
 
       (prisma.jobApplication.count as jest.Mock).mockResolvedValue(0);
@@ -317,16 +301,12 @@ describe('GET /api/admin/job-applications - List Job Applications', () => {
     it('should allow SUPER_ADMIN to access', async () => {
       mockSupabaseClient.auth.getUser.mockResolvedValue({
         data: { user: { id: 'superadmin-123' } },
+        error: null,
       });
 
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'SUPER_ADMIN' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'SUPER_ADMIN' },
+        error: null,
       });
 
       (prisma.jobApplication.count as jest.Mock).mockResolvedValue(0);
@@ -385,14 +365,9 @@ describe('GET /api/admin/job-applications - List Job Applications', () => {
     });
 
     it('should return 403 when CLIENT tries to access', async () => {
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'CLIENT' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'CLIENT' },
+        error: null,
       });
 
       const request = createGetRequest(
@@ -405,14 +380,9 @@ describe('GET /api/admin/job-applications - List Job Applications', () => {
     });
 
     it('should return 403 when VENDOR tries to access', async () => {
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'VENDOR' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'VENDOR' },
+        error: null,
       });
 
       const request = createGetRequest(
@@ -425,14 +395,9 @@ describe('GET /api/admin/job-applications - List Job Applications', () => {
     });
 
     it('should return 403 when DRIVER tries to access', async () => {
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'DRIVER' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'DRIVER' },
+        error: null,
       });
 
       const request = createGetRequest(
@@ -449,16 +414,12 @@ describe('GET /api/admin/job-applications - List Job Applications', () => {
     beforeEach(() => {
       mockSupabaseClient.auth.getUser.mockResolvedValue({
         data: { user: { id: 'admin-123' } },
+        error: null,
       });
 
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'ADMIN' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'ADMIN' },
+        error: null,
       });
     });
 
@@ -495,16 +456,12 @@ describe('GET /api/admin/job-applications - List Job Applications', () => {
     beforeEach(() => {
       mockSupabaseClient.auth.getUser.mockResolvedValue({
         data: { user: { id: 'admin-123' } },
+        error: null,
       });
 
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'ADMIN' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'ADMIN' },
+        error: null,
       });
     });
 

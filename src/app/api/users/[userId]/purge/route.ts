@@ -14,8 +14,6 @@ import { UserType } from '@/types/prisma';
  * - Creates audit log entry for the permanent deletion
  */
 export async function DELETE(request: NextRequest) {
-  console.log(`[DELETE /api/users/[userId]/purge] Request received for URL: ${request.url}`);
-  
   try {
     // Get userId from URL path
     const url = new URL(request.url);
@@ -59,8 +57,6 @@ export async function DELETE(request: NextRequest) {
         { status: 401 }
       );
     }
-    
-    console.log(`[DELETE /api/users/[userId]/purge] Authenticated user ID: ${user.id}`);
 
     // Check permissions - only SUPER_ADMIN can permanently delete users
     let requesterProfile;
@@ -70,12 +66,10 @@ export async function DELETE(request: NextRequest) {
         where: { id: user.id },
         select: { type: true }
       });
-      console.log(`[DELETE /api/users/[userId]/purge] Requester profile fetched:`, requesterProfile);
       
       const isSuperAdmin = requesterProfile?.type === UserType.SUPER_ADMIN;
 
       if (!isSuperAdmin) {
-        console.log(`[DELETE /api/users/[userId]/purge] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to permanently delete user ${userId}.`);
         return NextResponse.json(
           { error: 'Forbidden: Only Super Admin can permanently delete users' },
           { status: 403 }
@@ -100,14 +94,12 @@ export async function DELETE(request: NextRequest) {
           deletionReason: true
         }
       });
-      console.log(`[DELETE /api/users/[userId]/purge] Target user fetched:`, targetUser ? 'Found' : 'Not Found');
     } catch (targetUserError) {
       console.error(`[DELETE /api/users/[userId]/purge] Error fetching target user (ID: ${userId}):`, targetUserError);
       return NextResponse.json({ error: 'Failed to fetch target user' }, { status: 500 });
     }
 
     if (!targetUser) {
-      console.log(`[DELETE /api/users/[userId]/purge] User not found: ID ${userId}`);
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -115,7 +107,6 @@ export async function DELETE(request: NextRequest) {
     }
 
     if (!targetUser.deletedAt) {
-      console.log(`[DELETE /api/users/[userId]/purge] User is not soft deleted: ID ${userId}`);
       return NextResponse.json(
         { error: 'User must be soft deleted before permanent deletion' },
         { status: 409 }
@@ -124,7 +115,6 @@ export async function DELETE(request: NextRequest) {
 
     // Prevent permanent deletion of SUPER_ADMIN users
     if (targetUser.type === UserType.SUPER_ADMIN) {
-      console.log(`[DELETE /api/users/[userId]/purge] Cannot permanently delete Super Admin: ID ${userId}`);
       return NextResponse.json(
         { error: 'Super Admin users cannot be permanently deleted' },
         { status: 403 }
@@ -139,17 +129,11 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    console.log(`[DELETE /api/users/[userId]/purge] Starting permanent deletion process for user: ${userId}`);
-    console.log(`[DELETE /api/users/[userId]/purge] Requester: ${user.id} (Type: ${requesterProfile?.type})`);
-    console.log(`[DELETE /api/users/[userId]/purge] Reason: ${confirmationData.reason}`);
-
     // Import the soft delete service
     const { userSoftDeleteService } = await import('@/services/userSoftDeleteService');
     
     // Perform permanent deletion
     const result = await userSoftDeleteService.permanentlyDeleteUser(userId);
-    
-    console.log(`[DELETE /api/users/[userId]/purge] User permanently deleted successfully: ID ${userId}`);
     
     return NextResponse.json({
       message: 'User permanently deleted successfully',

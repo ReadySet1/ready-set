@@ -13,25 +13,19 @@ import {
   expectForbidden,
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
+import { createMockSupabaseClient } from '@/__tests__/helpers/supabase-mock-helpers';
 
 // Mock dependencies
 jest.mock('@/utils/supabase/server');
 jest.mock('@/lib/monitoring/dashboard-performance');
 
 describe('/api/admin/performance API', () => {
-  const mockSupabaseClient = {
-    auth: {
-      getUser: jest.fn(),
-    },
-    from: jest.fn(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn(),
-    })),
-  };
+  let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Use the helper to create a properly structured mock
+    mockSupabaseClient = createMockSupabaseClient();
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
   });
 
