@@ -264,7 +264,7 @@ describe("Tracking System Integration", () => {
         expect(mockStartShift).toHaveBeenCalledWith(mockLocationUpdate);
       });
 
-      // 2. Simulate shift becoming active
+      // 2. Simulate shift becoming active with mileage
       mockUseDriverShift.mockReturnValue({
         currentShift: {
           id: "shift-1",
@@ -272,7 +272,7 @@ describe("Tracking System Integration", () => {
           startTime: new Date(),
           startLocation: { lat: 40.7128, lng: -74.006 },
           status: "active" as const,
-          totalDistanceKm: 0,
+          totalDistanceKm: 12.3,
           deliveryCount: 0,
           breaks: [],
           metadata: {},
@@ -292,7 +292,12 @@ describe("Tracking System Integration", () => {
       // Re-render to show active shift
       render(<DriverTrackingPortal />);
 
-      // 3. End shift
+      // 3. Verify mileage is displayed
+      expect(
+        screen.getByText(/12.3 km/i)
+      ).toBeInTheDocument();
+
+      // 4. End shift
       const endButton = screen.getByRole("button", { name: /end shift/i });
       await userEvent.click(endButton);
 
