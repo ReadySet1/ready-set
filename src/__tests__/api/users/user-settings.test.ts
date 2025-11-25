@@ -2,6 +2,7 @@
 
 import { GET, PATCH } from '@/app/api/users/[userId]/settings/route';
 import { createClient } from '@/utils/supabase/server';
+import { createMockSupabaseClient } from '@/__tests__/helpers/supabase-mock-helpers';
 import { UserType, UserStatus } from '@/types/prisma';
 import {
   createGetRequest,
@@ -15,20 +16,11 @@ import {
 jest.mock('@/utils/supabase/server');
 
 describe('/api/users/[userId]/settings API', () => {
-  const mockSupabaseClient = {
-    auth: {
-      getUser: jest.fn(),
-    },
-    from: jest.fn(() => ({
-      select: jest.fn().mockReturnThis(),
-      update: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn(),
-    })),
-  };
+  let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSupabaseClient = createMockSupabaseClient();
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
   });
 
@@ -40,33 +32,23 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn()
-                .mockResolvedValueOnce({
-                  // First call for currentUser permissions
-                  data: { type: UserType.ADMIN },
-                  error: null,
-                })
-                .mockResolvedValueOnce({
-                  // Second call for target user settings
-                  data: {
-                    id: 'user-456',
-                    type: UserType.CLIENT,
-                    status: UserStatus.ACTIVE,
-                    isTemporaryPassword: false,
-                  },
-                  error: null,
-                }),
-            };
-          }
-          return mockSupabaseClient.from(table);
-        });
-
-        mockSupabaseClient.from = mockFrom;
+        // Mock two consecutive calls to profiles.single()
+        mockSupabaseClient.from('profiles').single
+          .mockResolvedValueOnce({
+            // First call for currentUser permissions
+            data: { type: UserType.ADMIN },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            // Second call for target user settings
+            data: {
+              id: 'user-456',
+              type: UserType.CLIENT,
+              status: UserStatus.ACTIVE,
+              isTemporaryPassword: false,
+            },
+            error: null,
+          });
 
         const request = createGetRequest(
           'http://localhost:3000/api/users/user-456/settings'
@@ -88,31 +70,21 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn()
-                .mockResolvedValueOnce({
-                  data: { type: UserType.SUPER_ADMIN },
-                  error: null,
-                })
-                .mockResolvedValueOnce({
-                  data: {
-                    id: 'user-789',
-                    type: UserType.VENDOR,
-                    status: UserStatus.SUSPENDED,
-                    isTemporaryPassword: true,
-                  },
-                  error: null,
-                }),
-            };
-          }
-          return mockSupabaseClient.from(table);
-        });
-
-        mockSupabaseClient.from = mockFrom;
+        // Mock two consecutive calls to profiles.single()
+        mockSupabaseClient.from('profiles').single
+          .mockResolvedValueOnce({
+            data: { type: UserType.SUPER_ADMIN },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: {
+              id: 'user-789',
+              type: UserType.VENDOR,
+              status: UserStatus.SUSPENDED,
+              isTemporaryPassword: true,
+            },
+            error: null,
+          });
 
         const request = createGetRequest(
           'http://localhost:3000/api/users/user-789/settings'
@@ -129,31 +101,21 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn()
-                .mockResolvedValueOnce({
-                  data: { type: UserType.ADMIN },
-                  error: null,
-                })
-                .mockResolvedValueOnce({
-                  data: {
-                    id: 'user-456',
-                    type: UserType.CLIENT,
-                    status: UserStatus.ACTIVE,
-                    isTemporaryPassword: false,
-                  },
-                  error: null,
-                }),
-            };
-          }
-          return mockSupabaseClient.from(table);
-        });
-
-        mockSupabaseClient.from = mockFrom;
+        // Mock two consecutive calls to profiles.single()
+        mockSupabaseClient.from('profiles').single
+          .mockResolvedValueOnce({
+            data: { type: UserType.ADMIN },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: {
+              id: 'user-456',
+              type: UserType.CLIENT,
+              status: UserStatus.ACTIVE,
+              isTemporaryPassword: false,
+            },
+            error: null,
+          });
 
         const request = createGetRequest(
           'http://localhost:3000/api/users/user-456/settings'
@@ -196,21 +158,10 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn().mockResolvedValue({
-                data: { type: UserType.CLIENT },
-                error: null,
-              }),
-            };
-          }
-          return mockSupabaseClient.from(table);
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
+          data: { type: UserType.CLIENT },
+          error: null,
         });
-
-        mockSupabaseClient.from = mockFrom;
 
         const request = createGetRequest(
           'http://localhost:3000/api/users/user-456/settings'
@@ -227,21 +178,10 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn().mockResolvedValue({
-                data: { type: UserType.VENDOR },
-                error: null,
-              }),
-            };
-          }
-          return mockSupabaseClient.from(table);
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
+          data: { type: UserType.VENDOR },
+          error: null,
         });
-
-        mockSupabaseClient.from = mockFrom;
 
         const request = createGetRequest(
           'http://localhost:3000/api/users/user-456/settings'
@@ -258,21 +198,10 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn().mockResolvedValue({
-                data: { type: UserType.DRIVER },
-                error: null,
-              }),
-            };
-          }
-          return mockSupabaseClient.from(table);
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
+          data: { type: UserType.DRIVER },
+          error: null,
         });
-
-        mockSupabaseClient.from = mockFrom;
 
         const request = createGetRequest(
           'http://localhost:3000/api/users/user-456/settings'
@@ -289,21 +218,10 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn().mockResolvedValue({
-                data: { type: UserType.HELPDESK },
-                error: null,
-              }),
-            };
-          }
-          return mockSupabaseClient.from(table);
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
+          data: { type: UserType.HELPDESK },
+          error: null,
         });
-
-        mockSupabaseClient.from = mockFrom;
 
         const request = createGetRequest(
           'http://localhost:3000/api/users/user-456/settings'
@@ -322,26 +240,15 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn()
-                .mockResolvedValueOnce({
-                  data: { type: UserType.ADMIN },
-                  error: null,
-                })
-                .mockResolvedValueOnce({
-                  data: null,
-                  error: null,
-                }),
-            };
-          }
-          return mockSupabaseClient.from(table);
-        });
-
-        mockSupabaseClient.from = mockFrom;
+        mockSupabaseClient.from('profiles').single
+          .mockResolvedValueOnce({
+            data: { type: UserType.ADMIN },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: null,
+            error: null,
+          });
 
         const request = createGetRequest(
           'http://localhost:3000/api/users/nonexistent-123/settings'
@@ -360,21 +267,10 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn().mockResolvedValue({
-                data: null,
-                error: new Error('Database error'),
-              }),
-            };
-          }
-          return mockSupabaseClient.from(table);
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
+          data: null,
+          error: new Error('Database error'),
         });
-
-        mockSupabaseClient.from = mockFrom;
 
         const request = createGetRequest(
           'http://localhost:3000/api/users/user-456/settings'
@@ -391,26 +287,15 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn()
-                .mockResolvedValueOnce({
-                  data: { type: UserType.ADMIN },
-                  error: null,
-                })
-                .mockResolvedValueOnce({
-                  data: null,
-                  error: new Error('Database timeout'),
-                }),
-            };
-          }
-          return mockSupabaseClient.from(table);
-        });
-
-        mockSupabaseClient.from = mockFrom;
+        mockSupabaseClient.from('profiles').single
+          .mockResolvedValueOnce({
+            data: { type: UserType.ADMIN },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: null,
+            error: new Error('Database timeout'),
+          });
 
         const request = createGetRequest(
           'http://localhost:3000/api/users/user-456/settings'
@@ -438,26 +323,23 @@ describe('/api/users/[userId]/settings API', () => {
           isTemporaryPassword: false,
         };
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              update: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn().mockResolvedValue({
-                data: { type: UserType.SUPER_ADMIN },
-                error: null,
-              }),
-            };
-          }
-          return mockSupabaseClient.from(table);
-        });
+        const mockBuilder = mockSupabaseClient.from('profiles');
 
-        mockSupabaseClient.from = mockFrom;
-        mockSupabaseClient.from().update().eq().select = jest.fn().mockResolvedValue({
-          data: [updatedUser],
+        // Mock the permission check: .from('profiles').select('type').eq(...).single()
+        // .select() should return this (for chaining), then .single() returns data
+        mockBuilder.single.mockResolvedValueOnce({
+          data: { type: UserType.SUPER_ADMIN },
           error: null,
         });
+
+        // Mock the update operation: .from('profiles').update(...).eq(...).select()
+        // The final .select() should return the updated data
+        mockBuilder.select
+          .mockReturnValueOnce(mockBuilder)  // First call in permission check - return this for chaining
+          .mockResolvedValueOnce({            // Second call at end of update - return data
+            data: [updatedUser],
+            error: null,
+          });
 
         const request = new Request(
           'http://localhost:3000/api/users/user-456/settings',
@@ -476,7 +358,7 @@ describe('/api/users/[userId]/settings API', () => {
         const response = await PATCH(request, { params });
         const data = await expectSuccessResponse(response, 200);
 
-        expect(data.message).toMatch(/updated successfully/i);
+        expect(data.message).toBe('User settings updated successfully');
         expect(data.data.type).toBe(UserType.ADMIN);
         expect(data.data.status).toBe(UserStatus.ACTIVE);
       });
@@ -489,21 +371,10 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn().mockResolvedValue({
-                data: { type: UserType.ADMIN },
-                error: null,
-              }),
-            };
-          }
-          return mockSupabaseClient.from(table);
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
+          data: { type: UserType.ADMIN },
+          error: null,
         });
-
-        mockSupabaseClient.from = mockFrom;
 
         const request = new Request(
           'http://localhost:3000/api/users/user-456/settings',
@@ -531,21 +402,10 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn().mockResolvedValue({
-                data: { type: UserType.SUPER_ADMIN },
-                error: null,
-              }),
-            };
-          }
-          return mockSupabaseClient.from(table);
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
+          data: { type: UserType.SUPER_ADMIN },
+          error: null,
         });
-
-        mockSupabaseClient.from = mockFrom;
 
         const request = new Request(
           'http://localhost:3000/api/users/user-456/settings',
@@ -571,21 +431,10 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn().mockResolvedValue({
-                data: { type: UserType.SUPER_ADMIN },
-                error: null,
-              }),
-            };
-          }
-          return mockSupabaseClient.from(table);
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
+          data: { type: UserType.SUPER_ADMIN },
+          error: null,
         });
-
-        mockSupabaseClient.from = mockFrom;
 
         const request = new Request(
           'http://localhost:3000/api/users/user-456/settings',
@@ -593,8 +442,8 @@ describe('/api/users/[userId]/settings API', () => {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              type: UserType.CLIENT,
-              status: 'INVALID_STATUS',
+              type: UserType.CLIENT,  // Valid type to pass first validation
+              status: 'INVALID_STATUS',  // Invalid status to trigger this validation
               isTemporaryPassword: false,
             }),
           }
@@ -611,21 +460,10 @@ describe('/api/users/[userId]/settings API', () => {
           error: null,
         });
 
-        const mockFrom = jest.fn().mockImplementation((table) => {
-          if (table === 'profiles') {
-            return {
-              select: jest.fn().mockReturnThis(),
-              eq: jest.fn().mockReturnThis(),
-              single: jest.fn().mockResolvedValue({
-                data: { type: UserType.SUPER_ADMIN },
-                error: null,
-              }),
-            };
-          }
-          return mockSupabaseClient.from(table);
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
+          data: { type: UserType.SUPER_ADMIN },
+          error: null,
         });
-
-        mockSupabaseClient.from = mockFrom;
 
         const request = new Request(
           'http://localhost:3000/api/users/user-456/settings',
@@ -633,9 +471,9 @@ describe('/api/users/[userId]/settings API', () => {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              type: UserType.CLIENT,
-              status: UserStatus.ACTIVE,
-              isTemporaryPassword: 'not-a-boolean',
+              type: UserType.CLIENT,  // Valid type to pass first validation
+              status: UserStatus.ACTIVE,  // Valid status to pass second validation
+              isTemporaryPassword: 'not-a-boolean',  // Invalid boolean to trigger this validation
             }),
           }
         );

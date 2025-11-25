@@ -12,6 +12,7 @@ import {
   expectUnauthorized,
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
+import { createMockSupabaseClient } from '@/__tests__/helpers/supabase-mock-helpers';
 import { createMockPrisma, MockPrismaClient } from '@/__tests__/helpers/prisma-mock';
 
 // Mock dependencies
@@ -26,24 +27,22 @@ jest.mock('@/utils/file-service', () => ({
 }));
 
 describe('/api/file-uploads API', () => {
+  let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
   // Type-safe Prisma mock
   let prismaMock: MockPrismaClient;
 
-  const mockSupabaseClient = {
-    auth: {
-      getUser: jest.fn(),
-    },
-    storage: {
-      from: jest.fn(() => ({
-        createSignedUrl: jest.fn(),
-        getPublicUrl: jest.fn(),
-        upload: jest.fn(),
-      })),
-    },
-  };
-
   beforeEach(() => {
     jest.clearAllMocks();
+    // Use the helper to create a properly structured mock
+    mockSupabaseClient = createMockSupabaseClient();
+
+    // Override storage methods for file upload tests
+    mockSupabaseClient.storage.from = jest.fn(() => ({
+      createSignedUrl: jest.fn(),
+      getPublicUrl: jest.fn(),
+      upload: jest.fn(),
+    }));
+
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
 
     // Initialize type-safe Prisma mock

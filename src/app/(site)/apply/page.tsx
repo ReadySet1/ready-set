@@ -78,7 +78,7 @@ export default function ApplyPage() {
 
             <h1 className="mb-6 text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
               Join Our{" "}
-              <span className="bg-gradient-to-r from-orange-500 to-orange-500 bg-clip-text text-transparent">
+              <span className="text-slate-900">
                 Amazing
               </span>{" "}
               Team
