@@ -82,13 +82,24 @@ export async function PATCH(
 
     const validatedData = validationResult.data;
 
-    // 2. Find the order
+    // 2. Find the order with driver info via dispatches
     const order = await prisma.cateringRequest.findUnique({
       where: { id: orderId },
       include: {
         user: true,
         pickupAddress: true,
         deliveryAddress: true,
+        dispatches: {
+          include: {
+            driver: {
+              select: {
+                name: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
     });
 
@@ -175,6 +186,10 @@ export async function PATCH(
     // 9. Send customer delivery-status email (best-effort)
     try {
       const preferences = await getEmailPreferencesForUser(order.userId);
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://readysetllc.com";
+
+      // Get driver name from most recent dispatch
+      const driverName = order.dispatches[0]?.driver?.name ?? undefined;
 
       await sendDeliveryStatusEmail({
         driverStatus: validatedData.driverStatus,
@@ -183,22 +198,19 @@ export async function PATCH(
           orderNumber: updatedOrder.orderNumber,
           customerEmail: order.user.email,
           customerName: order.user.name ?? order.user.email,
-          driverName: undefined,
+          driverName,
           estimatedArrival: updatedOrder.arrivalDateTime
             ? updatedOrder.arrivalDateTime.toISOString()
             : undefined,
           deliveryAddress: order.deliveryAddress
             ? `${order.deliveryAddress.street1}, ${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.zip}`
             : "",
-          trackingLink: `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://readysetllc.com"}/orders/${encodeURIComponent(
-            updatedOrder.orderNumber
-          )}`,
-          supportLink:
-            `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://readysetllc.com"}/contact`,
+          trackingLink: `${siteUrl}/orders/${encodeURIComponent(updatedOrder.orderNumber)}`,
+          supportLink: `${siteUrl}/contact`,
+          unsubscribeLink: `${siteUrl}/account/preferences?tab=notifications`,
         },
         preferences: {
           deliveryNotifications: preferences.deliveryNotifications,
-          promotionalEmails: preferences.promotionalEmails,
         },
       });
     } catch (emailError) {

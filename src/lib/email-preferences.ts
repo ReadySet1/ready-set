@@ -1,10 +1,7 @@
 // src/lib/email-preferences.ts
 // Domain helpers for loading and updating email notification preferences.
 
-import { createAdminClient } from "@/utils/supabase/server";
-import type { Tables } from "@/types/supabase";
-
-export type EmailPreferencesRow = Tables<"email_preferences">;
+import { prisma } from "@/lib/db/prisma";
 
 export interface EmailPreferences {
   deliveryNotifications: boolean;
@@ -16,38 +13,59 @@ const DEFAULT_PREFERENCES: EmailPreferences = {
   promotionalEmails: false,
 };
 
+/**
+ * Get email preferences for a user.
+ * Returns default preferences if user has no preferences record.
+ */
 export async function getEmailPreferencesForUser(
   userId: string
 ): Promise<EmailPreferences> {
   try {
-    const supabase = await createAdminClient();
+    const preferences = await prisma.emailPreferences.findUnique({
+      where: { userId },
+    });
 
-    const { data, error } = await supabase
-      .from("email_preferences")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle<EmailPreferencesRow>();
-
-    if (error) {
-      console.error("Failed to load email preferences", { userId, error });
-      return DEFAULT_PREFERENCES;
-    }
-
-    if (!data) {
+    if (!preferences) {
       return DEFAULT_PREFERENCES;
     }
 
     return {
-      deliveryNotifications: data.delivery_notifications ?? true,
-      promotionalEmails: data.promotional_emails ?? false,
+      deliveryNotifications: preferences.deliveryNotifications,
+      promotionalEmails: preferences.promotionalEmails,
     };
   } catch (error) {
-    console.error("Unexpected error loading email preferences", {
-      userId,
-      error,
-    });
+    console.error("Failed to load email preferences", { userId, error });
     return DEFAULT_PREFERENCES;
   }
 }
 
+/**
+ * Update email preferences for a user.
+ * Creates the record if it doesn't exist (upsert).
+ */
+export async function updateEmailPreferencesForUser(
+  userId: string,
+  updates: Partial<EmailPreferences>
+): Promise<EmailPreferences> {
+  const preferences = await prisma.emailPreferences.upsert({
+    where: { userId },
+    create: {
+      userId,
+      deliveryNotifications: updates.deliveryNotifications ?? true,
+      promotionalEmails: updates.promotionalEmails ?? false,
+    },
+    update: {
+      ...(updates.deliveryNotifications !== undefined && {
+        deliveryNotifications: updates.deliveryNotifications,
+      }),
+      ...(updates.promotionalEmails !== undefined && {
+        promotionalEmails: updates.promotionalEmails,
+      }),
+    },
+  });
 
+  return {
+    deliveryNotifications: preferences.deliveryNotifications,
+    promotionalEmails: preferences.promotionalEmails,
+  };
+}

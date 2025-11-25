@@ -22,6 +22,7 @@ export interface DeliveryTemplateVariables {
   deliveryAddress: string;
   trackingLink: string;
   supportLink: string;
+  unsubscribeLink: string;
   currentYear: string;
 }
 
@@ -119,6 +120,8 @@ export function renderDeliveryTemplate(
     deliveryAddress: vars.deliveryAddress,
     trackingLink: vars.trackingLink,
     supportLink: vars.supportLink,
+    unsubscribeLink: vars.unsubscribeLink,
+    currentYear: vars.currentYear,
   };
 
   const html = interpolate(shell, variables);

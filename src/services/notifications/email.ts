@@ -1,13 +1,10 @@
 // src/services/notifications/email.ts
-// High-level delivery status email notifications built on top of SendGrid.
+// High-level delivery status email notifications using Resend with resilience.
 // This module is server-only and should never be imported into client components.
 import "server-only";
 
-import { DriverStatus } from "@/types/user";
-import {
-  SendGridEmailProvider,
-  type EmailProvider,
-} from "@/lib/email/sendgrid";
+import { DriverStatus } from "@/types/prisma";
+import { sendEmail } from "@/utils/email";
 import {
   renderDeliveryTemplate,
   type DeliveryEmailTemplateId,
@@ -33,27 +30,45 @@ export interface DeliveryDetails {
   deliveryAddress: string;
   trackingLink: string;
   supportLink: string;
+  unsubscribeLink: string;
 }
 
 export interface EmailPreferences {
   deliveryNotifications: boolean;
 }
 
-export class PreferenceError extends Error {}
-export class TemplateRenderError extends Error {}
-export class EmailProviderError extends Error {}
+export class PreferenceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PreferenceError";
+  }
+}
+
+export class TemplateRenderError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TemplateRenderError";
+  }
+}
+
+export class EmailProviderError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EmailProviderError";
+  }
+}
 
 const mapDriverStatusToNotificationStatus = (
   status: DriverStatus
 ): DeliveryNotificationStatus | null => {
   switch (status) {
-    case DriverStatus.ASSIGNED:
+    case "ASSIGNED":
       return "ASSIGNED";
-    case DriverStatus.EN_ROUTE_TO_CLIENT:
+    case "EN_ROUTE_TO_CLIENT":
       return "EN_ROUTE_TO_DELIVERY";
-    case DriverStatus.ARRIVED_TO_CLIENT:
+    case "ARRIVED_TO_CLIENT":
       return "ARRIVED_AT_DELIVERY";
-    case DriverStatus.COMPLETED:
+    case "COMPLETED":
       return "DELIVERED";
     default:
       return null;
@@ -103,16 +118,19 @@ const getSubjectForStatus = (
   }
 };
 
-const provider: EmailProvider = new SendGridEmailProvider();
-
-const MAX_ATTEMPTS = 3;
-const BASE_DELAY_MS = 200;
-
-const sleep = (ms: number) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
+/**
+ * Send a delivery status email notification to the customer.
+ *
+ * Uses Resend with automatic retry, circuit breaker, and timeout handling
+ * via the existing email resilience system (REA-77).
+ *
+ * @param params.driverStatus - The current driver status
+ * @param params.details - Delivery details including customer info
+ * @param params.preferences - User email preferences (delivery notifications opt-in)
+ * @throws {PreferenceError} If customer email is missing
+ * @throws {TemplateRenderError} If template rendering fails
+ * @throws {EmailProviderError} If email sending fails after retries
+ */
 export async function sendDeliveryStatusEmail(params: {
   driverStatus: DriverStatus;
   details: DeliveryDetails;
@@ -120,23 +138,26 @@ export async function sendDeliveryStatusEmail(params: {
 }): Promise<void> {
   const { driverStatus, details, preferences } = params;
 
+  // Validate customer email
   if (!details.customerEmail) {
     throw new PreferenceError("Missing customer email");
   }
 
+  // Respect user preference for delivery notifications
   if (!preferences || !preferences.deliveryNotifications) {
     return;
   }
 
-  const notificationStatus = mapDriverStatusToNotificationStatus(
-    driverStatus
-  );
+  // Map driver status to notification status
+  const notificationStatus = mapDriverStatusToNotificationStatus(driverStatus);
   if (!notificationStatus) {
+    // Status not mapped to a notification - silently skip
     return;
   }
 
   const templateId = mapNotificationStatusToTemplateId(notificationStatus);
 
+  // Prepare template variables
   const templateVars: DeliveryTemplateVariables = {
     customerName: details.customerName,
     orderNumber: details.orderNumber,
@@ -145,9 +166,11 @@ export async function sendDeliveryStatusEmail(params: {
     deliveryAddress: details.deliveryAddress,
     trackingLink: details.trackingLink,
     supportLink: details.supportLink,
+    unsubscribeLink: details.unsubscribeLink,
     currentYear: new Date().getFullYear().toString(),
   };
 
+  // Render template
   let rendered;
   try {
     rendered = renderDeliveryTemplate(templateId, templateVars);
@@ -157,55 +180,32 @@ export async function sendDeliveryStatusEmail(params: {
     );
   }
 
-  const subject = getSubjectForStatus(
-    notificationStatus,
-    details.orderNumber
-  );
+  const subject = getSubjectForStatus(notificationStatus, details.orderNumber);
 
-  let lastError: string | undefined;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const result = await provider.send({
-      to: { email: details.customerEmail, name: details.customerName },
-      from: {
-        email:
-          process.env.SENDGRID_SENDER_EMAIL ||
-          "noreply@updates.readysetllc.com",
-        name: process.env.SENDGRID_SENDER_NAME || "Ready Set",
-      },
-      content: {
-        subject,
-        html: rendered.html,
-        text: rendered.text,
-      },
-      category: "delivery_status",
-      customArgs: {
-        delivery_id: details.deliveryId,
-        order_number: details.orderNumber,
-        status: notificationStatus,
-      },
+  // Send email using Resend with resilience (retry + circuit breaker + timeout)
+  try {
+    await sendEmail({
+      to: details.customerEmail,
+      subject,
+      html: rendered.html,
     });
 
-    if (result.success) {
-      return;
-    }
-
-    lastError = result.error;
-    console.error("Delivery status email send failed", {
-      attempt,
+    console.info("Delivery status email sent", {
       deliveryId: details.deliveryId,
       orderNumber: details.orderNumber,
       status: notificationStatus,
-      error: result.error,
+      customerEmail: details.customerEmail.replace(/(.{2}).*@/, "$1***@"),
+    });
+  } catch (error) {
+    console.error("Delivery status email send failed", {
+      deliveryId: details.deliveryId,
+      orderNumber: details.orderNumber,
+      status: notificationStatus,
+      error: error instanceof Error ? error.message : "Unknown error",
     });
 
-    if (attempt < MAX_ATTEMPTS) {
-      // Basic exponential backoff
-      // eslint-disable-next-line no-await-in-loop
-      await sleep(BASE_DELAY_MS * attempt);
-    }
+    throw new EmailProviderError(
+      error instanceof Error ? error.message : "Email sending failed"
+    );
   }
-
-  throw new EmailProviderError(lastError || "Unknown email error");
 }
-
-
