@@ -3,6 +3,7 @@
 // This module is server-only and should never be imported into client components.
 import "server-only";
 
+import * as Sentry from "@sentry/nextjs";
 import { DriverStatus } from "@/types/prisma";
 import { sendEmail } from "@/utils/email";
 import {
@@ -190,18 +191,27 @@ export async function sendDeliveryStatusEmail(params: {
       html: rendered.html,
     });
 
-    console.info("Delivery status email sent", {
-      deliveryId: details.deliveryId,
-      orderNumber: details.orderNumber,
-      status: notificationStatus,
-      customerEmail: details.customerEmail.replace(/(.{2}).*@/, "$1***@"),
+    Sentry.addBreadcrumb({
+      category: "email",
+      message: "Delivery status email sent",
+      level: "info",
+      data: {
+        deliveryId: details.deliveryId,
+        orderNumber: details.orderNumber,
+        status: notificationStatus,
+        customerEmail: details.customerEmail.replace(/(.{2}).*@/, "$1***@"),
+      },
     });
   } catch (error) {
-    console.error("Delivery status email send failed", {
-      deliveryId: details.deliveryId,
-      orderNumber: details.orderNumber,
-      status: notificationStatus,
-      error: error instanceof Error ? error.message : "Unknown error",
+    Sentry.captureException(error, {
+      tags: {
+        service: "email-notifications",
+        status: notificationStatus,
+      },
+      extra: {
+        deliveryId: details.deliveryId,
+        orderNumber: details.orderNumber,
+      },
     });
 
     throw new EmailProviderError(
