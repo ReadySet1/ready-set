@@ -3,6 +3,7 @@
 import { POST } from '@/app/api/cater-valley/orders/draft/route';
 import { prisma } from '@/lib/db/prisma';
 import * as pricingService from '@/lib/services/pricingService';
+import * as pricingHelper from '@/app/api/cater-valley/_lib/pricing-helper';
 import {
   createPostRequest,
   expectSuccessResponse,
@@ -27,9 +28,12 @@ jest.mock('@/lib/db/prisma', () => ({
 }));
 
 jest.mock('@/lib/services/pricingService', () => ({
-  calculateDeliveryPrice: jest.fn(),
   calculatePickupTime: jest.fn(),
   isDeliveryTimeAvailable: jest.fn(),
+}));
+
+jest.mock('@/app/api/cater-valley/_lib/pricing-helper', () => ({
+  calculateCaterValleyPricing: jest.fn(),
 }));
 
 jest.mock('@/lib/utils/timezone', () => ({
@@ -71,20 +75,21 @@ describe('POST /api/cater-valley/orders/draft - Create Draft Order', () => {
 
     // Default mocks
     (pricingService.isDeliveryTimeAvailable as jest.Mock).mockReturnValue(true);
-    (pricingService.calculateDeliveryPrice as jest.Mock).mockResolvedValue({
-      deliveryPrice: 65.00,
+    (pricingService.calculatePickupTime as jest.Mock).mockReturnValue('2025-10-25T13:15:00Z');
+
+    // Mock the new pricing helper (replaces calculateDeliveryPrice)
+    (pricingHelper.calculateCaterValleyPricing as jest.Mock).mockResolvedValue({
       distance: 5.2,
-      tier: 'tier2',
-      breakdown: {
-        basePrice: 65.00,
-        distanceTier: 'standard',
-        headCountTier: 'tier2',
-        foodCostTier: 'tier3',
-        tipIncluded: true,
-        calculation: 'Standard delivery',
+      usedFallbackDistance: false,
+      numberOfBridges: 0,
+      pricingResult: {
+        deliveryFee: 65.00,
+        deliveryCost: 65.00,
+        totalMileagePay: 0,
+        dailyDriveDiscount: 0,
+        bridgeToll: 0,
       },
     });
-    (pricingService.calculatePickupTime as jest.Mock).mockReturnValue('2025-10-25T13:15:00Z');
 
     (prisma.profile.upsert as jest.Mock).mockResolvedValue({
       id: 'system-user-1',
@@ -220,14 +225,13 @@ describe('POST /api/cater-valley/orders/draft - Create Draft Order', () => {
 
       await POST(request);
 
-      expect(pricingService.calculateDeliveryPrice).toHaveBeenCalledWith({
-        pickupAddress: '123 Pickup St, San Francisco, CA',
-        dropoffAddress: '456 Delivery Ave, San Francisco, CA',
-        headCount: 50,
-        foodCost: 750.00,
-        deliveryDate: '2025-10-25',
-        deliveryTime: '14:00',
-        includeTip: true,
+      expect(pricingHelper.calculateCaterValleyPricing).toHaveBeenCalledWith({
+        orderCode: 'TEST-001',
+        pickupLocation: validOrderData.pickupLocation,
+        dropOffLocation: validOrderData.dropOffLocation,
+        totalItem: 50,
+        priceTotal: 750.00,
+        feature: 'catervalley_webhook_draft',
       });
     });
 
@@ -247,11 +251,8 @@ describe('POST /api/cater-valley/orders/draft - Create Draft Order', () => {
 
       expect(data.breakdown).toEqual({
         basePrice: 65.00,
-        distanceTier: 'standard',
-        headCountTier: 'tier2',
-        foodCostTier: 'tier3',
-        tipIncluded: true,
-        calculation: 'Standard delivery',
+        mileageFee: 0,
+        dailyDriveDiscount: 0,
       });
     });
   });
