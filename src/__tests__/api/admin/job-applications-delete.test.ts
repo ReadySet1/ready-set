@@ -3,6 +3,7 @@
 import { DELETE } from '@/app/api/admin/job-applications/[id]/route';
 import { prisma } from '@/utils/prismaDB';
 import { createClient } from '@/utils/supabase/server';
+import { createMockSupabaseClient } from '@/__tests__/helpers/supabase-mock-helpers';
 import {
   createDeleteRequest,
   expectSuccessResponse,
@@ -30,21 +31,12 @@ jest.mock('@/utils/supabase/server', () => ({
 }));
 
 describe('DELETE /api/admin/job-applications/[id] - Delete Job Application', () => {
-  const mockSupabaseClient = {
-    auth: {
-      getUser: jest.fn(),
-    },
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          single: jest.fn(),
-        })),
-      })),
-    })),
-  };
+  let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Use the helper to create a properly structured mock
+    mockSupabaseClient = createMockSupabaseClient();
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
   });
 
@@ -54,14 +46,9 @@ describe('DELETE /api/admin/job-applications/[id] - Delete Job Application', () 
         data: { user: { id: 'admin-123', email: 'admin@example.com' } },
       });
 
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'ADMIN' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'ADMIN' },
+        error: null,
       });
     });
 
@@ -139,14 +126,9 @@ describe('DELETE /api/admin/job-applications/[id] - Delete Job Application', () 
     });
 
     it('should allow SUPER_ADMIN to delete', async () => {
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'SUPER_ADMIN' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'SUPER_ADMIN' },
+        error: null,
       });
 
       (prisma.jobApplication.findUnique as jest.Mock).mockResolvedValue({
@@ -215,18 +197,14 @@ describe('DELETE /api/admin/job-applications/[id] - Delete Job Application', () 
     beforeEach(() => {
       mockSupabaseClient.auth.getUser.mockResolvedValue({
         data: { user: { id: 'user-123', email: 'user@example.com' } },
+        error: null,
       });
     });
 
     it('should return 403 when CLIENT tries to delete', async () => {
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'CLIENT' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'CLIENT' },
+        error: null,
       });
 
       const request = createDeleteRequest(
@@ -242,14 +220,9 @@ describe('DELETE /api/admin/job-applications/[id] - Delete Job Application', () 
     });
 
     it('should return 403 when VENDOR tries to delete', async () => {
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'VENDOR' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'VENDOR' },
+        error: null,
       });
 
       const request = createDeleteRequest(
@@ -265,14 +238,9 @@ describe('DELETE /api/admin/job-applications/[id] - Delete Job Application', () 
     });
 
     it('should return 403 when DRIVER tries to delete', async () => {
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'DRIVER' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'DRIVER' },
+        error: null,
       });
 
       const request = createDeleteRequest(
@@ -288,14 +256,9 @@ describe('DELETE /api/admin/job-applications/[id] - Delete Job Application', () 
     });
 
     it('should return 403 when HELPDESK tries to delete', async () => {
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'HELPDESK' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'HELPDESK' },
+        error: null,
       });
 
       const request = createDeleteRequest(
@@ -315,16 +278,12 @@ describe('DELETE /api/admin/job-applications/[id] - Delete Job Application', () 
     beforeEach(() => {
       mockSupabaseClient.auth.getUser.mockResolvedValue({
         data: { user: { id: 'admin-123', email: 'admin@example.com' } },
+        error: null,
       });
 
-      mockSupabaseClient.from.mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'ADMIN' },
-            }),
-          }),
-        }),
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
+        data: { type: 'ADMIN' },
+        error: null,
       });
     });
 

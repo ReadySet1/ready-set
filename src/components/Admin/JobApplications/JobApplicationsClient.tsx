@@ -134,6 +134,14 @@ const ApplicationsSkeleton: React.FC = () => (
   </div>
 );
 
+// Color mapping for stats cards to avoid dynamic Tailwind classes
+const statsColorMap: Record<string, { bg: string; text: string }> = {
+  blue: { bg: 'bg-blue-100', text: 'text-blue-600' },
+  amber: { bg: 'bg-amber-100', text: 'text-amber-600' },
+  emerald: { bg: 'bg-emerald-100', text: 'text-emerald-600' },
+  purple: { bg: 'bg-purple-100', text: 'text-purple-600' },
+};
+
 // Modern Stats Overview Component
 const StatsOverview: React.FC<{ stats: JobApplicationStats }> = ({ stats }) => {
   const statsCards = [
@@ -197,8 +205,8 @@ const StatsOverview: React.FC<{ stats: JobApplicationStats }> = ({ stats }) => {
                     </span>
                   </div>
                 </div>
-                <div className={`p-3 rounded-xl bg-${stat.color}-100`}>
-                  <div className={`text-${stat.color}-600`}>
+                <div className={`p-3 rounded-xl ${statsColorMap[stat.color]?.bg || 'bg-gray-100'}`}>
+                  <div className={statsColorMap[stat.color]?.text || 'text-gray-600'}>
                     {stat.icon}
                   </div>
                 </div>

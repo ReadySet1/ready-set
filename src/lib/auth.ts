@@ -2,11 +2,21 @@
 import { createClient } from "@/utils/supabase/server";
 import { UserType } from "@/types/user";
 import { Database } from "@/types/supabase";
+import type { AuthError, PostgrestError } from "@supabase/supabase-js";
 // Note: If UserType enum from Prisma is available/generated for frontend/server code,
 // you could import and use it for stronger type safety, e.g.:
 //  // Adjust import path as needed
 
-export async function syncOAuthProfile(userId: string, metadata: any) {
+/** OAuth user metadata from identity providers (Google, etc.) */
+interface OAuthMetadata {
+  email?: string;
+  full_name?: string;
+  name?: string;
+  avatar_url?: string;
+  picture?: string;
+}
+
+export async function syncOAuthProfile(userId: string, metadata: OAuthMetadata) {
   // This function can be called after OAuth authentication to check if a profile needs to be created
   const supabase = await createClient();
 
@@ -82,8 +92,8 @@ export async function syncOAuthProfile(userId: string, metadata: any) {
 // IMPORTANT: Ensure the 'role' string passed here matches the UserType enum case (e.g., "VENDOR", "CLIENT")
 export async function updateUserRole(userId: string, role: 'VENDOR' | 'CLIENT' | 'DRIVER' | 'ADMIN' | 'HELPDESK' | 'SUPER_ADMIN') {
   const supabase = await createClient();
-  let profileError: any = null;
-  let authError: any = null;
+  let profileError: PostgrestError | null = null;
+  let authError: AuthError | null = null;
 
   // Changed: Update the 'type' field in the 'profiles' table first
     const { error: updateProfileError } = await supabase
