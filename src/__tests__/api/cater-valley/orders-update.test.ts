@@ -3,6 +3,7 @@
 import { POST } from '@/app/api/cater-valley/orders/update/route';
 import { prisma } from '@/lib/db/prisma';
 import * as pricingService from '@/lib/services/pricingService';
+import * as pricingHelper from '@/app/api/cater-valley/_lib/pricing-helper';
 import { expectSuccessResponse, expectErrorResponse } from '@/__tests__/helpers/api-test-helpers';
 
 // Mock dependencies
@@ -14,9 +15,12 @@ jest.mock('@/lib/db/prisma', () => ({
 }));
 
 jest.mock('@/lib/services/pricingService', () => ({
-  calculateDeliveryPrice: jest.fn(),
   calculatePickupTime: jest.fn(),
   isDeliveryTimeAvailable: jest.fn(),
+}));
+
+jest.mock('@/app/api/cater-valley/_lib/pricing-helper', () => ({
+  calculateCaterValleyPricing: jest.fn(),
 }));
 
 jest.mock('@/lib/utils/timezone', () => ({
@@ -51,11 +55,21 @@ describe('POST /api/cater-valley/orders/update - Update Order', () => {
     process.env.CATERVALLEY_API_KEY = 'test-api-key';
 
     (pricingService.isDeliveryTimeAvailable as jest.Mock).mockReturnValue(true);
-    (pricingService.calculateDeliveryPrice as jest.Mock).mockResolvedValue({
-      deliveryPrice: 75.00,
-      breakdown: { basePrice: 75.00 },
-    });
     (pricingService.calculatePickupTime as jest.Mock).mockReturnValue('2025-10-25T13:15:00Z');
+
+    // Mock the new pricing helper (replaces calculateDeliveryPrice)
+    (pricingHelper.calculateCaterValleyPricing as jest.Mock).mockResolvedValue({
+      distance: 5.2,
+      usedFallbackDistance: false,
+      numberOfBridges: 0,
+      pricingResult: {
+        deliveryFee: 75.00,
+        deliveryCost: 75.00,
+        totalMileagePay: 0,
+        dailyDriveDiscount: 0,
+        bridgeToll: 0,
+      },
+    });
 
     (prisma.address.findFirst as jest.Mock).mockResolvedValue(null);
     (prisma.address.create as jest.Mock)
@@ -119,13 +133,14 @@ describe('POST /api/cater-valley/orders/update - Update Order', () => {
 
       await POST(request);
 
-      expect(pricingService.calculateDeliveryPrice).toHaveBeenCalledWith(
-        expect.objectContaining({
-          headCount: 60,
-          foodCost: 850.00,
-          includeTip: true,
-        })
-      );
+      expect(pricingHelper.calculateCaterValleyPricing).toHaveBeenCalledWith({
+        orderCode: 'TEST-001',
+        pickupLocation: validUpdateData.pickupLocation,
+        dropOffLocation: validUpdateData.dropOffLocation,
+        totalItem: 60,
+        priceTotal: 850.00,
+        feature: 'catervalley_webhook_update',
+      });
     });
   });
 
@@ -257,9 +272,16 @@ describe('POST /api/cater-valley/orders/update - Update Order', () => {
     });
 
     it('should reject duplicate order code', async () => {
+      // Update to a different order code that already exists
+      const updateWithNewCode = {
+        ...validUpdateData,
+        orderCode: 'NEW-ORDER-CODE', // Different from the existing order's CV-TEST-001
+      };
+
+      // Mock that another order already has this code
       (prisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue({
         id: 'different-id',
-        orderNumber: 'CV-TEST-001',
+        orderNumber: 'CV-NEW-ORDER-CODE',
       });
 
       const request = new Request('http://localhost:3000/api/cater-valley/orders/update', {
@@ -269,7 +291,7 @@ describe('POST /api/cater-valley/orders/update - Update Order', () => {
           'x-api-key': 'test-api-key',
           'partner': 'catervalley',
         },
-        body: JSON.stringify(validUpdateData),
+        body: JSON.stringify(updateWithNewCode),
       });
 
       const response = await POST(request);

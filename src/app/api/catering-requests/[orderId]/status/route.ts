@@ -8,6 +8,8 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
 import { CarrierService, CarrierWebhookService } from '@/lib/services/carrierService';
 import { DriverStatus } from '@/types/prisma';
+import { getEmailPreferencesForUser } from "@/lib/email-preferences";
+import { sendDeliveryStatusEmail } from "@/services/notifications/email";
 import { invalidateVendorCacheOnStatusUpdate } from '@/lib/cache/cache-invalidation';
 
 // Validation schema for status update request
@@ -80,13 +82,24 @@ export async function PATCH(
 
     const validatedData = validationResult.data;
 
-    // 2. Find the order
+    // 2. Find the order with driver info via dispatches
     const order = await prisma.cateringRequest.findUnique({
       where: { id: orderId },
       include: {
         user: true,
         pickupAddress: true,
         deliveryAddress: true,
+        dispatches: {
+          include: {
+            driver: {
+              select: {
+                name: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
     });
 
@@ -170,7 +183,44 @@ export async function PATCH(
     // 8. Invalidate vendor cache since order status affects metrics and order lists
     invalidateVendorCacheOnStatusUpdate(order.userId, orderId);
 
-    // 9. Return success response
+    // 9. Send customer delivery-status email (best-effort)
+    try {
+      const preferences = await getEmailPreferencesForUser(order.userId);
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://readysetllc.com";
+
+      // Get driver name from most recent dispatch
+      const driverName = order.dispatches[0]?.driver?.name ?? undefined;
+
+      await sendDeliveryStatusEmail({
+        driverStatus: validatedData.driverStatus,
+        details: {
+          deliveryId: updatedOrder.id,
+          orderNumber: updatedOrder.orderNumber,
+          customerEmail: order.user.email,
+          customerName: order.user.name ?? order.user.email,
+          driverName,
+          estimatedArrival: updatedOrder.arrivalDateTime
+            ? updatedOrder.arrivalDateTime.toISOString()
+            : undefined,
+          deliveryAddress: order.deliveryAddress
+            ? `${order.deliveryAddress.street1}, ${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.zip}`
+            : "",
+          trackingLink: `${siteUrl}/orders/${encodeURIComponent(updatedOrder.orderNumber)}`,
+          supportLink: `${siteUrl}/contact`,
+          unsubscribeLink: `${siteUrl}/account/preferences?tab=notifications`,
+        },
+        preferences: {
+          deliveryNotifications: preferences.deliveryNotifications,
+        },
+      });
+    } catch (emailError) {
+      console.error("Failed to send delivery status email", {
+        orderId,
+        emailError,
+      });
+    }
+
+    // 10. Return success response
     const response: StatusUpdateResponse = {
       success: true,
       order: {
