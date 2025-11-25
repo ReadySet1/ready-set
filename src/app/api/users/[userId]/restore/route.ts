@@ -13,8 +13,6 @@ import { UserType } from '@/types/prisma';
  * - Creates audit log entry for the restore action
  */
 export async function POST(request: NextRequest) {
-  console.log(`[POST /api/users/[userId]/restore] Request received for URL: ${request.url}`);
-  
   try {
     // Get userId from URL path
     const url = new URL(request.url);
@@ -39,8 +37,6 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
-    
-    console.log(`[POST /api/users/[userId]/restore] Authenticated user ID: ${user.id}`);
 
     // Check permissions - only ADMIN and SUPER_ADMIN can restore users
     let requesterProfile;
@@ -50,14 +46,12 @@ export async function POST(request: NextRequest) {
         where: { id: user.id },
         select: { type: true }
       });
-      console.log(`[POST /api/users/[userId]/restore] Requester profile fetched:`, requesterProfile);
       
       const isAdminOrSuperAdmin =
         requesterProfile?.type === UserType.ADMIN ||
         requesterProfile?.type === UserType.SUPER_ADMIN;
 
       if (!isAdminOrSuperAdmin) {
-        console.log(`[POST /api/users/[userId]/restore] Forbidden: User ${user.id} (type: ${requesterProfile?.type}) attempted to restore user ${userId}.`);
         return NextResponse.json(
           { error: 'Forbidden: Only Admin or Super Admin can restore users' },
           { status: 403 }
@@ -82,14 +76,12 @@ export async function POST(request: NextRequest) {
           deletionReason: true
         }
       });
-      console.log(`[POST /api/users/[userId]/restore] Target user fetched:`, targetUser ? 'Found' : 'Not Found');
     } catch (targetUserError) {
       console.error(`[POST /api/users/[userId]/restore] Error fetching target user (ID: ${userId}):`, targetUserError);
       return NextResponse.json({ error: 'Failed to fetch target user' }, { status: 500 });
     }
 
     if (!targetUser) {
-      console.log(`[POST /api/users/[userId]/restore] User not found: ID ${userId}`);
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -97,7 +89,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (!targetUser.deletedAt) {
-      console.log(`[POST /api/users/[userId]/restore] User is not soft deleted: ID ${userId}`);
       return NextResponse.json(
         { error: 'User is not soft deleted' },
         { status: 409 }
@@ -109,8 +100,6 @@ export async function POST(request: NextRequest) {
     
     // Perform restore
     const result = await userSoftDeleteService.restoreUser(userId, user.id);
-    
-    console.log(`[POST /api/users/[userId]/restore] User restored successfully: ID ${userId}`);
     
     return NextResponse.json({
       message: 'User restored successfully',

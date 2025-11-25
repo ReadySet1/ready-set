@@ -10,6 +10,7 @@
  */
 
 import { ClientDeliveryConfiguration, getConfiguration, READY_SET_FOOD_STANDARD } from './client-configurations';
+import { captureMessage } from '@/lib/monitoring/sentry';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -255,10 +256,12 @@ function calculateDailyDriveDiscount(numberOfDrives: number, config: ClientDeliv
  */
 function checkManualReviewRequired(headcount: number, config: ClientDeliveryConfiguration): void {
   if (config.driverPaySettings.requiresManualReview && headcount >= MANUAL_REVIEW_HEADCOUNT_THRESHOLD) {
-    // TODO: Replace console.info with proper logging service (Sentry, Winston, etc.)
-    // See: reports/console-cleanup/README.md for logging cleanup strategy
-    // This is intentionally kept for debugging until proper logging is implemented
-    console.info(`Manual review required: headcount=${headcount}, threshold=${MANUAL_REVIEW_HEADCOUNT_THRESHOLD}, client=${config.clientName}`);
+    // Log to Sentry for monitoring large orders requiring manual review
+    captureMessage('Manual review required for large order', 'info', {
+      headcount,
+      threshold: MANUAL_REVIEW_HEADCOUNT_THRESHOLD,
+      clientName: config.clientName,
+    });
 
     // Return sanitized message to client without exposing exact thresholds
     throw new Error(
