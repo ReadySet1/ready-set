@@ -90,7 +90,98 @@ All push failures are logged via the existing `DispatchSystemError` + `trackDisp
 
 - `src/services/notifications/push.test.ts`:
   - Unit tests for status-to-event mapping and message generation.
+  - Rate limiting / deduplication tests.
+  - Integration tests for status-to-message pipeline.
 - `src/app/api/notifications/push/register/route.test.ts`:
   - Basic validation test for the registration endpoint (invalid payload handling).
+
+### Rate Limiting
+
+Push notifications include deduplication to prevent duplicate notifications on retries:
+
+- **TTL Window**: 60 seconds (same profile + event + order combination)
+- **Implementation**: In-memory cache in `src/services/notifications/push.ts`
+- **Functions**:
+  - `isDuplicateNotification(profileId, event, orderId)` - Check if duplicate
+  - `markNotificationSent(profileId, event, orderId)` - Mark as sent
+  - `clearNotificationCache()` - Clear cache (for testing)
+
+### Troubleshooting
+
+#### Notifications not being received
+
+1. **Check browser support**:
+   - Notifications require: `Notification` API, `ServiceWorker` API, `PushManager` API
+   - Safari on iOS requires iOS 16.4+ and the app must be added to Home Screen
+   - Private/Incognito mode may block notifications
+
+2. **Check user preferences**:
+   - Verify `profiles.has_push_notifications = true` in database
+   - Check for active tokens in `profile_push_tokens` table (where `revoked_at IS NULL`)
+
+3. **Check Firebase configuration**:
+   - Backend: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+   - Frontend: `NEXT_PUBLIC_FIREBASE_*` environment variables
+   - VAPID key: `NEXT_PUBLIC_FIREBASE_VAPID_KEY`
+
+4. **Check service worker**:
+   - Verify `/firebase-messaging-sw.js` is served correctly
+   - Check browser DevTools > Application > Service Workers
+   - Look for errors in service worker console
+
+#### Duplicate notifications
+
+- Notifications are deduplicated for 60 seconds based on `profileId:event:orderId`
+- If duplicates occur, check if the same status update is being sent multiple times
+- Rate limiting is in-memory; server restarts will reset the cache
+
+#### Invalid tokens
+
+- Tokens are automatically revoked when Firebase returns `registration-token-not-registered`
+- Check `profile_push_tokens.revoked_at` to see if tokens were invalidated
+- Users may need to re-enable notifications after clearing browser data
+
+#### Errors in logs
+
+Push notification errors are tracked via `DispatchSystemError` with type `DRIVER_NOTIFICATION_ERROR`:
+
+```typescript
+// Error context includes:
+{
+  dispatchId: string | undefined,
+  driverId: string | undefined,
+  orderId: string,
+  notificationDetails: {
+    type: "status_update_push",
+    recipient: "customer" | "admin" | "multiple"
+  }
+}
+```
+
+Search logs/Sentry for `DRIVER_NOTIFICATION_ERROR` to find push failures.
+
+#### Firebase quota limits
+
+Firebase Cloud Messaging has the following limits:
+- **Free tier**: Unlimited notifications
+- **Rate limits**: 1,000 messages/second per project (soft limit)
+- **Token limits**: Tokens expire after ~2 months of inactivity
+
+#### Testing notifications manually
+
+1. Enable notifications in profile settings
+2. Trigger a dispatch status update via API:
+   ```bash
+   curl -X POST /api/dispatch/status-update \
+     -H "Content-Type: application/json" \
+     -d '{
+       "dispatchId": "uuid",
+       "driverId": "uuid",
+       "orderId": "uuid",
+       "status": "EN_ROUTE_TO_DELIVERY"
+     }'
+   ```
+3. Check browser for notification popup
+4. Check service worker console for background message logs
 
 

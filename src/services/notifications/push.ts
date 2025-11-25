@@ -3,6 +3,68 @@ import { trackDispatchError, DispatchSystemError } from "@/utils/domain-error-tr
 import { prisma } from "@/lib/db/prisma";
 
 /**
+ * Simple in-memory cache for notification deduplication.
+ * Prevents duplicate notifications within a time window (e.g., retries).
+ */
+const notificationCache = new Map<string, number>();
+const NOTIFICATION_DEDUP_TTL_MS = 60_000; // 60 seconds
+
+/**
+ * Generate a unique key for deduplication based on profile, event, and order.
+ */
+function getNotificationCacheKey(profileId: string, event: string, orderId: string): string {
+  return `${profileId}:${event}:${orderId}`;
+}
+
+/**
+ * Check if a notification was recently sent (within TTL window).
+ * Returns true if duplicate (should skip), false if new notification.
+ */
+export function isDuplicateNotification(
+  profileId: string,
+  event: string,
+  orderId: string
+): boolean {
+  const key = getNotificationCacheKey(profileId, event, orderId);
+  const lastSent = notificationCache.get(key);
+
+  if (lastSent && Date.now() - lastSent < NOTIFICATION_DEDUP_TTL_MS) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Mark a notification as sent in the dedup cache.
+ */
+export function markNotificationSent(
+  profileId: string,
+  event: string,
+  orderId: string
+): void {
+  const key = getNotificationCacheKey(profileId, event, orderId);
+  notificationCache.set(key, Date.now());
+
+  // Cleanup old entries periodically (simple garbage collection)
+  if (notificationCache.size > 1000) {
+    const now = Date.now();
+    for (const [k, timestamp] of notificationCache.entries()) {
+      if (now - timestamp > NOTIFICATION_DEDUP_TTL_MS) {
+        notificationCache.delete(k);
+      }
+    }
+  }
+}
+
+/**
+ * Clear the notification cache (useful for testing).
+ */
+export function clearNotificationCache(): void {
+  notificationCache.clear();
+}
+
+/**
  * Supported delivery status events for push notifications.
  * These roughly correspond to the events described in REA-124.
  */
@@ -128,11 +190,20 @@ export async function sendPushNotification(payload: PushNotificationPayload): Pr
 /**
  * Send a delivery status push notification to all active tokens for a profile.
  * Errors here are tracked but should not break the caller's core flow.
+ * Includes rate limiting to prevent duplicate notifications within 60 seconds.
  */
 export async function sendDeliveryStatusPush(params: DeliveryStatusPushParams): Promise<void> {
   const { profileId, event, orderId, orderNumber, trackingUrl } = params;
 
   try {
+    // Check for duplicate notification (rate limiting)
+    if (isDuplicateNotification(profileId, event, orderId)) {
+      console.debug(
+        `Skipping duplicate notification: ${event} for profile ${profileId}, order ${orderId}`
+      );
+      return;
+    }
+
     // Check if user has push notifications enabled
     const profile = await prisma.profile.findUnique({
       where: { id: profileId },
@@ -174,6 +245,9 @@ export async function sendDeliveryStatusPush(params: DeliveryStatusPushParams): 
     if (orderNumber) {
       data.orderNumber = orderNumber;
     }
+
+    // Mark notification as sent before attempting (prevents race conditions on retries)
+    markNotificationSent(profileId, event, orderId);
 
     // Fire-and-forget style: send to all tokens, revoking invalid ones
     await Promise.all(

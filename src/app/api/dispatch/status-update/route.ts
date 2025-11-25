@@ -242,7 +242,9 @@ export async function POST(req: NextRequest) {
     }
     
     // Send notifications for critical status changes
+    // Note: ACCEPTED triggers "delivery:assigned" notification per REA-124
     const notificationStatuses = [
+      'ACCEPTED',
       'PICKUP_COMPLETE',
       'EN_ROUTE_TO_DELIVERY',
       'ARRIVED_AT_DELIVERY',

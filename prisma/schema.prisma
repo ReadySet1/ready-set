@@ -59,9 +59,11 @@ model Profile {
   performedAudits      UserAudit[]             @relation("UserAuditPerformer")
   clientConfigurations ClientConfiguration[]   @relation("ClientConfigurations")
   calculationHistory   CalculationHistory[]    @relation("CalculationHistory")
-  driverRecord         Driver?                 @relation("DriverProfile")
-  assignedDeliveries   Delivery[]              @relation("DeliveryAssigner")
-  emailPreferences     EmailPreferences?
+  driverRecord          Driver?                 @relation("DriverProfile")
+  assignedDeliveries    Delivery[]              @relation("DeliveryAssigner")
+  emailPreferences      EmailPreferences?
+  hasPushNotifications  Boolean                 @default(false) @map("has_push_notifications")
+  pushTokens            ProfilePushToken[]
 
   @@index([email])
   @@index([type])
@@ -107,6 +109,25 @@ model EmailPreferences {
   @@index([userId])
   @@schema("public")
   @@map("email_preferences")
+}
+
+/// Stores FCM push notification tokens for each user device.
+/// Used for browser push notifications via Firebase Cloud Messaging.
+model ProfilePushToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  profileId String    @db.Uuid @map("profile_id")
+  token     String    @unique
+  userAgent String?   @map("user_agent")
+  platform  String?
+  createdAt DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
+  revokedAt DateTime? @db.Timestamptz(6) @map("revoked_at")
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@index([profileId, revokedAt])
+  @@schema("public")
+  @@map("profile_push_tokens")
 }
 
 model Account {
