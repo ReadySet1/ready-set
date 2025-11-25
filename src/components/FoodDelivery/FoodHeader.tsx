@@ -98,152 +98,73 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
 
   return (
     <section
-      className={`relative min-h-[500px] w-full ${marginTopClass} mb-16 bg-white md:mb-24 lg:mb-32`}
+      className={`relative h-[70vh] min-h-[600px] w-full ${marginTopClass} mb-16 md:mb-24 lg:mb-32`}
     >
+      {/* Background image container */}
       <motion.div
-        className="relative mx-auto flex max-w-[1600px] flex-col items-center justify-between gap-8 px-4 py-8 md:flex-row md:items-center md:gap-12 md:py-12 lg:gap-16 lg:py-16"
+        className="absolute inset-0 z-0"
+        variants={imageVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <Image
+          src="/images/food/food-containers.png"
+          alt="Food containers with various prepared meals"
+          fill
+          className="object-cover object-center"
+          priority
+        />
+      </motion.div>
+
+      {/* Text content overlay */}
+      <motion.div
+        className="relative z-10 mx-auto flex h-full max-w-[1600px] items-center px-4 py-12 md:px-8 md:py-16 lg:px-12 lg:py-20"
         initial="hidden"
         animate="visible"
         variants={containerVariants}
       >
-        {/* Left content - Text with dashed border path */}
         <motion.div
-          className="relative z-10 w-full md:w-[45%] lg:w-[40%]"
+          className="relative z-10 ml-16 w-full max-w-md space-y-3 md:ml-28 lg:ml-32"
           variants={containerVariants}
         >
-          {/* Yellow dashed border path with location pins */}
-          <motion.div
-            className="relative min-h-[300px] rounded-2xl"
-            style={{
-              border: "3px dashed #facc15",
-            }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
+          <motion.h1
+            className="font-[Montserrat] text-xl font-black leading-tight tracking-tight text-gray-800 md:text-2xl lg:text-3xl"
+            variants={itemVariants}
           >
-            {/* Location pin icons */}
-            <div className="absolute -left-3 -top-3 z-10">
-              <MapPin className="h-8 w-8 text-yellow-400" fill="#facc15" />
-            </div>
-            <div className="absolute -bottom-3 -right-3 z-10">
-              <MapPin className="h-8 w-8 text-yellow-400" fill="#facc15" />
-            </div>
+            From Pickup to Complete Setup
+          </motion.h1>
 
-            {/* Content inside the border */}
-            <div className="relative space-y-6 px-8 py-10 md:px-10 md:py-12">
-              <motion.h1
-                className="font-[Montserrat] text-3xl font-black leading-tight tracking-tight text-gray-800 md:text-4xl lg:text-5xl"
-                variants={itemVariants}
-              >
-                From Pickup to Complete Setup
-              </motion.h1>
-
-              <motion.p
-                className="font-[Montserrat] text-base font-medium leading-relaxed text-gray-700 md:text-lg lg:text-xl"
-                variants={itemVariants}
-              >
-                More than delivery — we&apos;re a trusted partner helping
-                restaurants, caterers, and foodservice providers solve their
-                toughest logistics challenges.
-              </motion.p>
-
-              <motion.div
-                className="flex flex-wrap items-center gap-4 pt-4"
-                variants={itemVariants}
-              >
-                <motion.button
-                  onClick={handleQuoteClick}
-                  className="rounded-lg bg-yellow-300 px-8 py-3 font-[Montserrat] text-base font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg md:px-10 md:py-4 md:text-lg"
-                  variants={buttonVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                >
-                  Get a Quote
-                </motion.button>
-                <ScheduleDialog
-                  buttonText="Book a Call"
-                  calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
-                  className="rounded-lg bg-yellow-300 px-8 py-3 font-[Montserrat] text-base font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg md:px-10 md:py-4 md:text-lg"
-                />
-              </motion.div>
-            </div>
-          </motion.div>
-
-          {/* Second dashed path below the main border */}
-          <motion.div
-            className="relative hidden md:block"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.6 }}
+          <motion.p
+            className="font-[Montserrat] text-xs font-medium leading-relaxed text-gray-700 md:text-sm lg:text-base"
+            variants={itemVariants}
           >
-            {/* Vertical then horizontal dashed path */}
-            <svg
-              className="absolute left-[50%] top-0 h-32 w-80"
-              style={{ overflow: "visible" }}
-            >
-              {/* Vertical line down */}
-              <motion.line
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="60"
-                stroke="#facc15"
-                strokeWidth="3"
-                strokeDasharray="8 4"
-                strokeLinecap="round"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.8, delay: 0.7 }}
-              />
-              {/* Horizontal line right */}
-              <motion.line
-                x1="0"
-                y1="60"
-                x2="180"
-                y2="60"
-                stroke="#facc15"
-                strokeWidth="3"
-                strokeDasharray="8 4"
-                strokeLinecap="round"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.8, delay: 0.9 }}
-              />
-            </svg>
-            {/* Location pin at the end */}
-            <div className="absolute left-[50%] top-[56px] z-10 ml-[176px]">
-              <MapPin className="h-8 w-8 text-yellow-400" fill="#facc15" />
-            </div>
-          </motion.div>
-        </motion.div>
+            More than delivery — we&apos;re a trusted partner helping
+            restaurants, caterers, and foodservice providers solve their
+            toughest logistics challenges.
+          </motion.p>
 
-        {/* Right content - Food containers image */}
-        <motion.div
-          className="flex w-full items-center justify-center md:mt-0 md:w-[55%] md:justify-end lg:w-[60%]"
-          variants={containerVariants}
-        >
-          <div className="relative w-full">
-            <motion.div
-              className="relative flex items-center justify-end"
-              variants={imageVariants}
-              initial={{ opacity: 0, x: 20, scale: 0.95 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              transition={{ delay: 0.3, duration: 0.8 }}
-              whileHover={{ scale: 1.01 }}
+          <motion.div
+            className="flex flex-wrap items-center gap-4 pt-2"
+            variants={itemVariants}
+          >
+            <motion.button
+              onClick={handleQuoteClick}
+              className="rounded-lg bg-yellow-300 px-8 py-3 font-[Montserrat] text-base font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg md:px-10 md:py-4 md:text-lg"
+              variants={buttonVariants}
+              whileHover="hover"
+              whileTap="tap"
             >
-              <Image
-                src="/images/food/food-containers.png"
-                alt="Food containers with various prepared meals"
-                width={1200}
-                height={900}
-                className="h-auto w-full max-w-none object-contain"
-                priority
-                style={{ objectFit: "contain" }}
-              />
-            </motion.div>
-          </div>
+              Get a Quote
+            </motion.button>
+            <ScheduleDialog
+              buttonText="Book a Call"
+              calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+              className="rounded-lg bg-yellow-300 px-8 py-3 font-[Montserrat] text-base font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg md:px-10 md:py-4 md:text-lg"
+            />
+          </motion.div>
         </motion.div>
       </motion.div>
+
       {/* Render the dialog form */}
       {DialogForm}
     </section>
