@@ -63,9 +63,6 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
   }) => {
     // Don't create a new session if we already have a valid one
     if (session && !isSessionExpired()) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Using existing valid session');
-      }
       return;
     }
 
@@ -108,10 +105,6 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
       // uploadToken is stored here for UX only - consider this data public
       // Future: Migrate to httpOnly cookies for real security
       storeEncryptedSession('application_session', newSession);
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Application session created:', newSession.sessionId);
-      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create session';
       setError(errorMessage);
@@ -131,6 +124,13 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
       setIsLoading(false);
     }
   }, [session, isSessionExpired]);
+
+  // Reset session
+  const resetSession = useCallback(() => {
+    setSession(null);
+    setError(null);
+    sessionStorage.removeItem('application_session');
+  }, []);
 
   // Mark session as completed
   const markSessionCompleted = useCallback(async (jobApplicationId: string) => {
@@ -160,7 +160,7 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
       }
 
       if (process.env.NODE_ENV === 'development') {
-        console.log('Session marked as completed');
+        // console.log('Session marked as completed');
       }
 
       // Clear the session after marking it complete
@@ -183,14 +183,8 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
         console.error('Error marking session as completed:', err);
       }
     }
-  }, [session]);
+  }, [session, resetSession]);
 
-  // Reset session
-  const resetSession = useCallback(() => {
-    setSession(null);
-    setError(null);
-    sessionStorage.removeItem('application_session');
-  }, []);
 
   // Restore session from sessionStorage on mount
   useEffect(() => {
@@ -201,13 +195,7 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
         // Check if stored session is expired
         if (new Date(parsedSession.expiresAt) > new Date()) {
           setSession(parsedSession);
-          if (process.env.NODE_ENV === 'development') {
-            console.log('Restored session from storage:', parsedSession.sessionId);
-          }
         } else {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('Stored session is expired, clearing...');
-          }
           sessionStorage.removeItem('application_session');
         }
       }
@@ -225,9 +213,6 @@ export function ApplicationSessionProvider({ children }: ApplicationSessionProvi
 
     const checkExpiration = () => {
       if (isSessionExpired()) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Session expired, clearing...');
-        }
         resetSession();
         toast({
           title: 'Session Expired',

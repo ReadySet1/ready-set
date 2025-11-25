@@ -217,8 +217,45 @@ Update this file if you discover:
 
 ---
 
+---
+
+## Official Pricing Chart Reference
+
+### Mileage Rate: $3.00 Per Mile
+
+**Source:** CaterValley Terms & Pricing Chart (official document)
+
+**Key Pricing Information:**
+
+| Component | Value | Notes |
+|-----------|-------|-------|
+| Mileage Rate | $3.00/mile | Applied after 10 miles |
+| Distance Threshold | 10 miles | Mileage charges start beyond this |
+| Minimum Delivery Fee | $42.50 | Always enforced |
+
+**Tier Structure:**
+
+| Tier | Headcount | Food Cost | Within 10 Miles | Beyond 10 Miles |
+|------|-----------|-----------|-----------------|-----------------|
+| 1 | >25 | >$300 | $42.50 | $85 + $3.00/mile |
+| 2 | 25-49 | $300-$599 | $52.50 | $90 + $3.00/mile |
+| 3 | 50-74 | $600-$899 | $62.50 | $110 + $3.00/mile |
+| 4 | 75-99 | $900-$1,199 | $72.50 | $120 + $3.00/mile |
+| 5 | 100+ | $1,200+ | 10% of food cost | 10% + $3.00/mile |
+
+**Pricing Rule:** Uses "LESSER FEE" - whichever tier (headcount or food cost) results in lower fee.
+
+**Real-World Examples from Pricing Chart:**
+- 14.1 miles, 20 headcount, $278.67 food → $42.50 + $12.30 mileage = $54.80
+- 10.1 miles, 32 headcount, $321.59 food → $52.50 + $0.30 mileage = $52.80
+- 8.3 miles, 19 headcount, $191.89 food → $42.50 + $0.00 mileage = $42.50
+
+**📄 See Also:** `OFFICIAL_PRICING_CHART.md` for complete pricing documentation.
+
+---
+
 ## Last Updated
 
-**Date:** 2025-11-10
-**Updated By:** Claude Code (AI Assistant)
-**Reason:** Production database analysis confirmed schema discrepancy
+**Date:** 2025-11-19
+**Updated By:** Emmanuel Alanis
+**Reason:** Added official pricing chart reference with $3.00/mile mileage rate

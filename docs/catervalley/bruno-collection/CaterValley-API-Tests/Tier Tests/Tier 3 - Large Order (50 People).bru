@@ -1,0 +1,59 @@
+meta {
+  name: Tier 3 - Large Order (50 People)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{BASE_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "TEST-TIER3-001",
+    "deliveryDate": "2025-11-21",
+    "deliveryTime": "12:00",
+    "totalItem": 50,
+    "priceTotal": 700.00,
+    "pickupLocation": {
+      "name": "Large Caterer",
+      "address": "500 N First St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95112"
+    },
+    "dropOffLocation": {
+      "name": "Event Venue",
+      "address": "600 N Second St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95112",
+      "recipient": {
+        "name": "Event Coordinator",
+        "phone": "4085550100"
+      }
+    }
+  }
+}
+
+docs {
+  # Tier 3: Large Orders (50-74 headcount OR $600-899.99 food cost)
+  
+  **Within 10 miles:** $62.50
+  **Over 10 miles:** $110.00 + $1.10/mile
+}
+
+tests {
+  test("Delivery fee is $62.50 (Tier 3)", function() {
+    expect(res.getBody().deliveryPrice).to.equal(62.50);
+  });
+}
+

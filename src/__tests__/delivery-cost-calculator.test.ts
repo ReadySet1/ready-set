@@ -1,6 +1,28 @@
 /**
  * Delivery Cost Calculator Tests
  * Tests all business rules from pricing documents
+ *
+ * Note on Magic Numbers:
+ * This test file intentionally uses hardcoded values (e.g., 18, 23, 33, 43) rather than
+ * importing them from configuration for the following reasons:
+ * 1. Tests should verify specific expected values, not just match current config
+ * 2. Configuration changes should cause test failures if behavior changes unexpectedly
+ * 3. Tests serve as documentation of actual business requirements
+ * 4. Hardcoded values make tests more explicit and easier to understand
+ *
+ * The tier values being tested come from:
+ * - READY_SET_FOOD_STANDARD.driverPaySettings.driverBasePayTiers
+ * - TRY_HUNGRY.driverPaySettings.driverBasePayTiers
+ * - HY_FOOD_COMPANY_DIRECT.driverPaySettings (flat $50 rate)
+ *
+ * ⚠️ Configuration Change Protocol:
+ * If client configurations change (e.g., tier values, rates, thresholds), these tests
+ * MUST be reviewed and updated. Test failures indicate that:
+ * 1. Business logic has changed and tests need to reflect new requirements
+ * 2. Configuration changes may have unintended consequences
+ * 3. Stakeholders should verify the changes align with business goals
+ *
+ * Do not simply update test values to match new config - review the business impact first.
  */
 
 import {
@@ -201,30 +223,29 @@ describe('Delivery Cost Calculator', () => {
 
       const result = calculateDriverPay(input);
 
-      // Expected from Coolfire data fix:
-      // Driver Max Pay Per Drop: $40.00
-      // Driver Base Pay Per Drop: $23.00 (not used in actual calculation)
-      // Driver Total Base Pay: $40.00 (ALWAYS equals max in practice)
+      // Expected with tiered driver base pay (REA-41):
+      // Headcount 28 is in 25-49 tier → Driver Base Pay: $23.00
+      // Mileage: 3.1 miles × $0.70 = $2.17 < $7 minimum → $7.00
+      // Driver Total Base Pay: $23.00 + $7.00 = $30.00
+      // Driver Bonus Pay: $10.00
+      // Total Driver Pay: $30.00 + $10.00 = $40.00
       // Ready Set Fee: $70.00
       // Ready Set Total Fee: $70.00
-      // Driver Bonus Pay: $10.00 (shown separately, NOT added to total)
-      // Total Driver Pay: $40.00 (equals max, bonus separate)
-      // % Bonus Qualified: 100.00%
 
       expect(result.driverMaxPayPerDrop).toBe(40);
-      expect(result.driverBasePayPerDrop).toBe(23);
-      expect(result.driverTotalBasePay).toBe(40); // Equals max in practice
+      expect(result.driverBasePayPerDrop).toBe(23); // Tiered rate for 25-49 headcount
+      expect(result.driverTotalBasePay).toBe(30); // $23 base + $7 mileage
       expect(result.readySetFee).toBe(70);
       expect(result.readySetAddonFee).toBe(0);
       expect(result.readySetTotalFee).toBe(70);
       expect(result.driverBonusPay).toBe(10);
-      expect(result.totalDriverPay).toBe(40); // Equals max, bonus NOT added
+      expect(result.totalDriverPay).toBe(40); // $30 base + $10 bonus
       expect(result.bonusQualifiedPercent).toBe(100);
       expect(result.bonusQualified).toBe(true);
       expect(result.totalMileagePay).toBe(7.0); // 3.1 miles × $0.70 = $2.17 < $7 minimum
     });
 
-    test('driver pay always equals max per drop', () => {
+    test('driver pay with tiered base pay (50-74 headcount)', () => {
       const input: DriverPayInput = {
         headcount: 50,
         foodCost: 800,
@@ -236,11 +257,16 @@ describe('Delivery Cost Calculator', () => {
 
       const result = calculateDriverPay(input);
 
-      // Per Coolfire data: totalDriverPay ALWAYS equals max, bonus shown separately
-      expect(result.totalDriverPay).toBe(40);
+      // With tiered driver base pay (REA-41):
+      // Headcount 50 is in 50-74 tier → Driver Base Pay: $33.00
+      // Mileage: 12 miles × $0.70 = $8.40 (> $7 minimum)
+      // Driver Total Base Pay: $33.00 + $8.40 = $41.40, CAPPED at maxPayPerDrop $40
+      // Driver Bonus Pay: $10.00
+      // Total Driver Pay: $40.00 + $10.00 = $50.00
+      expect(result.driverBasePayPerDrop).toBe(33); // Tiered rate for 50-74 headcount
+      expect(result.driverTotalBasePay).toBe(40); // $33 + $8.40 = $41.40, capped at $40
       expect(result.driverBonusPay).toBe(10);
-      // Bonus is NOT added to total
-      expect(result.totalDriverPay).not.toBe(result.driverTotalBasePay + result.driverBonusPay);
+      expect(result.totalDriverPay).toBe(50); // $40 capped base + $10 bonus
     });
 
     test('no bonus when not qualified', () => {
@@ -258,8 +284,14 @@ describe('Delivery Cost Calculator', () => {
       expect(result.driverBonusPay).toBe(0);
       expect(result.bonusQualifiedPercent).toBe(0);
       expect(result.bonusQualified).toBe(false);
-      // Even without bonus, totalDriverPay equals max per drop
-      expect(result.totalDriverPay).toBe(40);
+      // With tiered driver base pay (REA-41):
+      // Headcount 30 is in 25-49 tier → Driver Base Pay: $23.00
+      // Mileage: 12 miles × $0.70 = $8.40 (> $7 minimum)
+      // Driver Total Base Pay: $23.00 + $8.40 = $31.40
+      // No bonus since not qualified
+      expect(result.driverBasePayPerDrop).toBe(23); // Tiered rate for 25-49 headcount
+      expect(result.driverTotalBasePay).toBeCloseTo(31.4, 1); // $23 base + $8.40 mileage
+      expect(result.totalDriverPay).toBeCloseTo(31.4, 1); // No bonus
     });
   });
 
@@ -551,10 +583,10 @@ describe('Delivery Cost Calculator', () => {
 
       // Over 10 miles uses regularRate of $85
       expect(result.deliveryCost).toBe(85);
-      // Mileage: (15 - 10) × $3 = $15
-      expect(result.totalMileagePay).toBe(15);
-      // Total: $85 + $15 = $100
-      expect(result.deliveryFee).toBe(100);
+      // Mileage: (15 - 10) × $3.00 = $15.00
+      expect(result.totalMileagePay).toBeCloseTo(15.00, 2);
+      // Total: $85 + $15.00 = $100.00
+      expect(result.deliveryFee).toBeCloseTo(100.00, 2);
     });
 
     test('CaterValley: Large order (50-74 headcount) within 10 miles shows $62.50', () => {
@@ -617,7 +649,7 @@ describe('Delivery Cost Calculator', () => {
 
       // Over 10 miles, should use regularRate
       expect(result.deliveryCost).toBe(85); // Regular rate for tier 1
-      expect(result.totalMileagePay).toBeCloseTo(0.30, 2); // (10.1 - 10) × $3 = $0.30
+      expect(result.totalMileagePay).toBeCloseTo(0.30, 2); // (10.1 - 10) × $3.00 = $0.30
       expect(result.deliveryFee).toBeCloseTo(85.30, 2); // $85 + $0.30
     });
 
@@ -718,10 +750,10 @@ describe('Delivery Cost Calculator', () => {
       const result = calculateDeliveryCost(input);
 
       // 10% of $1500 = $150 base
-      // 5 miles over threshold × $3.00 = $15 mileage
+      // 5 miles over threshold × $3.00 = $15.00 mileage
       expect(result.deliveryCost).toBe(150);
-      expect(result.totalMileagePay).toBe(15);
-      expect(result.deliveryFee).toBe(165);
+      expect(result.totalMileagePay).toBeCloseTo(15.00, 2);
+      expect(result.deliveryFee).toBeCloseTo(165.00, 2);
     });
 
     test('CaterValley: Zero-cost validation prevents $0 delivery for non-zero orders', () => {
@@ -765,6 +797,537 @@ describe('Delivery Cost Calculator', () => {
       expect(result.deliveryCost).toBe(62.50);
       expect(result.dailyDriveDiscount).toBe(0); // No discount for single drive
       expect(result.deliveryFee).toBe(62.50);
+    });
+
+    // ============================================================================
+    // BUG FIX VALIDATION: Issue reported by CaterValley client (Nov 2025)
+    // All orders were showing $130 delivery fee regardless of distance
+    // ============================================================================
+
+    test('CaterValley BUG FIX: 1.1 mile order shows $42.50 (not $130)', () => {
+      // SCENARIO: Client reported that a 1.1-mile order was showing $130 delivery fee
+      // EXPECTED: Should be $42.50 (Tier 1, within 10 miles, minimum fee)
+      const input: DeliveryCostInput = {
+        headcount: 1,
+        foodCost: 16.75, // Single item order
+        totalMileage: 1.1, // Very short distance
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // CRITICAL: Must be $42.50, NOT $130
+      expect(result.deliveryCost).toBe(42.50);
+      expect(result.totalMileagePay).toBe(0); // No mileage fee under 10 miles
+      expect(result.deliveryFee).toBe(42.50);
+      
+      // Ensure it's nowhere near $130
+      expect(result.deliveryFee).toBeLessThan(50);
+    });
+
+    test('CaterValley BUG FIX: Mileage rate is $3.00 per mile (official rate)', () => {
+      // SCENARIO: Verify correct mileage rate per official CaterValley pricing chart
+      // EXPECTED: 15-mile order should charge $3.00/mile for 5 extra miles = $15.00
+      const input: DeliveryCostInput = {
+        headcount: 1,
+        foodCost: 16.75,
+        totalMileage: 15, // 5 miles over threshold
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // Over 10 miles, uses regularRate (not within10Miles)
+      expect(result.deliveryCost).toBe(85); // Tier 1 regularRate
+      
+      // Mileage calculation: (15 - 10) × $3.00 = $15.00
+      expect(result.totalMileagePay).toBeCloseTo(15.00, 2);
+      
+      // Total: $85 + $15.00 = $100.00
+      expect(result.deliveryFee).toBeCloseTo(100.00, 2);
+    });
+
+    test('CaterValley BUG FIX: Corrected mileage calculation for 15-mile order', () => {
+      // SCENARIO: Testing correct mileage rate with orders over 10 miles
+      // For Tier 1 over 10 miles: regularRate (85) + mileage
+      const input: DeliveryCostInput = {
+        headcount: 1,
+        foodCost: 16.75,
+        totalMileage: 15, // 5 miles over threshold
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // Over 10 miles, uses regularRate
+      expect(result.deliveryCost).toBe(85); // Tier 1 regularRate
+      
+      // Mileage: (15 - 10) × $3.00 = $15.00
+      expect(result.totalMileagePay).toBeCloseTo(15.00, 2);
+      
+      // Total: $85 + $15.00 = $100.00
+      expect(result.deliveryFee).toBeCloseTo(100.00, 2);
+      
+      // Verify calculation is correct per official pricing chart
+      expect(result.deliveryFee).toBe(100);
+    });
+
+    test('CaterValley BUG FIX: No short-distance orders should ever show $130', () => {
+      // SCENARIO: Verify that NO tier shows $130 for orders under 10 miles
+      // Test all tier boundaries at short distances
+      
+      const testCases = [
+        { headcount: 1, foodCost: 50, tier: 1 },
+        { headcount: 26, foodCost: 350, tier: 2 },
+        { headcount: 50, foodCost: 650, tier: 3 },
+        { headcount: 75, foodCost: 950, tier: 4 },
+      ];
+
+      testCases.forEach(({ headcount, foodCost, tier }) => {
+        const input: DeliveryCostInput = {
+          headcount,
+          foodCost,
+          totalMileage: 5, // Well under 10 miles
+          numberOfDrives: 1,
+          clientConfigId: 'cater-valley'
+        };
+
+        const result = calculateDeliveryCost(input);
+
+        // CRITICAL: No order under 10 miles should be anywhere near $130
+        expect(result.deliveryFee).toBeLessThan(130);
+        expect(result.deliveryFee).toBeGreaterThanOrEqual(42.50); // Minimum fee
+        
+        // Log for debugging
+        if (result.deliveryFee >= 100) {
+          throw new Error(
+            `Tier ${tier} showing $${result.deliveryFee} for ${headcount} people, $${foodCost} food cost at 5 miles. ` +
+            `This should be less than $100 for short distances.`
+          );
+        }
+      });
+    });
+
+    test('CaterValley BUG FIX: Minimum $42.50 fee is always enforced', () => {
+      // SCENARIO: Very low cost/headcount orders should still have $42.50 minimum
+      const input: DeliveryCostInput = {
+        headcount: 1,
+        foodCost: 10, // Very low cost
+        totalMileage: 1,
+        numberOfDrives: 1,
+        clientConfigId: 'cater-valley'
+      };
+
+      const result = calculateDeliveryCost(input);
+
+      // Even for very small orders, minimum is $42.50
+      expect(result.deliveryFee).toBeGreaterThanOrEqual(42.50);
+      expect(result.deliveryFee).toBe(42.50); // Should be exactly minimum
+    });
+
+    describe('Try Hungry Configuration', () => {
+      test('uses custom $2.50 mileage rate for deliveries over 10 miles', () => {
+        const input: DeliveryCostInput = {
+          headcount: 50,
+          foodCost: 600,
+          totalMileage: 15, // 15 miles - 10 = 5 extra miles
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDeliveryCost(input);
+
+        // Mileage calculation: (15 - 10) × $2.50 = $12.50
+        expect(result.totalMileagePay).toBe(12.50);
+        expect(result.deliveryCost).toBe(60); // 50-74 headcount tier
+        expect(result.deliveryFee).toBe(72.50); // $60 + $12.50
+      });
+
+      test('uses correct driver base pay for 0-24 headcount tier', () => {
+        const input: DriverPayInput = {
+          headcount: 20,
+          foodCost: 200,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(18); // Tier 0-24
+        expect(result.driverTotalBasePay).toBe(25); // $18 + $7 mileage minimum
+        expect(result.totalDriverPay).toBe(25); // No bonus
+      });
+
+      test('uses correct driver base pay for 25-49 headcount tier', () => {
+        const input: DriverPayInput = {
+          headcount: 30,
+          foodCost: 400,
+          totalMileage: 5,
+          bonusQualified: true,
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(23); // Tier 25-49
+        expect(result.driverTotalBasePay).toBe(30); // $23 + $7 mileage minimum
+        expect(result.totalDriverPay).toBe(40); // $30 + $10 bonus (capped at maxPayPerDrop)
+      });
+
+      test('uses correct driver base pay for 50-74 headcount tier', () => {
+        const input: DriverPayInput = {
+          headcount: 60,
+          foodCost: 700,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(33); // Tier 50-74
+        expect(result.driverTotalBasePay).toBe(40); // $33 + $7 = $40 (capped at maxPayPerDrop)
+        expect(result.totalDriverPay).toBe(40); // Capped, no bonus
+      });
+
+      test('uses correct driver base pay for 75-99 headcount tier', () => {
+        const input: DriverPayInput = {
+          headcount: 85,
+          foodCost: 1000,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(43); // Tier 75-99
+        // $43 + $7 = $50, but capped at $40
+        expect(result.driverTotalBasePay).toBe(40); // Capped at maxPayPerDrop
+        expect(result.totalDriverPay).toBe(40);
+      });
+
+      test('tier boundary: 24 headcount uses 0-24 tier', () => {
+        const input: DriverPayInput = {
+          headcount: 24,
+          foodCost: 250,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(18); // Tier 0-24
+      });
+
+      test('tier boundary: 25 headcount uses 25-49 tier', () => {
+        const input: DriverPayInput = {
+          headcount: 25,
+          foodCost: 300,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(23); // Tier 25-49
+      });
+
+      test('tier boundary: 49 headcount uses 25-49 tier', () => {
+        const input: DriverPayInput = {
+          headcount: 49,
+          foodCost: 550,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(23); // Tier 25-49
+      });
+
+      test('tier boundary: 50 headcount uses 50-74 tier', () => {
+        const input: DriverPayInput = {
+          headcount: 50,
+          foodCost: 600,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(33); // Tier 50-74
+      });
+
+      test('tier boundary: 74 headcount uses 50-74 tier', () => {
+        const input: DriverPayInput = {
+          headcount: 74,
+          foodCost: 850,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(33); // Tier 50-74
+      });
+
+      test('tier boundary: 75 headcount uses 75-99 tier', () => {
+        const input: DriverPayInput = {
+          headcount: 75,
+          foodCost: 900,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(43); // Tier 75-99
+      });
+
+      test('tier boundary: 99 headcount uses 75-99 tier', () => {
+        const input: DriverPayInput = {
+          headcount: 99,
+          foodCost: 1150,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(43); // Tier 75-99
+      });
+
+      test('throws error for 100+ headcount requiring manual review', () => {
+        const input: DriverPayInput = {
+          headcount: 100,
+          foodCost: 1200,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        // Error message is sanitized to not expose business logic thresholds
+        expect(() => calculateDriverPay(input)).toThrow('This order requires manual review');
+        expect(() => calculateDriverPay(input)).toThrow('contact support for a custom quote');
+      });
+
+      test('throws error for 150 headcount requiring manual review', () => {
+        const input: DriverPayInput = {
+          headcount: 150,
+          foodCost: 1800,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        // Error message is sanitized to not expose business logic thresholds or client names
+        expect(() => calculateDriverPay(input)).toThrow('This order requires manual review');
+        expect(() => calculateDriverPay(input)).toThrow('contact support for a custom quote');
+      });
+
+      test('handles edge case: zero headcount', () => {
+        const input: DriverPayInput = {
+          headcount: 0,
+          foodCost: 100,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        const result = calculateDriverPay(input);
+
+        // Should use 0-24 tier
+        expect(result.driverBasePayPerDrop).toBe(18);
+        expect(result.driverTotalBasePay).toBe(25); // $18 + $7 minimum
+      });
+
+      test('concurrent conditions: 100 headcount with multiple edge cases', () => {
+        // Test interaction between manual review and other business rules
+        const input: DriverPayInput = {
+          headcount: 100, // Triggers manual review
+          foodCost: 1200,
+          totalMileage: 0, // Edge case: no mileage
+          bonusQualified: true, // Edge case: bonus should not be calculated
+          requiresBridge: true, // Edge case: bridge toll should not be calculated
+          clientConfigId: 'try-hungry'
+        };
+
+        // Manual review should throw before any other calculations
+        expect(() => calculateDriverPay(input)).toThrow('This order requires manual review');
+        expect(() => calculateDriverPay(input)).toThrow('contact support for a custom quote');
+      });
+
+      test('validates negative values are rejected', () => {
+        const input: DriverPayInput = {
+          headcount: -10, // Negative headcount
+          foodCost: 200,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        expect(() => calculateDriverPay(input)).toThrow('Headcount cannot be negative');
+      });
+
+      test('validates negative mileage is rejected', () => {
+        const input: DriverPayInput = {
+          headcount: 30,
+          foodCost: 400,
+          totalMileage: -5, // Negative mileage
+          bonusQualified: false,
+          clientConfigId: 'try-hungry'
+        };
+
+        expect(() => calculateDriverPay(input)).toThrow('Total mileage cannot be negative');
+      });
+    });
+
+    describe('HY Food Company Configuration', () => {
+      test('uses flat $50 driver base pay regardless of headcount (10 people)', () => {
+        const input: DriverPayInput = {
+          headcount: 10,
+          foodCost: 150,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'hy-food-company-direct'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(50); // Flat $50
+        // $50 + $7 = $57, but capped at $50 maxPayPerDrop
+        expect(result.driverTotalBasePay).toBe(50); // Capped at maxPayPerDrop
+        expect(result.totalDriverPay).toBe(50);
+      });
+
+      test('uses flat $50 driver base pay regardless of headcount (50 people)', () => {
+        const input: DriverPayInput = {
+          headcount: 50,
+          foodCost: 600,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'hy-food-company-direct'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(50); // Flat $50
+        expect(result.driverTotalBasePay).toBe(50); // Capped at maxPayPerDrop
+        expect(result.totalDriverPay).toBe(50);
+      });
+
+      test('uses flat $50 driver base pay regardless of headcount (100 people)', () => {
+        const input: DriverPayInput = {
+          headcount: 100,
+          foodCost: 1200,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'hy-food-company-direct'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(50); // Flat $50
+        expect(result.driverTotalBasePay).toBe(50); // Capped at maxPayPerDrop
+        expect(result.totalDriverPay).toBe(50);
+      });
+
+      test('maxPayPerDrop cap is enforced with mileage (12 miles scenario)', () => {
+        const input: DriverPayInput = {
+          headcount: 30,
+          foodCost: 400,
+          totalMileage: 12, // 12 miles × $0.70 = $8.40
+          bonusQualified: false,
+          clientConfigId: 'hy-food-company-direct'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(50); // Flat $50
+        expect(result.totalMileagePay).toBeCloseTo(8.40, 2); // 12 × $0.70
+        // $50 + $8.40 = $58.40, but should be capped at $50
+        expect(result.driverTotalBasePay).toBe(50); // Capped at maxPayPerDrop
+        expect(result.totalDriverPay).toBe(50);
+      });
+
+      test('maxPayPerDrop cap is enforced with mileage and bonus', () => {
+        const input: DriverPayInput = {
+          headcount: 30,
+          foodCost: 400,
+          totalMileage: 12,
+          bonusQualified: true,
+          clientConfigId: 'hy-food-company-direct'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(50);
+        expect(result.totalMileagePay).toBeCloseTo(8.40, 2);
+        expect(result.driverBonusPay).toBe(10);
+        // Base + mileage = $50 (capped), then add bonus
+        expect(result.driverTotalBasePay).toBe(50); // Capped
+        expect(result.totalDriverPay).toBe(60); // $50 capped base + $10 bonus
+      });
+
+      test('maxPayPerDrop cap with bridge toll', () => {
+        const input: DriverPayInput = {
+          headcount: 30,
+          foodCost: 400,
+          totalMileage: 12,
+          bonusQualified: false,
+          requiresBridge: true,
+          clientConfigId: 'hy-food-company-direct'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverTotalBasePay).toBe(50); // Capped
+        expect(result.bridgeToll).toBe(8.00);
+        // Capped base + bridge toll
+        expect(result.totalDriverPay).toBe(58); // $50 + $8 bridge toll
+      });
+
+      test('handles edge case: zero headcount with flat rate', () => {
+        const input: DriverPayInput = {
+          headcount: 0,
+          foodCost: 100,
+          totalMileage: 5,
+          bonusQualified: false,
+          clientConfigId: 'hy-food-company-direct'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.driverBasePayPerDrop).toBe(50); // Flat $50 for any headcount
+        expect(result.driverTotalBasePay).toBe(50); // Capped
+      });
+
+      test('standard mileage pay ($7 minimum) is used for HY Food Company', () => {
+        const input: DriverPayInput = {
+          headcount: 30,
+          foodCost: 400,
+          totalMileage: 3, // 3 miles × $0.70 = $2.10 < $7 minimum
+          bonusQualified: false,
+          clientConfigId: 'hy-food-company-direct'
+        };
+
+        const result = calculateDriverPay(input);
+
+        expect(result.totalMileagePay).toBe(7.0); // $7 minimum
+        // $50 + $7 = $57, capped at $50
+        expect(result.driverTotalBasePay).toBe(50); // Capped at maxPayPerDrop
+      });
     });
   });
 });

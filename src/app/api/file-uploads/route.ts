@@ -1,7 +1,7 @@
 // src/app/api/file-uploads/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { createClient, createAdminClient } from "@/utils/supabase/server";
 import { STORAGE_BUCKETS, initializeStorageBuckets, diagnoseStorageIssues } from "@/utils/file-service";
 import { DEFAULT_SIGNED_URL_EXPIRATION } from "@/config/file-config";
 import { prisma } from "@/utils/prismaDB";
@@ -14,9 +14,11 @@ import {
   DEFAULT_VALIDATION_CONFIG
 } from "@/lib/upload-error-handler";
 import { UploadSecurityManager } from "@/lib/upload-security";
-import { UploadErrorType } from "@/types/upload";
+import { UploadErrorType, ErrorResponse } from "@/types/upload";
 import type { Database } from '@/types/supabase';
 import { logApiError, logDatabaseError, logAuthError } from '@/lib/error-logging';
+import { buildErrorResponse } from '@/lib/error-response-builder';
+import { RETRY_CONFIG } from '@/config/upload-config';
 
 // Type definitions for application_sessions
 type ApplicationSession = Database['public']['Tables']['application_sessions']['Row'];
@@ -135,8 +137,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Validate session
-      const supabase = await createClient();
-      const { data: session, error: sessionError } = await supabase
+      // Use admin client to look up session by token (bypassing RLS since the token IS the credential)
+      const sessionValidator = await createAdminClient();
+      const { data: session, error: sessionError } = await sessionValidator
         .from('application_sessions')
         .select('id, session_token, session_expires_at, upload_count, max_uploads, completed')
         .eq('session_token', sessionToken)
@@ -311,8 +314,80 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the Supabase client for storage
+    // ===== CRITICAL: AUTHENTICATION VALIDATION =====
+    // SECURITY: We must verify user authentication BEFORE creating admin client.
+    // The admin client bypasses ALL RLS policies, so we need to ensure the request
+    // comes from either:
+    // 1. An authenticated user (for logged-in uploads), OR
+    // 2. A valid session token (for job application uploads)
+    //
+    // Why we use admin client for storage:
+    // - Storage RLS policies are too restrictive for upload operations
+    // - We need to create files in user-specific paths before the user record exists
+    // - Session-based uploads (job applications) don't have a user ID yet
+    //
+    // This is safe because:
+    // - We validate session tokens above for job applications
+    // - We validate user authentication below for other entity types
+    // - Admin client is ONLY used for storage.upload() and storage.createSignedUrl()
+    // - Database operations still use regular client with RLS
     const supabase = await createClient();
+
+    // For non-job-application uploads, verify user is authenticated
+    if (entityType !== "job_application" && !category.startsWith("job-applications")) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        logAuthError(
+          authError || new Error('Unauthorized upload attempt'),
+          'file-uploads-post',
+          undefined,
+          request
+        );
+        return NextResponse.json(
+          buildErrorResponse(
+            'Authentication required',
+            'AUTH_REQUIRED',
+            {
+              retryable: false,
+              diagnostics: {
+                operation: 'user_authentication',
+                entityType,
+                category
+              }
+            }
+          ),
+          { status: 401 }
+        );
+      }
+    }
+    // Note: Job application uploads are already validated via session token above (line 126-197)
+
+    // Now that authentication is verified, safely create admin client
+    // This client bypasses RLS ONLY for storage operations (upload, createSignedUrl)
+    let adminSupabase;
+    try {
+      adminSupabase = await createAdminClient();
+    } catch (error) {
+      console.error('Failed to create admin Supabase client:', error);
+      return NextResponse.json(
+        buildErrorResponse(
+          'Internal server configuration error',
+          'CONFIGURATION_ERROR',
+          {
+            retryable: false,
+            details: {
+              originalError: getErrorMessage(error)
+            },
+            diagnostics: {
+              operation: 'admin_client_creation',
+              critical: true
+            }
+          }
+        ),
+        { status: 500 }
+      );
+    }
 
     // Handle entity IDs in a consistent way
     // Don't add temp- prefix to IDs that already have temp_ prefix (job applications)
@@ -408,9 +483,9 @@ export async function POST(request: NextRequest) {
     // Simplified bucket verification - removed diagnostic call to reduce log noise
     let bucketVerified = false;
 
-    // Try to verify the bucket exists and is accessible
+    // Try to verify the bucket exists and is accessible using admin client
     try {
-      const { data, error: listError } = await supabase.storage
+      const { data, error: listError } = await adminSupabase.storage
         .from(storageBucket)
         .list();
 
@@ -420,7 +495,7 @@ export async function POST(request: NextRequest) {
         // If verification fails, try fallback to DEFAULT bucket
         if (storageBucket !== STORAGE_BUCKETS.DEFAULT) {
           storageBucket = STORAGE_BUCKETS.DEFAULT;
-          const { error: defaultError } = await supabase.storage.from(storageBucket).list();
+          const { error: defaultError } = await adminSupabase.storage.from(storageBucket).list();
           if (!defaultError) {
             bucketVerified = true;
           }
@@ -431,7 +506,7 @@ export async function POST(request: NextRequest) {
       if (storageBucket !== STORAGE_BUCKETS.DEFAULT) {
         storageBucket = STORAGE_BUCKETS.DEFAULT;
         try {
-          const { error: fallbackError } = await supabase.storage.from(storageBucket).list();
+          const { error: fallbackError } = await adminSupabase.storage.from(storageBucket).list();
           if (!fallbackError) {
             bucketVerified = true;
           }
@@ -445,10 +520,11 @@ export async function POST(request: NextRequest) {
     let storageData: any, storageError: { message?: string } | null = null;
 
     // Multiple upload strategies in case Supabase storage fails
+    // Using admin client to bypass RLS (user is already authenticated)
     const uploadStrategies = [
       // Strategy 1: Try Supabase storage with current bucket
       async () => {
-                const result = await supabase.storage
+                const result = await adminSupabase.storage
           .from(storageBucket)
           .upload(filePath, file, {
             upsert: true,
@@ -465,7 +541,7 @@ export async function POST(request: NextRequest) {
       // Strategy 2: Try with default bucket if current bucket fails
       async () => {
         if (storageBucket !== STORAGE_BUCKETS.DEFAULT) {
-                    const result = await supabase.storage
+                    const result = await adminSupabase.storage
             .from(STORAGE_BUCKETS.DEFAULT)
             .upload(filePath, file, {
               upsert: true,
@@ -523,7 +599,34 @@ export async function POST(request: NextRequest) {
     }
 
     if (storageError) {
-      logApiError(storageError, '/api/file-uploads', 'POST', { operation: 'storageUpload', allStrategiesFailed: true }, request);
+      // ENHANCED LOGGING: Log detailed storage error in development only
+      if (process.env.NODE_ENV === 'development') {
+        console.error('=== STORAGE UPLOAD ERROR ===');
+        console.error('Storage Error Message:', storageError.message);
+        console.error('Last Error:', lastError);
+        console.error('File Details:', {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          path: filePath,
+          bucket: storageBucket
+        });
+        console.error('Storage Error Object:', JSON.stringify(storageError, null, 2));
+        console.error('===========================');
+      } else {
+        // Production: Log only error type, excluding file names, paths, sizes, and stack traces
+        console.error('Storage upload error:', {
+          errorType: 'STORAGE_ERROR',
+          hasError: !!storageError
+        });
+      }
+
+      logApiError(storageError, '/api/file-uploads', 'POST', {
+        operation: 'storageUpload',
+        allStrategiesFailed: true,
+        errorMessage: storageError.message,
+        lastError: lastError ? getErrorMessage(lastError) : undefined
+      }, request);
 
       // Use enhanced error categorization
       const uploadError = UploadErrorHandler.categorizeError(storageError, file);
@@ -534,40 +637,67 @@ export async function POST(request: NextRequest) {
         filePath,
         bucket: storageBucket,
         entityId,
-        entityType
+        entityType,
+        originalStorageError: storageError.message
       });
       await UploadErrorHandler.reportError(uploadError);
 
+      // Build response with conditional details using typed interface
       return NextResponse.json(
-        {
-          error: uploadError.userMessage,
-          errorType: uploadError.type,
-          correlationId: uploadError.correlationId,
-          retryable: uploadError.retryable,
-          retryAfter: uploadError.retryAfter,
-          details: {
-            bucket: storageBucket,
-            filePath,
-            fileName: file.name,
-            fileSize: file.size
+        buildErrorResponse(
+          uploadError.userMessage,
+          uploadError.type,
+          {
+            correlationId: uploadError.correlationId || uuidv4(),
+            retryable: uploadError.retryable,
+            retryAfter: uploadError.retryAfter,
+            details: {
+              bucket: storageBucket,
+              filePath,
+              fileName: file.name,
+              fileSize: file.size
+            },
+            diagnostics: {
+              operation: 'storage_upload',
+              originalError: storageError.message,
+              bucket: storageBucket,
+              filePath,
+              fileType: file.type
+            }
           }
-        },
+        ),
         { status: uploadError.type === UploadErrorType.PERMISSION_ERROR ? 403 : 500 },
       );
     }
 
-    // Generate signed URL for private bucket
+    // Generate signed URL for private bucket using admin client
     // Generate signed URL - fail upload if this fails (security requirement)
     const {
       data: signedData,
       error: signedError
-    } = await supabase.storage
+    } = await adminSupabase.storage
       .from(storageBucket)
       .createSignedUrl(filePath, DEFAULT_SIGNED_URL_EXPIRATION);
 
     if (signedError || !signedData) {
+      // ENHANCED LOGGING: Log detailed signed URL error in development only
+      if (process.env.NODE_ENV === 'development') {
+        console.error('=== SIGNED URL GENERATION ERROR ===');
+        console.error('Error:', signedError);
+        console.error('File Path:', filePath);
+        console.error('Bucket:', storageBucket);
+        console.error('File Name:', file.name);
+        console.error('===================================');
+      } else {
+        // Production: Log only error type, excluding file paths, bucket names, and error details
+        console.error('Signed URL generation error:', {
+          errorType: 'SIGNED_URL_ERROR',
+          hasError: !!signedError
+        });
+      }
+
       // Clean up uploaded file since we can't generate a secure signed URL
-      await supabase.storage.from(storageBucket).remove([filePath]);
+      await adminSupabase.storage.from(storageBucket).remove([filePath]);
 
       logApiError(
         signedError || new Error('No signed URL data returned'),
@@ -577,16 +707,29 @@ export async function POST(request: NextRequest) {
           operation: 'createSignedUrl',
           filePath,
           bucket: storageBucket,
-          action: 'upload_failed_and_cleaned_up'
+          action: 'upload_failed_and_cleaned_up',
+          errorDetails: signedError?.message
         },
         request
       );
 
+      const correlationId = uuidv4();
+
+      // Build response with conditional diagnostics using typed interface
       return NextResponse.json(
-        {
-          error: 'Failed to generate secure file URL. Please try again or contact support if the problem persists.',
-          code: 'SIGNED_URL_GENERATION_FAILED'
-        },
+        buildErrorResponse(
+          'Failed to generate secure file URL. Please try again or contact support if the problem persists.',
+          'SIGNED_URL_GENERATION_FAILED',
+          {
+            correlationId,
+            diagnostics: {
+              operation: 'signed_url_generation',
+              bucket: storageBucket,
+              filePath,
+              originalError: signedError?.message || 'No signed URL data returned'
+            }
+          }
+        ),
         { status: 500 }
       );
     }
@@ -615,7 +758,7 @@ export async function POST(request: NextRequest) {
     // CRITICAL: Validate that file_path is always set for new uploads (security requirement)
     if (!dbData.filePath || dbData.filePath.trim() === '') {
       // This should never happen, but fail loudly if it does
-      await supabase.storage.from(storageBucket).remove([filePath]);
+      await adminSupabase.storage.from(storageBucket).remove([filePath]);
 
       logApiError(
         new Error('File path is missing or empty'),
@@ -819,8 +962,8 @@ export async function POST(request: NextRequest) {
         // CRITICAL: This RPC function MUST exist in the database before deployment
         // Migration required: see docs/security/deployment-guide.md
         // SECURITY: Pass session token to validate ownership and prevent session hijacking
-        // @ts-ignore - RPC function not yet in generated types
-        const { error: sessionUpdateError } = await supabase.rpc('increment_session_upload', {
+        // Casting supabase to any to bypass strict RPC name checking until types are regenerated
+        const { error: sessionUpdateError } = await (supabase as any).rpc('increment_session_upload', {
           p_session_id: validatedSession.id,
           p_file_path: filePath,
           p_session_token: validatedSession.session_token
@@ -880,28 +1023,70 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    logApiError(error, '/api/file-uploads', 'POST', { operation: 'fileUpload', fileName: file?.name }, request);
-
     // Use enhanced error categorization for general errors
     const uploadError = UploadErrorHandler.categorizeError(error, file);
+
+    // ENHANCED LOGGING: Log detailed error information in development only
+    if (process.env.NODE_ENV === 'development') {
+      console.error('=== FILE UPLOAD ERROR DETAILS ===');
+      console.error('Error Type:', error?.constructor?.name || typeof error);
+      console.error('Error Message:', error?.message || String(error));
+      console.error('Error Stack:', error?.stack);
+      console.error('File Details:', {
+        name: file?.name,
+        type: file?.type,
+        size: file?.size,
+        entityId,
+        entityType,
+        category
+      });
+      console.error('Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.error('================================');
+    } else {
+      // Production: Log only error type and correlation ID, excluding file details, paths, and stack traces
+      console.error('File upload error:', {
+        errorType: error?.constructor?.name,
+        correlationId: uploadError.correlationId
+      });
+    }
+
+    logApiError(error, '/api/file-uploads', 'POST', {
+      operation: 'fileUpload',
+      fileName: file?.name,
+      errorType: error?.constructor?.name,
+      errorCode: error?.code,
+      errorDetails: error?.message
+    }, request);
 
     // Log and report the error
     UploadErrorHandler.logError(uploadError, {
       fileName: file?.name,
       entityId,
       entityType,
-      category
+      category,
+      originalError: error?.message,
+      originalStack: error?.stack
     });
     await UploadErrorHandler.reportError(uploadError);
 
+    // Build response with conditional diagnostics using typed interface
     return NextResponse.json(
-      {
-        error: uploadError.userMessage,
-        errorType: uploadError.type,
-        correlationId: uploadError.correlationId,
-        retryable: uploadError.retryable,
-        retryAfter: uploadError.retryAfter
-      },
+      buildErrorResponse(
+        uploadError.userMessage,
+        uploadError.type,
+        {
+          correlationId: uploadError.correlationId || uuidv4(),
+          retryable: uploadError.retryable,
+          retryAfter: uploadError.retryAfter,
+          diagnostics: {
+            originalError: error?.message,
+            errorCode: error?.code,
+            fileName: file?.name,
+            fileType: file?.type,
+            fileSize: file?.size
+          }
+        }
+      ),
       { status: 500 }
     );
   }
@@ -1009,13 +1194,13 @@ export async function DELETE(request: NextRequest) {
       filePath = fileRecord.fileUrl.split('/').pop() || '';
     }
 
-    // Get Supabase client
-    const supabase = await createClient();
+    // Get Supabase admin client for storage deletion
+    const adminSupabase = await createAdminClient();
 
     // Delete from Supabase storage
     if (filePath) {
-            
-      const { error: storageError } = await supabase.storage
+
+      const { error: storageError } = await adminSupabase.storage
         .from(bucketName)
         .remove([filePath]);
 

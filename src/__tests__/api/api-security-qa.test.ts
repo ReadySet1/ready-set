@@ -16,7 +16,8 @@ import {
 import { UploadSecurityManager } from '@/lib/upload-security';
 import { InputSanitizer } from '@/lib/validation';
 
-// Note: Rate limiting uses in-memory storage for tests (Redis optional in production)
+// Note: Rate limiting uses in-memory storage (InMemoryRateLimitStorage)
+// No external dependencies like Redis are required for testing
 
 /**
  * Helper to create NextRequest with proper nextUrl.pathname

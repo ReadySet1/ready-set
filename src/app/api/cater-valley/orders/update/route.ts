@@ -120,6 +120,17 @@ function extractZipFromAddress(address: string): string {
   return zipMatch ? zipMatch[0] : '';
 }
 
+/**
+ * Ensures order number has CV- prefix, avoiding duplicate prefixes
+ * @param orderCode - The order code from CaterValley (may or may not include CV- prefix)
+ * @returns Order number with single CV- prefix
+ */
+function normalizeOrderNumber(orderCode: string): string {
+  // If orderCode already starts with CV-, use it as-is
+  // Otherwise, add the CV- prefix
+  return orderCode.startsWith('CV-') ? orderCode : `CV-${orderCode}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 1. Authentication
@@ -215,10 +226,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Check for duplicate order codes (excluding current order)
-    if (validatedData.orderCode !== existingOrder.orderNumber.replace('CV-', '')) {
+    const normalizedOrderNumber = normalizeOrderNumber(validatedData.orderCode);
+    if (normalizedOrderNumber !== existingOrder.orderNumber) {
       const duplicateOrder = await prisma.cateringRequest.findFirst({
         where: { 
-          orderNumber: `CV-${validatedData.orderCode}`,
+          orderNumber: normalizedOrderNumber,
           id: { not: validatedData.id },
         },
       });
@@ -278,7 +290,7 @@ export async function POST(request: NextRequest) {
     const updatedOrder = await prisma.cateringRequest.update({
       where: { id: validatedData.id },
       data: {
-        orderNumber: `CV-${validatedData.orderCode}`,
+        orderNumber: normalizedOrderNumber,
         pickupAddressId: pickupAddressRecord.id,
         deliveryAddressId: deliveryAddressRecord.id,
         headcount: validatedData.totalItem,
@@ -290,6 +302,9 @@ export async function POST(request: NextRequest) {
         specialNotes: usedFallbackDistance
           ? `${validatedData.dropOffLocation.instructions || ''}\n[FALLBACK DISTANCE: ${distance}mi - Manual review needed]`.trim()
           : validatedData.dropOffLocation.instructions || '',
+        // Update delivery cost and distance for transparency
+        deliveryCost: pricingResult.deliveryFee,
+        deliveryDistance: distance,
         updatedAt: new Date(),
       },
       include: {
@@ -310,7 +325,7 @@ export async function POST(request: NextRequest) {
         basePrice: pricingResult.deliveryCost,
         mileageFee: pricingResult.totalMileagePay,
         dailyDriveDiscount: pricingResult.dailyDriveDiscount,
-        bridgeToll: pricingResult.bridgeToll,
+        // Note: Bridge toll ($8) is NOT included - it's driver compensation paid by Ready Set
       },
     };
 

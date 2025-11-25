@@ -1,0 +1,72 @@
+meta {
+  name: 2. Minimum Fee Enforcement
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{BASE_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "TEST-MIN-FEE-001",
+    "deliveryDate": "2025-11-21",
+    "deliveryTime": "11:00",
+    "totalItem": 1,
+    "priceTotal": 10.00,
+    "pickupLocation": {
+      "name": "Test Restaurant",
+      "address": "150 S First St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95113",
+      "phone": "(408) 555-0100"
+    },
+    "dropOffLocation": {
+      "name": "Test Office",
+      "address": "201 S Market St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95113",
+      "recipient": {
+        "name": "Test User",
+        "phone": "4085550100"
+      }
+    }
+  }
+}
+
+docs {
+  # Minimum Fee Enforcement
+  
+  **Purpose:** Verify $42.50 minimum fee is enforced
+  
+  **Scenario:** Very low-cost order ($10)
+  
+  Even with extremely low food costs, the minimum delivery fee of $42.50 must be enforced per the CaterValley contract.
+}
+
+tests {
+  test("Status is SUCCESS", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().status).to.equal("SUCCESS");
+  });
+  
+  test("Minimum fee of $42.50 is enforced", function() {
+    expect(res.getBody().deliveryPrice).to.equal(42.50);
+  });
+  
+  test("Total includes minimum fee", function() {
+    expect(res.getBody().totalPrice).to.equal(52.50);
+  });
+}
+

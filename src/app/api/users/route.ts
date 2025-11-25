@@ -179,7 +179,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const rawTypeFilter = searchParams.get("type") ?? "all";
     typeFilter = ApiTypeUtils.normalizeUserType(rawTypeFilter); // Use shared utility
     sortField = searchParams.get("sort") || "createdAt";
-    sortOrder = searchParams.get("sortOrder") || "desc";
+    sortOrder = searchParams.get("sortOrder") || searchParams.get("direction") || "desc";
 
     
     // --- Build WHERE Clause ---

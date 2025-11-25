@@ -107,8 +107,9 @@ All requests must include these headers:
   deliveryFee?: number;           // Calculated delivery fee (minimum $42.50)
   deliveryCost?: number;          // Base delivery cost before adjustments
   totalMileagePay?: number;       // Additional mileage charges
-  bridgeToll?: number;            // Bridge toll if applicable
   totalFee?: number;              // Total: deliveryFee + priceTotal
+
+  // Note: Bridge toll ($8) is NOT charged to CaterValley - it's driver compensation paid by Ready Set
 
   // Metadata
   distance?: number;              // Distance in miles
@@ -158,7 +159,6 @@ All requests must include these headers:
   "deliveryFee": 62.50,
   "deliveryCost": 62.50,
   "totalMileagePay": 0,
-  "bridgeToll": 0,
   "totalFee": 1562.50,
   "distance": 8.2,
   "numberOfBridges": 0,
@@ -295,17 +295,17 @@ Pricing is determined by the **LESSER** of headcount tier or food cost tier:
 
 | Tier | Headcount Range | Food Cost Range | Within 10 Miles | Beyond 10 Miles |
 |------|----------------|-----------------|-----------------|-----------------|
-| 1 | 0-25 | $0-$300 | $42.50 | $85 + $1.10/mile |
-| 2 | 26-49 | $300.01-$599.99 | $52.50 | $90 + $1.10/mile |
-| 3 | 50-74 | $600-$899.99 | $62.50 | $110 + $1.10/mile |
-| 4 | 75-99 | $900-$1,199.99 | $72.50 | $120 + $1.10/mile |
-| 5 | 100+ | $1,200+ | 10% of food cost | 10% of food cost + $1.10/mile |
+| 1 | 0-25 | $0-$300 | $42.50 | $85 + $3.00/mile |
+| 2 | 26-49 | $300.01-$599.99 | $52.50 | $90 + $3.00/mile |
+| 3 | 50-74 | $600-$899.99 | $62.50 | $110 + $3.00/mile |
+| 4 | 75-99 | $900-$1,199.99 | $72.50 | $120 + $3.00/mile |
+| 5 | 100+ | $1,200+ | 10% of food cost | 10% of food cost + $3.00/mile |
 
 ### Additional Charges
 
-**Bridge Toll:** $7.00 (auto-detected for routes crossing San Francisco Bay)
+**Mileage:** $3.00 per mile beyond the tier's distance threshold (10 miles) - per official CaterValley Terms & Pricing Chart
 
-**Mileage:** $1.10 per mile beyond the tier's distance threshold (usually 10 miles)
+**Note on Bridge Tolls:** Bridge crossings (e.g., San Francisco Bay) are auto-detected for internal tracking. The $8.00 bridge toll is driver compensation paid by Ready Set and is **NOT charged** to CaterValley customers.
 
 ### Pricing Examples
 
@@ -331,14 +331,14 @@ Pricing is determined by the **LESSER** of headcount tier or food cost tier:
 - Headcount: 30 (Tier 2)
 - Food Cost: $400 (Tier 2)
 - Distance: 15 miles
-- Base: $90 + (5 miles × $1.10) = $90 + $5.50 = **$95.50**
+- Base: $90 + (5 miles × $3.00) = $90 + $15.00 = **$105.00**
 
-**Example 5: Bridge crossing**
+**Example 5: Bridge crossing** (SF → Oakland)
 - Headcount: 20 (Tier 1)
 - Food Cost: $200 (Tier 1)
 - Distance: 9 miles
-- Route: San Francisco → East Bay
-- Base: $42.50 + Bridge Toll: $7.00 = **$49.50**
+- **Delivery Fee:** $42.50 (Tier 1 within 10 miles)
+- Note: Bridge toll ($8) detected but NOT charged to CaterValley
 
 ---
 

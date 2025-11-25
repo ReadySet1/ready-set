@@ -1,0 +1,88 @@
+meta {
+  name: 3. Distance Calculation Verification (6.7 Miles)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{BASE_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "TEST-MILEAGE-RATE-001",
+    "deliveryDate": "2025-11-21",
+    "deliveryTime": "12:00",
+    "totalItem": 1,
+    "priceTotal": 20.00,
+    "pickupLocation": {
+      "name": "Restaurant Downtown",
+      "address": "100 W Santa Clara St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95113"
+    },
+    "dropOffLocation": {
+      "name": "Office Park",
+      "address": "3000 Cisco Way",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95134",
+      "recipient": {
+        "name": "Test User",
+        "phone": "4085550100"
+      }
+    }
+  }
+}
+
+docs {
+  # Mileage Rate Verification (Within 10 Miles)
+  
+  **Purpose:** Verify correct pricing for medium-distance delivery
+  
+  **Expected:** $42.50 (within 10 miles)
+  
+  ## Calculation
+  - Distance: ~6.7 miles (actual Google Maps distance)
+  - Within 10-mile threshold: YES
+  - Tier 1 pricing: $42.50 (within10Miles rate)
+  - Mileage fee: $0 (no extra mileage under 10 miles)
+  - **Total: $42.50** ✅
+  
+  ## Note
+  The actual driving distance between these addresses is 6.7 miles according to Google Maps,
+  which is within the 10-mile threshold, so the within10Miles rate applies.
+}
+
+tests {
+  test("Status is SUCCESS", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().status).to.equal("SUCCESS");
+  });
+  
+  test("Delivery price is $42.50 (within 10 miles)", function() {
+    expect(res.getBody().deliveryPrice).to.equal(42.50);
+  });
+  
+  test("Mileage fee is $0 (no extra mileage)", function() {
+    expect(res.getBody().breakdown.mileageFee).to.equal(0);
+  });
+  
+  test("Base rate is $42.50 (Tier 1 within10Miles)", function() {
+    expect(res.getBody().breakdown.basePrice).to.equal(42.50);
+  });
+  
+  test("Total price is correct", function() {
+    expect(res.getBody().totalPrice).to.equal(62.50);
+  });
+}
+

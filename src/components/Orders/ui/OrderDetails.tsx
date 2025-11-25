@@ -79,6 +79,26 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order }) => {
           <div className="grid grid-cols-2 gap-2">
             <div>Tip: {withCurrencySymbol(formatCurrency(order.tip))}</div>
           </div>
+          {isCateringRequest(order) && order.deliveryCost !== null && order.deliveryCost !== undefined && (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div>
+                Delivery Cost:{" "}
+                <span className="font-medium">
+                  {withCurrencySymbol(formatCurrency(order.deliveryCost))}
+                </span>
+              </div>
+            </div>
+          )}
+          {isCateringRequest(order) && order.deliveryDistance !== null && order.deliveryDistance !== undefined && (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                Distance:{" "}
+                <span className="font-medium">
+                  {Number(order.deliveryDistance).toFixed(2)} mi
+                </span>
+              </div>
+            </div>
+          )}
         </div>
         {isCateringRequest(order) && order.brokerage && (
           <div>

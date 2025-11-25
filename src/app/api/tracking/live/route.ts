@@ -1,6 +1,87 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
+import { captureException, captureMessage } from '@/lib/monitoring/sentry';
+
+/**
+ * Typed result row for the active drivers query.
+ *
+ * These fields map 1:1 to the SQL projection below. Keeping this interface
+ * in sync with the SELECT clause ensures we avoid `any` while still
+ * benefiting from the performance of raw SQL.
+ */
+interface ActiveDriverRow {
+  id: string;
+  user_id: string | null;
+  employee_id: string | null;
+  vehicle_number: string | null;
+  phone_number: string | null;
+  is_on_duty: boolean;
+  shift_start_time: Date | null;
+  current_shift_id: string | null;
+  last_known_location_geojson: string | null;
+  last_location_update: Date | null;
+  shift_status: string | null;
+  shift_start: Date | null;
+  total_distance: number | null;
+  active_deliveries: number | string;
+}
+
+/**
+ * Typed result row for the recent driver locations query.
+ */
+interface RecentLocationRow {
+  driver_id: string;
+  location_geojson: string;
+  accuracy: number | null;
+  speed: number | null;
+  heading: number | null;
+  battery_level: number | null;
+  is_moving: boolean | null;
+  source: string | null;
+  recorded_at: Date;
+}
+
+/**
+ * Typed result row for the active deliveries query.
+ */
+interface ActiveDeliveryRow {
+  id: string;
+  driver_id: string;
+  shift_id: string | null;
+  order_number: string;
+  status: string;
+  customer_name: string | null;
+  customer_phone: string | null;
+  pickup_address: string | null;
+  pickup_location_geojson: string | null;
+  delivery_address: string | null;
+  delivery_location_geojson: string | null;
+  estimated_pickup_time: Date | null;
+  estimated_delivery_time: Date | null;
+  assigned_at: Date | null;
+  accepted_at: Date | null;
+  picked_up_at: Date | null;
+  delivered_at: Date | null;
+  priority: string | null;
+  delivery_instructions: string | null;
+}
+
+/**
+ * Type-safe helper to check if SSE controller is still open and accepting data
+ * @param controller - The ReadableStreamDefaultController to check
+ * @returns true if controller is open and ready to accept data
+ */
+function isControllerOpen(controller: ReadableStreamDefaultController): boolean {
+  try {
+    // desiredSize is null when the stream is closed
+    // desiredSize is a number (can be negative) when the stream is open
+    return controller.desiredSize !== null;
+  } catch {
+    // If we can't access desiredSize, assume controller is closed
+    return false;
+  }
+}
 
 /**
  * Server-Sent Events endpoint for real-time driver tracking updates
@@ -27,6 +108,10 @@ export async function GET(request: NextRequest) {
     });
 
     // Create a ReadableStream for SSE
+    // Interval and cleanup function stored in outer scope so cancel() method can access them
+    let intervalId: NodeJS.Timeout | null = null;
+    let cleanupFn: (() => void) | null = null;
+
     const stream = new ReadableStream({
       start(controller) {
         // Send initial connection message
@@ -38,16 +123,16 @@ export async function GET(request: NextRequest) {
         controller.enqueue(new TextEncoder().encode(initMessage));
 
         // Set up interval for sending updates
-        const interval = setInterval(async () => {
+        intervalId = setInterval(async () => {
           // Check if controller is still open before processing
-          if ((controller as any).desiredSize === null) {
-            clearInterval(interval);
+          if (!isControllerOpen(controller)) {
+            if (intervalId) clearInterval(intervalId);
             return;
           }
 
           try {
             // Get active drivers with current locations and shifts
-            const activeDrivers = await prisma.$queryRawUnsafe<any[]>(`
+            const activeDrivers = await prisma.$queryRawUnsafe<ActiveDriverRow[]>(`
               SELECT
                 d.id,
                 d.user_id,
@@ -72,7 +157,7 @@ export async function GET(request: NextRequest) {
             `);
 
             // Get recent location updates (last 5 minutes)
-            const recentLocations = await prisma.$queryRawUnsafe<any[]>(`
+            const recentLocations = await prisma.$queryRawUnsafe<RecentLocationRow[]>(`
               SELECT
                 dl.driver_id,
                 ST_AsGeoJSON(dl.location) as location_geojson,
@@ -93,7 +178,7 @@ export async function GET(request: NextRequest) {
             `);
 
             // Get active deliveries with status updates
-            const activeDeliveries = await prisma.$queryRawUnsafe<any[]>(`
+            const activeDeliveries = await prisma.$queryRawUnsafe<ActiveDeliveryRow[]>(`
               SELECT
                 d.id,
                 d.driver_id,
@@ -141,7 +226,12 @@ export async function GET(request: NextRequest) {
                   shiftStatus: driver.shift_status,
                   shiftStart: driver.shift_start,
                   totalDistance: driver.total_distance || 0,
-                  activeDeliveries: parseInt(driver.active_deliveries) || 0
+                  activeDeliveries: (() => {
+                    const raw = driver.active_deliveries;
+                    const count =
+                      typeof raw === 'number' ? raw : Number.parseInt(raw, 10);
+                    return Number.isNaN(count) ? 0 : count;
+                  })()
                 })),
                 recentLocations: recentLocations.map(loc => ({
                   driverId: loc.driver_id,
@@ -181,27 +271,49 @@ export async function GET(request: NextRequest) {
             };
 
             const message = `data: ${JSON.stringify(updateData)}\n\n`;
-            // Check controller is still open before enqueueing
-            if ((controller as any).desiredSize !== null) {
-              controller.enqueue(new TextEncoder().encode(message));
+            // Use try-catch to handle controller state atomically (avoids TOCTOU race condition)
+            try {
+              if (controller.desiredSize !== null) {
+                controller.enqueue(new TextEncoder().encode(message));
+              } else {
+                // Controller already closed, cleanup interval
+                if (intervalId) clearInterval(intervalId);
+              }
+            } catch (enqueueError) {
+              // Controller was closed during enqueue operation - cleanup and stop
+              if (intervalId) clearInterval(intervalId);
             }
           } catch (error) {
             console.error('Error in SSE update:', error);
-            // Check controller is still open before enqueueing error
-            if ((controller as any).desiredSize !== null) {
-              const errorMessage = `data: ${JSON.stringify({
-                type: 'error',
-                message: 'Error fetching driver updates',
-                timestamp: new Date().toISOString()
-              })}\n\n`;
-              controller.enqueue(new TextEncoder().encode(errorMessage));
+            captureException(error, {
+              action: 'sse_driver_update',
+              feature: 'admin_tracking',
+              component: 'api/tracking/live',
+              handled: true,
+            });
+            // Use try-catch to handle controller state atomically (avoids TOCTOU race condition)
+            try {
+              if (controller.desiredSize !== null) {
+                const errorMessage = `data: ${JSON.stringify({
+                  type: 'error',
+                  message: 'Error fetching driver updates',
+                  timestamp: new Date().toISOString()
+                })}\n\n`;
+                controller.enqueue(new TextEncoder().encode(errorMessage));
+              } else {
+                // Controller already closed, cleanup interval
+                if (intervalId) clearInterval(intervalId);
+              }
+            } catch (enqueueError) {
+              // Controller was closed during enqueue operation - cleanup and stop
+              if (intervalId) clearInterval(intervalId);
             }
           }
         }, 5000); // Update every 5 seconds
 
         // Cleanup function
         const cleanup = () => {
-          clearInterval(interval);
+          if (intervalId) clearInterval(intervalId);
           try {
             controller.close();
           } catch (error) {
@@ -209,21 +321,38 @@ export async function GET(request: NextRequest) {
           }
         };
 
+        // Store cleanup function in outer scope for cancel() method
+        cleanupFn = cleanup;
+
         // Handle client disconnect
         request.signal.addEventListener('abort', cleanup);
-
-        // Store cleanup function for potential manual cleanup
-        (controller as any).cleanup = cleanup;
       },
 
       cancel() {
-              }
+        // Clean up interval and event listener when stream is cancelled
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+        if (cleanupFn) {
+          request.signal.removeEventListener('abort', cleanupFn);
+        }
+      }
+    });
+
+    captureMessage('Admin tracking SSE stream started', 'info', {
+      feature: 'admin_tracking',
     });
 
     return new NextResponse(stream, { headers });
 
   } catch (error) {
     console.error('Error setting up SSE endpoint:', error);
+    captureException(error, {
+      action: 'sse_setup',
+      feature: 'admin_tracking',
+      component: 'api/tracking/live',
+    });
     return NextResponse.json(
       { 
         success: false, 

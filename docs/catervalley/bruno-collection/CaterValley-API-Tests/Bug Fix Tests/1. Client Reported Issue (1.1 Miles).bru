@@ -1,0 +1,82 @@
+meta {
+  name: 1. Client Reported Issue (1.1 Miles)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{BASE_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "TEST-SHORT-DISTANCE-002",
+    "deliveryDate": "2025-11-21",
+    "deliveryTime": "11:45",
+    "totalItem": 1,
+    "priceTotal": 16.75,
+    "pickupLocation": {
+      "name": "Thai Chili Express",
+      "address": "304 E Santa Clara St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95112",
+      "phone": "(408) 555-0100"
+    },
+    "dropOffLocation": {
+      "name": "Grace Deli & Cafe",
+      "address": "303 S Almaden Blvd Ste 16",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95110",
+      "instructions": "Leave at front desk",
+      "recipient": {
+        "name": "Demo Account",
+        "phone": "4085550200"
+      }
+    }
+  }
+}
+
+tests {
+  test("Status is SUCCESS", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().status).to.equal("SUCCESS");
+  });
+  
+  test("Delivery fee is $42.50 (not $130)", function() {
+    expect(res.getBody().deliveryPrice).to.equal(42.50);
+  });
+  
+  test("Mileage fee is $0 (within 10 miles)", function() {
+    expect(res.getBody().breakdown.mileageFee).to.equal(0);
+  });
+  
+  test("Delivery fee is nowhere near $130", function() {
+    expect(res.getBody().deliveryPrice).to.be.lessThan(50);
+  });
+}
+
+docs {
+  # Client's Reported Issue (1.1 Miles)
+  
+  **Purpose:** Verify the exact scenario reported by the client
+  
+  **Expected:** $42.50 (was showing $130)
+  
+  ## Validation Checklist
+  - [ ] `deliveryPrice` is **$42.50** (not $130)
+  - [ ] `mileageFee` is **$0** (within 10 miles)
+  - [ ] `status` is **"SUCCESS"**
+  - [ ] Order can be created without errors
+  
+  This is the EXACT scenario the client reported with the $130 bug.
+}

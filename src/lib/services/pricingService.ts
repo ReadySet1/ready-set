@@ -2,9 +2,24 @@
  * Updated Pricing Service for CaterValley Integration
  * Implements the new distance-based and head count-based pricing structure
  * URGENT: Updated to address financial losses on deliveries
+ * 
+ * ⚠️ WARNING: This pricing service is DEPRECATED for CaterValley orders.
+ * CaterValley orders MUST use the new delivery-cost-calculator system:
+ * - File: src/lib/calculator/delivery-cost-calculator.ts
+ * - Config: src/lib/calculator/client-configurations.ts (CATER_VALLEY)
+ * - Helper: src/app/api/cater-valley/_lib/pricing-helper.ts
+ * 
+ * This old system has incorrect pricing tiers including $130 rates that do NOT
+ * match the CaterValley API contract. Using this system will cause overcharging.
+ * 
+ * USE CASES FOR THIS FILE:
+ * - Generic pricing calculations (non-CaterValley)
+ * - Legacy admin tools
+ * - DO NOT USE for CaterValley API endpoints
  */
 
 import { localTimeToUtc, utcToLocalTime } from '@/lib/utils/timezone';
+import { captureException, captureMessage } from '@/lib/monitoring/sentry';
 
 interface PricingParams {
   pickupAddress: string;
@@ -168,7 +183,15 @@ export async function calculateDistance(pickupAddress: string, dropoffAddress: s
   const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
   
   if (!GOOGLE_MAPS_API_KEY) {
-    console.warn('Google Maps API key not configured. Using estimated distance.');
+    captureMessage(
+      'Google Maps API key not configured. Using estimated distance.',
+      'warning',
+      {
+        action: 'missing_google_maps_key',
+        feature: 'distance_calculation',
+        metadata: { pickupAddress, dropoffAddress }
+      }
+    );
     return estimateDistance(pickupAddress, dropoffAddress);
   }
   
@@ -188,15 +211,48 @@ export async function calculateDistance(pickupAddress: string, dropoffAddress: s
       // Convert meters to miles
       const miles = (distanceValue * 0.000621371);
       
-            
+      // Log successful distance calculation for debugging
+      captureMessage(
+        `Distance calculated: ${miles.toFixed(2)} miles`,
+        'info',
+        {
+          action: 'distance_calculated',
+          feature: 'google_maps_api',
+          metadata: {
+            pickupAddress,
+            dropoffAddress,
+            miles: miles.toFixed(2),
+            distanceText
+          }
+        }
+      );
+      
       return Math.round(miles * 100) / 100; // Round to 2 decimal places
     } else {
-      console.warn('Google Maps API returned error:', data.error_message || data.status);
+      captureMessage(
+        `Google Maps API returned error: ${data.error_message || data.status}`,
+        'warning',
+        {
+          action: 'google_maps_api_error',
+          feature: 'distance_calculation',
+          metadata: {
+            pickupAddress,
+            dropoffAddress,
+            apiStatus: data.status,
+            errorMessage: data.error_message,
+            elementStatus: data.rows[0]?.elements[0]?.status
+          }
+        }
+      );
       return estimateDistance(pickupAddress, dropoffAddress);
     }
     
   } catch (error) {
-    console.error('Error calling Google Maps API:', error);
+    captureException(error as Error, {
+      action: 'google_maps_api_failure',
+      feature: 'distance_calculation',
+      metadata: { pickupAddress, dropoffAddress }
+    });
     return estimateDistance(pickupAddress, dropoffAddress);
   }
 }
@@ -213,6 +269,21 @@ function estimateDistance(pickupAddress: string, dropoffAddress: string): number
   const dropoffCity = extractCity(dropoff);
   
   if (pickupCity === dropoffCity) {
+    captureMessage(
+      `Using fallback distance estimate: 8 miles (same city)`,
+      'info',
+      {
+        action: 'fallback_distance_same_city',
+        feature: 'distance_estimation',
+        metadata: {
+          pickupAddress,
+          dropoffAddress,
+          pickupCity,
+          dropoffCity,
+          estimatedMiles: 8
+        }
+      }
+    );
     return 8; // Same city - average 8 miles
   }
   
@@ -242,10 +313,40 @@ function estimateDistance(pickupAddress: string, dropoffAddress: string): number
   const distance = cityDistances[pickupCity]?.[dropoffCity] || cityDistances[dropoffCity]?.[pickupCity];
   
   if (distance) {
+    captureMessage(
+      `Using fallback distance estimate: ${distance} miles (known city pair)`,
+      'info',
+      {
+        action: 'fallback_distance_known_cities',
+        feature: 'distance_estimation',
+        metadata: {
+          pickupAddress,
+          dropoffAddress,
+          pickupCity,
+          dropoffCity,
+          estimatedMiles: distance
+        }
+      }
+    );
     return distance;
   }
   
   // Default estimate for unknown city pairs
+  captureMessage(
+    `Using fallback distance estimate: 25 miles (unknown city pair)`,
+    'warning',
+    {
+      action: 'fallback_distance_unknown_cities',
+      feature: 'distance_estimation',
+      metadata: {
+        pickupAddress,
+        dropoffAddress,
+        pickupCity,
+        dropoffCity,
+        estimatedMiles: 25
+      }
+    }
+  );
   return 25;
 }
 

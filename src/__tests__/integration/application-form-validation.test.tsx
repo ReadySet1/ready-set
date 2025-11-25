@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import JobApplicationForm from '@/components/Apply/ApplyForm';
+import { ApplicationSessionProvider } from '@/contexts/ApplicationSessionContext';
 import React from 'react';
 
 // Mock session functions
@@ -37,26 +38,37 @@ jest.mock('@/hooks/use-job-application-upload', () => ({
 
 // Mock ApplicationSessionContext
 jest.mock('@/contexts/ApplicationSessionContext', () => {
+  const React = require('react');
   const mockCreateSession = jest.fn();
   const mockMarkSessionCompleted = jest.fn();
   const mockResetSession = jest.fn();
 
+  const mockContext = {
+    session: {
+      sessionId: 'test-session-id',
+      uploadToken: 'test-upload-token',
+      expiresAt: new Date(Date.now() + 7200000).toISOString(), // 2 hours from now
+      uploadCount: 0,
+      maxUploads: 10
+    },
+    isLoading: false,
+    error: null,
+    createSession: mockCreateSession,
+    markSessionCompleted: mockMarkSessionCompleted,
+    resetSession: mockResetSession
+  };
+
   return {
-    useApplicationSession: () => ({
-      session: {
-        sessionId: 'test-session-id',
-        uploadToken: 'test-upload-token',
-        expiresAt: new Date(Date.now() + 7200000).toISOString(), // 2 hours from now
-        uploadCount: 0,
-        maxUploads: 10
-      },
-      isLoading: false,
-      error: null,
-      createSession: mockCreateSession,
-      markSessionCompleted: mockMarkSessionCompleted,
-      resetSession: mockResetSession
-    }),
-    ApplicationSessionProvider: ({ children }: any) => children
+    useApplicationSession: () => mockContext,
+    ApplicationSessionProvider: ({ children }: any) => {
+      // Create a proper context provider for testing
+      const ApplicationSessionContext = React.createContext(mockContext);
+      return React.createElement(
+        ApplicationSessionContext.Provider,
+        { value: mockContext },
+        children
+      );
+    }
   };
 });
 
@@ -75,7 +87,11 @@ describe('Application Form Validation Timing', () => {
   describe('onBlur Validation Mode (REA-54 Fix)', () => {
     it('should NOT show validation errors while user is typing', async () => {
       const user = userEvent.setup();
-      render(<JobApplicationForm />);
+      render(
+        <ApplicationSessionProvider>
+          <JobApplicationForm />
+        </ApplicationSessionProvider>
+      );
 
       // Select a position to enable form fields
       const roleSelect = screen.getByRole('combobox', { name: /select position/i });
@@ -97,7 +113,11 @@ describe('Application Form Validation Timing', () => {
 
     it('should show validation errors only on blur', async () => {
       const user = userEvent.setup();
-      render(<JobApplicationForm />);
+      render(
+        <ApplicationSessionProvider>
+          <JobApplicationForm />
+        </ApplicationSessionProvider>
+      );
 
       // Select a position
       const roleSelect = screen.getByRole('combobox', { name: /select position/i });
@@ -121,7 +141,11 @@ describe('Application Form Validation Timing', () => {
 
     it('should validate on submit even if fields were not touched', async () => {
       const user = userEvent.setup();
-      render(<JobApplicationForm />);
+      render(
+        <ApplicationSessionProvider>
+          <JobApplicationForm />
+        </ApplicationSessionProvider>
+      );
 
       // Try to navigate to next step without filling anything
       const nextButton = screen.getByRole('button', { name: /next/i });
@@ -135,7 +159,11 @@ describe('Application Form Validation Timing', () => {
 
     it('should validate email format only on blur', async () => {
       const user = userEvent.setup();
-      render(<JobApplicationForm />);
+      render(
+        <ApplicationSessionProvider>
+          <JobApplicationForm />
+        </ApplicationSessionProvider>
+      );
 
       // Select position
       const roleSelect = screen.getByRole('combobox', { name: /select position/i });
@@ -159,7 +187,11 @@ describe('Application Form Validation Timing', () => {
 
     it('should clear validation errors when user corrects input', async () => {
       const user = userEvent.setup();
-      render(<JobApplicationForm />);
+      render(
+        <ApplicationSessionProvider>
+          <JobApplicationForm />
+        </ApplicationSessionProvider>
+      );
 
       // Select position
       const roleSelect = screen.getByRole('combobox', { name: /select position/i });
@@ -190,7 +222,11 @@ describe('Application Form Validation Timing', () => {
   describe('Step Navigation Validation', () => {
     it('should validate current step before allowing navigation to next step', async () => {
       const user = userEvent.setup();
-      render(<JobApplicationForm />);
+      render(
+        <ApplicationSessionProvider>
+          <JobApplicationForm />
+        </ApplicationSessionProvider>
+      );
 
       // Try to go to next step without filling step 1
       const nextButton = screen.getByRole('button', { name: /next/i });
@@ -207,7 +243,11 @@ describe('Application Form Validation Timing', () => {
 
     it('should allow navigation to next step when current step is valid', async () => {
       const user = userEvent.setup();
-      render(<JobApplicationForm />);
+      render(
+        <ApplicationSessionProvider>
+          <JobApplicationForm />
+        </ApplicationSessionProvider>
+      );
 
       // Fill step 1 completely
       const roleSelect = screen.getByRole('combobox', { name: /select position/i });
@@ -241,7 +281,11 @@ describe('Application Form Validation Timing', () => {
 
     it('should allow navigation back to previous steps without validation', async () => {
       const user = userEvent.setup();
-      render(<JobApplicationForm />);
+      render(
+        <ApplicationSessionProvider>
+          <JobApplicationForm />
+        </ApplicationSessionProvider>
+      );
 
       // Fill minimal data to get to step 2
       const roleSelect = screen.getByRole('combobox', { name: /select position/i });
@@ -280,7 +324,11 @@ describe('Application Form Validation Timing', () => {
   describe('Phone Number Validation', () => {
     it('should validate phone number format', async () => {
       const user = userEvent.setup();
-      render(<JobApplicationForm />);
+      render(
+        <ApplicationSessionProvider>
+          <JobApplicationForm />
+        </ApplicationSessionProvider>
+      );
 
       const roleSelect = screen.getByRole('combobox', { name: /select position/i });
       await user.selectOptions(roleSelect, 'Virtual Assistant');
@@ -296,7 +344,11 @@ describe('Application Form Validation Timing', () => {
 
     it('should accept valid phone number formats', async () => {
       const user = userEvent.setup();
-      render(<JobApplicationForm />);
+      render(
+        <ApplicationSessionProvider>
+          <JobApplicationForm />
+        </ApplicationSessionProvider>
+      );
 
       const roleSelect = screen.getByRole('combobox', { name: /select position/i });
       await user.selectOptions(roleSelect, 'Virtual Assistant');
@@ -322,7 +374,11 @@ describe('Application Form Validation Timing', () => {
   describe('ZIP Code Validation', () => {
     it('should validate ZIP code format', async () => {
       const user = userEvent.setup();
-      render(<JobApplicationForm />);
+      render(
+        <ApplicationSessionProvider>
+          <JobApplicationForm />
+        </ApplicationSessionProvider>
+      );
 
       const roleSelect = screen.getByRole('combobox', { name: /select position/i });
       await user.selectOptions(roleSelect, 'Virtual Assistant');
@@ -338,7 +394,11 @@ describe('Application Form Validation Timing', () => {
 
     it('should accept valid ZIP code formats', async () => {
       const user = userEvent.setup();
-      render(<JobApplicationForm />);
+      render(
+        <ApplicationSessionProvider>
+          <JobApplicationForm />
+        </ApplicationSessionProvider>
+      );
 
       const roleSelect = screen.getByRole('combobox', { name: /select position/i });
       await user.selectOptions(roleSelect, 'Virtual Assistant');

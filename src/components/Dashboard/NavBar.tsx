@@ -39,7 +39,7 @@ import {
 } from "../ui/dropdown-menu";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { toast } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { clearAuthCookies } from "@/utils/auth/cookies";
 

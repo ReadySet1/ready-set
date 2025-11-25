@@ -123,6 +123,31 @@ export async function calculateCaterValleyPricing(
     clientConfigId: 'cater-valley' // Use CaterValley-specific configuration
   });
 
+  // Log pricing calculation details for debugging
+  captureMessage(
+    `CaterValley pricing calculated for order ${orderCode}`,
+    'info',
+    {
+      action: 'pricing_calculated',
+      feature: feature,
+      metadata: {
+        orderCode,
+        distance: distance.toFixed(2),
+        usedFallback: usedFallbackDistance,
+        headcount: totalItem,
+        foodCost: priceTotal,
+        numberOfBridges,
+        calculatedFee: pricingResult.deliveryFee.toFixed(2),
+        breakdown: {
+          deliveryCost: pricingResult.deliveryCost.toFixed(2),
+          mileagePay: pricingResult.totalMileagePay.toFixed(2),
+          dailyDriveDiscount: pricingResult.dailyDriveDiscount.toFixed(2),
+          bridgeToll: pricingResult.bridgeToll.toFixed(2)
+        }
+      }
+    }
+  );
+
   // 4. CRITICAL: Validate that pricing is not zero (prevent revenue loss)
   if (pricingResult.deliveryFee <= 0) {
     throw new Error('Pricing calculation error - delivery fee cannot be zero. Please contact support.');
@@ -131,10 +156,26 @@ export async function calculateCaterValleyPricing(
   // 5. CRITICAL: Ensure CaterValley $42.50 minimum delivery fee
   const CATERVALLEY_MINIMUM_FEE = 42.50;
   if (pricingResult.deliveryFee < CATERVALLEY_MINIMUM_FEE) {
-    throw new Error(
-      `Calculated delivery fee ($${pricingResult.deliveryFee.toFixed(2)}) is below CaterValley minimum of $${CATERVALLEY_MINIMUM_FEE.toFixed(2)}. ` +
-      `This may indicate a pricing configuration error.`
+    // Log to Sentry for investigation (configuration may need adjustment)
+    captureMessage(
+      `CaterValley delivery fee below minimum: $${pricingResult.deliveryFee.toFixed(2)} adjusted to $${CATERVALLEY_MINIMUM_FEE.toFixed(2)}`,
+      'warning',
+      {
+        action: 'minimum_fee_adjustment',
+        feature: feature,
+        metadata: {
+          orderCode: orderCode,
+          calculatedFee: pricingResult.deliveryFee,
+          minimumFee: CATERVALLEY_MINIMUM_FEE,
+          headcount: totalItem,
+          foodCost: priceTotal,
+          distance: distance
+        }
+      }
     );
+
+    // Automatically adjust to minimum fee (don't throw error - customer shouldn't be blocked)
+    pricingResult.deliveryFee = CATERVALLEY_MINIMUM_FEE;
   }
 
   return {

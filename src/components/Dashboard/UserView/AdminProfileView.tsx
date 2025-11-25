@@ -12,7 +12,6 @@ import { FormProvider } from "react-hook-form";
 import UserProfileTabs from "./UserProfileTabs";
 import UserHeader from "./UserHeader";
 import UserStatusCard from "./Sidebar/UserStatusCard";
-import UserDocumentsCard from "./Sidebar/UserDocumentsCard";
 import UserArchiveCard from "./Sidebar/UserArchiveCard";
 import { useUserForm } from "./hooks/useUserForm";
 import { useUserData } from "./hooks/useUserData";
@@ -181,6 +180,8 @@ export default function ModernUserProfile({
                 control={control}
                 refreshTrigger={refreshTrigger}
                 isUserProfile={isUserProfile}
+                uploadHooks={uploadHooks}
+                setRefreshTrigger={setRefreshTrigger}
               />
             </div>
 
@@ -193,12 +194,6 @@ export default function ModernUserProfile({
                 loading={loading}
                 handleStatusChange={handleStatusChange}
                 handleRoleChange={handleRoleChange}
-              />
-
-              <UserDocumentsCard
-                uploadHooks={uploadHooks}
-                userType={watchedValues.type ?? "client"}
-                setRefreshTrigger={setRefreshTrigger}
               />
 
               <UserArchiveCard />

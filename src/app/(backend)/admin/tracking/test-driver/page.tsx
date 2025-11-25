@@ -28,7 +28,14 @@ const ROUTE_WAYPOINTS = [
 ];
 
 export default function TestDriverPage() {
-  const [driverId, setDriverId] = useState('test-driver-001');
+  // Generate a unique test driver UUID that persists across renders
+  // Uses crypto.randomUUID() for proper UUID v4 generation
+  const [driverId] = useState(() => {
+    // Use crypto.randomUUID() for standards-compliant UUID v4
+    return typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : '00000000-0000-4000-8000-000000000001'; // Fallback for older browsers
+  });
   const [driverName, setDriverName] = useState('Test Driver');
   const [speed, setSpeed] = useState(15); // m/s (about 33 mph)
   const [isConnected, setIsConnected] = useState(false);
@@ -41,13 +48,20 @@ export default function TestDriverPage() {
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  /**
+   * Establish a Realtime connection for this simulated driver.
+   *
+   * NOTE: This uses the same Supabase channel + payload shape as the
+   * production driver apps (`DriverLocationUpdatedPayload`). The admin
+   * dashboard (`useAdminRealtimeTracking`) listens for these
+   * `driver:location:updated` events and merges them into the live map.
+   */
   const connect = async () => {
     try {
       const locationChannel = createDriverLocationChannel();
 
       await locationChannel.subscribe({
         onConnect: async () => {
-          console.log('[Test Driver] Connected to location channel');
           setIsConnected(true);
 
           // Send initial location immediately so dashboard shows the driver
@@ -66,10 +80,8 @@ export default function TestDriverPage() {
             timestamp: new Date().toISOString(),
             vehicleNumber: 'VEH-001',
           });
-          console.log('[Test Driver] Sent initial location');
         },
         onDisconnect: () => {
-          console.log('[Test Driver] Disconnected from location channel');
           setIsConnected(false);
         },
         onError: (error: Error) => {
@@ -105,6 +117,13 @@ export default function TestDriverPage() {
     return (heading + 360) % 360; // Normalize to 0-360
   };
 
+  /**
+   * Broadcast a single location update to the Realtime channel.
+   *
+   * The payload intentionally matches `DriverLocationUpdatedPayload` from
+   * `@/lib/realtime/types` so that the admin dashboard can consume it
+   * without any special-casing for the simulator.
+   */
   const sendLocationUpdate = async (lat: number, lng: number, heading: number, isMoving: boolean) => {
     if (!channel || !isConnected) {
       return;
@@ -127,7 +146,6 @@ export default function TestDriverPage() {
       });
 
       setMessageCount(prev => prev + 1);
-      console.log('[Test Driver] Location update:', { lat, lng, waypoint: currentWaypoint, progress: progress.toFixed(2) });
     } catch (error) {
       console.error('[Test Driver] Failed to send location:', error);
     }
@@ -146,7 +164,6 @@ export default function TestDriverPage() {
         setCurrentWaypoint(prevWaypoint => {
           // Check if we've reached the end of the route
           if (prevWaypoint >= ROUTE_WAYPOINTS.length - 1) {
-            console.log('[Test Driver] Route completed!');
             if (intervalRef.current) {
               clearInterval(intervalRef.current);
             }
@@ -265,13 +282,16 @@ export default function TestDriverPage() {
           {/* Driver Info */}
           <div className="space-y-4">
             <div>
-              <Label htmlFor="driverId">Driver ID</Label>
+              <Label htmlFor="driverId">Driver ID (Test UUID)</Label>
               <Input
                 id="driverId"
                 value={driverId}
-                onChange={(e) => setDriverId(e.target.value)}
-                disabled={isConnected}
+                disabled
+                className="font-mono text-sm"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Fixed UUID for testing purposes
+              </p>
             </div>
 
             <div>
