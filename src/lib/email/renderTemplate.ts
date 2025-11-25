@@ -4,6 +4,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { convert } from "html-to-text";
 
 export type DeliveryEmailTemplateId =
   | "delivery-assigned"
@@ -48,16 +49,17 @@ const htmlEscape = (value: string): string =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
+// Use html-to-text library for secure HTML-to-plaintext conversion
+// This avoids regex-based HTML stripping which is vulnerable to bypass attacks
 const stripHtml = (html: string): string =>
-  html
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<\/(p|div|h[1-6]|li|br)[^>]*>/gi, "\n")
-    .replace(/<\/tr>/gi, "\n")
-    .replace(/<\/td>/gi, " ")
-    .replace(/<[^>]*>/g, "")
-    .replace(/\n{2,}/g, "\n")
-    .trim();
+  convert(html, {
+    wordwrap: false,
+    selectors: [
+      { selector: "style", format: "skip" },
+      { selector: "script", format: "skip" },
+      { selector: "a", options: { hideLinkHrefIfSameAsText: true } },
+    ],
+  });
 
 const loadFile = (filePath: string): string => {
   try {
