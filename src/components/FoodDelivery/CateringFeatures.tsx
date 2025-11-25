@@ -26,20 +26,18 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
       transition={{ duration: 0.6, delay: delay / 1000 }}
     >
       <motion.div
-        className="flex h-[280px] w-full max-w-[380px] flex-col items-center justify-center rounded-3xl border-4 border-yellow-400 bg-white p-8 shadow-sm"
+        className="flex w-full max-w-[380px] flex-col items-center rounded-3xl border-4 border-yellow-400 bg-white p-8 shadow-sm"
         whileHover={{ scale: 1.03, y: -5 }}
         transition={{ type: "spring", stiffness: 300 }}
       >
         <div className="mb-6 text-yellow-400">{icon}</div>
-        <h3 className="text-center text-xl font-black uppercase leading-tight tracking-wide text-gray-800 md:text-2xl">
+        <h3 className="mb-4 text-center text-xl font-black uppercase leading-tight tracking-wide text-gray-800 md:text-2xl">
           {title}
         </h3>
-      </motion.div>
-      <div className="mt-6 max-w-[380px] px-4">
         <p className="text-center text-base leading-relaxed text-gray-700">
           {description}
         </p>
-      </div>
+      </motion.div>
     </motion.div>
   );
 };
@@ -127,4 +125,3 @@ const CateringFeatures: React.FC = () => {
 };
 
 export default CateringFeatures;
-

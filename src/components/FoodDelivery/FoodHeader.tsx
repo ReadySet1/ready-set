@@ -124,7 +124,7 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
         variants={containerVariants}
       >
         <motion.div
-          className="relative z-10 ml-16 w-full max-w-md space-y-3 md:ml-28 lg:ml-32"
+          className="relative z-10 ml-16 mt-20 w-full max-w-md space-y-3 md:ml-28 md:mt-24 lg:ml-32 lg:mt-28"
           variants={containerVariants}
         >
           <motion.h1
