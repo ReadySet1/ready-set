@@ -1,3 +1,21 @@
 #!/usr/bin/env sh
-# Exit with success - tests disabled
-exit 0
+. "$(dirname -- "$0")/_/husky.sh"
+
+# REA-181: Pre-commit hooks - Staged rollout
+# Week 1: Lint only (fast feedback, minimal friction)
+# Week 2: Add typecheck
+# Week 3: Full hooks (see pre-commit.enhanced)
+
+echo "🔍 Running pre-commit validation (lint only)..."
+
+# Linting (fast, catches common issues)
+echo "🧹 Linting..."
+pnpm run lint
+if [ $? -ne 0 ]; then
+  echo "❌ Linting errors found. Fix them before committing."
+  echo ""
+  echo "💡 Tip: Run 'pnpm lint --fix' to auto-fix some issues"
+  exit 1
+fi
+
+echo "✅ Pre-commit checks passed!"

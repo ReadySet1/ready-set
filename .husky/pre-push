@@ -1,18 +1,36 @@
 #!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
 
-# Run TypeScript check but don't block build on errors
-echo "🔍 Running TypeScript type check (informational only)..."
-pnpm run typecheck || echo "⚠️ TypeScript check found errors, but continuing with push"
+# REA-181: Pre-push hooks - More comprehensive than pre-commit
+# Runs typecheck and lint as blocking checks
+# See pre-push.enhanced for full version with tests
 
-# Build validation disabled for faster push workflow
-echo "⚡ Build validation skipped for faster development workflow"
-echo "   Run 'pnpm run build:no-typecheck' manually before deployment if needed"
+echo "🚀 Running pre-push validation..."
 
-# Reminder about the TypeScript issue
-echo "📝 Note: TypeScript checks are informational only due to Next.js Edge Runtime typing issues"
-echo "   These will be fixed in a future update when Next.js resolves the Edge Runtime parameter typing"
+# 1. Type checking (catches type errors before they hit CI)
+echo "📝 Type checking..."
+pnpm run typecheck
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript errors found. Fix them before pushing."
+  exit 1
+fi
 
-# Run Vercel build simulation (commented out for faster development - uncomment before deployment)
-# pnpm run vercel-sim
+# 2. Lint (catches common issues)
+echo "🧹 Linting..."
+pnpm run lint
+if [ $? -ne 0 ]; then
+  echo "❌ Linting errors found. Fix them before pushing."
+  exit 1
+fi
+
+# 3. Prisma validation (ensures schema is valid)
+echo "🗄️  Validating Prisma schema..."
+pnpm prisma validate
+if [ $? -ne 0 ]; then
+  echo "❌ Prisma schema validation failed."
+  exit 1
+fi
 
 echo "✅ Pre-push checks passed!"
+echo ""
+echo "💡 CI will run full test suite with 80% pass rate threshold"

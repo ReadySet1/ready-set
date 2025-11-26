@@ -203,8 +203,23 @@ const mockPaginationData = {
 const mockUser = {
   id: "user123",
   email: "test@example.com",
-  user_metadata: { name: "Test User" },
+  user_metadata: { name: "Test User", role: "client" },
 } as any;
+
+// Helper to create a chainable query builder mock
+const createMockQueryBuilder = (returnData: any = null) => {
+  const builder: any = {
+    select: jest.fn().mockReturnThis(),
+    insert: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
+    delete: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: returnData, error: null }),
+    maybeSingle: jest.fn().mockResolvedValue({ data: returnData, error: null }),
+  };
+  return builder;
+};
 
 const mockSupabaseClient = {
   auth: {
@@ -219,6 +234,12 @@ const mockSupabaseClient = {
       data: { subscription: { unsubscribe: jest.fn() } },
     }),
   },
+  from: jest.fn((table: string) => {
+    if (table === "profiles") {
+      return createMockQueryBuilder({ type: "client" });
+    }
+    return createMockQueryBuilder();
+  }),
 };
 
 describe("AddressManager - Infinite Loop Prevention", () => {

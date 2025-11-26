@@ -1,6 +1,22 @@
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import UserAddresses from "@/components/AddressManager/UserAddresses";
+
+// Create a wrapper with QueryClientProvider for tests
+const createWrapper = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        gcTime: 0,
+      },
+    },
+  });
+  return ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+};
 
 // Mock Next.js router
 const mockPush = jest.fn();
@@ -12,25 +28,40 @@ jest.mock("next/navigation", () => ({
 
 // Mock Supabase client
 jest.mock("@/utils/supabase/client", () => ({
-  createClient: jest.fn().mockResolvedValue({
-    auth: {
-      getUser: jest.fn().mockResolvedValue({
-        data: { user: { id: "user1", email: "test@example.com" } },
-        error: null,
+  createClient: jest.fn(() => {
+    // Helper to create a chainable query builder mock
+    const createMockQueryBuilder = (returnData: any = null) => {
+      const builder: any = {
+        select: jest.fn().mockReturnThis(),
+        insert: jest.fn().mockReturnThis(),
+        update: jest.fn().mockReturnThis(),
+        delete: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        neq: jest.fn().mockReturnThis(),
+        or: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({ data: returnData, error: null }),
+        maybeSingle: jest.fn().mockResolvedValue({ data: returnData, error: null }),
+      };
+      return builder;
+    };
+
+    return {
+      auth: {
+        getUser: jest.fn().mockResolvedValue({
+          data: { user: { id: "user1", email: "test@example.com", user_metadata: { role: "client" } } },
+          error: null,
+        }),
+        onAuthStateChange: jest.fn().mockReturnValue({
+          data: { subscription: { unsubscribe: jest.fn() } },
+        }),
+      },
+      from: jest.fn((table: string) => {
+        if (table === "profiles") {
+          return createMockQueryBuilder({ type: "client" });
+        }
+        return createMockQueryBuilder();
       }),
-      onAuthStateChange: jest.fn().mockReturnValue({
-        data: { subscription: { unsubscribe: jest.fn() } },
-      }),
-    },
-    from: jest.fn().mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      or: jest.fn().mockReturnThis(),
-      then: jest.fn().mockResolvedValue({
-        data: [],
-        error: null,
-      }),
-    }),
+    };
   }),
 }));
 
@@ -135,7 +166,7 @@ describe("UserAddresses Integration Tests", () => {
 
   describe("Text Title Styling Integration", () => {
     it("should render the title with correct styling classes", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createWrapper() });
 
       await waitFor(() => {
         const title = screen.getByText("Your Addresses");
@@ -149,7 +180,7 @@ describe("UserAddresses Integration Tests", () => {
     });
 
     it("should render the subheading with correct styling classes", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createWrapper() });
 
       await waitFor(() => {
         const subheading = screen.getByText(
@@ -165,7 +196,7 @@ describe("UserAddresses Integration Tests", () => {
     });
 
     it("should have proper container styling with bottom padding", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createWrapper() });
 
       await waitFor(() => {
         const title = screen.getByText("Your Addresses");
@@ -180,7 +211,7 @@ describe("UserAddresses Integration Tests", () => {
     });
 
     it("should maintain proper spacing between title elements", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createWrapper() });
 
       await waitFor(() => {
         const subheading = screen.getByText(
@@ -193,7 +224,7 @@ describe("UserAddresses Integration Tests", () => {
 
   describe("Component Structure", () => {
     it("should render the main component structure", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createWrapper() });
 
       await waitFor(() => {
         // Check that the main title and subheading are present
@@ -216,7 +247,7 @@ describe("UserAddresses Integration Tests", () => {
     });
 
     it("should render tabs with correct structure", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createWrapper() });
 
       await waitFor(() => {
         const tabsList = screen.getByTestId("tabs-list");
@@ -232,7 +263,7 @@ describe("UserAddresses Integration Tests", () => {
 
   describe("Visual Layout", () => {
     it("should center the title text properly", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createWrapper() });
 
       await waitFor(() => {
         const title = screen.getByText("Your Addresses");
@@ -244,7 +275,7 @@ describe("UserAddresses Integration Tests", () => {
     });
 
     it("should center the subheading text properly", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createWrapper() });
 
       await waitFor(() => {
         const subheading = screen.getByText(
@@ -258,7 +289,7 @@ describe("UserAddresses Integration Tests", () => {
     });
 
     it("should apply proper padding around the title section", async () => {
-      render(<UserAddresses />);
+      render(<UserAddresses />, { wrapper: createWrapper() });
 
       await waitFor(() => {
         const title = screen.getByText("Your Addresses");
