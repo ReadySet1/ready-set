@@ -309,69 +309,94 @@ describe('/api/order/debug GET API', () => {
 
       const request = createGetRequest('http://localhost:3000/api/order/debug');
       const response = await GET(request);
+      const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(response.headers.get('content-type')).toContain('application/json');
+      // Verify response is valid JSON by checking parsed data structure
+      expect(data).toHaveProperty('timestamp');
+      expect(data).toHaveProperty('status');
+      expect(data).toHaveProperty('tests');
     });
   });
 
   describe('❌ Error Handling Tests', () => {
-    it('should return 500 when outer try-catch catches error', async () => {
+    it('should gracefully handle Prisma errors and continue other tests', async () => {
+      // When prisma.$queryRaw throws, the error is caught internally
+      // and the route continues with other tests
       (prisma.$queryRaw as jest.Mock).mockImplementation(() => {
         throw new Error('Catastrophic failure');
       });
+      (getCurrentUser as jest.Mock).mockResolvedValue({ id: 'user-123', email: 'test@example.com' });
+      (checkVendorAccess as jest.Mock).mockResolvedValue(true);
+      (prisma.profile.count as jest.Mock).mockResolvedValue(10);
 
       const request = createGetRequest('http://localhost:3000/api/order/debug');
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data).toHaveProperty('error');
-      expect(data).toHaveProperty('timestamp');
-      expect(data.status).toBe('Error during diagnosis');
+      // Route returns 200 with error info for failed test
+      expect(response.status).toBe(200);
+      expect(data.tests.prisma.success).toBe(false);
+      expect(data.tests.prisma.error).toBe('Catastrophic failure');
+      // Other tests should still succeed
+      expect(data.tests.authentication.success).toBe(true);
     });
 
-    it('should handle generic error message', async () => {
+    it('should handle error with empty message', async () => {
       (prisma.$queryRaw as jest.Mock).mockImplementation(() => {
         throw new Error();
       });
+      (getCurrentUser as jest.Mock).mockResolvedValue(null);
+      (checkVendorAccess as jest.Mock).mockResolvedValue(false);
+      (prisma.profile.count as jest.Mock).mockResolvedValue(10);
 
       const request = createGetRequest('http://localhost:3000/api/order/debug');
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Failed to run debug tests');
+      expect(response.status).toBe(200);
+      expect(data.tests.prisma.success).toBe(false);
+      // Empty error message falls back to empty string
+      expect(data.tests.prisma.error).toBe('');
     });
 
-    it('should log errors to console', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      (prisma.$queryRaw as jest.Mock).mockImplementation(() => {
-        throw new Error('Test error');
-      });
-
-      const request = createGetRequest('http://localhost:3000/api/order/debug');
-      await GET(request);
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '🔍 Debug API Error:',
-        expect.any(Error)
-      );
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it('should handle non-Error thrown values', async () => {
+    it('should handle non-Error thrown values in inner try-catch', async () => {
       (prisma.$queryRaw as jest.Mock).mockImplementation(() => {
         throw 'String error';
       });
+      (getCurrentUser as jest.Mock).mockResolvedValue(null);
+      (checkVendorAccess as jest.Mock).mockResolvedValue(false);
+      (prisma.profile.count as jest.Mock).mockResolvedValue(10);
 
       const request = createGetRequest('http://localhost:3000/api/order/debug');
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Failed to run debug tests');
+      expect(response.status).toBe(200);
+      expect(data.tests.prisma.success).toBe(false);
+      expect(data.tests.prisma.error).toBe('Unknown error');
+    });
+
+    it('should handle multiple test failures independently', async () => {
+      (prisma.$queryRaw as jest.Mock).mockRejectedValue(new Error('DB error'));
+      (getCurrentUser as jest.Mock).mockRejectedValue(new Error('Auth error'));
+      (checkVendorAccess as jest.Mock).mockRejectedValue(new Error('Access error'));
+      (prisma.profile.count as jest.Mock).mockRejectedValue(new Error('Profile error'));
+
+      const request = createGetRequest('http://localhost:3000/api/order/debug');
+      const response = await GET(request);
+      const data = await response.json();
+
+      // All tests fail but route returns 200 with error details for each
+      expect(response.status).toBe(200);
+      expect(data.tests.prisma.success).toBe(false);
+      expect(data.tests.prisma.error).toBe('DB error');
+      expect(data.tests.authentication.success).toBe(false);
+      expect(data.tests.authentication.error).toBe('Auth error');
+      expect(data.tests.vendorAccess.success).toBe(false);
+      expect(data.tests.vendorAccess.error).toBe('Access error');
+      expect(data.tests.profileTest.success).toBe(false);
+      expect(data.tests.profileTest.error).toBe('Profile error');
     });
   });
 
