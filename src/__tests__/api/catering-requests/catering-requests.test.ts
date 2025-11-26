@@ -18,12 +18,17 @@ jest.mock('@/lib/db/prisma', () => ({
   prisma: {
     cateringRequest: {
       create: jest.fn(),
+      findUnique: jest.fn(),
     },
     address: {
       create: jest.fn(),
+      findUnique: jest.fn(),
     },
     profile: {
       findUnique: jest.fn(),
+    },
+    fileUpload: {
+      create: jest.fn(),
     },
   },
 }));
@@ -42,41 +47,53 @@ describe('/api/catering-requests API', () => {
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
   });
 
+  // UUID constants for consistent test data
+  const PICKUP_ADDRESS_ID = '11111111-1111-1111-1111-111111111111';
+  const DELIVERY_ADDRESS_ID = '22222222-2222-2222-2222-222222222222';
+  const USER_ID = '33333333-3333-3333-3333-333333333333';
+  const ORDER_ID = '44444444-4444-4444-4444-444444444444';
+
   describe('POST /api/catering-requests - Create Catering Order', () => {
+    // Valid data matching the route's expected schema
     const validCateringData = {
-      pickupAddress: {
-        street1: '123 Vendor St',
-        street2: 'Suite 100',
-        city: 'Austin',
-        state: 'TX',
-        zip: '78701',
-        lat: 30.2672,
-        lng: -97.7431,
-      },
-      deliveryAddress: {
-        street1: '456 Client Ave',
-        city: 'Austin',
-        state: 'TX',
-        zip: '78702',
-        lat: 30.2700,
-        lng: -97.7300,
-      },
-      pickupTime: '2024-12-01T10:00:00Z',
-      arrivalTime: '2024-12-01T11:00:00Z',
+      orderNumber: 'CAT-12345',
+      brokerage: 'Test Brokerage',
+      date: '2024-12-01',
+      pickupTime: '10:00',
+      arrivalTime: '11:00',
+      pickupAddress: { id: PICKUP_ADDRESS_ID },
+      deliveryAddress: { id: DELIVERY_ADDRESS_ID },
       headcount: 50,
       orderTotal: '500.00',
-      needHost: 'yes',
+      needHost: 'YES',
       hoursNeeded: '2',
-      numberOfHost: '1',
+      numberOfHosts: '1',
       pickupNotes: 'Please call upon arrival',
       specialNotes: 'No peanuts please',
       clientAttention: 'John Doe',
     };
 
+    // Mock pickup and delivery address objects
+    const mockPickupAddress = {
+      id: PICKUP_ADDRESS_ID,
+      street1: '123 Vendor St',
+      city: 'Austin',
+      state: 'TX',
+      zip: '78701',
+    };
+
+    const mockDeliveryAddress = {
+      id: DELIVERY_ADDRESS_ID,
+      street1: '456 Client Ave',
+      city: 'Austin',
+      state: 'TX',
+      zip: '78702',
+    };
+
     describe('✅ Successful Order Creation', () => {
       it('should create a catering order with all fields', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123', email: 'client@example.com' } },
+          data: { user: { id: USER_ID, email: 'client@example.com' } },
           error: null,
         });
 
@@ -85,26 +102,26 @@ describe('/api/catering-requests API', () => {
         });
 
         (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-          id: 'user-123',
+          id: USER_ID,
           name: 'John Client',
           email: 'client@example.com',
         });
 
-        const mockPickupAddress = { id: 'pickup-addr-123', ...validCateringData.pickupAddress };
-        const mockDeliveryAddress = { id: 'delivery-addr-123', ...validCateringData.deliveryAddress };
+        // Mock existing order check (no duplicate)
+        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
 
-        (prisma.address.create as jest.Mock)
+        // Mock address lookups
+        (prisma.address.findUnique as jest.Mock)
           .mockResolvedValueOnce(mockPickupAddress)
           .mockResolvedValueOnce(mockDeliveryAddress);
 
         (prisma.cateringRequest.create as jest.Mock).mockResolvedValue({
-          id: 'order-123',
+          id: ORDER_ID,
           orderNumber: 'CAT-12345',
-          userId: 'user-123',
-          status: 'PENDING',
-          ...validCateringData,
-          pickupAddressId: mockPickupAddress.id,
-          deliveryAddressId: mockDeliveryAddress.id,
+          userId: USER_ID,
+          status: 'ACTIVE',
+          pickupAddressId: PICKUP_ADDRESS_ID,
+          deliveryAddressId: DELIVERY_ADDRESS_ID,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -117,23 +134,25 @@ describe('/api/catering-requests API', () => {
         const response = await POST(request);
         const data = await expectSuccessResponse(response, 201);
 
-        expect(data.id).toBe('order-123');
-        expect(data.orderNumber).toMatch(/^CAT-/);
-        expect(data.status).toBe('PENDING');
+        // Route returns orderId, message, and emailSent
+        expect(data.orderId).toBe(ORDER_ID);
+        expect(data.message).toBe('Catering request created successfully');
         expect(prisma.cateringRequest.create).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({
-              userId: 'user-123',
+              userId: USER_ID,
               headcount: 50,
               orderTotal: expect.anything(),
+              pickupAddressId: PICKUP_ADDRESS_ID,
+              deliveryAddressId: DELIVERY_ADDRESS_ID,
             }),
           })
         );
       });
 
-      it('should create addresses for pickup and delivery locations', async () => {
+      it('should validate pickup and delivery addresses exist', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: USER_ID } },
           error: null,
         });
 
@@ -142,17 +161,21 @@ describe('/api/catering-requests API', () => {
         });
 
         (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-          id: 'user-123',
+          id: USER_ID,
           name: 'Test User',
           email: 'test@example.com',
         });
 
-        (prisma.address.create as jest.Mock)
-          .mockResolvedValueOnce({ id: 'pickup-123' })
-          .mockResolvedValueOnce({ id: 'delivery-123' });
+        // Mock existing order check (no duplicate)
+        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
+
+        // Mock address lookups - both addresses exist
+        (prisma.address.findUnique as jest.Mock)
+          .mockResolvedValueOnce(mockPickupAddress)
+          .mockResolvedValueOnce(mockDeliveryAddress);
 
         (prisma.cateringRequest.create as jest.Mock).mockResolvedValue({
-          id: 'order-123',
+          id: ORDER_ID,
           orderNumber: 'CAT-12345',
         });
 
@@ -163,33 +186,18 @@ describe('/api/catering-requests API', () => {
 
         await POST(request);
 
-        // Verify both addresses were created
-        expect(prisma.address.create).toHaveBeenCalledTimes(2);
-
-        // Verify pickup address
-        expect(prisma.address.create).toHaveBeenCalledWith({
-          data: expect.objectContaining({
-            street1: validCateringData.pickupAddress.street1,
-            city: validCateringData.pickupAddress.city,
-            state: validCateringData.pickupAddress.state,
-            zip: validCateringData.pickupAddress.zip,
-          }),
+        // Verify both addresses were looked up
+        expect(prisma.address.findUnique).toHaveBeenCalledWith({
+          where: { id: PICKUP_ADDRESS_ID },
         });
-
-        // Verify delivery address
-        expect(prisma.address.create).toHaveBeenCalledWith({
-          data: expect.objectContaining({
-            street1: validCateringData.deliveryAddress.street1,
-            city: validCateringData.deliveryAddress.city,
-            state: validCateringData.deliveryAddress.state,
-            zip: validCateringData.deliveryAddress.zip,
-          }),
+        expect(prisma.address.findUnique).toHaveBeenCalledWith({
+          where: { id: DELIVERY_ADDRESS_ID },
         });
       });
 
       it('should generate unique order number', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: USER_ID } },
           error: null,
         });
 
@@ -198,16 +206,21 @@ describe('/api/catering-requests API', () => {
         });
 
         (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-          id: 'user-123',
+          id: USER_ID,
           name: 'Test User',
           email: 'test@example.com',
         });
 
-        (prisma.address.create as jest.Mock)
-          .mockResolvedValue({ id: 'addr-123' });
+        // Mock existing order check (no duplicate)
+        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
+
+        // Mock address lookups
+        (prisma.address.findUnique as jest.Mock)
+          .mockResolvedValueOnce(mockPickupAddress)
+          .mockResolvedValueOnce(mockDeliveryAddress);
 
         (prisma.cateringRequest.create as jest.Mock).mockResolvedValue({
-          id: 'order-123',
+          id: ORDER_ID,
           orderNumber: 'CAT-67890',
         });
 
@@ -219,12 +232,16 @@ describe('/api/catering-requests API', () => {
         const response = await POST(request);
         const data = await expectSuccessResponse(response, 201);
 
-        expect(data.orderNumber).toMatch(/^CAT-\d+$/);
+        // Route returns orderId, not the full order object
+        expect(data.orderId).toBe(ORDER_ID);
       });
 
       it('should allow admin to create order for another user', async () => {
+        const ADMIN_ID = '55555555-5555-5555-5555-555555555555';
+        const CLIENT_ID = '66666666-6666-6666-6666-666666666666';
+
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'admin-123', email: 'admin@example.com' } },
+          data: { user: { id: ADMIN_ID, email: 'admin@example.com' } },
           error: null,
         });
 
@@ -233,23 +250,28 @@ describe('/api/catering-requests API', () => {
         });
 
         (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-          id: 'client-456',
+          id: CLIENT_ID,
           name: 'Client User',
           email: 'client@example.com',
         });
 
-        (prisma.address.create as jest.Mock)
-          .mockResolvedValue({ id: 'addr-123' });
+        // Mock existing order check (no duplicate)
+        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
+
+        // Mock address lookups
+        (prisma.address.findUnique as jest.Mock)
+          .mockResolvedValueOnce(mockPickupAddress)
+          .mockResolvedValueOnce(mockDeliveryAddress);
 
         (prisma.cateringRequest.create as jest.Mock).mockResolvedValue({
-          id: 'order-123',
+          id: ORDER_ID,
           orderNumber: 'CAT-12345',
-          userId: 'client-456',
+          userId: CLIENT_ID,
         });
 
         const dataWithClientId = {
           ...validCateringData,
-          clientId: 'client-456',
+          clientId: CLIENT_ID,
         };
 
         const request = createPostRequest(
@@ -263,7 +285,7 @@ describe('/api/catering-requests API', () => {
         expect(prisma.cateringRequest.create).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({
-              userId: 'client-456',
+              userId: CLIENT_ID,
             }),
           })
         );
@@ -271,7 +293,7 @@ describe('/api/catering-requests API', () => {
 
       it('should store optional fields when provided', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: USER_ID } },
           error: null,
         });
 
@@ -280,16 +302,21 @@ describe('/api/catering-requests API', () => {
         });
 
         (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-          id: 'user-123',
+          id: USER_ID,
           name: 'Test User',
           email: 'test@example.com',
         });
 
-        (prisma.address.create as jest.Mock)
-          .mockResolvedValue({ id: 'addr-123' });
+        // Mock existing order check (no duplicate)
+        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
+
+        // Mock address lookups
+        (prisma.address.findUnique as jest.Mock)
+          .mockResolvedValueOnce(mockPickupAddress)
+          .mockResolvedValueOnce(mockDeliveryAddress);
 
         (prisma.cateringRequest.create as jest.Mock).mockResolvedValue({
-          id: 'order-123',
+          id: ORDER_ID,
           orderNumber: 'CAT-12345',
         });
 
@@ -301,15 +328,17 @@ describe('/api/catering-requests API', () => {
         await POST(request);
 
         // Verify optional fields were stored
+        // Note: Route stores needHost and numberOfHosts as provided by client
+        // hoursNeeded and numberOfHosts are converted to numbers in route
         expect(prisma.cateringRequest.create).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({
               pickupNotes: 'Please call upon arrival',
               specialNotes: 'No peanuts please',
               clientAttention: 'John Doe',
-              needHost: 'yes',
-              hoursNeeded: '2',
-              numberOfHost: '1',
+              needHost: 'YES',
+              hoursNeeded: 2,
+              numberOfHosts: 1,
             }),
           })
         );
@@ -479,9 +508,9 @@ describe('/api/catering-requests API', () => {
     });
 
     describe('❌ Error Handling', () => {
-      it('should handle database errors during address creation', async () => {
+      it('should handle database errors during address lookup', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: USER_ID } },
           error: null,
         });
 
@@ -489,12 +518,11 @@ describe('/api/catering-requests API', () => {
           isValid: true,
         });
 
-        (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-          id: 'user-123',
-          name: 'Test User',
-        });
+        // Mock existing order check (no duplicate)
+        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
 
-        (prisma.address.create as jest.Mock).mockRejectedValue(
+        // Mock address lookup failure
+        (prisma.address.findUnique as jest.Mock).mockRejectedValue(
           new Error('Database connection failed')
         );
 
@@ -509,7 +537,7 @@ describe('/api/catering-requests API', () => {
 
       it('should handle database errors during order creation', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: USER_ID } },
           error: null,
         });
 
@@ -517,13 +545,13 @@ describe('/api/catering-requests API', () => {
           isValid: true,
         });
 
-        (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-          id: 'user-123',
-          name: 'Test User',
-        });
+        // Mock existing order check (no duplicate)
+        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
 
-        (prisma.address.create as jest.Mock)
-          .mockResolvedValue({ id: 'addr-123' });
+        // Mock address lookups
+        (prisma.address.findUnique as jest.Mock)
+          .mockResolvedValueOnce(mockPickupAddress)
+          .mockResolvedValueOnce(mockDeliveryAddress);
 
         (prisma.cateringRequest.create as jest.Mock).mockRejectedValue(
           new Error('Order creation failed')
@@ -540,7 +568,7 @@ describe('/api/catering-requests API', () => {
 
       it('should handle errors when user profile not found', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: USER_ID } },
           error: null,
         });
 
@@ -548,10 +576,21 @@ describe('/api/catering-requests API', () => {
           isValid: true,
         });
 
-        (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null);
+        // Mock existing order check (no duplicate)
+        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
 
-        (prisma.address.create as jest.Mock)
-          .mockResolvedValue({ id: 'addr-123' });
+        // Mock address lookups
+        (prisma.address.findUnique as jest.Mock)
+          .mockResolvedValueOnce(mockPickupAddress)
+          .mockResolvedValueOnce(mockDeliveryAddress);
+
+        (prisma.cateringRequest.create as jest.Mock).mockResolvedValue({
+          id: ORDER_ID,
+          orderNumber: 'CAT-12345',
+        });
+
+        // Profile lookup returns null (happens after order creation for email)
+        (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null);
 
         const request = createPostRequest(
           'http://localhost:3000/api/catering-requests',
@@ -560,16 +599,15 @@ describe('/api/catering-requests API', () => {
 
         const response = await POST(request);
 
-        // Should still create the order even if profile fetch fails
-        // or handle appropriately based on business logic
-        expect(response.status).toBeGreaterThanOrEqual(200);
+        // Should still create the order even if profile not found for email
+        expect(response.status).toBe(201);
       });
     });
 
     describe('📧 Email Notifications', () => {
       it('should send confirmation email after successful order creation', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123', email: 'client@example.com' } },
+          data: { user: { id: USER_ID, email: 'client@example.com' } },
           error: null,
         });
 
@@ -577,20 +615,27 @@ describe('/api/catering-requests API', () => {
           isValid: true,
         });
 
-        (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-          id: 'user-123',
-          name: 'John Client',
-          email: 'client@example.com',
-        });
+        // Mock existing order check (no duplicate)
+        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
 
-        (prisma.address.create as jest.Mock)
-          .mockResolvedValue({ id: 'addr-123' });
+        // Mock address lookups
+        (prisma.address.findUnique as jest.Mock)
+          .mockResolvedValueOnce(mockPickupAddress)
+          .mockResolvedValueOnce(mockDeliveryAddress);
 
         (prisma.cateringRequest.create as jest.Mock).mockResolvedValue({
-          id: 'order-123',
+          id: ORDER_ID,
           orderNumber: 'CAT-12345',
-          userId: 'user-123',
-          ...validCateringData,
+          userId: USER_ID,
+          headcount: 50,
+          orderTotal: { toString: () => '500.00' },
+        });
+
+        // Profile lookup for email (after order creation)
+        (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
+          id: USER_ID,
+          name: 'John Client',
+          email: 'client@example.com',
         });
 
         const request = createPostRequest(

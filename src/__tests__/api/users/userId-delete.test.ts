@@ -2,27 +2,26 @@ import { NextRequest } from 'next/server';
 import { DELETE } from '@/app/api/users/[userId]/route';
 import { UserType } from '@/types/prisma';
 
-// Mock the Prisma module
-jest.mock('@prisma/client', () => ({
-  Prisma: {
-    PrismaClientKnownRequestError: class extends Error {
-      code: string;
-      clientVersion: string;
-      meta?: any;
-      
-      constructor(message: string, { code, clientVersion, meta }: { code: string; clientVersion: string; meta?: any }) {
-        super(message);
-        this.name = 'PrismaClientKnownRequestError';
-        this.code = code;
-        this.clientVersion = clientVersion;
-        this.meta = meta;
-      }
-    },
+// Valid UUID constants for testing (required by route's UUID validation)
+const ADMIN_USER_ID = '11111111-1111-1111-1111-111111111111';
+const SUPER_ADMIN_USER_ID = '22222222-2222-2222-2222-222222222222';
+const TARGET_USER_ID = '33333333-3333-3333-3333-333333333333';
+const HELPDESK_USER_ID = '44444444-4444-4444-4444-444444444444';
+const SELF_USER_ID = '55555555-5555-5555-5555-555555555555';
+const NONEXISTENT_USER_ID = '99999999-9999-9999-9999-999999999999';
+
+// Mock the soft delete service - define mock inside jest.mock to handle hoisting
+const mockSoftDeleteUser = jest.fn();
+
+jest.mock('@/services/userSoftDeleteService', () => ({
+  userSoftDeleteService: {
+    softDeleteUser: mockSoftDeleteUser,
   },
 }));
 
-// Import after mocking
-import { Prisma } from '@prisma/client';
+// Import the actual PrismaClientKnownRequestError from @/types/prisma
+// (used by the route for instanceof checks)
+import { PrismaClientKnownRequestError } from '@/types/prisma';
 
 // Mocks
 const mockSupabaseClient = {
@@ -39,24 +38,6 @@ jest.mock('@/utils/prismaDB', () => ({
   prisma: {
     profile: {
       findUnique: jest.fn(),
-    },
-    cateringRequest: {
-      count: jest.fn(),
-    },
-    onDemand: {
-      count: jest.fn(),
-    },
-    $transaction: jest.fn(),
-    dispatch: {
-      deleteMany: jest.fn(),
-    },
-    fileUpload: {
-      updateMany: jest.fn(),
-    },
-    address: {
-      findMany: jest.fn(),
-      delete: jest.fn(),
-      update: jest.fn(),
     },
   },
 }));
@@ -85,26 +66,22 @@ const mockAuthenticatedUser = (userId: string, userType: UserType = UserType.ADM
   });
 };
 
-const mockTargetUser = (userId: string, userType: UserType = UserType.VENDOR, email: string = 'target@example.com') => {
+const mockTargetUser = (
+  userId: string,
+  userType: UserType = UserType.VENDOR,
+  email: string = 'target@example.com'
+) => {
   (prisma.profile.findUnique as jest.Mock).mockResolvedValueOnce({
     type: userType,
     email: email,
   });
 };
 
-const mockNoActiveOrders = () => {
-  (prisma.cateringRequest.count as jest.Mock).mockResolvedValue(0);
-  (prisma.onDemand.count as jest.Mock).mockResolvedValue(0);
-};
-
-const mockActiveOrders = (cateringCount: number = 1, onDemandCount: number = 1) => {
-  (prisma.cateringRequest.count as jest.Mock).mockResolvedValue(cateringCount);
-  (prisma.onDemand.count as jest.Mock).mockResolvedValue(onDemandCount);
-};
-
 describe('/api/users/[userId] DELETE API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Reset soft delete service mock
+    mockSoftDeleteUser.mockReset();
   });
 
   describe('🔐 Authorization Tests', () => {
@@ -114,260 +91,192 @@ describe('/api/users/[userId] DELETE API', () => {
         error: null,
       });
 
-      const req = createRequest('target-user-id');
+      const req = createRequest(TARGET_USER_ID);
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(401);
       const data = await res.json();
       expect(data.error).toBe('Unauthorized: Authentication required');
     });
 
     it('should allow ADMIN to delete users', async () => {
-      mockAuthenticatedUser('admin-id', UserType.ADMIN);
-      mockTargetUser('target-id', UserType.VENDOR);
-      mockNoActiveOrders();
+      mockAuthenticatedUser(ADMIN_USER_ID, UserType.ADMIN);
+      mockTargetUser(TARGET_USER_ID, UserType.VENDOR);
 
-      // Mock successful deletion transaction
-      (prisma.$transaction as jest.Mock).mockResolvedValue({
-        deletedProfile: { id: 'target-id' },
-        deletedDispatches: 0,
-        updatedFileUploads: 0,
-        deletedAddresses: 0,
-        updatedAddresses: 0,
-        totalAddressesProcessed: 0,
+      // Mock successful soft delete
+      mockSoftDeleteUser.mockResolvedValue({
+        userId: TARGET_USER_ID,
+        deletedAt: new Date(),
+        deletedBy: ADMIN_USER_ID,
+        deletionReason: undefined,
       });
 
-      const req = createRequest('target-id');
+      const req = createRequest(TARGET_USER_ID);
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data.message).toBe('User and associated data deleted successfully');
+      expect(data.message).toBe('User soft deleted successfully');
     });
 
     it('should allow SUPER_ADMIN to delete users', async () => {
-      mockAuthenticatedUser('superadmin-id', UserType.SUPER_ADMIN);
-      mockTargetUser('target-id', UserType.VENDOR);
-      mockNoActiveOrders();
+      mockAuthenticatedUser(SUPER_ADMIN_USER_ID, UserType.SUPER_ADMIN);
+      mockTargetUser(TARGET_USER_ID, UserType.VENDOR);
 
-      (prisma.$transaction as jest.Mock).mockResolvedValue({
-        deletedProfile: { id: 'target-id' },
-        deletedDispatches: 0,
-        updatedFileUploads: 0,
-        deletedAddresses: 0,
-        updatedAddresses: 0,
-        totalAddressesProcessed: 0,
+      mockSoftDeleteUser.mockResolvedValue({
+        userId: TARGET_USER_ID,
+        deletedAt: new Date(),
+        deletedBy: SUPER_ADMIN_USER_ID,
+        deletionReason: undefined,
       });
 
-      const req = createRequest('target-id');
+      const req = createRequest(TARGET_USER_ID);
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(200);
     });
 
     it('should deny HELPDESK from deleting users', async () => {
-      mockAuthenticatedUser('helpdesk-id', UserType.HELPDESK);
+      mockAuthenticatedUser(HELPDESK_USER_ID, UserType.HELPDESK);
 
-      const req = createRequest('target-id');
+      const req = createRequest(TARGET_USER_ID);
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(403);
       const data = await res.json();
       expect(data.error).toBe('Forbidden: Only Admin or Super Admin can delete users');
     });
 
     it('should deny VENDOR from deleting users', async () => {
-      mockAuthenticatedUser('vendor-id', UserType.VENDOR);
+      mockAuthenticatedUser(TARGET_USER_ID, UserType.VENDOR);
 
-      const req = createRequest('target-id');
+      const req = createRequest(NONEXISTENT_USER_ID);
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(403);
       const data = await res.json();
       expect(data.error).toBe('Forbidden: Only Admin or Super Admin can delete users');
     });
 
     it('should prevent deletion of SUPER_ADMIN users', async () => {
-      mockAuthenticatedUser('admin-id', UserType.ADMIN);
-      mockTargetUser('superadmin-target', UserType.SUPER_ADMIN);
+      mockAuthenticatedUser(ADMIN_USER_ID, UserType.ADMIN);
+      mockTargetUser(SUPER_ADMIN_USER_ID, UserType.SUPER_ADMIN);
 
-      const req = createRequest('superadmin-target');
+      const req = createRequest(SUPER_ADMIN_USER_ID);
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(403);
       const data = await res.json();
       expect(data.error).toBe('Forbidden: Super Admin users cannot be deleted');
     });
 
     it('should prevent self-deletion', async () => {
-      const adminId = 'admin-id';
-      mockAuthenticatedUser(adminId, UserType.ADMIN);
-      mockTargetUser(adminId, UserType.ADMIN);
+      mockAuthenticatedUser(SELF_USER_ID, UserType.ADMIN);
+      mockTargetUser(SELF_USER_ID, UserType.ADMIN);
 
-      const req = createRequest(adminId);
+      const req = createRequest(SELF_USER_ID);
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(403);
       const data = await res.json();
       expect(data.error).toBe('Forbidden: Cannot delete your own account');
     });
   });
 
-  describe('🗄️ Database Integrity Tests', () => {
+  describe('🗄️ Service Integration Tests', () => {
     beforeEach(() => {
-      mockAuthenticatedUser('admin-id', UserType.ADMIN);
-      mockTargetUser('target-id', UserType.VENDOR);
+      mockAuthenticatedUser(ADMIN_USER_ID, UserType.ADMIN);
+      mockTargetUser(TARGET_USER_ID, UserType.VENDOR);
     });
 
-    it('should prevent deletion when user has active catering orders', async () => {
-      mockActiveOrders(2, 0); // 2 catering, 0 on-demand
-
-      const req = createRequest('target-id');
-      const res = await DELETE(req);
-      
-      expect(res.status).toBe(409);
-      const data = await res.json();
-      expect(data.error).toBe('Cannot delete user with active orders. Complete or cancel orders first.');
-      expect(data.details).toEqual({
-        activeCateringOrders: 2,
-        activeOnDemandOrders: 0,
-        totalActiveOrders: 2,
-      });
-    });
-
-    it('should prevent deletion when user has active on-demand orders', async () => {
-      mockActiveOrders(0, 3); // 0 catering, 3 on-demand
-
-      const req = createRequest('target-id');
-      const res = await DELETE(req);
-      
-      expect(res.status).toBe(409);
-      const data = await res.json();
-      expect(data.details.activeOnDemandOrders).toBe(3);
-      expect(data.details.totalActiveOrders).toBe(3);
-    });
-
-    it('should execute deletion transaction with all steps', async () => {
-      mockNoActiveOrders();
-
-      const mockTransactionCallback = jest.fn().mockResolvedValue({
-        deletedProfile: { id: 'target-id' },
-        deletedDispatches: 5,
-        updatedFileUploads: 3,
-        deletedAddresses: 2,
-        updatedAddresses: 1,
-        totalAddressesProcessed: 3,
+    it('should call soft delete service with correct parameters', async () => {
+      mockSoftDeleteUser.mockResolvedValue({
+        userId: TARGET_USER_ID,
+        deletedAt: new Date(),
+        deletedBy: ADMIN_USER_ID,
+        deletionReason: undefined,
       });
 
-      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-        // Simulate transaction operations
-        const mockTx = {
-          dispatch: { deleteMany: jest.fn().mockResolvedValue({ count: 5 }) },
-          fileUpload: { updateMany: jest.fn().mockResolvedValue({ count: 3 }) },
-          address: {
-            findMany: jest.fn().mockResolvedValue([
-              {
-                id: 'addr1',
-                userAddresses: [],
-                cateringPickupRequests: [],
-                cateringDeliveryRequests: [],
-                onDemandPickupRequests: [],
-                onDemandDeliveryRequests: [],
-              },
-              {
-                id: 'addr2',
-                userAddresses: [],
-                cateringPickupRequests: [],
-                cateringDeliveryRequests: [],
-                onDemandPickupRequests: [],
-                onDemandDeliveryRequests: [],
-              },
-              {
-                id: 'addr3',
-                userAddresses: [{ userId: 'other-user' }], // Used by another user
-                cateringPickupRequests: [],
-                cateringDeliveryRequests: [],
-                onDemandPickupRequests: [],
-                onDemandDeliveryRequests: [],
-              },
-            ]),
-            delete: jest.fn().mockResolvedValue({}),
-            update: jest.fn().mockResolvedValue({}),
-          },
-          profile: { delete: jest.fn().mockResolvedValue({ id: 'target-id' }) },
-        };
-        
-        return await callback(mockTx);
-      });
-
-      const req = createRequest('target-id');
+      const req = createRequest(TARGET_USER_ID);
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(200);
-      const data = await res.json();
-      
-      expect(data.summary).toMatchObject({
-        deletedUser: { id: 'target-id' },
-        deletedDispatches: 5,
-        updatedFileUploads: 3,
-        processedAddresses: 3,
-        deletedAddresses: 2,
-        updatedAddresses: 1,
-      });
-
-      // Verify transaction was called with timeout
-      expect(prisma.$transaction).toHaveBeenCalledWith(
-        expect.any(Function),
-        { timeout: 10000 }
+      expect(mockSoftDeleteUser).toHaveBeenCalledWith(
+        TARGET_USER_ID,
+        ADMIN_USER_ID,
+        undefined
       );
     });
 
-    it('should handle complex address relationships correctly', async () => {
-      mockNoActiveOrders();
-
-      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-        const mockTx = {
-          dispatch: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
-          fileUpload: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
-          address: {
-            findMany: jest.fn().mockResolvedValue([
-              {
-                id: 'unused-addr',
-                userAddresses: [], // Not used by anyone
-                cateringPickupRequests: [],
-                cateringDeliveryRequests: [],
-                onDemandPickupRequests: [],
-                onDemandDeliveryRequests: [],
-              },
-              {
-                id: 'used-addr',
-                userAddresses: [],
-                cateringPickupRequests: [{ id: 'catering-1' }], // Used by catering
-                cateringDeliveryRequests: [],
-                onDemandPickupRequests: [],
-                onDemandDeliveryRequests: [],
-              },
-            ]),
-            delete: jest.fn().mockResolvedValue({}),
-            update: jest.fn().mockResolvedValue({}),
-          },
-          profile: { delete: jest.fn().mockResolvedValue({ id: 'target-id' }) },
-        };
-        
-        return await callback(mockTx);
+    it('should pass deletion reason to soft delete service', async () => {
+      mockSoftDeleteUser.mockResolvedValue({
+        userId: TARGET_USER_ID,
+        deletedAt: new Date(),
+        deletedBy: ADMIN_USER_ID,
+        deletionReason: 'User requested account deletion',
       });
 
-      const req = createRequest('target-id');
-      await DELETE(req);
-      
-      // Verify the transaction callback was executed
-      expect(prisma.$transaction).toHaveBeenCalled();
+      const req = new Request(
+        `http://localhost:3000/api/users/${TARGET_USER_ID}`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'User requested account deletion' }),
+        }
+      ) as NextRequest;
+
+      const res = await DELETE(req);
+
+      expect(res.status).toBe(200);
+      expect(mockSoftDeleteUser).toHaveBeenCalledWith(
+        TARGET_USER_ID,
+        ADMIN_USER_ID,
+        'User requested account deletion'
+      );
+    });
+
+    it('should return summary with soft delete result', async () => {
+      const deletedAt = new Date('2024-01-15T10:30:00Z');
+      mockSoftDeleteUser.mockResolvedValue({
+        userId: TARGET_USER_ID,
+        deletedAt,
+        deletedBy: ADMIN_USER_ID,
+        deletionReason: 'Test deletion',
+      });
+
+      const req = createRequest(TARGET_USER_ID);
+      const res = await DELETE(req);
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+
+      expect(data.summary).toMatchObject({
+        deletedUser: {
+          id: TARGET_USER_ID,
+          type: UserType.VENDOR,
+        },
+        deletedBy: ADMIN_USER_ID,
+        deletionReason: 'Test deletion',
+      });
+    });
+
+    it('should handle service errors gracefully', async () => {
+      mockSoftDeleteUser.mockRejectedValue(
+        new Error('Service unavailable')
+      );
+
+      const req = createRequest(TARGET_USER_ID);
+      const res = await DELETE(req);
+
+      expect(res.status).toBe(500);
+      const data = await res.json();
+      expect(data.error).toBe('Failed to soft delete user');
     });
   });
 
   describe('🚫 Edge Case Testing', () => {
     beforeEach(() => {
-      mockAuthenticatedUser('admin-id', UserType.ADMIN);
+      mockAuthenticatedUser(ADMIN_USER_ID, UserType.ADMIN);
     });
 
     it('should return 400 when userId is missing', async () => {
@@ -376,262 +285,197 @@ describe('/api/users/[userId] DELETE API', () => {
       }) as NextRequest;
 
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data.error).toBe('User ID is required');
     });
 
+    it('should return 400 for invalid UUID format', async () => {
+      const req = createRequest('invalid-uuid-format');
+      const res = await DELETE(req);
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toBe('Invalid user ID format');
+    });
+
     it('should return 404 when target user does not exist', async () => {
-      // Setup authentication  
-      (mockSupabaseClient.auth.getUser as jest.Mock).mockResolvedValue({
-        data: { user: { id: 'admin-id' } },
-        error: null,
-      });
-      
+      // Reset and re-setup all mocks for this specific test case
+      (prisma.profile.findUnique as jest.Mock).mockReset();
+
       // Setup profile queries in sequence:
-      // 1. Requester profile check
+      // 1. Requester profile check (returns admin)
       // 2. Target user check (returns null - user doesn't exist)
       (prisma.profile.findUnique as jest.Mock)
         .mockResolvedValueOnce({ type: UserType.ADMIN }) // requester profile
         .mockResolvedValueOnce(null); // target user doesn't exist
 
-      const req = createRequest('nonexistent-id');
+      const req = createRequest(NONEXISTENT_USER_ID);
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(404);
       const data = await res.json();
       expect(data.error).toBe('User not found');
     });
 
     it('should handle Prisma P2025 error (record not found)', async () => {
-      mockAuthenticatedUser('admin-id', UserType.ADMIN);
-      mockTargetUser('target-id', UserType.VENDOR);
-      mockNoActiveOrders();
+      // Note: beforeEach already calls mockAuthenticatedUser
+      // Just add the target user mock
+      mockTargetUser(TARGET_USER_ID, UserType.VENDOR);
 
-      const prismaError = new Prisma.PrismaClientKnownRequestError(
-        'Record not found',
-        {
-          code: 'P2025',
-          clientVersion: '4.0.0',
-          meta: { cause: 'Record to delete does not exist.' }
-        }
-      );
+      const prismaError = new PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        meta: { cause: 'Record to delete does not exist.' },
+      });
 
-      (prisma.$transaction as jest.Mock).mockRejectedValue(prismaError);
+      mockSoftDeleteUser.mockRejectedValue(prismaError);
 
-      const req = createRequest('target-id');
+      const req = createRequest(TARGET_USER_ID);
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(404);
       const data = await res.json();
       expect(data.code).toBe('USER_NOT_FOUND');
-      expect(data.error).toBe('User not found or already deleted');
+      expect(data.error).toBe('User not found');
     });
 
     it('should handle Prisma P2003 error (foreign key constraint)', async () => {
-      mockAuthenticatedUser('admin-id', UserType.ADMIN);
-      mockTargetUser('target-id', UserType.VENDOR);
-      mockNoActiveOrders();
+      // Note: beforeEach already calls mockAuthenticatedUser
+      // Just add the target user mock
+      mockTargetUser(TARGET_USER_ID, UserType.VENDOR);
 
-      const prismaError = new Prisma.PrismaClientKnownRequestError(
+      const prismaError = new PrismaClientKnownRequestError(
         'Foreign key constraint failed',
         {
           code: 'P2003',
-          clientVersion: '4.0.0',
-          meta: { field_name: 'user_id' }
+          meta: { field_name: 'user_id' },
         }
       );
 
-      (prisma.$transaction as jest.Mock).mockRejectedValue(prismaError);
+      mockSoftDeleteUser.mockRejectedValue(prismaError);
 
-      const req = createRequest('target-id');
+      const req = createRequest(TARGET_USER_ID);
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(409);
       const data = await res.json();
       expect(data.code).toBe('FOREIGN_KEY_VIOLATION');
       expect(data.error).toBe('Cannot delete user: referenced by other records');
     });
 
-    it('should handle database connection timeout', async () => {
-      mockAuthenticatedUser('admin-id', UserType.ADMIN);
-      mockTargetUser('target-id', UserType.VENDOR);
-      mockNoActiveOrders();
-
-      const timeoutError = new Error('timeout exceeded');
-      (prisma.$transaction as jest.Mock).mockRejectedValue(timeoutError);
-
-      const req = createRequest('target-id');
-      const res = await DELETE(req);
-      
-      expect(res.status).toBe(408);
-      const data = await res.json();
-      expect(data.code).toBe('TRANSACTION_TIMEOUT');
-      expect(data.error).toContain('timed out');
-    });
-
     it('should handle unexpected errors gracefully', async () => {
-      mockAuthenticatedUser('admin-id', UserType.ADMIN);
-      mockTargetUser('target-id', UserType.VENDOR);
-      mockNoActiveOrders();
+      // Note: beforeEach already calls mockAuthenticatedUser
+      // Just add the target user mock
+      mockTargetUser(TARGET_USER_ID, UserType.VENDOR);
 
       const unexpectedError = new Error('Unexpected database error');
-      (prisma.$transaction as jest.Mock).mockRejectedValue(unexpectedError);
+      mockSoftDeleteUser.mockRejectedValue(unexpectedError);
 
-      const req = createRequest('target-id');
+      const req = createRequest(TARGET_USER_ID);
       const res = await DELETE(req);
-      
+
       expect(res.status).toBe(500);
       const data = await res.json();
-      expect(data.code).toBe('DELETION_FAILED');
-      expect(data.error).toBe('Failed to delete user');
+      expect(data.error).toBe('Failed to soft delete user');
     });
   });
 
-  describe('📊 Audit Trail Testing', () => {
+  describe('📊 Response Structure Testing', () => {
     beforeEach(() => {
-      mockAuthenticatedUser('admin-id', UserType.ADMIN);
-      mockTargetUser('target-id', UserType.VENDOR, 'target@example.com');
+      mockAuthenticatedUser(ADMIN_USER_ID, UserType.ADMIN);
+      mockTargetUser(TARGET_USER_ID, UserType.VENDOR, 'target@example.com');
     });
 
-    it('should log successful deletion audit trail', async () => {
-      mockNoActiveOrders();
-      
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-
-      (prisma.$transaction as jest.Mock).mockResolvedValue({
-        deletedProfile: { id: 'target-id' },
-        deletedDispatches: 2,
-        updatedFileUploads: 1,
-        deletedAddresses: 1,
-        updatedAddresses: 0,
-        totalAddressesProcessed: 1,
+    it('should include all expected fields in success response', async () => {
+      const deletedAt = new Date('2024-01-15T10:30:00Z');
+      mockSoftDeleteUser.mockResolvedValue({
+        userId: TARGET_USER_ID,
+        deletedAt,
+        deletedBy: ADMIN_USER_ID,
+        deletionReason: 'Inactive account',
       });
 
-      const req = createRequest('target-id');
-      await DELETE(req);
-      
-      // Check if audit log was created
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[AUDIT] User deletion completed:',
-        expect.stringContaining('"action":"USER_DELETION"')
-      );
-      
-      const auditCall = consoleSpy.mock.calls.find(call => 
-        call[0] === '[AUDIT] User deletion completed:'
-      );
-      
-      if (auditCall) {
-        const auditData = JSON.parse(auditCall[1]);
-        expect(auditData).toMatchObject({
-          action: 'USER_DELETION',
-          performedBy: 'admin-id',
-          performedByType: UserType.ADMIN,
-          targetUserId: 'target-id',
-          targetUserEmail: 'target@example.com',
-          targetUserType: UserType.VENDOR,
-          success: true,
-          affectedRecords: {
-            dispatchesDeleted: 2,
-            fileUploadsUpdated: 1,
-            addressesDeleted: 1,
-            addressesUpdated: 0,
-          },
-        });
-      }
+      const req = createRequest(TARGET_USER_ID);
+      const res = await DELETE(req);
 
-      consoleSpy.mockRestore();
+      expect(res.status).toBe(200);
+      const data = await res.json();
+
+      expect(data).toHaveProperty('message', 'User soft deleted successfully');
+      expect(data).toHaveProperty('summary');
+      expect(data.summary).toHaveProperty('deletedUser');
+      expect(data.summary).toHaveProperty('deletedAt');
+      expect(data.summary).toHaveProperty('deletedBy');
+      expect(data.summary).toHaveProperty('deletionReason');
+      expect(data.summary).toHaveProperty('duration');
+      expect(data.summary).toHaveProperty('timestamp');
     });
 
-    it('should log failed deletion audit trail', async () => {
-      mockAuthenticatedUser('admin-id', UserType.ADMIN);
-      mockTargetUser('target-id', UserType.VENDOR, 'target@example.com');
-      mockNoActiveOrders();
-      
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    it('should include user details in deleted user summary', async () => {
+      mockSoftDeleteUser.mockResolvedValue({
+        userId: TARGET_USER_ID,
+        deletedAt: new Date(),
+        deletedBy: ADMIN_USER_ID,
+        deletionReason: undefined,
+      });
 
-      const error = new Error('Database connection failed');
-      (prisma.$transaction as jest.Mock).mockRejectedValue(error);
+      const req = createRequest(TARGET_USER_ID);
+      const res = await DELETE(req);
 
-      const req = createRequest('target-id');
+      const data = await res.json();
+
+      expect(data.summary.deletedUser).toEqual({
+        id: TARGET_USER_ID,
+        email: 'target@example.com',
+        type: UserType.VENDOR,
+      });
+    });
+  });
+
+  describe('⚡ Error Logging', () => {
+    beforeEach(() => {
+      mockAuthenticatedUser(ADMIN_USER_ID, UserType.ADMIN);
+      mockTargetUser(TARGET_USER_ID, UserType.VENDOR);
+    });
+
+    it('should log error when soft delete fails', async () => {
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation();
+
+      const error = new Error('Service unavailable');
+      mockSoftDeleteUser.mockRejectedValue(error);
+
+      const req = createRequest(TARGET_USER_ID);
       await DELETE(req);
-      
-      // Check if failure audit log was created
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[AUDIT] User deletion failed:',
-        expect.stringContaining('"action":"USER_DELETION_FAILED"')
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\[DELETE\] Soft delete failed after \d+ms:/),
+        error
       );
 
-      consoleSpy.mockRestore();
       consoleErrorSpy.mockRestore();
     });
-  });
 
-  describe('⚡ Performance Considerations', () => {
-    beforeEach(() => {
-      mockAuthenticatedUser('admin-id', UserType.ADMIN);
-      mockTargetUser('target-id', UserType.VENDOR);
-      mockNoActiveOrders();
-    });
+    it('should handle already deleted user error', async () => {
+      // Note: beforeEach sets up auth but NOT target user - we override it here
+      // Need to clear and re-setup the profile mock
+      (prisma.profile.findUnique as jest.Mock).mockReset();
+      (prisma.profile.findUnique as jest.Mock)
+        .mockResolvedValueOnce({ type: UserType.ADMIN }) // requester profile
+        .mockResolvedValueOnce({
+          type: UserType.VENDOR,
+          email: 'target@example.com',
+          deletedAt: new Date(), // Already deleted
+        });
 
-    it('should complete deletion within reasonable time', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const req = createRequest(TARGET_USER_ID);
+      const res = await DELETE(req);
 
-      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-        // Simulate some processing time
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        const mockTx = {
-          dispatch: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
-          fileUpload: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
-          address: {
-            findMany: jest.fn().mockResolvedValue([]),
-            delete: jest.fn(),
-            update: jest.fn(),
-          },
-          profile: { delete: jest.fn().mockResolvedValue({ id: 'target-id' }) },
-        };
-        
-        return await callback(mockTx);
-      });
-
-      const req = createRequest('target-id');
-      const startTime = Date.now();
-      
-      await DELETE(req);
-      
-      const duration = Date.now() - startTime;
-      
-      // Should complete within reasonable time (allowing for test overhead)
-      expect(duration).toBeLessThan(5000);
-
-      // Check if performance logging occurred
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/\[DELETE\] Transaction completed successfully in \d+ms/)
-      );
-
-      consoleSpy.mockRestore();
-    });
-
-    it('should use transaction timeout correctly', async () => {
-      (prisma.$transaction as jest.Mock).mockResolvedValue({
-        deletedProfile: { id: 'target-id' },
-        deletedDispatches: 0,
-        updatedFileUploads: 0,
-        deletedAddresses: 0,
-        updatedAddresses: 0,
-        totalAddressesProcessed: 0,
-      });
-
-      const req = createRequest('target-id');
-      await DELETE(req);
-      
-      expect(prisma.$transaction).toHaveBeenCalledWith(
-        expect.any(Function),
-        { timeout: 10000 }
-      );
+      expect(res.status).toBe(409);
+      const data = await res.json();
+      expect(data.error).toBe('User is already soft deleted');
     });
   });
 });
