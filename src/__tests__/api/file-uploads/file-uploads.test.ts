@@ -8,6 +8,7 @@ import { UploadSecurityManager } from '@/lib/upload-security';
 import {
   createGetRequest,
   createPostRequest,
+  createPostRequestWithFormData,
   expectSuccessResponse,
   expectUnauthorized,
   expectErrorResponse,
@@ -261,15 +262,13 @@ describe('/api/file-uploads API', () => {
         formData.append('entityId', 'entity-123');
         formData.append('entityType', 'job_application');
 
-        const request = new Request('http://localhost:3000/api/file-uploads', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'x-user-id': 'user-123',
-          },
-        });
+        const request = createPostRequestWithFormData(
+          'http://localhost:3000/api/file-uploads',
+          formData,
+          { 'x-user-id': 'user-123' }
+        );
 
-        const response = await POST(request as any);
+        const response = await POST(request);
 
         expect(response.status).toBeGreaterThanOrEqual(200);
         expect(response.status).toBeLessThan(300);
@@ -297,15 +296,13 @@ describe('/api/file-uploads API', () => {
         formData.append('file', mockFile);
         formData.append('entityId', 'entity-123');
 
-        const request = new Request('http://localhost:3000/api/file-uploads', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'x-user-id': 'user-123',
-          },
-        });
+        const request = createPostRequestWithFormData(
+          'http://localhost:3000/api/file-uploads',
+          formData,
+          { 'x-user-id': 'user-123' }
+        );
 
-        const response = await POST(request as any);
+        const response = await POST(request);
 
         expect(response.status).toBe(429);
         const data = await response.json();
@@ -332,12 +329,12 @@ describe('/api/file-uploads API', () => {
         formData.append('file', mockFile);
         formData.append('entityId', 'entity-123');
 
-        const request = new Request('http://localhost:3000/api/file-uploads', {
-          method: 'POST',
-          body: formData,
-        });
+        const request = createPostRequestWithFormData(
+          'http://localhost:3000/api/file-uploads',
+          formData
+        );
 
-        const response = await POST(request as any);
+        const response = await POST(request);
 
         expect(response.status).toBeGreaterThanOrEqual(400);
       });
@@ -360,12 +357,12 @@ describe('/api/file-uploads API', () => {
         formData.append('file', mockFile);
         formData.append('entityId', 'entity-123');
 
-        const request = new Request('http://localhost:3000/api/file-uploads', {
-          method: 'POST',
-          body: formData,
-        });
+        const request = createPostRequestWithFormData(
+          'http://localhost:3000/api/file-uploads',
+          formData
+        );
 
-        const response = await POST(request as any);
+        const response = await POST(request);
 
         expect(response.status).toBeGreaterThanOrEqual(400);
       });
@@ -391,12 +388,12 @@ describe('/api/file-uploads API', () => {
         formData.append('file', mockFile);
         formData.append('entityId', 'entity-123');
 
-        const request = new Request('http://localhost:3000/api/file-uploads', {
-          method: 'POST',
-          body: formData,
-        });
+        const request = createPostRequestWithFormData(
+          'http://localhost:3000/api/file-uploads',
+          formData
+        );
 
-        const response = await POST(request as any);
+        const response = await POST(request);
 
         expect(response.status).toBeGreaterThanOrEqual(500);
       });
@@ -425,12 +422,12 @@ describe('/api/file-uploads API', () => {
         formData.append('file', mockFile);
         formData.append('entityId', 'entity-123');
 
-        const request = new Request('http://localhost:3000/api/file-uploads', {
-          method: 'POST',
-          body: formData,
-        });
+        const request = createPostRequestWithFormData(
+          'http://localhost:3000/api/file-uploads',
+          formData
+        );
 
-        const response = await POST(request as any);
+        const response = await POST(request);
 
         expect(response.status).toBeGreaterThanOrEqual(500);
       });
@@ -473,15 +470,13 @@ describe('/api/file-uploads API', () => {
         formData.append('entityId', 'temp_123_abc');
         formData.append('entityType', 'job_application');
 
-        const request = new Request('http://localhost:3000/api/file-uploads', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'x-upload-token': 'valid-session-token',
-          },
-        });
+        const request = createPostRequestWithFormData(
+          'http://localhost:3000/api/file-uploads',
+          formData,
+          { 'x-upload-token': 'valid-session-token' }
+        );
 
-        const response = await POST(request as any);
+        const response = await POST(request);
 
         expect(response.status).toBeGreaterThanOrEqual(200);
         expect(response.status).toBeLessThan(300);
@@ -498,12 +493,12 @@ describe('/api/file-uploads API', () => {
         formData.append('entityType', 'job_application');
 
         // No x-upload-token header provided
-        const request = new Request('http://localhost:3000/api/file-uploads', {
-          method: 'POST',
-          body: formData,
-        });
+        const request = createPostRequestWithFormData(
+          'http://localhost:3000/api/file-uploads',
+          formData
+        );
 
-        const response = await POST(request as any);
+        const response = await POST(request);
 
         // Should fail due to missing session token for job applications
         expect(response.status).toBeGreaterThanOrEqual(400);
@@ -550,15 +545,13 @@ describe('/api/file-uploads API', () => {
         formData.append('entityId', 'entity-123');
         formData.append('entityType', 'document'); // Not job_application
 
-        const request = new Request('http://localhost:3000/api/file-uploads', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'x-user-id': 'user-123',
-          },
-        });
+        const request = createPostRequestWithFormData(
+          'http://localhost:3000/api/file-uploads',
+          formData,
+          { 'x-user-id': 'user-123' }
+        );
 
-        const response = await POST(request as any);
+        const response = await POST(request);
 
         expect(response.status).toBeGreaterThanOrEqual(200);
         expect(response.status).toBeLessThan(300);
