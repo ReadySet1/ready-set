@@ -7,7 +7,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
 import { calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
-import { calculateCaterValleyPricing, type PricingCalculationResult } from '@/app/api/cater-valley/_lib/pricing-helper';
+import {
+  validateCaterValleyAuth,
+  ensureAddress,
+  extractZipFromAddress,
+  normalizeOrderNumber,
+  ensureCaterValleySystemUser,
+  calculateCaterValleyPricing,
+  type PricingCalculationResult,
+} from '@/app/api/cater-valley/_lib';
 
 // Validation schema for CaterValley draft order request
 const DraftOrderSchema = z.object({
@@ -55,104 +63,6 @@ interface DraftOrderResponse {
     bridgeToll?: number;         // Dollar amount for bridge toll
     peakTimeMultiplier?: number; // Reserved for future use
   };
-}
-
-/**
- * Authentication middleware for CaterValley requests
- */
-function validateCaterValleyAuth(request: NextRequest): boolean {
-  const apiKey = request.headers.get('x-api-key');
-  const partner = request.headers.get('partner');
-  
-  // Check for CaterValley-specific authentication
-  if (partner !== 'catervalley') {
-    return false;
-  }
-  
-  // In production, validate the API key against stored credentials
-  const expectedApiKey = process.env.CATERVALLEY_API_KEY;
-  if (expectedApiKey && apiKey !== expectedApiKey) {
-    return false;
-  }
-  
-  return true;
-}
-
-/**
- * Creates or finds a CaterValley system user
- */
-async function ensureCaterValleySystemUser() {
-  return await prisma.profile.upsert({
-    where: { email: 'system@catervalley.com' },
-    update: { 
-      updatedAt: new Date(),
-      status: 'ACTIVE',
-    },
-    create: {
-      email: 'system@catervalley.com',
-      name: 'CaterValley System',
-      type: 'CLIENT',
-      companyName: 'CaterValley',
-      status: 'ACTIVE',
-    },
-  });
-}
-
-/**
- * Creates or finds an address
- */
-async function ensureAddress(location: DraftOrderRequest['pickupLocation'] | DraftOrderRequest['dropOffLocation']): Promise<{ id: string }> {
-  // Parse ZIP from address if not provided separately
-  const zipCode = location.zip || extractZipFromAddress(location.address);
-  
-  // First, try to find an existing address
-  const existingAddress = await prisma.address.findFirst({
-    where: {
-      street1: location.address,
-      city: location.city,
-      state: location.state,
-      zip: zipCode,
-    },
-    select: { id: true },
-  });
-
-  if (existingAddress) {
-    return existingAddress;
-  }
-
-  // Create new address if not found
-  const newAddress = await prisma.address.create({
-    data: {
-      street1: location.address,
-      city: location.city,
-      state: location.state,
-      zip: zipCode,
-      name: location.name,
-      isRestaurant: false, // We'll determine this based on context later
-    },
-    select: { id: true },
-  });
-
-  return newAddress;
-}
-
-/**
- * Extract ZIP code from address string
- */
-function extractZipFromAddress(address: string): string {
-  const zipMatch = address.match(/\b\d{5}(-\d{4})?\b/);
-  return zipMatch ? zipMatch[0] : '';
-}
-
-/**
- * Ensures order number has CV- prefix, avoiding duplicate prefixes
- * @param orderCode - The order code from CaterValley (may or may not include CV- prefix)
- * @returns Order number with single CV- prefix
- */
-function normalizeOrderNumber(orderCode: string): string {
-  // If orderCode already starts with CV-, use it as-is
-  // Otherwise, add the CV- prefix
-  return orderCode.startsWith('CV-') ? orderCode : `CV-${orderCode}`;
 }
 
 export async function POST(request: NextRequest) {

@@ -6,6 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
+import {
+  validateCaterValleyAuth,
+  isOrderEditable,
+  isCaterValleyOrder,
+} from '@/app/api/cater-valley/_lib';
 
 // Validation schema for CaterValley confirm order request
 const ConfirmOrderSchema = z.object({
@@ -27,25 +32,6 @@ interface ConfirmOrderResponse {
     expectedAssignmentTime: string;
     trackingAvailable: boolean;
   };
-}
-
-/**
- * Authentication middleware for CaterValley requests
- */
-function validateCaterValleyAuth(request: NextRequest): boolean {
-  const apiKey = request.headers.get('x-api-key');
-  const partner = request.headers.get('partner');
-  
-  if (partner !== 'catervalley') {
-    return false;
-  }
-  
-  const expectedApiKey = process.env.CATERVALLEY_API_KEY;
-  if (expectedApiKey && apiKey !== expectedApiKey) {
-    return false;
-  }
-  
-  return true;
 }
 
 /**
@@ -142,7 +128,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify this is a CaterValley order
-    if (!existingOrder.orderNumber.startsWith('CV-') || existingOrder.user.email !== 'system@catervalley.com') {
+    if (!isCaterValleyOrder(existingOrder.orderNumber, existingOrder.user.email)) {
       return NextResponse.json(
         {
           status: 'ERROR',
@@ -153,7 +139,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if order is in a state that allows confirmation
-    if (!['PENDING', 'ACTIVE'].includes(existingOrder.status)) {
+    if (!isOrderEditable(existingOrder.status)) {
       return NextResponse.json(
         {
           status: 'ERROR',
