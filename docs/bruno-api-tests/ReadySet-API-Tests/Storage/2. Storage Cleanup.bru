@@ -1,0 +1,53 @@
+meta {
+  name: 2. Storage Cleanup
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{BASE_URL}}/storage/cleanup
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{AUTH_TOKEN}}
+}
+
+body:json {
+  {
+    "dryRun": true
+  }
+}
+
+docs {
+  # Storage Cleanup (Dry Run)
+
+  Triggers storage cleanup in dry-run mode.
+
+  ## Prerequisites
+  - Set AUTH_TOKEN in environment (admin required)
+
+  ## Tests REA-180 Changes
+  - Cleanup process improvements
+  - Response structure
+
+  ## Expected Response
+  - Status: 200 (admin) or 401/403 (not authorized)
+  - Cleanup report in response
+}
+
+tests {
+  test("Returns valid response", function() {
+    const status = res.getStatus();
+    expect([200, 401, 403]).to.include(status);
+  });
+
+  test("Dry run report returned if authorized", function() {
+    if (res.getStatus() === 200) {
+      const body = res.getBody();
+      expect(body).to.be.an('object');
+    }
+  });
+}

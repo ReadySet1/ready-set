@@ -1,0 +1,58 @@
+meta {
+  name: 1. Calculate Delivery Fee
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{BASE_URL}}/calculator/calculate
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "pickupAddress": "304 E Santa Clara St, San Jose, CA 95112",
+    "dropoffAddress": "303 S Almaden Blvd, San Jose, CA 95110",
+    "headcount": 10
+  }
+}
+
+docs {
+  # Calculate Delivery Fee
+
+  Calculates delivery fee based on pickup/dropoff locations and headcount.
+
+  ## Tests REA-179 Changes
+  - Proper response structure
+  - Correct JSON content-type
+
+  ## Expected Response
+  - Status: 200
+  - Body contains: deliveryFee, distance, tier info
+}
+
+tests {
+  test("Calculation returns 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has delivery fee", function() {
+    const body = res.getBody();
+    expect(body).to.have.property('deliveryFee');
+    expect(body.deliveryFee).to.be.a('number');
+  });
+
+  test("Delivery fee is positive", function() {
+    expect(res.getBody().deliveryFee).to.be.above(0);
+  });
+
+  test("Content-Type is JSON", function() {
+    const contentType = res.getHeader('content-type');
+    expect(contentType).to.include('application/json');
+  });
+}

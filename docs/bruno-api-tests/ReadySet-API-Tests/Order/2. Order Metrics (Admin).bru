@@ -1,0 +1,47 @@
+meta {
+  name: 2. Order Metrics (Admin)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{BASE_URL}}/order/metrics
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{AUTH_TOKEN}}
+}
+
+docs {
+  # Order Metrics Endpoint
+
+  Admin endpoint for order metrics and analytics.
+
+  ## Prerequisites
+  - Set AUTH_TOKEN in environment (admin user token)
+
+  ## Tests REA-179 Changes
+  - Response structure
+  - Proper JSON format
+
+  ## Expected Response
+  - Status: 200 (if authenticated as admin)
+  - Metrics data object
+}
+
+tests {
+  test("Returns valid response", function() {
+    const status = res.getStatus();
+    expect([200, 401, 403]).to.include(status);
+  });
+
+  test("Response is JSON if successful", function() {
+    if (res.getStatus() === 200) {
+      const contentType = res.getHeader('content-type');
+      expect(contentType).to.include('application/json');
+    }
+  });
+}

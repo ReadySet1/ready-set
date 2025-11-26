@@ -1,0 +1,46 @@
+meta {
+  name: 2. Calculate - Large Order
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{BASE_URL}}/calculator/calculate
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "pickupAddress": "1 Hacker Way, Menlo Park, CA 94025",
+    "dropoffAddress": "1600 Amphitheatre Parkway, Mountain View, CA 94043",
+    "headcount": 100
+  }
+}
+
+docs {
+  # Calculate - Large Order
+
+  Tests calculation for large headcount order.
+
+  ## Tests
+  - Tier pricing for large orders
+  - Distance-based calculation
+}
+
+tests {
+  test("Large order calculation succeeds", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Delivery fee reflects large order tier", function() {
+    const body = res.getBody();
+    expect(body.deliveryFee).to.be.a('number');
+    // Large orders should have higher fees
+    expect(body.deliveryFee).to.be.above(50);
+  });
+}

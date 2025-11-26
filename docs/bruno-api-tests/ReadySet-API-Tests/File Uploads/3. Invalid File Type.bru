@@ -1,0 +1,55 @@
+meta {
+  name: 3. Invalid File Type
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{BASE_URL}}/file-uploads/signed-url
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{AUTH_TOKEN}}
+}
+
+body:json {
+  {
+    "fileName": "malicious.exe",
+    "fileType": "application/x-msdownload",
+    "category": "documents",
+    "entityType": "order",
+    "entityId": "test-entity-123"
+  }
+}
+
+docs {
+  # Invalid File Type Test
+
+  Tests that dangerous file types are rejected.
+
+  ## Tests REA-180 Changes
+  - File type validation
+  - Proper error responses
+
+  ## Expected Response
+  - Status: 400 or 422
+  - Error message about invalid file type
+}
+
+tests {
+  test("Dangerous file type rejected", function() {
+    const status = res.getStatus();
+    // Should be rejected (400/422) or require auth (401/403)
+    expect([400, 401, 403, 422]).to.include(status);
+  });
+
+  test("Error response if rejected", function() {
+    if (res.getStatus() === 400 || res.getStatus() === 422) {
+      const body = res.getBody();
+      expect(body).to.have.property('error');
+    }
+  });
+}

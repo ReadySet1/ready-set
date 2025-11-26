@@ -1,0 +1,77 @@
+meta {
+  name: 6. Address with Suite Number
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{CATER_VALLEY_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "TEST-SUITE-{{$timestamp}}",
+    "deliveryDate": "2025-12-01",
+    "deliveryTime": "14:00",
+    "totalItem": 20,
+    "priceTotal": 250.00,
+    "pickupLocation": {
+      "name": "Corporate Catering",
+      "address": "1000 Tech Park Dr Bldg A",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95134",
+      "phone": "(408) 555-1000"
+    },
+    "dropOffLocation": {
+      "name": "Enterprise Office",
+      "address": "2000 Innovation Way Suite 500",
+      "city": "Santa Clara",
+      "state": "CA",
+      "zip": "95054",
+      "instructions": "5th floor, conference room B",
+      "recipient": {
+        "name": "Meeting Coordinator",
+        "phone": "4085552000"
+      }
+    }
+  }
+}
+
+docs {
+  # Address with Suite Number
+
+  Tests address parsing when suite number is included.
+
+  ## Tests REA-209 Changes
+  - address-utils.ts suite number extraction
+  - Proper address formatting for geocoding
+
+  ## Expected Response
+  - Status: 200
+  - Address correctly parsed with suite separated
+}
+
+tests {
+  test("Order with suite address created", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Order created successfully", function() {
+    expect(res.getBody().status).to.equal("SUCCESS");
+  });
+
+  test("Delivery fee calculated correctly", function() {
+    const body = res.getBody();
+    expect(body.deliveryPrice).to.be.a('number');
+    expect(body.deliveryPrice).to.be.above(0);
+  });
+}
