@@ -1,7 +1,7 @@
 // src/__tests__/api/file-uploads/file-uploads.test.ts
 
 import { GET, POST } from '@/app/api/file-uploads/route';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, createAdminClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
 import { FileValidator, UploadErrorHandler } from '@/lib/upload-error-handler';
 import { UploadSecurityManager } from '@/lib/upload-security';
@@ -13,13 +13,43 @@ import {
   expectUnauthorized,
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
-import { createMockSupabaseClient } from '@/__tests__/helpers/supabase-mock-helpers';
+import { createMockSupabaseClient, createMockQueryBuilder } from '@/__tests__/helpers/supabase-mock-helpers';
 import { createMockPrisma, MockPrismaClient } from '@/__tests__/helpers/prisma-mock';
 
 // Mock dependencies
-jest.mock('@/utils/supabase/server');
+jest.mock('@/utils/supabase/server', () => ({
+  __esModule: true,
+  createClient: jest.fn(),
+  createAdminClient: jest.fn(),
+}));
 jest.mock('@/utils/prismaDB');
-jest.mock('@/lib/upload-error-handler');
+jest.mock('@/lib/upload-error-handler', () => ({
+  UploadErrorHandler: {
+    categorizeError: jest.fn(),
+    logError: jest.fn(),
+    reportError: jest.fn(),
+    createValidationError: jest.fn(),
+  },
+  RetryHandler: {
+    // withRetry should execute the strategy function and return its result
+    withRetry: jest.fn(async (strategyFn: () => Promise<any>) => {
+      return await strategyFn();
+    }),
+  },
+  FileValidator: {
+    validateFile: jest.fn(),
+    sanitizeFilename: jest.fn((filename: string) => filename), // Return filename as-is for tests
+  },
+  DEFAULT_RETRY_CONFIG: {
+    maxAttempts: 3,
+    baseDelay: 1000,
+    maxDelay: 10000,
+  },
+  DEFAULT_VALIDATION_CONFIG: {
+    maxFileSize: 10 * 1024 * 1024,
+    allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png'],
+  },
+}));
 jest.mock('@/lib/upload-security');
 jest.mock('@/utils/file-service', () => ({
   STORAGE_BUCKETS: { DEFAULT: 'default-bucket' },
@@ -29,22 +59,95 @@ jest.mock('@/utils/file-service', () => ({
 
 describe('/api/file-uploads API', () => {
   let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
+  let mockAdminClient: ReturnType<typeof createMockSupabaseClient>;
   // Type-safe Prisma mock
   let prismaMock: MockPrismaClient;
+  // Stable storage mock objects that tests can reconfigure
+  let mockStorageBucket: {
+    createSignedUrl: jest.Mock;
+    getPublicUrl: jest.Mock;
+    upload: jest.Mock;
+    list: jest.Mock;
+    remove: jest.Mock;
+  };
+  let mockAdminStorageBucket: {
+    createSignedUrl: jest.Mock;
+    getPublicUrl: jest.Mock;
+    upload: jest.Mock;
+    list: jest.Mock;
+    remove: jest.Mock;
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     // Use the helper to create a properly structured mock
     mockSupabaseClient = createMockSupabaseClient();
+    mockAdminClient = createMockSupabaseClient();
 
-    // Override storage methods for file upload tests
-    mockSupabaseClient.storage.from = jest.fn(() => ({
-      createSignedUrl: jest.fn(),
-      getPublicUrl: jest.fn(),
-      upload: jest.fn(),
-    }));
+    // Create stable storage bucket mock that tests can reconfigure
+    // This is the SAME object returned every time storage.from() is called
+    mockStorageBucket = {
+      createSignedUrl: jest.fn().mockResolvedValue({ data: { signedUrl: 'https://signed.url/file.pdf' }, error: null }),
+      getPublicUrl: jest.fn((path: string) => ({ data: { publicUrl: `https://public.url/${path}` } })),
+      upload: jest.fn().mockResolvedValue({ data: { path: 'uploads/file.pdf' }, error: null }),
+      list: jest.fn().mockResolvedValue({ data: [], error: null }),
+      remove: jest.fn().mockResolvedValue({ data: null, error: null }),
+    };
+
+    // Override storage methods for file upload tests (GET endpoint uses regular supabase client)
+    mockSupabaseClient.storage.from = jest.fn(() => mockStorageBucket);
 
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
+
+    // Configure admin client for session validation AND storage operations
+    // The admin client is used for:
+    // 1. Session token validation (querying application_sessions table)
+    // 2. Storage operations (upload, list, createSignedUrl)
+    const adminQueryBuilder = createMockQueryBuilder();
+    mockAdminClient.from = jest.fn(() => adminQueryBuilder);
+
+    // Default: valid session with room for more uploads
+    adminQueryBuilder.single.mockResolvedValue({
+      data: {
+        id: 'session-123',
+        session_token: 'valid-session-token',
+        session_expires_at: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
+        upload_count: 0,
+        max_uploads: 10,
+        completed: false,
+      },
+      error: null,
+    });
+
+    // Create stable admin storage bucket mock for upload operations
+    mockAdminStorageBucket = {
+      upload: jest.fn().mockResolvedValue({ data: { path: 'uploads/file.pdf' }, error: null }),
+      createSignedUrl: jest.fn().mockResolvedValue({ data: { signedUrl: 'https://signed.url/file.pdf' }, error: null }),
+      getPublicUrl: jest.fn((path: string) => ({ data: { publicUrl: `https://public.url/${path}` } })),
+      list: jest.fn().mockResolvedValue({ data: [], error: null }),
+      remove: jest.fn().mockResolvedValue({ data: null, error: null }),
+    };
+
+    // Configure admin client storage methods for upload operations
+    mockAdminClient.storage.from = jest.fn(() => mockAdminStorageBucket);
+
+    (createAdminClient as jest.Mock).mockResolvedValue(mockAdminClient);
+
+    // Mock UploadErrorHandler methods used in error handling
+    (UploadErrorHandler.categorizeError as jest.Mock).mockReturnValue({
+      type: 'UNKNOWN_ERROR',
+      userMessage: 'An error occurred',
+      correlationId: 'test-correlation-id',
+      retryable: false,
+    });
+    (UploadErrorHandler.logError as jest.Mock).mockImplementation(() => {});
+    (UploadErrorHandler.reportError as jest.Mock).mockResolvedValue(undefined);
+
+    // Mock UploadSecurityManager.validateFileSecurity for successful cases
+    (UploadSecurityManager.validateFileSecurity as jest.Mock).mockResolvedValue({
+      isSecure: true,
+      scanResults: {},
+    });
 
     // Initialize type-safe Prisma mock
     prismaMock = createMockPrisma();
@@ -92,7 +195,8 @@ describe('/api/file-uploads API', () => {
           error: null,
         });
 
-        mockSupabaseClient.storage.from().createSignedUrl.mockResolvedValue({
+        // Use the stable mockStorageBucket object instead of chaining from storage.from()
+        mockStorageBucket.createSignedUrl.mockResolvedValue({
           data: { signedUrl: 'https://signed.url/file.pdf?token=abc123' },
           error: null,
         });
@@ -116,12 +220,13 @@ describe('/api/file-uploads API', () => {
           error: null,
         });
 
-        mockSupabaseClient.storage.from().createSignedUrl.mockResolvedValue({
+        // Use the stable mockStorageBucket object
+        mockStorageBucket.createSignedUrl.mockResolvedValue({
           data: null,
           error: { message: 'Bucket not configured for private access' },
         });
 
-        mockSupabaseClient.storage.from().getPublicUrl.mockReturnValue({
+        mockStorageBucket.getPublicUrl.mockReturnValue({
           data: { publicUrl: 'https://public.url/file.pdf' },
         });
 
@@ -201,7 +306,8 @@ describe('/api/file-uploads API', () => {
           error: null,
         });
 
-        mockSupabaseClient.storage.from().createSignedUrl.mockRejectedValue(
+        // Use the stable mockStorageBucket object
+        mockStorageBucket.createSignedUrl.mockRejectedValue(
           new Error('Storage service unavailable')
         );
 
@@ -223,15 +329,20 @@ describe('/api/file-uploads API', () => {
   describe('POST /api/file-uploads - Upload File', () => {
     describe('✅ Successful Upload', () => {
       it('should upload file with valid data', async () => {
+        // Auth must pass first for non-job-application uploads
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'user-123' } },
+          error: null,
+        });
+
         (UploadSecurityManager.checkRateLimit as jest.Mock).mockResolvedValue(
           true
         );
         (FileValidator.validateFile as jest.Mock).mockReturnValue(null);
 
-        mockSupabaseClient.storage.from().upload.mockResolvedValue({
-          data: { path: 'uploads/file-123.pdf' },
-          error: null,
-        });
+        // Use the stable mockAdminStorageBucket for storage operations
+        mockAdminStorageBucket.upload.mockResolvedValue({ data: { path: 'uploads/file-123.pdf' }, error: null });
+        mockAdminStorageBucket.createSignedUrl.mockResolvedValue({ data: { signedUrl: 'https://signed.url' }, error: null });
 
         // Use type-safe Prisma mock
         prismaMock.fileUpload.create.mockResolvedValue({
@@ -256,11 +367,11 @@ describe('/api/file-uploads API', () => {
           type: 'application/pdf',
         });
 
-        // Create form data
+        // Create form data - use 'document' type to go through regular user auth path
         const formData = new FormData();
         formData.append('file', mockFile);
         formData.append('entityId', 'entity-123');
-        formData.append('entityType', 'job_application');
+        formData.append('entityType', 'document'); // Not job_application, uses user auth
 
         const request = createPostRequestWithFormData(
           'http://localhost:3000/api/file-uploads',
@@ -277,6 +388,12 @@ describe('/api/file-uploads API', () => {
 
     describe('🚫 Rate Limiting', () => {
       it('should return 429 when rate limit exceeded', async () => {
+        // Auth must pass first for rate limit check to happen
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'user-123' } },
+          error: null,
+        });
+
         (UploadSecurityManager.checkRateLimit as jest.Mock).mockResolvedValue(
           false
         );
@@ -295,6 +412,7 @@ describe('/api/file-uploads API', () => {
         const formData = new FormData();
         formData.append('file', mockFile);
         formData.append('entityId', 'entity-123');
+        formData.append('entityType', 'document'); // Not job_application, so uses user auth
 
         const request = createPostRequestWithFormData(
           'http://localhost:3000/api/file-uploads',
@@ -312,6 +430,12 @@ describe('/api/file-uploads API', () => {
 
     describe('✏️ Validation Tests', () => {
       it('should reject invalid file types', async () => {
+        // Auth must pass first for validation to happen
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'user-123' } },
+          error: null,
+        });
+
         (UploadSecurityManager.checkRateLimit as jest.Mock).mockResolvedValue(
           true
         );
@@ -328,6 +452,7 @@ describe('/api/file-uploads API', () => {
         const formData = new FormData();
         formData.append('file', mockFile);
         formData.append('entityId', 'entity-123');
+        formData.append('entityType', 'document'); // Not job_application
 
         const request = createPostRequestWithFormData(
           'http://localhost:3000/api/file-uploads',
@@ -340,6 +465,12 @@ describe('/api/file-uploads API', () => {
       });
 
       it('should reject files exceeding size limit', async () => {
+        // Auth must pass first for validation to happen
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'user-123' } },
+          error: null,
+        });
+
         (UploadSecurityManager.checkRateLimit as jest.Mock).mockResolvedValue(
           true
         );
@@ -356,6 +487,7 @@ describe('/api/file-uploads API', () => {
         const formData = new FormData();
         formData.append('file', mockFile);
         formData.append('entityId', 'entity-123');
+        formData.append('entityType', 'document'); // Not job_application
 
         const request = createPostRequestWithFormData(
           'http://localhost:3000/api/file-uploads',
@@ -370,15 +502,19 @@ describe('/api/file-uploads API', () => {
 
     describe('❌ Error Handling', () => {
       it('should handle storage upload errors', async () => {
+        // Auth must pass first
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'user-123' } },
+          error: null,
+        });
+
         (UploadSecurityManager.checkRateLimit as jest.Mock).mockResolvedValue(
           true
         );
         (FileValidator.validateFile as jest.Mock).mockReturnValue(null);
 
-        mockSupabaseClient.storage.from().upload.mockResolvedValue({
-          data: null,
-          error: { message: 'Storage quota exceeded' },
-        });
+        // Use the stable mockAdminStorageBucket - configure upload to return error
+        mockAdminStorageBucket.upload.mockResolvedValue({ data: null, error: { message: 'Storage quota exceeded' } });
 
         const mockFile = new File(['content'], 'document.pdf', {
           type: 'application/pdf',
@@ -387,6 +523,7 @@ describe('/api/file-uploads API', () => {
         const formData = new FormData();
         formData.append('file', mockFile);
         formData.append('entityId', 'entity-123');
+        formData.append('entityType', 'document'); // Not job_application
 
         const request = createPostRequestWithFormData(
           'http://localhost:3000/api/file-uploads',
@@ -399,15 +536,20 @@ describe('/api/file-uploads API', () => {
       });
 
       it('should handle database errors when creating file record', async () => {
+        // Auth must pass first
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'user-123' } },
+          error: null,
+        });
+
         (UploadSecurityManager.checkRateLimit as jest.Mock).mockResolvedValue(
           true
         );
         (FileValidator.validateFile as jest.Mock).mockReturnValue(null);
 
-        mockSupabaseClient.storage.from().upload.mockResolvedValue({
-          data: { path: 'uploads/file-123.pdf' },
-          error: null,
-        });
+        // Use the stable mockAdminStorageBucket - configure for success (error is in Prisma)
+        mockAdminStorageBucket.upload.mockResolvedValue({ data: { path: 'uploads/file-123.pdf' }, error: null });
+        mockAdminStorageBucket.createSignedUrl.mockResolvedValue({ data: { signedUrl: 'https://signed.url' }, error: null });
 
         // Use type-safe Prisma mock for error case
         prismaMock.fileUpload.create.mockRejectedValue(
@@ -421,6 +563,7 @@ describe('/api/file-uploads API', () => {
         const formData = new FormData();
         formData.append('file', mockFile);
         formData.append('entityId', 'entity-123');
+        formData.append('entityType', 'document'); // Not job_application
 
         const request = createPostRequestWithFormData(
           'http://localhost:3000/api/file-uploads',
@@ -438,10 +581,9 @@ describe('/api/file-uploads API', () => {
         (UploadSecurityManager.checkRateLimit as jest.Mock).mockResolvedValue(true);
         (FileValidator.validateFile as jest.Mock).mockReturnValue(null);
 
-        mockSupabaseClient.storage.from().upload.mockResolvedValue({
-          data: { path: 'job-applications/temp/session-123/file.pdf' },
-          error: null,
-        });
+        // Use the stable mockAdminStorageBucket for storage operations
+        mockAdminStorageBucket.upload.mockResolvedValue({ data: { path: 'job-applications/temp/session-123/file.pdf' }, error: null });
+        mockAdminStorageBucket.createSignedUrl.mockResolvedValue({ data: { signedUrl: 'https://signed.url' }, error: null });
 
         // Use type-safe Prisma mock
         prismaMock.fileUpload.create.mockResolvedValue({
@@ -513,10 +655,9 @@ describe('/api/file-uploads API', () => {
           error: null,
         });
 
-        mockSupabaseClient.storage.from().upload.mockResolvedValue({
-          data: { path: 'documents/file.pdf' },
-          error: null,
-        });
+        // Use the stable mockAdminStorageBucket for storage operations
+        mockAdminStorageBucket.upload.mockResolvedValue({ data: { path: 'documents/file.pdf' }, error: null });
+        mockAdminStorageBucket.createSignedUrl.mockResolvedValue({ data: { signedUrl: 'https://signed.url' }, error: null });
 
         // Use type-safe Prisma mock
         prismaMock.fileUpload.create.mockResolvedValue({
