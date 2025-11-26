@@ -184,28 +184,13 @@ export async function PUT(
           );
         }
 
-        // Calculate total distance if location provided
-        let totalDistance = 0;
-        if (location && location.coordinates) {
-          const distanceResult = await prisma.$queryRawUnsafe<{ distance_km: number }[]>(`
-            SELECT ST_Distance(
-              (SELECT start_location FROM driver_shifts WHERE id = $1),
-              ST_GeogFromText($2)
-            ) / 1000 as distance_km
-          `,
-            id,
-            `POINT(${location.coordinates.lng} ${location.coordinates.lat})`
-          );
-          totalDistance = distanceResult[0]?.distance_km || 0;
-        }
-
-        // End shift
+        // End shift: record end location and mark as completed. Detailed mileage
+        // calculation is now handled by the mileage service and driver actions.
         await prisma.$executeRawUnsafe(`
           UPDATE driver_shifts 
           SET 
             end_time = NOW(),
             end_location = ${location ? 'ST_GeogFromText($2)' : 'NULL'},
-            total_distance_km = $3::float,
             status = 'completed',
             metadata = metadata || $4::jsonb,
             updated_at = NOW()
@@ -213,7 +198,6 @@ export async function PUT(
         `,
           id,
           location ? `POINT(${location.coordinates.lng} ${location.coordinates.lat})` : null,
-          totalDistance,
           JSON.stringify(metadata)
         );
 

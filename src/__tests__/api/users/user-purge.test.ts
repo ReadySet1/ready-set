@@ -402,7 +402,7 @@ describe('/api/users/[userId]/purge API', () => {
         await expectErrorResponse(
           response,
           400,
-          /Request body with confirmation is required/i
+          /Confirmation required.*confirmed.*true/i
         );
       });
 

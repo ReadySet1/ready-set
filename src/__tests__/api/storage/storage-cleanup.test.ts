@@ -2,6 +2,7 @@
 
 import { POST, GET } from '@/app/api/storage/cleanup/route';
 import { createClient } from '@/utils/supabase/server';
+import { createMockSupabaseClient } from '@/__tests__/helpers/supabase-mock-helpers';
 import { cleanupOrphanedFiles } from '@/utils/file-service';
 import {
   createGetRequest,
@@ -17,19 +18,11 @@ jest.mock('@/utils/supabase/server');
 jest.mock('@/utils/file-service');
 
 describe('/api/storage/cleanup API', () => {
-  const mockSupabaseClient = {
-    auth: {
-      getSession: jest.fn(),
-    },
-    from: jest.fn(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn(),
-    })),
-  };
+  let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSupabaseClient = createMockSupabaseClient();
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
   });
 
@@ -42,9 +35,10 @@ describe('/api/storage/cleanup API', () => {
               user: { id: 'admin-123', email: 'admin@example.com' },
             },
           },
+          error: null,
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -78,7 +72,7 @@ describe('/api/storage/cleanup API', () => {
           },
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -110,7 +104,7 @@ describe('/api/storage/cleanup API', () => {
           },
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
           data: { type: 'SUPER_ADMIN' },
           error: null,
         });
@@ -138,7 +132,7 @@ describe('/api/storage/cleanup API', () => {
           },
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -171,7 +165,7 @@ describe('/api/storage/cleanup API', () => {
           },
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -220,7 +214,7 @@ describe('/api/storage/cleanup API', () => {
           },
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
           data: { type: 'CLIENT' },
           error: null,
         });
@@ -243,7 +237,7 @@ describe('/api/storage/cleanup API', () => {
           },
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
           data: { type: 'VENDOR' },
           error: null,
         });
@@ -266,7 +260,7 @@ describe('/api/storage/cleanup API', () => {
           },
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
           data: { type: 'DRIVER' },
           error: null,
         });
@@ -289,7 +283,7 @@ describe('/api/storage/cleanup API', () => {
           },
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
           data: { type: 'HELPDESK' },
           error: null,
         });
@@ -312,7 +306,7 @@ describe('/api/storage/cleanup API', () => {
           },
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
           data: null,
           error: { message: 'Profile not found' },
         });
@@ -337,7 +331,7 @@ describe('/api/storage/cleanup API', () => {
           },
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -410,7 +404,7 @@ describe('/api/storage/cleanup API', () => {
           },
         });
 
-        mockSupabaseClient.from().single.mockResolvedValue({
+        mockSupabaseClient.from('profiles').single.mockResolvedValue({
           data: { type: 'ADMIN' },
           error: null,
         });
@@ -449,7 +443,7 @@ describe('/api/storage/cleanup API', () => {
         },
       });
 
-      mockSupabaseClient.from().single.mockResolvedValue({
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
         data: { type: 'ADMIN' },
         error: null,
       });
@@ -476,7 +470,7 @@ describe('/api/storage/cleanup API', () => {
         },
       });
 
-      mockSupabaseClient.from().single.mockResolvedValue({
+      mockSupabaseClient.from('profiles').single.mockResolvedValue({
         data: { type: 'CLIENT' },
         error: null,
       });

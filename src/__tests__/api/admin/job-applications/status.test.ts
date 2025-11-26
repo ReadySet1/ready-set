@@ -1,45 +1,11 @@
 import { NextRequest } from 'next/server';
 import { PATCH } from '@/app/api/admin/job-applications/[id]/status/route';
 import { prisma } from '@/utils/prismaDB';
-
-// Mock Supabase client
-const mockSupabaseClient = {
-  auth: {
-    getUser: jest.fn(),
-  },
-  from: jest.fn(() => ({
-    select: jest.fn(() => ({
-      eq: jest.fn(() => ({
-        single: jest.fn(),
-      })),
-    })),
-    update: jest.fn(() => ({
-      eq: jest.fn(() => ({
-        select: jest.fn(),
-      })),
-    })),
-  })),
-};
-
-// Create a mock for the from().select().eq().single() chain
-const mockSingleQuery = jest.fn();
-const mockEqQuery = jest.fn(() => ({ single: mockSingleQuery }));
-const mockSelectQuery = jest.fn(() => ({ eq: mockEqQuery }));
-const mockUpdateQuery = jest.fn(() => ({
-  eq: jest.fn(() => ({
-    select: jest.fn(),
-  })),
-}));
-const mockFromQuery = jest.fn(() => ({ 
-  select: mockSelectQuery,
-  update: mockUpdateQuery 
-}));
-
-// Override the from method to return our chained mock
-mockSupabaseClient.from = mockFromQuery;
+import { createMockSupabaseClient } from '@/__tests__/helpers/supabase-mock-helpers';
+import { createClient } from '@/utils/supabase/server';
 
 jest.mock('@/utils/supabase/server', () => ({
-  createClient: () => mockSupabaseClient,
+  createClient: jest.fn(),
 }));
 
 jest.mock('@/utils/prismaDB', () => ({
@@ -62,12 +28,16 @@ afterAll(() => {
 });
 
 describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
+  let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
+
   const mockContext = {
     params: Promise.resolve({ id: 'test-app-id' }),
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSupabaseClient = createMockSupabaseClient();
+    (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
   });
 
   afterEach(() => {
@@ -91,7 +61,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
     });
 
     // Mock successful user role fetch
-    mockSingleQuery.mockResolvedValue({
+    mockSupabaseClient.from('profiles').single.mockResolvedValue({
       data: { type: 'admin' },
       error: null,
     });
@@ -144,7 +114,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       });
 
     // Mock successful user role fetch
-    mockSingleQuery.mockResolvedValue({
+    mockSupabaseClient.from('profiles').single.mockResolvedValue({
       data: { type: 'admin' },
       error: null,
     });
@@ -179,42 +149,12 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
     expect(mockSupabaseClient.auth.getUser).toHaveBeenCalledWith('valid-token-123');
   });
 
-  it('should fallback to session auth when token auth fails', async () => {
-    // Mock token auth failure, then session auth success
-    mockSupabaseClient.auth.getUser
-      .mockResolvedValueOnce({
-        // First call with token - fails
-        data: { user: null },
-        error: { message: 'Invalid token' },
-      })
-      .mockResolvedValueOnce({
-        // Second call without token - succeeds
-        data: {
-          user: {
-            id: 'admin-user-id',
-            email: 'admin@example.com',
-            user_metadata: { userRole: 'admin' },
-          },
-        },
-        error: null,
-      });
-
-    // Mock successful user role fetch
-    mockSingleQuery.mockResolvedValue({
-      data: { type: 'admin' },
-      error: null,
-    });
-
-    // Mock successful job application find
-    (prisma.jobApplication.findUnique as jest.Mock).mockResolvedValue({
-      id: 'test-app-id',
-      status: 'PENDING',
-    });
-
-    // Mock successful status update
-    (prisma.jobApplication.update as jest.Mock).mockResolvedValue({
-      id: 'test-app-id',
-      status: 'PENDING',
+  it('should return 401 when token auth fails', async () => {
+    // Mock token auth failure - route doesn't fallback to session auth
+    mockSupabaseClient.auth.getUser.mockResolvedValue({
+      // Token auth fails
+      data: { user: null },
+      error: { message: 'Invalid token' },
     });
 
     const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
@@ -229,9 +169,9 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
     const response = await PATCH(request, mockContext);
     const data = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(mockSupabaseClient.auth.getUser).toHaveBeenCalledTimes(2);
+    expect(response.status).toBe(401);
+    expect(data.error).toBe('Unauthorized');
+    expect(mockSupabaseClient.auth.getUser).toHaveBeenCalledWith('invalid-token');
   });
 
   it('should return 401 when no authentication is available', async () => {
@@ -270,7 +210,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
     });
 
     // Mock user role fetch showing client role
-    mockSingleQuery.mockResolvedValue({
+    mockSupabaseClient.from('profiles').single.mockResolvedValue({
       data: { type: 'client' },
       error: null,
     });
@@ -290,7 +230,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
     expect(data.error).toBe('Forbidden');
   });
 
-  it('should return 400 when status is missing from request body', async () => {
+  it('should return 400 when request body is empty', async () => {
     // Mock successful authentication
     mockSupabaseClient.auth.getUser.mockResolvedValue({
       data: {
@@ -303,7 +243,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    mockSingleQuery.mockResolvedValue({
+    mockSupabaseClient.from('profiles').single.mockResolvedValue({
       data: { type: 'admin' },
       error: null,
     });
@@ -313,14 +253,14 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({}), // Missing status
+      body: JSON.stringify({}), // Empty body
     }) as NextRequest;
 
     const response = await PATCH(request, mockContext);
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe('Invalid status value');
+    expect(data.error).toBe('Request body is empty');
   });
 
   it('should return 400 when status value is invalid', async () => {
@@ -336,7 +276,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    mockSingleQuery.mockResolvedValue({
+    mockSupabaseClient.from('profiles').single.mockResolvedValue({
       data: { type: 'admin' },
       error: null,
     });
@@ -369,7 +309,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    mockSingleQuery.mockResolvedValue({
+    mockSupabaseClient.from('profiles').single.mockResolvedValue({
       data: { type: 'admin' },
       error: null,
     });
@@ -399,18 +339,6 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
   });
 
   it('should handle invalid JSON in request body', async () => {
-    // Mock successful authentication
-    mockSupabaseClient.auth.getUser.mockResolvedValue({
-      data: {
-        user: {
-          id: 'admin-user-id',
-          email: 'admin@example.com',
-          user_metadata: { userRole: 'admin' },
-        },
-      },
-      error: null,
-    });
-
     const request = new Request('http://localhost:3000/api/admin/job-applications/test-app-id/status', {
       method: 'PATCH',
       headers: {
@@ -422,8 +350,8 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
     const response = await PATCH(request, mockContext);
     const data = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(data.error).toBe('Failed to update job application status');
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid JSON in request body');
   });
 
   it('should allow helpdesk users to update status', async () => {
@@ -440,7 +368,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
     });
 
     // Mock user role fetch showing helpdesk role
-    mockSingleQuery.mockResolvedValue({
+    mockSupabaseClient.from('profiles').single.mockResolvedValue({
       data: { type: 'helpdesk' },
       error: null,
     });
@@ -470,7 +398,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(data.application.status).toBe('UNDER_REVIEW');
+    expect(data.application.status).toBe('INTERVIEWING');
   });
 
   it('should handle user role fetch error', async () => {
@@ -487,7 +415,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
     });
 
     // Mock error when fetching user role
-    mockSingleQuery.mockResolvedValue({
+    mockSupabaseClient.from('profiles').single.mockResolvedValue({
       data: null,
       error: { message: 'User not found' },
     });
@@ -520,7 +448,7 @@ describe('/api/admin/job-applications/[id]/status PATCH endpoint', () => {
       error: null,
     });
 
-    mockSingleQuery.mockResolvedValue({
+    mockSupabaseClient.from('profiles').single.mockResolvedValue({
       data: { type: 'admin' },
       error: null,
     });

@@ -97,6 +97,7 @@ pids/
 .cursor/
 .claude/
 !.claude/scripts/
+.mcp.json
 
 # OS generated files
 .DS_Store

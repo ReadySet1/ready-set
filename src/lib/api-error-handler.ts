@@ -86,6 +86,30 @@ export class RateLimitError extends ApiError {
 }
 
 /**
+ * BusinessLogicError - HTTP 422 Unprocessable Entity
+ *
+ * Use this for business rule violations where the request is syntactically valid
+ * but cannot be processed due to semantic/business logic constraints.
+ *
+ * Examples:
+ * - Delivery time not available (outside business hours)
+ * - Order cannot be updated in current status (e.g., COMPLETED orders)
+ * - Order not in confirmable state
+ * - Pricing calculation errors
+ * - Resource state machine violations
+ *
+ * Contrast with ValidationError (400):
+ * - ValidationError: Invalid JSON, missing required fields, invalid formats
+ * - BusinessLogicError: Valid format but violates business rules
+ */
+export class BusinessLogicError extends ApiError {
+  constructor(message: string, code: string = 'BUSINESS_LOGIC_ERROR') {
+    super(message, 422, code, ErrorCategory.VALIDATION, ErrorSeverity.HIGH);
+    this.name = 'BusinessLogicError';
+  }
+}
+
+/**
  * Standardized error handler for API routes
  */
 export function handleApiError(
@@ -314,7 +338,7 @@ export function createAuthorizationErrorResponse(
   if (request) {
     return handleApiError(error, request);
   }
-  
+
   const errorResponse: ApiErrorResponse = {
     error: message,
     code: 'AUTHORIZATION_ERROR',
@@ -324,6 +348,34 @@ export function createAuthorizationErrorResponse(
   };
 
   return NextResponse.json(errorResponse, { status: 403 });
+}
+
+/**
+ * Utility function to create consistent business logic error responses (HTTP 422)
+ *
+ * Use this for business rule violations where the request is syntactically valid
+ * but cannot be processed due to semantic/business logic constraints.
+ */
+export function createBusinessLogicErrorResponse(
+  message: string,
+  details?: Record<string, unknown>,
+  request?: NextRequest
+): NextResponse<ApiErrorResponse> {
+  const error = new BusinessLogicError(message);
+  if (request) {
+    return handleApiError(error, request, { businessLogicDetails: details });
+  }
+
+  const errorResponse: ApiErrorResponse = {
+    error: message,
+    code: 'BUSINESS_LOGIC_ERROR',
+    timestamp: new Date().toISOString(),
+    requestId: `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    statusCode: 422,
+    details: process.env.NODE_ENV === 'development' && details ? JSON.stringify(details) : undefined
+  };
+
+  return NextResponse.json(errorResponse, { status: 422 });
 }
 
 /**
