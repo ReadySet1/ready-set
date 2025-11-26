@@ -3,7 +3,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
+import ScheduleDialog from "@/components/Logistics/Schedule";
 
 interface FeatureCardProps {
   iconSrc: string;
@@ -53,12 +53,6 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
 };
 
 const CateringFeatures: React.FC = () => {
-  const { openForm, DialogForm } = FormManager();
-
-  const handleGetStarted = () => {
-    openForm("food");
-  };
-
   const features = [
     {
       iconSrc: "/images/food/icons/map-pin.png",
@@ -122,18 +116,23 @@ const CateringFeatures: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.6 }}
         >
-          <motion.button
-            onClick={handleGetStarted}
-            className="rounded-lg bg-yellow-400 px-12 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-500 hover:shadow-lg"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Get Started
-          </motion.button>
+          <ScheduleDialog
+            buttonText="Get Started"
+            dialogTitle="Schedule an Appointment"
+            dialogDescription="Choose a convenient time for your appointment."
+            calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+            customButton={
+              <motion.button
+                className="rounded-lg bg-yellow-400 px-12 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-500 hover:shadow-lg"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Get Started
+              </motion.button>
+            }
+          />
         </motion.div>
       </div>
-      {/* Render the dialog form */}
-      {DialogForm}
     </div>
   );
 };

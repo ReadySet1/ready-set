@@ -4,6 +4,7 @@ import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import ScheduleDialog from "@/components/Logistics/Schedule";
 
 interface StatProps {
   value: string;
@@ -37,12 +38,12 @@ const CateringAbout: React.FC = () => {
     { value: "98%", label: "On-Time Delivery Rate", delay: 400 },
   ];
 
-  const checkoutLinks = [
-    { text: "Pricing and Delivery Terms", href: "#pricing" },
-    { text: "Hosting Service", href: "#hosting" },
-    { text: "How We Operate", href: "#operate" },
-    { text: "How to Get Started", href: "#get-started" },
-    { text: "Most Frequent Questions", href: "#faq" },
+  const checkoutItems = [
+    "Pricing and Delivery Terms",
+    "Hosting Service",
+    "How We Operate",
+    "How to Get Started",
+    "Most Frequent Questions",
   ];
 
   return (
@@ -109,15 +110,15 @@ const CateringAbout: React.FC = () => {
             <div className="mb-6 space-y-4">
               <p className="font-[Montserrat] text-base leading-relaxed text-gray-700 md:text-lg">
                 At Ready Set, we specialize in catering delivery logistics.
-                Since launching in 2019 in the San Francisco Bay Area, we&apos;ve
-                expanded to Austin, Atlanta, and Dallas, partnering with
-                hundreds of restaurants and catering brands to ensure every
+                Since launching in 2019 in the San Francisco Bay Area,
+                we&apos;ve expanded to Austin, Atlanta, and Dallas, partnering
+                with hundreds of restaurants and catering brands to ensure every
                 order arrives on time and perfectly presented.
               </p>
 
               <p className="font-[Montserrat] text-base leading-relaxed text-gray-700 md:text-lg">
-                We&apos;re not a marketplace or broker — we don&apos;t take customer
-                orders or list you on apps. Instead, we act as your
+                We&apos;re not a marketplace or broker — we don&apos;t take
+                customer orders or list you on apps. Instead, we act as your
                 behind-the-scenes delivery partner, managing every step from
                 pickup to setup so your team can focus on the food and the
                 experience.
@@ -130,20 +131,16 @@ const CateringAbout: React.FC = () => {
                 Check out:
               </p>
               <ul className="space-y-2">
-                {checkoutLinks.map((link, index) => (
+                {checkoutItems.map((item, index) => (
                   <motion.li
                     key={index}
                     initial={{ opacity: 0, x: -10 }}
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.4, delay: 0.4 + index * 0.1 }}
+                    className="font-[Montserrat] text-base text-gray-700 md:text-lg"
                   >
-                    <Link
-                      href={link.href}
-                      className="font-[Montserrat] text-base text-gray-700 transition-colors hover:text-yellow-500 md:text-lg"
-                    >
-                      • {link.text}
-                    </Link>
+                    • {item}
                   </motion.li>
                 ))}
               </ul>
@@ -156,15 +153,21 @@ const CateringAbout: React.FC = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.8 }}
             >
-              <Link href="/about">
-                <motion.button
-                  className="rounded-lg bg-yellow-400 px-12 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-500 hover:shadow-lg"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Learn More
-                </motion.button>
-              </Link>
+              <ScheduleDialog
+                buttonText="Learn More"
+                dialogTitle="Schedule an Appointment"
+                dialogDescription="Choose a convenient time for your appointment."
+                calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+                customButton={
+                  <motion.button
+                    className="rounded-lg bg-yellow-400 px-12 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-500 hover:shadow-lg"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    Learn More
+                  </motion.button>
+                }
+              />
             </motion.div>
           </motion.div>
         </div>
@@ -174,4 +177,3 @@ const CateringAbout: React.FC = () => {
 };
 
 export default CateringAbout;
-

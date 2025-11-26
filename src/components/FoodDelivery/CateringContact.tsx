@@ -465,15 +465,16 @@ const CateringContact: React.FC = () => {
             </form>
           </motion.div>
 
-          {/* Right Section - Testimonials */}
+          {/* Right Section - Centered Partnership CTA */}
           <motion.div
+            className="flex items-center justify-center"
             initial={{ opacity: 0, x: 20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            {/* Testimonial Cards */}
-            <div className="mb-8 space-y-6">
+            {/* Testimonial Cards - Commented out as requested */}
+            {/* <div className="mb-8 space-y-6">
               {testimonials.map((testimonial, index) => (
                 <motion.div
                   key={index}
@@ -507,9 +508,9 @@ const CateringContact: React.FC = () => {
                   </div>
                 </motion.div>
               ))}
-            </div>
+            </div> */}
 
-            {/* Partnership CTA */}
+            {/* Partnership CTA - Centered on right side */}
             <motion.div
               className="text-center"
               initial={{ opacity: 0, y: 20 }}
