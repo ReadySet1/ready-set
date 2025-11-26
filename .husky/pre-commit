@@ -1,6 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 # REA-181: Pre-commit hooks - Staged rollout
 # Week 1: Lint only (fast feedback, minimal friction)
 # Week 2: Add typecheck

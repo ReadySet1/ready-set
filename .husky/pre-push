@@ -1,6 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 # REA-181: Pre-push hooks - More comprehensive than pre-commit
 # Runs typecheck and lint as blocking checks
 # See pre-push.enhanced for full version with tests
