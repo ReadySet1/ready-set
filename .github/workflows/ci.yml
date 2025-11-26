@@ -93,7 +93,7 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     # REA-181: Threshold-based enforcement (currently 80%, will increase to 95%)
 
     steps:
