@@ -4,6 +4,7 @@ import { Metadata } from "next";
 import CateringFeatures from "@/components/FoodDelivery/CateringFeatures";
 import CateringAbout from "@/components/FoodDelivery/CateringAbout";
 import DeliveryPartners from "@/components/FoodDelivery/DeliveryPartners";
+import FoodSetupCarousel from "@/components/FoodDelivery/FoodSetupCarousel";
 // import FoodGallery from "@/components/FoodDelivery/FoodGallery";
 // import DeliveryTerms from "@/components/FoodDelivery/DeliveryTerms";
 import HostingChecklist from "@/components/FoodDelivery/HostingChecklist";
@@ -57,6 +58,7 @@ export default function FoodPage() {
       <CateringFeatures />
       <CateringAbout />
       <DeliveryPartners />
+      <FoodSetupCarousel />
       {/* <FoodGallery /> */}
       {/* <DeliveryTerms /> */}
       {/* <HostingChecklist /> */}
