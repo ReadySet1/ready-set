@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { getUserOrderMetrics, checkOrderAccess } from "@/lib/services/vendor";
 
 export async function GET(req: NextRequest) {
@@ -14,14 +15,18 @@ export async function GET(req: NextRequest) {
 
     // Get user order metrics
     const metrics = await getUserOrderMetrics();
-    
+
     return NextResponse.json(metrics);
-  } catch (error: any) {
-    console.error("Error fetching vendor metrics:", error);
-    
-    return NextResponse.json(
-      { error: error.message || "Failed to fetch vendor metrics" },
-      { status: 500 }
-    );
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { operation: "order-metrics" },
+    });
+
+    const errorMessage =
+      error instanceof Error && error.message
+        ? error.message
+        : "Failed to fetch vendor metrics";
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 } 

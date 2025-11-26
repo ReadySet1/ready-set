@@ -33,10 +33,15 @@ jest.mock('@/types/calculator', () => ({
   },
 }));
 
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+}));
+
 import { GET, POST } from '@/app/api/calculator/calculate/route';
 import { createClient } from '@/utils/supabase/server';
 import { CalculatorService } from '@/lib/calculator/calculator-service';
 import { CalculationInputSchema, ConfigurationError, CalculatorError } from '@/types/calculator';
+import * as Sentry from '@sentry/nextjs';
 
 describe('/api/calculator/calculate API', () => {
   const mockSupabaseClient = {
@@ -341,8 +346,7 @@ describe('/api/calculator/calculate API', () => {
         expect(data.error).toBe('Internal server error');
       });
 
-      it('should log errors to console', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      it('should report errors to Sentry', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
           data: { user: { id: 'user-123', email: 'test@example.com' } },
           error: null,
@@ -359,12 +363,12 @@ describe('/api/calculator/calculate API', () => {
 
         await POST(request);
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Failed to calculate delivery costs:',
-          expect.any(Error)
+        expect(Sentry.captureException).toHaveBeenCalledWith(
+          expect.any(Error),
+          expect.objectContaining({
+            tags: { operation: 'calculator-calculate-post' },
+          })
         );
-
-        consoleErrorSpy.mockRestore();
       });
     });
   });
@@ -501,8 +505,7 @@ describe('/api/calculator/calculate API', () => {
         expect(data.error).toBe('Internal server error');
       });
 
-      it('should log errors to console', async () => {
-        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      it('should report errors to Sentry', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
           data: { user: { id: 'user-123', email: 'test@example.com' } },
           error: null,
@@ -516,11 +519,14 @@ describe('/api/calculator/calculate API', () => {
           'http://localhost:3000/api/calculator/calculate?templateId=template-123'
         );
 
-        await POST(request);
+        await GET(request);
 
-        expect(consoleErrorSpy).toHaveBeenCalled();
-
-        consoleErrorSpy.mockRestore();
+        expect(Sentry.captureException).toHaveBeenCalledWith(
+          expect.any(Error),
+          expect.objectContaining({
+            tags: { operation: 'calculator-calculate-get' },
+          })
+        );
       });
     });
   });
