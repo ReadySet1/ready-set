@@ -13,15 +13,51 @@ interface PartnerLogo {
 const DeliveryPartners: React.FC = () => {
   // Partner logos - user will add images later
   const partners: PartnerLogo[] = [
-    { name: "Destino", image: "/images/food/partners/destino.png", alt: "Destino logo" },
-    { name: "Grace Deli & Cafe", image: "/images/food/partners/grace.png", alt: "Grace Deli & Cafe logo" },
-    { name: "Kasa Indian Eatery", image: "/images/food/partners/kasa.png", alt: "Kasa Indian Eatery logo" },
-    { name: "Hungry", image: "/images/food/partners/hungry.png", alt: "Hungry logo" },
-    { name: "CaterValley", image: "/images/food/partners/catervalley.png", alt: "CaterValley logo" },
-    { name: "Conviva", image: "/images/food/partners/conviva.png", alt: "Conviva logo" },
-    { name: "Roost Roast", image: "/images/food/partners/roostroast.png", alt: "Roost Roast logo" },
-    { name: "Noor Indian Fusion Kitchen", image: "/images/food/partners/noor.png", alt: "Noor Indian Fusion Kitchen logo" },
-    { name: "Food.ee", image: "/images/food/partners/foodee.jpg", alt: "Food.ee logo" },
+    {
+      name: "Destino",
+      image: "/images/food/partners/destino.png",
+      alt: "Destino logo",
+    },
+    {
+      name: "Grace Deli & Cafe",
+      image: "/images/food/partners/grace.png",
+      alt: "Grace Deli & Cafe logo",
+    },
+    {
+      name: "Kasa Indian Eatery",
+      image: "/images/food/partners/kasa.png",
+      alt: "Kasa Indian Eatery logo",
+    },
+    {
+      name: "Hungry",
+      image: "/images/food/partners/hungry.png",
+      alt: "Hungry logo",
+    },
+    {
+      name: "CaterValley",
+      image: "/images/food/partners/catervalley.png",
+      alt: "CaterValley logo",
+    },
+    {
+      name: "Conviva",
+      image: "/images/food/partners/conviva.png",
+      alt: "Conviva logo",
+    },
+    {
+      name: "Roost Roast",
+      image: "/images/food/partners/roostroast.png",
+      alt: "Roost Roast logo",
+    },
+    {
+      name: "Noor Indian Fusion Kitchen",
+      image: "/images/food/partners/noor.png",
+      alt: "Noor Indian Fusion Kitchen logo",
+    },
+    {
+      name: "Food.ee",
+      image: "/images/food/partners/foodee.jpg",
+      alt: "Food.ee logo",
+    },
   ];
 
   return (
@@ -39,7 +75,8 @@ const DeliveryPartners: React.FC = () => {
             Our Food Delivery Partners
           </h2>
           <p className="font-[Montserrat] text-base font-medium text-gray-600 md:text-lg">
-            We&apos;re proud to collaborate with some of the top names in the industry:
+            We&apos;re proud to collaborate with some of the top names in the
+            industry:
           </p>
         </motion.div>
 

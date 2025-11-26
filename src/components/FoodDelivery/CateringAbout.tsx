@@ -20,7 +20,7 @@ const StatCard: React.FC<StatProps> = ({ value, label, delay }) => {
       viewport={{ once: true }}
       transition={{ duration: 0.6, delay: delay / 1000 }}
     >
-      <h3 className="mb-2 font-[Montserrat] text-5xl font-black text-yellow-400 md:text-6xl lg:text-7xl">
+      <h3 className="mb-2 font-[Montserrat] text-3xl font-black text-yellow-400 md:text-4xl lg:text-5xl">
         {value}
       </h3>
       <p className="font-[Montserrat] text-lg font-semibold text-gray-800 md:text-xl">

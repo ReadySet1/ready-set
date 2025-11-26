@@ -53,11 +53,10 @@ export default function FoodPage() {
   return (
     <div className="pt-20 md:pt-24">
       <FoodHeader />
-      {/* <DeliveryPartners /> */}
       {/* <FoodServiceFeatures /> */}
       <CateringFeatures />
       <CateringAbout />
-      {/* <DeliveryPartners /> */}
+      <DeliveryPartners />
       {/* <FoodGallery /> */}
       {/* <DeliveryTerms /> */}
       {/* <HostingChecklist /> */}
