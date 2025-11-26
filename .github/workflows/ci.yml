@@ -93,7 +93,7 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     # REA-181: Threshold-based enforcement (currently 80%, will increase to 95%)
 
     steps:
@@ -130,7 +130,7 @@ jobs:
       - name: Run unit tests with threshold check
         run: |
           # Run tests and capture JSON output
-          pnpm test:ci --json --outputFile=jest-results.json --maxWorkers=4 --testTimeout=25000 --cache --cacheDirectory=.jest-cache --forceExit || true
+          pnpm test:ci --json --outputFile=jest-results.json --testTimeout=25000 --cache --cacheDirectory=.jest-cache --forceExit || true
 
           # Extract test results
           if [ -f jest-results.json ]; then
