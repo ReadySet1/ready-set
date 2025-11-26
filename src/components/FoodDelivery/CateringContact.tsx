@@ -153,7 +153,10 @@ const CateringContact: React.FC = () => {
       const result = await sendEmail(emailData);
       console.log("[CateringContact] Email sent successfully:", result);
 
-      setMessage({ type: "success", text: result });
+      setMessage({
+        type: "success",
+        text: "Thank you! Your message has been sent successfully. We'll get back to you soon.",
+      });
 
       // Reset form after successful submission
       setTimeout(() => {
@@ -165,7 +168,7 @@ const CateringContact: React.FC = () => {
           company: "",
           message: "",
         });
-      }, 3000);
+      }, 5000); // Increased timeout to give user more time to see success message
     } catch (error: unknown) {
       console.error("[CateringContact] Error sending email:", error);
       console.error("[CateringContact] Error details:", {
@@ -255,47 +258,6 @@ const CateringContact: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* Success/Error Message */}
-            {message && (
-              <div
-                className={`mb-6 rounded-lg p-4 ${
-                  message.type === "success"
-                    ? "border border-green-200 bg-green-50 text-green-800"
-                    : "border border-red-200 bg-red-50 text-red-800"
-                }`}
-                role="alert"
-              >
-                <div className="flex items-center">
-                  {message.type === "success" ? (
-                    <svg
-                      className="mr-2 h-5 w-5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="mr-2 h-5 w-5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  )}
-                  <p className="font-medium">{message.text}</p>
                 </div>
               </div>
             )}
@@ -429,6 +391,73 @@ const CateringContact: React.FC = () => {
                   )}
                 </button>
               </motion.div>
+
+              {/* Success/Error Message - appears right below Submit button */}
+              {message && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`mt-4 rounded-lg border-2 p-5 shadow-lg ${
+                    message.type === "success"
+                      ? "border-green-300 bg-green-50 text-green-800"
+                      : "border-red-300 bg-red-50 text-red-800"
+                  }`}
+                  role="alert"
+                >
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      {message.type === "success" ? (
+                        <svg
+                          className="h-6 w-6 text-green-600"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="h-6 w-6 text-red-600"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <h3
+                        className={`text-base font-semibold ${
+                          message.type === "success"
+                            ? "text-green-800"
+                            : "text-red-800"
+                        }`}
+                      >
+                        {message.type === "success"
+                          ? "Message Sent Successfully!"
+                          : "Error Sending Message"}
+                      </h3>
+                      <p
+                        className={`mt-1 text-sm ${
+                          message.type === "success"
+                            ? "text-green-700"
+                            : "text-red-700"
+                        }`}
+                      >
+                        {message.text}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
               <p className="text-xs text-gray-500">
                 Your name won&apos;t be shared. Never submit passwords.
