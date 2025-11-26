@@ -1,5 +1,6 @@
 // src/__tests__/api/vendor/vendor-orders.test.ts
 
+import { NextResponse } from 'next/server';
 import { GET } from '@/app/api/vendor/orders/route';
 import {
   getUserOrders,
@@ -30,7 +31,7 @@ jest.mock('@/lib/cache/dashboard-cache');
 jest.mock('@/lib/cache/http-cache', () => ({
   ...jest.requireActual('@/lib/cache/http-cache'),
   handleConditionalRequest: jest.fn(),
-  createCachedResponse: jest.fn(),
+  createCachedResponse: jest.fn(), // Will be configured in beforeEach
   recordCacheMetrics: jest.fn(),
   CACHE_CONFIGS: {
     VENDOR_ORDERS: {
@@ -43,6 +44,11 @@ jest.mock('@/lib/cache/http-cache', () => ({
 describe('/api/vendor/orders API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Re-establish createCachedResponse implementation after clearAllMocks
+    // Using NextResponse.json() to ensure proper JSON parsing in tests
+    (createCachedResponse as jest.Mock).mockImplementation((data) => {
+      return NextResponse.json(data, { status: 200 });
+    });
   });
 
   describe('GET /api/vendor/orders - Vendor Orders List', () => {
@@ -78,9 +84,6 @@ describe('/api/vendor/orders API', () => {
         });
 
         (setVendorOrdersCache as jest.Mock).mockReturnValue('etag-abc');
-        (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
-        );
 
         const request = createGetRequest(
           'http://localhost:3000/api/vendor/orders'
@@ -110,9 +113,6 @@ describe('/api/vendor/orders API', () => {
         });
 
         (setVendorOrdersCache as jest.Mock).mockReturnValue('etag-page2');
-        (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
-        );
 
         const request = createGetRequest(
           'http://localhost:3000/api/vendor/orders?page=2&limit=20'
@@ -137,9 +137,6 @@ describe('/api/vendor/orders API', () => {
         });
 
         (setVendorOrdersCache as jest.Mock).mockReturnValue('etag-default');
-        (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
-        );
 
         const request = createGetRequest(
           'http://localhost:3000/api/vendor/orders'
@@ -167,12 +164,10 @@ describe('/api/vendor/orders API', () => {
           etag: 'etag-cached-orders',
         });
 
-        (handleConditionalRequest as jest.Mock).mockReturnValue(
-          new Response(JSON.stringify(cachedOrders), {
-            status: 200,
-            headers: { 'X-Cache': 'HIT' },
-          })
-        );
+        // Use NextResponse.json for proper JSON parsing, with custom headers
+        const cachedResponse = NextResponse.json(cachedOrders, { status: 200 });
+        cachedResponse.headers.set('X-Cache', 'HIT');
+        (handleConditionalRequest as jest.Mock).mockReturnValue(cachedResponse);
 
         const request = createGetRequest(
           'http://localhost:3000/api/vendor/orders'
@@ -200,9 +195,6 @@ describe('/api/vendor/orders API', () => {
         });
 
         (setVendorOrdersCache as jest.Mock).mockReturnValue('etag');
-        (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
-        );
 
         const request = createGetRequest(
           'http://localhost:3000/api/vendor/orders?page=3&limit=3'
@@ -268,9 +260,6 @@ describe('/api/vendor/orders API', () => {
           total: 0,
         });
         (setVendorOrdersCache as jest.Mock).mockReturnValue('etag');
-        (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
-        );
 
         const request = createGetRequest(
           'http://localhost:3000/api/vendor/orders'
@@ -297,9 +286,6 @@ describe('/api/vendor/orders API', () => {
 
         (getUserOrders as jest.Mock).mockResolvedValue(mockResult);
         (setVendorOrdersCache as jest.Mock).mockReturnValue('etag-new');
-        (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
-        );
 
         const request = createGetRequest(
           'http://localhost:3000/api/vendor/orders?page=2&limit=5'
@@ -359,9 +345,6 @@ describe('/api/vendor/orders API', () => {
           total: 0,
         });
         (setVendorOrdersCache as jest.Mock).mockReturnValue('etag');
-        (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
-        );
 
         const request = createGetRequest(
           'http://localhost:3000/api/vendor/orders'
@@ -392,9 +375,6 @@ describe('/api/vendor/orders API', () => {
           total: 20,
         });
         (setVendorOrdersCache as jest.Mock).mockReturnValue('etag-page1');
-        (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
-        );
 
         const request1 = createGetRequest(
           'http://localhost:3000/api/vendor/orders?page=1&limit=10'
@@ -448,10 +428,11 @@ describe('/api/vendor/orders API', () => {
         );
 
         const response = await GET(request);
+        // Route returns error.message when available, falling back to generic message
         await expectErrorResponse(
           response,
           500,
-          /Failed to fetch vendor orders/i
+          /Database query failed/i
         );
       });
 
