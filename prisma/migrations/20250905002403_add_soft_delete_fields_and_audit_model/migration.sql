@@ -11,7 +11,7 @@ ALTER TABLE "profiles" ADD CONSTRAINT "profiles_deletedBy_fkey"
 FOREIGN KEY ("deletedBy") REFERENCES "profiles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- Add indexes for the new fields
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "profiles_deletedBy_idx" ON "profiles"("deletedBy");
+CREATE INDEX IF NOT EXISTS "profiles_deletedBy_idx" ON "profiles"("deletedBy");
 
 -- Create user_audits table
 CREATE TABLE "user_audits" (
@@ -35,7 +35,7 @@ ALTER TABLE "user_audits" ADD CONSTRAINT "user_audits_performedBy_fkey"
 FOREIGN KEY ("performedBy") REFERENCES "profiles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- Add indexes for user_audits table
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "user_audits_userId_idx" ON "user_audits"("userId");
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "user_audits_action_idx" ON "user_audits"("action");
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "user_audits_performedBy_idx" ON "user_audits"("performedBy");
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "user_audits_createdAt_idx" ON "user_audits"("createdAt");
+CREATE INDEX IF NOT EXISTS "user_audits_userId_idx" ON "user_audits"("userId");
+CREATE INDEX IF NOT EXISTS "user_audits_action_idx" ON "user_audits"("action");
+CREATE INDEX IF NOT EXISTS "user_audits_performedBy_idx" ON "user_audits"("performedBy");
+CREATE INDEX IF NOT EXISTS "user_audits_createdAt_idx" ON "user_audits"("createdAt");

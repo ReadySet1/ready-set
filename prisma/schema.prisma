@@ -61,9 +61,10 @@ model Profile {
   calculationHistory   CalculationHistory[]    @relation("CalculationHistory")
   driverRecord          Driver?                 @relation("DriverProfile")
   assignedDeliveries    Delivery[]              @relation("DeliveryAssigner")
-  emailPreferences      EmailPreferences?
-  hasPushNotifications  Boolean                 @default(false) @map("has_push_notifications")
-  pushTokens            ProfilePushToken[]
+  emailPreferences          EmailPreferences?
+  hasPushNotifications      Boolean                   @default(false) @map("has_push_notifications")
+  pushTokens                ProfilePushToken[]
+  notificationAnalytics     NotificationAnalytics[]
 
   @@index([email])
   @@index([type])
@@ -114,20 +115,64 @@ model EmailPreferences {
 /// Stores FCM push notification tokens for each user device.
 /// Used for browser push notifications via Firebase Cloud Messaging.
 model ProfilePushToken {
-  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  profileId String    @db.Uuid @map("profile_id")
-  token     String    @unique
-  userAgent String?   @map("user_agent")
-  platform  String?
-  createdAt DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
-  revokedAt DateTime? @db.Timestamptz(6) @map("revoked_at")
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  profileId       String    @db.Uuid @map("profile_id")
+  token           String    @unique
+  userAgent       String?   @map("user_agent")
+  platform        String?
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
+  revokedAt       DateTime? @db.Timestamptz(6) @map("revoked_at")
+  lastRefreshedAt DateTime  @default(now()) @db.Timestamptz(6) @map("last_refreshed_at")
+  refreshCount    Int       @default(0) @map("refresh_count")
 
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@index([profileId])
   @@index([profileId, revokedAt])
+  @@index([lastRefreshedAt])
   @@schema("public")
   @@map("profile_push_tokens")
+}
+
+/// Tracks notification analytics for push and email notifications.
+/// Used for monitoring delivery rates, failures, and user engagement.
+model NotificationAnalytics {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  profileId        String    @db.Uuid @map("profile_id")
+  notificationType String    @map("notification_type") // 'push' | 'email'
+  event            String    // 'delivery:assigned', 'driver:en_route', etc.
+  recipientType    String    @map("recipient_type") // 'CUSTOMER' | 'ADMIN' | 'STORE'
+  orderId          String?   @db.Uuid @map("order_id")
+  dispatchId       String?   @db.Uuid @map("dispatch_id")
+  status           String    @default("sent") // 'sent' | 'delivered' | 'failed' | 'clicked'
+  errorMessage     String?   @map("error_message")
+  fcmMessageId     String?   @map("fcm_message_id")
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
+  deliveredAt      DateTime? @db.Timestamptz(6) @map("delivered_at")
+  clickedAt        DateTime? @db.Timestamptz(6) @map("clicked_at")
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([notificationType, status])
+  @@index([recipientType, createdAt])
+  @@schema("public")
+  @@map("notification_analytics")
+}
+
+/// Distributed notification deduplication table.
+/// Replaces in-memory cache for multi-instance support.
+model NotificationDedup {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cacheKey  String   @unique @map("cache_key") // "{profileId}:{event}:{orderId}"
+  createdAt DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+
+  @@index([cacheKey])
+  @@index([createdAt])
+  @@schema("public")
+  @@map("notification_dedup")
 }
 
 model Account {

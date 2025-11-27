@@ -1,10 +1,15 @@
 import { getFirebaseMessaging } from "@/lib/firebase-admin";
 import { trackDispatchError, DispatchSystemError } from "@/utils/domain-error-tracking";
 import { prisma } from "@/lib/db/prisma";
+import {
+  isDuplicateNotificationDistributed,
+  markNotificationSentDistributed,
+  clearDedupCache,
+} from "./dedup";
 
 /**
- * Simple in-memory cache for notification deduplication.
- * Prevents duplicate notifications within a time window (e.g., retries).
+ * In-memory cache for local fallback deduplication.
+ * Used as a fast path before hitting the database.
  */
 const notificationCache = new Map<string, number>();
 const NOTIFICATION_DEDUP_TTL_MS = 60_000; // 60 seconds
@@ -18,32 +23,37 @@ function getNotificationCacheKey(profileId: string, event: string, orderId: stri
 
 /**
  * Check if a notification was recently sent (within TTL window).
+ * Uses both in-memory cache (fast path) and distributed database cache.
  * Returns true if duplicate (should skip), false if new notification.
  */
-export function isDuplicateNotification(
+export async function isDuplicateNotification(
   profileId: string,
   event: string,
   orderId: string
-): boolean {
+): Promise<boolean> {
   const key = getNotificationCacheKey(profileId, event, orderId);
   const lastSent = notificationCache.get(key);
 
+  // Fast path: check in-memory cache first
   if (lastSent && Date.now() - lastSent < NOTIFICATION_DEDUP_TTL_MS) {
     return true;
   }
 
-  return false;
+  // Slow path: check distributed database cache
+  return isDuplicateNotificationDistributed(profileId, event, orderId);
 }
 
 /**
- * Mark a notification as sent in the dedup cache.
+ * Mark a notification as sent in both caches.
  */
-export function markNotificationSent(
+export async function markNotificationSent(
   profileId: string,
   event: string,
   orderId: string
-): void {
+): Promise<void> {
   const key = getNotificationCacheKey(profileId, event, orderId);
+
+  // Update in-memory cache (fast path for same instance)
   notificationCache.set(key, Date.now());
 
   // Cleanup old entries periodically (simple garbage collection)
@@ -55,13 +65,17 @@ export function markNotificationSent(
       }
     }
   }
+
+  // Update distributed cache (for multi-instance support)
+  await markNotificationSentDistributed(profileId, event, orderId);
 }
 
 /**
  * Clear the notification cache (useful for testing).
  */
-export function clearNotificationCache(): void {
+export async function clearNotificationCache(): Promise<void> {
   notificationCache.clear();
+  await clearDedupCache();
 }
 
 /**
@@ -197,7 +211,7 @@ export async function sendDeliveryStatusPush(params: DeliveryStatusPushParams): 
 
   try {
     // Check for duplicate notification (rate limiting)
-    if (isDuplicateNotification(profileId, event, orderId)) {
+    if (await isDuplicateNotification(profileId, event, orderId)) {
       console.debug(
         `Skipping duplicate notification: ${event} for profile ${profileId}, order ${orderId}`
       );
@@ -247,7 +261,7 @@ export async function sendDeliveryStatusPush(params: DeliveryStatusPushParams): 
     }
 
     // Mark notification as sent before attempting (prevents race conditions on retries)
-    markNotificationSent(profileId, event, orderId);
+    await markNotificationSent(profileId, event, orderId);
 
     // Fire-and-forget style: send to all tokens, revoking invalid ones
     await Promise.all(
