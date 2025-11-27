@@ -10,6 +10,10 @@ type CateringDelivery = CateringRequestGetPayload<{
     user: { select: { name: true; email: true } };
     pickupAddress: true;
     deliveryAddress: true;
+    fileUploads: {
+      where: { category: 'proof_of_delivery' };
+      select: { id: true; fileUrl: true; category: true; uploadedAt: true };
+    };
   };
 }>;
 
@@ -18,6 +22,10 @@ type OnDemandDelivery = OnDemandGetPayload<{
     user: { select: { name: true; email: true } };
     pickupAddress: true;
     deliveryAddress: true;
+    fileUploads: {
+      where: { category: 'proof_of_delivery' };
+      select: { id: true; fileUrl: true; category: true; uploadedAt: true };
+    };
   };
 }>;
 
@@ -75,6 +83,10 @@ export async function GET(req: NextRequest) {
         user: { select: { name: true, email: true } },
         pickupAddress: true,
         deliveryAddress: true,
+        fileUploads: {
+          where: { category: 'proof_of_delivery' },
+          select: { id: true, fileUrl: true, category: true, uploadedAt: true },
+        },
       },
     });
 
@@ -87,6 +99,10 @@ export async function GET(req: NextRequest) {
         user: { select: { name: true, email: true } },
         pickupAddress: true,
         deliveryAddress: true,
+        fileUploads: {
+          where: { category: 'proof_of_delivery' },
+          select: { id: true, fileUrl: true, category: true, uploadedAt: true },
+        },
       },
     });
 

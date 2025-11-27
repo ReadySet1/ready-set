@@ -88,7 +88,7 @@ export default function DriverStatusList({
           if (!a.isOnDuty && b.isOnDuty) return 1;
           return 0;
         case 'distance':
-          return (b.totalDistanceKm || 0) - (a.totalDistanceKm || 0);
+          return (b.totalDistanceMiles || 0) - (a.totalDistanceMiles || 0);
         case 'deliveries':
           return (b.deliveryCount || 0) - (a.deliveryCount || 0);
         default:
@@ -184,7 +184,7 @@ export default function DriverStatusList({
                   </div>
                   <div>
                     <div className="text-muted-foreground">Distance</div>
-                    <div className="font-medium">{Math.round((driver.totalDistanceKm || 0) * 10) / 10} km</div>
+                    <div className="font-medium">{Math.round((driver.totalDistanceMiles || 0) * 10) / 10} mi</div>
                   </div>
                 </div>
               )}

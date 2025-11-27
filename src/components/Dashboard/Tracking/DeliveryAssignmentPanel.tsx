@@ -244,7 +244,7 @@ export default function DeliveryAssignmentPanel({
                               <div className="font-medium">Driver #{driver.employeeId}</div>
                               <div className="text-sm text-muted-foreground">
                                 {driver.vehicleNumber} • {driver.activeDeliveries || 0} active • 
-                                {Math.round((driver.totalDistanceKm || 0) * 10) / 10} km today
+                                {Math.round((driver.totalDistanceMiles || 0) * 10) / 10} mi today
                               </div>
                             </div>
                           </div>

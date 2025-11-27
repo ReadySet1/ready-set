@@ -7,6 +7,41 @@ importScripts("https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compa
 
 let messaging = null;
 
+/**
+ * Track notification click for analytics.
+ * Sends a fire-and-forget request to the click tracking endpoint.
+ */
+async function trackNotificationClick(data) {
+  try {
+    const payload = {};
+    if (data?.fcmMessageId) {
+      payload.fcmMessageId = data.fcmMessageId;
+    }
+    if (data?.orderId) {
+      payload.orderId = data.orderId;
+    }
+    if (data?.notificationId) {
+      payload.notificationId = data.notificationId;
+    }
+
+    // Only send if we have something to track
+    if (Object.keys(payload).length === 0) {
+      return;
+    }
+
+    await fetch("/api/notifications/push/click", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    // Silently fail - analytics shouldn't break the UX
+    console.warn("Failed to track notification click:", error);
+  }
+}
+
 async function initFirebase() {
   if (messaging) {
     return messaging;
@@ -32,8 +67,15 @@ async function initFirebase() {
       const notificationOptions = {
         body: payload.notification?.body || "",
         icon: "/icons/icon-192x192.png",
+        badge: "/icons/badge-72x72.png",
+        tag: payload.data?.orderId || "ready-set-notification",
+        renotify: true,
         data: {
           url: payload.data?.url || "/",
+          orderId: payload.data?.orderId,
+          orderNumber: payload.data?.orderNumber,
+          fcmMessageId: payload.fcmMessageId,
+          notificationId: payload.data?.notificationId,
         },
       };
 
@@ -48,7 +90,14 @@ async function initFirebase() {
 }
 
 self.addEventListener("install", (event) => {
+  // Skip waiting to activate the new service worker immediately
+  self.skipWaiting();
   event.waitUntil(initFirebase());
+});
+
+self.addEventListener("activate", (event) => {
+  // Claim all clients immediately
+  event.waitUntil(clients.claim());
 });
 
 // Ensure Firebase is initialized before handling push events
@@ -60,23 +109,28 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const url = event.notification.data && event.notification.data.url
-    ? event.notification.data.url
-    : "/";
+  const data = event.notification.data || {};
+  const url = data.url || "/";
 
+  // Track the click for analytics
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if ("focus" in client) {
-          client.navigate(url);
-          return client.focus();
+    Promise.all([
+      trackNotificationClick(data),
+      clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+        // Try to focus an existing window first
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && "focus" in client) {
+            client.navigate(url);
+            return client.focus();
+          }
         }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(url);
-      }
-      return undefined;
-    })
+        // Open a new window if no existing window found
+        if (clients.openWindow) {
+          return clients.openWindow(url);
+        }
+        return undefined;
+      }),
+    ])
   );
 });
 

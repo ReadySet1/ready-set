@@ -18,6 +18,7 @@ import { staleLocationDetector } from '@/lib/realtime/stale-detection';
 import {
   calculateShiftMileage,
   calculateShiftMileageWithBreakdown,
+  calculateShiftMileageWithValidation,
 } from '@/services/tracking/mileage';
 
 /**
@@ -152,28 +153,34 @@ export async function endDriverShift(
       })
     );
 
-    // Calculate mileage from GPS trail. If finalMileage is provided, prefer it
-    // as the canonical total but still perform the calculation so that
-    // per-delivery breakdowns remain accurate and stored.
-    let totalKm = finalMileage ?? 0;
-    let calculationError: Error | null = null;
+    // Calculate mileage from GPS trail. If finalMileage is provided (e.g., odometer reading),
+    // use validation to compare GPS vs reported values and log discrepancies.
+    let totalMiles = finalMileage ?? 0;
 
     try {
       if (finalMileage == null) {
-        const { totalKm: computedKm } = await calculateShiftMileage(shiftId);
-        totalKm = computedKm;
+        // Pure GPS-based calculation
+        const result = await calculateShiftMileage(shiftId);
+        totalMiles = result.totalMiles;
       } else {
-        // Use the richer breakdown calculation when the client already has a
-        // trusted odometer reading; this still persists total_distance_km.
-        const { totalKm: computedKm } = await calculateShiftMileageWithBreakdown(shiftId);
-        // Keep the client-reported mileage as the primary value, but if the
-        // computation differs wildly we still log it for later analysis.
-        if (!Number.isFinite(totalKm) || totalKm <= 0) {
-          totalKm = computedKm;
+        // Client provided mileage - validate against GPS and store both for audit
+        const result = await calculateShiftMileageWithValidation(shiftId, finalMileage);
+        totalMiles = result.totalMiles;
+
+        // Log any warnings from the calculation
+        if (result.warnings.length > 0) {
+          realtimeLogger.warn('Mileage calculation warnings', {
+            driverId: shift?.driver_id,
+            metadata: {
+              shiftId,
+              warnings: result.warnings,
+              discrepancyPercent: result.discrepancyPercent,
+            },
+          });
         }
       }
     } catch (error) {
-      calculationError = error instanceof Error ? error : new Error('Unknown mileage calculation error');
+      const calculationError = error instanceof Error ? error : new Error('Unknown mileage calculation error');
       realtimeLogger.error('Failed to calculate shift mileage from GPS trail', {
         driverId: shift?.driver_id,
         error: calculationError,
@@ -183,18 +190,18 @@ export async function endDriverShift(
       });
     }
 
-    // If we have a finalKm value (either provided or computed), persist it as
-    // a final safety net in case the mileage service failed before updating.
-    if (Number.isFinite(totalKm) && totalKm > 0) {
+    // Safety net: ensure mileage is persisted even if service had partial failure
+    if (Number.isFinite(totalMiles) && totalMiles > 0) {
       await prisma.$executeRawUnsafe(`
         UPDATE driver_shifts
-        SET 
-          total_distance_km = $2::float,
+        SET
+          total_distance_miles = COALESCE(total_distance_miles, $2::float),
           updated_at = NOW()
         WHERE id = $1::uuid
+          AND total_distance_miles IS NULL
       `,
       shiftId,
-      totalKm);
+      totalMiles);
     }
 
     // Update driver status
@@ -383,23 +390,23 @@ export async function getActiveShift(driverId: string): Promise<DriverShift | nu
       return null;
     }
     const result = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT 
+      SELECT
         ds.id,
         ds.driver_id,
-        ds.start_time,
-        ds.end_time,
+        ds.shift_start as start_time,
+        ds.shift_end as end_time,
         ST_AsGeoJSON(ds.start_location) as start_location_geojson,
         ST_AsGeoJSON(ds.end_location) as end_location_geojson,
-        ds.total_distance_km,
+        ds.total_distance_miles,
         ds.delivery_count,
         ds.status,
         ds.metadata,
         ds.created_at,
         ds.updated_at
       FROM driver_shifts ds
-      WHERE ds.driver_id = $1::uuid 
+      WHERE ds.driver_id = $1::uuid
       AND ds.status IN ('active', 'paused')
-      ORDER BY ds.start_time DESC
+      ORDER BY ds.shift_start DESC
       LIMIT 1
     `, driverId);
 
@@ -427,11 +434,11 @@ export async function getActiveShift(driverId: string): Promise<DriverShift | nu
       driverId: shift.driver_id,
       startTime: shift.start_time,
       endTime: shift.end_time,
-      startLocation: shift.start_location_geojson ? 
+      startLocation: shift.start_location_geojson ?
         JSON.parse(shift.start_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
-      endLocation: shift.end_location_geojson ? 
+      endLocation: shift.end_location_geojson ?
         JSON.parse(shift.end_location_geojson).coordinates.reverse() : undefined,
-      totalDistanceKm: shift.total_distance_km,
+      totalDistanceMiles: shift.total_distance_miles,
       deliveryCount: shift.delivery_count,
       status: shift.status,
       breaks: breaks.map(b => ({
@@ -440,7 +447,7 @@ export async function getActiveShift(driverId: string): Promise<DriverShift | nu
         startTime: b.start_time,
         endTime: b.end_time,
         breakType: b.break_type,
-        location: b.location_geojson ? 
+        location: b.location_geojson ?
           JSON.parse(b.location_geojson).coordinates.reverse() : undefined,
         createdAt: b.created_at
       })),
@@ -629,22 +636,22 @@ export async function getDriverShiftHistory(
       return [];
     }
     const result = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT 
+      SELECT
         ds.id,
         ds.driver_id,
-        ds.start_time,
-        ds.end_time,
+        ds.shift_start as start_time,
+        ds.shift_end as end_time,
         ST_AsGeoJSON(ds.start_location) as start_location_geojson,
         ST_AsGeoJSON(ds.end_location) as end_location_geojson,
-        ds.total_distance_km,
+        ds.total_distance_miles,
         ds.delivery_count,
         ds.status,
         ds.metadata,
         ds.created_at,
         ds.updated_at
       FROM driver_shifts ds
-      WHERE ds.driver_id = $1::uuid 
-      ORDER BY ds.start_time DESC
+      WHERE ds.driver_id = $1::uuid
+      ORDER BY ds.shift_start DESC
       LIMIT $2::int
     `, driverId, limit);
 
@@ -653,11 +660,11 @@ export async function getDriverShiftHistory(
       driverId: shift.driver_id,
       startTime: shift.start_time,
       endTime: shift.end_time,
-      startLocation: shift.start_location_geojson ? 
+      startLocation: shift.start_location_geojson ?
         JSON.parse(shift.start_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
-      endLocation: shift.end_location_geojson ? 
+      endLocation: shift.end_location_geojson ?
         JSON.parse(shift.end_location_geojson).coordinates.reverse() : undefined,
-      totalDistanceKm: shift.total_distance_km,
+      totalDistanceMiles: shift.total_distance_miles,
       deliveryCount: shift.delivery_count,
       status: shift.status,
       breaks: [], // Breaks loaded separately if needed

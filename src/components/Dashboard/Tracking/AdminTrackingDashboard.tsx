@@ -69,7 +69,7 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
     averageSpeed: recentLocations.length > 0 
       ? Math.round(recentLocations.reduce((sum, loc) => sum + loc.speed, 0) / recentLocations.length * 2.237) // m/s to mph
       : 0,
-    totalDistance: activeDrivers.reduce((sum, driver) => sum + (driver.totalDistanceKm || 0), 0)
+    totalDistance: activeDrivers.reduce((sum, driver) => sum + (driver.totalDistanceMiles || 0), 0)
   };
 
   // Update last refresh time when data changes

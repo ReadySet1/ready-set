@@ -362,7 +362,7 @@ export function useAdminRealtimeTracking(
           currentShiftId: existing?.currentShiftId,
           shiftStartTime: existing?.shiftStartTime,
           deliveryCount: existing?.deliveryCount,
-          totalDistanceKm: existing?.totalDistanceKm ?? 0,
+          totalDistanceMiles: existing?.totalDistanceMiles ?? 0,
           activeDeliveries: existing?.activeDeliveries ?? 0,
           metadata: existing?.metadata ?? {},
           createdAt: existing?.createdAt ?? new Date(),

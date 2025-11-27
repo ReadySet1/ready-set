@@ -927,12 +927,68 @@ transaction?.finish();
 
 ### Slack Integration
 
-1. Go to **Settings** → **Integrations**
-2. Find and configure **Slack**
-3. Select channels for different alert levels:
-   - `#engineering-critical` - Fatal errors
-   - `#engineering-alerts` - High priority
-   - `#engineering-monitoring` - All issues
+#### Step 1: Connect Slack Workspace
+
+1. Go to **Settings** → **Integrations** → **Slack**
+2. Click **Add Workspace**
+3. Authorize Sentry to access your Slack workspace
+4. Select the workspace (Ready Set LLC)
+
+#### Step 2: Configure Alert Routing
+
+Create channels (if they don't exist):
+- `#engineering-critical` - Fatal errors, database failures
+- `#engineering-alerts` - All high-priority issues
+
+Map alerts to channels:
+1. Go to **Alerts** → **Alert Rules**
+2. For each rule, under **Actions**, click **Add action**
+3. Select **Send a Slack notification**
+4. Choose the appropriate channel
+
+#### Step 3: Create Alert Rules
+
+**Critical Errors (Email + Slack)**:
+```
+Name: Critical Error Alert
+Trigger: When an issue is seen more than 50 times in 1 hour
+         OR error has tag level:fatal
+Actions:
+  - Send email to team@readysetllc.com
+  - Send Slack notification to #engineering-critical
+```
+
+**New Issues (Slack)**:
+```
+Name: New Issue Alert
+Trigger: When a new issue is first seen
+Actions:
+  - Send Slack notification to #engineering-alerts
+```
+
+**Performance Degradation (Weekly)**:
+```
+Name: Performance Alert
+Trigger: When p95 transaction duration > 5000ms
+Frequency: Weekly digest
+Actions:
+  - Send email digest to engineering team
+```
+
+#### Step 4: Test the Integration
+
+1. Go to the test page: `/test-sentry`
+2. Click "Test Client Error"
+3. Verify alert appears in Slack within 30 seconds
+
+### Email Alerts
+
+Email notifications are enabled by default. Configure recipients:
+
+1. Go to **Settings** → **General Settings**
+2. Under **Email** section:
+   - Add team member emails
+   - Configure digest frequency (real-time, hourly, daily)
 
 ## Troubleshooting
 
