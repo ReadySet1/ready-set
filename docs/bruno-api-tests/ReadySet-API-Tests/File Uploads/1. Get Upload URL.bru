@@ -1,0 +1,65 @@
+meta {
+  name: 1. Get Upload URL
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{BASE_URL}}/file-uploads/signed-url
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{AUTH_TOKEN}}
+}
+
+body:json {
+  {
+    "fileName": "test-document.pdf",
+    "fileType": "application/pdf",
+    "category": "documents",
+    "entityType": "order",
+    "entityId": "test-entity-123"
+  }
+}
+
+docs {
+  # Get Signed Upload URL
+
+  Requests a signed URL for file upload.
+
+  ## Prerequisites
+  - Set AUTH_TOKEN in environment
+
+  ## Tests REA-180 Changes
+  - Proper signed URL generation
+  - Response structure
+
+  ## Expected Response
+  - Status: 200 (authenticated) or 401 (not authenticated)
+  - signedUrl and path in response
+}
+
+tests {
+  test("Returns valid response", function() {
+    const status = res.getStatus();
+    expect([200, 401, 403]).to.include(status);
+  });
+
+  test("Signed URL returned if authenticated", function() {
+    if (res.getStatus() === 200) {
+      const body = res.getBody();
+      expect(body).to.have.property('signedUrl');
+      expect(body).to.have.property('path');
+    }
+  });
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setVar("uploadUrl", res.getBody().signedUrl);
+    bru.setVar("uploadPath", res.getBody().path);
+  }
+}

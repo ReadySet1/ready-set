@@ -1,0 +1,41 @@
+meta {
+  name: 1. Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{BASE_URL}}/health
+  body: none
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  # Health Check
+
+  Verifies the API is running and responsive.
+
+  ## Expected Response
+  - Status: 200
+  - Body contains status: "ok" or "healthy"
+}
+
+tests {
+  test("API is healthy", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has proper JSON structure", function() {
+    const body = res.getBody();
+    expect(body).to.be.an('object');
+  });
+
+  test("Content-Type is JSON", function() {
+    const contentType = res.getHeader('content-type');
+    expect(contentType).to.include('application/json');
+  });
+}

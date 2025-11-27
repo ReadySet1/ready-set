@@ -1,0 +1,49 @@
+meta {
+  name: 1. Storage Upload
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{BASE_URL}}/storage/upload
+  body: multipartForm
+  auth: bearer
+}
+
+headers {
+  Authorization: Bearer {{AUTH_TOKEN}}
+}
+
+body:multipart-form {
+  file: @file(test-file.txt)
+  bucket: documents
+  path: test/uploads
+}
+
+docs {
+  # Storage Upload
+
+  Direct upload to Supabase storage.
+
+  ## Prerequisites
+  - Set AUTH_TOKEN in environment
+  - Create a test-file.txt in Bruno collection folder
+
+  ## Tests REA-180 Changes
+  - Storage upload handling
+  - Error responses for quota/permissions
+
+  ## Note
+  This test requires a file to be present. Create a small test file:
+  ```
+  echo "Test file content" > test-file.txt
+  ```
+}
+
+tests {
+  test("Upload returns valid response", function() {
+    const status = res.getStatus();
+    // Success or auth/permission error
+    expect([200, 201, 401, 403, 413]).to.include(status);
+  });
+}

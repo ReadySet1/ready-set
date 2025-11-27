@@ -241,8 +241,23 @@ const mockPaginationData = {
 const mockUser = {
   id: "user123",
   email: "test@example.com",
-  user_metadata: { name: "Test User" },
+  user_metadata: { name: "Test User", role: "client" },
 } as any;
+
+// Helper to create a chainable query builder mock
+const createMockQueryBuilder = (returnData: any = null) => {
+  const builder: any = {
+    select: jest.fn().mockReturnThis(),
+    insert: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
+    delete: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: returnData, error: null }),
+    maybeSingle: jest.fn().mockResolvedValue({ data: returnData, error: null }),
+  };
+  return builder;
+};
 
 const mockSupabaseClient = {
   auth: {
@@ -254,6 +269,13 @@ const mockSupabaseClient = {
       error: null,
     }),
   },
+  from: jest.fn((table: string) => {
+    // Return profile data when querying profiles table
+    if (table === "profiles") {
+      return createMockQueryBuilder({ type: "client" });
+    }
+    return createMockQueryBuilder();
+  }),
 };
 
 // Create a test wrapper with QueryClient
@@ -405,8 +427,9 @@ describe("UserAddresses - Enhanced Infinite Loop Prevention with React Query", (
       });
 
       // Change filter to "shared"
-      const sharedTab = screen.getByTestId("tabs-trigger-shared");
-      await userEvent.click(sharedTab);
+      // Click the "Shared" filter button (text includes count like "Shared (1)")
+      const sharedButton = screen.getByRole("button", { name: /Shared/i });
+      await userEvent.click(sharedButton);
 
       // Wait for filter change to complete
       await waitFor(() => {
@@ -444,15 +467,16 @@ describe("UserAddresses - Enhanced Infinite Loop Prevention with React Query", (
       });
 
       // Rapidly change filters multiple times
-      const allTab = screen.getByTestId("tabs-trigger-all");
-      const privateTab = screen.getByTestId("tabs-trigger-private");
-      const sharedTab = screen.getByTestId("tabs-trigger-shared");
+      // Get filter buttons by their text (includes count)
+      const allButton = screen.getByRole("button", { name: /All/i });
+      const privateButton = screen.getByRole("button", { name: /Private/i });
+      const sharedButton = screen.getByRole("button", { name: /Shared/i });
 
       await act(async () => {
-        await userEvent.click(privateTab);
-        await userEvent.click(sharedTab);
-        await userEvent.click(allTab);
-        await userEvent.click(privateTab);
+        await userEvent.click(privateButton);
+        await userEvent.click(sharedButton);
+        await userEvent.click(allButton);
+        await userEvent.click(privateButton);
       });
 
       // Wait for all changes to settle
@@ -496,14 +520,14 @@ describe("UserAddresses - Enhanced Infinite Loop Prevention with React Query", (
       });
 
       // Simulate rapid state changes
-      const privateTab = screen.getByTestId("tabs-trigger-private");
-      const sharedTab = screen.getByTestId("tabs-trigger-shared");
+      const privateButton = screen.getByRole("button", { name: /Private/i });
+      const sharedButton = screen.getByRole("button", { name: /Shared/i });
 
       await act(async () => {
         // These should be deduplicated by React Query
-        privateTab.click();
-        sharedTab.click();
-        privateTab.click();
+        privateButton.click();
+        sharedButton.click();
+        privateButton.click();
       });
 
       // Wait for changes to settle
@@ -540,12 +564,12 @@ describe("UserAddresses - Enhanced Infinite Loop Prevention with React Query", (
       });
 
       // Simulate rapid filter changes to trigger monitoring
-      const privateTab = screen.getByTestId("tabs-trigger-private");
-      const sharedTab = screen.getByTestId("tabs-trigger-shared");
+      const privateButton = screen.getByRole("button", { name: /Private/i });
+      const sharedButton = screen.getByRole("button", { name: /Shared/i });
 
       await act(async () => {
         for (let i = 0; i < 5; i++) {
-          await userEvent.click(i % 2 === 0 ? privateTab : sharedTab);
+          await userEvent.click(i % 2 === 0 ? privateButton : sharedButton);
           await new Promise((resolve) => setTimeout(resolve, 10)); // Small delay
         }
       });
@@ -707,8 +731,8 @@ describe("UserAddresses - Enhanced Infinite Loop Prevention with React Query", (
       });
 
       // Change filter to trigger cache invalidation
-      const privateTab = screen.getByTestId("tabs-trigger-private");
-      await userEvent.click(privateTab);
+      const privateButton = screen.getByRole("button", { name: /Private/i });
+      await userEvent.click(privateButton);
 
       // Wait for filter change to complete
       await waitFor(() => {

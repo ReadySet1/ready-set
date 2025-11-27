@@ -497,3 +497,61 @@ Each issue contains:
 - Files to modify
 - Acceptance criteria
 - Links to API_FAILURE_CATEGORIZATION.md for context
+
+---
+
+## ✅ REA-181: Final Validation & CI Setup (IN PROGRESS)
+
+**Started:** 2025-11-26
+**Status:** In Progress
+**Branch:** `feature/rea-181-final-validation-ci-setup`
+
+### Completed Tasks
+
+#### 1. ✅ CI Configuration - 80% Threshold Enforcement
+Updated `.github/workflows/ci.yml`:
+- Removed `continue-on-error: true` from unit tests
+- Added threshold-based pass rate check (80%)
+- Test results now exported to `jest-results.json`
+- Clear pass/fail reporting in CI summary
+- Future plan: Increase to 95% as tests improve
+
+#### 2. ✅ Pre-commit Hooks - Staged Rollout
+Updated `.husky/pre-commit` and `.husky/pre-push`:
+- **Pre-commit (Week 1):** Lint only - fast feedback
+- **Pre-push:** Typecheck + Lint + Prisma validation
+- Enhanced versions available in `.husky/*.enhanced`
+
+#### 3. ✅ Testing Documentation
+Created `docs/testing/README.md`:
+- Test stack overview
+- Running tests (unit, integration, E2E)
+- Writing tests and mocking guidelines
+- CI/CD integration details
+- Troubleshooting common issues
+
+#### 4. ✅ AddressManager Test Fixes (Partial)
+Fixed Supabase mock issues in test files:
+- Added `from()` method to mock clients
+- Added `role` to user metadata
+- Added QueryClientProvider wrapper
+- Fixed tabs-trigger → button selectors
+
+### Remaining Tasks
+
+- [ ] Fix remaining component tests (Order, Auth)
+- [ ] Fix integration tests (4 files)
+- [ ] Fix security tests (3 files)
+- [ ] Document skipped tests with JSDoc comments
+- [ ] Achieve 80%+ pass rate
+
+### Key Changes
+
+| File | Change |
+|------|--------|
+| `.github/workflows/ci.yml` | 80% threshold enforcement |
+| `.husky/pre-commit` | Lint-only staged rollout |
+| `.husky/pre-push` | Typecheck + Lint + Prisma |
+| `docs/testing/README.md` | New testing documentation |
+| `**/AddressManager/*.test.tsx` | Supabase mock fixes |
+

@@ -1,0 +1,57 @@
+meta {
+  name: 4. Update Order
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{CATER_VALLEY_URL}}/orders/{{orderId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "deliveryDate": "2025-12-02",
+    "deliveryTime": "13:00",
+    "totalItem": 15,
+    "priceTotal": 200.00,
+    "dropOffLocation": {
+      "instructions": "Updated: Ring doorbell twice"
+    }
+  }
+}
+
+docs {
+  # Update Order
+
+  Updates an existing draft order.
+
+  ## Prerequisites
+  - Run "Create Draft Order" first to set orderId variable
+
+  ## Tests REA-209 Changes
+  - order-utils.ts update processing
+  - Address utilities for partial updates
+
+  ## Expected Response
+  - Status: 200
+  - Updated order data
+}
+
+tests {
+  test("Order updated successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response confirms update", function() {
+    const body = res.getBody();
+    expect(body.status).to.equal("SUCCESS");
+  });
+}

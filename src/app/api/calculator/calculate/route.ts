@@ -2,6 +2,7 @@
 // POST: Calculate delivery costs using template and input data
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { CalculatorService } from '@/lib/calculator/calculator-service';
 import { CalculationInputSchema, ConfigurationError, CalculatorError } from '@/types/calculator';
 import { createClient } from '@/utils/supabase/server';
@@ -67,15 +68,17 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Failed to calculate delivery costs:', error);
-    
+    Sentry.captureException(error, {
+      tags: { operation: 'calculator-calculate-post' },
+    });
+
     if (error instanceof ConfigurationError || error instanceof CalculatorError) {
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 400 }
       );
     }
-    
+
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -115,15 +118,17 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Failed to get calculator configuration:', error);
-    
+    Sentry.captureException(error, {
+      tags: { operation: 'calculator-calculate-get' },
+    });
+
     if (error instanceof ConfigurationError) {
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 400 }
       );
     }
-    
+
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

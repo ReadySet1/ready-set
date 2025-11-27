@@ -1,0 +1,45 @@
+meta {
+  name: 3. Calculate - Invalid Address
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{BASE_URL}}/calculator/calculate
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "pickupAddress": "Invalid Address That Does Not Exist 12345",
+    "dropoffAddress": "Another Invalid Address 67890",
+    "headcount": 10
+  }
+}
+
+docs {
+  # Calculate - Invalid Address
+
+  Tests error handling for invalid addresses.
+
+  ## Tests REA-179 Changes
+  - Proper error response structure
+  - Meaningful error messages
+}
+
+tests {
+  test("Returns error status", function() {
+    const status = res.getStatus();
+    expect([400, 422, 500]).to.include(status);
+  });
+
+  test("Error response has message", function() {
+    const body = res.getBody();
+    expect(body).to.have.property('error');
+  });
+}

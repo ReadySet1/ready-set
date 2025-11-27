@@ -7,7 +7,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
 import { calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
-import { calculateCaterValleyPricing, type PricingCalculationResult } from '@/app/api/cater-valley/_lib/pricing-helper';
+import {
+  validateCaterValleyAuth,
+  ensureAddress,
+  normalizeOrderNumber,
+  isOrderEditable,
+  isCaterValleyOrder,
+  calculateCaterValleyPricing,
+  type PricingCalculationResult,
+} from '@/app/api/cater-valley/_lib';
 
 // Validation schema for CaterValley update order request
 const UpdateOrderSchema = z.object({
@@ -56,79 +64,6 @@ interface UpdateOrderResponse {
     bridgeToll?: number;         // Dollar amount for bridge toll
     peakTimeMultiplier?: number; // Reserved for future use
   };
-}
-
-/**
- * Authentication middleware for CaterValley requests
- */
-function validateCaterValleyAuth(request: NextRequest): boolean {
-  const apiKey = request.headers.get('x-api-key');
-  const partner = request.headers.get('partner');
-  
-  if (partner !== 'catervalley') {
-    return false;
-  }
-  
-  const expectedApiKey = process.env.CATERVALLEY_API_KEY;
-  if (expectedApiKey && apiKey !== expectedApiKey) {
-    return false;
-  }
-  
-  return true;
-}
-
-/**
- * Creates or finds an address
- */
-async function ensureAddress(location: UpdateOrderRequest['pickupLocation'] | UpdateOrderRequest['dropOffLocation']): Promise<{ id: string }> {
-  const zipCode = location.zip || extractZipFromAddress(location.address);
-  
-  const existingAddress = await prisma.address.findFirst({
-    where: {
-      street1: location.address,
-      city: location.city,
-      state: location.state,
-      zip: zipCode,
-    },
-    select: { id: true },
-  });
-
-  if (existingAddress) {
-    return existingAddress;
-  }
-
-  const newAddress = await prisma.address.create({
-    data: {
-      street1: location.address,
-      city: location.city,
-      state: location.state,
-      zip: zipCode,
-      name: location.name,
-      isRestaurant: false,
-    },
-    select: { id: true },
-  });
-
-  return newAddress;
-}
-
-/**
- * Extract ZIP code from address string
- */
-function extractZipFromAddress(address: string): string {
-  const zipMatch = address.match(/\b\d{5}(-\d{4})?\b/);
-  return zipMatch ? zipMatch[0] : '';
-}
-
-/**
- * Ensures order number has CV- prefix, avoiding duplicate prefixes
- * @param orderCode - The order code from CaterValley (may or may not include CV- prefix)
- * @returns Order number with single CV- prefix
- */
-function normalizeOrderNumber(orderCode: string): string {
-  // If orderCode already starts with CV-, use it as-is
-  // Otherwise, add the CV- prefix
-  return orderCode.startsWith('CV-') ? orderCode : `CV-${orderCode}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -193,7 +128,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify this is a CaterValley order
-    if (!existingOrder.orderNumber.startsWith('CV-') || existingOrder.user.email !== 'system@catervalley.com') {
+    if (!isCaterValleyOrder(existingOrder.orderNumber, existingOrder.user.email)) {
       return NextResponse.json(
         {
           status: 'ERROR',
@@ -204,7 +139,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if order is in a state that allows updates
-    if (!['PENDING', 'ACTIVE'].includes(existingOrder.status)) {
+    if (!isOrderEditable(existingOrder.status)) {
       return NextResponse.json(
         {
           status: 'ERROR',

@@ -1,0 +1,97 @@
+meta {
+  name: 1. Create Draft Order
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{CATER_VALLEY_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "TEST-{{$timestamp}}",
+    "deliveryDate": "2025-12-01",
+    "deliveryTime": "12:00",
+    "totalItem": 10,
+    "priceTotal": 150.00,
+    "pickupLocation": {
+      "name": "Test Restaurant",
+      "address": "123 Main St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95112",
+      "phone": "(408) 555-0100"
+    },
+    "dropOffLocation": {
+      "name": "Test Office",
+      "address": "456 Corporate Blvd Suite 100",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95110",
+      "instructions": "Deliver to reception",
+      "recipient": {
+        "name": "John Doe",
+        "phone": "4085550200"
+      }
+    }
+  }
+}
+
+docs {
+  # Create Draft Order
+
+  Creates a new draft order in the CaterValley system.
+
+  ## Tests REA-209 Changes
+  - Address parsing with suite number
+  - Auth header validation (x-api-key)
+  - Order utilities processing
+
+  ## Expected Response
+  - Status: 200
+  - Body: { status: "SUCCESS", id: "...", deliveryPrice: ... }
+}
+
+tests {
+  test("Order created successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has SUCCESS status", function() {
+    expect(res.getBody().status).to.equal("SUCCESS");
+  });
+
+  test("Order ID is returned", function() {
+    const body = res.getBody();
+    expect(body.id).to.be.a('string');
+    expect(body.id).to.have.lengthOf.above(0);
+  });
+
+  test("Delivery price is calculated", function() {
+    const body = res.getBody();
+    expect(body.deliveryPrice).to.be.a('number');
+    expect(body.deliveryPrice).to.be.above(0);
+  });
+
+  test("Response structure is correct (REA-179)", function() {
+    const body = res.getBody();
+    expect(body).to.have.property('status');
+    expect(body).to.have.property('id');
+  });
+}
+
+script:post-response {
+  // Save order ID for subsequent tests
+  if (res.getBody().id) {
+    bru.setVar("orderId", res.getBody().id);
+  }
+}

@@ -8,8 +8,13 @@ jest.mock('@/lib/services/vendor', () => ({
   getUserOrderMetrics: jest.fn(),
 }));
 
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+}));
+
 import { GET } from '@/app/api/order/metrics/route';
 import { checkOrderAccess, getUserOrderMetrics } from '@/lib/services/vendor';
+import * as Sentry from '@sentry/nextjs';
 
 describe('/api/order/metrics GET API', () => {
   beforeEach(() => {
@@ -221,20 +226,19 @@ describe('/api/order/metrics GET API', () => {
       expect(data.error).toBe('Auth service unavailable');
     });
 
-    it('should log errors to console', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    it('should report errors to Sentry', async () => {
       (checkOrderAccess as jest.Mock).mockResolvedValue(true);
       (getUserOrderMetrics as jest.Mock).mockRejectedValue(new Error('Test error'));
 
       const request = createGetRequest('http://localhost:3000/api/order/metrics');
       await GET(request);
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error fetching vendor metrics:',
-        expect.any(Error)
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: { operation: 'order-metrics' },
+        })
       );
-
-      consoleErrorSpy.mockRestore();
     });
 
     it('should handle non-Error thrown values', async () => {

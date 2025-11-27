@@ -1,0 +1,30 @@
+meta {
+  name: ReadySet API Tests
+  type: collection
+  version: 1
+}
+
+docs {
+  # ReadySet API Tests
+
+  Comprehensive API test suite for ReadySet application.
+
+  ## Release Coverage
+  Tests for PR #166 (development → main):
+  - REA-179: API response structure fixes + Sentry migration
+  - REA-180: Test mocks fixes (file-uploads, storage, catering-requests)
+  - REA-209: CaterValley shared utilities extraction
+
+  ## Folders
+  - **Health**: API health checks
+  - **CaterValley**: CaterValley integration tests
+  - **Calculator**: Delivery fee calculator tests
+  - **File Uploads**: File upload/download tests
+  - **Storage**: Supabase storage tests
+  - **Order**: Order management tests
+
+  ## Usage
+  1. Select the appropriate environment (Local, Development, Production)
+  2. Run individual requests or entire folders
+  3. Check test results in the Tests tab
+}
