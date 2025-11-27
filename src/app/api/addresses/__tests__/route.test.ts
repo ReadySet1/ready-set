@@ -35,10 +35,9 @@ import {
   createMockAddress,
 } from "@/__tests__/helpers/api-test-helpers";
 
-// Mock dependencies
-jest.mock("@/utils/supabase/server", () => ({
-  createClient: jest.fn(),
-}));
+// Mock dependencies - explicitly override global jest.setup.ts mock
+// Use doMock to ensure it runs after jest.setup.ts
+jest.mock("@/utils/supabase/server");
 
 jest.mock("@/lib/db/prisma-client", () => ({
   prisma: {
@@ -107,6 +106,10 @@ describe("/api/addresses", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Reset rate limiting between tests using global reference
+    if ((global as any).__addressesRateLimitMap) {
+      (global as any).__addressesRateLimitMap.clear();
+    }
 
     // Default: authenticated user
     mockSupabase.auth.getUser.mockResolvedValue({
@@ -557,9 +560,9 @@ describe("/api/addresses", () => {
     });
 
     it("should handle unique constraint violations", async () => {
-      mockPrisma.$transaction.mockRejectedValue({
-        message: "Unique constraint failed",
-      });
+      mockPrisma.$transaction.mockRejectedValue(
+        new Error("Unique constraint failed on the fields")
+      );
 
       const request = createPostRequest(
         "http://localhost:3000/api/addresses",
@@ -572,9 +575,9 @@ describe("/api/addresses", () => {
     });
 
     it("should handle foreign key constraint violations", async () => {
-      mockPrisma.$transaction.mockRejectedValue({
-        message: "Foreign key constraint failed",
-      });
+      mockPrisma.$transaction.mockRejectedValue(
+        new Error("Foreign key constraint failed on the fields")
+      );
 
       const request = createPostRequest(
         "http://localhost:3000/api/addresses",
