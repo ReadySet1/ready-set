@@ -12,6 +12,7 @@ import { createClient } from "@/utils/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { UserType } from "@/types/user";
 import { authLogger } from "@/utils/logger";
+import { setSentryUser, captureException } from "@/lib/monitoring/sentry";
 
 // Import enhanced authentication services (session manager loaded dynamically)
 import { getTokenRefreshService } from "@/lib/auth/token-refresh-service";
@@ -461,6 +462,16 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               setSession(session);
               setHasImmediateData(true);
               setIsLoading(false);
+
+              // Sync Sentry user context for error attribution
+              setSentryUser({
+                id: session.user.id,
+                email: session.user.email || undefined,
+                role: userRole,
+                name:
+                  session.user.user_metadata?.name ||
+                  session.user.email?.split("@")[0],
+              });
             }
             return;
           }
@@ -744,6 +755,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
               clearAllHydrationData();
               clearPersistedAuthState();
 
+              // Clear Sentry user context
+              setSentryUser(null);
+
               // Stop token refresh
               const tokenRefreshService = getTokenRefreshService();
               tokenRefreshService.stopAutoRefresh();
@@ -1025,6 +1039,9 @@ function UserProviderClient({ children }: { children: ReactNode }) {
       clearAllHydrationData();
       clearPersistedAuthState();
 
+      // Clear Sentry user context
+      setSentryUser(null);
+
       // Update auth state
       setAuthState({
         user: null,
@@ -1111,8 +1128,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
   return (
     <AuthErrorBoundary
       onError={(error, errorInfo) => {
-        // You can add error reporting service here
-        // e.g., Sentry, LogRocket, etc.
+        // Report auth errors to Sentry for monitoring
+        captureException(error, {
+          component: "AuthErrorBoundary",
+          feature: "authentication",
+          metadata: {
+            componentStack: errorInfo?.componentStack,
+          },
+        });
       }}
     >
       <UserProviderClient>{children}</UserProviderClient>
