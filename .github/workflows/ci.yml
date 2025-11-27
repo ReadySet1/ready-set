@@ -93,8 +93,8 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    continue-on-error: true # Non-blocking: 47.6% pass rate (1004/2106 tests passing)
+    timeout-minutes: 25
+    # REA-181: Threshold-based enforcement (currently 80%, will increase to 95%)
 
     steps:
       - name: Checkout code
@@ -127,19 +127,39 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-jest-
 
-      - name: Run unit tests
+      - name: Run unit tests with threshold check
         run: |
-          # Run tests with timeout safeguards
-          timeout 540 pnpm test:ci --maxWorkers=4 --testTimeout=25000 --cache --cacheDirectory=.jest-cache --forceExit --bail || {
-            EXIT_CODE=$?
-            if [ $EXIT_CODE -eq 124 ]; then
-              echo "⚠️  Tests timed out after 9 minutes - some tests may be hanging"
-              echo "This is non-blocking but should be investigated"
-              exit 0
+          # Run tests and capture JSON output
+          pnpm test:ci --json --outputFile=jest-results.json --testTimeout=25000 --cache --cacheDirectory=.jest-cache --forceExit || true
+
+          # Extract test results
+          if [ -f jest-results.json ]; then
+            PASSED=$(jq '.numPassedTests // 0' jest-results.json)
+            TOTAL=$(jq '.numTotalTests // 0' jest-results.json)
+
+            if [ "$TOTAL" -gt 0 ]; then
+              PASS_RATE=$(echo "scale=2; $PASSED * 100 / $TOTAL" | bc)
+              echo "📊 Pass rate: $PASS_RATE% ($PASSED/$TOTAL tests)"
+
+              # Threshold check: Start at 80%, increase to 95% as tests improve
+              THRESHOLD=80
+              if (( $(echo "$PASS_RATE < $THRESHOLD" | bc -l) )); then
+                echo "❌ Pass rate ${PASS_RATE}% is below ${THRESHOLD}% threshold"
+                echo "PASS_RATE=$PASS_RATE" >> $GITHUB_ENV
+                echo "THRESHOLD=$THRESHOLD" >> $GITHUB_ENV
+                exit 1
+              else
+                echo "✅ Pass rate ${PASS_RATE}% meets ${THRESHOLD}% threshold"
+                echo "PASS_RATE=$PASS_RATE" >> $GITHUB_ENV
+              fi
+            else
+              echo "⚠️  No tests found or tests failed to run"
+              exit 1
             fi
-            echo "Tests completed with exit code: $EXIT_CODE"
-            exit 0
-          }
+          else
+            echo "⚠️  jest-results.json not found - tests may have crashed"
+            exit 1
+          fi
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
@@ -155,22 +175,41 @@ jobs:
           path: coverage/
           retention-days: 30
 
+      - name: Upload Jest results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jest-results
+          path: jest-results.json
+          retention-days: 30
+
       - name: Generate test summary
         if: always()
         run: |
           echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f jest-results.json ]; then
+            PASSED=$(jq '.numPassedTests // 0' jest-results.json)
+            FAILED=$(jq '.numFailedTests // 0' jest-results.json)
+            TOTAL=$(jq '.numTotalTests // 0' jest-results.json)
+
+            echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| ✅ Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
+            echo "| ❌ Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
+            echo "| 📊 Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🎯 Threshold | 80% |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
           if [ -f coverage/coverage-summary.json ]; then
             echo "### Coverage Report" >> $GITHUB_STEP_SUMMARY
             echo '```json' >> $GITHUB_STEP_SUMMARY
             cat coverage/coverage-summary.json >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
           fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📊 **Current Test Status**: 47.6% pass rate (1004/2106 tests passing)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Test infrastructure is working correctly" >> $GITHUB_STEP_SUMMARY
-          echo "🔧 Individual test fixes being addressed incrementally" >> $GITHUB_STEP_SUMMARY
 
   e2e-tests:
     name: E2E Tests
@@ -353,16 +392,21 @@ jobs:
     steps:
       - name: Check job statuses
         run: |
+          FAILED=false
+
           if [[ "${{ needs.lint-and-typecheck.result }}" != "success" ]]; then
             echo "❌ Lint and type check failed"
-            exit 1
+            FAILED=true
+          else
+            echo "✅ Lint and type check passed"
           fi
 
-          # Unit tests are informational only (47.6% pass rate)
-          if [[ "${{ needs.unit-tests.result }}" == "failure" ]]; then
-            echo "⚠️  Unit tests failed (non-blocking: 1004/2106 tests passing)"
+          # REA-181: Unit tests now blocking at 80% threshold
+          if [[ "${{ needs.unit-tests.result }}" != "success" ]]; then
+            echo "❌ Unit tests failed (below 80% threshold)"
+            FAILED=true
           else
-            echo "✅ Unit tests passed"
+            echo "✅ Unit tests passed (≥80% threshold)"
           fi
 
           # Build check is non-blocking (works with SKIP_ENV_VALIDATION)
@@ -373,9 +417,14 @@ jobs:
           fi
 
           echo ""
+          if [[ "$FAILED" == "true" ]]; then
+            echo "❌ Required checks failed"
+            exit 1
+          fi
+
           echo "✅ All required checks passed!"
           echo ""
-          echo "📊 Test Status:"
-          echo "  - TypeScript: ✅ All errors fixed (REA-43)"
-          echo "  - Unit Tests: 🟡 Running (47.6% pass rate, ~54s)"
-          echo "  - E2E Tests: ⏸️  Disabled (will address separately)"
+          echo "📊 Test Status (REA-181):"
+          echo "  - TypeScript: ✅ Type checking enabled"
+          echo "  - Unit Tests: ✅ Passing (80% threshold)"
+          echo "  - E2E Tests: ⏸️  Requires secrets configuration"

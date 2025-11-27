@@ -668,6 +668,21 @@ describe('Multi-Tenant Data Isolation', () => {
 
 describe('Security Edge Cases', () => {
   describe('CSRF Protection', () => {
+    // Set the expected origin for CSRF validation
+    const originalEnv = process.env.NEXT_PUBLIC_SITE_URL;
+
+    beforeAll(() => {
+      process.env.NEXT_PUBLIC_SITE_URL = 'http://localhost:3000';
+    });
+
+    afterAll(() => {
+      if (originalEnv) {
+        process.env.NEXT_PUBLIC_SITE_URL = originalEnv;
+      } else {
+        delete process.env.NEXT_PUBLIC_SITE_URL;
+      }
+    });
+
     it('should allow GET requests without CSRF token', () => {
       const request = new NextRequest(new URL('http://localhost:3000/api/test'), {
         method: 'GET',

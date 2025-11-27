@@ -240,8 +240,23 @@ const mockPaginationData = {
 const mockUser = {
   id: "user123",
   email: "test@example.com",
-  user_metadata: { name: "Test User" },
+  user_metadata: { name: "Test User", role: "client" },
 } as any;
+
+// Helper to create a chainable query builder mock
+const createMockQueryBuilder = (returnData: any = null) => {
+  const builder: any = {
+    select: jest.fn().mockReturnThis(),
+    insert: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
+    delete: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: returnData, error: null }),
+    maybeSingle: jest.fn().mockResolvedValue({ data: returnData, error: null }),
+  };
+  return builder;
+};
 
 const mockSupabaseClient = {
   auth: {
@@ -253,6 +268,12 @@ const mockSupabaseClient = {
       error: null,
     }),
   },
+  from: jest.fn((table: string) => {
+    if (table === "profiles") {
+      return createMockQueryBuilder({ type: "client" });
+    }
+    return createMockQueryBuilder();
+  }),
 };
 
 describe("UserAddresses - Infinite Loop Prevention", () => {
@@ -336,8 +357,8 @@ describe("UserAddresses - Infinite Loop Prevention", () => {
       });
 
       // Change filter to shared
-      const sharedTab = screen.getByTestId("tabs-trigger-shared");
-      await userEvent.click(sharedTab);
+      const sharedButton = screen.getByRole("button", { name: /Shared/i });
+      await userEvent.click(sharedButton);
 
       // Wait for filter change to complete
       await waitFor(() => {
@@ -516,10 +537,10 @@ describe("UserAddresses - Infinite Loop Prevention", () => {
         expect(screen.getByText("Home")).toBeInTheDocument();
       });
 
-      // Verify "All" tab is selected by default
-      const allTab = screen.getByTestId("tabs-trigger-all");
-      // The Tabs component doesn't set data-state attributes, so we check the default value instead
-      expect(allTab).toBeInTheDocument();
+      // Verify "All" button is selected by default
+      const allButton = screen.getByRole("button", { name: /All/i });
+      // The button exists and is rendered
+      expect(allButton).toBeInTheDocument();
 
       // Verify all addresses are displayed
       expect(screen.getByText("Home")).toBeInTheDocument();
@@ -561,8 +582,8 @@ describe("UserAddresses - Infinite Loop Prevention", () => {
       });
 
       // Change to private filter
-      const privateTab = screen.getByTestId("tabs-trigger-private");
-      await userEvent.click(privateTab);
+      const privateButton = screen.getByRole("button", { name: /Private/i });
+      await userEvent.click(privateButton);
 
       // Verify only private addresses are shown
       await waitFor(() => {
@@ -606,8 +627,8 @@ describe("UserAddresses - Infinite Loop Prevention", () => {
       });
 
       // Change to shared filter
-      const sharedTab = screen.getByTestId("tabs-trigger-shared");
-      await userEvent.click(sharedTab);
+      const sharedButton = screen.getByRole("button", { name: /Shared/i });
+      await userEvent.click(sharedButton);
 
       // Verify only shared addresses are shown
       await waitFor(() => {
@@ -626,8 +647,8 @@ describe("UserAddresses - Infinite Loop Prevention", () => {
       });
 
       // Change filter to "shared"
-      const sharedTab = screen.getByTestId("tabs-trigger-shared");
-      await userEvent.click(sharedTab);
+      const sharedButton = screen.getByRole("button", { name: /Shared/i });
+      await userEvent.click(sharedButton);
 
       // Wait for filter change to complete
       await waitFor(() => {

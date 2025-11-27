@@ -5,22 +5,48 @@ import { Address } from "@/types/address";
 
 // Mock the createClient function
 jest.mock("@/utils/supabase/client", () => ({
-  createClient: jest.fn(() => ({
-    auth: {
-      getUser: jest.fn(() =>
-        Promise.resolve({ data: { user: { id: "test-user" } }, error: null }),
-      ),
-      onAuthStateChange: jest.fn(() => ({
-        data: { subscription: { unsubscribe: jest.fn() } },
-      })),
-      getSession: jest.fn(() =>
-        Promise.resolve({
-          data: { session: { access_token: "test-token" } },
-          error: null,
-        }),
-      ),
-    },
-  })),
+  createClient: jest.fn(() => {
+    // Helper to create a chainable query builder mock
+    const createMockQueryBuilder = (returnData: any = null) => {
+      const builder: any = {
+        select: jest.fn().mockReturnThis(),
+        insert: jest.fn().mockReturnThis(),
+        update: jest.fn().mockReturnThis(),
+        delete: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        neq: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({ data: returnData, error: null }),
+        maybeSingle: jest.fn().mockResolvedValue({ data: returnData, error: null }),
+      };
+      return builder;
+    };
+
+    return {
+      auth: {
+        getUser: jest.fn(() =>
+          Promise.resolve({
+            data: { user: { id: "test-user", user_metadata: { role: "client" } } },
+            error: null,
+          }),
+        ),
+        onAuthStateChange: jest.fn(() => ({
+          data: { subscription: { unsubscribe: jest.fn() } },
+        })),
+        getSession: jest.fn(() =>
+          Promise.resolve({
+            data: { session: { access_token: "test-token" } },
+            error: null,
+          }),
+        ),
+      },
+      from: jest.fn((table: string) => {
+        if (table === "profiles") {
+          return createMockQueryBuilder({ type: "client" });
+        }
+        return createMockQueryBuilder();
+      }),
+    };
+  }),
 }));
 
 // Mock fetch globally
