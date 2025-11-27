@@ -15,7 +15,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { GET, POST, PUT, DELETE, __resetRateLimitForTesting } from "../route";
+import { GET, POST, PUT, DELETE } from "../route";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/db/prisma-client";
 import { withDatabaseRetry } from "@/utils/prismaDB";
@@ -106,8 +106,10 @@ describe("/api/addresses", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset rate limiting between tests
-    __resetRateLimitForTesting();
+    // Reset rate limiting between tests using global reference
+    if ((global as any).__addressesRateLimitMap) {
+      (global as any).__addressesRateLimitMap.clear();
+    }
 
     // Default: authenticated user
     mockSupabase.auth.getUser.mockResolvedValue({
