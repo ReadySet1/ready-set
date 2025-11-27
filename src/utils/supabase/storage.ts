@@ -53,42 +53,44 @@ export const storage = {
 };
 
 /**
+ * Storage bucket name for POD images
+ */
+export const POD_BUCKET_NAME = 'delivery-proofs';
+
+/**
  * Upload a Proof of Delivery image
  *
  * @param file - The image file to upload (File or Blob)
  * @param deliveryId - The delivery UUID
- * @returns Object with url and optional error message
+ * @returns Object with url, path, and optional error message
  */
 export async function uploadPODImage(
   file: File | Blob,
   deliveryId: string
-): Promise<{ url: string; error?: string }> {
+): Promise<{ url: string; path?: string; error?: string }> {
   try {
     const supabase = await createClient();
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024;
+    // Validate file size (max 2MB - images are compressed client-side)
+    const maxSize = 2 * 1024 * 1024;
     if (file.size > maxSize) {
-      return { url: '', error: 'File too large (max 5MB)' };
+      return { url: '', error: 'File too large (max 2MB)' };
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
     const fileType = file.type || '';
     if (!allowedTypes.includes(fileType)) {
       return { url: '', error: 'Invalid file type. Only JPEG, PNG, and WebP images are allowed.' };
     }
 
-    // Generate unique filename
+    // Generate unique filename following the pattern: delivery-{deliveryId}-{timestamp}.jpg
     const timestamp = Date.now();
-    const fileExtension = file instanceof File
-      ? file.name.split('.').pop() || 'jpg'
-      : (fileType.split('/')[1] || 'jpg');
-    const filename = `deliveries/${deliveryId}/pod-${timestamp}.${fileExtension}`;
+    const filename = `deliveries/${deliveryId}/delivery-${deliveryId}-${timestamp}.jpg`;
 
-    // Upload to Supabase Storage (order-files bucket)
+    // Upload to Supabase Storage (delivery-proofs bucket)
     const { data, error } = await supabase.storage
-      .from('order-files')
+      .from(POD_BUCKET_NAME)
       .upload(filename, file, {
         cacheControl: '3600',
         upsert: false,
@@ -102,15 +104,79 @@ export async function uploadPODImage(
 
     // Get public URL
     const { data: { publicUrl } } = supabase.storage
-      .from('order-files')
+      .from(POD_BUCKET_NAME)
       .getPublicUrl(data.path);
 
-    return { url: publicUrl };
+    return { url: publicUrl, path: data.path };
   } catch (error) {
     console.error('POD upload exception:', error);
     return {
       url: '',
       error: error instanceof Error ? error.message : 'Upload failed'
+    };
+  }
+}
+
+/**
+ * Delete a Proof of Delivery image
+ *
+ * @param path - The storage path of the image to delete
+ * @returns Object with success status and optional error
+ */
+export async function deletePODImage(
+  path: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+
+    const { error } = await supabase.storage
+      .from(POD_BUCKET_NAME)
+      .remove([path]);
+
+    if (error) {
+      console.error('POD delete error:', error);
+      return { success: false, error: error.message || 'Delete failed' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('POD delete exception:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Delete failed'
+    };
+  }
+}
+
+/**
+ * Get a signed URL for a POD image (for private access if needed)
+ *
+ * @param path - The storage path of the image
+ * @param expiresIn - Expiration time in seconds (default: 3600 = 1 hour)
+ * @returns Object with signed URL and optional error
+ */
+export async function getPODSignedUrl(
+  path: string,
+  expiresIn: number = 3600
+): Promise<{ url: string; error?: string }> {
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.storage
+      .from(POD_BUCKET_NAME)
+      .createSignedUrl(path, expiresIn);
+
+    if (error) {
+      console.error('POD signed URL error:', error);
+      return { url: '', error: error.message || 'Failed to generate URL' };
+    }
+
+    return { url: data.signedUrl };
+  } catch (error) {
+    console.error('POD signed URL exception:', error);
+    return {
+      url: '',
+      error: error instanceof Error ? error.message : 'Failed to generate URL'
     };
   }
 }
