@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -64,7 +65,10 @@ export function ProofOfDeliveryViewer({
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Failed to download image:', error);
+      Sentry.captureException(error, {
+        tags: { operation: 'pod_download', component: 'ProofOfDeliveryViewer' },
+        extra: { orderNumber, deliveryId },
+      });
     }
   };
 

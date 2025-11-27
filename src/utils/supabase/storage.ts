@@ -1,6 +1,7 @@
 // src/utils/supabase/storage.ts
 
 import { createClient } from '@/utils/supabase/server';
+import * as Sentry from '@sentry/nextjs';
 
 /**
  * Utility class for interacting with Supabase Storage
@@ -98,7 +99,9 @@ export async function uploadPODImage(
       });
 
     if (error) {
-      console.error('POD upload error:', error);
+      Sentry.captureException(error, {
+        tags: { operation: 'pod_upload', component: 'storage' },
+      });
       return { url: '', error: error.message || 'Upload failed' };
     }
 
@@ -109,7 +112,9 @@ export async function uploadPODImage(
 
     return { url: publicUrl, path: data.path };
   } catch (error) {
-    console.error('POD upload exception:', error);
+    Sentry.captureException(error, {
+      tags: { operation: 'pod_upload', component: 'storage' },
+    });
     return {
       url: '',
       error: error instanceof Error ? error.message : 'Upload failed'
@@ -134,13 +139,17 @@ export async function deletePODImage(
       .remove([path]);
 
     if (error) {
-      console.error('POD delete error:', error);
+      Sentry.captureException(error, {
+        tags: { operation: 'pod_delete', component: 'storage' },
+      });
       return { success: false, error: error.message || 'Delete failed' };
     }
 
     return { success: true };
   } catch (error) {
-    console.error('POD delete exception:', error);
+    Sentry.captureException(error, {
+      tags: { operation: 'pod_delete', component: 'storage' },
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Delete failed'
@@ -167,13 +176,17 @@ export async function getPODSignedUrl(
       .createSignedUrl(path, expiresIn);
 
     if (error) {
-      console.error('POD signed URL error:', error);
+      Sentry.captureException(error, {
+        tags: { operation: 'pod_signed_url', component: 'storage' },
+      });
       return { url: '', error: error.message || 'Failed to generate URL' };
     }
 
     return { url: data.signedUrl };
   } catch (error) {
-    console.error('POD signed URL exception:', error);
+    Sentry.captureException(error, {
+      tags: { operation: 'pod_signed_url', component: 'storage' },
+    });
     return {
       url: '',
       error: error instanceof Error ? error.message : 'Failed to generate URL'

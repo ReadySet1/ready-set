@@ -1,6 +1,7 @@
 import { getFirebaseMessaging } from "@/lib/firebase-admin";
 import { trackDispatchError, DispatchSystemError } from "@/utils/domain-error-tracking";
 import { prisma } from "@/lib/db/prisma";
+import * as Sentry from "@sentry/nextjs";
 import {
   isDuplicateNotificationDistributed,
   markNotificationSentDistributed,
@@ -175,7 +176,10 @@ export async function sendPushNotification(payload: PushNotificationPayload): Pr
   const messaging = getFirebaseMessaging();
 
   if (!messaging) {
-    console.warn("Firebase Messaging not available, skipping push notification send.");
+    Sentry.captureMessage("Firebase Messaging not available, skipping push notification send.", {
+      level: "warning",
+      tags: { operation: "push_notification", component: "push" },
+    });
     return;
   }
 
@@ -196,7 +200,10 @@ export async function sendPushNotification(payload: PushNotificationPayload): Pr
   try {
     await messaging.send(message);
   } catch (error) {
-    console.error("Push notification error:", error);
+    Sentry.captureException(error, {
+      tags: { operation: "push_notification_send", component: "push" },
+      extra: { token: payload.token?.slice(0, 20) + "..." },
+    });
     throw error;
   }
 }

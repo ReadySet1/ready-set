@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
 import { uploadPODImage, deletePODImage } from '@/utils/supabase/storage';
+import * as Sentry from '@sentry/nextjs';
 
 /**
  * POST - Upload a Proof of Delivery photo for an order
@@ -183,7 +184,9 @@ export async function POST(
       message: 'Proof of delivery uploaded successfully',
     });
   } catch (error) {
-    console.error('Error uploading POD:', error);
+    Sentry.captureException(error, {
+      tags: { operation: 'pod_upload', route: 'orders' },
+    });
     return NextResponse.json(
       {
         success: false,
@@ -281,7 +284,9 @@ export async function GET(
       fileUploadId: fileUpload.id,
     });
   } catch (error) {
-    console.error('Error fetching POD:', error);
+    Sentry.captureException(error, {
+      tags: { operation: 'pod_fetch', route: 'orders' },
+    });
     return NextResponse.json(
       {
         success: false,
@@ -378,7 +383,11 @@ export async function DELETE(
     if (fileUpload.filePath) {
       const deleteResult = await deletePODImage(fileUpload.filePath);
       if (deleteResult.error) {
-        console.warn('Failed to delete POD from storage:', deleteResult.error);
+        Sentry.captureMessage('Failed to delete POD from storage', {
+          level: 'warning',
+          tags: { operation: 'pod_delete_storage', route: 'orders' },
+          extra: { error: deleteResult.error },
+        });
         // Continue anyway to delete the database record
       }
     }
@@ -393,7 +402,9 @@ export async function DELETE(
       message: 'Proof of delivery deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting POD:', error);
+    Sentry.captureException(error, {
+      tags: { operation: 'pod_delete', route: 'orders' },
+    });
     return NextResponse.json(
       {
         success: false,
