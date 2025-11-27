@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/db/prisma";
 import {
   sendDeliveryStatusPush,
@@ -307,8 +308,13 @@ export async function sendDispatchStatusNotification(
 
   const failures = results.filter((r) => r.status === "rejected");
   if (failures.length > 0) {
-    console.error(
-      `Failed to send ${failures.length}/${results.length} notifications for ${recipientType}`
+    Sentry.captureMessage(
+      `Failed to send ${failures.length}/${results.length} notifications for ${recipientType}`,
+      {
+        level: "error",
+        tags: { service: "delivery-status-notification" },
+        extra: { recipientType, orderId, dispatchId, event },
+      }
     );
   }
 

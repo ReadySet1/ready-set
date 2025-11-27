@@ -7,6 +7,13 @@ import {
   type DeliveryStatusEvent,
 } from "./push";
 
+// Mock the dedup module to avoid Prisma calls in tests
+jest.mock("./dedup", () => ({
+  isDuplicateNotificationDistributed: jest.fn().mockResolvedValue(false),
+  markNotificationSentDistributed: jest.fn().mockResolvedValue(undefined),
+  clearDedupCache: jest.fn().mockResolvedValue(undefined),
+}));
+
 describe("mapDispatchStatusToPushEvent", () => {
   it("maps known dispatch statuses to delivery events", () => {
     expect(mapDispatchStatusToPushEvent("ACCEPTED")).toBe("delivery:assigned");
@@ -58,76 +65,76 @@ describe("buildDeliveryStatusMessage", () => {
 });
 
 describe("Notification Rate Limiting", () => {
-  beforeEach(() => {
-    clearNotificationCache();
+  beforeEach(async () => {
+    await clearNotificationCache();
   });
 
-  afterEach(() => {
-    clearNotificationCache();
+  afterEach(async () => {
+    await clearNotificationCache();
   });
 
-  it("returns false for first notification (not a duplicate)", () => {
-    const result = isDuplicateNotification("profile-1", "delivery:assigned", "order-1");
+  it("returns false for first notification (not a duplicate)", async () => {
+    const result = await isDuplicateNotification("profile-1", "delivery:assigned", "order-1");
     expect(result).toBe(false);
   });
 
-  it("returns true for duplicate notification within TTL window", () => {
+  it("returns true for duplicate notification within TTL window", async () => {
     const profileId = "profile-1";
     const event = "delivery:assigned";
     const orderId = "order-1";
 
     // First notification
-    expect(isDuplicateNotification(profileId, event, orderId)).toBe(false);
-    markNotificationSent(profileId, event, orderId);
+    expect(await isDuplicateNotification(profileId, event, orderId)).toBe(false);
+    await markNotificationSent(profileId, event, orderId);
 
-    // Second notification (duplicate)
-    expect(isDuplicateNotification(profileId, event, orderId)).toBe(true);
+    // Second notification (duplicate) - in-memory cache should catch this
+    expect(await isDuplicateNotification(profileId, event, orderId)).toBe(true);
   });
 
-  it("allows different events for the same order", () => {
+  it("allows different events for the same order", async () => {
     const profileId = "profile-1";
     const orderId = "order-1";
 
-    markNotificationSent(profileId, "delivery:assigned", orderId);
+    await markNotificationSent(profileId, "delivery:assigned", orderId);
 
     // Different event should not be considered duplicate
-    expect(isDuplicateNotification(profileId, "driver:en_route", orderId)).toBe(false);
+    expect(await isDuplicateNotification(profileId, "driver:en_route", orderId)).toBe(false);
   });
 
-  it("allows same event for different orders", () => {
+  it("allows same event for different orders", async () => {
     const profileId = "profile-1";
     const event = "delivery:assigned";
 
-    markNotificationSent(profileId, event, "order-1");
+    await markNotificationSent(profileId, event, "order-1");
 
     // Different order should not be considered duplicate
-    expect(isDuplicateNotification(profileId, event, "order-2")).toBe(false);
+    expect(await isDuplicateNotification(profileId, event, "order-2")).toBe(false);
   });
 
-  it("allows same event and order for different profiles", () => {
+  it("allows same event and order for different profiles", async () => {
     const event = "delivery:assigned";
     const orderId = "order-1";
 
-    markNotificationSent("profile-1", event, orderId);
+    await markNotificationSent("profile-1", event, orderId);
 
     // Different profile should not be considered duplicate
-    expect(isDuplicateNotification("profile-2", event, orderId)).toBe(false);
+    expect(await isDuplicateNotification("profile-2", event, orderId)).toBe(false);
   });
 
-  it("clearNotificationCache clears all cached entries", () => {
-    markNotificationSent("profile-1", "delivery:assigned", "order-1");
-    markNotificationSent("profile-2", "driver:en_route", "order-2");
+  it("clearNotificationCache clears all cached entries", async () => {
+    await markNotificationSent("profile-1", "delivery:assigned", "order-1");
+    await markNotificationSent("profile-2", "driver:en_route", "order-2");
 
-    // Both should be duplicates
-    expect(isDuplicateNotification("profile-1", "delivery:assigned", "order-1")).toBe(true);
-    expect(isDuplicateNotification("profile-2", "driver:en_route", "order-2")).toBe(true);
+    // Both should be duplicates (in-memory cache)
+    expect(await isDuplicateNotification("profile-1", "delivery:assigned", "order-1")).toBe(true);
+    expect(await isDuplicateNotification("profile-2", "driver:en_route", "order-2")).toBe(true);
 
     // Clear cache
-    clearNotificationCache();
+    await clearNotificationCache();
 
     // Should no longer be duplicates
-    expect(isDuplicateNotification("profile-1", "delivery:assigned", "order-1")).toBe(false);
-    expect(isDuplicateNotification("profile-2", "driver:en_route", "order-2")).toBe(false);
+    expect(await isDuplicateNotification("profile-1", "delivery:assigned", "order-1")).toBe(false);
+    expect(await isDuplicateNotification("profile-2", "driver:en_route", "order-2")).toBe(false);
   });
 });
 
@@ -154,5 +161,3 @@ describe("Status to Event Mapping Integration", () => {
     }
   });
 });
-
-

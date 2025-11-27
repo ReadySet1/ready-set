@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/db/prisma";
@@ -101,7 +102,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       },
     });
   } catch (error: unknown) {
-    console.error("Error fetching notification analytics:", error);
+    Sentry.captureException(error, {
+      tags: { route: "notifications/push/analytics" },
+    });
 
     return NextResponse.json(
       {

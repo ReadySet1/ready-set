@@ -24,9 +24,17 @@ jest.mock("@/lib/db/prisma", () => ({
   },
 }));
 
+// Mock Sentry
+jest.mock("@sentry/nextjs", () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
+
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/db/prisma";
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+const mockSentry = Sentry as jest.Mocked<typeof Sentry>;
 
 describe("notification analytics service", () => {
   beforeEach(() => {
@@ -83,8 +91,6 @@ describe("notification analytics service", () => {
         new Error("Database error")
       );
 
-      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
-
       const result = await trackNotification({
         profileId: "profile-123",
         notificationType: "delivery_status",
@@ -93,9 +99,7 @@ describe("notification analytics service", () => {
       });
 
       expect(result).toBeNull();
-      expect(consoleSpy).toHaveBeenCalled();
-
-      consoleSpy.mockRestore();
+      expect(mockSentry.captureException).toHaveBeenCalled();
     });
   });
 
@@ -229,14 +233,10 @@ describe("notification analytics service", () => {
         new Error("Database error")
       );
 
-      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
-
       const count = await cleanupOldAnalytics(90);
 
       expect(count).toBe(0);
-      expect(consoleSpy).toHaveBeenCalled();
-
-      consoleSpy.mockRestore();
+      expect(mockSentry.captureException).toHaveBeenCalled();
     });
   });
 });

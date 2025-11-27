@@ -8,6 +8,7 @@
  * 3. Clean up stale/invalid tokens
  */
 
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/db/prisma";
 import { getFirebaseMessaging } from "@/lib/firebase-admin";
 
@@ -88,7 +89,10 @@ export async function recordTokenRefresh(
     return { success: true, isNew: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error recording token refresh:", error);
+    Sentry.captureException(error, {
+      tags: { service: "token-refresh" },
+      extra: { operation: "recordTokenRefresh", profileId },
+    });
     return { success: false, isNew: false, error: errorMessage };
   }
 }
@@ -126,7 +130,10 @@ export async function getStaleTokens(limit: number = 100): Promise<StaleTokenInf
       ),
     }));
   } catch (error) {
-    console.error("Error getting stale tokens:", error);
+    Sentry.captureException(error, {
+      tags: { service: "token-refresh" },
+      extra: { operation: "getStaleTokens", limit },
+    });
     return [];
   }
 }
@@ -225,10 +232,16 @@ export async function revokeToken(
       },
     });
 
-    console.info(`Revoked token ${tokenId}: ${reason || "No reason provided"}`);
+    Sentry.captureMessage(`Revoked token ${tokenId}: ${reason || "No reason provided"}`, {
+      level: "info",
+      tags: { service: "token-refresh" },
+    });
     return true;
   } catch (error) {
-    console.error(`Error revoking token ${tokenId}:`, error);
+    Sentry.captureException(error, {
+      tags: { service: "token-refresh" },
+      extra: { operation: "revokeToken", tokenId, reason },
+    });
     return false;
   }
 }
@@ -255,7 +268,10 @@ export async function cleanupRevokedTokens(retentionDays: number = 7): Promise<n
 
     return result.count;
   } catch (error) {
-    console.error("Error cleaning up revoked tokens:", error);
+    Sentry.captureException(error, {
+      tags: { service: "token-refresh" },
+      extra: { operation: "cleanupRevokedTokens", retentionDays },
+    });
     return 0;
   }
 }

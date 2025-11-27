@@ -21,9 +21,17 @@ jest.mock("@/lib/db/prisma", () => ({
   },
 }));
 
+// Mock Sentry
+jest.mock("@sentry/nextjs", () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
+
 import { prisma } from "@/lib/db/prisma";
+import * as Sentry from "@sentry/nextjs";
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+const mockSentry = Sentry as jest.Mocked<typeof Sentry>;
 
 describe("notification dedup service", () => {
   beforeEach(() => {
@@ -82,8 +90,6 @@ describe("notification dedup service", () => {
         new Error("Database error")
       );
 
-      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
-
       const result = await isDuplicateNotificationDistributed(
         "profile-123",
         "delivery:completed",
@@ -91,9 +97,7 @@ describe("notification dedup service", () => {
       );
 
       expect(result).toBe(false);
-      expect(consoleSpy).toHaveBeenCalled();
-
-      consoleSpy.mockRestore();
+      expect(mockSentry.captureException).toHaveBeenCalled();
     });
   });
 
@@ -123,15 +127,11 @@ describe("notification dedup service", () => {
         new Error("Database error")
       );
 
-      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
-
       await expect(
         markNotificationSentDistributed("profile-123", "delivery:completed", "order-456")
       ).resolves.not.toThrow();
 
-      expect(consoleSpy).toHaveBeenCalled();
-
-      consoleSpy.mockRestore();
+      expect(mockSentry.captureException).toHaveBeenCalled();
     });
   });
 

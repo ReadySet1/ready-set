@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/utils/supabase/server";
@@ -59,7 +60,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       error: result.error,
     });
   } catch (error: unknown) {
-    console.error("Error validating push token:", error);
+    Sentry.captureException(error, {
+      tags: { route: "notifications/push/validate" },
+    });
 
     return NextResponse.json(
       {

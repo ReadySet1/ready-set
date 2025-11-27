@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { trackNotificationClickByMessageId } from "@/services/notifications/analytics";
@@ -49,7 +50,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error("Error tracking notification click:", error);
+    Sentry.captureException(error, {
+      tags: { route: "notifications/push/click" },
+    });
 
     // Don't fail the request on analytics errors
     // The user experience shouldn't be affected by tracking issues

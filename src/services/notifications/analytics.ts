@@ -5,6 +5,7 @@
  * Integrates with the NotificationAnalytics database table for persistence.
  */
 
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/db/prisma";
 import { DeliveryStatusEvent } from "./push";
 import { DispatchNotificationRecipient } from "./delivery-status";
@@ -98,7 +99,10 @@ export async function trackNotification(
     return record as NotificationAnalyticsRecord;
   } catch (error) {
     // Log but don't fail the notification flow
-    console.error("Error tracking notification analytics:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-analytics" },
+      extra: { operation: "trackNotification", profileId, event },
+    });
     return null;
   }
 }
@@ -121,7 +125,10 @@ export async function markNotificationDelivered(
 
     return record as NotificationAnalyticsRecord;
   } catch (error) {
-    console.error("Error marking notification as delivered:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-analytics" },
+      extra: { operation: "markNotificationDelivered", analyticsId },
+    });
     return null;
   }
 }
@@ -144,7 +151,10 @@ export async function markNotificationFailed(
 
     return record as NotificationAnalyticsRecord;
   } catch (error) {
-    console.error("Error marking notification as failed:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-analytics" },
+      extra: { operation: "markNotificationFailed", analyticsId },
+    });
     return null;
   }
 }
@@ -167,7 +177,10 @@ export async function markNotificationClicked(
 
     return record as NotificationAnalyticsRecord;
   } catch (error) {
-    console.error("Error marking notification as clicked:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-analytics" },
+      extra: { operation: "markNotificationClicked", analyticsId },
+    });
     return null;
   }
 }
@@ -187,13 +200,19 @@ export async function trackNotificationClickByMessageId(
     });
 
     if (!notification) {
-      console.warn(`No notification found for FCM message ID: ${fcmMessageId}`);
+      Sentry.captureMessage(`No notification found for FCM message ID: ${fcmMessageId}`, {
+        level: "warning",
+        tags: { service: "notification-analytics" },
+      });
       return null;
     }
 
     return markNotificationClicked(notification.id);
   } catch (error) {
-    console.error("Error tracking notification click by message ID:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-analytics" },
+      extra: { operation: "trackNotificationClickByMessageId", fcmMessageId },
+    });
     return null;
   }
 }
@@ -245,7 +264,10 @@ export async function getNotificationMetrics(
       clickRate: Math.round(clickRate * 100) / 100,
     };
   } catch (error) {
-    console.error("Error getting notification metrics:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-analytics" },
+      extra: { operation: "getNotificationMetrics", startDate, endDate, notificationType },
+    });
     return {
       totalSent: 0,
       totalDelivered: 0,
@@ -308,7 +330,10 @@ export async function getMetricsByRecipientType(
 
     return results;
   } catch (error) {
-    console.error("Error getting metrics by recipient type:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-analytics" },
+      extra: { operation: "getMetricsByRecipientType", startDate, endDate },
+    });
     return [];
   }
 }
@@ -353,7 +378,10 @@ export async function getMetricsByEventType(
 
     return results;
   } catch (error) {
-    console.error("Error getting metrics by event type:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-analytics" },
+      extra: { operation: "getMetricsByEventType", startDate, endDate },
+    });
     return [];
   }
 }
@@ -373,7 +401,10 @@ export async function getRecentFailedNotifications(
 
     return records as NotificationAnalyticsRecord[];
   } catch (error) {
-    console.error("Error getting recent failed notifications:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-analytics" },
+      extra: { operation: "getRecentFailedNotifications", limit },
+    });
     return [];
   }
 }
@@ -394,7 +425,10 @@ export async function getProfileNotificationHistory(
 
     return records as NotificationAnalyticsRecord[];
   } catch (error) {
-    console.error("Error getting profile notification history:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-analytics" },
+      extra: { operation: "getProfileNotificationHistory", profileId, limit },
+    });
     return [];
   }
 }
@@ -415,7 +449,10 @@ export async function cleanupOldAnalytics(retentionDays: number = 90): Promise<n
     });
     return result.count;
   } catch (error) {
-    console.error("Error cleaning up old analytics:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-analytics" },
+      extra: { operation: "cleanupOldAnalytics", retentionDays },
+    });
     return 0;
   }
 }

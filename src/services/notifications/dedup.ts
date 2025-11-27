@@ -6,6 +6,7 @@
  * where multiple server instances may be running.
  */
 
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/db/prisma";
 
 const DEDUP_TTL_SECONDS = 60; // 60 second deduplication window
@@ -46,7 +47,10 @@ export async function isDuplicateNotificationDistributed(
     return !!existing;
   } catch (error) {
     // On database error, allow the notification (fail open)
-    console.error("Error checking notification dedup:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-dedup" },
+      extra: { operation: "isDuplicateNotificationDistributed", cacheKey },
+    });
     return false;
   }
 }
@@ -70,7 +74,10 @@ export async function markNotificationSentDistributed(
     });
   } catch (error) {
     // Log but don't fail the notification on dedup cache error
-    console.error("Error marking notification in dedup cache:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-dedup" },
+      extra: { operation: "markNotificationSentDistributed", cacheKey },
+    });
   }
 }
 
@@ -89,7 +96,10 @@ export async function cleanupExpiredDedup(): Promise<number> {
     });
     return result.count;
   } catch (error) {
-    console.error("Error cleaning up expired dedup entries:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-dedup" },
+      extra: { operation: "cleanupExpiredDedup" },
+    });
     return 0;
   }
 }
@@ -101,7 +111,10 @@ export async function clearDedupCache(): Promise<void> {
   try {
     await prisma.notificationDedup.deleteMany({});
   } catch (error) {
-    console.error("Error clearing dedup cache:", error);
+    Sentry.captureException(error, {
+      tags: { service: "notification-dedup" },
+      extra: { operation: "clearDedupCache" },
+    });
   }
 }
 
