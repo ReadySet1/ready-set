@@ -518,6 +518,24 @@ const CateringContact: React.FC = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.5 }}
             >
+              {/* Ready Set Logo */}
+              <div className="mb-8 flex justify-center">
+                <div className="relative h-32 w-64">
+                  <Image
+                    src="/images/logo/logo.png"
+                    alt="Ready Set"
+                    fill
+                    className="object-contain"
+                    sizes="256px"
+                    onError={(e) => {
+                      // Hide image if it fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = "none";
+                    }}
+                  />
+                </div>
+              </div>
+
               <p className="mb-6 font-[Montserrat] text-base font-medium text-gray-800 md:text-lg">
                 Here at Ready Set, we treat your business like an extension of
                 our own.

@@ -61,7 +61,7 @@ const CateringAbout: React.FC = () => {
             {/* Image */}
             <div className="relative mb-8 overflow-hidden rounded-3xl">
               <Image
-                src="/images/food/catering-about.jpg"
+                src="/images/food/catering-about.png"
                 alt="Restaurant owners reviewing catering orders"
                 width={800}
                 height={600}

@@ -2,20 +2,18 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import Image from "next/image";
+import { MapPin, Headset, Truck } from "lucide-react";
 import ScheduleDialog from "@/components/Logistics/Schedule";
 
 interface FeatureCardProps {
-  iconSrc: string;
-  iconAlt: string;
+  icon: React.ReactNode;
   title: string;
   description: string;
   delay: number;
 }
 
 const FeatureCard: React.FC<FeatureCardProps> = ({
-  iconSrc,
-  iconAlt,
+  icon,
   title,
   description,
   delay,
@@ -32,14 +30,8 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
         whileHover={{ scale: 1.03, y: -5 }}
         transition={{ type: "spring", stiffness: 300 }}
       >
-        <div className="mb-6 flex items-center justify-center">
-          <Image
-            src={iconSrc}
-            alt={iconAlt}
-            width={80}
-            height={80}
-            className="object-contain"
-          />
+        <div className="mb-6 flex items-center justify-center text-yellow-400">
+          {icon}
         </div>
         <h3 className="mb-4 text-center text-xl font-black uppercase leading-tight tracking-wide text-gray-800 md:text-2xl">
           {title}
@@ -55,24 +47,21 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
 const CateringFeatures: React.FC = () => {
   const features = [
     {
-      iconSrc: "/images/food/icons/map-pin.png",
-      iconAlt: "Flexible Coordination Icon",
+      icon: <MapPin size={80} strokeWidth={2} />,
       title: "Flexible Coordination",
       description:
         "We simplify coordination and make sure every delivery is confirmed, scheduled, and on time.",
       delay: 0,
     },
     {
-      iconSrc: "/images/food/icons/headset.png",
-      iconAlt: "Transparent Service Icon",
+      icon: <Headset size={80} strokeWidth={2} />,
       title: "Transparent Service",
       description:
         "With real-time tracking and responsive support, you always know where your order is.",
       delay: 200,
     },
     {
-      iconSrc: "/images/food/icons/truck.png",
-      iconAlt: "Hands-Off Experience Icon",
+      icon: <Truck size={80} strokeWidth={2} />,
       title: "Hands-Off Experience",
       description:
         "Dependable, trained drivers handle every detail, from quick drop-offs to full setups.",
@@ -100,8 +89,7 @@ const CateringFeatures: React.FC = () => {
           {features.map((feature, index) => (
             <FeatureCard
               key={index}
-              iconSrc={feature.iconSrc}
-              iconAlt={feature.iconAlt}
+              icon={feature.icon}
               title={feature.title}
               description={feature.description}
               delay={feature.delay}
