@@ -832,7 +832,12 @@ model DriverShift {
   endLocation            Unsupported("geography(Point)")? @map("end_location")
   startOdometer          Float?    @map("start_odometer")
   endOdometer            Float?    @map("end_odometer")
-  totalDistance          Float?    @map("total_distance")
+  totalDistance          Float?    @map("total_distance") // Legacy km field
+  totalDistanceMiles     Float?    @map("total_distance_miles") // Primary distance in miles
+  gpsDistanceMiles       Float?    @map("gps_distance_miles") // GPS-calculated for audit
+  reportedDistanceMiles  Float?    @map("reported_distance_miles") // Client-reported
+  mileageSource          String?   @map("mileage_source") @db.VarChar(20) // gps, odometer, manual, hybrid
+  deliveryCount          Int?      @default(0) @map("delivery_count")
   breakStart             DateTime? @map("break_start") @db.Timestamptz(6)
   breakEnd               DateTime? @map("break_end") @db.Timestamptz(6)
   totalBreakDuration     String?   @map("total_break_duration") // Interval type

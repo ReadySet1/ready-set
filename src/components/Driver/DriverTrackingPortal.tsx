@@ -292,9 +292,9 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-primary">
-                    {currentShift.totalDistanceKm
-                      ? `${Math.round(currentShift.totalDistanceKm * 10) / 10} km`
-                      : '0 km'}
+                    {currentShift.totalDistanceMiles
+                      ? `${Math.round(currentShift.totalDistanceMiles * 10) / 10} mi`
+                      : '0 mi'}
                   </p>
                   <p className="text-xs text-muted-foreground">Distance</p>
                 </div>
