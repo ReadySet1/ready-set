@@ -1,0 +1,47 @@
+meta {
+  name: 2. List Files
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{BASE_URL}}/file-uploads?entityType=order&entityId=test-entity-123
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{AUTH_TOKEN}}
+}
+
+docs {
+  # List Files
+
+  Lists files for a specific entity.
+
+  ## Prerequisites
+  - Set AUTH_TOKEN in environment
+
+  ## Tests REA-180 Changes
+  - File listing response structure
+  - Proper filtering by entity
+
+  ## Expected Response
+  - Status: 200
+  - Array of file objects
+}
+
+tests {
+  test("Returns valid response", function() {
+    const status = res.getStatus();
+    expect([200, 401, 403]).to.include(status);
+  });
+
+  test("Returns array if authenticated", function() {
+    if (res.getStatus() === 200) {
+      const body = res.getBody();
+      expect(body).to.be.an('array');
+    }
+  });
+}

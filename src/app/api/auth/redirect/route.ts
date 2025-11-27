@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   // destination is *exactly* the Supabase callback or another allowed URL.
   const allowedDomains = [
     'ready-sets-projects.vercel.app', // Your frontend domain
-    'localhost:3000',             // Your local dev domain
+    'localhost',                  // Your local dev domain (hostname doesn't include port)
     'supabase.co'                 // Domain for Supabase callback
     // Add other valid domains/origins if necessary
   ];

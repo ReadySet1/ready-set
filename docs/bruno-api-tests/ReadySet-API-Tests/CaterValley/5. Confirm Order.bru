@@ -1,0 +1,48 @@
+meta {
+  name: 5. Confirm Order
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{CATER_VALLEY_URL}}/orders/{{orderId}}/confirm
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: {{API_KEY}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  # Confirm Order
+
+  Confirms a draft order, making it active.
+
+  ## Prerequisites
+  - Run "Create Draft Order" first to set orderId variable
+
+  ## Tests REA-209 Changes
+  - order-utils.ts confirmation processing
+
+  ## Expected Response
+  - Status: 200
+  - Order status changed to confirmed
+}
+
+tests {
+  test("Order confirmed successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response confirms status change", function() {
+    const body = res.getBody();
+    expect(body.status).to.equal("SUCCESS");
+  });
+}

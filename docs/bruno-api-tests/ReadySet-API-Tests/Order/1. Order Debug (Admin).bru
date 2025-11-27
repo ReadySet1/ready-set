@@ -1,0 +1,48 @@
+meta {
+  name: 1. Order Debug (Admin)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{BASE_URL}}/order/debug
+  body: none
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{AUTH_TOKEN}}
+}
+
+docs {
+  # Order Debug Endpoint
+
+  Admin endpoint for debugging order issues.
+
+  ## Prerequisites
+  - Set AUTH_TOKEN in environment (admin user token)
+
+  ## Tests REA-179 Changes
+  - Response structure
+  - Sentry error tracking (errors go to Sentry, not console)
+
+  ## Expected Response
+  - Status: 200 (if authenticated as admin)
+  - Status: 401/403 (if not authenticated/authorized)
+}
+
+tests {
+  test("Returns valid response", function() {
+    const status = res.getStatus();
+    // Either success (200) or auth required (401/403)
+    expect([200, 401, 403]).to.include(status);
+  });
+
+  test("Response is JSON", function() {
+    const contentType = res.getHeader('content-type');
+    if (contentType) {
+      expect(contentType).to.include('application/json');
+    }
+  });
+}

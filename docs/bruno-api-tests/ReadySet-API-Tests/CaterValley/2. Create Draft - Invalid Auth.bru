@@ -1,0 +1,71 @@
+meta {
+  name: 2. Create Draft - Invalid Auth
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{CATER_VALLEY_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+  x-api-key: invalid-key
+}
+
+body:json {
+  {
+    "orderCode": "TEST-AUTH-{{$timestamp}}",
+    "deliveryDate": "2025-12-01",
+    "deliveryTime": "12:00",
+    "totalItem": 5,
+    "priceTotal": 75.00,
+    "pickupLocation": {
+      "name": "Test Restaurant",
+      "address": "123 Main St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95112",
+      "phone": "(408) 555-0100"
+    },
+    "dropOffLocation": {
+      "name": "Test Office",
+      "address": "456 Corporate Blvd",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95110",
+      "recipient": {
+        "name": "Jane Doe",
+        "phone": "4085550300"
+      }
+    }
+  }
+}
+
+docs {
+  # Invalid Auth Test
+
+  Tests that invalid API key is rejected.
+
+  ## Tests REA-209 Changes
+  - auth-utils.ts validation
+
+  ## Expected Response
+  - Status: 401 or 403
+  - Error message about authentication
+}
+
+tests {
+  test("Invalid auth is rejected", function() {
+    const status = res.getStatus();
+    expect([401, 403]).to.include(status);
+  });
+
+  test("Error response is returned", function() {
+    const body = res.getBody();
+    expect(body).to.have.property('error');
+  });
+}

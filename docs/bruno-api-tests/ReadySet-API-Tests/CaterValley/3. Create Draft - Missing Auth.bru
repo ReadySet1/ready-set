@@ -1,0 +1,69 @@
+meta {
+  name: 3. Create Draft - Missing Auth
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{CATER_VALLEY_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{PARTNER}}
+}
+
+body:json {
+  {
+    "orderCode": "TEST-NOAUTH-{{$timestamp}}",
+    "deliveryDate": "2025-12-01",
+    "deliveryTime": "12:00",
+    "totalItem": 5,
+    "priceTotal": 75.00,
+    "pickupLocation": {
+      "name": "Test Restaurant",
+      "address": "123 Main St",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95112",
+      "phone": "(408) 555-0100"
+    },
+    "dropOffLocation": {
+      "name": "Test Office",
+      "address": "456 Corporate Blvd",
+      "city": "San Jose",
+      "state": "CA",
+      "zip": "95110",
+      "recipient": {
+        "name": "Jane Doe",
+        "phone": "4085550300"
+      }
+    }
+  }
+}
+
+docs {
+  # Missing Auth Test
+
+  Tests that missing API key header is rejected.
+
+  ## Tests REA-209 Changes
+  - auth-utils.ts validation for missing header
+
+  ## Expected Response
+  - Status: 401
+  - Error message about missing authentication
+}
+
+tests {
+  test("Missing auth is rejected", function() {
+    expect(res.getStatus()).to.equal(401);
+  });
+
+  test("Error response explains issue", function() {
+    const body = res.getBody();
+    expect(body).to.have.property('error');
+  });
+}
