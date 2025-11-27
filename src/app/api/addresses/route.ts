@@ -13,6 +13,12 @@ const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 30; // 30 requests per minute
 
+// Test utility function - accessed via module for testing
+// @ts-ignore: Attaching test utility to module object
+if (typeof global !== 'undefined') {
+  (global as any).__addressesRateLimitMap = rateLimitMap;
+}
+
 function checkRateLimit(userId: string): { allowed: boolean; remaining: number; resetTime: number } {
   const now = Date.now();
   const userLimit = rateLimitMap.get(userId);
