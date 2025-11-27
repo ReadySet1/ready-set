@@ -473,13 +473,29 @@ class MockNextResponse {
   }
 
   static json(data: any, options?: ResponseInit) {
-    const response = new MockNextResponse(data, options);
+    const mergedHeaders = new Headers(options?.headers);
+    if (!mergedHeaders.has('content-type')) {
+      mergedHeaders.set('content-type', 'application/json');
+    }
+    const response = new MockNextResponse(data, {
+      ...options,
+      headers: mergedHeaders,
+    });
     response.json = () => Promise.resolve(data);
     return response;
   }
 
   static next() {
     return new MockNextResponse({}, { status: 200 });
+  }
+
+  static redirect(url: string | URL, status: number = 302) {
+    const urlString = typeof url === 'string' ? url : url.toString();
+    const response = new MockNextResponse(null, {
+      status,
+      headers: { location: urlString },
+    });
+    return response;
   }
 }
 

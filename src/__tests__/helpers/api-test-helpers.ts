@@ -462,9 +462,19 @@ export function createPostRequest(
     },
     body: JSON.stringify(body),
   });
+  const urlObj = new URL(url);
 
   // Ensure url property is set for the route handler
   Object.defineProperty(request, 'url', { value: url, writable: true });
+
+  // Ensure nextUrl property exists and has searchParams
+  if (!request.nextUrl) {
+    Object.defineProperty(request, 'nextUrl', {
+      value: urlObj,
+      writable: true,
+      configurable: true,
+    });
+  }
 
   // Override json() method to return the body data
   (request as any).json = jest.fn().mockResolvedValue(body);
@@ -515,9 +525,19 @@ export function createPatchRequest(
     },
     body: JSON.stringify(body),
   });
+  const urlObj = new URL(url);
 
   // Ensure url property is set for the route handler
   Object.defineProperty(request, 'url', { value: url, writable: true });
+
+  // Ensure nextUrl property exists and has searchParams
+  if (!request.nextUrl) {
+    Object.defineProperty(request, 'nextUrl', {
+      value: urlObj,
+      writable: true,
+      configurable: true,
+    });
+  }
 
   // Override json() method to return the body data
   (request as any).json = jest.fn().mockResolvedValue(body);
@@ -533,8 +553,17 @@ export function createDeleteRequest(url: string, additionalHeaders?: Record<stri
     method: "DELETE",
     headers: additionalHeaders,
   });
+  const urlObj = new URL(url);
   // Ensure url property is set for the route handler
   Object.defineProperty(request, 'url', { value: url, writable: true });
+  // Ensure nextUrl property exists and has searchParams
+  if (!request.nextUrl) {
+    Object.defineProperty(request, 'nextUrl', {
+      value: urlObj,
+      writable: true,
+      configurable: true,
+    });
+  }
   return request;
 }
 
@@ -554,9 +583,19 @@ export function createPutRequest(
     },
     body: JSON.stringify(body),
   });
+  const urlObj = new URL(url);
 
   // Ensure url property is set for the route handler
   Object.defineProperty(request, 'url', { value: url, writable: true });
+
+  // Ensure nextUrl property exists and has searchParams
+  if (!request.nextUrl) {
+    Object.defineProperty(request, 'nextUrl', {
+      value: urlObj,
+      writable: true,
+      configurable: true,
+    });
+  }
 
   // Override json() method to return the body data
   (request as any).json = jest.fn().mockResolvedValue(body);

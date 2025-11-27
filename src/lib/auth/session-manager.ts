@@ -673,6 +673,8 @@ export class EnhancedSessionManager implements SessionManager {
       this.clearStoredSession();
     }
 
+    // Always clear in-memory session
+    this.currentSession = null;
     this.isInitialized = false;
   }
 }

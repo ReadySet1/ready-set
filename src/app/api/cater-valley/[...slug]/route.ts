@@ -9,7 +9,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const resolvedParams = await params;
   const headers = Object.fromEntries(request.headers.entries());
   const url = request.url;
-  const searchParams = Object.fromEntries(request.nextUrl.searchParams.entries());
+  // Use nextUrl.searchParams if available, otherwise fall back to URL parsing
+  const searchParams = request.nextUrl?.searchParams
+    ? Object.fromEntries(request.nextUrl.searchParams.entries())
+    : Object.fromEntries(new URL(url).searchParams.entries());
   const slug = resolvedParams.slug;
 
             
@@ -33,7 +36,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const resolvedParams = await params;
   const headers = Object.fromEntries(request.headers.entries());
   const url = request.url;
-  const searchParams = Object.fromEntries(request.nextUrl.searchParams.entries());
+  // Use nextUrl.searchParams if available, otherwise fall back to URL parsing
+  const searchParams = request.nextUrl?.searchParams
+    ? Object.fromEntries(request.nextUrl.searchParams.entries())
+    : Object.fromEntries(new URL(url).searchParams.entries());
   const slug = resolvedParams.slug;
   
   let body = null;

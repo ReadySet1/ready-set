@@ -93,8 +93,8 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    continue-on-error: true # Non-blocking: 47.6% pass rate (1004/2106 tests passing)
+    timeout-minutes: 15
+    continue-on-error: true # Non-blocking: 83.7% pass rate (3610/4314 tests passing)
 
     steps:
       - name: Checkout code
@@ -167,10 +167,10 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📊 **Current Test Status**: 47.6% pass rate (1004/2106 tests passing)" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **Current Test Status**: 83.7% pass rate (3610/4314 tests passing)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ Test infrastructure is working correctly" >> $GITHUB_STEP_SUMMARY
-          echo "🔧 Individual test fixes being addressed incrementally" >> $GITHUB_STEP_SUMMARY
+          echo "🔧 Significant progress: improved from 47.6% to 83.7%" >> $GITHUB_STEP_SUMMARY
 
   e2e-tests:
     name: E2E Tests
@@ -358,9 +358,9 @@ jobs:
             exit 1
           fi
 
-          # Unit tests are informational only (47.6% pass rate)
+          # Unit tests are informational only (83.7% pass rate)
           if [[ "${{ needs.unit-tests.result }}" == "failure" ]]; then
-            echo "⚠️  Unit tests failed (non-blocking: 1004/2106 tests passing)"
+            echo "⚠️  Unit tests failed (non-blocking: 3610/4314 tests passing)"
           else
             echo "✅ Unit tests passed"
           fi
@@ -377,5 +377,5 @@ jobs:
           echo ""
           echo "📊 Test Status:"
           echo "  - TypeScript: ✅ All errors fixed (REA-43)"
-          echo "  - Unit Tests: 🟡 Running (47.6% pass rate, ~54s)"
+          echo "  - Unit Tests: 🟡 83.7% pass rate (3610/4314 tests)"
           echo "  - E2E Tests: ⏸️  Disabled (will address separately)"

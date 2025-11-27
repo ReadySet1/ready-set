@@ -23,9 +23,12 @@ export async function GET(req: NextRequest) {
   let isAllowed = false;
   try {
     const destinationUrl = new URL(destination);
-    // Check if the destination *hostname* is exactly the Supabase callback hostname or ends with an allowed domain suffix.
-    // A more secure check might involve comparing against the full expected Supabase URL.
-    isAllowed = allowedDomains.some(domain => destinationUrl.hostname.endsWith(domain));
+    // Check if the destination host (hostname:port) matches an allowed domain,
+    // or if the hostname alone ends with an allowed domain suffix.
+    // Using .host includes the port for localhost:3000, while .hostname doesn't.
+    isAllowed = allowedDomains.some(domain =>
+      destinationUrl.host === domain || destinationUrl.hostname.endsWith(domain)
+    );
     
     // A stricter check might be:
     // const expectedSupabaseCallback = 'https://jiasmmmmhtreoacdpiby.supabase.co/auth/v1/callback';

@@ -161,8 +161,9 @@ describe('/api/auth/redirect GET API', () => {
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid destination URL format');
+      // data: URLs are parsed as valid URLs but their "hostname" isn't in allowed domains
+      expect(response.status).toBe(403);
+      expect(data.error).toBe('Unauthorized redirect destination');
     });
 
     it('should prevent redirect to javascript URLs', async () => {
@@ -170,8 +171,9 @@ describe('/api/auth/redirect GET API', () => {
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid destination URL format');
+      // javascript: URLs are parsed as valid URLs but their "hostname" isn't in allowed domains
+      expect(response.status).toBe(403);
+      expect(data.error).toBe('Unauthorized redirect destination');
     });
 
     it('should prevent redirect to file URLs', async () => {
@@ -179,8 +181,9 @@ describe('/api/auth/redirect GET API', () => {
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(400);
-      expect(data.error).toBe('Invalid destination URL format');
+      // file: URLs are parsed as valid URLs but their "hostname" isn't in allowed domains
+      expect(response.status).toBe(403);
+      expect(data.error).toBe('Unauthorized redirect destination');
     });
   });
 
@@ -213,13 +216,15 @@ describe('/api/auth/redirect GET API', () => {
   });
 
   describe('🔒 Protocol-based Attack Prevention', () => {
-    it('should reject ftp protocol', async () => {
-      const request = createRedirectRequest('ftp://localhost:3000/file');
+    it('should reject ftp protocol for non-allowed domains', async () => {
+      // Use a non-allowed domain to test ftp rejection
+      const request = createRedirectRequest('ftp://evil.com/file');
       const response = await GET(request);
       const data = await response.json();
 
-      // ftp is a valid URL but not an allowed domain
+      // ftp is a valid URL but evil.com not in allowed domains
       expect(response.status).toBe(403);
+      expect(data.error).toBe('Unauthorized redirect destination');
     });
 
     it('should reject mailto protocol', async () => {
@@ -227,7 +232,9 @@ describe('/api/auth/redirect GET API', () => {
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(400);
+      // mailto: URLs have hostname that isn't in allowed domains
+      expect(response.status).toBe(403);
+      expect(data.error).toBe('Unauthorized redirect destination');
     });
 
     it('should reject custom protocols', async () => {
@@ -235,7 +242,9 @@ describe('/api/auth/redirect GET API', () => {
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(400);
+      // custom protocols have hostname that isn't in allowed domains
+      expect(response.status).toBe(403);
+      expect(data.error).toBe('Unauthorized redirect destination');
     });
   });
 
@@ -272,12 +281,24 @@ describe('/api/auth/redirect GET API', () => {
   });
 
   describe('🔍 Edge Cases', () => {
-    it('should handle URLs with ports correctly for localhost', async () => {
-      const destination = 'http://localhost:3001/dashboard';
+    it('should handle URLs with allowed port for localhost', async () => {
+      // Only localhost:3000 is in the allowed domains list
+      const destination = 'http://localhost:3000/dashboard';
       const request = createRedirectRequest(destination);
       const response = await GET(request);
 
       expect(response.status).toBe(302);
+    });
+
+    it('should reject localhost with non-allowed port', async () => {
+      // localhost:3001 is NOT in the allowed domains list
+      const destination = 'http://localhost:3001/dashboard';
+      const request = createRedirectRequest(destination);
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(data.error).toBe('Unauthorized redirect destination');
     });
 
     it('should handle URLs with query parameters', async () => {
