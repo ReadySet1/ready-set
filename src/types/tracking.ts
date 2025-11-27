@@ -40,7 +40,7 @@ export interface DriverShift {
   endTime?: Date;
   startLocation: Coordinates;
   endLocation?: Coordinates;
-  totalDistanceKm: number;
+  totalDistanceMiles: number;
   deliveryCount: number;
   status: 'active' | 'paused' | 'completed';
   breaks: ShiftBreak[];
@@ -66,7 +66,7 @@ export interface DeliveryTracking {
   actualArrival?: Date;
   route: LocationUpdate[];
   proofOfDelivery?: string;
-  actualDistanceKm?: number;
+  actualDistanceMiles?: number;
   routePolyline?: string;
   metadata: Record<string, any>;
   assignedAt: Date;
@@ -112,7 +112,7 @@ export interface TrackedDriver {
   };
   // Additional computed fields from queries
   deliveryCount?: number;
-  totalDistanceKm?: number;
+  totalDistanceMiles?: number;
   activeDeliveries?: number;
   metadata: Record<string, any>;
   createdAt: Date;

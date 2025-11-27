@@ -1,25 +1,11 @@
 import { z } from 'zod';
 import * as Sentry from '@sentry/nextjs';
 import { prisma } from '@/utils/prismaDB';
-
-/**
- * Maximum reasonable mileage for a single shift (in km).
- * Values exceeding this threshold trigger a warning log but are still saved.
- * 500 km ≈ 310 miles, which is very high for a typical delivery shift.
- */
-const MAX_REASONABLE_SHIFT_KM = 500;
-
-/**
- * Threshold for GPS filter rate warnings.
- * If more than this percentage of GPS points are filtered out, log a warning.
- */
-const HIGH_FILTER_RATE_THRESHOLD = 0.5;
-
-/**
- * Threshold for per-delivery breakdown deviation from total.
- * If the sum of per-delivery distances differs from total by more than this, log a warning.
- */
-const BREAKDOWN_DEVIATION_THRESHOLD = 0.2;
+import {
+  MILEAGE_CONFIG,
+  METERS_TO_MILES,
+  milesToMeters,
+} from '@/config/mileage-config';
 
 /**
  * Internal type representing the minimal shift window needed for mileage calculation.
@@ -34,12 +20,15 @@ interface ShiftWindow {
 }
 
 interface ShiftMileageResult {
-  totalKm: number;
+  totalMiles: number;
+  gpsDistanceMiles: number;
+  mileageSource: 'gps' | 'odometer' | 'manual' | 'hybrid';
+  warnings: string[];
 }
 
 export interface DeliveryMileageBreakdown {
   deliveryId: string;
-  distanceKm: number;
+  distanceMiles: number;
 }
 
 export interface ShiftMileageWithBreakdown extends ShiftMileageResult {
@@ -57,22 +46,23 @@ function assertUuid(id: string, field: 'shiftId' | 'driverId'): void {
 }
 
 /**
- * Core helper to calculate distance (in kilometers) for a driver within a specific
+ * Core helper to calculate distance (in miles) for a driver within a specific
  * time window based on the GPS trail stored in driver_locations.
  *
  * This uses PostGIS ST_Distance over consecutive points ordered by recorded_at,
  * with several quality and safety filters:
- * - Filters out low-accuracy points (accuracy > 100m)
- * - Filters out stationary points (speed < 0.5 m/s)
- * - Caps effective segment speed at 150 km/h to drop GPS glitches
- * - Drops outlier segments (> 5km over short time deltas)
+ * - Filters out low-accuracy points (accuracy > configured threshold)
+ * - Filters out stationary points (speed < configured minimum)
+ * - Caps effective segment speed to filter GPS glitches
+ * - Drops outlier segments (unrealistic jumps over short time deltas)
  */
-async function calculateWindowDistanceKm(
+async function calculateWindowDistanceMiles(
   driverId: string,
   startTime: Date,
   endTime: Date
-): Promise<number> {
+): Promise<{ miles: number; warnings: string[] }> {
   assertUuid(driverId, 'driverId');
+  const warnings: string[] = [];
 
   // Run diagnostic query to check GPS data quality
   const diagnosticRows = await prisma.$queryRawUnsafe<{
@@ -81,18 +71,20 @@ async function calculateWindowDistanceKm(
   }[]>(`
     SELECT
       COUNT(*) AS total_points,
-      COUNT(*) FILTER (WHERE accuracy IS NOT NULL AND accuracy > 100) AS filtered_points
+      COUNT(*) FILTER (WHERE accuracy IS NOT NULL AND accuracy > $4) AS filtered_points
     FROM driver_locations
     WHERE driver_id = $1::uuid
       AND recorded_at BETWEEN $2::timestamptz AND $3::timestamptz
       AND deleted_at IS NULL
-  `, driverId, startTime, endTime);
+  `, driverId, startTime, endTime, MILEAGE_CONFIG.GPS_ACCURACY_THRESHOLD_M);
 
   const totalPoints = Number(diagnosticRows[0]?.total_points ?? 0);
   const filteredPoints = Number(diagnosticRows[0]?.filtered_points ?? 0);
 
   // Warn if high percentage of points were filtered due to poor accuracy
-  if (totalPoints > 0 && filteredPoints / totalPoints > HIGH_FILTER_RATE_THRESHOLD) {
+  if (totalPoints > 0 && filteredPoints / totalPoints > MILEAGE_CONFIG.HIGH_FILTER_RATE_THRESHOLD) {
+    const warningMsg = `High GPS filter rate: ${filteredPoints}/${totalPoints} points filtered (${((filteredPoints / totalPoints) * 100).toFixed(1)}%)`;
+    warnings.push(warningMsg);
     Sentry.captureMessage('High GPS filter rate for driver', {
       level: 'warning',
       extra: {
@@ -106,6 +98,8 @@ async function calculateWindowDistanceKm(
 
   // Warn if no GPS data available
   if (totalPoints === 0) {
+    const warningMsg = 'No GPS data available for time window';
+    warnings.push(warningMsg);
     Sentry.captureMessage('No GPS data for driver in time window', {
       level: 'warning',
       extra: {
@@ -116,7 +110,11 @@ async function calculateWindowDistanceKm(
     });
   }
 
-  const rows = await prisma.$queryRawUnsafe<{ total_km: number | null }[]>(`
+  // Convert config values for SQL query
+  const maxSpeedMsForQuery = MILEAGE_CONFIG.MAX_SPEED_MPH / 2.23694; // mph to m/s
+  const maxSegmentMeters = milesToMeters(MILEAGE_CONFIG.MAX_SEGMENT_DISTANCE_MILES);
+
+  const rows = await prisma.$queryRawUnsafe<{ total_miles: number | null }[]>(`
     WITH ordered_points AS (
       SELECT
         location,
@@ -130,7 +128,7 @@ async function calculateWindowDistanceKm(
         AND recorded_at BETWEEN $2::timestamptz AND $3::timestamptz
         AND deleted_at IS NULL
         -- Accuracy filter: keep only reasonably accurate points
-        AND (accuracy IS NULL OR accuracy <= 100)
+        AND (accuracy IS NULL OR accuracy <= $4)
     ),
     segments AS (
       SELECT
@@ -144,34 +142,44 @@ async function calculateWindowDistanceKm(
       WHERE prev_location IS NOT NULL
     )
     SELECT
-      COALESCE(SUM(segment_distance_m), 0) / 1000.0 AS total_km
+      COALESCE(SUM(segment_distance_m), 0) * $8::float AS total_miles
     FROM segments
     WHERE
       segment_distance_m IS NOT NULL
-      -- Filter out stationary points: require speed >= 0.5 m/s when available
-      AND (speed IS NULL OR speed >= 0.5)
+      -- Filter out stationary points: require speed >= minimum when available
+      AND (speed IS NULL OR speed >= $5)
       -- Ensure positive time delta when available
       AND (dt_seconds IS NULL OR dt_seconds > 0)
-      -- Drop obvious outliers: > 5km jump within ~30 seconds
+      -- Drop obvious outliers: large jumps within short time
       AND (
         dt_seconds IS NULL
-        OR segment_distance_m <= 5000
-        OR dt_seconds >= 30
+        OR segment_distance_m <= $6
+        OR dt_seconds >= $7
       )
-      -- Cap effective speed at 150 km/h (≈ 41.67 m/s) to filter GPS glitches
+      -- Cap effective speed to filter GPS glitches
       AND (
         dt_seconds IS NULL
-        OR (segment_distance_m / GREATEST(dt_seconds, 1)) <= (150000.0 / 3600.0)
+        OR (segment_distance_m / GREATEST(dt_seconds, 1)) <= $9::float
       );
-  `, driverId, startTime, endTime);
+  `,
+    driverId,
+    startTime,
+    endTime,
+    MILEAGE_CONFIG.GPS_ACCURACY_THRESHOLD_M,
+    MILEAGE_CONFIG.MIN_MOVING_SPEED_MS,
+    maxSegmentMeters,
+    MILEAGE_CONFIG.OUTLIER_MIN_TIME_DELTA_SECONDS,
+    METERS_TO_MILES,
+    maxSpeedMsForQuery
+  );
 
-  const totalKm = rows[0]?.total_km ?? 0;
+  const totalMiles = rows[0]?.total_miles ?? 0;
   // Guard against NaN or negative values from unexpected database behavior
-  if (!Number.isFinite(totalKm) || totalKm < 0) {
-    return 0;
+  if (!Number.isFinite(totalMiles) || totalMiles < 0) {
+    return { miles: 0, warnings };
   }
 
-  return totalKm;
+  return { miles: totalMiles, warnings };
 }
 
 /**
@@ -185,8 +193,8 @@ async function getShiftWindow(shiftId: string): Promise<ShiftWindow | null> {
     SELECT
       id,
       driver_id,
-      start_time,
-      end_time
+      shift_start as start_time,
+      shift_end as end_time
     FROM driver_shifts
     WHERE id = $1::uuid
   `, shiftId);
@@ -200,10 +208,10 @@ async function getShiftWindow(shiftId: string): Promise<ShiftWindow | null> {
 
 /**
  * Calculate total mileage for a given shift based on the driver's GPS trail,
- * and persist it back to driver_shifts.total_distance_km.
+ * and persist it back to driver_shifts.total_distance_miles.
  *
  * This function is safe to call multiple times; it will simply overwrite the
- * stored total_distance_km value for the given shift.
+ * stored total_distance_miles value for the given shift.
  */
 export async function calculateShiftMileage(shiftId: string): Promise<ShiftMileageResult> {
   const shift = await getShiftWindow(shiftId);
@@ -214,20 +222,22 @@ export async function calculateShiftMileage(shiftId: string): Promise<ShiftMilea
   const startTime = shift.start_time;
   const endTime = shift.end_time ?? new Date();
 
-  const totalKm = await calculateWindowDistanceKm(
+  const { miles: totalMiles, warnings } = await calculateWindowDistanceMiles(
     shift.driver_id,
     startTime,
     endTime
   );
 
   // Warn if mileage seems unrealistically high
-  if (totalKm > MAX_REASONABLE_SHIFT_KM) {
+  if (totalMiles > MILEAGE_CONFIG.MAX_REASONABLE_SHIFT_MILES) {
+    const warningMsg = `Unusually high mileage: ${totalMiles.toFixed(2)} miles exceeds ${MILEAGE_CONFIG.MAX_REASONABLE_SHIFT_MILES} mile threshold`;
+    warnings.push(warningMsg);
     Sentry.captureMessage('Unusually high mileage for shift', {
       level: 'warning',
       extra: {
         shiftId,
-        totalKm: totalKm.toFixed(2),
-        threshold: MAX_REASONABLE_SHIFT_KM,
+        totalMiles: totalMiles.toFixed(2),
+        threshold: MILEAGE_CONFIG.MAX_REASONABLE_SHIFT_MILES,
       },
     });
   }
@@ -236,15 +246,22 @@ export async function calculateShiftMileage(shiftId: string): Promise<ShiftMilea
     `
     UPDATE driver_shifts
     SET
-      total_distance_km = $2::float,
+      total_distance_miles = $2::float,
+      gps_distance_miles = $2::float,
+      mileage_source = 'gps',
       updated_at = NOW()
     WHERE id = $1::uuid
   `,
     shift.id,
-    totalKm
+    totalMiles
   );
 
-  return { totalKm };
+  return {
+    totalMiles,
+    gpsDistanceMiles: totalMiles,
+    mileageSource: 'gps',
+    warnings
+  };
 }
 
 /**
@@ -266,8 +283,8 @@ export async function calculateShiftMileageWithBreakdown(
   const startTime = shift.start_time;
   const endTime = shift.end_time ?? new Date();
 
-  const [totalKm, deliveries] = await Promise.all([
-    calculateWindowDistanceKm(shift.driver_id, startTime, endTime),
+  const [totalResult, deliveries] = await Promise.all([
+    calculateWindowDistanceMiles(shift.driver_id, startTime, endTime),
     prisma.$queryRawUnsafe<{
       id: string;
       driver_id: string;
@@ -292,6 +309,7 @@ export async function calculateShiftMileageWithBreakdown(
     `, shiftId),
   ]);
 
+  const { miles: totalMiles, warnings } = totalResult;
   const breakdown: DeliveryMileageBreakdown[] = [];
 
   for (const delivery of deliveries) {
@@ -310,12 +328,12 @@ export async function calculateShiftMileageWithBreakdown(
     if (!windowStart || !windowEnd || windowEnd <= windowStart) {
       breakdown.push({
         deliveryId: delivery.id,
-        distanceKm: 0,
+        distanceMiles: 0,
       });
       continue;
     }
 
-    const distanceKm = await calculateWindowDistanceKm(
+    const { miles: distanceMiles } = await calculateWindowDistanceMiles(
       shift.driver_id,
       windowStart,
       windowEnd
@@ -323,44 +341,130 @@ export async function calculateShiftMileageWithBreakdown(
 
     breakdown.push({
       deliveryId: delivery.id,
-      distanceKm,
+      distanceMiles,
     });
   }
 
   // Validate breakdown consistency: sum of per-delivery distances vs total
-  if (breakdown.length > 0 && totalKm > 0) {
-    const breakdownSum = breakdown.reduce((acc, d) => acc + d.distanceKm, 0);
-    const deviation = Math.abs(breakdownSum - totalKm) / totalKm;
-    if (deviation > BREAKDOWN_DEVIATION_THRESHOLD) {
+  if (breakdown.length > 0 && totalMiles > 0) {
+    const breakdownSum = breakdown.reduce((acc, d) => acc + d.distanceMiles, 0);
+    const deviation = Math.abs(breakdownSum - totalMiles) / totalMiles;
+    if (deviation > MILEAGE_CONFIG.BREAKDOWN_DEVIATION_THRESHOLD) {
+      const warningMsg = `Mileage breakdown inconsistency: sum ${breakdownSum.toFixed(2)} vs total ${totalMiles.toFixed(2)} (${(deviation * 100).toFixed(1)}% deviation)`;
+      warnings.push(warningMsg);
       Sentry.captureMessage('Mileage breakdown inconsistency for shift', {
         level: 'warning',
         extra: {
           shiftId,
           breakdownSum: breakdownSum.toFixed(2),
-          totalKm: totalKm.toFixed(2),
+          totalMiles: totalMiles.toFixed(2),
           deviationPercent: (deviation * 100).toFixed(1),
         },
       });
     }
   }
 
-  // Persist the total distance (km) for the shift in a single write
+  // Persist the total distance (miles) for the shift in a single write
   await prisma.$executeRawUnsafe(
     `
     UPDATE driver_shifts
     SET
-      total_distance_km = $2::float,
+      total_distance_miles = $2::float,
+      gps_distance_miles = $2::float,
+      mileage_source = 'gps',
       updated_at = NOW()
     WHERE id = $1::uuid
   `,
     shift.id,
-    totalKm
+    totalMiles
   );
 
   return {
-    totalKm,
+    totalMiles,
+    gpsDistanceMiles: totalMiles,
+    mileageSource: 'gps',
+    warnings,
     deliveries: breakdown,
   };
 }
 
+/**
+ * Calculate shift mileage with client-reported value validation.
+ * Used when the driver provides an odometer reading at shift end.
+ *
+ * @param shiftId - The shift to calculate mileage for
+ * @param reportedMiles - Client-reported mileage (e.g., from odometer reading)
+ * @returns The final mileage result with audit information
+ */
+export async function calculateShiftMileageWithValidation(
+  shiftId: string,
+  reportedMiles: number
+): Promise<ShiftMileageResult & { discrepancyPercent: number | null }> {
+  const shift = await getShiftWindow(shiftId);
+  if (!shift) {
+    throw new Error('Shift not found for mileage calculation');
+  }
 
+  const startTime = shift.start_time;
+  const endTime = shift.end_time ?? new Date();
+
+  const { miles: gpsMiles, warnings } = await calculateWindowDistanceMiles(
+    shift.driver_id,
+    startTime,
+    endTime
+  );
+
+  // Calculate discrepancy between GPS and reported values
+  let discrepancyPercent: number | null = null;
+  let mileageSource: 'gps' | 'odometer' | 'manual' | 'hybrid' = 'odometer';
+  let finalMiles = reportedMiles;
+
+  if (gpsMiles > 0) {
+    discrepancyPercent = Math.abs(reportedMiles - gpsMiles) / gpsMiles;
+
+    if (discrepancyPercent > MILEAGE_CONFIG.CLIENT_DISCREPANCY_WARN_THRESHOLD) {
+      const warningMsg = `Client-reported mileage differs significantly from GPS: reported ${reportedMiles.toFixed(2)} vs GPS ${gpsMiles.toFixed(2)} (${(discrepancyPercent * 100).toFixed(1)}% difference)`;
+      warnings.push(warningMsg);
+      Sentry.captureMessage('Client mileage discrepancy detected', {
+        level: 'warning',
+        extra: {
+          shiftId,
+          reportedMiles: reportedMiles.toFixed(2),
+          gpsMiles: gpsMiles.toFixed(2),
+          discrepancyPercent: (discrepancyPercent * 100).toFixed(1),
+        },
+      });
+      mileageSource = 'hybrid';
+    }
+  } else {
+    // No GPS data available, trust the reported value
+    warnings.push('No GPS data available, using client-reported mileage');
+  }
+
+  // Persist both values for audit trail
+  await prisma.$executeRawUnsafe(
+    `
+    UPDATE driver_shifts
+    SET
+      total_distance_miles = $2::float,
+      gps_distance_miles = $3::float,
+      reported_distance_miles = $4::float,
+      mileage_source = $5,
+      updated_at = NOW()
+    WHERE id = $1::uuid
+  `,
+    shift.id,
+    finalMiles,
+    gpsMiles > 0 ? gpsMiles : null,
+    reportedMiles,
+    mileageSource
+  );
+
+  return {
+    totalMiles: finalMiles,
+    gpsDistanceMiles: gpsMiles,
+    mileageSource,
+    warnings,
+    discrepancyPercent,
+  };
+}
