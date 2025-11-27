@@ -86,6 +86,8 @@ export interface ProofOfDeliveryCaptureProps {
   onCancel: () => void;
   onError?: (error: string) => void;
   className?: string;
+  /** Custom upload endpoint - defaults to tracking API if not provided */
+  uploadEndpoint?: string;
 }
 
 /**

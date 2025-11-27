@@ -13,17 +13,28 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   CalendarIcon,
   MapPinIcon,
   FileTextIcon,
   CarIcon,
   UsersIcon,
   ArrowLeftIcon,
+  Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePathname, useRouter, useParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { decodeOrderNumber } from "@/utils/order";
+import { ProofOfDeliveryCapture } from "./ProofOfDeliveryCapture";
+import { ProofOfDeliveryViewer } from "./ProofOfDeliveryViewer";
 
 // Shared types
 interface Driver {
@@ -40,6 +51,13 @@ interface Address {
   zip?: string;
   locationNumber?: string;
   parkingLoading?: string;
+}
+
+interface FileUpload {
+  id: string;
+  fileUrl: string;
+  category?: string | null;
+  uploadedAt?: string;
 }
 
 interface BaseOrder {
@@ -66,6 +84,7 @@ interface BaseOrder {
   dispatches: Array<{
     driver: Driver;
   }>;
+  fileUploads?: FileUpload[];
 }
 
 interface CateringOrder extends BaseOrder {
@@ -97,6 +116,8 @@ interface DriverStatusCardProps {
   };
   driverInfo: Driver | null;
   updateDriverStatus: (newStatus: string) => Promise<void>;
+  onCompletionRequest?: () => void;
+  hasExistingPOD?: boolean;
 }
 
 const BackButton: React.FC<{ href: string }> = ({ href }) => {
@@ -135,6 +156,8 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   order,
   driverInfo,
   updateDriverStatus,
+  onCompletionRequest,
+  hasExistingPOD = false,
 }) => {
   const getProgressValue = (status: string | null) => {
     return driverStatusProgress[status || "assigned"] || 0;
@@ -144,6 +167,17 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
     return status
       ? driverStatusMap[status] || status
       : driverStatusMap["assigned"];
+  };
+
+  /**
+   * Handle status change - intercept "completed" to show POD option
+   */
+  const handleStatusChange = (newStatus: string) => {
+    if (newStatus === "completed" && !hasExistingPOD && onCompletionRequest) {
+      onCompletionRequest();
+    } else {
+      updateDriverStatus(newStatus);
+    }
   };
 
   return (
@@ -193,7 +227,7 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                         ([status, label]) => (
                           <DropdownMenuItem
                             key={status}
-                            onClick={() => updateDriverStatus(status)}
+                            onClick={() => handleStatusChange(status)}
                           >
                             {label}
                           </DropdownMenuItem>
@@ -246,7 +280,20 @@ const OrderPage: React.FC<{ backHref: string }> = ({ backHref }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
+  const [showPODConfirm, setShowPODConfirm] = useState(false);
+  const [showPODCapture, setShowPODCapture] = useState(false);
   const params = useParams();
+
+  /**
+   * Get POD photo URL from fileUploads
+   */
+  const getPODUrl = () => {
+    return order?.fileUploads?.find(
+      (f) => f.category === "proof_of_delivery"
+    )?.fileUrl;
+  };
+
+  const hasExistingPOD = !!getPODUrl();
 
   // Extract order number from URL params with proper decoding for slashes
   const orderNumber = (() => {
@@ -339,6 +386,61 @@ const OrderPage: React.FC<{ backHref: string }> = ({ backHref }) => {
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     }
+  };
+
+  /**
+   * Handle completion request - show POD confirmation dialog
+   */
+  const handleCompletionRequest = () => {
+    setShowPODConfirm(true);
+  };
+
+  /**
+   * Complete without POD - just update status to completed
+   */
+  const handleCompleteWithoutPOD = () => {
+    setShowPODConfirm(false);
+    updateDriverStatus("completed");
+  };
+
+  /**
+   * Complete with POD - show capture dialog
+   */
+  const handleCompleteWithPOD = () => {
+    setShowPODConfirm(false);
+    setShowPODCapture(true);
+  };
+
+  /**
+   * POD upload completed successfully
+   */
+  const handlePODUploadComplete = async (url: string) => {
+    setShowPODCapture(false);
+    // Refresh order to get updated fileUploads
+    if (order) {
+      try {
+        const response = await fetch(
+          `/api/orders/${encodeURIComponent(order.orderNumber)}`
+        );
+        if (response.ok) {
+          const data: Order = await response.json();
+          setOrder(data);
+        }
+      } catch {
+        // Ignore refresh errors
+      }
+    }
+    // Then complete the delivery
+    updateDriverStatus("completed");
+  };
+
+  /**
+   * POD capture cancelled
+   */
+  const handlePODCancel = () => {
+    setShowPODCapture(false);
+    // Re-show confirmation dialog so user can choose again
+    setShowPODConfirm(true);
   };
 
   if (loading)
@@ -571,9 +673,88 @@ const OrderPage: React.FC<{ backHref: string }> = ({ backHref }) => {
             }}
             driverInfo={driverInfo}
             updateDriverStatus={updateDriverStatus}
+            onCompletionRequest={handleCompletionRequest}
+            hasExistingPOD={hasExistingPOD}
           />
+
+          {/* POD Photo Viewer - show existing photo if available */}
+          {hasExistingPOD && getPODUrl() && (
+            <Card className="border-green-200 bg-green-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Camera className="h-4 w-4 text-green-600" />
+                  Proof of Delivery
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ProofOfDeliveryViewer
+                  photoUrl={getPODUrl()!}
+                  deliveryId={order.id}
+                  orderNumber={order.orderNumber}
+                  showDownload={true}
+                  className="max-w-xs"
+                />
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
+
+      {/* POD Confirmation Dialog */}
+      <Dialog open={showPODConfirm} onOpenChange={setShowPODConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5" />
+              Complete Delivery
+            </DialogTitle>
+            <DialogDescription>
+              Would you like to add a proof of delivery photo before marking this
+              order as complete?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={handleCompleteWithoutPOD}
+              className="w-full sm:w-auto"
+            >
+              Complete without Photo
+            </Button>
+            <Button
+              onClick={handleCompleteWithPOD}
+              className="w-full sm:w-auto"
+            >
+              <Camera className="mr-2 h-4 w-4" />
+              Add Photo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* POD Capture Dialog */}
+      <Dialog open={showPODCapture} onOpenChange={setShowPODCapture}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5" />
+              Proof of Delivery Photo
+            </DialogTitle>
+            <DialogDescription>
+              Take or upload a photo showing the delivery has been completed.
+            </DialogDescription>
+          </DialogHeader>
+          {order && (
+            <ProofOfDeliveryCapture
+              deliveryId={order.id}
+              orderNumber={order.orderNumber}
+              onUploadComplete={handlePODUploadComplete}
+              onCancel={handlePODCancel}
+              uploadEndpoint={`/api/orders/${encodeURIComponent(order.orderNumber)}/pod`}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

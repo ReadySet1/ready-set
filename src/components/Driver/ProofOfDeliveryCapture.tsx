@@ -52,6 +52,7 @@ export function ProofOfDeliveryCapture({
   onCancel,
   onError,
   className,
+  uploadEndpoint,
 }: ProofOfDeliveryCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { permission, requestPermission, error: permissionError, isCameraSupported } = useCameraPermission();
@@ -167,8 +168,9 @@ export function ProofOfDeliveryCapture({
       formData.append('file', state.file, filename);
       formData.append('deliveryId', deliveryId);
 
-      // Upload to API
-      const response = await fetch(`/api/tracking/deliveries/${deliveryId}/pod`, {
+      // Upload to API - use custom endpoint if provided
+      const apiEndpoint = uploadEndpoint || `/api/tracking/deliveries/${deliveryId}/pod`;
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         body: formData,
       });
@@ -207,7 +209,7 @@ export function ProofOfDeliveryCapture({
       }));
       onError?.(errorMessage);
     }
-  }, [state.file, deliveryId, onUploadComplete, onError]);
+  }, [state.file, deliveryId, uploadEndpoint, onUploadComplete, onError]);
 
   /**
    * Render camera permission error state
