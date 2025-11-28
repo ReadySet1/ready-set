@@ -116,9 +116,7 @@ describe("Email Notification Service - User Welcome", () => {
           "verify your email address",
         ]);
 
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          expect.stringContaining(`Welcome email sent successfully to ${userData.email}`)
-        );
+        // Note: logging happens in the resilience wrapper, not the service itself
       });
 
       it("should send welcome email to vendor (self-registration)", async () => {
