@@ -43,5 +43,21 @@ export default {
   accessToken: '',
 };
 
+const mapboxGlMock = {
+  Map: jest.fn().mockImplementation(() => mockMap),
+  Marker: jest.fn().mockImplementation(() => mockMarker),
+  Popup: jest.fn().mockImplementation(() => mockPopup),
+  NavigationControl: jest.fn().mockImplementation(() => ({})),
+  ScaleControl: jest.fn().mockImplementation(() => ({})),
+  LngLatBounds: jest.fn().mockImplementation(() => ({
+    extend: jest.fn().mockReturnThis(),
+    isEmpty: jest.fn().mockReturnValue(false),
+  })),
+  accessToken: '',
+};
+
+// Export as default module
+export default mapboxGlMock;
+
 // Export mocks for test assertions
 export { mockMap, mockMarker, mockPopup };

@@ -84,7 +84,7 @@ export function FileUploader({
       if (selectedFiles.length === 0) return;
       
       // Debug log to see parameters
-            
+      
       setError(null);
       await onUpload(selectedFiles);
       // Only clear selected files if upload was successful
@@ -97,7 +97,7 @@ export function FileUploader({
         setError("Failed to upload. Please try again.");
       }
     }
-  }, [selectedFiles, onUpload, entityType, entityId, category]);
+  }, [selectedFiles, onUpload]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';

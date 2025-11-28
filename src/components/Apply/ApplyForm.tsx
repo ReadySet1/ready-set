@@ -356,13 +356,14 @@ const JobApplicationForm = () => {
     }
   }, [selectedRole, isDirty, trigger]);
 
+  // Watch form fields
+  const email = watch("email");
+  const firstName = watch("firstName");
+  const lastName = watch("lastName");
+  const role = watch("role");
+
   // Create session when user provides basic information
   React.useEffect(() => {
-    const email = watch("email");
-    const firstName = watch("firstName");
-    const lastName = watch("lastName");
-    const role = watch("role");
-
     // Only create session if we have all required info and don't already have a valid session
     if (email && firstName && lastName && role && !session) {
       createSession({ email, firstName, lastName, role }).catch(err => {
@@ -378,7 +379,7 @@ const JobApplicationForm = () => {
         // Session creation failure is logged but non-blocking
       });
     }
-  }, [watch("email"), watch("firstName"), watch("lastName"), watch("role"), session, createSession, watch]);
+  }, [email, firstName, lastName, role, session, createSession]);
 
   // Handle step navigation
   const goToNextStep = async (event?: React.MouseEvent) => {

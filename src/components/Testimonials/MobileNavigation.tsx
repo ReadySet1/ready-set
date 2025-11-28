@@ -17,8 +17,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = React.memo(
         e.preventDefault();
         e.stopPropagation();
         onPrev();
-              },
-      [onPrev, currentIndex],
+      },
+      [onPrev],
     );
 
     const handleNext = useCallback(
@@ -26,8 +26,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = React.memo(
         e.preventDefault();
         e.stopPropagation();
         onNext();
-              },
-      [onNext, currentIndex],
+      },
+      [onNext],
     );
 
     // No renderizar si solo hay un item
