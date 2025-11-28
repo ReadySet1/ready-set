@@ -104,9 +104,9 @@ if (typeof ReadableStream === 'undefined') {
 // Mock Next.js Image component
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: ({ src, alt, width, height, ...props }: any) => {
+  default: ({ src, alt, width, height, priority, ...props }: any) => {
     // eslint-disable-next-line @next/next/no-img-element
-    return React.createElement('img', { src, alt, width, height, ...props });
+    return React.createElement('img', { src, alt, width, height, 'data-priority': priority ? 'true' : 'false', ...props });
   },
 }));
 

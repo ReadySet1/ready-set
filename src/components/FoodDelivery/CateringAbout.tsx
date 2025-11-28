@@ -16,6 +16,7 @@ const StatCard: React.FC<StatProps> = ({ value, label, delay }) => {
   return (
     <motion.div
       className="flex flex-col items-center text-center"
+      data-testid="stat-card"
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
