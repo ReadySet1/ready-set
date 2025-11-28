@@ -7,12 +7,20 @@ import React from 'react';
 // Mock cheerio - ESM module that doesn't work well with Jest + pnpm
 jest.mock('cheerio', () => ({
   load: jest.fn((html: string) => {
-    // Create a simple mock cheerio interface
-    const mockElement = {
+    // Create a simple mock cheerio interface with explicit type
+    interface MockCheerioElement {
+      text: jest.Mock;
+      html: jest.Mock;
+      attr: jest.Mock;
+      find: jest.Mock;
+      each: jest.Mock;
+      length: number;
+    }
+    const mockElement: MockCheerioElement = {
       text: jest.fn(() => ''),
       html: jest.fn(() => html),
       attr: jest.fn(() => ''),
-      find: jest.fn(() => mockElement),
+      find: jest.fn((): MockCheerioElement => mockElement),
       each: jest.fn(),
       length: 0,
     };
