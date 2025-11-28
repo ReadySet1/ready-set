@@ -63,20 +63,12 @@ const CateringContact: React.FC = () => {
       try {
         await loadRecaptchaScript();
         setRecaptchaLoadError(false);
-        console.log("[CateringContact Form] reCAPTCHA loaded successfully");
       } catch (error) {
-        console.error(
-          `[CateringContact Form] Failed to load reCAPTCHA (attempt ${attempt}):`,
-          error,
-        );
         setRecaptchaLoadAttempts(attempt);
 
         // Retry up to 3 times with exponential backoff
         if (attempt < 3) {
           const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // 1s, 2s, 5s
-          console.log(
-            `[CateringContact Form] Retrying reCAPTCHA load in ${retryDelay}ms...`,
-          );
 
           setTimeout(() => {
             loadWithRetry(attempt + 1);
@@ -84,9 +76,6 @@ const CateringContact: React.FC = () => {
         } else {
           // All retries failed
           setRecaptchaLoadError(true);
-          console.warn(
-            "[CateringContact Form] reCAPTCHA failed to load after 3 attempts. Form will still work with reduced spam protection.",
-          );
         }
       }
     };
@@ -106,7 +95,6 @@ const CateringContact: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("[CateringContact] Form submit triggered", formData);
 
     // Validate required fields
     if (
@@ -149,9 +137,7 @@ const CateringContact: React.FC = () => {
         recaptchaToken: recaptchaToken || undefined,
       };
 
-      console.log("[CateringContact] Sending email with data:", emailData);
-      const result = await sendEmail(emailData);
-      console.log("[CateringContact] Email sent successfully:", result);
+      await sendEmail(emailData);
 
       setMessage({
         type: "success",
@@ -170,26 +156,11 @@ const CateringContact: React.FC = () => {
         });
       }, 5000); // Increased timeout to give user more time to see success message
     } catch (error: unknown) {
-      console.error("[CateringContact] Error sending email:", error);
-      console.error("[CateringContact] Error details:", {
-        error,
-        errorType: typeof error,
-        errorConstructor: error?.constructor?.name,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-      });
-
       let errorMessage =
         "We're sorry, there was an error sending your message.";
 
       if (error instanceof Error) {
-        // Show the actual error message to help with debugging
         errorMessage = error.message || errorMessage;
-        console.error("[CateringContact] Error message:", error.message);
-        console.error("[CateringContact] Error stack:", error.stack);
-      } else {
-        console.error("[CateringContact] Unknown error type:", error);
-        errorMessage += " Please check the console for details.";
       }
 
       setMessage({
