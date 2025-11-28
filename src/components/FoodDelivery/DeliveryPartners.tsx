@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
@@ -102,7 +102,7 @@ const DeliveryPartners: React.FC = () => {
                     fill
                     className="object-contain"
                     sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 200px"
-                    onError={(e) => {
+                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                       // Hide image if it fails to load
                       const target = e.target as HTMLImageElement;
                       target.style.display = "none";
@@ -133,7 +133,7 @@ const DeliveryPartners: React.FC = () => {
                     fill
                     className="object-contain"
                     sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 200px"
-                    onError={(e) => {
+                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                       // Hide image if it fails to load
                       const target = e.target as HTMLImageElement;
                       target.style.display = "none";

@@ -1,5 +1,5 @@
 // src/app/(site)/catering-deliveries/page.tsx
-import type { Metadata } from "next";
+import { Metadata } from "next";
 // import { FoodServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
 import CateringFeatures from "@/components/FoodDelivery/CateringFeatures";
 import CateringAbout from "@/components/FoodDelivery/CateringAbout";
