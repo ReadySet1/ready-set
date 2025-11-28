@@ -484,18 +484,16 @@ export function useUploadFile({
     },
     [
       progresses,
-      uploadedFiles.length, // Add dependency
-      maxFileCount,        // Add dependency
-      maxFileSize,         // Add dependency
-      allowedFileTypes,    // Add dependency
-      entityId,            // Add dependency
-      tempEntityId,        // Add dependency
-      entityType,          // Add dependency
-      category,            // Add dependency
-      userId,              // Add dependency
-      bucketName,          // Add dependency
-      actualBucketName,    // Add the missing dependency
-      // initSupabase,     // Remove if not directly used inside onUpload
+      uploadedFiles.length,
+      maxFileCount,
+      maxFileSize,
+      allowedFileTypes,
+      entityId,
+      tempEntityId,
+      entityType,
+      category,
+      userId,
+      actualBucketName,
     ]
   );
 

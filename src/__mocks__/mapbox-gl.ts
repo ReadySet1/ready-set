@@ -30,19 +30,7 @@ const mockMap = {
   getCenter: jest.fn().mockReturnValue({ lng: 0, lat: 0 }),
 };
 
-export default {
-  Map: jest.fn().mockImplementation(() => mockMap),
-  Marker: jest.fn().mockImplementation(() => mockMarker),
-  Popup: jest.fn().mockImplementation(() => mockPopup),
-  NavigationControl: jest.fn().mockImplementation(() => ({})),
-  ScaleControl: jest.fn().mockImplementation(() => ({})),
-  LngLatBounds: jest.fn().mockImplementation(() => ({
-    extend: jest.fn().mockReturnThis(),
-    isEmpty: jest.fn().mockReturnValue(false),
-  })),
-  accessToken: '',
-};
-
+// Create the mock object to be exported as default
 const mapboxGlMock = {
   Map: jest.fn().mockImplementation(() => mockMap),
   Marker: jest.fn().mockImplementation(() => mockMarker),

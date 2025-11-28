@@ -126,8 +126,7 @@ export function DeliveryCalculator({
       hasLoadedTemplates.current = true;
       loadTemplates();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
+  }, [loadTemplates]);
 
   // Load initial config when template is available
   useEffect(() => {
@@ -135,7 +134,7 @@ export function DeliveryCalculator({
       hasLoadedInitialConfig.current = true;
       loadConfig(templateId);
     }
-  }, [templateId]);
+  }, [templateId, loadConfig]);
 
   // Auto-calculate when input changes and config is loaded
   useEffect(() => {
@@ -146,7 +145,7 @@ export function DeliveryCalculator({
 
       return () => clearTimeout(timer);
     }
-  }, [input, config]); // ✅ FIXED: Removed 'calculate' from dependencies to prevent infinite loop
+  }, [input, config, calculate]);
 
   // Call completion callback when calculation finishes
   useEffect(() => {
@@ -168,7 +167,7 @@ export function DeliveryCalculator({
       hasLoadedClientConfigs.current = true;
       loadClientConfigs();
     }
-  }, [templates.length]); // ✅ FIXED: Only depend on templates.length, not the function or array reference
+  }, [templates.length, loadClientConfigs]);
 
   // Auto-select Ready Set Food - Standard when configs load (only once)
   useEffect(() => {
@@ -180,7 +179,7 @@ export function DeliveryCalculator({
         setActiveClientConfig(readySetConfig.id);
       }
     }
-  }, [clientConfigs.length, config?.clientConfig?.id, config?.template?.id]); // ✅ FIXED: Removed function from dependencies, use specific IDs only
+  }, [clientConfigs, config?.clientConfig, config?.template, setActiveClientConfig]);
 
   const handleInputChange = (field: keyof CalculationInput, value: any) => {
     setInput(prev => ({ ...prev, [field]: value }));

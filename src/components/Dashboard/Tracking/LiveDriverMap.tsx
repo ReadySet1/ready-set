@@ -130,15 +130,17 @@ export default function LiveDriverMap({
 
       mapRef.current = map;
 
+      // Capture refs at the time of effect setup for cleanup
+      const markersRefCurrent = markersRef.current;
+      const deliveryMarkersRefCurrent = deliveryMarkersRef.current;
+
       return () => {
         // Clean up markers before removing map to prevent memory leaks
-        const markers = markersRef.current;
-        const deliveryMarkers = deliveryMarkersRef.current;
-        
-        markers.forEach(marker => marker.remove());
-        deliveryMarkers.forEach(marker => marker.remove());
-        markers.clear();
-        deliveryMarkers.clear();
+        // Use captured refs to avoid stale closure issues
+        markersRefCurrent.forEach(marker => marker.remove());
+        deliveryMarkersRefCurrent.forEach(marker => marker.remove());
+        markersRefCurrent.clear();
+        deliveryMarkersRefCurrent.clear();
 
         map.remove();
         mapRef.current = null;
@@ -479,7 +481,7 @@ export default function LiveDriverMap({
         deliveryMarkersRef.current.set(delivery.id, marker);
       }
     });
-  }, [deliveries, mapLoaded]);
+  }, [deliveries, mapLoaded, createDeliveryMarkerElement]);
 
   // Zoom controls
   const zoomIn = () => {
