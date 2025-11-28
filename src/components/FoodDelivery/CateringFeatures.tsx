@@ -24,6 +24,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: delay / 1000 }}
+      data-testid="feature-card"
     >
       <motion.div
         className="flex w-full max-w-[380px] flex-col items-center rounded-3xl border-4 border-yellow-400 bg-white p-8 shadow-sm"
@@ -70,7 +71,7 @@ const CateringFeatures: React.FC = () => {
   ];
 
   return (
-    <div className="w-full bg-gray-50 py-16 md:py-20">
+    <main className="w-full bg-gray-50 py-16 md:py-20" role="main">
       <div className="mx-auto max-w-7xl px-4">
         {/* Title */}
         <motion.div
@@ -121,7 +122,7 @@ const CateringFeatures: React.FC = () => {
           />
         </motion.div>
       </div>
-    </div>
+    </main>
   );
 };
 
