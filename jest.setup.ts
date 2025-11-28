@@ -473,13 +473,29 @@ class MockNextResponse {
   }
 
   static json(data: any, options?: ResponseInit) {
-    const response = new MockNextResponse(data, options);
+    const mergedHeaders = new Headers(options?.headers);
+    if (!mergedHeaders.has('content-type')) {
+      mergedHeaders.set('content-type', 'application/json');
+    }
+    const response = new MockNextResponse(data, {
+      ...options,
+      headers: mergedHeaders,
+    });
     response.json = () => Promise.resolve(data);
     return response;
   }
 
   static next() {
     return new MockNextResponse({}, { status: 200 });
+  }
+
+  static redirect(url: string | URL, status: number = 302) {
+    const urlString = typeof url === 'string' ? url : url.toString();
+    const response = new MockNextResponse(null, {
+      status,
+      headers: { location: urlString },
+    });
+    return response;
   }
 }
 
@@ -495,39 +511,6 @@ jest.mock('next/server', () => {
 
 // Also mock NextResponse directly for API routes
 (global as any).NextResponse = MockNextResponse;
-
-// Mock Radix UI Select primitive
-jest.mock('@radix-ui/react-select', () => {
-  const React = require('react');
-  return {
-    Root: ({ children, ...props }: any) => React.createElement('div', props, children),
-    Group: ({ children, ...props }: any) => React.createElement('div', props, children),
-    Value: ({ children, ...props }: any) => React.createElement('span', props, children),
-    Trigger: ({ children, ...props }: any) => React.createElement('button', { ...props, role: 'combobox' }, children),
-    Content: ({ children, ...props }: any) => React.createElement('div', props, children),
-    Label: ({ children, ...props }: any) => React.createElement('div', props, children),
-    Item: ({ children, ...props }: any) => React.createElement('div', props, children),
-    Separator: ({ children, ...props }: any) => React.createElement('div', props, children),
-    ScrollUpButton: ({ children, ...props }: any) => React.createElement('button', props, children),
-    ScrollDownButton: ({ children, ...props }: any) => React.createElement('button', props, children),
-    Viewport: ({ children, ...props }: any) => React.createElement('div', props, children),
-    Portal: ({ children, ...props }: any) => children,
-    ItemIndicator: ({ children, ...props }: any) => React.createElement('span', props, children),
-    ItemText: ({ children, ...props }: any) => React.createElement('span', props, children),
-    Icon: ({ children, ...props }: any) => React.createElement('span', props, children),
-  };
-});
-
-// Mock other Radix UI components that might be used
-jest.mock('@radix-ui/react-tabs', () => {
-  const React = require('react');
-  return {
-    Root: ({ children, ...props }: any) => React.createElement('div', props, children),
-    List: ({ children, ...props }: any) => React.createElement('div', { ...props, role: 'tablist' }, children),
-    Trigger: ({ children, ...props }: any) => React.createElement('button', { ...props, role: 'tab' }, children),
-    Content: ({ children, ...props }: any) => React.createElement('div', { ...props, role: 'tabpanel' }, children),
-  };
-});
 
 // Mock framer-motion
 jest.mock('framer-motion', () => ({

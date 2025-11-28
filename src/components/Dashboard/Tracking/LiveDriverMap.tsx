@@ -306,7 +306,7 @@ export default function LiveDriverMap({
         ${driver.currentShift ? `
           <div style="font-size: 11px; color: #6b7280;">
             <div>Deliveries: ${driver.currentShift.deliveryCount || 0}</div>
-            <div>Distance: ${Math.round((driver.currentShift.totalDistanceKm || 0) * 10) / 10} km</div>
+            <div>Distance: ${Math.round((driver.currentShift.totalDistanceMiles || 0) * 10) / 10} mi</div>
           </div>
         ` : ''}
       </div>

@@ -26,6 +26,7 @@ jest.mock('@sentry/nextjs', () => ({
   withScope: jest.fn((callback) => {
     const mockScope = {
       setContext: jest.fn(),
+      setTag: jest.fn(),
     };
     callback(mockScope);
   }),

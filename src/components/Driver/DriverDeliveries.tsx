@@ -32,6 +32,7 @@ import {
   ClipboardList,
   AlertTriangle,
   User,
+  Camera,
 } from "lucide-react";
 import {
   HoverCard,
@@ -97,6 +98,12 @@ interface Delivery {
     name?: string | null;
     email: string;
   };
+  fileUploads?: Array<{
+    id: string;
+    fileUrl: string;
+    category?: string | null;
+    uploadedAt?: string;
+  }>;
 }
 
 interface UserProfile extends ProfileResponse {
@@ -239,6 +246,15 @@ const DriverDeliveries: React.FC = () => {
       default:
         return null;
     }
+  };
+
+  /**
+   * Get POD URL from fileUploads if available
+   */
+  const getPODUrl = (delivery: Delivery) => {
+    return delivery.fileUploads?.find(
+      (f) => f.category === "proof_of_delivery"
+    )?.fileUrl;
   };
 
   const getStatusBadge = (status: string, driverStatus?: string) => {
@@ -816,10 +832,31 @@ const DriverDeliveries: React.FC = () => {
                                 </TableCell>
                                 <TableCell className="hidden lg:table-cell">
                                   <div className="flex flex-col space-y-1">
-                                    {getStatusBadge(
-                                      delivery.status,
-                                      delivery.driverStatus,
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                      {getStatusBadge(
+                                        delivery.status,
+                                        delivery.driverStatus,
+                                      )}
+                                      {getPODUrl(delivery) && (
+                                        <HoverCard>
+                                          <HoverCardTrigger asChild>
+                                            <div className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400">
+                                              <Camera className="h-3.5 w-3.5" />
+                                            </div>
+                                          </HoverCardTrigger>
+                                          <HoverCardContent className="w-auto p-2">
+                                            <div className="space-y-2">
+                                              <p className="text-sm font-medium">Proof of Delivery</p>
+                                              <img
+                                                src={getPODUrl(delivery)!}
+                                                alt="Proof of Delivery"
+                                                className="h-32 w-auto rounded-md object-cover"
+                                              />
+                                            </div>
+                                          </HoverCardContent>
+                                        </HoverCard>
+                                      )}
+                                    </div>
                                     <div className="text-muted-foreground text-sm">
                                       {delivery.user?.name ||
                                         delivery.user?.email ||

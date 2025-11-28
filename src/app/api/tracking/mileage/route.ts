@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
 import {
-  calculateShiftMileage,
   calculateShiftMileageWithBreakdown,
 } from '@/services/tracking/mileage';
 
@@ -40,7 +39,7 @@ function parseQuery(request: NextRequest): MileageQuery {
 
 function buildCsv(rows: Array<Record<string, unknown>>): string {
   if (rows.length === 0) {
-    return 'driver_id,shift_id,shift_start,shift_end,total_distance_km,delivery_count\n';
+    return 'driver_id,shift_id,shift_start,shift_end,total_distance_miles,delivery_count\n';
   }
 
   const headers = Object.keys(rows[0]!);
@@ -84,7 +83,7 @@ export async function GET(request: NextRequest) {
         const csvRows = mileage.deliveries.map(delivery => ({
           shift_id: query.shiftId!,
           delivery_id: delivery.deliveryId,
-          distance_km: delivery.distanceKm,
+          distance_miles: delivery.distanceMiles,
         }));
 
         const csv = buildCsv(csvRows);
@@ -102,7 +101,10 @@ export async function GET(request: NextRequest) {
           success: true,
           data: {
             shiftId: query.shiftId,
-            totalKm: mileage.totalKm,
+            totalMiles: mileage.totalMiles,
+            gpsDistanceMiles: mileage.gpsDistanceMiles,
+            mileageSource: mileage.mileageSource,
+            warnings: mileage.warnings,
             deliveries: mileage.deliveries,
           },
         },
@@ -125,7 +127,10 @@ export async function GET(request: NextRequest) {
         ds.driver_id,
         ds.shift_start,
         ds.shift_end,
-        ds.total_distance_km,
+        ds.total_distance_miles,
+        ds.gps_distance_miles,
+        ds.reported_distance_miles,
+        ds.mileage_source,
         ds.delivery_count
       FROM driver_shifts ds
       WHERE
@@ -147,7 +152,10 @@ export async function GET(request: NextRequest) {
       driver_id: string;
       shift_start: Date;
       shift_end: Date | null;
-      total_distance_km: number | null;
+      total_distance_miles: number | null;
+      gps_distance_miles: number | null;
+      reported_distance_miles: number | null;
+      mileage_source: string | null;
       delivery_count: number | null;
     }[]>(sql, ...params);
 
@@ -157,7 +165,10 @@ export async function GET(request: NextRequest) {
         shift_id: row.shift_id,
         shift_start: row.shift_start.toISOString(),
         shift_end: row.shift_end ? row.shift_end.toISOString() : '',
-        total_distance_km: row.total_distance_km ?? 0,
+        total_distance_miles: row.total_distance_miles ?? 0,
+        gps_distance_miles: row.gps_distance_miles ?? 0,
+        reported_distance_miles: row.reported_distance_miles ?? '',
+        mileage_source: row.mileage_source ?? 'gps',
         delivery_count: row.delivery_count ?? 0,
       }));
 
@@ -179,7 +190,10 @@ export async function GET(request: NextRequest) {
           shiftId: row.shift_id,
           shiftStart: row.shift_start,
           shiftEnd: row.shift_end,
-          totalDistanceKm: row.total_distance_km ?? 0,
+          totalDistanceMiles: row.total_distance_miles ?? 0,
+          gpsDistanceMiles: row.gps_distance_miles ?? 0,
+          reportedDistanceMiles: row.reported_distance_miles,
+          mileageSource: row.mileage_source ?? 'gps',
           deliveryCount: row.delivery_count ?? 0,
         })),
       },
@@ -197,5 +211,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-

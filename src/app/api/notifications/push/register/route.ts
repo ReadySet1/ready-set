@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/db/prisma";
+import { recordTokenRefresh } from "@/services/notifications/token-refresh";
 
 const registerSchema = z.object({
   token: z.string().min(10),
@@ -47,25 +48,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Upsert token for this profile. We keep a single active row per (profile, token)
-    await prisma.profilePushToken.upsert({
-      where: {
-        // Compound uniqueness is not enforced by the DB, but we simulate it via token uniqueness
-        token: data.token,
-      },
-      create: {
-        profileId: user.id,
-        token: data.token,
-        userAgent: data.userAgent,
-        platform: data.platform,
-      },
-      update: {
-        profileId: user.id,
-        userAgent: data.userAgent,
-        platform: data.platform,
-        revokedAt: null,
-      },
-    });
+    // Use the token refresh service to record this token registration
+    // This handles both new tokens and refreshed tokens with proper tracking
+    const result = await recordTokenRefresh(
+      data.token,
+      user.id,
+      data.userAgent,
+      data.platform
+    );
+
+    if (!result.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          errorCode: "TOKEN_REGISTRATION_FAILED",
+          message: result.error || "Failed to register push token.",
+        },
+        { status: 500 }
+      );
+    }
 
     // Ensure profile-level preference flag is enabled
     await prisma.profile.update({
@@ -73,7 +74,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       data: { hasPushNotifications: true },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      isNewToken: result.isNew,
+    });
   } catch (error: unknown) {
     console.error("Error registering push token:", error);
 
