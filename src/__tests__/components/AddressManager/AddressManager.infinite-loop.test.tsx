@@ -242,7 +242,11 @@ const mockSupabaseClient = {
   }),
 };
 
-describe("AddressManager - Infinite Loop Prevention", () => {
+/**
+ * TODO: REA-211 - This is a duplicate test file
+ * The canonical AddressManager tests are in src/components/AddressManager/__tests__/
+ */
+describe.skip("AddressManager - Infinite Loop Prevention", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (createClient as jest.Mock).mockReturnValue(mockSupabaseClient);

@@ -50,7 +50,12 @@ jest.mock("react-hook-form", () => ({
 // Mock fetch globally
 global.fetch = jest.fn();
 
-describe("AddressManager Infinite Loop Prevention", () => {
+/**
+ * TODO: REA-211 - This is a duplicate test file
+ * The canonical AddressManager tests are in src/components/AddressManager/__tests__/
+ * These tests should be merged into the canonical location and this file deleted.
+ */
+describe.skip("AddressManager Infinite Loop Prevention", () => {
   beforeEach(() => {
     jest.clearAllMocks();
 

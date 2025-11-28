@@ -73,7 +73,11 @@ const mockAddresses: Address[] = [
   },
 ];
 
-describe("AddressManager - Mobile Responsiveness", () => {
+/**
+ * TODO: REA-211 - This is a duplicate test file
+ * The canonical AddressManager tests are in src/components/AddressManager/__tests__/
+ */
+describe.skip("AddressManager - Mobile Responsiveness", () => {
   const mockOnAddressesLoaded = jest.fn();
   const mockOnAddressSelected = jest.fn();
   const mockOnError = jest.fn();

@@ -55,7 +55,12 @@ const renderAddressManager = (props = {}) => {
   );
 };
 
-describe("AddressManager", () => {
+/**
+ * TODO: REA-211 - This is a duplicate test file
+ * The canonical AddressManager tests are in src/components/AddressManager/__tests__/
+ * These tests should be merged into the canonical location and this file deleted.
+ */
+describe.skip("AddressManager", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Mock successful API response

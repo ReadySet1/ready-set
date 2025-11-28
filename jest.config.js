@@ -78,7 +78,8 @@ const customJestConfig = {
     }],
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(.*\\.mjs$|@supabase|isows|bufferutil|@solana|ws|@noble|tweetnacl|cheerio.*|resend|parse5|dom-serializer|domutils|htmlparser2|entities|domhandler|date-fns|date-fns-tz))',
+    // Use pattern that works with pnpm's nested node_modules structure
+    '/node_modules/(?!.*((\\.mjs$)|(@supabase)|isows|bufferutil|(@solana)|ws|(@noble)|tweetnacl|cheerio|resend|parse5|dom-serializer|domutils|htmlparser2|entities|domhandler|date-fns|date-fns-tz|undici|css-what|css-select|boolbase|nth-check))',
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   // Add test timeout - increased for CI stability

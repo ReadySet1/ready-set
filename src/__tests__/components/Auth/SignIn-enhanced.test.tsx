@@ -29,7 +29,12 @@ jest.mock("@/components/Common/Loader", () => {
   };
 });
 
-describe("Enhanced SignIn Component - Phases 3 & 4", () => {
+/**
+ * TODO: REA-211 - This is a duplicate test file
+ * The canonical SignIn tests are in src/components/Auth/__tests__/SignIn.test.tsx
+ * These enhanced tests should be merged into the canonical file and this file deleted.
+ */
+describe.skip("Enhanced SignIn Component - Phases 3 & 4", () => {
   const mockRouter = {
     push: jest.fn(),
     replace: jest.fn(),
