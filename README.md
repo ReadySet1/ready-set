@@ -89,6 +89,98 @@ NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD=true
 NEXT_PUBLIC_FF_REALTIME_FALLBACK_TO_SSE=true
 ```
 
+## 🗺️ Live Map Visualization (Mapbox)
+
+The admin tracking dashboard features a production-ready **Mapbox GL JS** integration for visualizing driver locations in real-time:
+
+### Features
+- **Live Driver Markers** - Color-coded by status (moving, stopped, on-duty, off-duty)
+- **Battery Indicators** - Visual battery level on driver markers
+- **Delivery Markers** - Orange markers for active delivery destinations
+- **Map Controls** - Zoom, fit bounds, toggle between Street and Satellite views
+- **Interactive Popups** - Driver details on marker click
+- **Auto-Refresh** - Seamless position updates via WebSocket
+
+### Components
+- `LiveDriverMap.tsx` - Full-featured admin map (650+ lines)
+- `DriverLiveMap.tsx` - Lightweight driver-facing map
+
+### Configuration
+```bash
+NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_token
+```
+
+See [Mapbox Integration Guide](docs/setup/mapbox-integration.md) for setup instructions.
+
+## 📱 Push & Email Notifications
+
+Ready Set includes a comprehensive notification system for keeping drivers and customers informed:
+
+### Push Notifications (Firebase Cloud Messaging)
+- **PWA Support** - Works on Chrome, Edge, and Safari 16.4+
+- **Background Delivery** - Notifications work even when app is closed
+- **Delivery Status Events** - `driver:en_route`, `driver:arrived`, `delivery:completed`, etc.
+- **Token Management** - Automatic token refresh and revocation
+- **Deduplication** - Prevents duplicate notifications (60-second TTL)
+
+### Email Notifications (SendGrid)
+- **Delivery Status Emails** - Automated emails on status changes
+- **Branded Templates** - Consistent branding with customizable templates
+- **Event Tracking** - Analytics for email delivery and opens
+
+### API Endpoints
+- `POST /api/notifications/push/register` - Register device for push
+- `POST /api/notifications/push/validate` - Validate push token
+- `GET /api/notifications/preferences` - Get notification preferences
+
+### Configuration
+```bash
+# Firebase (Push)
+NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+FIREBASE_PROJECT_ID=your_project_id
+
+# SendGrid (Email)
+SENDGRID_API_KEY=your_sendgrid_key
+```
+
+See [Notifications Setup Guide](docs/setup/notifications.md) for complete configuration.
+
+## 📍 Driver Mileage Calculation
+
+Automatic GPS-based mileage calculation for accurate driver payroll:
+
+### Features
+- **GPS Trail Processing** - Calculate distance from location history
+- **PostGIS Integration** - Uses ST_Distance for accurate calculations
+- **Quality Filtering** - Filters low-accuracy and stationary points
+- **Validation** - Compare GPS vs. odometer readings with discrepancy detection
+- **Per-Delivery Breakdown** - Mileage attributed to specific deliveries
+
+### API Endpoints
+- `GET /api/tracking/mileage` - Calculate mileage for a shift
+- Background job: `driverMileageRecalculation.ts` - Periodic recalculation
+
+## 📸 Proof of Delivery Photos
+
+Mobile-optimized photo capture for delivery confirmation:
+
+### Features
+- **Camera Integration** - Native camera access with back camera preference
+- **Image Compression** - Client-side compression before upload
+- **Preview & Retake** - Review photos before submission
+- **Cloud Storage** - Uploaded to Supabase Storage
+- **Admin Gallery** - View all POD images in admin dashboard
+
+### Components
+- `ProofOfDeliveryCapture.tsx` - Driver-facing capture UI
+- `ProofOfDeliveryViewer.tsx` - View captured photos
+- `AdminPODGallery.tsx` - Admin gallery view
+
+### API Endpoints
+- `POST /api/tracking/deliveries/[id]/pod` - Upload POD image
+- `GET /api/tracking/deliveries/[id]/pod` - Retrieve POD metadata
+- `DELETE /api/tracking/deliveries/[id]/pod` - Remove POD image
+
 ## 🚚 Carrier Management
 
 Ready Set includes a comprehensive carrier integration system for managing multiple delivery service providers:
