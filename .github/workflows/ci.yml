@@ -135,11 +135,17 @@ jobs:
           # Extract test results
           if [ -f jest-results.json ]; then
             PASSED=$(jq '.numPassedTests // 0' jest-results.json)
+            FAILED=$(jq '.numFailedTests // 0' jest-results.json)
+            PENDING=$(jq '.numPendingTests // 0' jest-results.json)
             TOTAL=$(jq '.numTotalTests // 0' jest-results.json)
 
-            if [ "$TOTAL" -gt 0 ]; then
-              PASS_RATE=$(echo "scale=2; $PASSED * 100 / $TOTAL" | bc)
-              echo "📊 Pass rate: $PASS_RATE% ($PASSED/$TOTAL tests)"
+            # Calculate run tests (excluding skipped/pending)
+            RUN_TESTS=$((PASSED + FAILED))
+
+            if [ "$RUN_TESTS" -gt 0 ]; then
+              PASS_RATE=$(echo "scale=2; $PASSED * 100 / $RUN_TESTS" | bc)
+              echo "📊 Pass rate: $PASS_RATE% ($PASSED/$RUN_TESTS executed tests)"
+              echo "📋 Total: $TOTAL | Passed: $PASSED | Failed: $FAILED | Skipped: $PENDING"
 
               # Threshold check: Start at 80%, increase to 95% as tests improve
               THRESHOLD=80

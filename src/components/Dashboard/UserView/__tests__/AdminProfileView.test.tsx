@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import AdminProfileView from "../AdminProfileView";
 import { UserFormValues } from "../types";
 
-// Mock the useUserForm hook
+// Mock the useUserForm hook - must be defined before jest.mock due to hoisting
 const mockUseUserForm = jest.fn();
 
 // Mock next/navigation
@@ -34,8 +34,9 @@ jest.mock("@/utils/supabase/server", () => ({
   })),
 }));
 
+// Use jest.fn() directly in the factory to avoid hoisting issues
 jest.mock("../hooks/useUserForm", () => ({
-  useUserForm: mockUseUserForm,
+  useUserForm: jest.fn(),
 }));
 
 // Mock Supabase client

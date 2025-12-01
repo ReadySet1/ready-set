@@ -606,6 +606,33 @@ jest.mock('@radix-ui/react-dialog', () => {
   };
 });
 
+// Mock Radix UI Alert Dialog
+jest.mock('@radix-ui/react-alert-dialog', () => {
+  const React = require('react');
+
+  const createMockComponent = (name: string) => {
+    const Component = React.forwardRef(({ children, ...props }: any, ref: any) => {
+      // Filter out Radix-specific props
+      const { asChild, onOpenChange, ...domProps } = props;
+      return React.createElement('div', { ref, 'data-testid': `alert-dialog-${name.toLowerCase()}`, ...domProps }, children);
+    });
+    Component.displayName = name;
+    return Component;
+  };
+
+  return {
+    Root: createMockComponent('Root'),
+    Trigger: createMockComponent('Trigger'),
+    Portal: createMockComponent('Portal'),
+    Overlay: createMockComponent('Overlay'),
+    Content: createMockComponent('Content'),
+    Title: createMockComponent('Title'),
+    Description: createMockComponent('Description'),
+    Action: createMockComponent('Action'),
+    Cancel: createMockComponent('Cancel'),
+  };
+});
+
 // Mock Radix UI Select
 jest.mock('@radix-ui/react-select', () => {
   const React = require('react');
