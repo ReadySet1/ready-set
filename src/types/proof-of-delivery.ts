@@ -13,6 +13,7 @@ export type PODCaptureStatus =
   | 'previewing'
   | 'compressing'
   | 'uploading'
+  | 'queued' // Photo queued for offline upload
   | 'complete'
   | 'error';
 
