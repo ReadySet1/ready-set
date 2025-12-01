@@ -98,6 +98,42 @@ function isNonErrorRejection(hint: EventHint): boolean {
 }
 
 /**
+ * Check if error is a React Server Components streaming connection error
+ * These occur when users navigate away or close browser during page load
+ * Fixes: READY-SET-NEXTJS-1
+ */
+function isRSCConnectionError(event: ErrorEvent): boolean {
+  const errorValue = event.exception?.values?.[0]?.value || '';
+
+  // Filter "Connection closed" errors from react-server-dom-webpack
+  // These are benign - typically caused by users navigating away
+  return errorValue === 'Connection closed.' ||
+         errorValue.includes('Connection closed');
+}
+
+/**
+ * Check if error is a handled Supabase Realtime connection error
+ * These are transient WebSocket issues that are already handled by the realtime client
+ * Fixes: READY-SET-NEXTJS-6, READY-SET-NEXTJS-7, READY-SET-NEXTJS-8
+ */
+function isHandledRealtimeError(event: ErrorEvent): boolean {
+  const errorType = event.exception?.values?.[0]?.type || '';
+  const errorValue = event.exception?.values?.[0]?.value || '';
+
+  // Check if it's a RealtimeConnectionError or RealtimeError
+  const isRealtimeError =
+    errorType === 'RealtimeConnectionError' ||
+    errorType === 'RealtimeError' ||
+    errorValue.includes('Channel subscription timed out') ||
+    errorValue.includes('Failed to subscribe to channel');
+
+  // Only filter if it's marked as handled
+  const isHandled = event.tags?.handled === 'yes' || event.tags?.handled === true;
+
+  return isRealtimeError && isHandled;
+}
+
+/**
  * Apply client-specific filters
  */
 function applyClientFilters(event: ErrorEvent, hint: EventHint): boolean {
@@ -118,6 +154,16 @@ function applyClientFilters(event: ErrorEvent, hint: EventHint): boolean {
 
   // Filter out non-Error rejections
   if (isNonErrorRejection(hint)) {
+    return false;
+  }
+
+  // Filter out RSC streaming connection errors (READY-SET-NEXTJS-1)
+  if (isRSCConnectionError(event)) {
+    return false;
+  }
+
+  // Filter out handled Realtime connection errors (READY-SET-NEXTJS-6/7/8)
+  if (isHandledRealtimeError(event)) {
     return false;
   }
 

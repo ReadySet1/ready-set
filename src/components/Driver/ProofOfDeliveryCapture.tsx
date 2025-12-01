@@ -14,6 +14,9 @@ import {
   AlertCircle,
   ImageIcon,
   Loader2,
+  WifiOff,
+  CloudOff,
+  CloudUpload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCameraPermission, isMobileDevice } from '@/hooks/useCameraPermission';
@@ -30,6 +33,8 @@ import {
   PODMetadata,
   POD_STORAGE_CONFIG,
 } from '@/types/proof-of-delivery';
+import { usePODOfflineQueue } from '@/hooks/tracking/usePODOfflineQueue';
+import { Badge } from '@/components/ui/badge';
 
 /**
  * ProofOfDeliveryCapture Component
@@ -56,6 +61,7 @@ export function ProofOfDeliveryCapture({
 }: ProofOfDeliveryCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { permission, requestPermission, error: permissionError, isCameraSupported } = useCameraPermission();
+  const { offlineStatus, queuePODUpload, syncPendingUploads } = usePODOfflineQueue();
 
   const [state, setState] = useState<PODCaptureState>({
     status: 'idle',
@@ -143,7 +149,7 @@ export function ProofOfDeliveryCapture({
   }, [state.previewUrl]);
 
   /**
-   * Upload the captured photo
+   * Upload the captured photo (with offline support)
    */
   const handleUpload = useCallback(async () => {
     if (!state.file) {
@@ -155,6 +161,54 @@ export function ProofOfDeliveryCapture({
       return;
     }
 
+    const apiEndpoint = uploadEndpoint || `/api/tracking/deliveries/${deliveryId}/pod`;
+
+    // Check if we're offline - queue for later
+    if (!offlineStatus.isOnline) {
+      try {
+        await queuePODUpload(
+          deliveryId,
+          orderNumber,
+          state.file,
+          apiEndpoint,
+          {
+            capturedAt: new Date(),
+            compressionApplied: true,
+            originalSize: state.file.size,
+          }
+        );
+
+        setState((prev) => ({
+          ...prev,
+          status: 'queued',
+        }));
+
+        // Create metadata for parent callback
+        const metadata: PODMetadata = {
+          deliveryId,
+          capturedAt: new Date(),
+          uploadedAt: new Date(),
+          compressionApplied: true,
+          compressedSize: state.file.size,
+          originalFilename: state.file.name,
+        };
+
+        // Notify parent - use preview URL as temporary URL
+        onUploadComplete(state.previewUrl || '', metadata);
+        return;
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to queue upload';
+        setState((prev) => ({
+          ...prev,
+          status: 'error',
+          error: errorMessage,
+        }));
+        onError?.(errorMessage);
+        return;
+      }
+    }
+
+    // Online - proceed with direct upload
     setState((prev) => ({
       ...prev,
       status: 'uploading',
@@ -168,8 +222,7 @@ export function ProofOfDeliveryCapture({
       formData.append('file', state.file, filename);
       formData.append('deliveryId', deliveryId);
 
-      // Upload to API - use custom endpoint if provided
-      const apiEndpoint = uploadEndpoint || `/api/tracking/deliveries/${deliveryId}/pod`;
+      // Upload to API
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         body: formData,
@@ -201,6 +254,42 @@ export function ProofOfDeliveryCapture({
       // Notify parent of successful upload
       onUploadComplete(result.url, metadata);
     } catch (err) {
+      // Check if this is a network error - queue for later
+      if (!navigator.onLine || (err instanceof TypeError && err.message.includes('fetch'))) {
+        try {
+          await queuePODUpload(
+            deliveryId,
+            orderNumber,
+            state.file,
+            apiEndpoint,
+            {
+              capturedAt: new Date(),
+              compressionApplied: true,
+              originalSize: state.file.size,
+            }
+          );
+
+          setState((prev) => ({
+            ...prev,
+            status: 'queued',
+          }));
+
+          const metadata: PODMetadata = {
+            deliveryId,
+            capturedAt: new Date(),
+            uploadedAt: new Date(),
+            compressionApplied: true,
+            compressedSize: state.file.size,
+            originalFilename: state.file.name,
+          };
+
+          onUploadComplete(state.previewUrl || '', metadata);
+          return;
+        } catch (queueErr) {
+          // If queuing also fails, show error
+        }
+      }
+
       const errorMessage = err instanceof Error ? err.message : 'Upload failed';
       setState((prev) => ({
         ...prev,
@@ -209,7 +298,7 @@ export function ProofOfDeliveryCapture({
       }));
       onError?.(errorMessage);
     }
-  }, [state.file, deliveryId, uploadEndpoint, onUploadComplete, onError]);
+  }, [state.file, state.previewUrl, deliveryId, orderNumber, uploadEndpoint, offlineStatus.isOnline, queuePODUpload, onUploadComplete, onError]);
 
   /**
    * Render camera permission error state
@@ -329,6 +418,28 @@ export function ProofOfDeliveryCapture({
   );
 
   /**
+   * Render queued state (offline)
+   */
+  const renderQueued = () => (
+    <div className="flex flex-col items-center gap-4 py-8">
+      <div className="rounded-full bg-amber-100 p-4">
+        <CloudOff className="h-8 w-8 text-amber-600" />
+      </div>
+      <div className="text-center">
+        <h3 className="font-medium text-amber-600">Photo Queued</h3>
+        <p className="text-sm text-muted-foreground">
+          Will upload automatically when back online
+        </p>
+      </div>
+      {offlineStatus.pendingUploads > 0 && (
+        <Badge variant="secondary" className="mt-2">
+          {offlineStatus.pendingUploads} pending upload{offlineStatus.pendingUploads > 1 ? 's' : ''}
+        </Badge>
+      )}
+    </div>
+  );
+
+  /**
    * Render error state
    */
   const renderError = () => (
@@ -364,6 +475,8 @@ export function ProofOfDeliveryCapture({
         return renderPreview();
       case 'uploading':
         return renderUploading();
+      case 'queued':
+        return renderQueued();
       case 'complete':
         return renderComplete();
       case 'error':
@@ -377,7 +490,7 @@ export function ProofOfDeliveryCapture({
    * Render footer buttons based on state
    */
   const renderFooter = () => {
-    if (state.status === 'complete') {
+    if (state.status === 'complete' || state.status === 'queued') {
       return null; // Parent will handle completion
     }
 
@@ -419,8 +532,22 @@ export function ProofOfDeliveryCapture({
   return (
     <Card className={cn('w-full max-w-md', className)}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-lg">Proof of Delivery</CardTitle>
-        {state.status !== 'uploading' && state.status !== 'complete' && (
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-lg">Proof of Delivery</CardTitle>
+          {!offlineStatus.isOnline && (
+            <Badge variant="secondary" className="gap-1 bg-amber-100 text-amber-700">
+              <WifiOff className="h-3 w-3" />
+              Offline
+            </Badge>
+          )}
+          {offlineStatus.isOnline && offlineStatus.pendingUploads > 0 && (
+            <Badge variant="secondary" className="gap-1">
+              <CloudUpload className="h-3 w-3" />
+              {offlineStatus.pendingUploads} pending
+            </Badge>
+          )}
+        </div>
+        {state.status !== 'uploading' && state.status !== 'complete' && state.status !== 'queued' && (
           <Button variant="ghost" size="icon" onClick={onCancel}>
             <X className="h-4 w-4" />
           </Button>
