@@ -482,3 +482,5 @@ describe("FoodHeader Component", () => {
     });
   });
 });
+
+
