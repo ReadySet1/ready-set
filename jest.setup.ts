@@ -4,6 +4,34 @@
 import '@testing-library/jest-dom';
 import React from 'react';
 
+// Mock cheerio - ESM module that doesn't work well with Jest + pnpm
+jest.mock('cheerio', () => ({
+  load: jest.fn((html: string) => {
+    // Create a simple mock cheerio interface with explicit type
+    interface MockCheerioElement {
+      text: jest.Mock;
+      html: jest.Mock;
+      attr: jest.Mock;
+      find: jest.Mock;
+      each: jest.Mock;
+      length: number;
+    }
+    const mockElement: MockCheerioElement = {
+      text: jest.fn(() => ''),
+      html: jest.fn(() => html),
+      attr: jest.fn(() => ''),
+      find: jest.fn((): MockCheerioElement => mockElement),
+      each: jest.fn(),
+      length: 0,
+    };
+    const $ = jest.fn(() => mockElement);
+    Object.assign($, mockElement);
+    return $;
+  }),
+  contains: jest.fn(),
+  merge: jest.fn(),
+}));
+
 // Set up test environment variables
 // Use Object.defineProperty to avoid read-only property error
 Object.defineProperty(process.env, 'NODE_ENV', {
@@ -575,6 +603,33 @@ jest.mock('@radix-ui/react-dialog', () => {
     Content: createMockComponent('Content'),
     Title: createMockComponent('Title'),
     Description: createMockComponent('Description'),
+  };
+});
+
+// Mock Radix UI Alert Dialog
+jest.mock('@radix-ui/react-alert-dialog', () => {
+  const React = require('react');
+
+  const createMockComponent = (name: string) => {
+    const Component = React.forwardRef(({ children, ...props }: any, ref: any) => {
+      // Filter out Radix-specific props
+      const { asChild, onOpenChange, ...domProps } = props;
+      return React.createElement('div', { ref, 'data-testid': `alert-dialog-${name.toLowerCase()}`, ...domProps }, children);
+    });
+    Component.displayName = name;
+    return Component;
+  };
+
+  return {
+    Root: createMockComponent('Root'),
+    Trigger: createMockComponent('Trigger'),
+    Portal: createMockComponent('Portal'),
+    Overlay: createMockComponent('Overlay'),
+    Content: createMockComponent('Content'),
+    Title: createMockComponent('Title'),
+    Description: createMockComponent('Description'),
+    Action: createMockComponent('Action'),
+    Cancel: createMockComponent('Cancel'),
   };
 });
 
