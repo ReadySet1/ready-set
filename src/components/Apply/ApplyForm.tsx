@@ -363,8 +363,12 @@ const JobApplicationForm = () => {
     const lastName = watch("lastName");
     const role = watch("role");
 
-    // Only create session if we have all required info and don't already have a valid session
-    if (email && firstName && lastName && role && !session) {
+    // Email validation regex (same as form validation)
+    const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+    const isValidEmail = email && emailRegex.test(email);
+
+    // Only create session if we have all required info with valid email and don't already have a valid session
+    if (isValidEmail && firstName && lastName && role && !session) {
       createSession({ email, firstName, lastName, role }).catch(err => {
         // Log error and send to Sentry for monitoring
         logger.error('Failed to create application session:', err);
