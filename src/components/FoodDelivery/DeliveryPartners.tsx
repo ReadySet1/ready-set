@@ -1,137 +1,147 @@
 "use client";
 
+import React from "react";
 import Image from "next/image";
-import React, { useState, useMemo, useEffect, useRef } from "react";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-} from "@/components/ui/carousel";
-import Autoplay from "embla-carousel-autoplay";
+import { motion } from "framer-motion";
 
-interface Partner {
+interface PartnerLogo {
   name: string;
-  logo: string;
+  image: string;
+  alt: string;
 }
 
 const DeliveryPartners: React.FC = () => {
-  const partners: Partner[] = useMemo(
-    () => [
-      { name: "Deli", logo: "/images/food/partners/Deli.jpg" },
-      { name: "Bobcha", logo: "/images/food/partners/bobcha.jpg" },
-      { name: "Foodee", logo: "/images/food/partners/foodee.jpg" },
-      { name: "Destino", logo: "/images/food/partners/destino.png" },
-      { name: "Conviva", logo: "/images/food/partners/conviva.png" },
-      { name: "Kasa Indian Eatery", logo: "/images/food/partners/kasa.png" },
-      { name: "CaterValley", logo: "/images/food/partners/catervalley.png" },
-      // Add any additional partners here
-    ],
-    [],
-  );
-
-  const [isMobile, setIsMobile] = useState<boolean>(false);
-  const [topImageMargin, setTopImageMargin] = useState<string>("-40px");
-  const autoplayPlugin = useRef(
-    Autoplay({
-      delay: 3000,
-      stopOnInteraction: false,
-      stopOnMouseEnter: true,
-    }),
-  );
-  const isClient = typeof window !== "undefined";
-
-  useEffect(() => {
-    const checkIfMobile = () => {
-      const width = window.innerWidth;
-      setIsMobile(width < 768);
-
-      // Ajustar el margen superior basado en el ancho de la pantalla
-      if (width < 640) {
-        // Para móviles pequeños
-        setTopImageMargin("-20px");
-      } else if (width < 768) {
-        // Para móviles más grandes
-        setTopImageMargin("-30px");
-      } else {
-        // Para tablets y desktop
-        setTopImageMargin("-40px");
-      }
-    };
-
-    checkIfMobile();
-    window.addEventListener("resize", checkIfMobile);
-    return () => window.removeEventListener("resize", checkIfMobile);
-  }, []);
+  const partners: PartnerLogo[] = [
+    {
+      name: "Destino",
+      image: "/images/food/partners/destino.png",
+      alt: "Destino logo",
+    },
+    {
+      name: "Grace Deli & Cafe",
+      image: "/images/food/partners/grace.png",
+      alt: "Grace Deli & Cafe logo",
+    },
+    {
+      name: "Kasa Indian Eatery",
+      image: "/images/food/partners/kasa.png",
+      alt: "Kasa Indian Eatery logo",
+    },
+    {
+      name: "Hungry",
+      image: "/images/food/partners/hungry.png",
+      alt: "Hungry logo",
+    },
+    {
+      name: "CaterValley",
+      image: "/images/food/partners/catervalley.png",
+      alt: "CaterValley logo",
+    },
+    {
+      name: "Conviva",
+      image: "/images/food/partners/conviva.png",
+      alt: "Conviva logo",
+    },
+    {
+      name: "Roost Roast",
+      image: "/images/food/partners/roostroast.png",
+      alt: "Roost Roast logo",
+    },
+    {
+      name: "Noor Indian Fusion Kitchen",
+      image: "/images/food/partners/noor.png",
+      alt: "Noor Indian Fusion Kitchen logo",
+    },
+    {
+      name: "Food.ee",
+      image: "/images/food/partners/foodee.jpg",
+      alt: "Food.ee logo",
+    },
+  ];
 
   return (
-    <div className="relative flex min-h-[600px] w-full items-center justify-center overflow-hidden bg-gray-100">
-      {/* Background Image with flowers */}
-      <div className="absolute inset-0 z-0">
-        <Image
-          src="/images/food/deliverypartnersbg.png"
-          alt="Flower shop background"
-          fill
-          style={{ objectFit: "cover" }}
-          className="opacity-100 saturate-150"
-        />
-      </div>
-
-      {/* Content container para mejor posicionamiento */}
-      <div className="relative z-10 flex h-full w-full flex-col justify-between">
-        {/* Top section with penguin logo - now positioned relative to the container */}
-        <div
-          className="relative mx-auto mt-8 w-full max-w-3xl px-4 md:mt-16 md:px-0"
-          style={{ marginTop: topImageMargin }}
+    <div className="w-full bg-white py-16 md:py-20 lg:py-24">
+      <div className="mx-auto max-w-7xl px-4">
+        {/* Title Section */}
+        <motion.div
+          className="mb-4 text-center"
+          initial={{ opacity: 0, y: -20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
         >
-          <Image
-            src="/images/food/partners/deliverysupport.png"
-            alt="Delivery Support"
-            width={800}
-            height={400}
-            className="w-full rounded-xl shadow-xl"
-            priority
-          />
-        </div>
+          <h2 className="mb-3 font-[Montserrat] text-3xl font-black text-gray-800 md:text-4xl lg:text-5xl">
+            Our Food Delivery Partners
+          </h2>
+          <p className="font-[Montserrat] text-base font-medium text-gray-600 md:text-lg">
+            We&apos;re proud to collaborate with some of the top names in the
+            industry:
+          </p>
+        </motion.div>
 
-        {/* Spacer que empuja el carrusel hacia abajo en desktop pero menos en móvil */}
-        <div className="flex-grow" />
-
-        {/* Partners slider at bottom */}
-        <div className="w-full pb-8 pt-4 md:pb-8 md:pt-0">
-          <div className="mx-auto max-w-[90%] md:max-w-[80%]">
-            <Carousel
-              opts={{
-                align: "center",
-                loop: true,
-                dragFree: false,
-                containScroll: false,
-                slidesToScroll: 3,
-              }}
-              plugins={isClient ? [autoplayPlugin.current] : []}
-              className="w-full"
-            >
-              <CarouselContent className="-ml-0 -mr-0">
-                {partners.map((partner) => (
-                  <CarouselItem
-                    key={partner.name}
-                    className="basis-1/3 pl-0 pr-0"
-                  >
-                    <div className="mx-1 md:mx-2">
-                      <div className="relative h-20 w-full overflow-hidden rounded-2xl border-4 border-yellow-400 bg-white shadow-lg md:h-24">
-                        <Image
-                          src={partner.logo}
-                          alt={partner.name}
-                          fill
-                          className="object-contain p-2"
-                          style={{ objectFit: "contain" }}
-                        />
-                      </div>
-                    </div>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-            </Carousel>
+        {/* Partner Logos Grid */}
+        <div className="mt-12">
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8 lg:gap-10">
+            {partners.slice(0, 8).map((partner, index) => (
+              <motion.div
+                key={partner.name}
+                className="flex items-center justify-center"
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{
+                  duration: 0.5,
+                  delay: index * 0.1,
+                }}
+              >
+                <div className="relative h-24 w-full max-w-[200px] transition-transform hover:scale-105 md:h-32 lg:h-36">
+                  <Image
+                    src={partner.image}
+                    alt={partner.alt}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 200px"
+                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                      // Hide image if it fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = "none";
+                    }}
+                  />
+                </div>
+              </motion.div>
+            ))}
           </div>
+          {/* Last logo centered */}
+          {(() => {
+            const lastPartner = partners[8];
+            return lastPartner ? (
+              <motion.div
+                className="mt-8 flex justify-center md:mt-10"
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{
+                  duration: 0.5,
+                  delay: 0.8,
+                }}
+              >
+                <div className="relative h-24 w-full max-w-[200px] transition-transform hover:scale-105 md:h-32 lg:h-36">
+                  <Image
+                    src={lastPartner.image}
+                    alt={lastPartner.alt}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 200px"
+                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                      // Hide image if it fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = "none";
+                    }}
+                  />
+                </div>
+              </motion.div>
+            ) : null;
+          })()}
         </div>
       </div>
     </div>

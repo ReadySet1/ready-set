@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/utils/prismaDB';
 import { createClient } from '@/utils/supabase/server';
 import { UserType } from "@/types/prisma";
+import { UserAuditService } from '@/services/userAuditService';
+import { AuditAction } from '@/types/audit';
 
 
 export async function POST(request: NextRequest, props: { params: Promise<{ userId: string }> }) {
@@ -47,17 +49,45 @@ export async function POST(request: NextRequest, props: { params: Promise<{ user
       );
     }
 
-    const updatedUser = await prisma.profile.update({
+    // Get current user role before update
+    const currentUser = await prisma.profile.findUnique({
       where: { id: userId },
-      // Use the validated uppercase role
-      data: { type: upperCaseNewRole as UserType },
-      select: {
+      select: { type: true }
+    });
+
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    // Use transaction for update + audit logging
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      const updated = await tx.profile.update({
+        where: { id: userId },
+        data: { type: upperCaseNewRole as UserType },
+        select: {
           id: true,
           email: true,
           type: true,
           name: true,
           status: true,
-       }
+        }
+      });
+
+      // Create audit entry for role change
+      const auditService = new UserAuditService();
+      await auditService.createAuditEntry(tx, {
+        userId,
+        action: AuditAction.ROLE_CHANGE,
+        performedBy: authUser.id,
+        before: { type: currentUser.type },
+        after: { type: upperCaseNewRole },
+        reason: `Role changed from ${currentUser.type} to ${upperCaseNewRole}`,
+      });
+
+      return updated;
     });
 
     return NextResponse.json(

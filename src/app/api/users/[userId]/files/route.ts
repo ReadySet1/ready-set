@@ -61,7 +61,13 @@ export async function GET(
   try {
     const params = await context.params;
     const userId = params.userId;
-        
+
+    // Validate UUID format before querying database
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userId)) {
+      return NextResponse.json([], { status: 200 }); // Return empty array for invalid UUIDs
+    }
+
     // Check authorization
     const authResponse = await checkAuthorization(userId);
     if (authResponse) return authResponse;

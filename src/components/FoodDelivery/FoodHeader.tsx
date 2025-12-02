@@ -6,11 +6,7 @@ import { motion } from "framer-motion";
 import ScheduleDialog from "../Logistics/Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 
-interface FoodHeaderProps {
-  onRequestQuote?: () => void;
-}
-
-const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
+const FoodHeader: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [marginTopClass, setMarginTopClass] = useState("mt-0");
   const { openForm, DialogForm } = FormManager();
@@ -40,7 +36,7 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
   }, []);
 
   const handleQuoteClick = () => {
-        openForm("food");
+    openForm("food");
   };
 
   // Animation variants
@@ -97,56 +93,58 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
 
   return (
     <section
-      className={`relative min-h-[500px] w-full ${marginTopClass} mb-16 bg-gray-50 md:mb-24 lg:mb-32`}
+      className={`relative min-h-[500px] w-full md:h-[70vh] md:min-h-[600px] ${marginTopClass} mb-16 md:mb-24 lg:mb-32`}
     >
+      {/* Background image container */}
       <motion.div
-        className="relative mx-auto flex max-w-7xl flex-col items-center justify-between px-4 py-8 md:flex-row md:items-center md:py-12 lg:py-16"
+        className="absolute inset-0 z-0"
+        variants={imageVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <Image
+          src="/images/food/food-containers.png"
+          alt="Food containers with various prepared meals"
+          fill
+          className="object-cover object-right md:object-center"
+          priority
+        />
+      </motion.div>
+
+      {/* Text content overlay */}
+      <motion.div
+        className="relative z-10 mx-auto flex h-full max-w-[1600px] items-center px-4 py-8 md:px-8 md:py-16 lg:px-12 lg:py-20"
         initial="hidden"
         animate="visible"
         variants={containerVariants}
       >
-        {/* Left content - Text */}
         <motion.div
-          className="relative z-10 w-full max-w-xl space-y-8 px-4 md:w-1/2 md:px-6 lg:px-8"
+          className="relative z-10 ml-4 mt-40 w-full max-w-[55%] space-y-3 sm:ml-8 sm:mt-44 sm:max-w-[50%] md:ml-28 md:mt-24 md:max-w-md lg:ml-32 lg:mt-28"
           variants={containerVariants}
         >
           <motion.h1
-            className="font-[Montserrat] text-2xl font-black leading-none tracking-tight text-gray-800 md:text-3xl lg:text-4xl"
+            className="font-[Montserrat] text-xl font-black leading-tight tracking-tight text-gray-800 md:text-2xl lg:text-3xl"
             variants={itemVariants}
           >
-            Your Go-To Catering
-            <br />
-            Delivery Partner Since
-            <br />
-            <motion.span
-              className="relative inline-block text-2xl text-yellow-400 md:text-3xl lg:text-4xl"
-              variants={itemVariants}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8, duration: 0.5 }}
-            >
-              2019
-            </motion.span>
+            From Pickup to Complete Setup
           </motion.h1>
 
           <motion.p
-            className="text-md font-[Montserrat] font-medium leading-relaxed text-gray-900 md:text-lg lg:text-xl"
+            className="font-[Montserrat] text-xs font-medium leading-relaxed text-gray-700 md:text-sm lg:text-base"
             variants={itemVariants}
           >
-            Ready Set HQ, based in the San Francisco Bay Area, is expanding to
-            Atlanta and Austin. We deliver daily team lunches, corporate events,
-            and special occasions, trusted by top tech companies like Apple,
-            Google, Facebook, and Netflix for our reliable catering delivery
-            service.
+            More than delivery — we&apos;re a trusted partner helping
+            restaurants, caterers, and foodservice providers solve their
+            toughest logistics challenges.
           </motion.p>
 
           <motion.div
-            className="flex flex-wrap items-center gap-6 pt-6"
+            className="flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4"
             variants={itemVariants}
           >
             <motion.button
               onClick={handleQuoteClick}
-              className="rounded-full bg-yellow-300 px-10 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg"
+              className="rounded-lg bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
               variants={buttonVariants}
               whileHover="hover"
               whileTap="tap"
@@ -156,44 +154,12 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
             <ScheduleDialog
               buttonText="Book a Call"
               calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
-              className="rounded-full bg-yellow-300 px-10 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg"
+              className="rounded-lg bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
             />
           </motion.div>
         </motion.div>
-
-        {/* Right content - Image */}
-        <motion.div
-          className="mt-12 flex w-full items-center justify-center md:mt-0 md:w-1/2 md:justify-end"
-          variants={containerVariants}
-        >
-          <div className="relative w-full max-w-md md:max-w-lg lg:max-w-lg">
-            {/* Yellow circular background with food bowl image */}
-            <motion.div
-              className="relative mx-auto h-[320px] w-[320px] overflow-hidden rounded-full border-8 border-yellow-300 bg-yellow-300 md:h-[400px] md:w-[400px] lg:h-[450px] lg:w-[450px]"
-              variants={imageVariants}
-              whileHover={{ rotate: 3, transition: { duration: 0.5 } }}
-              animate={pulseAnimation}
-            >
-              <motion.div
-                className="absolute inset-0 flex items-center justify-center"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5, duration: 0.8 }}
-              >
-                <Image
-                  src="/images/food/salad-bowl.png"
-                  alt="Catering food bowl with fresh ingredients"
-                  fill
-                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 450px"
-                  priority
-                  className="scale-125"
-                  style={{ objectFit: "cover" }}
-                />
-              </motion.div>
-            </motion.div>
-          </div>
-        </motion.div>
       </motion.div>
+
       {/* Render the dialog form */}
       {DialogForm}
     </section>

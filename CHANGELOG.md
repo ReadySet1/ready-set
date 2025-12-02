@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **User Audit History (REA-173)**: Comprehensive audit trail for user profile changes
+  - New `UserAudit` model tracking all user modifications with before/after state
+  - `UserAuditService` for creating and querying audit entries
+  - `useAuditHistory` hook for fetching paginated audit logs
+  - CSV export functionality for audit logs
+  - Audit summary statistics per user
+  - Sensitive field sanitization (excludes passwords, tokens, API keys)
+
+- **Catering Landing Page**: New responsive catering services landing page
+  - `FoodSetupCarousel` component with animated image showcase
+  - `CateringFeatures` component highlighting service benefits
+  - Responsive design with mobile-first approach
+  - Integration with `ScheduleDialog` for booking consultations
+
+- **FoodDelivery Component Tests**: Comprehensive test coverage
+  - 24 tests for `CateringFeatures` component (100% coverage)
+  - Tests for responsive design, accessibility, and motion animations
+  - Mocking strategy documentation in `README.md`
+
 - **Push Notification Enhancements (REA-124)**: Analytics tracking and multi-recipient support
   - New `NotificationAnalytics` model for tracking delivery, open, and click rates
   - New `NotificationDedup` model for distributed deduplication across instances
@@ -62,6 +81,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `src/services/notifications/push.ts` - Push notification error tracking
 
 ### Fixed
+- **Toast Auto-Dismiss**: Removed duplicate Toaster component causing toasts not to auto-dismiss
+  - Root cause: Two `<Toaster />` components rendering (one from `layout.tsx`, one from page)
+  - Fix: Removed redundant Toaster from affected pages
+
+- **User Files UUID Validation**: Fixed 500 error on invalid userId format
+  - Added proper UUID format validation before database query
+  - Returns 400 Bad Request for malformed user IDs
+
+- **Change Role API Tests**: Fixed test suite to support transaction-based audit logging
+  - Updated mocks to include `$transaction` and `UserAuditService`
+  - All 25 tests now passing
+
 - **TypeScript**: Improved type safety in `src/lib/auth.ts`
   - Added `OAuthMetadata` interface for OAuth user metadata
   - Replaced `any` types with proper Supabase error types (`AuthError`, `PostgrestError`)

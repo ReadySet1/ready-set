@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { createClient } from "@/utils/supabase/server";
 import { UserStatus, UserType } from '@/types/prisma';
+import { UserAuditService } from '@/services/userAuditService';
+import { AuditAction } from '@/types/audit';
 
 export async function PUT(request: Request) {
   try {
@@ -84,20 +86,47 @@ export async function PUT(request: Request) {
        }, { status: 400 });
     }
 
-    // Update user status in database using the enum value
-    const updatedUser = await prisma.profile.update({
+    // Get current user status before update
+    const currentUser = await prisma.profile.findUnique({
       where: { id: userId },
-      data: { status: statusEnum },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        type: true,
-        status: true,
-      }
+      select: { status: true }
     });
 
-    
+    if (!currentUser) {
+      return NextResponse.json({
+        error: "User not found"
+      }, { status: 404 });
+    }
+
+    // Use transaction for update + audit logging
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      const updated = await tx.profile.update({
+        where: { id: userId },
+        data: { status: statusEnum },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          type: true,
+          status: true,
+        }
+      });
+
+      // Create audit entry for status change
+      const auditService = new UserAuditService();
+      await auditService.createAuditEntry(tx, {
+        userId,
+        action: AuditAction.STATUS_CHANGE,
+        performedBy: user.id,
+        before: { status: currentUser.status },
+        after: { status: statusEnum },
+        reason: `Status changed from ${currentUser.status} to ${statusEnum}`,
+      });
+
+      return updated;
+    });
+
+
     return NextResponse.json({
       message: "User status updated successfully",
       user: updatedUser

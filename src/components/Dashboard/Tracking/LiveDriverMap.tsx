@@ -130,12 +130,17 @@ export default function LiveDriverMap({
 
       mapRef.current = map;
 
+      // Capture refs at the time of effect setup for cleanup
+      const markersRefCurrent = markersRef.current;
+      const deliveryMarkersRefCurrent = deliveryMarkersRef.current;
+
       return () => {
         // Clean up markers before removing map to prevent memory leaks
-        markersRef.current.forEach(marker => marker.remove());
-        deliveryMarkersRef.current.forEach(marker => marker.remove());
-        markersRef.current.clear();
-        deliveryMarkersRef.current.clear();
+        // Use captured refs to avoid stale closure issues
+        markersRefCurrent.forEach(marker => marker.remove());
+        deliveryMarkersRefCurrent.forEach(marker => marker.remove());
+        markersRefCurrent.clear();
+        deliveryMarkersRefCurrent.clear();
 
         map.remove();
         mapRef.current = null;
@@ -164,7 +169,7 @@ export default function LiveDriverMap({
   }, [mapStyle]);
 
   // Get driver color based on status
-  const getDriverColor = (driver: TrackedDriver): string => {
+  const getDriverColor = useCallback((driver: TrackedDriver): string => {
     if (!driver.isOnDuty) return DRIVER_STATUS_COLORS.offDuty;
 
     const recentLocation = recentLocations.find(loc => loc.driverId === driver.id);
@@ -174,10 +179,10 @@ export default function LiveDriverMap({
     }
 
     return DRIVER_STATUS_COLORS.onDuty;
-  };
+  }, [recentLocations]);
 
   // Get battery status
-  const getBatteryStatus = (driverId: string): { level?: number; status: 'good' | 'low' | 'critical' } => {
+  const getBatteryStatus = useCallback((driverId: string): { level?: number; status: 'good' | 'low' | 'critical' } => {
     const location = recentLocations.find(loc => loc.driverId === driverId);
     const level = location?.batteryLevel;
 
@@ -186,10 +191,10 @@ export default function LiveDriverMap({
     if (level <= BATTERY_THRESHOLDS.CRITICAL) return { level, status: 'critical' };
     if (level <= BATTERY_THRESHOLDS.LOW) return { level, status: 'low' };
     return { level, status: 'good' };
-  };
+  }, [recentLocations]);
 
   // Create custom marker element
-  const createDriverMarkerElement = (driver: TrackedDriver): HTMLDivElement => {
+  const createDriverMarkerElement = useCallback((driver: TrackedDriver): HTMLDivElement => {
     const el = document.createElement('div');
     el.className = 'driver-marker';
     el.style.width = '32px';
@@ -238,10 +243,10 @@ export default function LiveDriverMap({
     `;
 
     return el;
-  };
+  }, [getDriverColor, getBatteryStatus]);
 
   // Create delivery marker element
-  const createDeliveryMarkerElement = (): HTMLDivElement => {
+  const createDeliveryMarkerElement = useCallback((): HTMLDivElement => {
     const el = document.createElement('div');
     el.className = 'delivery-marker';
     el.style.width = `${MARKER_CONFIG.DELIVERY_MARKER_SIZE}px`;
@@ -267,10 +272,10 @@ export default function LiveDriverMap({
     `;
 
     return el;
-  };
+  }, []);
 
   // Create popup content
-  const createPopupContent = (driver: TrackedDriver): string => {
+  const createPopupContent = useCallback((driver: TrackedDriver): string => {
     const battery = getBatteryStatus(driver.id);
     const batteryIcon = battery.status === 'good' ? '🔋' : battery.status === 'low' ? '🪫' : '⚠️';
     const dutyColor = driver.isOnDuty ? DRIVER_STATUS_COLORS.moving : DRIVER_STATUS_COLORS.offDuty;
@@ -306,7 +311,7 @@ export default function LiveDriverMap({
         ` : ''}
       </div>
     `;
-  };
+  }, [getBatteryStatus]);
 
   // Store previous driver states to detect visual changes
   const previousDriverStatesRef = useRef<Map<string, { color: string; batteryStatus: string }>>(new Map());
@@ -320,7 +325,7 @@ export default function LiveDriverMap({
     if (!previousState) return true; // First time seeing this driver
 
     return previousState.color !== currentColor || previousState.batteryStatus !== currentBattery;
-  }, [recentLocations]); // Only depends on recentLocations as that's what affects color/battery
+  }, [getDriverColor, getBatteryStatus]);
 
   // Update driver markers
   useEffect(() => {
@@ -428,7 +433,7 @@ export default function LiveDriverMap({
       // Disable auto-fit after first load
       setShouldAutoFit(false);
     }
-  }, [drivers, recentLocations, mapLoaded, shouldAutoFit, hasUserInteracted, shouldRecreateMarker]);
+  }, [drivers, recentLocations, mapLoaded, shouldAutoFit, hasUserInteracted, shouldRecreateMarker, createDriverMarkerElement, createPopupContent, getBatteryStatus, getDriverColor]);
 
   // Update delivery markers
   useEffect(() => {
@@ -476,7 +481,7 @@ export default function LiveDriverMap({
         deliveryMarkersRef.current.set(delivery.id, marker);
       }
     });
-  }, [deliveries, mapLoaded]);
+  }, [deliveries, mapLoaded, createDeliveryMarkerElement]);
 
   // Zoom controls
   const zoomIn = () => {

@@ -1,14 +1,17 @@
 // src/app/(site)/catering-deliveries/page.tsx
 import { Metadata } from "next";
-import { FormType } from "@/components/Logistics/QuoteRequest/types";
-import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
+// import { FoodServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
+import CateringFeatures from "@/components/FoodDelivery/CateringFeatures";
+import CateringAbout from "@/components/FoodDelivery/CateringAbout";
 import DeliveryPartners from "@/components/FoodDelivery/DeliveryPartners";
-import { FoodServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
-import DeliveryTerms from "@/components/FoodDelivery/DeliveryTerms";
+import FoodSetupCarousel from "@/components/FoodDelivery/FoodSetupCarousel";
+// import FoodGallery from "@/components/FoodDelivery/FoodGallery";
+// import DeliveryTerms from "@/components/FoodDelivery/DeliveryTerms";
 import HostingChecklist from "@/components/FoodDelivery/HostingChecklist";
 import MainMeal from "@/components/FoodDelivery/MainMeal";
 import FoodHeader from "@/components/FoodDelivery/FoodHeader";
 import CateringStats from "@/components/FoodDelivery/CateringStats";
+import CateringContact from "@/components/FoodDelivery/CateringContact";
 
 export const metadata: Metadata = {
   title: "Food Delivery Services for Events | Ready Set",
@@ -51,12 +54,17 @@ export default function FoodPage() {
   return (
     <div className="pt-20 md:pt-24">
       <FoodHeader />
+      {/* <FoodServiceFeatures /> */}
+      <CateringFeatures />
+      <CateringAbout />
       <DeliveryPartners />
-      <FoodServiceFeatures />
-      <DeliveryTerms />
-      <HostingChecklist />
-      <MainMeal />
-      <CateringStats />
+      <FoodSetupCarousel />
+      {/* <FoodGallery /> */}
+      {/* <DeliveryTerms /> */}
+      {/* <HostingChecklist /> */}
+      {/* <MainMeal /> */}
+      {/* <CateringStats /> */}
+      <CateringContact />
     </div>
   );
 }

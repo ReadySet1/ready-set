@@ -132,9 +132,9 @@ if (typeof ReadableStream === 'undefined') {
 // Mock Next.js Image component
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: ({ src, alt, width, height, ...props }: any) => {
+  default: ({ src, alt, width, height, priority, ...props }: any) => {
     // eslint-disable-next-line @next/next/no-img-element
-    return React.createElement('img', { src, alt, width, height, ...props });
+    return React.createElement('img', { src, alt, width, height, 'data-priority': priority ? 'true' : 'false', ...props });
   },
 }));
 
@@ -546,6 +546,9 @@ jest.mock('framer-motion', () => ({
     div: ({ children, ...props }: any) => React.createElement('div', props, children),
     span: ({ children, ...props }: any) => React.createElement('span', props, children),
     button: ({ children, ...props }: any) => React.createElement('button', props, children),
+    p: ({ children, ...props }: any) => React.createElement('p', props, children),
+    li: ({ children, ...props }: any) => React.createElement('li', props, children),
+    section: ({ children, ...props }: any) => React.createElement('section', props, children),
   },
   AnimatePresence: ({ children }: any) => children,
 }));

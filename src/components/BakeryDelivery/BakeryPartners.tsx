@@ -93,7 +93,7 @@ const BakeryPartners: React.FC = () => {
           />
         </div>
 
-        {/* Spacer que empuja el carrusel hacia abajo en desktop pero menos en móvil */}
+        {/* Spacer that pushes the carousel down on desktop but less on mobile */}
         <div className="flex-grow" />
 
         {/* Partners slider at bottom */}
