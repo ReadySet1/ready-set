@@ -1,6 +1,6 @@
 // src/components/Dashboard/AdminView/PasswordChange.tsx
 
-import { Toaster, toast } from "react-hot-toast";
+import { toast } from "react-hot-toast";
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -185,7 +185,6 @@ export const PasswordChange = ({
 
   return (
     <Card>
-      <Toaster position="top-right" />
       <CardHeader>
         <CardTitle>Password Management</CardTitle>
         <CardDescription>Update or reset your password</CardDescription>
