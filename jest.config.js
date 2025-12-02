@@ -21,8 +21,16 @@ const customJestConfig = {
     '\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/test/__mocks__/fileMock.js',
   },
   testMatch: [
-    '<rootDir>/src/**/__tests__/**/*.{js,jsx,ts,tsx}',
+    '<rootDir>/src/**/__tests__/**/*.{test,spec}.{js,jsx,ts,tsx}',
+    '<rootDir>/src/**/__tests__/**/*-test.{js,jsx,ts,tsx}',
+    '<rootDir>/src/**/__tests__/**/*.test.{js,jsx,ts,tsx}',
     '<rootDir>/src/**/*.{test,spec}.{js,jsx,ts,tsx}',
+  ],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '<rootDir>/src/__tests__/helpers/',
+    '<rootDir>/src/__tests__/__mocks__/',
+    '<rootDir>/src/__tests__/utils/test-utils.tsx',
   ],
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
@@ -78,7 +86,8 @@ const customJestConfig = {
     }],
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(.*\\.mjs$|@supabase|isows|bufferutil|@solana|ws|@noble|tweetnacl|cheerio.*|resend|parse5|dom-serializer|domutils|htmlparser2|entities|domhandler|date-fns|date-fns-tz))',
+    // Use pattern that works with pnpm's nested node_modules structure
+    '/node_modules/(?!.*((\\.mjs$)|(@supabase)|isows|bufferutil|(@solana)|ws|(@noble)|tweetnacl|cheerio|resend|parse5|dom-serializer|domutils|htmlparser2|entities|domhandler|date-fns|date-fns-tz|undici|css-what|css-select|boolbase|nth-check))',
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   // Add test timeout - increased for CI stability

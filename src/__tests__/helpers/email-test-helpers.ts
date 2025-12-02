@@ -372,12 +372,23 @@ export const createMultipleRecipients = (count: number = 3): string[] => {
 
 /**
  * Sets up test environment variables for email testing
+ * Also resets the email circuit breaker to ensure clean test state
  */
 export const setupEmailTestEnv = () => {
   process.env.RESEND_API_KEY = "test-resend-api-key";
   process.env.EMAIL_FROM = "solutions@updates.readysetllc.com";
   process.env.ADMIN_EMAIL = "admin@test.com";
   process.env.NOTIFICATION_RECIPIENT = "admin@test.com";
+
+  // Reset circuit breaker to ensure clean test state
+  try {
+    const { emailCircuitBreaker } = require("@/utils/email-resilience");
+    if (emailCircuitBreaker && typeof emailCircuitBreaker.reset === "function") {
+      emailCircuitBreaker.reset();
+    }
+  } catch {
+    // Circuit breaker module may not be available in all test contexts
+  }
 };
 
 /**
