@@ -110,14 +110,26 @@ export const useUserData = (
         // Keep original string if needed elsewhere, ensure it's a string or fallback
         counties: typeof data.counties === 'string' ? data.counties : "",
 
-        // Time Needed - Use the array directly from the API
-        timeNeeded: Array.isArray(data.timeNeeded) ? data.timeNeeded : [],
+        // Time Needed - Parse array or comma-separated string from API
+        timeNeeded: Array.isArray(data.timeNeeded)
+          ? data.timeNeeded
+          : (typeof data.timeNeeded === 'string' && data.timeNeeded
+              ? data.timeNeeded.split(',').map((s: string) => s.trim()).filter(Boolean)
+              : []),
 
-        // Catering Brokerage - Use the array directly from the API
-        cateringBrokerage: Array.isArray(data.cateringBrokerage) ? data.cateringBrokerage : [],
+        // Catering Brokerage - Parse array or comma-separated string from API
+        cateringBrokerage: Array.isArray(data.cateringBrokerage)
+          ? data.cateringBrokerage
+          : (typeof data.cateringBrokerage === 'string' && data.cateringBrokerage
+              ? data.cateringBrokerage.split(',').map((s: string) => s.trim()).filter(Boolean)
+              : []),
 
-        // Provisions - Use the array directly from the API
-        provisions: Array.isArray(data.provisions) ? data.provisions : [],
+        // Provisions - Parse array or comma-separated string from API
+        provisions: Array.isArray(data.provisions)
+          ? data.provisions
+          : (typeof data.provisions === 'string' && data.provisions
+              ? data.provisions.split(',').map((s: string) => s.trim()).filter(Boolean)
+              : []),
         frequency: data.frequency || null,
         headCount: data.headCount ?? null,
         status: data.status || "pending",

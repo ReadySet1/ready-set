@@ -23,7 +23,9 @@ export default function UserHeader({ watchedValues }: UserHeaderProps) {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-800">
-              {watchedValues.displayName || "New User"}
+              {watchedValues.type === "vendor" || watchedValues.type === "client"
+                ? watchedValues.company_name || watchedValues.displayName || "New User"
+                : watchedValues.displayName || "New User"}
             </h1>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
               <Badge

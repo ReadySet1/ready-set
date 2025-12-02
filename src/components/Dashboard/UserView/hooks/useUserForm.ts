@@ -116,8 +116,8 @@ export const useUserForm = (
         // cateringBrokerage field in Prisma is String?
         cateringBrokerage: type === 'vendor' && cateringBrokerage && Array.isArray(cateringBrokerage) ? cateringBrokerage.join(",") : null,
         
-        // provide field in Prisma is String?
-        provide: type === 'vendor' && provisions && Array.isArray(provisions) ? provisions.join(",") : null,
+        // provisions field - API maps this to 'provide' column in Prisma
+        provisions: type === 'vendor' && provisions && Array.isArray(provisions) ? provisions.join(",") : null,
         
         // headCount is handled by baseSubmitData as it's number | null
         // frequency is handled by baseSubmitData as it's string | null
