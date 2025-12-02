@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Toaster } from "react-hot-toast";
 import { UserSettingsTab } from "./UserSettingsTab";
 import { createClient } from "@/utils/supabase/client";
 import { UserType } from "@/types/user";
@@ -70,7 +69,6 @@ export function SettingsUser() {
 
   return (
     <div className="flex min-h-screen w-full flex-col">
-      <Toaster position="top-right" />
       <main className="bg-muted/40 flex min-h-[calc(100vh_-_theme(spacing.16))] flex-1 flex-col gap-4 p-4 md:gap-8 md:p-10">
         <div className="mx-auto grid w-full max-w-6xl gap-2">
           <h1 className="text-3xl font-semibold">Settings</h1>

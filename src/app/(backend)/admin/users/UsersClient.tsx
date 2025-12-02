@@ -79,7 +79,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { UserType, UserStatus } from "@/types/prisma";
@@ -683,8 +683,6 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
 
   return (
     <div className="space-y-4">
-      <Toaster position="top-center" />
-
       <Card className="shadow-sm">
         <CardContent className="p-0">
           <div className="flex flex-col">
