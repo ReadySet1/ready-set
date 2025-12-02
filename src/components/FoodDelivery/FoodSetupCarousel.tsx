@@ -10,11 +10,11 @@ import {
 import Autoplay from "embla-carousel-autoplay";
 
 const FoodSetupCarousel: React.FC = () => {
-  // Generate array of food setup images (foodsetup1.png through foodsetup20.png)
-  // Using 20 images for a 10x2 grid layout
+  // Generate array of food setup images (foodsetup1.png through foodsetup10.png)
+  // Using 10 images for a 5x2 grid layout
   const foodSetupImages = useMemo(
     () =>
-      Array.from({ length: 20 }, (_, i) => ({
+      Array.from({ length: 10 }, (_, i) => ({
         src: `/images/food/foodsetup/foodsetup${i + 1}.png`,
         alt: `Food setup ${i + 1}`,
       })),
