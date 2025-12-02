@@ -71,6 +71,10 @@ const FoodSetupCarousel: React.FC = () => {
                       fill
                       className="object-cover"
                       sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                      }}
                     />
                   </div>
                   {/* Bottom image (if exists) */}
@@ -82,6 +86,10 @@ const FoodSetupCarousel: React.FC = () => {
                         fill
                         className="object-cover"
                         sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                        onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                        }}
                       />
                     </div>
                   )}

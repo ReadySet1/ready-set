@@ -11,7 +11,6 @@ interface PartnerLogo {
 }
 
 const DeliveryPartners: React.FC = () => {
-  // Partner logos - user will add images later
   const partners: PartnerLogo[] = [
     {
       name: "Destino",

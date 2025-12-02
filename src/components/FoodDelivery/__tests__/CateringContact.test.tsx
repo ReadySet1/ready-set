@@ -18,14 +18,28 @@ jest.mock("@/lib/recaptcha", () => ({
   executeRecaptcha: (...args: unknown[]) => mockExecuteRecaptcha(...args),
 }));
 
-// Mock FormManager
-const mockOpenForm = jest.fn();
-jest.mock("@/components/Logistics/QuoteRequest/Quotes/FormManager", () => ({
-  FormManager: () => ({
-    openForm: mockOpenForm,
-    DialogForm: <div data-testid="dialog-form">Mock Dialog Form</div>,
-  }),
-}));
+// Mock ScheduleDialog component
+jest.mock("@/components/Logistics/Schedule", () => {
+  const React = require("react");
+  return function MockScheduleDialog({
+    buttonText,
+    calendarUrl,
+    className,
+  }: {
+    buttonText: string;
+    calendarUrl: string;
+    className?: string;
+  }) {
+    return (
+      <div data-testid="schedule-dialog">
+        <button className={className} data-testid="schedule-dialog-button">
+          {buttonText}
+        </button>
+        <div data-testid="schedule-dialog-calendar-url">{calendarUrl}</div>
+      </div>
+    );
+  };
+});
 
 describe("CateringContact", () => {
   beforeEach(() => {
@@ -71,10 +85,10 @@ describe("CateringContact", () => {
       expect(title).toHaveTextContent("Send us a message");
     });
 
-    it("renders the DialogForm component", () => {
+    it("renders the ScheduleDialog component for Partner button", () => {
       render(<CateringContact />);
 
-      expect(screen.getByTestId("dialog-form")).toBeInTheDocument();
+      expect(screen.getByTestId("schedule-dialog")).toBeInTheDocument();
     });
   });
 
@@ -424,20 +438,17 @@ describe("CateringContact", () => {
       expect(partnerButton).toBeInTheDocument();
     });
 
-    it("calls openForm with 'food' when Partner button is clicked", async () => {
-      const user = userEvent.setup();
+    it("renders Partner button with ScheduleDialog", () => {
       render(<CateringContact />);
 
-      const partnerButton = screen.getByRole("button", { name: /partner with us/i });
-      await user.click(partnerButton);
-
-      expect(mockOpenForm).toHaveBeenCalledWith("food");
+      const partnerButton = screen.getByTestId("schedule-dialog-button");
+      expect(partnerButton).toHaveTextContent("Partner With Us");
     });
 
     it("renders Partner button with correct styling", () => {
       render(<CateringContact />);
 
-      const partnerButton = screen.getByRole("button", { name: /partner with us/i });
+      const partnerButton = screen.getByTestId("schedule-dialog-button");
       expect(partnerButton).toHaveClass(
         "rounded-lg",
         "bg-yellow-400",

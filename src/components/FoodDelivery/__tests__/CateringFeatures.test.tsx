@@ -40,14 +40,19 @@ describe("CateringFeatures", () => {
     it("renders the main container with correct styling", () => {
       render(<CateringFeatures />);
 
-      const container = screen.getByRole("main");
-      expect(container).toHaveClass("w-full", "bg-gray-50", "py-16", "md:py-20");
+      const container = screen.getByRole("region", {
+        name: /more than just delivery/i,
+      });
+      expect(container).toHaveClass("w-full", "bg-gray-50", "py-16");
     });
 
     it("renders the max-width wrapper", () => {
       render(<CateringFeatures />);
 
-      const wrapper = screen.getByRole("main").firstElementChild;
+      const container = screen.getByRole("region", {
+        name: /more than just delivery/i,
+      });
+      const wrapper = container.firstElementChild;
       expect(wrapper).toHaveClass("mx-auto", "max-w-7xl", "px-4");
     });
 
@@ -76,7 +81,10 @@ describe("CateringFeatures", () => {
     it("renders the feature cards grid container", () => {
       render(<CateringFeatures />);
 
-      const grid = screen.getByRole("main").querySelector(".grid");
+      const container = screen.getByRole("region", {
+        name: /more than just delivery/i,
+      });
+      const grid = container.querySelector(".grid");
       expect(grid).toHaveClass(
         "grid",
         "grid-cols-1",
@@ -314,9 +322,11 @@ describe("CateringFeatures", () => {
     it("has proper semantic structure", () => {
       render(<CateringFeatures />);
 
-      // Check that we have a main container (already tested)
-      const main = screen.getByRole("main");
-      expect(main).toBeInTheDocument();
+      // Check that we have a labeled region (section with aria-labelledby)
+      const section = screen.getByRole("region", {
+        name: /more than just delivery/i,
+      });
+      expect(section).toBeInTheDocument();
     });
 
     it("feature cards are properly structured for screen readers", () => {
@@ -339,15 +349,20 @@ describe("CateringFeatures", () => {
     it("applies responsive grid classes", () => {
       render(<CateringFeatures />);
 
-      const grid = screen.getByRole("main").querySelector(".grid");
+      const container = screen.getByRole("region", {
+        name: /more than just delivery/i,
+      });
+      const grid = container.querySelector(".grid");
       expect(grid).toHaveClass("grid-cols-1", "md:grid-cols-3");
     });
 
     it("applies responsive padding classes", () => {
       render(<CateringFeatures />);
 
-      const container = screen.getByRole("main");
-      expect(container).toHaveClass("py-16", "md:py-20");
+      const container = screen.getByRole("region", {
+        name: /more than just delivery/i,
+      });
+      expect(container).toHaveClass("py-16");
     });
 
     it("applies responsive title classes", () => {

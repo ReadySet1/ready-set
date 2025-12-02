@@ -71,7 +71,10 @@ const CateringFeatures: React.FC = () => {
   ];
 
   return (
-    <main className="w-full bg-gray-50 py-16 md:py-20" role="main">
+    <section
+      className="w-full bg-gray-50 py-16 md:py-20"
+      aria-labelledby="catering-features-heading"
+    >
       <div className="mx-auto max-w-7xl px-4">
         {/* Title */}
         <motion.div
@@ -80,7 +83,10 @@ const CateringFeatures: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <h2 className="text-4xl font-black text-gray-800 md:text-5xl lg:text-6xl">
+          <h2
+            id="catering-features-heading"
+            className="text-4xl font-black text-gray-800 md:text-5xl lg:text-6xl"
+          >
             More Than Just Delivery
           </h2>
         </motion.div>
@@ -122,7 +128,7 @@ const CateringFeatures: React.FC = () => {
           />
         </motion.div>
       </div>
-    </main>
+    </section>
   );
 };
 

@@ -3,15 +3,10 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { MapPin } from "lucide-react";
 import ScheduleDialog from "../Logistics/Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 
-interface FoodHeaderProps {
-  onRequestQuote?: () => void;
-}
-
-const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
+const FoodHeader: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [marginTopClass, setMarginTopClass] = useState("mt-0");
   const { openForm, DialogForm } = FormManager();

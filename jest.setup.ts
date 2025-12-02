@@ -546,6 +546,9 @@ jest.mock('framer-motion', () => ({
     div: ({ children, ...props }: any) => React.createElement('div', props, children),
     span: ({ children, ...props }: any) => React.createElement('span', props, children),
     button: ({ children, ...props }: any) => React.createElement('button', props, children),
+    p: ({ children, ...props }: any) => React.createElement('p', props, children),
+    li: ({ children, ...props }: any) => React.createElement('li', props, children),
+    section: ({ children, ...props }: any) => React.createElement('section', props, children),
   },
   AnimatePresence: ({ children }: any) => children,
 }));

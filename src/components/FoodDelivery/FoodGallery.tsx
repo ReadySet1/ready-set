@@ -5,7 +5,6 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 
 const FoodGallery: React.FC = () => {
-  // Food images - user will add images later
   const foodImages = [
     {
       src: "/images/food/gallery/food-1.jpg",

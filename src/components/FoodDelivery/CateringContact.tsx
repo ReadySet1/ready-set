@@ -11,13 +11,6 @@ import { loadRecaptchaScript, executeRecaptcha } from "@/lib/recaptcha";
 const LOGISTICS_CALENDAR_URL =
   "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true";
 
-interface Testimonial {
-  name: string;
-  quote: string;
-  companyLogo: string;
-  companyAlt: string;
-}
-
 interface MessageState {
   type: "success" | "error";
   text: string;
@@ -34,49 +27,26 @@ const CateringContact: React.FC = () => {
   const [message, setMessage] = useState<MessageState | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [recaptchaLoadError, setRecaptchaLoadError] = useState<boolean>(false);
-  const [recaptchaLoadAttempts, setRecaptchaLoadAttempts] = useState<number>(0);
-
-  const testimonials: Testimonial[] = [
-    {
-      name: "Kaleb Bautista",
-      quote:
-        "I wanted my first project as a model to be with someone I trusted, so I contacted Delora for a portfolio-building shoot. She guided me through everything while respecting my own preferences. I would not trade that experience for anything.",
-      companyLogo: "/images/food/partners/catervalley.png",
-      companyAlt: "CaterValley",
-    },
-    {
-      name: "Mai Yap",
-      quote:
-        "We love working with Delora because she captures the brand so well. She shows the voice we want to project through her photos. She's a joy to work with, especially on set.",
-      companyLogo: "/images/food/partners/hungry.png",
-      companyAlt: "HUNGRY",
-    },
-    {
-      name: "April Ducao",
-      quote:
-        "Delora helps us bring element in our clothes customers the fluidity the racks. We always a we need a photograph",
-      companyLogo: "/images/food/partners/kasa.png",
-      companyAlt: "KASA INDIAN EATERY",
-    },
-  ];
 
   // Load reCAPTCHA script on component mount with retry logic
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    let isMounted = true;
+
     const loadWithRetry = async (attempt: number = 1) => {
       try {
         await loadRecaptchaScript();
-        setRecaptchaLoadError(false);
-      } catch (error) {
-        setRecaptchaLoadAttempts(attempt);
-
+        if (isMounted) {
+          setRecaptchaLoadError(false);
+        }
+      } catch {
         // Retry up to 3 times with exponential backoff
-        if (attempt < 3) {
-          const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // 1s, 2s, 5s
-
-          setTimeout(() => {
+        if (attempt < 3 && isMounted) {
+          const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          timeoutId = setTimeout(() => {
             loadWithRetry(attempt + 1);
           }, retryDelay);
-        } else {
+        } else if (isMounted) {
           // All retries failed
           setRecaptchaLoadError(true);
         }
@@ -84,6 +54,13 @@ const CateringContact: React.FC = () => {
     };
 
     loadWithRetry();
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   const handleInputChange = (
@@ -443,43 +420,6 @@ const CateringContact: React.FC = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            {/* Testimonial Cards - Commented out as requested */}
-            {/* <div className="mb-8 space-y-6">
-              {testimonials.map((testimonial, index) => (
-                <motion.div
-                  key={index}
-                  className="rounded-2xl border-4 border-yellow-400 bg-white p-6 shadow-sm"
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                >
-                  <h3 className="mb-3 font-[Montserrat] text-lg font-black text-gray-800">
-                    {testimonial.name}
-                  </h3>
-                  <p className="mb-4 font-[Montserrat] text-sm leading-relaxed text-gray-700">
-                    &quot;{testimonial.quote}&quot;
-                  </p>
-                  <div className="flex items-center">
-                    <div className="relative h-8 w-24">
-                      <Image
-                        src={testimonial.companyLogo}
-                        alt={testimonial.companyAlt}
-                        fill
-                        className="object-contain"
-                        sizes="96px"
-                        onError={(e) => {
-                          // Hide image if it fails to load
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = "none";
-                        }}
-                      />
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div> */}
-
             {/* Partnership CTA - Centered on right side */}
             <motion.div
               className="text-center"

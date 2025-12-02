@@ -3,7 +3,6 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import Link from "next/link";
 import ScheduleDialog from "@/components/Logistics/Schedule";
 
 interface StatProps {
