@@ -142,26 +142,46 @@ const sendEmail = async (data: FormInputs) => {
   try {
     const resend = getResendClient();
     if (!resend) {
-      console.warn("⚠️  Resend client not available - skipping email");
-      throw new Error("Email service not configured");
+      console.error("⚠️  Resend client not available - RESEND_API_KEY missing or invalid");
+      throw new Error("Email service not configured. Please check RESEND_API_KEY environment variable.");
     }
 
     // Add this validation before sending
     if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
-      throw new Error("Invalid recipient email address");
+      console.error("Invalid recipient email address:", recipient);
+      throw new Error(`Invalid recipient email address: ${recipient}`);
     }
 
-    await resend.emails.send({
+    console.log(`[Email] Sending email to: ${recipient}, from: solutions@updates.readysetllc.com`);
+    console.log(`[Email] Subject: ${subject}`);
+
+    const result = await resend.emails.send({
       to: recipient,
       from: "Ready Set Website <solutions@updates.readysetllc.com>",
       subject,
       html,
     });
 
+    console.log("[Email] Email sent successfully:", result);
+
     return "Your message was sent successfully.";
   } catch (error) {
-    console.error("Email sending error:", error);
-    throw new Error("Error trying to send the message.");
+    console.error("[Email] Email sending error:", error);
+    
+    // Provide more detailed error information
+    if (error instanceof Error) {
+      console.error("[Email] Error message:", error.message);
+      console.error("[Email] Error stack:", error.stack);
+      
+      // Check if it's a Resend API error
+      if (error.message.includes("API") || error.message.includes("resend")) {
+        throw new Error(`Email service error: ${error.message}. Please check RESEND_API_KEY configuration.`);
+      }
+      
+      throw error; // Re-throw with original message
+    }
+    
+    throw new Error(`Error trying to send the message: ${String(error)}`);
   }
 };
 

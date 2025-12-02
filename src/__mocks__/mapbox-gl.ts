@@ -30,7 +30,8 @@ const mockMap = {
   getCenter: jest.fn().mockReturnValue({ lng: 0, lat: 0 }),
 };
 
-export default {
+// Create the mock object to be exported as default
+const mapboxGlMock = {
   Map: jest.fn().mockImplementation(() => mockMap),
   Marker: jest.fn().mockImplementation(() => mockMarker),
   Popup: jest.fn().mockImplementation(() => mockPopup),
@@ -42,6 +43,9 @@ export default {
   })),
   accessToken: '',
 };
+
+// Export as default module
+export default mapboxGlMock;
 
 // Export mocks for test assertions
 export { mockMap, mockMarker, mockPopup };
