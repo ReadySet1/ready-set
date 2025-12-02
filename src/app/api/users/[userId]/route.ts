@@ -15,6 +15,8 @@ import { prisma } from '@/utils/prismaDB';
 import { Prisma } from '@prisma/client';
 import { UserType, PrismaClientKnownRequestError } from '@/types/prisma';
 import { PrismaTransaction } from '@/types/prisma-types';
+import { UserAuditService } from '@/services/userAuditService';
+import { AuditAction } from '@/types/audit';
 
 export async function GET(request: NextRequest) {
     try {
@@ -389,16 +391,56 @@ export async function PUT(
         );
       }
 
-      profile = await prisma.profile.create({
-        data: profileData,
+      // Use transaction for create + audit logging
+      profile = await prisma.$transaction(async (tx) => {
+        const newProfile = await tx.profile.create({
+          data: profileData,
+        });
+
+        // Create audit entry for user creation
+        const auditService = new UserAuditService();
+        await auditService.createAuditEntry(tx, {
+          userId: newProfile.id,
+          action: AuditAction.CREATE,
+          performedBy: user.id,
+          after: UserAuditService.sanitizeForAudit(profileData),
+          reason: 'User created',
+        });
+
+        return newProfile;
       });
     } else {
       // Update existing user profile
 
-      // Check if user exists and is not soft-deleted before updating
+      // Check if user exists and is not soft-deleted, and get current state for audit
       const existingUser = await prisma.profile.findUnique({
         where: { id: userId },
-        select: { id: true, deletedAt: true }
+        select: {
+          id: true,
+          deletedAt: true,
+          name: true,
+          email: true,
+          contactNumber: true,
+          type: true,
+          companyName: true,
+          website: true,
+          street1: true,
+          street2: true,
+          city: true,
+          state: true,
+          zip: true,
+          locationNumber: true,
+          parkingLoading: true,
+          counties: true,
+          timeNeeded: true,
+          cateringBrokerage: true,
+          provide: true,
+          frequency: true,
+          headCount: true,
+          status: true,
+          contactName: true,
+          sideNotes: true,
+        }
       });
 
       if (!existingUser) {
@@ -415,9 +457,61 @@ export async function PUT(
         );
       }
 
-      profile = await prisma.profile.update({
-        where: { id: userId },
-        data: profileData,
+      // Use transaction for update + audit logging
+      profile = await prisma.$transaction(async (tx) => {
+        const updatedProfile = await tx.profile.update({
+          where: { id: userId },
+          data: profileData,
+        });
+
+        // Prepare before/after states for audit (only include changed fields)
+        const beforeState = UserAuditService.sanitizeForAudit({
+          name: existingUser.name,
+          email: existingUser.email,
+          contactNumber: existingUser.contactNumber,
+          type: existingUser.type,
+          companyName: existingUser.companyName,
+          website: existingUser.website,
+          street1: existingUser.street1,
+          street2: existingUser.street2,
+          city: existingUser.city,
+          state: existingUser.state,
+          zip: existingUser.zip,
+          locationNumber: existingUser.locationNumber,
+          parkingLoading: existingUser.parkingLoading,
+          counties: existingUser.counties,
+          timeNeeded: existingUser.timeNeeded,
+          cateringBrokerage: existingUser.cateringBrokerage,
+          provide: existingUser.provide,
+          frequency: existingUser.frequency,
+          headCount: existingUser.headCount,
+          status: existingUser.status,
+          contactName: existingUser.contactName,
+          sideNotes: existingUser.sideNotes,
+        });
+
+        const afterState = UserAuditService.sanitizeForAudit(profileData);
+
+        // Get only the changed fields
+        const changes = UserAuditService.getChangedFields(
+          beforeState as Record<string, unknown>,
+          afterState as Record<string, unknown>
+        );
+
+        // Only create audit entry if there are actual changes
+        if (Object.keys(changes.before).length > 0 || Object.keys(changes.after).length > 0) {
+          const auditService = new UserAuditService();
+          await auditService.createAuditEntry(tx, {
+            userId,
+            action: AuditAction.UPDATE,
+            performedBy: user.id,
+            before: changes.before,
+            after: changes.after,
+            reason: 'User profile updated',
+          });
+        }
+
+        return updatedProfile;
       });
     }
 

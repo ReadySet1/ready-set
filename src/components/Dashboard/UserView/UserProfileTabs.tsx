@@ -7,6 +7,7 @@ import ProfileTab from "./Tabs/ProfileTab";
 import AddressTab from "./Tabs/AddressTab";
 import DetailsTab from "./Tabs/DetailsTab";
 import FilesTab from "./Tabs/FilesTab";
+import { AuditHistoryTab } from "./Tabs/AuditHistoryTab";
 
 interface UserProfileTabsProps {
   userId: string;
@@ -69,6 +70,14 @@ export default function UserProfileTabs({
           >
             Files
           </TabsTrigger>
+          {!isUserProfile && (
+            <TabsTrigger
+              value="audit"
+              className="rounded-t-lg border-b-2 border-transparent px-4 py-2 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              Audit History
+            </TabsTrigger>
+          )}
         </TabsList>
       </div>
 
@@ -93,14 +102,21 @@ export default function UserProfileTabs({
 
       {/* Files Tab */}
       <TabsContent value="files" className="m-0 p-6">
-        <FilesTab 
-          userId={userId} 
+        <FilesTab
+          userId={userId}
           refreshTrigger={refreshTrigger}
           uploadHooks={uploadHooks}
           userType={watchedValues.type ?? "client"}
           setRefreshTrigger={setRefreshTrigger}
         />
       </TabsContent>
+
+      {/* Audit History Tab - Only shown for admins viewing other users */}
+      {!isUserProfile && (
+        <TabsContent value="audit" className="m-0">
+          <AuditHistoryTab userId={userId} />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }
