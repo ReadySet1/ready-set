@@ -3,9 +3,13 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
+import ScheduleDialog from "@/components/Logistics/Schedule";
 import sendEmail from "@/app/actions/email";
 import { loadRecaptchaScript, executeRecaptcha } from "@/lib/recaptcha";
+
+// Logistics calendar URL for scheduling appointments
+const LOGISTICS_CALENDAR_URL =
+  "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true";
 
 interface Testimonial {
   name: string;
@@ -20,7 +24,6 @@ interface MessageState {
 }
 
 const CateringContact: React.FC = () => {
-  const { openForm, DialogForm } = FormManager();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -174,10 +177,6 @@ const CateringContact: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handlePartnerClick = () => {
-    openForm("food");
   };
 
   return (
@@ -511,20 +510,15 @@ const CateringContact: React.FC = () => {
                 Here at Ready Set, we treat your business like an extension of
                 our own.
               </p>
-              <motion.button
-                onClick={handlePartnerClick}
+              <ScheduleDialog
+                buttonText="Partner With Us"
+                calendarUrl={LOGISTICS_CALENDAR_URL}
                 className="rounded-lg bg-yellow-400 px-8 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-500 hover:shadow-lg"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Partner With Us
-              </motion.button>
+              />
             </motion.div>
           </motion.div>
         </div>
       </div>
-      {/* Render the dialog form */}
-      {DialogForm}
     </div>
   );
 };
