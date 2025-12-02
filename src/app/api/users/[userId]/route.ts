@@ -164,12 +164,12 @@ export async function GET(request: NextRequest) {
       parking_loading: profile.parkingLoading,
       contact_name: profile.contactName,
       counties: profile.counties,
-      timeNeeded: profile.timeNeeded,
-      cateringBrokerage: profile.cateringBrokerage,
+      // Parse comma-separated strings to arrays for form consumption
+      timeNeeded: parseCommaSeparatedString(profile.timeNeeded),
+      cateringBrokerage: parseCommaSeparatedString(profile.cateringBrokerage),
       provide: profile.provide,
       frequency: profile.frequency,
       headCount: profile.headCount,
-      // Use the helper function to parse counties and provisions
       countiesServed: parseCommaSeparatedString(profile.counties),
       provisions: parseCommaSeparatedString(profile.provide)
     };
