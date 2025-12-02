@@ -14,8 +14,22 @@ jest.mock('@/utils/prismaDB', () => ({
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    userAudit: {
+      create: jest.fn(),
+    },
+    $transaction: jest.fn(),
   },
 }));
+
+// Mock the UserAuditService to avoid Prisma.JsonNull dependency
+jest.mock('@/services/userAuditService', () => ({
+  UserAuditService: jest.fn().mockImplementation(() => ({
+    createAuditEntry: jest.fn().mockResolvedValue(undefined),
+  })),
+}));
+
+// Get the mocked prisma for configuration in tests
+const mockPrisma = jest.requireMock('@/utils/prismaDB').prisma;
 
 describe('/api/users/[userId]/change-role POST API', () => {
   const mockSupabaseClient = {
@@ -24,9 +38,24 @@ describe('/api/users/[userId]/change-role POST API', () => {
     },
   };
 
+  // Mock transaction client that gets passed to the callback
+  const mockTxClient = {
+    profile: {
+      update: jest.fn(),
+    },
+    userAudit: {
+      create: jest.fn().mockResolvedValue({}),
+    },
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     (createClient as jest.Mock).mockResolvedValue(mockSupabaseClient);
+
+    // Default transaction mock - calls the callback with the tx client
+    mockPrisma.$transaction.mockImplementation(async (callback: (tx: typeof mockTxClient) => Promise<unknown>) => {
+      return callback(mockTxClient);
+    });
   });
 
   describe('🔐 Authentication Tests', () => {
@@ -108,17 +137,21 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.CLIENT });
 
-      (prisma.profile.update as jest.Mock).mockResolvedValue({
+      const updatedUser = {
         id: 'target-user-id',
         email: 'target@example.com',
         type: UserType.ADMIN,
         name: 'Target User',
         status: 'active',
-      });
+      };
+
+      // Mock the transaction client's profile.update
+      mockTxClient.profile.update.mockResolvedValue(updatedUser);
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/target-user-id/change-role',
@@ -258,17 +291,21 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.CLIENT });
 
-      (prisma.profile.update as jest.Mock).mockResolvedValue({
+      const updatedUser = {
         id: 'different-user-id',
         email: 'target@example.com',
         type: UserType.ADMIN,
         name: 'Target User',
         status: 'active',
-      });
+      };
+
+      // Mock the transaction client's profile.update
+      mockTxClient.profile.update.mockResolvedValue(updatedUser);
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/different-user-id/change-role',
@@ -378,17 +415,21 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.CLIENT });
 
-      (prisma.profile.update as jest.Mock).mockResolvedValue({
+      const updatedUser = {
         id: 'target-user-id',
         email: 'target@example.com',
         type: UserType.ADMIN,
         name: 'Target User',
         status: 'active',
-      });
+      };
+
+      // Mock the transaction client's profile.update
+      mockTxClient.profile.update.mockResolvedValue(updatedUser);
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/target-user-id/change-role',
@@ -399,7 +440,7 @@ describe('/api/users/[userId]/change-role POST API', () => {
       const response = await POST(request, { params });
 
       expect(response.status).toBe(200);
-      expect(prisma.profile.update).toHaveBeenCalledWith({
+      expect(mockTxClient.profile.update).toHaveBeenCalledWith({
         where: { id: 'target-user-id' },
         data: { type: 'ADMIN' }, // Should be uppercase
         select: {
@@ -423,17 +464,21 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.CLIENT });
 
-      (prisma.profile.update as jest.Mock).mockResolvedValue({
+      const updatedUser = {
         id: 'target-user-id',
         email: 'target@example.com',
         type: UserType.VENDOR,
         name: 'Target User',
         status: 'active',
-      });
+      };
+
+      // Mock the transaction client's profile.update
+      mockTxClient.profile.update.mockResolvedValue(updatedUser);
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/target-user-id/change-role',
@@ -444,7 +489,7 @@ describe('/api/users/[userId]/change-role POST API', () => {
       const response = await POST(request, { params });
 
       expect(response.status).toBe(200);
-      expect(prisma.profile.update).toHaveBeenCalledWith({
+      expect(mockTxClient.profile.update).toHaveBeenCalledWith({
         where: { id: 'target-user-id' },
         data: { type: 'VENDOR' },
         select: {
@@ -470,9 +515,10 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.CLIENT });
 
       const updatedUser = {
         id: 'target-user-id',
@@ -482,7 +528,8 @@ describe('/api/users/[userId]/change-role POST API', () => {
         status: 'active',
       };
 
-      (prisma.profile.update as jest.Mock).mockResolvedValue(updatedUser);
+      // Mock the transaction client's profile.update
+      mockTxClient.profile.update.mockResolvedValue(updatedUser);
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/target-user-id/change-role',
@@ -509,9 +556,10 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.CLIENT });
 
       const updatedUser = {
         id: 'target-user-id',
@@ -521,7 +569,8 @@ describe('/api/users/[userId]/change-role POST API', () => {
         status: 'active',
       };
 
-      (prisma.profile.update as jest.Mock).mockResolvedValue(updatedUser);
+      // Mock the transaction client's profile.update
+      mockTxClient.profile.update.mockResolvedValue(updatedUser);
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/target-user-id/change-role',
@@ -547,9 +596,10 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.CLIENT });
 
       const updatedUser = {
         id: 'target-user-id',
@@ -559,7 +609,8 @@ describe('/api/users/[userId]/change-role POST API', () => {
         status: 'active',
       };
 
-      (prisma.profile.update as jest.Mock).mockResolvedValue(updatedUser);
+      // Mock the transaction client's profile.update
+      mockTxClient.profile.update.mockResolvedValue(updatedUser);
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/target-user-id/change-role',
@@ -585,9 +636,10 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.VENDOR });
 
       const updatedUser = {
         id: 'target-user-id',
@@ -597,7 +649,8 @@ describe('/api/users/[userId]/change-role POST API', () => {
         status: 'active',
       };
 
-      (prisma.profile.update as jest.Mock).mockResolvedValue(updatedUser);
+      // Mock the transaction client's profile.update
+      mockTxClient.profile.update.mockResolvedValue(updatedUser);
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/target-user-id/change-role',
@@ -625,13 +678,13 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.CLIENT });
 
-      (prisma.profile.update as jest.Mock).mockRejectedValue(
-        new Error('Database connection failed')
-      );
+      // Mock transaction to throw error
+      mockPrisma.$transaction.mockRejectedValue(new Error('Database connection failed'));
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/target-user-id/change-role',
@@ -657,13 +710,14 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.CLIENT });
 
       const prismaError = new Error('Record not found');
-      (prismaError as any).code = 'P2025';
-      (prisma.profile.update as jest.Mock).mockRejectedValue(prismaError);
+      (prismaError as unknown as { code: string }).code = 'P2025';
+      mockPrisma.$transaction.mockRejectedValue(prismaError);
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/nonexistent-user-id/change-role',
@@ -689,9 +743,7 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockRejectedValue(
-        new Error('Profile lookup failed')
-      );
+      mockPrisma.profile.findUnique.mockRejectedValue(new Error('Profile lookup failed'));
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/target-user-id/change-role',
@@ -719,11 +771,13 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.CLIENT });
 
-      (prisma.profile.update as jest.Mock).mockRejectedValue(
+      // Mock transaction to throw error with sensitive info
+      mockPrisma.$transaction.mockRejectedValue(
         new Error('Internal: Database connection string postgres://user:pass@host')
       );
 
@@ -753,7 +807,7 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
+      mockPrisma.profile.findUnique.mockResolvedValue({
         type: UserType.SUPER_ADMIN,
       });
 
@@ -783,9 +837,10 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.CLIENT });
 
       const updatedUser = {
         id: 'target-user-id',
@@ -795,7 +850,8 @@ describe('/api/users/[userId]/change-role POST API', () => {
         status: 'active',
       };
 
-      (prisma.profile.update as jest.Mock).mockResolvedValue(updatedUser);
+      // Mock the transaction client's profile.update
+      mockTxClient.profile.update.mockResolvedValue(updatedUser);
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/target-user-id/change-role',
@@ -826,9 +882,10 @@ describe('/api/users/[userId]/change-role POST API', () => {
         error: null,
       });
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue({
-        type: UserType.SUPER_ADMIN,
-      });
+      // First call: requester's profile, Second call: target user's current role
+      mockPrisma.profile.findUnique
+        .mockResolvedValueOnce({ type: UserType.SUPER_ADMIN })
+        .mockResolvedValueOnce({ type: UserType.CLIENT });
 
       const updatedUser = {
         id: 'target-user-id',
@@ -838,7 +895,8 @@ describe('/api/users/[userId]/change-role POST API', () => {
         status: 'active',
       };
 
-      (prisma.profile.update as jest.Mock).mockResolvedValue(updatedUser);
+      // Mock the transaction client's profile.update
+      mockTxClient.profile.update.mockResolvedValue(updatedUser);
 
       const request = createPostRequest(
         'http://localhost:3000/api/users/target-user-id/change-role',
