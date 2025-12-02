@@ -98,7 +98,7 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
 
   return (
     <section
-      className={`relative h-[70vh] min-h-[600px] w-full ${marginTopClass} mb-16 md:mb-24 lg:mb-32`}
+      className={`relative min-h-[500px] w-full md:h-[70vh] md:min-h-[600px] ${marginTopClass} mb-16 md:mb-24 lg:mb-32`}
     >
       {/* Background image container */}
       <motion.div
@@ -111,20 +111,20 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
           src="/images/food/food-containers.png"
           alt="Food containers with various prepared meals"
           fill
-          className="object-cover object-center"
+          className="object-cover object-right md:object-center"
           priority
         />
       </motion.div>
 
       {/* Text content overlay */}
       <motion.div
-        className="relative z-10 mx-auto flex h-full max-w-[1600px] items-center px-4 py-12 md:px-8 md:py-16 lg:px-12 lg:py-20"
+        className="relative z-10 mx-auto flex h-full max-w-[1600px] items-center px-4 py-8 md:px-8 md:py-16 lg:px-12 lg:py-20"
         initial="hidden"
         animate="visible"
         variants={containerVariants}
       >
         <motion.div
-          className="relative z-10 ml-16 mt-20 w-full max-w-md space-y-3 md:ml-28 md:mt-24 lg:ml-32 lg:mt-28"
+          className="relative z-10 ml-4 mt-40 w-full max-w-[55%] space-y-3 sm:ml-8 sm:mt-44 sm:max-w-[50%] md:ml-28 md:mt-24 md:max-w-md lg:ml-32 lg:mt-28"
           variants={containerVariants}
         >
           <motion.h1
@@ -144,12 +144,12 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
           </motion.p>
 
           <motion.div
-            className="flex flex-wrap items-center gap-4 pt-2"
+            className="flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4"
             variants={itemVariants}
           >
             <motion.button
               onClick={handleQuoteClick}
-              className="rounded-lg bg-yellow-300 px-8 py-3 font-[Montserrat] text-base font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg md:px-10 md:py-4 md:text-lg"
+              className="rounded-lg bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
               variants={buttonVariants}
               whileHover="hover"
               whileTap="tap"
@@ -159,7 +159,7 @@ const FoodHeader: React.FC<FoodHeaderProps> = ({ onRequestQuote }) => {
             <ScheduleDialog
               buttonText="Book a Call"
               calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
-              className="rounded-lg bg-yellow-300 px-8 py-3 font-[Montserrat] text-base font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg md:px-10 md:py-4 md:text-lg"
+              className="rounded-lg bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
             />
           </motion.div>
         </motion.div>
