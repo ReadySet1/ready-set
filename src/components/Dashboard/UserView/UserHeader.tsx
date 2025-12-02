@@ -23,7 +23,7 @@ export default function UserHeader({ watchedValues }: UserHeaderProps) {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-800">
-              {watchedValues.type === "vendor"
+              {watchedValues.type === "vendor" || watchedValues.type === "client"
                 ? watchedValues.company_name || watchedValues.displayName || "New User"
                 : watchedValues.displayName || "New User"}
             </h1>
