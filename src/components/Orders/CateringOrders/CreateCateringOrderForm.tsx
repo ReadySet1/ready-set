@@ -636,16 +636,18 @@ export const CreateCateringOrderForm: React.FC<
                 <Button
                   variant={"outline"}
                   className={cn(
-                    "w-full justify-start text-left font-normal",
+                    "w-full h-12 justify-start text-left font-normal text-sm px-4",
                     !watch("pickupDateTime") && "text-muted-foreground",
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {watch("pickupDateTime") ? (
-                    format(watch("pickupDateTime"), "PPPp")
-                  ) : (
-                    <span>Pick a date and time</span>
-                  )}
+                  <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {watch("pickupDateTime") ? (
+                      format(watch("pickupDateTime"), "PPPp")
+                    ) : (
+                      "Pick a date and time"
+                    )}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -750,16 +752,18 @@ export const CreateCateringOrderForm: React.FC<
                 <Button
                   variant={"outline"}
                   className={cn(
-                    "w-full justify-start text-left font-normal",
+                    "w-full h-12 justify-start text-left font-normal text-sm px-4",
                     !watch("arrivalDateTime") && "text-muted-foreground",
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {watch("arrivalDateTime") ? (
-                    format(watch("arrivalDateTime"), "PPPp")
-                  ) : (
-                    <span>Pick a date and time</span>
-                  )}
+                  <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {watch("arrivalDateTime") ? (
+                      format(watch("arrivalDateTime"), "PPPp")
+                    ) : (
+                      "Pick a date and time"
+                    )}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -867,16 +871,18 @@ export const CreateCateringOrderForm: React.FC<
                 <Button
                   variant={"outline"}
                   className={cn(
-                    "w-full justify-start text-left font-normal",
+                    "w-full h-12 justify-start text-left font-normal text-sm px-4",
                     !watch("completeDateTime") && "text-muted-foreground",
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {watch("completeDateTime") ? (
-                    format(watch("completeDateTime") as Date, "PPPp")
-                  ) : (
-                    <span>Pick a date and time</span>
-                  )}
+                  <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {watch("completeDateTime") ? (
+                      format(watch("completeDateTime") as Date, "PPPp")
+                    ) : (
+                      "Pick a date and time"
+                    )}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
