@@ -58,23 +58,36 @@ export async function GET(req: NextRequest) {
     const page = parseInt(url.searchParams.get('page') || '1', 10);
     const skip = (page - 1) * limit;
     const statusParam = url.searchParams.get('status');
+    const statusFilter = url.searchParams.get('statusFilter'); // 'active' for all active statuses
     const searchTerm = url.searchParams.get('search') || '';
     const sortField = url.searchParams.get('sort') || 'pickupDateTime';
     const sortDirection = url.searchParams.get('direction') || 'desc';
     const recentOnly = url.searchParams.get('recentOnly') === 'true';
 
-          // Build where clause
+    // Build where clause
     let whereClause: any = {
       deletedAt: null
     };
 
-    if (statusParam && statusParam !== 'all') {
+    // Handle statusFilter=active (fetches all orders with active-like statuses)
+    if (statusFilter === 'active') {
+      whereClause.status = {
+        in: [
+          CateringStatus.ACTIVE,
+          CateringStatus.ASSIGNED,
+          CateringStatus.PENDING,
+          CateringStatus.CONFIRMED,
+          CateringStatus.IN_PROGRESS,
+        ]
+      };
+    } else if (statusParam && statusParam !== 'all') {
       if (Object.values(CateringStatus).includes(statusParam as CateringStatus)) {
          whereClause.status = statusParam as CateringStatus;
       }
     }
 
-    if (recentOnly) {
+    // Only apply 30-day restriction for recentOnly when not using statusFilter
+    if (recentOnly && !statusFilter) {
       // Only get orders from the last 30 days for recent view
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
