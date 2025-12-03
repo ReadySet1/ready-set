@@ -26,6 +26,15 @@ jest.mock('@/utils/prismaDB', () => ({
   },
 }));
 
+// Test UUIDs - must be valid UUID format since API validates UUID format
+const TEST_USER_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+const OTHER_USER_ID = 'a1b2c3d4-5678-9abc-def0-123456789abc';
+const ADMIN_USER_ID = '11111111-1111-1111-1111-111111111111';
+const SUPER_ADMIN_ID = '22222222-2222-2222-2222-222222222222';
+const HELPDESK_USER_ID = '33333333-3333-3333-3333-333333333333';
+const VENDOR_USER_ID = '44444444-4444-4444-4444-444444444444';
+const DRIVER_USER_ID = '55555555-5555-5555-5555-555555555555';
+
 describe('/api/users/[userId]/files and /api/users/files APIs', () => {
   const mockSupabaseClient = {
     auth: {
@@ -43,11 +52,11 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
     describe('✅ Successful Fetch', () => {
       it('should fetch own files for authenticated user', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: TEST_USER_ID } },
           error: null,
         });
 
@@ -60,7 +69,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
             fileSize: 1024,
             category: 'invoice',
             uploadedAt: new Date('2024-01-15T10:00:00Z'),
-            userId: 'user-123',
+            userId: TEST_USER_ID,
           },
           {
             id: 'file-2',
@@ -70,16 +79,16 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
             fileSize: 2048,
             category: 'photo',
             uploadedAt: new Date('2024-01-14T10:00:00Z'),
-            userId: 'user-123',
+            userId: TEST_USER_ID,
           },
         ];
 
         (prisma.fileUpload.findMany as jest.Mock).mockResolvedValue(mockFiles);
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-123/files'
+          `http://localhost:3000/api/users/${TEST_USER_ID}/files`
         );
-        const params = { userId: 'user-123' };
+        const params = { userId: TEST_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         const data = await expectSuccessResponse(response, 200);
@@ -89,18 +98,18 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         expect(data[0].fileName).toBe('document.pdf');
         expect(data[1].id).toBe('file-2');
         expect(prisma.fileUpload.findMany).toHaveBeenCalledWith({
-          where: { userId: 'user-123' },
+          where: { userId: TEST_USER_ID },
           orderBy: { uploadedAt: 'desc' },
         });
       });
 
       it('should fetch user files by ADMIN', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'admin-123' } } },
+          data: { session: { user: { id: ADMIN_USER_ID } } },
         });
 
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'admin-123', app_metadata: { role: 'admin' } } },
+          data: { user: { id: ADMIN_USER_ID, app_metadata: { role: 'admin' } } },
           error: null,
         });
 
@@ -113,16 +122,16 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
             fileSize: 512,
             category: 'document',
             uploadedAt: new Date('2024-01-15T10:00:00Z'),
-            userId: 'user-456',
+            userId: OTHER_USER_ID,
           },
         ];
 
         (prisma.fileUpload.findMany as jest.Mock).mockResolvedValue(mockFiles);
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-456/files'
+          `http://localhost:3000/api/users/${OTHER_USER_ID}/files`
         );
-        const params = { userId: 'user-456' };
+        const params = { userId: OTHER_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         expect(response.status).toBe(200);
@@ -130,20 +139,20 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
 
       it('should fetch user files by SUPER_ADMIN', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'superadmin-123' } } },
+          data: { session: { user: { id: SUPER_ADMIN_ID } } },
         });
 
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'superadmin-123', app_metadata: { role: 'super_admin' } } },
+          data: { user: { id: SUPER_ADMIN_ID, app_metadata: { role: 'super_admin' } } },
           error: null,
         });
 
         (prisma.fileUpload.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-456/files'
+          `http://localhost:3000/api/users/${OTHER_USER_ID}/files`
         );
-        const params = { userId: 'user-456' };
+        const params = { userId: OTHER_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         expect(response.status).toBe(200);
@@ -151,11 +160,11 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
 
       it('should fetch user files by HELPDESK', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'helpdesk-123' } } },
+          data: { session: { user: { id: HELPDESK_USER_ID } } },
         });
 
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'helpdesk-123' } },
+          data: { user: { id: HELPDESK_USER_ID } },
           error: null,
         });
 
@@ -166,9 +175,9 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         (prisma.fileUpload.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-456/files'
+          `http://localhost:3000/api/users/${OTHER_USER_ID}/files`
         );
-        const params = { userId: 'user-456' };
+        const params = { userId: OTHER_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         expect(response.status).toBe(200);
@@ -176,20 +185,20 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
 
       it('should return empty array when user has no files', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: TEST_USER_ID } },
           error: null,
         });
 
         (prisma.fileUpload.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-123/files'
+          `http://localhost:3000/api/users/${TEST_USER_ID}/files`
         );
-        const params = { userId: 'user-123' };
+        const params = { userId: TEST_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         const data = await expectSuccessResponse(response, 200);
@@ -199,11 +208,11 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
 
       it('should return files ordered by uploadedAt descending', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: TEST_USER_ID } },
           error: null,
         });
 
@@ -216,7 +225,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
             fileSize: 1024,
             category: 'document',
             uploadedAt: new Date('2024-01-17T10:00:00Z'),
-            userId: 'user-123',
+            userId: TEST_USER_ID,
           },
           {
             id: 'file-2',
@@ -226,7 +235,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
             fileSize: 1024,
             category: 'document',
             uploadedAt: new Date('2024-01-16T10:00:00Z'),
-            userId: 'user-123',
+            userId: TEST_USER_ID,
           },
           {
             id: 'file-1',
@@ -236,16 +245,16 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
             fileSize: 1024,
             category: 'document',
             uploadedAt: new Date('2024-01-15T10:00:00Z'),
-            userId: 'user-123',
+            userId: TEST_USER_ID,
           },
         ];
 
         (prisma.fileUpload.findMany as jest.Mock).mockResolvedValue(mockFiles);
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-123/files'
+          `http://localhost:3000/api/users/${TEST_USER_ID}/files`
         );
-        const params = { userId: 'user-123' };
+        const params = { userId: TEST_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         const data = await expectSuccessResponse(response, 200);
@@ -254,18 +263,18 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         expect(data[1].fileName).toBe('middle.pdf');
         expect(data[2].fileName).toBe('oldest.pdf');
         expect(prisma.fileUpload.findMany).toHaveBeenCalledWith({
-          where: { userId: 'user-123' },
+          where: { userId: TEST_USER_ID },
           orderBy: { uploadedAt: 'desc' },
         });
       });
 
       it('should return formatted file objects with required fields', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: TEST_USER_ID } },
           error: null,
         });
 
@@ -278,7 +287,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
             fileSize: 1024,
             category: 'invoice',
             uploadedAt: new Date('2024-01-15T10:00:00Z'),
-            userId: 'user-123',
+            userId: TEST_USER_ID,
             extraField: 'should not be included',
           },
         ];
@@ -286,9 +295,9 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         (prisma.fileUpload.findMany as jest.Mock).mockResolvedValue(mockFiles);
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-123/files'
+          `http://localhost:3000/api/users/${TEST_USER_ID}/files`
         );
-        const params = { userId: 'user-123' };
+        const params = { userId: TEST_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         const data = await expectSuccessResponse(response, 200);
@@ -317,9 +326,9 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         });
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-456/files'
+          `http://localhost:3000/api/users/${OTHER_USER_ID}/files`
         );
-        const params = { userId: 'user-456' };
+        const params = { userId: OTHER_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         await expectUnauthorized(response, /Please log in/i);
@@ -329,11 +338,11 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
     describe('🔒 Authorization Tests', () => {
       it('should return 403 when non-admin user tries to access another user files', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: TEST_USER_ID } },
           error: null,
         });
 
@@ -342,9 +351,9 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         });
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-456/files'
+          `http://localhost:3000/api/users/${OTHER_USER_ID}/files`
         );
-        const params = { userId: 'user-456' };
+        const params = { userId: OTHER_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         await expectForbidden(response, /Insufficient permissions/i);
@@ -352,11 +361,11 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
 
       it('should return 403 for VENDOR trying to access another user files', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'vendor-123' } } },
+          data: { session: { user: { id: VENDOR_USER_ID } } },
         });
 
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'vendor-123' } },
+          data: { user: { id: VENDOR_USER_ID } },
           error: null,
         });
 
@@ -365,9 +374,9 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         });
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-456/files'
+          `http://localhost:3000/api/users/${OTHER_USER_ID}/files`
         );
-        const params = { userId: 'user-456' };
+        const params = { userId: OTHER_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         await expectForbidden(response);
@@ -375,11 +384,11 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
 
       it('should return 403 for DRIVER trying to access another user files', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'driver-123' } } },
+          data: { session: { user: { id: DRIVER_USER_ID } } },
         });
 
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'driver-123' } },
+          data: { user: { id: DRIVER_USER_ID } },
           error: null,
         });
 
@@ -388,9 +397,9 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         });
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-456/files'
+          `http://localhost:3000/api/users/${OTHER_USER_ID}/files`
         );
-        const params = { userId: 'user-456' };
+        const params = { userId: OTHER_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         await expectForbidden(response);
@@ -400,11 +409,11 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
     describe('❌ Error Handling', () => {
       it('should handle database query errors', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: TEST_USER_ID } },
           error: null,
         });
 
@@ -413,9 +422,9 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         );
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-123/files'
+          `http://localhost:3000/api/users/${TEST_USER_ID}/files`
         );
-        const params = { userId: 'user-123' };
+        const params = { userId: TEST_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         await expectErrorResponse(response, 500, /Database connection failed/i);
@@ -423,11 +432,11 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
 
       it('should handle profile lookup errors', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         mockSupabaseClient.auth.getUser.mockResolvedValue({
-          data: { user: { id: 'user-123' } },
+          data: { user: { id: TEST_USER_ID } },
           error: null,
         });
 
@@ -436,9 +445,9 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         );
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/user-456/files'
+          `http://localhost:3000/api/users/${OTHER_USER_ID}/files`
         );
-        const params = { userId: 'user-456' };
+        const params = { userId: OTHER_USER_ID };
 
         const response = await GET_USER_FILES(request, { params: Promise.resolve(params) });
         await expectErrorResponse(response, 500, /authorization/i);
@@ -450,7 +459,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
     describe('✅ Successful Fetch', () => {
       it('should fetch files with userId query parameter', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         const mockFiles = [
@@ -468,7 +477,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         (prisma.fileUpload.findMany as jest.Mock).mockResolvedValue(mockFiles);
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/files?userId=user-456'
+          `http://localhost:3000/api/users/files?userId=${OTHER_USER_ID}`
         );
 
         const response = await GET_FILES(request);
@@ -482,7 +491,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
 
       it('should return files with formatted field names', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         const mockFiles = [
@@ -500,7 +509,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         (prisma.fileUpload.findMany as jest.Mock).mockResolvedValue(mockFiles);
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/files?userId=user-456'
+          `http://localhost:3000/api/users/files?userId=${OTHER_USER_ID}`
         );
 
         const response = await GET_FILES(request);
@@ -517,19 +526,19 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
 
       it('should order files by uploadedAt descending', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         (prisma.fileUpload.findMany as jest.Mock).mockResolvedValue([]);
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/files?userId=user-456'
+          `http://localhost:3000/api/users/files?userId=${OTHER_USER_ID}`
         );
 
         await GET_FILES(request);
 
         expect(prisma.fileUpload.findMany).toHaveBeenCalledWith({
-          where: { userId: 'user-456' },
+          where: { userId: OTHER_USER_ID },
           orderBy: { uploadedAt: 'desc' },
         });
       });
@@ -542,7 +551,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         });
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/files?userId=user-456'
+          `http://localhost:3000/api/users/files?userId=${OTHER_USER_ID}`
         );
 
         const response = await GET_FILES(request);
@@ -553,7 +562,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
     describe('✏️ Validation Tests', () => {
       it('should return 400 when userId parameter is missing', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         const request = createGetRequest(
@@ -568,7 +577,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
     describe('❌ Error Handling', () => {
       it('should handle database errors', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         (prisma.fileUpload.findMany as jest.Mock).mockRejectedValue(
@@ -576,7 +585,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         );
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/files?userId=user-456'
+          `http://localhost:3000/api/users/files?userId=${OTHER_USER_ID}`
         );
 
         const response = await GET_FILES(request);
@@ -585,7 +594,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
 
       it('should return error details in response', async () => {
         mockSupabaseClient.auth.getSession.mockResolvedValue({
-          data: { session: { user: { id: 'user-123' } } },
+          data: { session: { user: { id: TEST_USER_ID } } },
         });
 
         (prisma.fileUpload.findMany as jest.Mock).mockRejectedValue(
@@ -593,7 +602,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         );
 
         const request = createGetRequest(
-          'http://localhost:3000/api/users/files?userId=user-456'
+          `http://localhost:3000/api/users/files?userId=${OTHER_USER_ID}`
         );
 
         const response = await GET_FILES(request);

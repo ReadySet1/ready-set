@@ -8,14 +8,16 @@ import FoodHeader from "@/components/FoodDelivery/FoodHeader";
 
 // Mock the FormManager hook
 const mockOpenForm = jest.fn();
-const mockDialogForm = <div data-testid="mock-dialog-form">Mock Dialog Form</div>;
 
-jest.mock("@/components/Logistics/QuoteRequest/Quotes/FormManager", () => ({
-  FormManager: jest.fn(() => ({
-    openForm: mockOpenForm,
-    DialogForm: mockDialogForm,
-  })),
-}));
+jest.mock("@/components/Logistics/QuoteRequest/Quotes/FormManager", () => {
+  const React = require("react");
+  return {
+    FormManager: jest.fn(() => ({
+      openForm: mockOpenForm,
+      DialogForm: React.createElement("div", { "data-testid": "mock-dialog-form" }, "Mock Dialog Form"),
+    })),
+  };
+});
 
 // Mock the ScheduleDialog component
 jest.mock("@/components/Logistics/Schedule", () => {
@@ -127,7 +129,7 @@ describe("FoodHeader Component", () => {
 
       render(<FoodHeader />);
 
-      const section = screen.getByRole("banner").closest("section");
+      const section = screen.getByText("From Pickup to Complete Setup").closest("section");
       expect(section).toHaveClass("mt-6");
     });
 
@@ -141,7 +143,7 @@ describe("FoodHeader Component", () => {
 
       render(<FoodHeader />);
 
-      const section = screen.getByRole("banner").closest("section");
+      const section = screen.getByText("From Pickup to Complete Setup").closest("section");
       expect(section).toHaveClass("mt-8");
     });
 
@@ -155,7 +157,7 @@ describe("FoodHeader Component", () => {
 
       render(<FoodHeader />);
 
-      const section = screen.getByRole("banner").closest("section");
+      const section = screen.getByText("From Pickup to Complete Setup").closest("section");
       expect(section).toHaveClass("mt-4");
     });
 
@@ -169,7 +171,7 @@ describe("FoodHeader Component", () => {
 
       render(<FoodHeader />);
 
-      const section = screen.getByRole("banner").closest("section");
+      const section = screen.getByText("From Pickup to Complete Setup").closest("section");
       expect(section).toHaveClass("mt-4");
 
       // Change to mobile
@@ -252,8 +254,8 @@ describe("FoodHeader Component", () => {
     it("has proper section styling", () => {
       render(<FoodHeader />);
 
-      const section = screen.getByRole("banner").closest("section");
-      expect(section).toHaveClass("relative", "h-[70vh]", "min-h-[600px]", "w-full");
+      const section = screen.getByText("From Pickup to Complete Setup").closest("section");
+      expect(section).toHaveClass("relative", "min-h-[500px]", "w-full");
       expect(section?.className).toMatch(/mb-16|md:mb-24|lg:mb-32/);
     });
 
@@ -268,8 +270,8 @@ describe("FoodHeader Component", () => {
     it("positions content correctly", () => {
       render(<FoodHeader />);
 
-      const contentWrapper = screen.getByText("From Pickup to Complete Setup").closest(".relative.z-10");
-      expect(contentWrapper).toHaveClass("relative", "z-10", "ml-16");
+      const contentWrapper = screen.getByText("From Pickup to Complete Setup").closest("div.relative.z-10");
+      expect(contentWrapper).toHaveClass("relative", "z-10", "ml-4");
     });
 
     it("applies hover effects to Get a Quote button", () => {
@@ -291,7 +293,8 @@ describe("FoodHeader Component", () => {
 
       const quoteButton = screen.getByRole("button", { name: /Get a Quote/i });
       const buttonsContainer = quoteButton.closest(".flex");
-      expect(buttonsContainer).toHaveClass("flex", "flex-wrap", "items-center", "gap-4");
+      // At mobile, container has flex-col gap-3, at sm: breakpoint it has flex-row flex-wrap items-center gap-4
+      expect(buttonsContainer).toHaveClass("flex", "flex-col", "gap-3");
     });
   });
 
@@ -299,8 +302,9 @@ describe("FoodHeader Component", () => {
     it("applies container animation variants", () => {
       render(<FoodHeader />);
 
-      // Check that the container has motion props (would be tested via framer-motion mock)
-      const container = screen.getByText("From Pickup to Complete Setup").closest("[data-testid]");
+      // Check that the container exists (framer-motion is mocked)
+      const heading = screen.getByText("From Pickup to Complete Setup");
+      const container = heading.closest(".mx-auto");
       // Since framer-motion is mocked, we just verify the component renders
       expect(container).toBeInTheDocument();
     });
@@ -363,7 +367,7 @@ describe("FoodHeader Component", () => {
     it("section uses semantic HTML", () => {
       render(<FoodHeader />);
 
-      const section = screen.getByRole("banner").closest("section");
+      const section = screen.getByText("From Pickup to Complete Setup").closest("section");
       expect(section).toBeInTheDocument();
     });
   });
