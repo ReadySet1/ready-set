@@ -1,12 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { MapPin, Star, Clock, Search, Plus } from 'lucide-react';
 import type { Address } from '@/types/address';
-import type { AddressSelectorProps, AddressSection } from '@/types/address-selector';
+import type { AddressSelectorProps, AddressSection, PaginationInfo } from '@/types/address-selector';
 import { useUser } from '@/contexts/UserContext';
 import { useAddresses } from '@/hooks/useAddresses';
-import { useAddressSearch } from '@/hooks/useAddressSearch';
 import { useAddressFavorites } from '@/hooks/useAddressFavorites';
 import { useAddressRecents } from '@/hooks/useAddressRecents';
 import {
@@ -17,6 +16,9 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import AddressModal from '@/components/AddressManager/AddressModal';
+import { useDebounce } from '@/hooks/useDebounce';
+
+const ADDRESSES_PER_PAGE = 20;
 
 /**
  * Main AddressSelector component
@@ -37,18 +39,32 @@ export function AddressSelector({
 }: AddressSelectorProps) {
   const { user } = useUser();
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 300);
 
-  // Fetch all addresses with pagination (we'll load all for now)
+  // Reset page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
+
+  // Fetch addresses with pagination and server-side search
   const { data: addressesResponse, isLoading: isLoadingAddresses, refetch: refetchAddresses } = useAddresses(
     {
       filter: 'all',
-      page: 1,
-      limit: 1000, // Load all addresses for client-side filtering
+      page: currentPage,
+      limit: ADDRESSES_PER_PAGE,
+      search: debouncedSearch || undefined,
     },
     {
       staleTime: 5 * 60 * 1000, // 5 minutes
     }
   );
+
+  // Handle page change
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
 
   // Memoize addresses and apply address type filter to prevent unnecessary re-renders
   const addresses = useMemo(() => {
@@ -80,50 +96,50 @@ export function AddressSelector({
     isLoading: isLoadingRecents,
   } = useAddressRecents(user?.id, 5);
 
-  // Search and filter
-  const {
-    query,
-    setQuery,
-    filters,
-    setFilters,
-    filteredAddresses,
-    favoriteAddresses,
-    recentAddresses,
-    resultCount,
-    debouncedQuery,
-  } = useAddressSearch({
-    addresses,
-    initialFilter: 'all',
-    favorites: favoriteIds,
-    recents: recents.map((addr) => ({
-      addressId: addr.id,
-      lastUsedAt: addr.lastUsedAt,
-    })),
-  });
+  // For favorites/recents, we use client-side filtering from the local state
+  const [quickFilter, setQuickFilter] = useState<'all' | 'shared' | 'private'>('all');
+
+  // Get favorite addresses from fetched addresses
+  const favoriteAddresses = useMemo(() => {
+    return addresses.filter((addr) => favoriteIds.includes(addr.id));
+  }, [addresses, favoriteIds]);
+
+  // Get recent addresses
+  const recentAddresses = useMemo(() => {
+    const recentIds = recents.map((r) => r.id);
+    return addresses.filter((addr) => recentIds.includes(addr.id));
+  }, [addresses, recents]);
+
+  // Get pagination info from response
+  const pagination: PaginationInfo | undefined = useMemo(() => {
+    if (!addressesResponse?.pagination) return undefined;
+    const { currentPage, totalPages, totalCount, hasNextPage, hasPrevPage } = addressesResponse.pagination;
+    return { currentPage, totalPages, totalCount, hasNextPage, hasPrevPage };
+  }, [addressesResponse?.pagination]);
 
   // Build sections for the section list
   const sections: AddressSection[] = useMemo(() => {
     const result: AddressSection[] = [];
 
-    // Favorites section
-    if (showFavorites && favoriteAddresses.length > 0) {
+    // Favorites section (only when not searching)
+    if (showFavorites && favoriteAddresses.length > 0 && !debouncedSearch) {
       result.push({
         id: 'favorites',
         title: 'Favorites',
         icon: Star,
-        addresses: favoriteAddresses,
+        addresses: favoriteAddresses.map((a) => ({ ...a, isFavorite: true })),
         count: favoriteAddresses.length,
         emptyMessage: 'No favorite addresses yet',
       });
     }
 
-    // Recents section
-    if (showRecents && recentAddresses.length > 0) {
+    // Recents section (only when not searching)
+    if (showRecents && recentAddresses.length > 0 && !debouncedSearch) {
       result.push({
         id: 'recents',
         title: 'Recently Used',
         icon: Clock,
-        addresses: recentAddresses,
+        addresses: recentAddresses.map((a) => ({ ...a, isFavorite: favoriteIds.includes(a.id) })),
         count: recentAddresses.length,
         emptyMessage: 'No recent addresses',
       });
@@ -135,9 +151,9 @@ export function AddressSelector({
         id: 'all',
         title: 'All Addresses',
         icon: MapPin,
-        addresses: filteredAddresses,
-        count: addresses.length,
-        emptyMessage: query ? 'No addresses found matching your search' : 'No addresses available',
+        addresses: addresses.map((a) => ({ ...a, isFavorite: favoriteIds.includes(a.id) })),
+        count: pagination?.totalCount || addresses.length,
+        emptyMessage: debouncedSearch ? 'No addresses found matching your search' : 'No addresses available',
       });
     }
 
@@ -147,10 +163,11 @@ export function AddressSelector({
     showRecents,
     favoriteAddresses,
     recentAddresses,
-    filteredAddresses,
-    addresses.length,
-    query,
+    addresses,
+    favoriteIds,
+    debouncedSearch,
     showAllAddressesSection,
+    pagination?.totalCount,
   ]);
 
   // Handle address selection
@@ -173,14 +190,15 @@ export function AddressSelector({
     toggleFavorite(addressId);
   };
 
-  // Calculate filter counts
+  // Calculate filter counts - use pagination total for accurate count
   const filterCounts = useMemo(() => {
+    const total = pagination?.totalCount || addresses.length;
     return {
-      all: addresses.length,
+      all: total,
       shared: addresses.filter((addr) => addr.isShared).length,
       private: addresses.filter((addr) => !addr.isShared).length,
     };
-  }, [addresses]);
+  }, [addresses, pagination?.totalCount]);
 
   const isLoading = isLoadingAddresses || isLoadingFavorites || isLoadingRecents;
 
@@ -196,8 +214,8 @@ export function AddressSelector({
               ? `Search ${type} addresses...`
               : 'Search addresses...'
           }
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           disabled={isLoading}
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         />
@@ -205,8 +223,8 @@ export function AddressSelector({
 
       {/* Quick Filters */}
       <AddressQuickFilters
-        activeFilter={filters.filter}
-        onFilterChange={(filter) => setFilters({ ...filters, filter })}
+        activeFilter={quickFilter}
+        onFilterChange={(filter) => setQuickFilter(filter)}
         counts={filterCounts}
       />
 
@@ -220,6 +238,8 @@ export function AddressSelector({
           onFavoriteToggle={handleFavoriteToggle}
           favoriteIds={favoriteIds}
           defaultCollapsed={defaultCollapsed}
+          pagination={pagination}
+          onPageChange={handlePageChange}
         />
       )}
 
@@ -227,7 +247,7 @@ export function AddressSelector({
       {!showAllAddressesSection && (
         <>
           {/* Show prompt to search if no query */}
-          {debouncedQuery.length === 0 && !isLoading && (
+          {!debouncedSearch && !isLoading && (
             <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed bg-slate-50">
               <div className="text-center space-y-2 px-4">
                 <Search className="h-8 w-8 mx-auto text-muted-foreground/50" />
@@ -242,7 +262,7 @@ export function AddressSelector({
           )}
 
           {/* Show message for queries that are too short */}
-          {debouncedQuery.length > 0 && debouncedQuery.length < 2 && !isLoading && (
+          {debouncedSearch && debouncedSearch.length < 2 && !isLoading && (
             <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed">
               <p className="text-sm text-muted-foreground">
                 Type at least 2 characters to search
@@ -251,15 +271,15 @@ export function AddressSelector({
           )}
 
           {/* Show results when query is 2+ characters */}
-          {debouncedQuery.length >= 2 && filteredAddresses.length > 0 && (
+          {debouncedSearch && debouncedSearch.length >= 2 && addresses.length > 0 && (
             <>
               {/* Results count */}
               <div className="text-sm text-muted-foreground">
-                Found {filteredAddresses.length} address{filteredAddresses.length !== 1 ? 'es' : ''}
+                Found {pagination?.totalCount || addresses.length} address{(pagination?.totalCount || addresses.length) !== 1 ? 'es' : ''}
               </div>
 
               <div className="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-                {filteredAddresses.map((address) => {
+                {addresses.map((address) => {
                   const addressWithFavorite = {
                     ...address,
                     isFavorite: favoriteIds.includes(address.id),
@@ -287,7 +307,7 @@ export function AddressSelector({
           )}
 
           {/* No results found */}
-          {debouncedQuery.length >= 2 && filteredAddresses.length === 0 && !isLoading && (
+          {debouncedSearch && debouncedSearch.length >= 2 && addresses.length === 0 && !isLoading && (
             <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed">
               <div className="text-center space-y-2 px-4">
                 <MapPin className="h-8 w-8 mx-auto text-muted-foreground/50" />
