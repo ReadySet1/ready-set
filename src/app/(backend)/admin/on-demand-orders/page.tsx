@@ -1,13 +1,13 @@
-// src/app/(backend)/admin/catering-orders/page.tsx
+// src/app/(backend)/admin/on-demand-orders/page.tsx
 
 import React from "react";
 import { Metadata } from "next";
-import { PageHeader } from "@/components/Dashboard/ui/PageHeader"; // Adjust import path if needed
-import OnDemandOrdersPage from "@/components/Orders/OnDemand/OnDemandOrders";
+import { PageHeader } from "@/components/Dashboard/ui/PageHeader";
+import OnDemandOrdersPage from "@/components/Orders/OnDemand/OnDemandOrdersPageNew";
 
 export const metadata: Metadata = {
-  title: "Catering Orders | Admin Dashboard",
-  description: "Manage and track all catering orders across the platform",
+  title: "On-Demand Orders | Admin Dashboard",
+  description: "Manage and track all on-demand delivery orders across the platform",
 };
 
 const Orders = () => {

@@ -3,7 +3,7 @@
  * Reduces N+1 queries when fetching multiple files
  */
 
-import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/server';
 import { DEFAULT_SIGNED_URL_EXPIRATION, SIGNED_URL_EXPIRATION } from '@/config/file-config';
 
 interface CachedSignedUrl {
@@ -47,7 +47,7 @@ class SignedUrlCache {
 
     // Generate new signed URL
     try {
-      const supabase = await createClient();
+      const supabase = await createAdminClient();
       const { data, error } = await supabase.storage
         .from(bucket)
         .createSignedUrl(filePath, expirationSeconds);
