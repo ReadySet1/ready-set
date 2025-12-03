@@ -34,8 +34,8 @@ export function AddressQuickFilters({
   ];
 
   return (
-    <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Address filters">
-      <span className="text-xs sm:text-sm font-medium text-muted-foreground">Filter:</span>
+    <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Address filters">
+      <span className="text-[10px] font-medium text-slate-400">Filter:</span>
       {filters.map((filter) => {
         const isActive = activeFilter === filter.value;
         return (
@@ -45,19 +45,18 @@ export function AddressQuickFilters({
             size="sm"
             onClick={() => onFilterChange(filter.value)}
             className={cn(
-              'h-8 sm:h-9 rounded-full px-3 sm:px-4 transition-all',
-              'touch-manipulation', // Improve touch responsiveness
-              'min-h-[44px] sm:min-h-0', // Touch-friendly minimum height on mobile (WCAG 2.1)
+              'h-6 rounded-full px-2 transition-all',
+              'touch-manipulation',
               isActive && 'shadow-sm'
             )}
             aria-pressed={isActive}
             aria-label={`Filter by ${filter.label} addresses. ${filter.count} addresses.`}
           >
-            <span className="flex items-center gap-1.5 sm:gap-2">
-              <span className="text-xs sm:text-sm">{filter.label}</span>
+            <span className="flex items-center gap-1">
+              <span className="text-[10px]">{filter.label}</span>
               <Badge
                 variant={isActive ? 'secondary' : 'outline'}
-                className="h-4 sm:h-5 min-w-[1.25rem] sm:min-w-[1.5rem] rounded-full px-1 sm:px-1.5 text-[10px] sm:text-xs"
+                className="h-4 min-w-[1rem] rounded-full px-1 text-[9px]"
               >
                 {filter.count}
               </Badge>

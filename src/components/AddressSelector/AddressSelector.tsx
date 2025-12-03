@@ -203,21 +203,21 @@ export function AddressSelector({
   const isLoading = isLoadingAddresses || isLoadingFavorites || isLoadingRecents;
 
   return (
-    <div className={cn('space-y-4', className)}>
-      {/* Search Input */}
+    <div className={cn('space-y-2', className)}>
+      {/* Search Input - Compact */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400" />
         <input
           type="text"
           placeholder={
             type
-              ? `Search ${type} addresses...`
-              : 'Search addresses...'
+              ? `Search ${type}...`
+              : 'Search...'
           }
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           disabled={isLoading}
-          className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-7 w-full rounded-md border border-slate-200 bg-white pl-7 pr-3 text-[11px] transition-all duration-150 placeholder:text-slate-400 focus:border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
         />
       </div>
 
@@ -323,15 +323,16 @@ export function AddressSelector({
         </>
       )}
 
-      {/* Add New Address Button */}
+      {/* Add New Address Button - Compact */}
       {allowAddNew && (
-        <div className="pt-2 border-t">
+        <div className="pt-1.5 border-t border-slate-100">
           <Button
             onClick={() => setIsAddressModalOpen(true)}
-            variant="outline"
-            className="w-full flex items-center justify-center gap-2 transition-all duration-200 hover:bg-primary hover:text-white"
+            variant="ghost"
+            size="sm"
+            className="w-full h-7 flex items-center justify-center gap-1 text-[10px] text-slate-500 hover:text-slate-700 hover:bg-slate-50"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-3 w-3" />
             <span>Add New {addressTypeFilter === 'restaurant' ? 'Restaurant' : 'Address'}</span>
           </Button>
         </div>

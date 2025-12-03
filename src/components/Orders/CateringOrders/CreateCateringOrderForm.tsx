@@ -173,7 +173,7 @@ export const CreateCateringOrderForm: React.FC<
       completeDateTime: undefined,
       orderNumber: "",
       brokerage: "",
-      userId: undefined,
+      userId: "",
       hoursNeeded: null,
       numberOfHosts: null,
       headcount: null,

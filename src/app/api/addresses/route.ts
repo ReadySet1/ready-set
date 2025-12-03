@@ -126,6 +126,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "5", 10);
     const skip = (page - 1) * limit;
+    const search = searchParams.get("search")?.trim() || "";
 
     // If requesting a specific address by ID
     if (id) {
@@ -182,8 +183,25 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
+    // Build search conditions if search term is provided
+    const searchConditions = search.length >= 2 ? {
+      OR: [
+        { name: { contains: search, mode: "insensitive" as const } },
+        { street1: { contains: search, mode: "insensitive" as const } },
+        { city: { contains: search, mode: "insensitive" as const } },
+        { county: { contains: search, mode: "insensitive" as const } },
+        { locationNumber: { contains: search, mode: "insensitive" as const } },
+      ],
+    } : null;
+
     // Different query strategies based on filter parameter
-    const addressesQuery = {
+    const addressesQuery: {
+      where: Record<string, unknown>;
+      orderBy: { createdAt: "desc" };
+      skip: number;
+      take: number;
+      select: Record<string, boolean>;
+    } = {
       where: {},
       orderBy: { createdAt: "desc" as const },
       skip,
@@ -212,23 +230,25 @@ export async function GET(request: NextRequest) {
     switch (filterParam) {
       case "shared":
         // Only fetch shared addresses
-        addressesQuery.where = { isShared: true };
+        addressesQuery.where = searchConditions
+          ? { AND: [{ isShared: true }, searchConditions] }
+          : { isShared: true };
         break;
 
       case "private":
         // Only fetch user's private addresses
-        addressesQuery.where = {
-          createdBy: currentUser.id,
-          isShared: false,
-        };
+        addressesQuery.where = searchConditions
+          ? { AND: [{ createdBy: currentUser.id, isShared: false }, searchConditions] }
+          : { createdBy: currentUser.id, isShared: false };
         break;
 
       case "all":
       default:
         // Fetch both shared addresses and user's private addresses
-        addressesQuery.where = {
-          OR: [{ isShared: true }, { createdBy: currentUser.id }],
-        };
+        const accessCondition = { OR: [{ isShared: true }, { createdBy: currentUser.id }] };
+        addressesQuery.where = searchConditions
+          ? { AND: [accessCondition, searchConditions] }
+          : accessCondition;
         break;
     }
 
@@ -262,7 +282,7 @@ export async function GET(request: NextRequest) {
     // Add cache headers to prevent unnecessary refetches
     // Short cache for paginated results to allow for real-time updates
     response.headers.set('Cache-Control', 'private, max-age=60'); // 1 minute
-    response.headers.set('ETag', `"${currentUser.id}-${filterParam}-${page}-${limit}"`);
+    response.headers.set('ETag', `"${currentUser.id}-${filterParam}-${page}-${limit}-${search}"`);
     
     // Add rate limit headers
     response.headers.set('X-RateLimit-Limit', MAX_REQUESTS_PER_WINDOW.toString());
