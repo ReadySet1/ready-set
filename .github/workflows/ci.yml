@@ -221,8 +221,8 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    # Increased timeout: build (~5min) + server startup (~2min) + 119 tests
-    timeout-minutes: 20
+    # Increased timeout: build (~5min) + server startup (~2min) + 119 tests at ~10s each
+    timeout-minutes: 25
     continue-on-error: true # Non-blocking: Tests require secrets configuration
 
     steps:
@@ -305,10 +305,10 @@ jobs:
       - name: Run E2E tests
         if: steps.check-secrets.outputs.secrets_configured == 'true'
         run: |
-          timeout 900 pnpm test:e2e || {
+          timeout 1080 pnpm test:e2e || {
             EXIT_CODE=$?
             if [ $EXIT_CODE -eq 124 ]; then
-              echo "⚠️  E2E tests timed out after 15 minutes"
+              echo "⚠️  E2E tests timed out after 18 minutes"
               echo "This is non-blocking but should be investigated"
               exit 0
             fi
