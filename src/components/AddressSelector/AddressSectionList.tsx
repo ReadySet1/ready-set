@@ -94,39 +94,37 @@ export function AddressSectionList({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {sections.map((section) => {
         const isCollapsed = isSectionCollapsed(section.id);
         const hasAddresses = section.addresses.length > 0;
         const Icon = section.icon;
 
         return (
-          <div key={section.id} className="space-y-3">
-            {/* Section Header */}
-            <div className="flex items-center justify-between">
-              <Button
-                variant="ghost"
-                className="h-auto p-0 hover:bg-transparent"
-                onClick={() => toggleSection(section.id)}
-              >
-                <div className="flex items-center gap-2">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold">{section.title}</h3>
-                  <span className="text-xs text-muted-foreground">
-                    ({section.addresses.length})
-                  </span>
+          <div key={section.id} className="space-y-1.5">
+            {/* Section Header - Compact */}
+            <Button
+              variant="ghost"
+              className="h-auto px-1 py-0.5 hover:bg-slate-100 w-full justify-start"
+              onClick={() => toggleSection(section.id)}
+            >
+              <div className="flex items-center gap-1.5">
+                <Icon className="h-3 w-3 text-slate-400" />
+                <span className="text-xs font-medium text-slate-600">{section.title}</span>
+                <span className="text-[10px] text-slate-400">
+                  ({section.id === 'all' && pagination ? pagination.totalCount : section.addresses.length})
+                </span>
+              </div>
+              {hasAddresses && (
+                <div className="ml-auto">
+                  {isCollapsed ? (
+                    <ChevronDown className="h-3 w-3 text-slate-400" />
+                  ) : (
+                    <ChevronUp className="h-3 w-3 text-slate-400" />
+                  )}
                 </div>
-                {hasAddresses && (
-                  <div className="ml-2">
-                    {isCollapsed ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </div>
-                )}
-              </Button>
-            </div>
+              )}
+            </Button>
 
             {/* Section Content */}
             <AnimatePresence initial={false}>
@@ -139,10 +137,10 @@ export function AddressSectionList({
                   className="overflow-hidden"
                 >
                   {hasAddresses ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {/* Address list with max height */}
                       <div
-                        className="space-y-3 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+                        className="space-y-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
                         style={{ maxHeight: `${MAX_LIST_HEIGHT}px` }}
                       >
                         {section.addresses.map((address) => {
@@ -172,36 +170,36 @@ export function AddressSectionList({
 
                       {/* Pagination controls for "all" section */}
                       {section.id === 'all' && pagination && pagination.totalPages > 1 && onPageChange && (
-                        <div className="flex items-center justify-between border-t pt-3 mt-3">
+                        <div className="flex items-center justify-between border-t border-slate-100 pt-2 mt-2">
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             onClick={() => onPageChange(pagination.currentPage - 1)}
                             disabled={!pagination.hasPrevPage}
-                            className="flex items-center gap-1"
+                            className="h-7 px-2 text-xs flex items-center gap-0.5 text-slate-600"
                           >
-                            <ChevronLeft className="h-4 w-4" />
-                            Previous
+                            <ChevronLeft className="h-3 w-3" />
+                            Prev
                           </Button>
-                          <span className="text-sm text-muted-foreground">
-                            Page {pagination.currentPage} of {pagination.totalPages}
+                          <span className="text-[10px] text-slate-400">
+                            {pagination.currentPage} / {pagination.totalPages}
                           </span>
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             onClick={() => onPageChange(pagination.currentPage + 1)}
                             disabled={!pagination.hasNextPage}
-                            className="flex items-center gap-1"
+                            className="h-7 px-2 text-xs flex items-center gap-0.5 text-slate-600"
                           >
                             Next
-                            <ChevronRight className="h-4 w-4" />
+                            <ChevronRight className="h-3 w-3" />
                           </Button>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="flex min-h-[100px] items-center justify-center rounded-lg border border-dashed">
-                      <p className="text-sm text-muted-foreground">
+                    <div className="flex h-12 items-center justify-center rounded border border-dashed border-slate-200">
+                      <p className="text-[10px] text-slate-400">
                         {section.emptyMessage}
                       </p>
                     </div>
