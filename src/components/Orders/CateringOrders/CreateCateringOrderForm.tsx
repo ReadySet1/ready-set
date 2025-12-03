@@ -681,19 +681,8 @@ export const CreateCateringOrderForm: React.FC<
                   }}
                   disabled={(date) =>
                     date < new Date(new Date().setHours(0, 0, 0, 0))
-                  } // Disable past dates
-                  classNames={{
-                    head_row: "flex w-full",
-                    head_cell:
-                      "text-muted-foreground rounded-md w-10 font-medium text-sm",
-                    day_selected:
-                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                    day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                    day_disabled:
-                      "rdp-day_disabled text-red-300 line-through bg-gray-100",
-                    cell: "text-center text-sm relative [&:has([aria-selected])]:bg-accent focus-within:relative focus-within:z-20",
-                    nav: "absolute top-1 right-1 flex items-center space-x-1",
-                  }}
+                  }
+                  captionLayout="dropdown"
                 />
                 {/* Time Input */}
                 <div className="border-border border-t p-3">
@@ -806,19 +795,8 @@ export const CreateCateringOrderForm: React.FC<
                   }}
                   disabled={(date) =>
                     date < new Date(new Date().setHours(0, 0, 0, 0))
-                  } // Disable past dates
-                  classNames={{
-                    head_row: "flex w-full",
-                    head_cell:
-                      "text-muted-foreground rounded-md w-10 font-medium text-sm",
-                    day_selected:
-                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                    day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                    day_disabled:
-                      "rdp-day_disabled text-red-300 line-through bg-gray-100",
-                    cell: "text-center text-sm relative [&:has([aria-selected])]:bg-accent focus-within:relative focus-within:z-20",
-                    nav: "absolute top-1 right-1 flex items-center space-x-1",
-                  }}
+                  }
+                  captionLayout="dropdown"
                 />
                 {/* Time Input */}
                 <div className="border-border border-t p-3">
@@ -933,19 +911,8 @@ export const CreateCateringOrderForm: React.FC<
                   }}
                   disabled={(date) =>
                     date < new Date(new Date().setHours(0, 0, 0, 0))
-                  } // Disable past dates
-                  classNames={{
-                    head_row: "flex w-full",
-                    head_cell:
-                      "text-muted-foreground rounded-md w-10 font-medium text-sm",
-                    day_selected:
-                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                    day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                    day_disabled:
-                      "rdp-day_disabled text-red-300 line-through bg-gray-100",
-                    cell: "text-center text-sm relative [&:has([aria-selected])]:bg-accent focus-within:relative focus-within:z-20",
-                    nav: "absolute top-1 right-1 flex items-center space-x-1",
-                  }}
+                  }
+                  captionLayout="dropdown"
                 />
                 {/* Time Input */}
                 <div className="border-border border-t p-3">
