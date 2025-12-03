@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   ClipboardList,
   Users,
@@ -365,7 +365,7 @@ const DataTableCard: React.FC<{
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className="whitespace-nowrap px-6 py-4 text-sm text-slate-900"
+                    className="px-6 py-4 text-sm text-slate-900"
                   >
                     {column.render ? column.render(item) : item[column.key]}
                   </td>
@@ -379,53 +379,90 @@ const DataTableCard: React.FC<{
   </motion.div>
 );
 
+// Activity Item Interface
+interface ActivityItem {
+  id: string;
+  type: "order" | "user" | "application";
+  title: string;
+  timestamp: Date;
+}
+
 // Activity Feed Card
-const ActivityFeedCard: React.FC = () => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.4, delay: 0.3 }}
-    className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-  >
-    <div className="border-b border-slate-100 p-6">
-      <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
-        <Activity className="h-5 w-5 text-purple-600" />
-        Recent Activity
-      </h3>
-    </div>
-    <div className="p-6">
-      <div className="space-y-4">
-        <div className="flex items-start gap-3">
+const ActivityFeedCard: React.FC<{ activities: ActivityItem[] }> = ({
+  activities,
+}) => {
+  const getActivityIcon = (type: ActivityItem["type"]) => {
+    switch (type) {
+      case "order":
+        return (
           <div className="rounded-lg bg-blue-50 p-2">
             <Activity className="h-4 w-4 text-blue-600" />
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm text-slate-900">New order created</p>
-            <p className="text-xs text-slate-500">2 minutes ago</p>
-          </div>
-        </div>
-        <div className="flex items-start gap-3">
+        );
+      case "user":
+        return (
           <div className="rounded-lg bg-green-50 p-2">
             <UserPlus className="h-4 w-4 text-green-600" />
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm text-slate-900">New user registered</p>
-            <p className="text-xs text-slate-500">1 hour ago</p>
-          </div>
-        </div>
-        <div className="flex items-start gap-3">
+        );
+      case "application":
+        return (
           <div className="rounded-lg bg-purple-50 p-2">
             <Briefcase className="h-4 w-4 text-purple-600" />
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm text-slate-900">Application approved</p>
-            <p className="text-xs text-slate-500">3 hours ago</p>
-          </div>
-        </div>
+        );
+    }
+  };
+
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+    return date.toLocaleDateString();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.3 }}
+      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div className="border-b border-slate-100 p-6">
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+          <Activity className="h-5 w-5 text-purple-600" />
+          Recent Activity
+        </h3>
       </div>
-    </div>
-  </motion.div>
-);
+      <div className="p-6">
+        {activities.length === 0 ? (
+          <p className="text-center text-sm text-slate-500">No recent activity</p>
+        ) : (
+          <div className="space-y-4">
+            {activities.map((activity) => (
+              <div key={activity.id} className="flex items-start gap-3">
+                {getActivityIcon(activity.type)}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-slate-900">{activity.title}</p>
+                  <p className="text-xs text-slate-500">
+                    {formatTimeAgo(activity.timestamp)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};
 
 // Main Dashboard Component
 export function ModernDashboardHome() {
@@ -598,6 +635,47 @@ export function ModernDashboardHome() {
     fetchData();
   }, [userLoading, user]);
 
+  // Create recent activity feed from real data
+  // Must be called before early returns to maintain hooks order
+  const recentActivities = useMemo<ActivityItem[]>(() => {
+    const activities: ActivityItem[] = [];
+
+    // Add recent orders
+    recentOrders.slice(0, 3).forEach((order) => {
+      activities.push({
+        id: `order-${order.id}`,
+        type: "order",
+        title: `Order #${order.orderNumber} created`,
+        timestamp: new Date(order.createdAt),
+      });
+    });
+
+    // Add recent users
+    users.slice(0, 3).forEach((user) => {
+      activities.push({
+        id: `user-${user.id}`,
+        type: "user",
+        title: `${user.name || "New user"} registered`,
+        timestamp: new Date(user.createdAt),
+      });
+    });
+
+    // Add recent applications
+    recentApplications.slice(0, 3).forEach((app) => {
+      activities.push({
+        id: `app-${app.id}`,
+        type: "application",
+        title: `${app.firstName} ${app.lastName} submitted an application`,
+        timestamp: new Date(app.createdAt),
+      });
+    });
+
+    // Sort by timestamp (most recent first) and take top 5
+    return activities
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, 5);
+  }, [recentOrders, users, recentApplications]);
+
   const combinedLoading = userLoading || loading || metricsLoading;
   const combinedError = userError || error || metricsError;
 
@@ -736,27 +814,23 @@ export function ModernDashboardHome() {
     {
       key: "position",
       label: "Position",
-      render: (app: JobApplication) => (
-        <span className="text-slate-600">
-          {app.position || "Not specified"}
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (app: JobApplication) => (
-        <ApplicationStatusBadge status={app.status} />
-      ),
-    },
-    {
-      key: "date",
-      label: "Applied",
-      render: (app: JobApplication) => (
-        <span className="text-slate-600">
-          {new Date(app.createdAt).toLocaleDateString()}
-        </span>
-      ),
+      render: (app: JobApplication) => {
+        // Simplify position to show just "Driver" or "Helpdesk"
+        const position = app.position?.toLowerCase() || "";
+        let displayPosition = "Not specified";
+        if (position.includes("driver")) {
+          displayPosition = "Driver";
+        } else if (position.includes("helpdesk") || position.includes("help desk")) {
+          displayPosition = "Helpdesk";
+        } else if (app.position) {
+          displayPosition = app.position;
+        }
+        return (
+          <Badge variant="outline" className="border-slate-200 font-medium">
+            {displayPosition}
+          </Badge>
+        );
+      },
     },
   ];
 
@@ -771,12 +845,9 @@ export function ModernDashboardHome() {
               {user.name?.charAt(0) || user.email?.charAt(0) || "U"}
             </AvatarFallback>
           </Avatar>
-          <div>
-            <p className="font-medium text-slate-800">
-              {user.name || "Unknown User"}
-            </p>
-            <p className="text-xs text-slate-500">{user.email}</p>
-          </div>
+          <span className="font-medium text-slate-800">
+            {user.name || "Unknown User"}
+          </span>
         </div>
       ),
     },
@@ -786,15 +857,6 @@ export function ModernDashboardHome() {
       render: (user: any) => (
         <Badge variant="outline" className="border-slate-200 font-medium">
           {user.type || "User"}
-        </Badge>
-      ),
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (user: any) => (
-        <Badge className="border-0 bg-green-100 text-green-700 hover:bg-green-100">
-          Active
         </Badge>
       ),
     },
@@ -878,18 +940,12 @@ export function ModernDashboardHome() {
               title="Total Vendors"
               value={metrics.totalVendors}
               icon={BarChart4}
-              change="+12.5% this month"
-              changeType="increase"
               color="green"
             />
             <StatCard
-              title="Total Revenue"
-              value={`$${metrics.totalRevenue.toLocaleString()}`}
+              title="Completed Orders"
+              value={metrics.salesTotal}
               icon={CheckCircle}
-              change={
-                metrics.totalRevenue > 0 ? "+8.2% this month" : "No revenue yet"
-              }
-              changeType={metrics.totalRevenue > 0 ? "increase" : "neutral"}
               color="orange"
             />
           </div>
@@ -960,7 +1016,7 @@ export function ModernDashboardHome() {
             <div className="space-y-6">
               <QuickActions />
               <CarrierSummaryWidget />
-              <ActivityFeedCard />
+              <ActivityFeedCard activities={recentActivities} />
             </div>
           </div>
         </div>

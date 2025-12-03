@@ -135,8 +135,9 @@ export async function getFileUrl(bucketName: string, filePath: string) {
 }
 
 // Function to generate a signed URL for a file (useful for private files)
+// Uses admin client to bypass RLS - safe since this runs server-side after auth
 export async function getSignedUrl(bucketName: string, filePath: string, expiresIn = 60) {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
   
   try {
     const { data, error } = await supabase.storage
