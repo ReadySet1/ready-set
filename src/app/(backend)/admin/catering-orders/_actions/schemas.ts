@@ -26,7 +26,10 @@ export const addressSchema = z.object({
 
 // Schema for the create catering order form
 export const createCateringOrderSchema = z.object({
-  userId: z.string().uuid("Invalid client ID"),
+  userId: z.preprocess(
+    (val) => (val === undefined || val === null || val === '') ? '' : String(val),
+    z.string().min(1, "Client is required").uuid("Invalid client ID")
+  ),
   orderNumber: z.string().optional(),
   brokerage: z.string().optional().nullable(),
   tempEntityId: z.string().optional(),

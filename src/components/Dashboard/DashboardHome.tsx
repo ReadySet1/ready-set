@@ -535,7 +535,8 @@ export function ModernDashboardHome() {
         };
 
         const results = await Promise.allSettled([
-          fetch("/api/orders/catering-orders?recentOnly=true", { headers }),
+          // Use statusFilter=active to get all active orders regardless of creation date
+          fetch("/api/orders/catering-orders?statusFilter=active", { headers }),
           fetch("/api/users", { headers }),
           fetch("/api/admin/job-applications", { headers }),
           // Fetch user profile
@@ -553,20 +554,9 @@ export function ModernDashboardHome() {
           }
           const ordersData =
             (await ordersResult.value.json()) as OrdersApiResponse;
-          setRecentOrders(ordersData.orders || []);
-          // Filter for orders that are considered "active" (not completed or cancelled)
-          // Active orders include: ACTIVE, ASSIGNED, PENDING, CONFIRMED, IN_PROGRESS, DELIVERED
-          const activeOrdersList = (ordersData.orders || []).filter(
-            (order: CateringRequest) =>
-              [
-                OrderStatus.ACTIVE,
-                OrderStatus.ASSIGNED,
-                OrderStatus.PENDING,
-                OrderStatus.CONFIRMED,
-                OrderStatus.IN_PROGRESS,
-                OrderStatus.DELIVERED,
-              ].includes(order.status),
-          );
+          // Server already filters for active statuses, so use directly
+          const activeOrdersList = ordersData.orders || [];
+          setRecentOrders(activeOrdersList);
           setActiveOrders(activeOrdersList);
         } else {
           console.error("Failed to fetch orders:", ordersResult.reason);

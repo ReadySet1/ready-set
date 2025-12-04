@@ -6,6 +6,7 @@ interface AddressesQueryParams {
   filter: 'all' | 'shared' | 'private';
   page: number;
   limit: number;
+  search?: string;
 }
 
 interface AddressesResponse {
@@ -34,8 +35,17 @@ const fetchAddresses = async (params: AddressesQueryParams): Promise<AddressesRe
     throw new Error('Authentication required. Please sign in again.');
   }
 
+  const searchParams = new URLSearchParams({
+    filter: params.filter,
+    page: params.page.toString(),
+    limit: params.limit.toString(),
+  });
+  if (params.search) {
+    searchParams.set('search', params.search);
+  }
+
   const response = await fetch(
-    `/api/addresses?filter=${params.filter}&page=${params.page}&limit=${params.limit}`,
+    `/api/addresses?${searchParams.toString()}`,
     {
       credentials: 'include',
       headers: {
@@ -169,7 +179,7 @@ export function useAddresses(
   } = options;
 
   return useQuery({
-    queryKey: ['addresses', params.filter, params.page, params.limit],
+    queryKey: ['addresses', params.filter, params.page, params.limit, params.search],
     queryFn: () => fetchAddresses(params),
     enabled,
     staleTime,
@@ -271,7 +281,7 @@ export function usePrefetchAddresses() {
 
   return (params: AddressesQueryParams) => {
     queryClient.prefetchQuery({
-      queryKey: ['addresses', params.filter, params.page, params.limit],
+      queryKey: ['addresses', params.filter, params.page, params.limit, params.search],
       queryFn: () => fetchAddresses(params),
       staleTime: 5 * 60 * 1000,
     });
