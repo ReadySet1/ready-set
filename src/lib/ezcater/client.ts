@@ -124,19 +124,20 @@ export async function executeQuery<T>(
       });
 
       return result;
-    } catch (error) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
 
       if (error instanceof ClientError) {
+        const clientError = error as ClientError;
         ezCaterLogger.error(`[ezCater] ${operationName} GraphQL error`, {
           requestId,
           duration: `${duration}ms`,
-          status: error.response?.status,
-          errors: error.response?.errors,
+          status: clientError.response?.status,
+          errors: clientError.response?.errors,
         });
 
         throw EzCaterApiError.fromGraphQLResponse(
-          error.response as EzCaterGraphQLResponse<T>,
+          clientError.response as EzCaterGraphQLResponse<T>,
           { requestId, operation: operationName }
         );
       }
