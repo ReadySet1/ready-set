@@ -29,6 +29,7 @@ import { sendRegistrationNotification } from "@/lib/notifications";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import GoogleAuthButton from "@/components/Auth/GoogleAuthButton";
 import RegistrationSuccessModal from "./RegistrationSuccessModal";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 // User types
 const userTypes = ["vendor", "client"] as const;
@@ -294,7 +295,7 @@ const SignUp = () => {
                 className="mx-auto mb-6 inline-block max-w-[160px]"
               >
                 <Image
-                  src="/images/logo/logo-white.png"
+                  src={getCloudinaryUrl("logo/logo-white")}
                   alt="logo"
                   width={140}
                   height={30}
@@ -302,7 +303,7 @@ const SignUp = () => {
                   priority
                 />
                 <Image
-                  src="/images/logo/logo-dark.png"
+                  src={getCloudinaryUrl("logo/logo-dark")}
                   alt="logo"
                   width={140}
                   height={30}

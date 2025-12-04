@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const Breadcrumb = ({
   pageName,
@@ -12,7 +13,7 @@ const Breadcrumb = ({
       <div
         className="relative z-10 overflow-hidden bg-cover bg-center bg-no-repeat pb-[40px] pt-[80px] sm:pb-[50px] sm:pt-[100px] md:pb-[60px] md:pt-[130px] lg:pt-[160px]"
         style={{
-          backgroundImage: "url('/images/header/header-bg.png')",
+          backgroundImage: `url('${getCloudinaryUrl("header/header-bg")}')`,
         }}
       >
         <div className="absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-stroke/0 via-stroke to-stroke/0 dark:via-dark-3"></div>

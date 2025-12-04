@@ -11,6 +11,7 @@ import GoogleAuthButton from "@/components/Auth/GoogleAuthButton";
 import { useUser } from "@/contexts/UserContext";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/use-toast";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const Signin = ({
   searchParams,
@@ -447,14 +448,14 @@ const Signin = ({
               <div className="mb-10 text-center">
                 <Link href="/" className="mx-auto inline-block max-w-[160px]">
                   <Image
-                    src="/images/logo/logo-white.png"
+                    src={getCloudinaryUrl("logo/logo-white")}
                     alt="logo"
                     width={140}
                     height={30}
                     className="dark:hidden"
                   />
                   <Image
-                    src="/images/logo/logo-dark.png"
+                    src={getCloudinaryUrl("logo/logo-dark")}
                     alt="logo"
                     width={140}
                     height={30}

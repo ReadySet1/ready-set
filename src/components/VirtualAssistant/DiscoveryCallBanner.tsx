@@ -2,6 +2,7 @@
 
 import React from "react";
 import AppointmentDialog from "./Appointment";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface CTAProps {
   heading?: string;
@@ -16,7 +17,7 @@ const DiscoveryBanner: React.FC<CTAProps> = ({
   heading = "Is your current business model holding you back",
   subheading = "Streamline your processes and maximize your resources. Schedule a Discovery Call now to scale efficiently and achieve sustainable growth. You can focus on building a better business, while we do the heavy lifting.",
   buttonText = "BOOK A DISCOVERY CALL",
-  logoSrc = "/images/logo/new-logo-ready-set.png",
+  logoSrc = getCloudinaryUrl("logo/new-logo-ready-set"),
   logoAlt = "Ready Set logo",
   onButtonClick = () => {},
 }) => {
@@ -61,17 +62,11 @@ const DiscoveryBanner: React.FC<CTAProps> = ({
         {/* Logo section */}
         <div className="container mx-auto px-4 pb-20">
           <div className="flex items-center justify-center">
-            <picture>
-              <source
-                srcSet="/images/virtual/logo-headset.webp"
-                type="image/webp"
-              />
-              <img
-                src="/images/virtual/logo-headset.png"
-                alt="Virtual Headset Logo"
-                className="h-40 w-auto object-contain md:h-40"
-              />
-            </picture>
+            <img
+              src={getCloudinaryUrl("virtual/logo-headset")}
+              alt="Virtual Headset Logo"
+              className="h-40 w-auto object-contain md:h-40"
+            />
           </div>
         </div>
       </div>

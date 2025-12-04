@@ -1,5 +1,6 @@
 import Image from "next/image";
 import React from "react";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface ServiceCardProps {
   title: string;
@@ -33,19 +34,19 @@ const BusinessServices = () => {
       title: "Your Business, Simplified",
       description:
         "We're the team that's got your back. From expert catering delivery to top-notch virtual assistants, we've got the solutions to help your business thrive.",
-      imagePath: "/images/about/1.png",
+      imagePath: getCloudinaryUrl("about/1"),
     },
     {
       title: "Adapting to Win.",
       description:
         "We started as a leading catering delivery service, serving tech giants like Apple and Google. When the pandemic hit, we pivoted, partnering with flower shops and launching our virtual assistant service. Now, we help businesses of all sizes streamline operations and achieve their goals.",
-      imagePath: "/images/about/2.png",
+      imagePath: getCloudinaryUrl("about/2"),
     },
     {
       title: "Your Virtual Workforce.",
       description:
         "Need an extra pair of hands? Our skilled virtual assistants can handle everything from email management to sales outreach. Let us take care of the busy work, so you can focus on what matters most.",
-      imagePath: "/images/about/3.png",
+      imagePath: getCloudinaryUrl("about/3"),
     },
   ];
 

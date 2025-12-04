@@ -1,5 +1,6 @@
 import Image from "next/image";
 import AppointmentDialog from "./Appointment";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface Challenge {
   icon: React.ReactNode;
@@ -11,7 +12,7 @@ const BusinessOverwhelm = () => {
     {
       icon: (
         <Image
-          src="/images/virtual/1.webp"
+          src={getCloudinaryUrl("virtual/1")}
           alt="Feeling trapped icon"
           width={100}
           height={100}
@@ -23,7 +24,7 @@ const BusinessOverwhelm = () => {
     {
       icon: (
         <Image
-          src="/images/virtual/4.webp"
+          src={getCloudinaryUrl("virtual/4")}
           alt="Business scaling icon"
           width={100}
           height={100}
@@ -35,7 +36,7 @@ const BusinessOverwhelm = () => {
     {
       icon: (
         <Image
-          src="/images/virtual/2.webp"
+          src={getCloudinaryUrl("virtual/2")}
           alt="Can't take on more clients icon"
           width={100}
           height={100}
@@ -47,7 +48,7 @@ const BusinessOverwhelm = () => {
     {
       icon: (
         <Image
-          src="/images/virtual/3.webp"
+          src={getCloudinaryUrl("virtual/3")}
           alt="No work life balance icon"
           width={100}
           height={100}

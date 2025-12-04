@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Contact } from "lucide-react";
 import Image from "next/image";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const AustinMap = () => {
   const [selectedRegion, setSelectedRegion] = useState("");
@@ -35,7 +36,7 @@ const AustinMap = () => {
     <div className="relative w-full lg:w-1/2">
       <div className="aspect-square w-full">
         <Image
-          src="/images/maps/Austin Map.jpg"
+          src={getCloudinaryUrl("maps/Austin_Map")}
           alt="Austin Map"
           fill
           className="rounded-lg shadow-md transition-shadow duration-300 hover:shadow-xl object-contain"

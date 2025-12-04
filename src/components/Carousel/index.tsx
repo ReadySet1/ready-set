@@ -10,21 +10,19 @@ import {
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const images = [
   {
-    webp: "/images/hero/slider1.webp",
-    png: "/images/hero/slider1.png",
+    src: getCloudinaryUrl("hero/slider1"),
     alt: "Image 1 description",
   },
   {
-    webp: "/images/hero/slider2.webp",
-    png: "/images/hero/slider2.png",
+    src: getCloudinaryUrl("hero/slider2"),
     alt: "Image 2 description",
   },
   {
-    webp: "/images/hero/slider3.webp",
-    png: "/images/hero/slider3.png",
+    src: getCloudinaryUrl("hero/slider3"),
     alt: "Image 3 description",
   },
 ];
@@ -47,19 +45,15 @@ export function CarouselPlugin() {
       <Card className="overflow-hidden">
         <CardContent className="p-0">
           <div className="relative aspect-[16/9]">
-            <picture>
-              <source srcSet={image.webp} type="image/webp" />
-              <source srcSet={image.png} type="image/png" />
-              <Image
-                src={image.webp}
-                alt={image.alt}
-                fill
-                sizes="(max-width: 768px) 100vw, 845px"
-                quality={80}
-                priority={index === 0}
-                className="object-cover rounded-md"
-              />
-            </picture>
+            <Image
+              src={image.src}
+              alt={image.alt}
+              fill
+              sizes="(max-width: 768px) 100vw, 845px"
+              quality={80}
+              priority={index === 0}
+              className="object-cover rounded-md"
+            />
           </div>
         </CardContent>
       </Card>

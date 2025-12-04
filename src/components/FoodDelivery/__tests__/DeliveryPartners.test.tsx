@@ -119,15 +119,15 @@ describe("DeliveryPartners", () => {
       render(<DeliveryPartners />);
 
       const expectedPaths = [
-        "/images/food/partners/destino.png",
-        "/images/food/partners/grace.png",
-        "/images/food/partners/kasa.png",
-        "/images/food/partners/hungry.png",
-        "/images/food/partners/catervalley.png",
-        "/images/food/partners/conviva.png",
-        "/images/food/partners/roostroast.png",
-        "/images/food/partners/noor.png",
-        "/images/food/partners/foodee.jpg",
+        "/images/food/partners/destino",
+        "/images/food/partners/grace",
+        "/images/food/partners/kasa",
+        "/images/food/partners/hungry",
+        "/images/food/partners/catervalley",
+        "/images/food/partners/conviva",
+        "/images/food/partners/roostroast",
+        "/images/food/partners/noor",
+        "/images/food/partners/foodee",
       ];
 
       expectedPaths.forEach((path) => {
@@ -162,7 +162,7 @@ describe("DeliveryPartners", () => {
 
       const lastPartnerImage = within(centeredContainer as HTMLElement).getByAltText("Food.ee logo");
       expect(lastPartnerImage).toBeInTheDocument();
-      expect(lastPartnerImage).toHaveAttribute("src", "/images/food/partners/foodee.jpg");
+      expect(lastPartnerImage).toHaveAttribute("src", "/images/food/partners/foodee");
     });
 
     it("applies correct styling to the centered partner container", () => {

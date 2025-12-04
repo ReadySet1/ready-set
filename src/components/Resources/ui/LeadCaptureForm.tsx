@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface FormData {
   firstName: string;
@@ -197,7 +198,7 @@ const LeadCaptureForm: React.FC<LeadCaptureFormProps> = ({
         <CardHeader className="space-y-2 text-center">
           <div className="mx-auto w-24">
             <img
-              src="/images/logo/new-logo-ready-set.png"
+              src={getCloudinaryUrl("logo/new-logo-ready-set")}
               alt="Company Logo"
               className="h-auto w-full"
             />
@@ -233,7 +234,7 @@ const LeadCaptureForm: React.FC<LeadCaptureFormProps> = ({
       <CardHeader className="space-y-3 text-center">
         <div className="mx-auto w-24">
           <img
-            src="/images/logo/new-logo-ready-set.png"
+            src={getCloudinaryUrl("logo/new-logo-ready-set")}
             alt="Company Logo"
             className="h-auto w-full"
           />

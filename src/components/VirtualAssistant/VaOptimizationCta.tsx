@@ -1,29 +1,27 @@
 import Image from "next/image";
 import Link from "next/link";
 import AppointmentDialog from "./Appointment";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const BusinessScaleSection = () => {
   const benefits = [
     {
-      imageWebp: "/images/virtual/customer-service.webp",
-      imageFallback: "/images/virtual/customer-service.jpg",
+      image: getCloudinaryUrl("virtual/customer-service"),
       alt: "Business collaboration",
       title: "Develop a business that runs smoothly on it's own",
       description:
         "Escape the hustle and build a business that runs on autopilot.",
     },
     {
-      imageWebp: "/images/virtual/content-creation.webp",
-      imageFallback: "/images/virtual/content-creation.jpg",
+      image: getCloudinaryUrl("virtual/content-creation"),
       alt: "Work life balance",
       title: "​Unlock extra time for what drives results​",
       description:
         "Our skilled VAs lighten your workload, giving you space to focus on what moves the needle.",
-      isFlipped: true, 
+      isFlipped: true,
     },
     {
-      imageWebp: "/images/virtual/administrative-support.webp",
-      imageFallback: "/images/virtual/administrative-support.jpg",
+      image: getCloudinaryUrl("virtual/administrative-support"),
       alt: "Remote work setup",
       title: "​Grow revenue without the stress​",
       description:
@@ -37,7 +35,7 @@ const BusinessScaleSection = () => {
       <div className="mb-20 grid items-center gap-8 md:grid-cols-2">
         <div className="relative aspect-square w-full max-w-md">
           <Image
-            src="/images/virtual/va-diagram.png"
+            src={getCloudinaryUrl("virtual/va-diagram")}
             alt="Business scaling venn diagram showing People, Technology, and Process intersection"
             fill
             className="object-contain"
@@ -86,17 +84,14 @@ const BusinessScaleSection = () => {
           {benefits.map((benefit, index) => (
             <div key={index} className="flex flex-col items-center">
               <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl">
-                <picture>
-                  <source srcSet={benefit.imageWebp} type="image/webp" />
-                  <Image
-                    src={benefit.imageFallback}
-                    alt={benefit.alt}
-                    fill
-                    className={`object-cover ${benefit.isFlipped ? "scale-x-[-1]" : ""}`}
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    quality={85}
-                  />
-                </picture>
+                <Image
+                  src={benefit.image}
+                  alt={benefit.alt}
+                  fill
+                  className={`object-cover ${benefit.isFlipped ? "scale-x-[-1]" : ""}`}
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  quality={85}
+                />
               </div>
               <div className="mt-6 flex flex-col items-center space-y-4 px-4">
                 <h3 className="text-center text-2xl font-bold">

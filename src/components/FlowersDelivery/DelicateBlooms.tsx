@@ -1,12 +1,13 @@
 import React from "react";
 import Image from "next/image";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface DelicateBloomsProps {
   backgroundImage?: string;
 }
 
 const DelicateBlooms: React.FC<DelicateBloomsProps> = ({
-  backgroundImage = "/images/flowers/background2.jpg",
+  backgroundImage = getCloudinaryUrl("flowers/background2"),
 }) => {
   return (
     <div className="relative min-h-screen w-full bg-gray-100">
@@ -47,7 +48,7 @@ const DelicateBlooms: React.FC<DelicateBloomsProps> = ({
               <div className="relative flex h-16 w-full justify-center pt-2 sm:h-24 sm:pt-8">
                 <div className="absolute -top-24 scale-[0.35] sm:-top-36 sm:scale-75">
                   <Image
-                    src="/images/flowers/van.png"
+                    src={getCloudinaryUrl("flowers/van")}
                     alt="Delivery van"
                     width={500}
                     height={420}
@@ -71,7 +72,7 @@ const DelicateBlooms: React.FC<DelicateBloomsProps> = ({
               <div className="relative flex h-16 w-full justify-center pt-2 sm:h-24 sm:pt-4">
                 <div className="absolute -top-36 scale-[0.35] sm:-top-44 sm:scale-75">
                   <Image
-                    src="/images/flowers/boxes.png"
+                    src={getCloudinaryUrl("flowers/boxes")}
                     alt="Storage box"
                     width={300}
                     height={260}
@@ -97,7 +98,7 @@ const DelicateBlooms: React.FC<DelicateBloomsProps> = ({
               <div className="relative flex h-16 w-full justify-center pt-2 sm:h-24 sm:pt-4">
                 <div className="absolute -top-36 scale-[0.35] sm:-top-44 sm:scale-75">
                   <Image
-                    src="/images/flowers/container.png"
+                    src={getCloudinaryUrl("flowers/container")}
                     alt="Nursery pot"
                     width={240}
                     height={200}

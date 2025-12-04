@@ -7,6 +7,7 @@ import Link from "next/link";
 import ScheduleDialog from "../Logistics/Schedule";
 import { FormType } from "../Logistics/QuoteRequest/types";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface BakeryTermsProps {
   onRequestQuote?: (formType: FormType) => void;
@@ -24,7 +25,7 @@ const BakeryTerms = ({ onRequestQuote }: BakeryTermsProps) => {
       {/* Background container with image */}
       <div className="relative">
         <Image
-          src="/images/bakery/bakerybg2.png"
+          src={getCloudinaryUrl("bakery/bakerybg2")}
           alt="Food dishes"
           width={1200}
           height={800}

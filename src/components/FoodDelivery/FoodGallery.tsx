@@ -3,47 +3,48 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const FoodGallery: React.FC = () => {
   const foodImages = [
     {
-      src: "/images/food/gallery/food-1.jpg",
+      src: getCloudinaryUrl("food/gallery/food-1"),
       alt: "Catering food containers",
     },
     {
-      src: "/images/food/gallery/food-2.jpg",
+      src: getCloudinaryUrl("food/gallery/food-2"),
       alt: "Individual meal containers",
     },
     {
-      src: "/images/food/gallery/food-3.jpg",
+      src: getCloudinaryUrl("food/gallery/food-3"),
       alt: "Prepared meals in containers",
     },
     {
-      src: "/images/food/gallery/food-4.jpg",
+      src: getCloudinaryUrl("food/gallery/food-4"),
       alt: "Pasta and rice dishes",
     },
     {
-      src: "/images/food/gallery/food-5.jpg",
+      src: getCloudinaryUrl("food/gallery/food-5"),
       alt: "Salads and main courses",
     },
     {
-      src: "/images/food/gallery/food-6.jpg",
+      src: getCloudinaryUrl("food/gallery/food-6"),
       alt: "Catering containers on counter",
     },
     {
-      src: "/images/food/gallery/food-7.jpg",
+      src: getCloudinaryUrl("food/gallery/food-7"),
       alt: "Food containers with beverages",
     },
     {
-      src: "/images/food/gallery/food-8.jpg",
+      src: getCloudinaryUrl("food/gallery/food-8"),
       alt: "Stacked food containers",
     },
     {
-      src: "/images/food/gallery/food-9.jpg",
+      src: getCloudinaryUrl("food/gallery/food-9"),
       alt: "Close-up of meal containers",
     },
     {
-      src: "/images/food/gallery/food-10.jpg",
+      src: getCloudinaryUrl("food/gallery/food-10"),
       alt: "Variety of prepared meals",
     },
   ];

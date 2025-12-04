@@ -465,7 +465,7 @@ describe("CateringContact", () => {
 
       const logo = screen.getByAltText("Ready Set");
       expect(logo).toBeInTheDocument();
-      expect(logo).toHaveAttribute("src", "/images/logo/logo.png");
+      expect(logo).toHaveAttribute("src", "/images/logo/logo");
     });
 
     it("renders company description text", () => {

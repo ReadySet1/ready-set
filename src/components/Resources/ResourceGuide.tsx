@@ -4,6 +4,7 @@ import { Card, CardContent, CardFooter, CardTitle } from "../ui/card";
 import Image from "next/image";
 import { Button } from "../ui/button";
 import { urlForImage } from "@/sanity/lib/image";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface Guide {
   title: string;
@@ -28,7 +29,7 @@ const ResourcesGrid: React.FC<ResourcesGridProps> = ({ guides }) => {
         <div className="mb-12 text-center">
           <div className="flex justify-center pb-8">
             <Image
-              src="/images/logo/logo.png"
+              src={getCloudinaryUrl("logo/logo")}
               alt="logo"
               width={140}
               height={30}

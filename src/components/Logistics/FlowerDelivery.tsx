@@ -3,6 +3,7 @@
 
 import Image from "next/image";
 import { FormType } from "./QuoteRequest/types";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface DeliveryOccasion {
   title: string;
@@ -66,17 +67,14 @@ const FlowerDeliverySection: React.FC<FlowerDeliverySectionProps> = ({
           {/* Image Section */}
           <div className="relative">
             <div className="overflow-hidden">
-              <picture>
-              <source srcSet="/images/logistics/flowerpic.webp" type="image/webp" />
               <Image
-                src="/images/logistics/flowerpic.png"
+                src={getCloudinaryUrl("logistics/flowerpic")}
                 alt="Flower delivery person holding a beautiful bouquet"
                 className="rounded-3xl object-cover"
                 width={800}
                 height={600}
                 priority
               />
-              </picture>
             </div>
           </div>
 

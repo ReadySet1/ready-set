@@ -6,27 +6,24 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const ImageCarousel = () => {
   const images = [
     {
-      src: "/images/logistics/carousel/1.png",
-      webp: "/images/logistics/carousel/1.webp",
+      src: getCloudinaryUrl("logistics/carousel/1"),
       alt: "Catering buffet with various hot dishes and garnished items in chafing dishes",
     },
     {
-      src: "/images/logistics/carousel/2.png",
-      webp: "/images/logistics/carousel/2.webp",
+      src: getCloudinaryUrl("logistics/carousel/2"),
       alt: "Florist arranging colorful spring bouquet with tulips and mixed flowers",
     },
     {
-      src: "/images/logistics/carousel/3.png",
-      webp: "/images/logistics/carousel/3.webp",
+      src: getCloudinaryUrl("logistics/carousel/3"),
       alt: "Assorted fresh baked pastries and bread with decorative patterns",
     },
     {
-      src: "/images/logistics/carousel/4.png",
-      webp: "/images/logistics/carousel/4.webp",
+      src: getCloudinaryUrl("logistics/carousel/4"),
       alt: "Hands exchanging cardboard delivery boxes outdoors",
     },
   ];
@@ -50,17 +47,11 @@ const ImageCarousel = () => {
                 className="basis-full pl-8 md:basis-1/2 lg:basis-1/4"
               >
                 <div className="relative h-[400px] w-full overflow-hidden rounded-3xl bg-white p-2">
-                  <picture>
-                    <source
-                    srcSet={image.src.replace('.png', '.webp')}
-                    type="image/webp"
-                    />
                   <img
                     src={image.src}
                     alt={image.alt}
                     className="h-full w-full rounded-2xl object-cover"
                   />
-                  </picture>
                 </div>
               </CarouselItem>
             ))}

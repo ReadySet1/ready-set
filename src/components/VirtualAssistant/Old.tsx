@@ -1,6 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import { Briefcase, Phone, Calendar, FileText, BarChart2 } from "lucide-react";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 interface ServiceSectionProps {
   title: string;
   description: React.ReactNode;
@@ -61,7 +62,7 @@ const ReadySetVirtualAssistantPage: React.FC = () => {
           </ul>
         </>
       ),
-      imageSrc: "/images/virtual/administrative-support.jpg",
+      imageSrc: getCloudinaryUrl("virtual/administrative-support"),
       imagePosition: "right",
     },
     {
@@ -82,7 +83,7 @@ const ReadySetVirtualAssistantPage: React.FC = () => {
           </ul>
         </>
       ),
-      imageSrc: "/images/virtual/customer-service.jpg",
+      imageSrc: getCloudinaryUrl("virtual/customer-service"),
       imagePosition: "left",
     },
     {
@@ -103,7 +104,7 @@ const ReadySetVirtualAssistantPage: React.FC = () => {
           </ul>
         </>
       ),
-      imageSrc: "/images/virtual/appointment-scheduling.jpg",
+      imageSrc: getCloudinaryUrl("virtual/appointment-scheduling"),
       imagePosition: "right",
     },
     {
@@ -124,7 +125,7 @@ const ReadySetVirtualAssistantPage: React.FC = () => {
           </ul>
         </>
       ),
-      imageSrc: "/images/virtual/content-creation.jpg",
+      imageSrc: getCloudinaryUrl("virtual/content-creation"),
       imagePosition: "left",
     },
     {
@@ -144,7 +145,7 @@ const ReadySetVirtualAssistantPage: React.FC = () => {
           </ul>
         </>
       ),
-      imageSrc: "/images/virtual/research-analysis.jpg",
+      imageSrc: getCloudinaryUrl("virtual/research-analysis"),
       imagePosition: "right",
     },
   ];
@@ -183,7 +184,7 @@ const ReadySetVirtualAssistantPage: React.FC = () => {
         <div className="w-full lg:w-1/2 lg:pl-8">
           <div className="relative h-[300px] lg:h-[400px]">
             <Image
-              src="/images/virtual/header.jpg"
+              src={getCloudinaryUrl("virtual/header")}
               alt="ReadySet Virtual Assistant Team"
               fill
               className="rounded-lg object-cover object-center"

@@ -3,6 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface ServiceFeatureData {
   icon: string;
@@ -193,7 +194,7 @@ export default ServiceFeaturesSection;
 export const FlowersServiceFeatures: React.FC = () => {
   const flowersFeatures = [
     {
-      icon: "/images/flowers/computer.svg",
+      icon: getCloudinaryUrl("flowers/computer"),
       title: "Bulk Orders? No Problem!",
       description: (
         <span>
@@ -205,14 +206,14 @@ export const FlowersServiceFeatures: React.FC = () => {
       delay: 0,
     },
     {
-      icon: "/images/flowers/truck.svg",
+      icon: getCloudinaryUrl("flowers/truck"),
       title: "Personalized Delivery Service",
       description:
         "You'll get a dedicated driver assigned to your shop. No more guessing who's coming—just familiar, reliable service every time.",
       delay: 200,
     },
     {
-      icon: "/images/flowers/agent.svg",
+      icon: getCloudinaryUrl("flowers/agent"),
       title: "Hands-On Support",
       description:
         "Our helpdesk monitors every delivery from dispatch to doorstep, keeping you updated in real-time so you're never in the dark — so you can focus more on operations while we handle the admin work.",
@@ -229,21 +230,21 @@ export const FlowersServiceFeatures: React.FC = () => {
 export const FoodServiceFeatures: React.FC = () => {
   const foodFeatures = [
     {
-      icon: "/images/food/cards/truck.png",
+      icon: getCloudinaryUrl("food/cards/truck"),
       altText: "Reliable Delivery Truck",
       description:
         "Our professional, reliable drivers act as an extension of your brand—punctual, presentable and committed to handling every delivery with care.",
       delay: 0,
     },
     {
-      icon: "/images/food/cards/bag.png",
+      icon: getCloudinaryUrl("food/cards/bag"),
       altText: "Proper Equipment Bag",
       description:
         "We use insulated bags and pro-grade gear to keep food fresh, presentable and at the right temperature—solving a major pain point for restaurants.",
       delay: 200,
     },
     {
-      icon: "/images/food/cards/headset.png",
+      icon: getCloudinaryUrl("food/cards/headset"),
       altText: "Delivery Support Headset",
       description:
         "We go beyond delivery, streamlining operations to align with industry needs and elevate the experience into a seamless extension of your service.",
@@ -255,7 +256,7 @@ export const FoodServiceFeatures: React.FC = () => {
     <ServiceFeaturesSection
       features={foodFeatures}
       showTitleInBox={false}
-      backgroundImage="/images/food/bagbg.png"
+      backgroundImage={getCloudinaryUrl("food/bagbg")}
     />
   );
 };
@@ -264,21 +265,21 @@ export const FoodServiceFeatures: React.FC = () => {
 export const SpecialtyServiceFeatures: React.FC = () => {
   const specialtyFeatures = [
     {
-      icon: "/images/food/cards/truck.png",
+      icon: getCloudinaryUrl("food/cards/truck"),
       altText: "Reliable Delivery Truck",
       description:
         "Our HIPAA-trained drivers and support team act as a seamless extension of your brand, punctual, professional, and committed to every delivery.",
       delay: 0,
     },
     {
-      icon: "/images/specialty/handling.png",
+      icon: getCloudinaryUrl("specialty/handling"),
       altText: "Handling Specialty Items",
       description:
         "We ensure your items, whether medications, legal documents, equipment, or parcels, are delivered with the utmost care and strict confidentiality.",
       delay: 200,
     },
     {
-      icon: "/images/food/cards/headset.png",
+      icon: getCloudinaryUrl("food/cards/headset"),
       altText: "Delivery Support Headset",
       description:
         "We go beyond delivery, streamlining operations to align with industry needs and elevate the experience into a seamless extension of your service.",
@@ -290,7 +291,7 @@ export const SpecialtyServiceFeatures: React.FC = () => {
     <ServiceFeaturesSection
       features={specialtyFeatures}
       showTitleInBox={false}
-      backgroundImage="/images/food/bagbg.png"
+      backgroundImage={getCloudinaryUrl("food/bagbg")}
     />
   );
 };
