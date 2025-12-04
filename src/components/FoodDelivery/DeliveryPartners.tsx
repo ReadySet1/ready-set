@@ -29,7 +29,7 @@ const DeliveryPartners: React.FC = () => {
       name: "Grace Deli & Cafe",
       image: getCloudinaryUrl("food/partners/grace"),
       alt: "Grace Deli & Cafe logo",
-      url: "https://www.ezcater.com/",
+      url: "https://www.grace303.com/",
     },
     {
       name: "Kasa Indian Eatery",
