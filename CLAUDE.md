@@ -105,7 +105,7 @@ API Route → Server Action → Service Layer → Utils → Prisma
 
 ### Cloudinary Image CDN
 
-Static images are served from Cloudinary CDN for optimized delivery.
+Static images are served from Cloudinary CDN for optimized delivery. See [docs/cloudinary-integration.md](docs/cloudinary-integration.md) for complete documentation.
 
 **Configuration**:
 - Cloud name: `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`

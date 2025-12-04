@@ -86,6 +86,7 @@ UI-related fixes and improvements.
 ## Root Files
 
 - `auth-testing-summary.md` - Comprehensive authentication & authorization testing documentation (REA-24)
+- `cloudinary-integration.md` - Cloudinary CDN integration guide, API reference, and best practices
 - `LINEAR_ISSUE_TEMPLATE.md` - Template for creating Linear issues
 
 ## Contributing
