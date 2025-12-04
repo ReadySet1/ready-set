@@ -107,50 +107,100 @@ describe("CateringAbout", () => {
       );
     });
 
-    it("renders the stats grid container", () => {
+    it("renders the top stats grid container with 3 columns", () => {
       const { container } = render(<CateringAbout />);
 
-      const statsGrid = container.querySelectorAll(".grid")[1];
-      expect(statsGrid).toHaveClass("grid", "grid-cols-1", "gap-8", "md:grid-cols-3", "md:gap-6");
+      const statsGrids = container.querySelectorAll(".grid");
+      // First grid is the main layout, second is top stats, third is bottom stats
+      const topStatsGrid = statsGrids[1];
+      expect(topStatsGrid).toHaveClass("grid", "grid-cols-1", "gap-4", "sm:grid-cols-3", "mb-4");
+    });
+
+    it("renders the bottom stats grid container with 2 columns and max-width", () => {
+      const { container } = render(<CateringAbout />);
+
+      const statsGrids = container.querySelectorAll(".grid");
+      const bottomStatsGrid = statsGrids[2];
+      expect(bottomStatsGrid).toHaveClass("grid", "grid-cols-1", "gap-4", "sm:grid-cols-2", "sm:max-w-[66%]");
     });
   });
 
   describe("Stat Cards", () => {
-    it("renders all three stat cards", () => {
+    it("renders all five stat cards", () => {
       render(<CateringAbout />);
 
       const statCards = screen.getAllByTestId("stat-card");
-      expect(statCards).toHaveLength(3);
+      expect(statCards).toHaveLength(5);
     });
 
-    it("renders the first stat card with correct content", () => {
+    it("renders the first stat card (2019 Founded)", () => {
       render(<CateringAbout />);
 
       const statCards = screen.getAllByTestId("stat-card");
       const firstCard = statCards[0];
 
-      expect(firstCard).toHaveTextContent("350+");
-      expect(firstCard).toHaveTextContent("Restaurants Served");
+      expect(firstCard).toHaveTextContent("2019");
+      expect(firstCard).toHaveTextContent("Founded");
     });
 
-    it("renders the second stat card with correct content", () => {
+    it("renders the second stat card (350+ Restaurants Served)", () => {
       render(<CateringAbout />);
 
       const statCards = screen.getAllByTestId("stat-card");
       const secondCard = statCards[1];
 
-      expect(secondCard).toHaveTextContent("338K+");
-      expect(secondCard).toHaveTextContent("Deliveries Completed");
+      expect(secondCard).toHaveTextContent("350+");
+      expect(secondCard).toHaveTextContent("Restaurants Served");
     });
 
-    it("renders the third stat card with correct content", () => {
+    it("renders the third stat card (338K+ Deliveries Completed)", () => {
       render(<CateringAbout />);
 
       const statCards = screen.getAllByTestId("stat-card");
       const thirdCard = statCards[2];
 
-      expect(thirdCard).toHaveTextContent("98%");
-      expect(thirdCard).toHaveTextContent("On-Time Delivery Rate");
+      expect(thirdCard).toHaveTextContent("338K+");
+      expect(thirdCard).toHaveTextContent("Deliveries Completed");
+    });
+
+    it("renders the fourth stat card (200+ Professional Drivers)", () => {
+      render(<CateringAbout />);
+
+      const statCards = screen.getAllByTestId("stat-card");
+      const fourthCard = statCards[3];
+
+      expect(fourthCard).toHaveTextContent("200+");
+      expect(fourthCard).toHaveTextContent("Professional Drivers");
+    });
+
+    it("renders the fifth stat card (98% On-Time Delivery Rate)", () => {
+      render(<CateringAbout />);
+
+      const statCards = screen.getAllByTestId("stat-card");
+      const fifthCard = statCards[4];
+
+      expect(fifthCard).toHaveTextContent("98%");
+      expect(fifthCard).toHaveTextContent("On-Time Delivery Rate");
+    });
+
+    it("renders top row with exactly 3 stat cards", () => {
+      const { container } = render(<CateringAbout />);
+
+      const statsGrids = container.querySelectorAll(".grid");
+      const topStatsGrid = statsGrids[1];
+      const topStatCards = topStatsGrid?.querySelectorAll('[data-testid="stat-card"]');
+
+      expect(topStatCards).toHaveLength(3);
+    });
+
+    it("renders bottom row with exactly 2 stat cards", () => {
+      const { container } = render(<CateringAbout />);
+
+      const statsGrids = container.querySelectorAll(".grid");
+      const bottomStatsGrid = statsGrids[2];
+      const bottomStatCards = bottomStatsGrid?.querySelectorAll('[data-testid="stat-card"]');
+
+      expect(bottomStatCards).toHaveLength(2);
     });
   });
 
@@ -206,60 +256,11 @@ describe("CateringAbout", () => {
     });
   });
 
-  describe("Checkout Items List", () => {
-    it("renders the checkout section", () => {
-      render(<CateringAbout />);
-
-      const checkoutText = screen.getByText("Check out:");
-      expect(checkoutText).toHaveClass(
-        "mb-4",
-        "font-[Montserrat]",
-        "text-base",
-        "font-semibold",
-        "text-gray-800",
-        "md:text-lg"
-      );
-    });
-
-    it("renders all checkout items", () => {
-      render(<CateringAbout />);
-
-      const items = [
-        "Pricing and Delivery Terms",
-        "Hosting Service",
-        "How We Operate",
-        "How to Get Started",
-        "Most Frequent Questions"
-      ];
-
-      items.forEach(item => {
-        expect(screen.getByText(`• ${item}`)).toBeInTheDocument();
-      });
-    });
-
-    it("renders checkout items with correct styling", () => {
-      render(<CateringAbout />);
-
-      const listItems = screen.getAllByText(/^• /);
-      expect(listItems).toHaveLength(5);
-
-      listItems.forEach(item => {
-        expect(item).toHaveClass(
-          "font-[Montserrat]",
-          "text-base",
-          "text-gray-700",
-          "md:text-lg"
-        );
-      });
-    });
-  });
-
   describe("ScheduleDialog Integration", () => {
-    it("renders the Learn More button section", () => {
+    it("renders the How Our Service Works button section", () => {
       render(<CateringAbout />);
 
-      // The motion.div wraps the ScheduleDialog
-      const button = screen.getByRole("button", { name: "Learn More" });
+      const button = screen.getByRole("button", { name: "How Our Service Works" });
       expect(button).toBeInTheDocument();
 
       // Verify the button has the correct styling
@@ -278,20 +279,20 @@ describe("CateringAbout", () => {
       const scheduleDialog = screen.getByTestId("schedule-dialog");
       expect(scheduleDialog).toBeInTheDocument();
 
-      expect(screen.getByTestId("schedule-dialog-button-text")).toHaveTextContent("Learn More");
+      expect(screen.getByTestId("schedule-dialog-button-text")).toHaveTextContent("How Our Service Works");
       expect(screen.getByTestId("schedule-dialog-title")).toHaveTextContent("Schedule an Appointment");
       expect(screen.getByTestId("schedule-dialog-description")).toHaveTextContent("Choose a convenient time for your appointment.");
       expect(screen.getByTestId("schedule-dialog-calendar-url")).toHaveTextContent("https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true");
     });
 
-    it("renders the custom button within ScheduleDialog", () => {
+    it("renders the custom button within ScheduleDialog with correct text", () => {
       render(<CateringAbout />);
 
       const customButton = screen.getByTestId("schedule-dialog-custom-button");
       expect(customButton).toBeInTheDocument();
 
       const button = customButton.querySelector("button");
-      expect(button).toHaveTextContent("Learn More");
+      expect(button).toHaveTextContent("How Our Service Works");
       expect(button).toHaveClass(
         "rounded-lg",
         "bg-yellow-400",
@@ -307,35 +308,60 @@ describe("CateringAbout", () => {
   });
 
   describe("StatCard Component", () => {
-    it("renders StatCard with correct structure", () => {
+    it("renders StatCard with correct card styling", () => {
       render(<CateringAbout />);
 
       const statCards = screen.getAllByTestId("stat-card");
       const firstCard = statCards[0];
 
-      // Check the card wrapper has the correct structure
-      expect(firstCard).toHaveClass("flex", "flex-col", "items-center", "text-center");
+      // Check the card wrapper has the correct card styling with background
+      expect(firstCard).toHaveClass(
+        "flex",
+        "flex-col",
+        "items-center",
+        "justify-center",
+        "rounded-2xl",
+        "bg-gray-100",
+        "px-6",
+        "py-8",
+        "text-center",
+        "shadow-sm"
+      );
+    });
 
-      // Check the value (h3) has correct styling
+    it("renders StatCard value with italic styling", () => {
+      render(<CateringAbout />);
+
+      const statCards = screen.getAllByTestId("stat-card");
+      const firstCard = statCards[0];
+
+      // Check the value (h3) has correct styling including italic
       const value = firstCard.querySelector("h3");
       expect(value).toHaveClass(
         "mb-2",
         "font-[Montserrat]",
         "text-3xl",
         "font-black",
+        "italic",
         "text-yellow-400",
-        "md:text-4xl",
-        "lg:text-5xl"
+        "md:text-4xl"
       );
+    });
+
+    it("renders StatCard label with correct styling", () => {
+      render(<CateringAbout />);
+
+      const statCards = screen.getAllByTestId("stat-card");
+      const firstCard = statCards[0];
 
       // Check the label (p) has correct styling
       const label = firstCard.querySelector("p");
       expect(label).toHaveClass(
         "font-[Montserrat]",
-        "text-lg",
+        "text-base",
         "font-semibold",
         "text-gray-800",
-        "md:text-xl"
+        "md:text-lg"
       );
     });
   });
@@ -367,18 +393,10 @@ describe("CateringAbout", () => {
       // Since framer-motion is mocked, we just verify the text exists
     });
 
-    it("applies motion props to checkout items", () => {
+    it("applies motion props to How Our Service Works button section", () => {
       render(<CateringAbout />);
 
-      const listItems = screen.getAllByText(/^• /);
-      expect(listItems).toHaveLength(5);
-      // Since framer-motion is mocked, we verify the items have the expected structure
-    });
-
-    it("applies motion props to Learn More button section", () => {
-      render(<CateringAbout />);
-
-      const button = screen.getByRole("button", { name: "Learn More" });
+      const button = screen.getByRole("button", { name: "How Our Service Works" });
       expect(button).toBeInTheDocument();
       // Since framer-motion is mocked, we just verify the button exists
     });
@@ -396,9 +414,9 @@ describe("CateringAbout", () => {
       const h2 = screen.getByRole("heading", { level: 2 });
       expect(h2).toHaveTextContent("Delivery Designed for Your Catering");
 
-      // Check that stat cards have proper heading structure
+      // Check that stat cards have proper heading structure (5 stat cards)
       const statHeadings = screen.getAllByRole("heading", { level: 3 });
-      expect(statHeadings).toHaveLength(3);
+      expect(statHeadings).toHaveLength(5);
     });
 
     it("stat cards are properly structured for screen readers", () => {
@@ -450,7 +468,7 @@ describe("CateringAbout", () => {
       const firstCard = statCards[0];
       const value = firstCard.querySelector("h3");
 
-      expect(value).toHaveClass("text-3xl", "md:text-4xl", "lg:text-5xl");
+      expect(value).toHaveClass("text-3xl", "md:text-4xl");
     });
 
     it("applies responsive stat label classes", () => {
@@ -460,14 +478,23 @@ describe("CateringAbout", () => {
       const firstCard = statCards[0];
       const label = firstCard.querySelector("p");
 
-      expect(label).toHaveClass("text-lg", "md:text-xl");
+      expect(label).toHaveClass("text-base", "md:text-lg");
     });
 
-    it("applies responsive stats grid classes", () => {
+    it("applies responsive top stats grid classes", () => {
       const { container } = render(<CateringAbout />);
 
-      const statsGrid = container.querySelectorAll(".grid")[1];
-      expect(statsGrid).toHaveClass("grid-cols-1", "md:grid-cols-3");
+      const statsGrids = container.querySelectorAll(".grid");
+      const topStatsGrid = statsGrids[1];
+      expect(topStatsGrid).toHaveClass("grid-cols-1", "sm:grid-cols-3");
+    });
+
+    it("applies responsive bottom stats grid classes", () => {
+      const { container } = render(<CateringAbout />);
+
+      const statsGrids = container.querySelectorAll(".grid");
+      const bottomStatsGrid = statsGrids[2];
+      expect(bottomStatsGrid).toHaveClass("grid-cols-1", "sm:grid-cols-2");
     });
 
     it("applies responsive text classes", () => {
@@ -476,43 +503,25 @@ describe("CateringAbout", () => {
       const paragraph = screen.getByText(/At Ready Set, we specialize in catering delivery logistics/);
       expect(paragraph).toHaveClass("text-base", "md:text-lg");
     });
-
-    it("applies responsive checkout item classes", () => {
-      render(<CateringAbout />);
-
-      const listItems = screen.getAllByText(/^• /);
-      listItems.forEach(item => {
-        expect(item).toHaveClass("text-base", "md:text-lg");
-      });
-    });
   });
 
   describe("Content Accuracy", () => {
-    it("displays correct stats data", () => {
+    it("displays all five stats with correct data", () => {
       render(<CateringAbout />);
 
+      // Top row stats
+      expect(screen.getByText("2019")).toBeInTheDocument();
+      expect(screen.getByText("Founded")).toBeInTheDocument();
       expect(screen.getByText("350+")).toBeInTheDocument();
       expect(screen.getByText("Restaurants Served")).toBeInTheDocument();
       expect(screen.getByText("338K+")).toBeInTheDocument();
       expect(screen.getByText("Deliveries Completed")).toBeInTheDocument();
+
+      // Bottom row stats
+      expect(screen.getByText("200+")).toBeInTheDocument();
+      expect(screen.getByText("Professional Drivers")).toBeInTheDocument();
       expect(screen.getByText("98%")).toBeInTheDocument();
       expect(screen.getByText("On-Time Delivery Rate")).toBeInTheDocument();
-    });
-
-    it("displays correct checkout items", () => {
-      render(<CateringAbout />);
-
-      const expectedItems = [
-        "Pricing and Delivery Terms",
-        "Hosting Service",
-        "How We Operate",
-        "How to Get Started",
-        "Most Frequent Questions"
-      ];
-
-      expectedItems.forEach(item => {
-        expect(screen.getByText(`• ${item}`)).toBeInTheDocument();
-      });
     });
 
     it("displays correct company description", () => {
@@ -529,6 +538,42 @@ describe("CateringAbout", () => {
       expect(screen.getByText(/We're not a marketplace or broker/)).toBeInTheDocument();
       expect(screen.getByText(/we don't take customer orders or list you on apps/)).toBeInTheDocument();
       expect(screen.getByText(/we act as your behind-the-scenes delivery partner/)).toBeInTheDocument();
+    });
+
+    it("displays correct button text (How Our Service Works)", () => {
+      render(<CateringAbout />);
+
+      const button = screen.getByRole("button", { name: "How Our Service Works" });
+      expect(button).toBeInTheDocument();
+      expect(button).toHaveTextContent("How Our Service Works");
+    });
+  });
+
+  describe("Stats Layout Structure", () => {
+    it("renders stats in correct 3+2 grid layout", () => {
+      const { container } = render(<CateringAbout />);
+
+      const statsGrids = container.querySelectorAll(".grid");
+
+      // Should have 3 grids total: main layout, top stats, bottom stats
+      expect(statsGrids.length).toBeGreaterThanOrEqual(3);
+
+      // Top stats grid should have 3-column layout on sm screens
+      const topStatsGrid = statsGrids[1];
+      expect(topStatsGrid).toHaveClass("sm:grid-cols-3");
+
+      // Bottom stats grid should have 2-column layout on sm screens
+      const bottomStatsGrid = statsGrids[2];
+      expect(bottomStatsGrid).toHaveClass("sm:grid-cols-2");
+    });
+
+    it("bottom stats grid has max-width constraint", () => {
+      const { container } = render(<CateringAbout />);
+
+      const statsGrids = container.querySelectorAll(".grid");
+      const bottomStatsGrid = statsGrids[2];
+
+      expect(bottomStatsGrid).toHaveClass("sm:max-w-[66%]");
     });
   });
 });

@@ -15,17 +15,17 @@ interface StatProps {
 const StatCard: React.FC<StatProps> = ({ value, label, delay }) => {
   return (
     <motion.div
-      className="flex flex-col items-center text-center"
+      className="flex flex-col items-center justify-center rounded-2xl bg-gray-100 px-6 py-8 text-center shadow-sm"
       data-testid="stat-card"
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.6, delay: delay / 1000 }}
     >
-      <h3 className="mb-2 font-[Montserrat] text-3xl font-black text-yellow-400 md:text-4xl lg:text-5xl">
+      <h3 className="mb-2 font-[Montserrat] text-3xl font-black italic text-yellow-400 md:text-4xl">
         {value}
       </h3>
-      <p className="font-[Montserrat] text-lg font-semibold text-gray-800 md:text-xl">
+      <p className="font-[Montserrat] text-base font-semibold text-gray-800 md:text-lg">
         {label}
       </p>
     </motion.div>
@@ -33,18 +33,15 @@ const StatCard: React.FC<StatProps> = ({ value, label, delay }) => {
 };
 
 const CateringAbout: React.FC = () => {
-  const stats = [
-    { value: "350+", label: "Restaurants Served", delay: 0 },
+  const topStats = [
+    { value: "2019", label: "Founded", delay: 0 },
+    { value: "350+", label: "Restaurants Served", delay: 100 },
     { value: "338K+", label: "Deliveries Completed", delay: 200 },
-    { value: "98%", label: "On-Time Delivery Rate", delay: 400 },
   ];
 
-  const checkoutItems = [
-    "Pricing and Delivery Terms",
-    "Hosting Service",
-    "How We Operate",
-    "How to Get Started",
-    "Most Frequent Questions",
+  const bottomStats = [
+    { value: "200+", label: "Professional Drivers", delay: 300 },
+    { value: "98%", label: "On-Time Delivery Rate", delay: 400 },
   ];
 
   return (
@@ -83,9 +80,21 @@ const CateringAbout: React.FC = () => {
               deliveries from 350+ restaurants.
             </motion.p>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-6">
-              {stats.map((stat, index) => (
+            {/* Stats - Top Row (3 cards) */}
+            <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {topStats.map((stat, index) => (
+                <StatCard
+                  key={index}
+                  value={stat.value}
+                  label={stat.label}
+                  delay={stat.delay}
+                />
+              ))}
+            </div>
+
+            {/* Stats - Bottom Row (2 cards) */}
+            <div className="grid grid-cols-1 gap-4 sm:max-w-[66%] sm:grid-cols-2">
+              {bottomStats.map((stat, index) => (
                 <StatCard
                   key={index}
                   value={stat.value}
@@ -126,28 +135,7 @@ const CateringAbout: React.FC = () => {
               </p>
             </div>
 
-            {/* Check out section */}
-            <div className="mb-8">
-              <p className="mb-4 font-[Montserrat] text-base font-semibold text-gray-800 md:text-lg">
-                Check out:
-              </p>
-              <ul className="space-y-2">
-                {checkoutItems.map((item, index) => (
-                  <motion.li
-                    key={index}
-                    initial={{ opacity: 0, x: -10 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.4, delay: 0.4 + index * 0.1 }}
-                    className="font-[Montserrat] text-base text-gray-700 md:text-lg"
-                  >
-                    • {item}
-                  </motion.li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Learn More Button */}
+            {/* How Our Service Works Button */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -155,7 +143,7 @@ const CateringAbout: React.FC = () => {
               transition={{ duration: 0.6, delay: 0.8 }}
             >
               <ScheduleDialog
-                buttonText="Learn More"
+                buttonText="How Our Service Works"
                 dialogTitle="Schedule an Appointment"
                 dialogDescription="Choose a convenient time for your appointment."
                 calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
@@ -165,7 +153,7 @@ const CateringAbout: React.FC = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    Learn More
+                    How Our Service Works
                   </motion.button>
                 }
               />
