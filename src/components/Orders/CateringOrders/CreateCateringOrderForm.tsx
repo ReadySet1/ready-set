@@ -173,7 +173,7 @@ export const CreateCateringOrderForm: React.FC<
       completeDateTime: undefined,
       orderNumber: "",
       brokerage: "",
-      userId: undefined,
+      userId: "",
       hoursNeeded: null,
       numberOfHosts: null,
       headcount: null,
@@ -636,16 +636,18 @@ export const CreateCateringOrderForm: React.FC<
                 <Button
                   variant={"outline"}
                   className={cn(
-                    "w-full justify-start text-left font-normal",
+                    "w-full h-12 justify-start text-left font-normal text-sm px-4",
                     !watch("pickupDateTime") && "text-muted-foreground",
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {watch("pickupDateTime") ? (
-                    format(watch("pickupDateTime"), "PPPp")
-                  ) : (
-                    <span>Pick a date and time</span>
-                  )}
+                  <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {watch("pickupDateTime") ? (
+                      format(watch("pickupDateTime"), "PPPp")
+                    ) : (
+                      "Pick a date and time"
+                    )}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -681,19 +683,8 @@ export const CreateCateringOrderForm: React.FC<
                   }}
                   disabled={(date) =>
                     date < new Date(new Date().setHours(0, 0, 0, 0))
-                  } // Disable past dates
-                  classNames={{
-                    head_row: "flex w-full",
-                    head_cell:
-                      "text-muted-foreground rounded-md w-10 font-medium text-sm",
-                    day_selected:
-                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                    day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                    day_disabled:
-                      "rdp-day_disabled text-red-300 line-through bg-gray-100",
-                    cell: "text-center text-sm relative [&:has([aria-selected])]:bg-accent focus-within:relative focus-within:z-20",
-                    nav: "absolute top-1 right-1 flex items-center space-x-1",
-                  }}
+                  }
+                  captionLayout="dropdown"
                 />
                 {/* Time Input */}
                 <div className="border-border border-t p-3">
@@ -761,16 +752,18 @@ export const CreateCateringOrderForm: React.FC<
                 <Button
                   variant={"outline"}
                   className={cn(
-                    "w-full justify-start text-left font-normal",
+                    "w-full h-12 justify-start text-left font-normal text-sm px-4",
                     !watch("arrivalDateTime") && "text-muted-foreground",
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {watch("arrivalDateTime") ? (
-                    format(watch("arrivalDateTime"), "PPPp")
-                  ) : (
-                    <span>Pick a date and time</span>
-                  )}
+                  <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {watch("arrivalDateTime") ? (
+                      format(watch("arrivalDateTime"), "PPPp")
+                    ) : (
+                      "Pick a date and time"
+                    )}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -806,19 +799,8 @@ export const CreateCateringOrderForm: React.FC<
                   }}
                   disabled={(date) =>
                     date < new Date(new Date().setHours(0, 0, 0, 0))
-                  } // Disable past dates
-                  classNames={{
-                    head_row: "flex w-full",
-                    head_cell:
-                      "text-muted-foreground rounded-md w-10 font-medium text-sm",
-                    day_selected:
-                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                    day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                    day_disabled:
-                      "rdp-day_disabled text-red-300 line-through bg-gray-100",
-                    cell: "text-center text-sm relative [&:has([aria-selected])]:bg-accent focus-within:relative focus-within:z-20",
-                    nav: "absolute top-1 right-1 flex items-center space-x-1",
-                  }}
+                  }
+                  captionLayout="dropdown"
                 />
                 {/* Time Input */}
                 <div className="border-border border-t p-3">
@@ -889,16 +871,18 @@ export const CreateCateringOrderForm: React.FC<
                 <Button
                   variant={"outline"}
                   className={cn(
-                    "w-full justify-start text-left font-normal",
+                    "w-full h-12 justify-start text-left font-normal text-sm px-4",
                     !watch("completeDateTime") && "text-muted-foreground",
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {watch("completeDateTime") ? (
-                    format(watch("completeDateTime") as Date, "PPPp")
-                  ) : (
-                    <span>Pick a date and time</span>
-                  )}
+                  <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {watch("completeDateTime") ? (
+                      format(watch("completeDateTime") as Date, "PPPp")
+                    ) : (
+                      "Pick a date and time"
+                    )}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -933,19 +917,8 @@ export const CreateCateringOrderForm: React.FC<
                   }}
                   disabled={(date) =>
                     date < new Date(new Date().setHours(0, 0, 0, 0))
-                  } // Disable past dates
-                  classNames={{
-                    head_row: "flex w-full",
-                    head_cell:
-                      "text-muted-foreground rounded-md w-10 font-medium text-sm",
-                    day_selected:
-                      "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                    day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                    day_disabled:
-                      "rdp-day_disabled text-red-300 line-through bg-gray-100",
-                    cell: "text-center text-sm relative [&:has([aria-selected])]:bg-accent focus-within:relative focus-within:z-20",
-                    nav: "absolute top-1 right-1 flex items-center space-x-1",
-                  }}
+                  }
+                  captionLayout="dropdown"
                 />
                 {/* Time Input */}
                 <div className="border-border border-t p-3">

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 // Virtualization commented out temporarily due to react-window v2 API changes
 // Will be re-enabled once the API is properly typed
@@ -10,16 +10,11 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AddressCompactCard } from './AddressCompactCard';
-import type { AddressSectionListProps } from '@/types/address-selector';
+import type { AddressSectionListProps, PaginationInfo } from '@/types/address-selector';
 import type { Address } from '@/types/address';
 
-// Virtualization temporarily disabled - will be re-enabled with proper react-window v2 integration
-// Threshold for when to use virtualization (addresses per section)
-const VIRTUALIZATION_THRESHOLD = 999999; // Effectively disabled
-// Height of each address card in pixels
-const ITEM_HEIGHT = 100;
-// Max height for virtualized list (shows ~6 items)
-const MAX_LIST_HEIGHT = 600;
+// Max height for address list
+const MAX_LIST_HEIGHT = 400;
 
 /**
  * AddressSectionList Component
@@ -41,12 +36,18 @@ export function AddressSectionList({
   onFavoriteToggle,
   favoriteIds = [],
   defaultCollapsed = false,
+  pagination,
+  onPageChange,
 }: AddressSectionListProps) {
-  // Initialize collapsed sections based on defaultCollapsed prop
+  // Initialize collapsed sections - "all" is collapsed by default unless there are few addresses
   const [collapsedSections, setCollapsedSections] = React.useState<Set<string>>(() => {
     if (defaultCollapsed) {
       // If defaultCollapsed is true, collapse all sections initially
       return new Set(sections.map((s) => s.id));
+    }
+    // By default, collapse "all" section if there are many addresses (pagination present)
+    if (pagination && pagination.totalCount > 20) {
+      return new Set(['all']);
     }
     return new Set();
   });
@@ -93,39 +94,37 @@ export function AddressSectionList({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {sections.map((section) => {
         const isCollapsed = isSectionCollapsed(section.id);
         const hasAddresses = section.addresses.length > 0;
         const Icon = section.icon;
 
         return (
-          <div key={section.id} className="space-y-3">
-            {/* Section Header */}
-            <div className="flex items-center justify-between">
-              <Button
-                variant="ghost"
-                className="h-auto p-0 hover:bg-transparent"
-                onClick={() => toggleSection(section.id)}
-              >
-                <div className="flex items-center gap-2">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold">{section.title}</h3>
-                  <span className="text-xs text-muted-foreground">
-                    ({section.addresses.length})
-                  </span>
+          <div key={section.id} className="space-y-1.5">
+            {/* Section Header - Compact */}
+            <Button
+              variant="ghost"
+              className="h-auto px-1 py-0.5 hover:bg-slate-100 w-full justify-start"
+              onClick={() => toggleSection(section.id)}
+            >
+              <div className="flex items-center gap-1.5">
+                <Icon className="h-3 w-3 text-slate-400" />
+                <span className="text-xs font-medium text-slate-600">{section.title}</span>
+                <span className="text-[10px] text-slate-400">
+                  ({section.id === 'all' && pagination ? pagination.totalCount : section.addresses.length})
+                </span>
+              </div>
+              {hasAddresses && (
+                <div className="ml-auto">
+                  {isCollapsed ? (
+                    <ChevronDown className="h-3 w-3 text-slate-400" />
+                  ) : (
+                    <ChevronUp className="h-3 w-3 text-slate-400" />
+                  )}
                 </div>
-                {hasAddresses && (
-                  <div className="ml-2">
-                    {isCollapsed ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </div>
-                )}
-              </Button>
-            </div>
+              )}
+            </Button>
 
             {/* Section Content */}
             <AnimatePresence initial={false}>
@@ -138,35 +137,69 @@ export function AddressSectionList({
                   className="overflow-hidden"
                 >
                   {hasAddresses ? (
-                    // Regular rendering (virtualization temporarily disabled)
-                    <div className="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-                      {section.addresses.map((address) => {
-                        // Ensure address has isFavorite property
-                        const addressWithFavorite = {
-                          ...address,
-                          isFavorite: favoriteIds.includes(address.id),
-                        };
+                    <div className="space-y-2">
+                      {/* Address list with max height */}
+                      <div
+                        className="space-y-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+                        style={{ maxHeight: `${MAX_LIST_HEIGHT}px` }}
+                      >
+                        {section.addresses.map((address) => {
+                          // Ensure address has isFavorite property
+                          const addressWithFavorite = {
+                            ...address,
+                            isFavorite: favoriteIds.includes(address.id),
+                          };
 
-                        return (
-                          <AddressCompactCard
-                            key={address.id}
-                            address={addressWithFavorite}
-                            onSelect={() => onAddressSelect(address)}
-                            isSelected={selectedAddressId === address.id}
-                            variant="compact"
-                            showActions={true}
-                            onFavoriteToggle={
-                              onFavoriteToggle
-                                ? () => onFavoriteToggle(address.id)
-                                : undefined
-                            }
-                          />
-                        );
-                      })}
+                          return (
+                            <AddressCompactCard
+                              key={address.id}
+                              address={addressWithFavorite}
+                              onSelect={() => onAddressSelect(address)}
+                              isSelected={selectedAddressId === address.id}
+                              variant="compact"
+                              showActions={true}
+                              onFavoriteToggle={
+                                onFavoriteToggle
+                                  ? () => onFavoriteToggle(address.id)
+                                  : undefined
+                              }
+                            />
+                          );
+                        })}
+                      </div>
+
+                      {/* Pagination controls for "all" section */}
+                      {section.id === 'all' && pagination && pagination.totalPages > 1 && onPageChange && (
+                        <div className="flex items-center justify-between border-t border-slate-100 pt-2 mt-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onPageChange(pagination.currentPage - 1)}
+                            disabled={!pagination.hasPrevPage}
+                            className="h-7 px-2 text-xs flex items-center gap-0.5 text-slate-600"
+                          >
+                            <ChevronLeft className="h-3 w-3" />
+                            Prev
+                          </Button>
+                          <span className="text-[10px] text-slate-400">
+                            {pagination.currentPage} / {pagination.totalPages}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onPageChange(pagination.currentPage + 1)}
+                            disabled={!pagination.hasNextPage}
+                            className="h-7 px-2 text-xs flex items-center gap-0.5 text-slate-600"
+                          >
+                            Next
+                            <ChevronRight className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <div className="flex min-h-[100px] items-center justify-center rounded-lg border border-dashed">
-                      <p className="text-sm text-muted-foreground">
+                    <div className="flex h-12 items-center justify-center rounded border border-dashed border-slate-200">
+                      <p className="text-[10px] text-slate-400">
                         {section.emptyMessage}
                       </p>
                     </div>

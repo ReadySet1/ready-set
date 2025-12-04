@@ -77,6 +77,17 @@ export interface AddressCompactCardProps {
 }
 
 /**
+ * Pagination info from API response
+ */
+export interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+
+/**
  * Props for AddressSectionList component
  */
 export interface AddressSectionListProps {
@@ -88,6 +99,10 @@ export interface AddressSectionListProps {
   onFavoriteToggle?: (addressId: string) => void;
   favoriteIds?: string[];
   defaultCollapsed?: boolean;
+  /** Pagination info for the "all" section */
+  pagination?: PaginationInfo;
+  /** Callback when page changes */
+  onPageChange?: (page: number) => void;
 }
 
 /**
