@@ -1,17 +1,13 @@
 'use client'
 
 import React from 'react';
+import { getCloudinaryUrl } from '@/lib/cloudinary';
 
 const Logo = () => {
   return (
     <div className="mt-4 flex flex-col items-center">
       <img
-        src="/images/logo/new-logo-ready-set.webp"
-        onError={(e) => {
-          const img = e.target as HTMLImageElement;
-          img.onerror = null;
-          img.src = "/images/logo/new-logo-ready-set.png";
-        }}
+        src={getCloudinaryUrl('logo/new-logo-ready-set')}
         alt="Company logo"
         className="mb-2 h-auto w-24"
       />

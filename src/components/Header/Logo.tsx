@@ -2,6 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface LogoProps {
   sticky: boolean;
@@ -23,14 +24,14 @@ const Logo: React.FC<LogoProps> = ({
       {pathUrl !== "/" ? (
         <>
           <Image
-            src="/images/logo/new-logo-ready-set.png"
+            src={getCloudinaryUrl("logo/new-logo-ready-set")}
             alt="logo"
             width={240}
             height={30}
             className="header-logo w-full dark:hidden"
           />
           <Image
-            src="/images/logo/new-logo-ready-set.png"
+            src={getCloudinaryUrl("logo/new-logo-ready-set")}
             alt="logo"
             width={240}
             height={30}
@@ -40,14 +41,14 @@ const Logo: React.FC<LogoProps> = ({
       ) : (
         <>
           <Image
-            src="/images/logo/new-logo-ready-set.png"
+            src={getCloudinaryUrl("logo/new-logo-ready-set")}
             alt="logo"
             width={140}
             height={30}
             className="header-logo w-full dark:hidden"
           />
           <Image
-            src="/images/logo/new-logo-ready-set.png"
+            src={getCloudinaryUrl("logo/new-logo-ready-set")}
             alt="logo"
             width={140}
             height={30}

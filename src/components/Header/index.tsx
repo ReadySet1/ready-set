@@ -15,6 +15,7 @@ import MobileMenu from "./MobileMenu";
 import { AuthButtonsSkeleton } from "@/components/Skeleton/AuthSkeleton";
 import { clearAuthCookies, hasAuthCookies } from "@/utils/auth/cookies";
 import { uiLogger } from "@/utils/logger";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 // Define base menu items (visible to all users)
 const baseMenuItems: MenuItem[] = [
@@ -116,35 +117,23 @@ const Logo: React.FC<LogoProps> = ({
         className={`navbar-logo block w-full ${sticky ? "py-3" : "py-6"}`}
       >
         {sticky ? (
-          <picture>
-            <source
-              srcSet="/images/virtual/logo-headset.webp"
-              type="image/webp"
-            />
-            <Image
-              src="/images/virtual/logo-headset.png"
-              alt="Virtual Assistant Logo"
-              width={180}
-              height={40}
-              className="header-logo w-full"
-              priority
-            />
-          </picture>
+          <Image
+            src={getCloudinaryUrl("virtual/logo-headset")}
+            alt="Virtual Assistant Logo"
+            width={180}
+            height={40}
+            className="header-logo w-full"
+            priority
+          />
         ) : (
-          <picture>
-            <source
-              srcSet="/images/virtual/logo-headset-dark.webp"
-              type="image/webp"
-            />
-            <Image
-              src="/images/virtual/logo-headset-dark.png"
-              alt="Virtual Assistant Logo"
-              width={180}
-              height={40}
-              className="header-logo w-full"
-              priority
-            />
-          </picture>
+          <Image
+            src={getCloudinaryUrl("virtual/logo-headset-dark")}
+            alt="Virtual Assistant Logo"
+            width={180}
+            height={40}
+            className="header-logo w-full"
+            priority
+          />
         )}
       </Link>
     );
@@ -163,14 +152,14 @@ const Logo: React.FC<LogoProps> = ({
       {!isHomePage || sticky ? (
         <>
           <Image
-            src="/images/logo/logo-white.png"
+            src={getCloudinaryUrl("logo/logo-white")}
             alt="logo"
             width={280}
             height={40}
             className={`header-logo w-full ${logoClasses.light}`}
           />
           <Image
-            src="/images/logo/logo-dark.png"
+            src={getCloudinaryUrl("logo/logo-dark")}
             alt="logo"
             width={280}
             height={40}
@@ -180,14 +169,14 @@ const Logo: React.FC<LogoProps> = ({
       ) : (
         <>
           <Image
-            src="/images/logo/logo-white.png"
+            src={getCloudinaryUrl("logo/logo-white")}
             alt="logo"
             width={180}
             height={40}
             className={`header-logo w-full ${logoClasses.light}`}
           />
           <Image
-            src="/images/logo/logo-dark.png"
+            src={getCloudinaryUrl("logo/logo-dark")}
             alt="logo"
             width={180}
             height={40}
