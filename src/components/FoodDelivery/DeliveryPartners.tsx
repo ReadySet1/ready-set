@@ -4,11 +4,17 @@ import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import ScheduleDialog from "@/components/Logistics/Schedule";
+
+// Logistics calendar URL for scheduling appointments
+const LOGISTICS_CALENDAR_URL =
+  "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true";
 
 interface PartnerLogo {
   name: string;
   image: string;
   alt: string;
+  url: string;
 }
 
 const DeliveryPartners: React.FC = () => {
@@ -17,46 +23,55 @@ const DeliveryPartners: React.FC = () => {
       name: "Destino",
       image: getCloudinaryUrl("food/partners/destino"),
       alt: "Destino logo",
+      url: "https://www.destinosf.com/",
     },
     {
       name: "Grace Deli & Cafe",
       image: getCloudinaryUrl("food/partners/grace"),
       alt: "Grace Deli & Cafe logo",
+      url: "https://www.ezcater.com/",
     },
     {
       name: "Kasa Indian Eatery",
       image: getCloudinaryUrl("food/partners/kasa"),
       alt: "Kasa Indian Eatery logo",
+      url: "https://kasaindian.com/",
     },
     {
       name: "Hungry",
       image: getCloudinaryUrl("food/partners/hungry"),
       alt: "Hungry logo",
+      url: "https://www.tryhungry.com/",
     },
     {
       name: "CaterValley",
       image: getCloudinaryUrl("food/partners/catervalley"),
       alt: "CaterValley logo",
+      url: "https://catervalley.com/",
     },
     {
       name: "Conviva",
       image: getCloudinaryUrl("food/partners/conviva"),
       alt: "Conviva logo",
+      url: "https://www.conviva.com/",
     },
     {
       name: "Roost Roast",
       image: getCloudinaryUrl("food/partners/roostroast"),
       alt: "Roost Roast logo",
+      url: "https://www.roostandroast.com/",
     },
     {
       name: "Noor Indian Fusion Kitchen",
       image: getCloudinaryUrl("food/partners/noor"),
       alt: "Noor Indian Fusion Kitchen logo",
+      url: "https://noorfusionkitchen.com/",
     },
     {
       name: "Food.ee",
       image: getCloudinaryUrl("food/partners/foodee"),
       alt: "Food.ee logo",
+      url: "https://specials.tryhungry.com/foodeeandhungry",
     },
   ];
 
@@ -95,7 +110,13 @@ const DeliveryPartners: React.FC = () => {
                   delay: index * 0.1,
                 }}
               >
-                <div className="relative h-24 w-full max-w-[200px] transition-transform hover:scale-105 md:h-32 lg:h-36">
+                <a
+                  href={partner.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative h-24 w-full max-w-[200px] transition-transform hover:scale-105 md:h-32 lg:h-36"
+                  aria-label={`Visit ${partner.name} website`}
+                >
                   <Image
                     src={partner.image}
                     alt={partner.alt}
@@ -108,7 +129,7 @@ const DeliveryPartners: React.FC = () => {
                       target.style.display = "none";
                     }}
                   />
-                </div>
+                </a>
               </motion.div>
             ))}
           </div>
@@ -126,7 +147,13 @@ const DeliveryPartners: React.FC = () => {
                   delay: 0.8,
                 }}
               >
-                <div className="relative h-24 w-full max-w-[200px] transition-transform hover:scale-105 md:h-32 lg:h-36">
+                <a
+                  href={lastPartner.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative h-24 w-full max-w-[200px] transition-transform hover:scale-105 md:h-32 lg:h-36"
+                  aria-label={`Visit ${lastPartner.name} website`}
+                >
                   <Image
                     src={lastPartner.image}
                     alt={lastPartner.alt}
@@ -139,11 +166,26 @@ const DeliveryPartners: React.FC = () => {
                       target.style.display = "none";
                     }}
                   />
-                </div>
+                </a>
               </motion.div>
             ) : null;
           })()}
         </div>
+
+        {/* Partner With Us Button */}
+        <motion.div
+          className="mt-12 flex justify-center"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.9 }}
+        >
+          <ScheduleDialog
+            buttonText="Partner With Us"
+            calendarUrl={LOGISTICS_CALENDAR_URL}
+            className="rounded-lg bg-yellow-400 px-8 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-500 hover:shadow-lg"
+          />
+        </motion.div>
       </div>
     </div>
   );
