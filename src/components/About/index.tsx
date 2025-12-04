@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const About = () => {
   return (
@@ -31,7 +32,7 @@ const About = () => {
             <div className="w-full px-4 lg:w-1/2">
               <div className="relative h-[500px] w-full">
                 <Image
-                  src="/images/about/hexagon-image.png"
+                  src={getCloudinaryUrl("about/hexagon-image")}
                   alt="about image"
                   fill
                   className="h-full w-full object-contain"

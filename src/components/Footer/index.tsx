@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const Footer = () => {
   return (
@@ -14,7 +15,7 @@ const Footer = () => {
             <div className="mb-10 w-full text-center lg:pr-8">
               <Link href="/" className="mb-6 inline-block max-w-[160px]">
                 <Image
-                  src="/images/logo/logo-dark.png"
+                  src={getCloudinaryUrl("logo/logo-dark")}
                   alt="logo"
                   width={140}
                   height={30}

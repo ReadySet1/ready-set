@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import Link from "next/link";
 import { useState } from "react";
 import toast from "react-hot-toast";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface FormData {
   firstName: string;
@@ -213,7 +214,7 @@ export default function NewsletterForm() {
 
           <div className="flex w-full flex-col items-center justify-center border-l border-gray-200 pt-6 md:w-1/3 md:pt-0">
             <img
-              src="/images/logo/logo-white.png"
+              src={getCloudinaryUrl("logo/logo-white")}
               alt="Penguin Logo"
               className="mb-4 h-10 object-contain"
             />

@@ -73,13 +73,13 @@ describe("FoodSetupCarousel Component", () => {
       const firstImage = screen.getAllByAltText("Food setup 1")[0];
       expect(firstImage).toHaveAttribute(
         "src",
-        "/images/food/foodsetup/foodsetup1.png"
+        "/images/food/foodsetup/foodsetup1"
       );
 
       const secondImage = screen.getAllByAltText("Food setup 2")[0];
       expect(secondImage).toHaveAttribute(
         "src",
-        "/images/food/foodsetup/foodsetup2.png"
+        "/images/food/foodsetup/foodsetup2"
       );
     });
 

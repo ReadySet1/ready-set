@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import ScheduleDialog from "../Logistics/Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface SpecialtyHeroProps {
   onRequestQuote?: () => void;
@@ -119,7 +120,7 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
       >
         {/* La imagen de Next.js se mantiene con objectFit: "contain" encima del fondo gris */}
         <Image
-          src="/images/specialty/specialtydelivery.png"
+          src={getCloudinaryUrl("specialty/specialtydelivery")}
           alt="Delivery truck background"
           fill
           sizes="100vw"

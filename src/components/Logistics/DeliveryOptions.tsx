@@ -7,6 +7,7 @@ import {
   FormManager,
   FormType,
 } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface DeliveryOptionCardProps {
   title: string;
@@ -101,7 +102,7 @@ const DeliveryOptions: React.FC = () => {
       title: "Catering Deliveries",
       description:
         "We deliver meals for daily team lunches, corporate events, and special occasions.",
-      imageSrc: "/images/logistics/deliveries/cateringdeliveries.png",
+      imageSrc: getCloudinaryUrl("logistics/deliveries/cateringdeliveries"),
       imageAlt: "Catering food display with various dishes and trays",
       formType: "food",
       learnMoreRoute: "/catering-deliveries",
@@ -110,7 +111,7 @@ const DeliveryOptions: React.FC = () => {
       title: "Flower Deliveries",
       description:
         "We partner with local flower shops to help deliver joy and connection to communities.",
-      imageSrc: "/images/logistics/deliveries/flowerdeliveries.png",
+      imageSrc: getCloudinaryUrl("logistics/deliveries/flowerdeliveries"),
       imageAlt: "Bouquet of colorful tulips and flowers",
       formType: "flower",
       learnMoreRoute: "/flowers-deliveries",
@@ -119,7 +120,7 @@ const DeliveryOptions: React.FC = () => {
       title: "Bakery Deliveries",
       description:
         "We're not just about catering; we now deliver for local bakeries too.",
-      imageSrc: "/images/logistics/deliveries/bakerydeliveries.png",
+      imageSrc: getCloudinaryUrl("logistics/deliveries/bakerydeliveries"),
       imageAlt: "Assortment of fresh baked breads and pastries",
       formType: "bakery",
       learnMoreRoute: "/bakery-deliveries",
@@ -128,7 +129,7 @@ const DeliveryOptions: React.FC = () => {
       title: "Specialty Deliveries",
       description:
         "We offer Specialty Delivery for urgent, high-value items such as legal documents, medications, and custom orders.",
-      imageSrc: "/images/logistics/deliveries/specialtydeliveries.png",
+      imageSrc: getCloudinaryUrl("logistics/deliveries/specialtydeliveries"),
       imageAlt: "Stack of neatly wrapped brown delivery packages",
       formType: "specialty",
       learnMoreRoute: "/specialty-deliveries",

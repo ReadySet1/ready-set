@@ -8,6 +8,7 @@ import {
   CarouselItem,
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 // Custom icons for navigation
 const ArrowLeftIcon = () => (
@@ -171,7 +172,7 @@ const ExpertSupportSection: React.FC = () => {
       {/* Background Image with flowers */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="/images/flowers/flower5.jpg"
+          src={getCloudinaryUrl("flowers/flower5")}
           alt="Flower shop background"
           fill
           style={{ objectFit: "cover" }}
@@ -186,7 +187,7 @@ const ExpertSupportSection: React.FC = () => {
           <div className="relative flex w-full justify-center">
             <div className="z-30">
               <Image
-                src="/images/flowers/expertsupport.png"
+                src={getCloudinaryUrl("flowers/expertsupport")}
                 alt="Expert Support"
                 width={800}
                 height={500}

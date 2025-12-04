@@ -4,6 +4,7 @@ import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import ScheduleDialog from "@/components/Logistics/Schedule";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface StatProps {
   value: string;
@@ -61,7 +62,7 @@ const CateringAbout: React.FC = () => {
             {/* Image */}
             <div className="relative mb-8 overflow-hidden rounded-3xl">
               <Image
-                src="/images/food/catering-about.png"
+                src={getCloudinaryUrl("food/catering-about")}
                 alt="Restaurant owners reviewing catering orders"
                 width={800}
                 height={600}

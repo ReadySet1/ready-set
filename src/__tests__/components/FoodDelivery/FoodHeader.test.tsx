@@ -76,7 +76,7 @@ describe("FoodHeader Component", () => {
 
       const image = screen.getByAltText("Food containers with various prepared meals");
       expect(image).toBeInTheDocument();
-      expect(image).toHaveAttribute("src", "/images/food/food-containers.png");
+      expect(image).toHaveAttribute("src", "/images/food/food-containers");
     });
 
     it("renders the Get a Quote button", () => {
@@ -425,7 +425,7 @@ describe("FoodHeader Component", () => {
       render(<FoodHeader />);
 
       const image = screen.getByAltText("Food containers with various prepared meals");
-      expect(image).toHaveAttribute("src", "/images/food/food-containers.png");
+      expect(image).toHaveAttribute("src", "/images/food/food-containers");
     });
   });
 

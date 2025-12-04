@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import AppointmentDialog from "@/components/VirtualAssistant/Appointment";
 import { DownloadPopup } from "../ui/DownloadPopup";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const GuideVirtualAssistant = () => {
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
@@ -80,12 +81,7 @@ const GuideVirtualAssistant = () => {
             <div className="space-y-6">
               <Card className="rounded-lg bg-yellow-400 p-6">
                 <img
-                  src="/images/resources/7.webp"
-                  onError={(e) => {
-                    const img = e.target as HTMLImageElement;
-                    img.onerror = null; // Prevent infinite loop
-                    img.src = "/images/resources/7.png"; // Fallback PNG
-                  }}
+                  src={getCloudinaryUrl("resources/7")}
                   alt="Business woman working on a computer"
                   className="mb-4 w-full rounded-lg"
                 />
@@ -100,12 +96,7 @@ const GuideVirtualAssistant = () => {
 
               <div className="mt-4 flex flex-col items-center">
                 <img
-                  src="/images/logo/new-logo-ready-set.webp"
-                  onError={(e) => {
-                    const img = e.target as HTMLImageElement;
-                    img.onerror = null; // Prevent infinite loop
-                    img.src = "/images/logo/new-logo-ready-set.png"; // Fallback PNG
-                  }}
+                  src={getCloudinaryUrl("logo/new-logo-ready-set")}
                   alt="Company logo"
                   className="mb-2 h-auto w-24"
                 />

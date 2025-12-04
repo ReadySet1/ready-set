@@ -12,20 +12,21 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 import Image from "next/image";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const features = [
   {
-    iconPath: "/images/virtual/drive.svg",
+    iconPath: getCloudinaryUrl("virtual/drive"),
     title: "Put Your Business\non Autopilot",
     alt: "Drive Icon",
   },
   {
-    iconPath: "/images/virtual/time.svg",
+    iconPath: getCloudinaryUrl("virtual/time"),
     title: "Focus your\ntime on  \n what matters",
     alt: "Time Icon",
   },
   {
-    iconPath: "/images/virtual/dollar.svg",
+    iconPath: getCloudinaryUrl("virtual/dollar"),
     title: "Delegated tasks to\n grow revenue",
     alt: "Dollar Icon",
   },

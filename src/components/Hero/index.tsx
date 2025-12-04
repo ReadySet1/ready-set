@@ -7,6 +7,7 @@ import Image from "next/image";
 import { Truck, Headphones, Users, LucideIcon } from "lucide-react";
 import { motion, MotionProps } from "framer-motion";
 import NewsletterForm from "../Resources/ui/NewsLetterForm"; // Assuming this is below the Hero section
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 // Type definitions
 interface ButtonLinkProps {
@@ -160,16 +161,12 @@ const Hero: React.FC = () => {
       <div className="fixed inset-0 -z-20 bg-primary" />
       <div className="fixed inset-0 -z-10">
         <Image
-          src="/images/hero/hero-bg.webp"
+          src={getCloudinaryUrl("hero/hero-bg")}
           alt="Hero background"
           fill
           className="object-cover mix-blend-multiply"
           priority
           quality={100}
-          onError={(e) => {
-            const imgElement = e.currentTarget;
-            imgElement.src = "/images/hero/hero-bg.png";
-          }}
         />
       </div>
       {/* Changed h-screen to pt-16 (or higher as needed) and added padding-bottom */}
@@ -188,7 +185,7 @@ const Hero: React.FC = () => {
           >
             <div className="relative h-full w-full">
               <Image
-                src="/images/logo/logo-white.png"
+                src={getCloudinaryUrl("logo/logo-white")}
                 alt="Ready Set Group LLC Logo"
                 fill
                 sizes="(max-width: 640px) 300px, (max-width: 768px) 400px, 500px"

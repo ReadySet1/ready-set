@@ -4,6 +4,7 @@ import ResourcesGrid from "@/components/Resources/ResourcesGrid";
 import NewsletterForm from "@/components/Resources/ui/NewsLetterForm";
 import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 // Export with dynamic data fetching to avoid static generation problems
 export const dynamic = "force-dynamic";
@@ -43,7 +44,7 @@ const FreeResourcesPage = async () => {
       <div className="mb-12 flex flex-col items-center justify-center text-center">
         <div className="mb-6">
           <Image
-            src="/images/logo/logo.png"
+            src={getCloudinaryUrl("logo/logo")}
             alt="Ready Set Logo"
             width={150}
             height={60}

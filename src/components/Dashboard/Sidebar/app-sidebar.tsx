@@ -24,6 +24,7 @@ import toast from "react-hot-toast";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
 import Image from "next/image";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 import {
   Sidebar,
@@ -186,7 +187,7 @@ export function AppSidebar() {
                 className="flex w-full items-center justify-center py-2"
               >
                 <Image
-                  src="/images/logo/logo-white.png"
+                  src={getCloudinaryUrl("logo/logo-white")}
                   alt="Ready Set Logo"
                   width={240}
                   height={80}

@@ -86,7 +86,7 @@ describe("CateringAbout", () => {
 
       const image = screen.getByAltText("Restaurant owners reviewing catering orders");
       expect(image).toBeInTheDocument();
-      expect(image).toHaveAttribute("src", "/images/food/catering-about.png");
+      expect(image).toHaveAttribute("src", "/images/food/catering-about");
       expect(image).toHaveAttribute("width", "800");
       expect(image).toHaveAttribute("height", "600");
       expect(image).toHaveClass("h-auto", "w-full", "object-cover");

@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FileDownIcon } from "lucide-react";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface ServiceCardProps {
   title: string;
@@ -31,38 +32,38 @@ const services: Service[] = [
     title: "Admin",
     description:
       "Efficient management of calendars, emails, and data entry tasks.",
-    imageUrl: "/images/virtual/projects/1.png",
+    imageUrl: getCloudinaryUrl("virtual/projects/1"),
     pdfName: "va-admin-services.pdf",
   },
   {
     title: "Customer Service & Sales",
     description: "Provide your clients with timely and professional support.",
-    imageUrl: "/images/virtual/projects/2.png",
+    imageUrl: getCloudinaryUrl("virtual/projects/2"),
     pdfName: "va-customer-services.pdf",
   },
   {
     title: "Design & Editing",
     description: "Plan, create, and post content to grow your online presence.",
-    imageUrl: "/images/virtual/projects/3.png",
+    imageUrl: getCloudinaryUrl("virtual/projects/3"),
     pdfName: "va-design-and-editing.pdf",
   },
   {
     title: "Social Media",
     description:
       "Manage posts, schedule content, and engage with your audience.",
-    imageUrl: "/images/virtual/projects/4.png",
+    imageUrl: getCloudinaryUrl("virtual/projects/4"),
     pdfName: "va-social-media.pdf",
   },
   {
     title: "Web Development",
     description: "Build and optimize websites for seamless user experiences",
-    imageUrl: "/images/virtual/projects/5.png",
+    imageUrl: getCloudinaryUrl("virtual/projects/5"),
     pdfName: "va-web-development.pdf",
   },
   {
     title: "Custom Requests",
     description: "Didn't find the service you need? We can help.",
-    imageUrl: "/images/virtual/projects/6.png",
+    imageUrl: getCloudinaryUrl("virtual/projects/6"),
     pdfName: "custom-services.pdf",
   },
 ];

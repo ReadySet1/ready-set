@@ -1,6 +1,7 @@
 import Image from "next/image";
 import React from "react";
 import AppointmentDialog from "./Appointment";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface StepProps {
   number: number;
@@ -68,19 +69,13 @@ const GettingStartedSection = () => {
         {/* Right Section */}
         <div className="w-full md:w-1/2">
           <div className="h-full w-full overflow-hidden rounded-3xl bg-gray-100">
-            <picture>
-              <source
-                srcSet="/images/virtual/discovery-call.webp"
-                type="image/webp"
-              />
-              <Image
-                src="/images/virtual/discovery-call.jpg"
-                alt="Business professional with laptop"
-                width={800}
-                height={600}
-                className="h-full w-full object-cover"
-              />
-            </picture>
+            <Image
+              src={getCloudinaryUrl("virtual/discovery-call")}
+              alt="Business professional with laptop"
+              width={800}
+              height={600}
+              className="h-full w-full object-cover"
+            />
           </div>
         </div>
       </div>

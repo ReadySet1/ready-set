@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 import {
   Card,
   CardContent,
@@ -454,7 +455,7 @@ export default function CompleteProfile() {
               <CardHeader className="text-center">
                 <div className="mx-auto mb-6 inline-block max-w-[160px]">
                   <Image
-                    src="/images/logo/logo-white.png"
+                    src={getCloudinaryUrl("logo/logo-white")}
                     alt="logo"
                     width={140}
                     height={30}
@@ -462,7 +463,7 @@ export default function CompleteProfile() {
                     priority
                   />
                   <Image
-                    src="/images/logo/logo-dark.png"
+                    src={getCloudinaryUrl("logo/logo-dark")}
                     alt="logo"
                     width={140}
                     height={30}
@@ -525,7 +526,7 @@ export default function CompleteProfile() {
             <CardHeader className="text-center">
               <div className="mx-auto mb-6 inline-block max-w-[160px]">
                 <Image
-                  src="/images/logo/logo-white.png"
+                  src={getCloudinaryUrl("logo/logo-white")}
                   alt="logo"
                   width={140}
                   height={30}
@@ -533,7 +534,7 @@ export default function CompleteProfile() {
                   priority
                 />
                 <Image
-                  src="/images/logo/logo-dark.png"
+                  src={getCloudinaryUrl("logo/logo-dark")}
                   alt="logo"
                   width={140}
                   height={30}
