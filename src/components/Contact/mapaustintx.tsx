@@ -36,7 +36,7 @@ const AustinMap = () => {
     <div className="relative w-full lg:w-1/2">
       <div className="aspect-square w-full">
         <Image
-          src={getCloudinaryUrl("maps/Austin_Map")}
+          src={getCloudinaryUrl("maps/Austin Map")}
           alt="Austin Map"
           fill
           className="rounded-lg shadow-md transition-shadow duration-300 hover:shadow-xl object-contain"

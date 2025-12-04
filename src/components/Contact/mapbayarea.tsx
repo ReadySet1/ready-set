@@ -34,7 +34,7 @@ const BayAreaMap = () => {
     <div className="relative w-full lg:w-1/2">
       <div className="aspect-square w-full">
         <Image
-          src={getCloudinaryUrl("maps/Bay_Area_Map")}
+          src={getCloudinaryUrl("maps/Bay Area Map")}
           alt="Bay Area Map"
           fill
           className="rounded-lg shadow-md transition-shadow duration-300 hover:shadow-xl object-contain"
