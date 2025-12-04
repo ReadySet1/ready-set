@@ -111,6 +111,13 @@ export const apiResilienceLogger = new Logger({
   enabledInTest: false,
 });
 
+export const ezCaterLogger = new Logger({
+  enabledInProduction: true, // Enable for monitoring external integration
+  enabledInBuild: false,
+  enabledInDevelopment: true, // Enable for debugging
+  enabledInTest: false,
+});
+
 /**
  * Security logger for authentication, authorization, spam protection, and security events.
  * Always enabled in production for security monitoring and incident response.
