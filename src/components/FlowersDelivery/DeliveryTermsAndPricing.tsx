@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import ScheduleDialog from "@/components/Logistics/Schedule";
 import { FormType } from "@/components/Logistics/QuoteRequest/types";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface PackageDeliveryProps {
   onRequestQuote?: (formType: FormType) => void;
@@ -24,7 +25,7 @@ const DeliveryTermsAndPricing = ({ onRequestQuote }: PackageDeliveryProps) => {
       {/* Make the image container full width */}
       <div className="relative h-full w-full">
         <Image
-          src="/images/flowers/flower3.jpg"
+          src={getCloudinaryUrl("flowers/flower3")}
           alt="Tulips"
           width={1200}
           height={400}

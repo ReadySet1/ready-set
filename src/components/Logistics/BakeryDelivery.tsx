@@ -2,6 +2,7 @@
 
 import { Button } from "../ui/button";
 import { FormType } from "./QuoteRequest/types";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface ServiceItem {
   title: string;
@@ -107,17 +108,11 @@ const BakeryDeliverySection: React.FC<BakeryDeliverySectionProps> = ({
           <div className="relative mt-8 w-full md:mt-12 lg:mt-20">
             <div className="aspect-w-16 aspect-h-9 md:aspect-h-10 lg:aspect-h-7">
               <div className="h-full w-full overflow-hidden rounded-3xl">
-                <picture>
-                  <source
-                    srcSet="/images/logistics/bakerypic.webp"
-                    type="image/webp"
-                  />
-                  <img
-                    src="/images/logistics/bakerypic.png"
-                    alt="A container showing delicious breads"
-                    className="h-full w-full object-cover object-center"
-                  />
-                </picture>
+                <img
+                  src={getCloudinaryUrl("logistics/bakerypic")}
+                  alt="A container showing delicious breads"
+                  className="h-full w-full object-cover object-center"
+                />
               </div>
             </div>
           </div>

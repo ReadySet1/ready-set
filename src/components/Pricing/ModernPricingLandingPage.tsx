@@ -13,6 +13,7 @@ import {
   Users,
   DollarSign,
 } from "lucide-react";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface PricingTier {
   headcount: string;
@@ -129,7 +130,7 @@ const ModernPricingLandingPage = () => {
           >
             <div className="group relative flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-2xl transition-transform hover:scale-105 sm:h-32 sm:w-32 md:h-40 md:w-40">
               <Image
-                src="/images/logo/logo.png"
+                src={getCloudinaryUrl("logo/logo")}
                 alt="Ready Set Logo"
                 width={150}
                 height={150}

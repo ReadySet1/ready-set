@@ -5,6 +5,7 @@ import NewsletterForm from "@/components/Resources/ui/NewsLetterForm";
 import { Metadata } from "next";
 import { client } from "@/sanity/lib/client";
 import { postsQuery, getAllPosts } from "@/sanity/lib/queries";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 // Export with dynamic data fetching to avoid static generation problems
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ export const metadata: Metadata = {
     siteName: "Ready Set",
     images: [
       {
-        url: "https://readyset.consulting/images/blog-og.jpg",
+        url: getCloudinaryUrl("blog-og"),
         width: 1200,
         height: 630,
       },
@@ -53,7 +54,7 @@ export const metadata: Metadata = {
     title: "Business Blog For Efficiency and Growth | Ready Set LLC",
     description:
       "Explore our blog for practical advice on business efficiency, operational excellence, and sustainable growth strategies for small to mid-sized companies.",
-    images: ["https://readyset.consulting/images/blog-og.jpg"],
+    images: [getCloudinaryUrl("blog-og")],
   },
   alternates: {
     canonical: "https://readyset.consulting/blog",

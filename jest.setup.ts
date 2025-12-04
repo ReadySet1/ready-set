@@ -53,6 +53,7 @@ process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
 process.env.SENDGRID_API_KEY = 'test-sendgrid-key';
 process.env.RESEND_API_KEY = 'test-resend-key';
 process.env.OPENAI_API_KEY = 'test-openai-key';
+process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = 'test-cloud';
 process.env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
 process.env.CLOUDINARY_API_KEY = 'test-api-key';
 process.env.CLOUDINARY_API_SECRET = 'test-api-secret';
@@ -417,6 +418,26 @@ jest.mock('@/utils/supabase/client', () => {
     }),
   };
 });
+
+// Mock Cloudinary utilities
+jest.mock('@/lib/cloudinary', () => ({
+  getCloudinaryUrl: jest.fn((publicId: string, options?: any) => {
+    // Return a mock URL that mimics local path for easy testing
+    return `/images/${publicId}`;
+  }),
+  getResponsiveCloudinaryUrl: jest.fn((publicId: string, breakpoints: number[], options?: any) => ({
+    src: `/images/${publicId}`,
+    srcSet: breakpoints.map((w) => `/images/${publicId} ${w}w`).join(', '),
+  })),
+  localPathToPublicId: jest.fn((localPath: string) => {
+    return localPath.replace(/^\/images\//, '').replace(/\.[^/.]+$/, '');
+  }),
+  cloudinaryConfig: {
+    cloudName: 'test-cloud',
+    folder: 'ready-set',
+  },
+  CLOUDINARY_BASE_URL: 'https://res.cloudinary.com/test-cloud/image/upload',
+}));
 
 // Mock auth utilities to prevent real database calls during auth middleware tests
 jest.mock('@/lib/auth', () => ({

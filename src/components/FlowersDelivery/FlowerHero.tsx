@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 import ScheduleDialog from "../Logistics/Schedule";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface FlowerHeroProps {
   headline?: string;
@@ -11,7 +12,7 @@ interface FlowerHeroProps {
 }
 
 const FlowerHero: React.FC<FlowerHeroProps> = ({
-  imagePath = "/images/flowers/flower4.png",
+  imagePath = getCloudinaryUrl("flowers/flower4"),
 }) => {
   const [isTextAnimated, setIsTextAnimated] = useState(false);
   const { openForm, DialogForm } = FormManager();

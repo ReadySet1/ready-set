@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef, ErrorInfo } from "react";
 import Image from "next/image";
 import { Clock, Truck, Shield } from "lucide-react";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 // Carousel imports
 import {
@@ -196,7 +197,7 @@ const useResponsiveBackground = (imageSrc: string): BackgroundImageSettings => {
 const ServiceFeaturesSection: React.FC<ServiceFeaturesSectionProps> = ({
   title = "Premium Services",
   subtitle = "Your trusted partner since 2019",
-  backgroundImage = "/images/logistics/bg-hero.png",
+  backgroundImage = getCloudinaryUrl("logistics/bg-hero"),
   partners = [],
   features = [],
   primaryButtonText = "Get Quote",
@@ -217,13 +218,13 @@ const ServiceFeaturesSection: React.FC<ServiceFeaturesSectionProps> = ({
   // Default partners list
   const defaultPartners: Partner[] = useMemo(
     () => [
-      { name: "Deli", logo: "/images/food/partners/Deli.jpg" },
-      { name: "Bobcha", logo: "/images/food/partners/bobcha.jpg" },
-      { name: "Foodee", logo: "/images/food/partners/foodee.jpg" },
-      { name: "Destino", logo: "/images/food/partners/destino.png" },
-      { name: "Conviva", logo: "/images/food/partners/conviva.png" },
-      { name: "Kasa Indian Eatery", logo: "/images/food/partners/kasa.png" },
-      { name: "CaterValley", logo: "/images/food/partners/catervalley.png" },
+      { name: "Deli", logo: getCloudinaryUrl("food/partners/Deli") },
+      { name: "Bobcha", logo: getCloudinaryUrl("food/partners/bobcha") },
+      { name: "Foodee", logo: getCloudinaryUrl("food/partners/foodee") },
+      { name: "Destino", logo: getCloudinaryUrl("food/partners/destino") },
+      { name: "Conviva", logo: getCloudinaryUrl("food/partners/conviva") },
+      { name: "Kasa Indian Eatery", logo: getCloudinaryUrl("food/partners/kasa") },
+      { name: "CaterValley", logo: getCloudinaryUrl("food/partners/catervalley") },
     ],
     [],
   );

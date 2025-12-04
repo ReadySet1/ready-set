@@ -6,6 +6,7 @@ import BakeryPartners from "@/components/BakeryDelivery/BakeryPartners";
 import BakeryTerms from "@/components/BakeryDelivery/BakeryTerms";
 import DownloadableResources from "@/components/BakeryDelivery/DownloadableResources";
 import BakeryHero from "@/components/BakeryDelivery/BakeryHero";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 export const metadata: Metadata = {
   title: "Premium Food & Bakery Delivery Services | Ready Set",
@@ -35,7 +36,7 @@ export const metadata: Metadata = {
     url: "/bakery-deliveries",
     images: [
       {
-        url: "/images/og-food-delivery.jpg", // Add your actual image path
+        url: getCloudinaryUrl("og-food-delivery"),
         width: 1200,
         height: 630,
         alt: "Ready Set food and bakery delivery services showcase",
@@ -48,7 +49,7 @@ export const metadata: Metadata = {
     title: "Premium Food & Bakery Delivery | Ready Set",
     description:
       "Elevate your events with our professional food and bakery delivery services in the Bay Area and Silicon Valley. Fresh quality, on-time delivery guaranteed.",
-    images: ["/images/twitter-food-card.jpg"], // Add your actual image path
+    images: [getCloudinaryUrl("twitter-food-card")],
     site: "@ReadySetDelivery", // Replace with actual handle
     creator: "@ReadySetDelivery", // Replace with actual handle
   },

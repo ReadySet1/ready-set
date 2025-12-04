@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import ScheduleDialog from "../Logistics/Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const FoodHeader: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
@@ -103,7 +104,7 @@ const FoodHeader: React.FC = () => {
         animate="visible"
       >
         <Image
-          src="/images/food/food-containers.png"
+          src={getCloudinaryUrl("food/food-containers")}
           alt="Food containers with various prepared meals"
           fill
           className="object-cover object-right md:object-center"

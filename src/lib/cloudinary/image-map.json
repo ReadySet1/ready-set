@@ -1,0 +1,1597 @@
+{
+  "generatedAt": "2025-12-04T01:52:58.960Z",
+  "cloudName": "dzm8qcnfd",
+  "folder": "ready-set",
+  "totalImages": 227,
+  "images": [
+    {
+      "localPath": "/images/404-dark.svg",
+      "publicId": "404-dark",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812905/ready-set/404-dark.svg",
+      "format": "svg",
+      "size": 13139
+    },
+    {
+      "localPath": "/images/404.svg",
+      "publicId": "404",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812908/ready-set/404.svg",
+      "format": "svg",
+      "size": 13139
+    },
+    {
+      "localPath": "/images/about/1.png",
+      "publicId": "about/1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812910/ready-set/about/1.png",
+      "format": "png",
+      "size": 13475
+    },
+    {
+      "localPath": "/images/about/2.png",
+      "publicId": "about/2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812911/ready-set/about/2.png",
+      "format": "png",
+      "size": 10537
+    },
+    {
+      "localPath": "/images/about/3.png",
+      "publicId": "about/3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812911/ready-set/about/3.png",
+      "format": "png",
+      "size": 20776
+    },
+    {
+      "localPath": "/images/about/hexagon-image.png",
+      "publicId": "about/hexagon-image",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812913/ready-set/about/hexagon-image.png",
+      "format": "png",
+      "size": 841845
+    },
+    {
+      "localPath": "/images/bakery/bakerybg.png",
+      "publicId": "bakery/bakerybg",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812916/ready-set/bakery/bakerybg.png",
+      "format": "png",
+      "size": 1630061
+    },
+    {
+      "localPath": "/images/bakery/bakerybg2.png",
+      "publicId": "bakery/bakerybg2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812922/ready-set/bakery/bakerybg2.png",
+      "format": "png",
+      "size": 3276490
+    },
+    {
+      "localPath": "/images/bakery/breadbasket.png",
+      "publicId": "bakery/breadbasket",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812923/ready-set/bakery/breadbasket.png",
+      "format": "png",
+      "size": 618760
+    },
+    {
+      "localPath": "/images/bakery/deliverysupport1.png",
+      "publicId": "bakery/deliverysupport1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812925/ready-set/bakery/deliverysupport1.png",
+      "format": "png",
+      "size": 75169
+    },
+    {
+      "localPath": "/images/blog/article-author-01.png",
+      "publicId": "blog/article-author-01",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812926/ready-set/blog/article-author-01.png",
+      "format": "png",
+      "size": 10825
+    },
+    {
+      "localPath": "/images/blog/article-author-02.png",
+      "publicId": "blog/article-author-02",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812926/ready-set/blog/article-author-02.png",
+      "format": "png",
+      "size": 10532
+    },
+    {
+      "localPath": "/images/blog/article-author-03.png",
+      "publicId": "blog/article-author-03",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812927/ready-set/blog/article-author-03.png",
+      "format": "png",
+      "size": 11899
+    },
+    {
+      "localPath": "/images/blog/article-author-04.png",
+      "publicId": "blog/article-author-04",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812929/ready-set/blog/article-author-04.png",
+      "format": "png",
+      "size": 12369
+    },
+    {
+      "localPath": "/images/blog/author-01.png",
+      "publicId": "blog/author-01",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812931/ready-set/blog/author-01.png",
+      "format": "png",
+      "size": 3957
+    },
+    {
+      "localPath": "/images/blog/author-02.jpg",
+      "publicId": "blog/author-02",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812932/ready-set/blog/author-02.jpg",
+      "format": "jpg",
+      "size": 547287
+    },
+    {
+      "localPath": "/images/blog/bannder-ad.png",
+      "publicId": "blog/bannder-ad",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812933/ready-set/blog/bannder-ad.png",
+      "format": "png",
+      "size": 75103
+    },
+    {
+      "localPath": "/images/blog/blog-01.jpg",
+      "publicId": "blog/blog-01",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812934/ready-set/blog/blog-01.jpg",
+      "format": "jpg",
+      "size": 847855
+    },
+    {
+      "localPath": "/images/blog/blog-02.jpg",
+      "publicId": "blog/blog-02",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812936/ready-set/blog/blog-02.jpg",
+      "format": "jpg",
+      "size": 537712
+    },
+    {
+      "localPath": "/images/blog/blog-03.jpg",
+      "publicId": "blog/blog-03",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812938/ready-set/blog/blog-03.jpg",
+      "format": "jpg",
+      "size": 635956
+    },
+    {
+      "localPath": "/images/blog/blog-details-01.jpg",
+      "publicId": "blog/blog-details-01",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812940/ready-set/blog/blog-details-01.jpg",
+      "format": "jpg",
+      "size": 715615
+    },
+    {
+      "localPath": "/images/blog/blog-footer-01.jpg",
+      "publicId": "blog/blog-footer-01",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812940/ready-set/blog/blog-footer-01.jpg",
+      "format": "jpg",
+      "size": 6790
+    },
+    {
+      "localPath": "/images/blog/blog-footer-02.jpg",
+      "publicId": "blog/blog-footer-02",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812942/ready-set/blog/blog-footer-02.jpg",
+      "format": "jpg",
+      "size": 6283
+    },
+    {
+      "localPath": "/images/blog/dotted-shape.svg",
+      "publicId": "blog/dotted-shape",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812942/ready-set/blog/dotted-shape.svg",
+      "format": "svg",
+      "size": 1622
+    },
+    {
+      "localPath": "/images/blog/quote-bg.svg",
+      "publicId": "blog/quote-bg",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812944/ready-set/blog/quote-bg.svg",
+      "format": "svg",
+      "size": 965
+    },
+    {
+      "localPath": "/images/flowers/agent.png",
+      "publicId": "flowers/agent",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812946/ready-set/flowers/agent.png",
+      "format": "png",
+      "size": 22045
+    },
+    {
+      "localPath": "/images/flowers/agent.svg",
+      "publicId": "flowers/agent",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/flowers/agent",
+      "format": "svg",
+      "size": 2099
+    },
+    {
+      "localPath": "/images/flowers/background2.jpg",
+      "publicId": "flowers/background2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812948/ready-set/flowers/background2.jpg",
+      "format": "jpg",
+      "size": 236717
+    },
+    {
+      "localPath": "/images/flowers/boxes.png",
+      "publicId": "flowers/boxes",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812949/ready-set/flowers/boxes.png",
+      "format": "png",
+      "size": 200051
+    },
+    {
+      "localPath": "/images/flowers/computer.png",
+      "publicId": "flowers/computer",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812951/ready-set/flowers/computer.png",
+      "format": "png",
+      "size": 13543
+    },
+    {
+      "localPath": "/images/flowers/computer.svg",
+      "publicId": "flowers/computer",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/flowers/computer",
+      "format": "svg",
+      "size": 1568
+    },
+    {
+      "localPath": "/images/flowers/container.png",
+      "publicId": "flowers/container",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812951/ready-set/flowers/container.png",
+      "format": "png",
+      "size": 104045
+    },
+    {
+      "localPath": "/images/flowers/deskgirl.png",
+      "publicId": "flowers/deskgirl",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812954/ready-set/flowers/deskgirl.png",
+      "format": "png",
+      "size": 1315226
+    },
+    {
+      "localPath": "/images/flowers/expertsupport.png",
+      "publicId": "flowers/expertsupport",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812955/ready-set/flowers/expertsupport.png",
+      "format": "png",
+      "size": 95445
+    },
+    {
+      "localPath": "/images/flowers/flower1.png",
+      "publicId": "flowers/flower1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812956/ready-set/flowers/flower1.png",
+      "format": "png",
+      "size": 630448
+    },
+    {
+      "localPath": "/images/flowers/flower2.jpg",
+      "publicId": "flowers/flower2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812957/ready-set/flowers/flower2.jpg",
+      "format": "jpg",
+      "size": 165712
+    },
+    {
+      "localPath": "/images/flowers/flower3.jpg",
+      "publicId": "flowers/flower3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812958/ready-set/flowers/flower3.jpg",
+      "format": "jpg",
+      "size": 68539
+    },
+    {
+      "localPath": "/images/flowers/flower3.png",
+      "publicId": "flowers/flower3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/flowers/flower3",
+      "format": "png",
+      "size": 1284045
+    },
+    {
+      "localPath": "/images/flowers/flower4.jpg",
+      "publicId": "flowers/flower4",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812959/ready-set/flowers/flower4.jpg",
+      "format": "jpg",
+      "size": 59916
+    },
+    {
+      "localPath": "/images/flowers/flower4.png",
+      "publicId": "flowers/flower4",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/flowers/flower4",
+      "format": "png",
+      "size": 500402
+    },
+    {
+      "localPath": "/images/flowers/flower5.jpg",
+      "publicId": "flowers/flower5",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812960/ready-set/flowers/flower5.jpg",
+      "format": "jpg",
+      "size": 105584
+    },
+    {
+      "localPath": "/images/flowers/headset-icon.png",
+      "publicId": "flowers/headset-icon",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812961/ready-set/flowers/headset-icon.png",
+      "format": "png",
+      "size": 10299
+    },
+    {
+      "localPath": "/images/flowers/truck.png",
+      "publicId": "flowers/truck",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812962/ready-set/flowers/truck.png",
+      "format": "png",
+      "size": 14291
+    },
+    {
+      "localPath": "/images/flowers/truck.svg",
+      "publicId": "flowers/truck",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/flowers/truck",
+      "format": "svg",
+      "size": 1331
+    },
+    {
+      "localPath": "/images/flowers/van.png",
+      "publicId": "flowers/van",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812964/ready-set/flowers/van.png",
+      "format": "png",
+      "size": 677090
+    },
+    {
+      "localPath": "/images/food/bagbg.png",
+      "publicId": "food/bagbg",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812964/ready-set/food/bagbg.png",
+      "format": "png",
+      "size": 18283
+    },
+    {
+      "localPath": "/images/food/cards/bag.png",
+      "publicId": "food/cards/bag",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812965/ready-set/food/cards/bag.png",
+      "format": "png",
+      "size": 85079
+    },
+    {
+      "localPath": "/images/food/cards/headset.png",
+      "publicId": "food/cards/headset",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812966/ready-set/food/cards/headset.png",
+      "format": "png",
+      "size": 59255
+    },
+    {
+      "localPath": "/images/food/cards/truck.png",
+      "publicId": "food/cards/truck",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812967/ready-set/food/cards/truck.png",
+      "format": "png",
+      "size": 170039
+    },
+    {
+      "localPath": "/images/food/catering-about.png",
+      "publicId": "food/catering-about",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812968/ready-set/food/catering-about.png",
+      "format": "png",
+      "size": 267071
+    },
+    {
+      "localPath": "/images/food/deliverypartnersbg.png",
+      "publicId": "food/deliverypartnersbg",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812971/ready-set/food/deliverypartnersbg.png",
+      "format": "png",
+      "size": 1529988
+    },
+    {
+      "localPath": "/images/food/food-containers.png",
+      "publicId": "food/food-containers",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812972/ready-set/food/food-containers.png",
+      "format": "png",
+      "size": 239480
+    },
+    {
+      "localPath": "/images/food/fooddeliverybg.png",
+      "publicId": "food/fooddeliverybg",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812976/ready-set/food/fooddeliverybg.png",
+      "format": "png",
+      "size": 2335997
+    },
+    {
+      "localPath": "/images/food/fooddeliverybg1.png",
+      "publicId": "food/fooddeliverybg1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812979/ready-set/food/fooddeliverybg1.png",
+      "format": "png",
+      "size": 1428328
+    },
+    {
+      "localPath": "/images/food/foodsetup/foodsetup1.png",
+      "publicId": "food/foodsetup/foodsetup1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812980/ready-set/food/foodsetup/foodsetup1.png",
+      "format": "png",
+      "size": 217458
+    },
+    {
+      "localPath": "/images/food/foodsetup/foodsetup10.png",
+      "publicId": "food/foodsetup/foodsetup10",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812981/ready-set/food/foodsetup/foodsetup10.png",
+      "format": "png",
+      "size": 217458
+    },
+    {
+      "localPath": "/images/food/foodsetup/foodsetup2.png",
+      "publicId": "food/foodsetup/foodsetup2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812982/ready-set/food/foodsetup/foodsetup2.png",
+      "format": "png",
+      "size": 209959
+    },
+    {
+      "localPath": "/images/food/foodsetup/foodsetup3.png",
+      "publicId": "food/foodsetup/foodsetup3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812983/ready-set/food/foodsetup/foodsetup3.png",
+      "format": "png",
+      "size": 207329
+    },
+    {
+      "localPath": "/images/food/foodsetup/foodsetup4.png",
+      "publicId": "food/foodsetup/foodsetup4",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812984/ready-set/food/foodsetup/foodsetup4.png",
+      "format": "png",
+      "size": 180953
+    },
+    {
+      "localPath": "/images/food/foodsetup/foodsetup5.png",
+      "publicId": "food/foodsetup/foodsetup5",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812985/ready-set/food/foodsetup/foodsetup5.png",
+      "format": "png",
+      "size": 227535
+    },
+    {
+      "localPath": "/images/food/foodsetup/foodsetup6.png",
+      "publicId": "food/foodsetup/foodsetup6",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812987/ready-set/food/foodsetup/foodsetup6.png",
+      "format": "png",
+      "size": 230213
+    },
+    {
+      "localPath": "/images/food/foodsetup/foodsetup7.png",
+      "publicId": "food/foodsetup/foodsetup7",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812988/ready-set/food/foodsetup/foodsetup7.png",
+      "format": "png",
+      "size": 185767
+    },
+    {
+      "localPath": "/images/food/foodsetup/foodsetup8.png",
+      "publicId": "food/foodsetup/foodsetup8",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812989/ready-set/food/foodsetup/foodsetup8.png",
+      "format": "png",
+      "size": 149868
+    },
+    {
+      "localPath": "/images/food/foodsetup/foodsetup9.png",
+      "publicId": "food/foodsetup/foodsetup9",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812990/ready-set/food/foodsetup/foodsetup9.png",
+      "format": "png",
+      "size": 222035
+    },
+    {
+      "localPath": "/images/food/icons/headset.png",
+      "publicId": "food/icons/headset",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812991/ready-set/food/icons/headset.png",
+      "format": "png",
+      "size": 1106
+    },
+    {
+      "localPath": "/images/food/icons/map-pin.png",
+      "publicId": "food/icons/map-pin",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812993/ready-set/food/icons/map-pin.png",
+      "format": "png",
+      "size": 1400
+    },
+    {
+      "localPath": "/images/food/icons/truck.png",
+      "publicId": "food/icons/truck",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812996/ready-set/food/icons/truck.png",
+      "format": "png",
+      "size": 1266
+    },
+    {
+      "localPath": "/images/food/mainmeal.png",
+      "publicId": "food/mainmeal",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812997/ready-set/food/mainmeal.png",
+      "format": "png",
+      "size": 440599
+    },
+    {
+      "localPath": "/images/food/partners/bobcha.jpg",
+      "publicId": "food/partners/bobcha",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812999/ready-set/food/partners/bobcha.jpg",
+      "format": "jpg",
+      "size": 45321
+    },
+    {
+      "localPath": "/images/food/partners/catervalley.png",
+      "publicId": "food/partners/catervalley",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813000/ready-set/food/partners/catervalley.png",
+      "format": "png",
+      "size": 5927
+    },
+    {
+      "localPath": "/images/food/partners/conviva.png",
+      "publicId": "food/partners/conviva",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813001/ready-set/food/partners/conviva.png",
+      "format": "png",
+      "size": 3994
+    },
+    {
+      "localPath": "/images/food/partners/Deli.jpg",
+      "publicId": "food/partners/Deli",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764812998/ready-set/food/partners/Deli.jpg",
+      "format": "jpg",
+      "size": 8998
+    },
+    {
+      "localPath": "/images/food/partners/deliverysupport.png",
+      "publicId": "food/partners/deliverysupport",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813002/ready-set/food/partners/deliverysupport.png",
+      "format": "png",
+      "size": 35215
+    },
+    {
+      "localPath": "/images/food/partners/destino.png",
+      "publicId": "food/partners/destino",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813002/ready-set/food/partners/destino.png",
+      "format": "png",
+      "size": 3767
+    },
+    {
+      "localPath": "/images/food/partners/foodee.jpg",
+      "publicId": "food/partners/foodee",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813003/ready-set/food/partners/foodee.jpg",
+      "format": "jpg",
+      "size": 4358
+    },
+    {
+      "localPath": "/images/food/partners/grace.png",
+      "publicId": "food/partners/grace",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813004/ready-set/food/partners/grace.png",
+      "format": "png",
+      "size": 74421
+    },
+    {
+      "localPath": "/images/food/partners/hungry.png",
+      "publicId": "food/partners/hungry",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813005/ready-set/food/partners/hungry.png",
+      "format": "png",
+      "size": 21729
+    },
+    {
+      "localPath": "/images/food/partners/kasa.png",
+      "publicId": "food/partners/kasa",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813006/ready-set/food/partners/kasa.png",
+      "format": "png",
+      "size": 3328
+    },
+    {
+      "localPath": "/images/food/partners/noor.png",
+      "publicId": "food/partners/noor",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813006/ready-set/food/partners/noor.png",
+      "format": "png",
+      "size": 52059
+    },
+    {
+      "localPath": "/images/food/partners/quivx.png",
+      "publicId": "food/partners/quivx",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813007/ready-set/food/partners/quivx.png",
+      "format": "png",
+      "size": 8340
+    },
+    {
+      "localPath": "/images/food/partners/roostroast.png",
+      "publicId": "food/partners/roostroast",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813008/ready-set/food/partners/roostroast.png",
+      "format": "png",
+      "size": 5313
+    },
+    {
+      "localPath": "/images/food/salad-bowl.png",
+      "publicId": "food/salad-bowl",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813010/ready-set/food/salad-bowl.png",
+      "format": "png",
+      "size": 687829
+    },
+    {
+      "localPath": "/images/food/truckbg.png",
+      "publicId": "food/truckbg",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813011/ready-set/food/truckbg.png",
+      "format": "png",
+      "size": 21574
+    },
+    {
+      "localPath": "/images/footer/brands/ayroui.svg",
+      "publicId": "footer/brands/ayroui",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813011/ready-set/footer/brands/ayroui.svg",
+      "format": "svg",
+      "size": 1451
+    },
+    {
+      "localPath": "/images/footer/brands/ecommerce-html.svg",
+      "publicId": "footer/brands/ecommerce-html",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813013/ready-set/footer/brands/ecommerce-html.svg",
+      "format": "svg",
+      "size": 12103
+    },
+    {
+      "localPath": "/images/footer/brands/graygrids.svg",
+      "publicId": "footer/brands/graygrids",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813015/ready-set/footer/brands/graygrids.svg",
+      "format": "svg",
+      "size": 10862
+    },
+    {
+      "localPath": "/images/footer/brands/lineicons.svg",
+      "publicId": "footer/brands/lineicons",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813016/ready-set/footer/brands/lineicons.svg",
+      "format": "svg",
+      "size": 6015
+    },
+    {
+      "localPath": "/images/footer/brands/plainadmin.svg",
+      "publicId": "footer/brands/plainadmin",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813018/ready-set/footer/brands/plainadmin.svg",
+      "format": "svg",
+      "size": 6538
+    },
+    {
+      "localPath": "/images/footer/brands/tailgrids.svg",
+      "publicId": "footer/brands/tailgrids",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813019/ready-set/footer/brands/tailgrids.svg",
+      "format": "svg",
+      "size": 5743
+    },
+    {
+      "localPath": "/images/footer/brands/tailwindtemplates.svg",
+      "publicId": "footer/brands/tailwindtemplates",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813021/ready-set/footer/brands/tailwindtemplates.svg",
+      "format": "svg",
+      "size": 8727
+    },
+    {
+      "localPath": "/images/footer/brands/uideck.svg",
+      "publicId": "footer/brands/uideck",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813023/ready-set/footer/brands/uideck.svg",
+      "format": "svg",
+      "size": 6613
+    },
+    {
+      "localPath": "/images/footer/shape-1.svg",
+      "publicId": "footer/shape-1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813025/ready-set/footer/shape-1.svg",
+      "format": "svg",
+      "size": 429
+    },
+    {
+      "localPath": "/images/footer/shape-3.svg",
+      "publicId": "footer/shape-3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813026/ready-set/footer/shape-3.svg",
+      "format": "svg",
+      "size": 474
+    },
+    {
+      "localPath": "/images/header/header-bg.png",
+      "publicId": "header/header-bg",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813028/ready-set/header/header-bg.png",
+      "format": "png",
+      "size": 211099
+    },
+    {
+      "localPath": "/images/hero/hero-bg.png",
+      "publicId": "hero/hero-bg",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813029/ready-set/hero/hero-bg.png",
+      "format": "png",
+      "size": 533356
+    },
+    {
+      "localPath": "/images/hero/hero-bg.webp",
+      "publicId": "hero/hero-bg",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/hero/hero-bg",
+      "format": "webp",
+      "size": 162954
+    },
+    {
+      "localPath": "/images/logistics/bakerypic.png",
+      "publicId": "logistics/bakerypic",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813032/ready-set/logistics/bakerypic.png",
+      "format": "png",
+      "size": 838858
+    },
+    {
+      "localPath": "/images/logistics/bakerypic.webp",
+      "publicId": "logistics/bakerypic",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/logistics/bakerypic",
+      "format": "webp",
+      "size": 56486
+    },
+    {
+      "localPath": "/images/logistics/bg-hero.jpg",
+      "publicId": "logistics/bg-hero",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813033/ready-set/logistics/bg-hero.jpg",
+      "format": "jpg",
+      "size": 117526
+    },
+    {
+      "localPath": "/images/logistics/bg-hero.png",
+      "publicId": "logistics/bg-hero",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/logistics/bg-hero",
+      "format": "png",
+      "size": 2215221
+    },
+    {
+      "localPath": "/images/logistics/carousel/1.png",
+      "publicId": "logistics/carousel/1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813035/ready-set/logistics/carousel/1.png",
+      "format": "png",
+      "size": 667694
+    },
+    {
+      "localPath": "/images/logistics/carousel/1.webp",
+      "publicId": "logistics/carousel/1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/logistics/carousel/1",
+      "format": "webp",
+      "size": 64086
+    },
+    {
+      "localPath": "/images/logistics/carousel/2.png",
+      "publicId": "logistics/carousel/2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813036/ready-set/logistics/carousel/2.png",
+      "format": "png",
+      "size": 588423
+    },
+    {
+      "localPath": "/images/logistics/carousel/2.webp",
+      "publicId": "logistics/carousel/2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/logistics/carousel/2",
+      "format": "webp",
+      "size": 42538
+    },
+    {
+      "localPath": "/images/logistics/carousel/3.png",
+      "publicId": "logistics/carousel/3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813038/ready-set/logistics/carousel/3.png",
+      "format": "png",
+      "size": 708399
+    },
+    {
+      "localPath": "/images/logistics/carousel/3.webp",
+      "publicId": "logistics/carousel/3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/logistics/carousel/3",
+      "format": "webp",
+      "size": 65250
+    },
+    {
+      "localPath": "/images/logistics/carousel/4.png",
+      "publicId": "logistics/carousel/4",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813040/ready-set/logistics/carousel/4.png",
+      "format": "png",
+      "size": 388385
+    },
+    {
+      "localPath": "/images/logistics/carousel/4.webp",
+      "publicId": "logistics/carousel/4",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/logistics/carousel/4",
+      "format": "webp",
+      "size": 15374
+    },
+    {
+      "localPath": "/images/logistics/deliveries/bakerydeliveries.png",
+      "publicId": "logistics/deliveries/bakerydeliveries",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813042/ready-set/logistics/deliveries/bakerydeliveries.png",
+      "format": "png",
+      "size": 1667823
+    },
+    {
+      "localPath": "/images/logistics/deliveries/cateringdeliveries.png",
+      "publicId": "logistics/deliveries/cateringdeliveries",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813047/ready-set/logistics/deliveries/cateringdeliveries.png",
+      "format": "png",
+      "size": 2222826
+    },
+    {
+      "localPath": "/images/logistics/deliveries/flowerdeliveries.png",
+      "publicId": "logistics/deliveries/flowerdeliveries",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813050/ready-set/logistics/deliveries/flowerdeliveries.png",
+      "format": "png",
+      "size": 1620647
+    },
+    {
+      "localPath": "/images/logistics/deliveries/specialtydeliveries.png",
+      "publicId": "logistics/deliveries/specialtydeliveries",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813053/ready-set/logistics/deliveries/specialtydeliveries.png",
+      "format": "png",
+      "size": 1698895
+    },
+    {
+      "localPath": "/images/logistics/flowerpic.png",
+      "publicId": "logistics/flowerpic",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813055/ready-set/logistics/flowerpic.png",
+      "format": "png",
+      "size": 775269
+    },
+    {
+      "localPath": "/images/logistics/flowerpic.webp",
+      "publicId": "logistics/flowerpic",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/logistics/flowerpic",
+      "format": "webp",
+      "size": 43716
+    },
+    {
+      "localPath": "/images/logistics/foodpic.png",
+      "publicId": "logistics/foodpic",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813057/ready-set/logistics/foodpic.png",
+      "format": "png",
+      "size": 638800
+    },
+    {
+      "localPath": "/images/logistics/foodpic.webp",
+      "publicId": "logistics/foodpic",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/logistics/foodpic",
+      "format": "webp",
+      "size": 26392
+    },
+    {
+      "localPath": "/images/logistics/specialtydeliverypic.png",
+      "publicId": "logistics/specialtydeliverypic",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813059/ready-set/logistics/specialtydeliverypic.png",
+      "format": "png",
+      "size": 537509
+    },
+    {
+      "localPath": "/images/logistics/specialtydeliverypic.webp",
+      "publicId": "logistics/specialtydeliverypic",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/logistics/specialtydeliverypic",
+      "format": "webp",
+      "size": 22252
+    },
+    {
+      "localPath": "/images/logo/full-logo-dark.png",
+      "publicId": "logo/full-logo-dark",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813060/ready-set/logo/full-logo-dark.png",
+      "format": "png",
+      "size": 48788
+    },
+    {
+      "localPath": "/images/logo/full-logo-dark.webp",
+      "publicId": "logo/full-logo-dark",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/logo/full-logo-dark",
+      "format": "webp",
+      "size": 15774
+    },
+    {
+      "localPath": "/images/logo/full-logo-light.png",
+      "publicId": "logo/full-logo-light",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813061/ready-set/logo/full-logo-light.png",
+      "format": "png",
+      "size": 48034
+    },
+    {
+      "localPath": "/images/logo/full-logo-light.webp",
+      "publicId": "logo/full-logo-light",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/logo/full-logo-light",
+      "format": "webp",
+      "size": 15674
+    },
+    {
+      "localPath": "/images/logo/logo-dark.png",
+      "publicId": "logo/logo-dark",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813062/ready-set/logo/logo-dark.png",
+      "format": "png",
+      "size": 42941
+    },
+    {
+      "localPath": "/images/logo/logo-white.png",
+      "publicId": "logo/logo-white",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813063/ready-set/logo/logo-white.png",
+      "format": "png",
+      "size": 41667
+    },
+    {
+      "localPath": "/images/logo/logo.png",
+      "publicId": "logo/logo",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813063/ready-set/logo/logo.png",
+      "format": "png",
+      "size": 23706
+    },
+    {
+      "localPath": "/images/logo/new-logo-ready-set copy.png",
+      "publicId": "logo/new-logo-ready-set copy",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813065/ready-set/logo/new-logo-ready-set%20copy.png",
+      "format": "png",
+      "size": 421066
+    },
+    {
+      "localPath": "/images/logo/new-logo-ready-set.png",
+      "publicId": "logo/new-logo-ready-set",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813066/ready-set/logo/new-logo-ready-set.png",
+      "format": "png",
+      "size": 421066
+    },
+    {
+      "localPath": "/images/logo/new-logo-ready-set.webp",
+      "publicId": "logo/new-logo-ready-set",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/logo/new-logo-ready-set",
+      "format": "webp",
+      "size": 110878
+    },
+    {
+      "localPath": "/images/maps/Austin Map.jpg",
+      "publicId": "maps/Austin Map",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813067/ready-set/maps/Austin%20Map.png",
+      "format": "jpg",
+      "size": 165471
+    },
+    {
+      "localPath": "/images/maps/Bay Area Map.jpg",
+      "publicId": "maps/Bay Area Map",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813068/ready-set/maps/Bay%20Area%20Map.png",
+      "format": "jpg",
+      "size": 144653
+    },
+    {
+      "localPath": "/images/placeholder.svg",
+      "publicId": "placeholder",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813069/ready-set/placeholder.svg",
+      "format": "svg",
+      "size": 892
+    },
+    {
+      "localPath": "/images/resources/1.png",
+      "publicId": "resources/1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813073/ready-set/resources/1.png",
+      "format": "png",
+      "size": 1578868
+    },
+    {
+      "localPath": "/images/resources/1.webp",
+      "publicId": "resources/1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/resources/1",
+      "format": "webp",
+      "size": 53806
+    },
+    {
+      "localPath": "/images/resources/10.png",
+      "publicId": "resources/10",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813075/ready-set/resources/10.png",
+      "format": "png",
+      "size": 1059237
+    },
+    {
+      "localPath": "/images/resources/10.webp",
+      "publicId": "resources/10",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/resources/10",
+      "format": "webp",
+      "size": 151488
+    },
+    {
+      "localPath": "/images/resources/2.png",
+      "publicId": "resources/2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813078/ready-set/resources/2.png",
+      "format": "png",
+      "size": 1710387
+    },
+    {
+      "localPath": "/images/resources/2.webp",
+      "publicId": "resources/2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/resources/2",
+      "format": "webp",
+      "size": 74656
+    },
+    {
+      "localPath": "/images/resources/3.png",
+      "publicId": "resources/3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813080/ready-set/resources/3.png",
+      "format": "png",
+      "size": 1182055
+    },
+    {
+      "localPath": "/images/resources/3.webp",
+      "publicId": "resources/3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/resources/3",
+      "format": "webp",
+      "size": 18246
+    },
+    {
+      "localPath": "/images/resources/4.png",
+      "publicId": "resources/4",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813082/ready-set/resources/4.png",
+      "format": "png",
+      "size": 180765
+    },
+    {
+      "localPath": "/images/resources/4.webp",
+      "publicId": "resources/4",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/resources/4",
+      "format": "webp",
+      "size": 14736
+    },
+    {
+      "localPath": "/images/resources/5.png",
+      "publicId": "resources/5",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813085/ready-set/resources/5.png",
+      "format": "png",
+      "size": 1664353
+    },
+    {
+      "localPath": "/images/resources/5.webp",
+      "publicId": "resources/5",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/resources/5",
+      "format": "webp",
+      "size": 64738
+    },
+    {
+      "localPath": "/images/resources/6.png",
+      "publicId": "resources/6",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813090/ready-set/resources/6.png",
+      "format": "png",
+      "size": 3357797
+    },
+    {
+      "localPath": "/images/resources/6.webp",
+      "publicId": "resources/6",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/resources/6",
+      "format": "webp",
+      "size": 91544
+    },
+    {
+      "localPath": "/images/resources/7.png",
+      "publicId": "resources/7",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813092/ready-set/resources/7.png",
+      "format": "png",
+      "size": 419106
+    },
+    {
+      "localPath": "/images/resources/7.webp",
+      "publicId": "resources/7",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/resources/7",
+      "format": "webp",
+      "size": 15888
+    },
+    {
+      "localPath": "/images/resources/8.png",
+      "publicId": "resources/8",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813094/ready-set/resources/8.png",
+      "format": "png",
+      "size": 608432
+    },
+    {
+      "localPath": "/images/resources/8.webp",
+      "publicId": "resources/8",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/resources/8",
+      "format": "webp",
+      "size": 30864
+    },
+    {
+      "localPath": "/images/resources/9.png",
+      "publicId": "resources/9",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813096/ready-set/resources/9.png",
+      "format": "png",
+      "size": 913334
+    },
+    {
+      "localPath": "/images/resources/9.webp",
+      "publicId": "resources/9",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/resources/9",
+      "format": "webp",
+      "size": 79552
+    },
+    {
+      "localPath": "/images/social/1.png",
+      "publicId": "social/1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813097/ready-set/social/1.png",
+      "format": "png",
+      "size": 2076
+    },
+    {
+      "localPath": "/images/social/2.png",
+      "publicId": "social/2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813098/ready-set/social/2.png",
+      "format": "png",
+      "size": 4306
+    },
+    {
+      "localPath": "/images/social/3.png",
+      "publicId": "social/3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813099/ready-set/social/3.png",
+      "format": "png",
+      "size": 6015
+    },
+    {
+      "localPath": "/images/social/4.png",
+      "publicId": "social/4",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813099/ready-set/social/4.png",
+      "format": "png",
+      "size": 2695
+    },
+    {
+      "localPath": "/images/specialty/handling.png",
+      "publicId": "specialty/handling",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813100/ready-set/specialty/handling.png",
+      "format": "png",
+      "size": 32872
+    },
+    {
+      "localPath": "/images/specialty/specialtydelivery.png",
+      "publicId": "specialty/specialtydelivery",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813102/ready-set/specialty/specialtydelivery.png",
+      "format": "png",
+      "size": 518659
+    },
+    {
+      "localPath": "/images/specialty/specialtydelivery1.png",
+      "publicId": "specialty/specialtydelivery1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813104/ready-set/specialty/specialtydelivery1.png",
+      "format": "png",
+      "size": 1175925
+    },
+    {
+      "localPath": "/images/specialty/specialtydelivery2.png",
+      "publicId": "specialty/specialtydelivery2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813108/ready-set/specialty/specialtydelivery2.png",
+      "format": "png",
+      "size": 2301342
+    },
+    {
+      "localPath": "/images/team/Alanis_Emmanuel.png",
+      "publicId": "team/Alanis_Emmanuel",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813109/ready-set/team/Alanis_Emmanuel.png",
+      "format": "png",
+      "size": 263310
+    },
+    {
+      "localPath": "/images/team/Andig_Lezylane.png",
+      "publicId": "team/Andig_Lezylane",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813111/ready-set/team/Andig_Lezylane.png",
+      "format": "png",
+      "size": 606091
+    },
+    {
+      "localPath": "/images/team/Bagay_Honey.png",
+      "publicId": "team/Bagay_Honey",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813112/ready-set/team/Bagay_Honey.png",
+      "format": "png",
+      "size": 156305
+    },
+    {
+      "localPath": "/images/team/Batingana_Trishelle.png",
+      "publicId": "team/Batingana_Trishelle",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813113/ready-set/team/Batingana_Trishelle.png",
+      "format": "png",
+      "size": 173185
+    },
+    {
+      "localPath": "/images/team/Bautista_Gilbert.png",
+      "publicId": "team/Bautista_Gilbert",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813114/ready-set/team/Bautista_Gilbert.png",
+      "format": "png",
+      "size": 132625
+    },
+    {
+      "localPath": "/images/team/Cardenas_Fernando.png",
+      "publicId": "team/Cardenas_Fernando",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813116/ready-set/team/Cardenas_Fernando.png",
+      "format": "png",
+      "size": 133557
+    },
+    {
+      "localPath": "/images/team/Cardoza_Zajarah.png",
+      "publicId": "team/Cardoza_Zajarah",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813117/ready-set/team/Cardoza_Zajarah.png",
+      "format": "png",
+      "size": 286098
+    },
+    {
+      "localPath": "/images/team/Cartilla_Andrea.png",
+      "publicId": "team/Cartilla_Andrea",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813118/ready-set/team/Cartilla_Andrea.png",
+      "format": "png",
+      "size": 331246
+    },
+    {
+      "localPath": "/images/team/Dahan_Rochelle.png",
+      "publicId": "team/Dahan_Rochelle",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813120/ready-set/team/Dahan_Rochelle.png",
+      "format": "png",
+      "size": 293218
+    },
+    {
+      "localPath": "/images/team/dotted-shape.svg",
+      "publicId": "team/dotted-shape",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813136/ready-set/team/dotted-shape.svg",
+      "format": "svg",
+      "size": 5303
+    },
+    {
+      "localPath": "/images/team/Ducao_April.png",
+      "publicId": "team/Ducao_April",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813121/ready-set/team/Ducao_April.png",
+      "format": "png",
+      "size": 222050
+    },
+    {
+      "localPath": "/images/team/Fabian_Romelita.png",
+      "publicId": "team/Fabian_Romelita",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813122/ready-set/team/Fabian_Romelita.png",
+      "format": "png",
+      "size": 158246
+    },
+    {
+      "localPath": "/images/team/Gonzales_Bon.png",
+      "publicId": "team/Gonzales_Bon",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813124/ready-set/team/Gonzales_Bon.png",
+      "format": "png",
+      "size": 246206
+    },
+    {
+      "localPath": "/images/team/Homilda_Annamoira.png",
+      "publicId": "team/Homilda_Annamoira",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813125/ready-set/team/Homilda_Annamoira.png",
+      "format": "png",
+      "size": 201788
+    },
+    {
+      "localPath": "/images/team/Homilda_Luther.png",
+      "publicId": "team/Homilda_Luther",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813126/ready-set/team/Homilda_Luther.png",
+      "format": "png",
+      "size": 177583
+    },
+    {
+      "localPath": "/images/team/Logroño_Leneth.png",
+      "publicId": "team/Logroño_Leneth",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813128/ready-set/team/Logro%C3%B1o_Leneth.png",
+      "format": "png",
+      "size": 235842
+    },
+    {
+      "localPath": "/images/team/Melchor_Efren III.png",
+      "publicId": "team/Melchor_Efren III",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813129/ready-set/team/Melchor_Efren%20III.png",
+      "format": "png",
+      "size": 200418
+    },
+    {
+      "localPath": "/images/team/Pinzon_Michael.png",
+      "publicId": "team/Pinzon_Michael",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813130/ready-set/team/Pinzon_Michael.png",
+      "format": "png",
+      "size": 147711
+    },
+    {
+      "localPath": "/images/team/shape-2.svg",
+      "publicId": "team/shape-2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813138/ready-set/team/shape-2.svg",
+      "format": "svg",
+      "size": 206
+    },
+    {
+      "localPath": "/images/team/Tan_Rochelle_Lean.png",
+      "publicId": "team/Tan_Rochelle_Lean",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813131/ready-set/team/Tan_Rochelle_Lean.png",
+      "format": "png",
+      "size": 164934
+    },
+    {
+      "localPath": "/images/team/Toralba_Bryan.png",
+      "publicId": "team/Toralba_Bryan",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813133/ready-set/team/Toralba_Bryan.png",
+      "format": "png",
+      "size": 121407
+    },
+    {
+      "localPath": "/images/team/Yap_Maria_Noreen.png",
+      "publicId": "team/Yap_Maria_Noreen",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813135/ready-set/team/Yap_Maria_Noreen.png",
+      "format": "png",
+      "size": 223590
+    },
+    {
+      "localPath": "/images/testimonials/author-01.png",
+      "publicId": "testimonials/author-01",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813140/ready-set/testimonials/author-01.png",
+      "format": "png",
+      "size": 310994
+    },
+    {
+      "localPath": "/images/testimonials/author-02.png",
+      "publicId": "testimonials/author-02",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813141/ready-set/testimonials/author-02.png",
+      "format": "png",
+      "size": 36841
+    },
+    {
+      "localPath": "/images/testimonials/author-03.png",
+      "publicId": "testimonials/author-03",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813142/ready-set/testimonials/author-03.png",
+      "format": "png",
+      "size": 81685
+    },
+    {
+      "localPath": "/images/testimonials/author-04.png",
+      "publicId": "testimonials/author-04",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813143/ready-set/testimonials/author-04.png",
+      "format": "png",
+      "size": 38771
+    },
+    {
+      "localPath": "/images/testimonials/author-05.png",
+      "publicId": "testimonials/author-05",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813147/ready-set/testimonials/author-05.png",
+      "format": "png",
+      "size": 2575540
+    },
+    {
+      "localPath": "/images/testimonials/author-06.png",
+      "publicId": "testimonials/author-06",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813148/ready-set/testimonials/author-06.png",
+      "format": "png",
+      "size": 6294
+    },
+    {
+      "localPath": "/images/testimonials/author-07.png",
+      "publicId": "testimonials/author-07",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813150/ready-set/testimonials/author-07.png",
+      "format": "png",
+      "size": 4283
+    },
+    {
+      "localPath": "/images/testimonials/author-08.png",
+      "publicId": "testimonials/author-08",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813150/ready-set/testimonials/author-08.png",
+      "format": "png",
+      "size": 36362
+    },
+    {
+      "localPath": "/images/testimonials/author-09.png",
+      "publicId": "testimonials/author-09",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813151/ready-set/testimonials/author-09.png",
+      "format": "png",
+      "size": 322674
+    },
+    {
+      "localPath": "/images/testimonials/author-10.png",
+      "publicId": "testimonials/author-10",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813152/ready-set/testimonials/author-10.png",
+      "format": "png",
+      "size": 99012
+    },
+    {
+      "localPath": "/images/virtual/1.png",
+      "publicId": "virtual/1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813153/ready-set/virtual/1.png",
+      "format": "png",
+      "size": 15509
+    },
+    {
+      "localPath": "/images/virtual/1.webp",
+      "publicId": "virtual/1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/virtual/1",
+      "format": "webp",
+      "size": 4520
+    },
+    {
+      "localPath": "/images/virtual/2.png",
+      "publicId": "virtual/2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813154/ready-set/virtual/2.png",
+      "format": "png",
+      "size": 15201
+    },
+    {
+      "localPath": "/images/virtual/2.webp",
+      "publicId": "virtual/2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/virtual/2",
+      "format": "webp",
+      "size": 4018
+    },
+    {
+      "localPath": "/images/virtual/3.png",
+      "publicId": "virtual/3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813155/ready-set/virtual/3.png",
+      "format": "png",
+      "size": 12063
+    },
+    {
+      "localPath": "/images/virtual/3.webp",
+      "publicId": "virtual/3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/virtual/3",
+      "format": "webp",
+      "size": 3938
+    },
+    {
+      "localPath": "/images/virtual/4.png",
+      "publicId": "virtual/4",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813155/ready-set/virtual/4.png",
+      "format": "png",
+      "size": 17268
+    },
+    {
+      "localPath": "/images/virtual/4.webp",
+      "publicId": "virtual/4",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/virtual/4",
+      "format": "webp",
+      "size": 3822
+    },
+    {
+      "localPath": "/images/virtual/administrative-support.jpg",
+      "publicId": "virtual/administrative-support",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813156/ready-set/virtual/administrative-support.jpg",
+      "format": "jpg",
+      "size": 50466
+    },
+    {
+      "localPath": "/images/virtual/administrative-support.webp",
+      "publicId": "virtual/administrative-support",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/virtual/administrative-support",
+      "format": "webp",
+      "size": 10746
+    },
+    {
+      "localPath": "/images/virtual/appointment-scheduling.jpg",
+      "publicId": "virtual/appointment-scheduling",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813157/ready-set/virtual/appointment-scheduling.jpg",
+      "format": "jpg",
+      "size": 38993
+    },
+    {
+      "localPath": "/images/virtual/content-creation.jpg",
+      "publicId": "virtual/content-creation",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813158/ready-set/virtual/content-creation.jpg",
+      "format": "jpg",
+      "size": 48086
+    },
+    {
+      "localPath": "/images/virtual/content-creation.webp",
+      "publicId": "virtual/content-creation",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/virtual/content-creation",
+      "format": "webp",
+      "size": 10084
+    },
+    {
+      "localPath": "/images/virtual/customer-service.jpg",
+      "publicId": "virtual/customer-service",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813159/ready-set/virtual/customer-service.jpg",
+      "format": "jpg",
+      "size": 46281
+    },
+    {
+      "localPath": "/images/virtual/customer-service.webp",
+      "publicId": "virtual/customer-service",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/virtual/customer-service",
+      "format": "webp",
+      "size": 9998
+    },
+    {
+      "localPath": "/images/virtual/discovery-call.jpg",
+      "publicId": "virtual/discovery-call",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813160/ready-set/virtual/discovery-call.jpg",
+      "format": "jpg",
+      "size": 109606
+    },
+    {
+      "localPath": "/images/virtual/discovery-call.webp",
+      "publicId": "virtual/discovery-call",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/virtual/discovery-call",
+      "format": "webp",
+      "size": 28026
+    },
+    {
+      "localPath": "/images/virtual/dollar.svg",
+      "publicId": "virtual/dollar",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813161/ready-set/virtual/dollar.svg",
+      "format": "svg",
+      "size": 10761
+    },
+    {
+      "localPath": "/images/virtual/drive.svg",
+      "publicId": "virtual/drive",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813163/ready-set/virtual/drive.svg",
+      "format": "svg",
+      "size": 10332
+    },
+    {
+      "localPath": "/images/virtual/header-bg.jpg",
+      "publicId": "virtual/header-bg",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813164/ready-set/virtual/header-bg.jpg",
+      "format": "jpg",
+      "size": 38153
+    },
+    {
+      "localPath": "/images/virtual/header-bg.webp",
+      "publicId": "virtual/header-bg",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/virtual/header-bg",
+      "format": "webp",
+      "size": 19436
+    },
+    {
+      "localPath": "/images/virtual/header.jpg",
+      "publicId": "virtual/header",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813166/ready-set/virtual/header.jpg",
+      "format": "jpg",
+      "size": 45305
+    },
+    {
+      "localPath": "/images/virtual/logo-headset-dark.png",
+      "publicId": "virtual/logo-headset-dark",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813167/ready-set/virtual/logo-headset-dark.png",
+      "format": "png",
+      "size": 22655
+    },
+    {
+      "localPath": "/images/virtual/logo-headset-dark.webp",
+      "publicId": "virtual/logo-headset-dark",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/virtual/logo-headset-dark",
+      "format": "webp",
+      "size": 5720
+    },
+    {
+      "localPath": "/images/virtual/logo-headset.png",
+      "publicId": "virtual/logo-headset",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813167/ready-set/virtual/logo-headset.png",
+      "format": "png",
+      "size": 22138
+    },
+    {
+      "localPath": "/images/virtual/logo-headset.webp",
+      "publicId": "virtual/logo-headset",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/virtual/logo-headset",
+      "format": "webp",
+      "size": 5480
+    },
+    {
+      "localPath": "/images/virtual/place-holder.png",
+      "publicId": "virtual/place-holder",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813168/ready-set/virtual/place-holder.png",
+      "format": "png",
+      "size": 13697
+    },
+    {
+      "localPath": "/images/virtual/projects/1.png",
+      "publicId": "virtual/projects/1",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813169/ready-set/virtual/projects/1.png",
+      "format": "png",
+      "size": 87293
+    },
+    {
+      "localPath": "/images/virtual/projects/2.png",
+      "publicId": "virtual/projects/2",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813171/ready-set/virtual/projects/2.png",
+      "format": "png",
+      "size": 68116
+    },
+    {
+      "localPath": "/images/virtual/projects/3.png",
+      "publicId": "virtual/projects/3",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813172/ready-set/virtual/projects/3.png",
+      "format": "png",
+      "size": 69369
+    },
+    {
+      "localPath": "/images/virtual/projects/4.png",
+      "publicId": "virtual/projects/4",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813173/ready-set/virtual/projects/4.png",
+      "format": "png",
+      "size": 77119
+    },
+    {
+      "localPath": "/images/virtual/projects/5.png",
+      "publicId": "virtual/projects/5",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813174/ready-set/virtual/projects/5.png",
+      "format": "png",
+      "size": 85179
+    },
+    {
+      "localPath": "/images/virtual/projects/6.png",
+      "publicId": "virtual/projects/6",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813175/ready-set/virtual/projects/6.png",
+      "format": "png",
+      "size": 82501
+    },
+    {
+      "localPath": "/images/virtual/research-analysis.jpg",
+      "publicId": "virtual/research-analysis",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813176/ready-set/virtual/research-analysis.jpg",
+      "format": "jpg",
+      "size": 80360
+    },
+    {
+      "localPath": "/images/virtual/time.svg",
+      "publicId": "virtual/time",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813176/ready-set/virtual/time.svg",
+      "format": "svg",
+      "size": 5483
+    },
+    {
+      "localPath": "/images/virtual/va-diagram.png",
+      "publicId": "virtual/va-diagram",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813178/ready-set/virtual/va-diagram.png",
+      "format": "png",
+      "size": 68973
+    }
+  ]
+}

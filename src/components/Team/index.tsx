@@ -1,13 +1,14 @@
 import { TeamType } from "@/types/team";
 import SectionTitle from "../Common/SectionTitle";
 import SingleTeam from "./SingleTeam";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const teamData: TeamType[] = [
   {
     id: 1,
     name: "Gilbert Bautista",
     designation: "Senior Brand Manager",
-    image: "/images/team/Bautista_Gilbert.png",
+    image: getCloudinaryUrl("team/Bautista_Gilbert"),
     skills: [
       "Brand Strategy",
       "Digital Marketing & SEO",
@@ -23,7 +24,7 @@ const teamData: TeamType[] = [
     id: 2,
     name: "Bon Gonzales",
     designation: "Brand Manager",
-    image: "/images/team/Gonzales_Bon.png",
+    image: getCloudinaryUrl("team/Gonzales_Bon"),
     skills: ["Customer Service", "Brand Management", "Project & Marketing Management"],
     description:
       "Enjoys collaborating with teams and taking initiative in independent work, focusing on quality and efficiency.",
@@ -35,7 +36,7 @@ const teamData: TeamType[] = [
     id: 3,
     name: "Anne Leneth Logroño",
     designation: "Brand Manager Support Supervisor",
-    image: "/images/team/Logroño_Leneth.png",
+    image: getCloudinaryUrl("team/Logrono_Leneth"),
     skills: ["Social Media Management", "Logistics Coordination", "Campaign Monitoring"],
     description:
       "Strong organizational skills with proven ability to train teams on metrics and product analytics.",
@@ -47,7 +48,7 @@ const teamData: TeamType[] = [
     id: 4,
     name: "Bryan Paul Toralba",
     designation: "Customer Service & Sales Support Specialist",
-    image: "/images/team/Toralba_Bryan.png",
+    image: getCloudinaryUrl("team/Toralba_Bryan"),
     skills: ["Quality Assurance", "Tech-Savvy", "Brand Strategy"],
     description:
       "Punctual and adaptable with excellent problem-solving abilities and clear communication skills.",
@@ -59,7 +60,7 @@ const teamData: TeamType[] = [
     id: 5,
     name: "Trishelle Batingana",
     designation: "Sales and Marketing Coordinator",
-    image: "/images/team/Batingana_Trishelle.png",
+    image: getCloudinaryUrl("team/Batingana_Trishelle"),
     skills: ["Customer Service", "Sales Support", "Digital Marketing"],
     description:
       "Focuses on delivering quality work and meeting deadlines efficiently, both independently and in team environments.",
@@ -71,7 +72,7 @@ const teamData: TeamType[] = [
     id: 6,
     name: "Honey Bagay",
     designation: "Marketing Supervisor",
-    image: "/images/team/Bagay_Honey.png",
+    image: getCloudinaryUrl("team/Bagay_Honey"),
     skills: [
       "Content Creation",
       "Operational Coordination",
@@ -87,7 +88,7 @@ const teamData: TeamType[] = [
     id: 7,
     name: "Zajarah Mae Cardoza",
     designation: "Logistics Supervisor",
-    image: "/images/team/Cardoza_Zajarah.png",
+    image: getCloudinaryUrl("team/Cardoza_Zajarah"),
     skills: [
       "Logistics and Operations",
       "Team Development",
@@ -103,7 +104,7 @@ const teamData: TeamType[] = [
     id: 8,
     name: "Luther Homilda",
     designation: "Logistics Supervisor",
-    image: "/images/team/Homilda_Luther.png",
+    image: getCloudinaryUrl("team/Homilda_Luther"),
     skills: ["Logistics Coordination", "Customer Service & Sales", "Team Management"],
     description:
       "Analytical abilities, problem-solving, leadership and team management, as well as strong communication skills.",
@@ -115,7 +116,7 @@ const teamData: TeamType[] = [
     id: 9,
     name: "April Ducao",
     designation: "Project and Human Resources Supervisor",
-    image: "/images/team/Ducao_April.png",
+    image: getCloudinaryUrl("team/Ducao_April"),
     skills: [
       "Team Managment",
       "Process Improvement",
@@ -131,7 +132,7 @@ const teamData: TeamType[] = [
     id: 10,
     name: "Annamoira Homilda",
     designation: "Logistics Coordinator",
-    image: "/images/team/Homilda_Annamoira.png",
+    image: getCloudinaryUrl("team/Homilda_Annamoira"),
     skills: [
       "Logistics",
       "Client and Vendor Communication",
@@ -147,7 +148,7 @@ const teamData: TeamType[] = [
     id: 11,
     name: "Andrea Fetalyn Cartilla",
     designation: "Quality Assurance and Social Media Lead",
-    image: "/images/team/Cartilla_Andrea.png",
+    image: getCloudinaryUrl("team/Cartilla_Andrea"),
     skills: [
       "Quality Control",
       "Social Media",
@@ -163,7 +164,7 @@ const teamData: TeamType[] = [
     id: 12,
     name: "Rochelle Dahan",
     designation: "Social Media Coordinator",
-    image: "/images/team/Dahan_Rochelle.png",
+    image: getCloudinaryUrl("team/Dahan_Rochelle"),
     skills: ["Digital Marketing", "Lead Generation", "Quality Assurance"],
     description:
       "I seek for work efficiency and productivity to help fortify brand presence, drive customer loyalty, and achieve organizational success.",
@@ -175,7 +176,7 @@ const teamData: TeamType[] = [
     id: 13,
     name: "Lezylane Andig",
     designation: "Senior Graphic Designer",
-    image: "/images/team/Andig_Lezylane.png",
+    image: getCloudinaryUrl("team/Andig_Lezylane"),
     skills: [
       "Graphic Design",
       "Administrative Support",
@@ -191,7 +192,7 @@ const teamData: TeamType[] = [
     id: 14,
     name: "Emmanuel Alanis",
     designation: "Full Stack Developer",
-    image: "/images/team/Alanis_Emmanuel.png",
+    image: getCloudinaryUrl("team/Alanis_Emmanuel"),
     skills: ["Web Development", "Problem Solving", "Operation Management"],
     description:
       "Streamlines food orders, manages driver communication, and oversees food drives while enhancing customer experiences.",
@@ -203,7 +204,7 @@ const teamData: TeamType[] = [
     id: 15,
     name: "Fernando Cardenas",
     designation: "Web Development Specialist",
-    image: "/images/team/Cardenas_Fernando.png",
+    image: getCloudinaryUrl("team/Cardenas_Fernando"),
     skills: ["Web Development", "Bilingual Communication (English/Spanish)", "Sales Support and Recruitment"],
     description:
       "Experienced in customer service, logistics, and administrative skills, currently expanding web development expertise.",
@@ -215,7 +216,7 @@ const teamData: TeamType[] = [
     id: 16,
     name: "Maria Noreen Yap",
     designation: "Marketing Coordinator",
-    image: "/images/team/Yap_Maria_Noreen.png",
+    image: getCloudinaryUrl("team/Yap_Maria_Noreen"),
     skills: [
       "Marketing Operations",
       "People Management",
@@ -231,7 +232,7 @@ const teamData: TeamType[] = [
     id: 17,
     name: "Rochelle Lean Tan",
     designation: "Customer Service & Sales Support Specialist",
-    image: "/images/team/Tan_Rochelle_Lean.png",
+    image: getCloudinaryUrl("team/Tan_Rochelle_Lean"),
     skills: ["Customer Service", "Data Management", "Marketing and Social Media"],
     description:
       "Experienced in handling inbound and outbound calls, emails, and correspondences with strong communication skills.",
@@ -243,7 +244,7 @@ const teamData: TeamType[] = [
     id: 18,
     name: "Romelita Fabian",
     designation: "Customer Service & Sales Support Specialist",
-    image: "/images/team/Fabian_Romelita.png",
+    image: getCloudinaryUrl("team/Fabian_Romelita"),
     skills: [
       "Client Management",
       "Sales Support",
@@ -255,17 +256,6 @@ const teamData: TeamType[] = [
     twitterLink: "/#",
     instagramLink: "/#",
   },
-  // {
-  //   id: 19,
-  //   name: "Efren Melchor III",
-  //   designation: "Sales and Marketing Data Coordinator", // Updated from CSV
-  //   image: "/images/team/Melchor_Efren III.png",
-  //   skills: ["Marketing Data Analysis", "Email Campaign Management", "Lead Management & Prospecting"],
-  //   description: "Committed to continuous learning and delivering top-notch service with enthusiasm for new opportunities.",
-  //   facebookLink: "/#",
-  //   twitterLink: "/#",
-  //   instagramLink: "/#",
-  // },
 ];
 
 const Team = () => {

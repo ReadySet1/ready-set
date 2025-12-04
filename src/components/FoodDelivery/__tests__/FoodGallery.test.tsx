@@ -89,7 +89,7 @@ describe("FoodGallery", () => {
       images.forEach((image, index) => {
         expect(image).toHaveAttribute(
           "src",
-          expect.stringContaining(`food-${index + 1}.jpg`)
+          expect.stringContaining(`food-${index + 1}`)
         );
       });
     });

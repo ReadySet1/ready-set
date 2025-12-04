@@ -1,6 +1,7 @@
 "use client";
 
 import { FormType } from './QuoteRequest/types';
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface DeliveryFeature {
   title: string;
@@ -39,12 +40,11 @@ const SpecialtyDelivery: React.FC<SpecialtyDeliveryProps> = ({ onRequestQuote })
         {/* Image Column */}
         <div className="order-2 md:order-1">
           <div className="max-w-md mx-auto">
-            <picture>
-            <source srcSet="/images/logistics/specialtydeliverypic.webp" type="image/webp"/>
-            <img src="/images/logistics/specialtydeliverypic.png"
+            <img
+              src={getCloudinaryUrl("logistics/specialtydeliverypic")}
               alt="Specialty Delivery Service"
-              className="w-full h-auto rounded-3xl shadow-lg object-cover"/>
-              </picture>
+              className="w-full h-auto rounded-3xl shadow-lg object-cover"
+            />
           </div>
         </div>
 

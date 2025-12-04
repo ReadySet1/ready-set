@@ -6,6 +6,7 @@ import * as React from "react";
 import FeatureCarousel from "./FeatureCarousel";
 import { MaskBackground } from "./MaskBackground";
 import AppointmentDialog from "./Appointment";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const HeroHeader: React.FC = () => {
   const animations: Record<string, Variants> = {
@@ -40,19 +41,13 @@ const HeroHeader: React.FC = () => {
           <div className="absolute inset-0 min-h-full overflow-hidden">
             {" "}
             {/* Changed from h-screen to min-h-full */}
-            <picture>
-              <source
-                srcSet="/images/virtual/header-bg.webp"
-                type="image/webp"
-              />
-              <Image
-                src="/images/virtual/header-bg.jpg"
-                alt="Background"
-                fill
-                className="object-cover brightness-50"
-                priority
-              />
-            </picture>
+            <Image
+              src={getCloudinaryUrl("virtual/header-bg")}
+              alt="Background"
+              fill
+              className="object-cover brightness-50"
+              priority
+            />
           </div>
           <MaskBackground />
 

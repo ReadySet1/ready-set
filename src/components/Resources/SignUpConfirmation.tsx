@@ -1,12 +1,14 @@
 // app/page.tsx
 import Image from 'next/image';
+import { getCloudinaryUrl } from "@/lib/cloudinary";
+
 export default function ConfirmationPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-white p-4">
         <div className="w-full max-w-2xl rounded-3xl bg-white p-8 text-center shadow-lg">
           {/* Logo */}
           <div className="mb-8">
-        <Image src="/images/logo/logo-white.png"
+        <Image src={getCloudinaryUrl("logo/logo-white")}
          alt="Ready Set Logo"
          width={120}
          height={40}

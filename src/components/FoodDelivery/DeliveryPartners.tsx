@@ -3,6 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface PartnerLogo {
   name: string;
@@ -14,47 +15,47 @@ const DeliveryPartners: React.FC = () => {
   const partners: PartnerLogo[] = [
     {
       name: "Destino",
-      image: "/images/food/partners/destino.png",
+      image: getCloudinaryUrl("food/partners/destino"),
       alt: "Destino logo",
     },
     {
       name: "Grace Deli & Cafe",
-      image: "/images/food/partners/grace.png",
+      image: getCloudinaryUrl("food/partners/grace"),
       alt: "Grace Deli & Cafe logo",
     },
     {
       name: "Kasa Indian Eatery",
-      image: "/images/food/partners/kasa.png",
+      image: getCloudinaryUrl("food/partners/kasa"),
       alt: "Kasa Indian Eatery logo",
     },
     {
       name: "Hungry",
-      image: "/images/food/partners/hungry.png",
+      image: getCloudinaryUrl("food/partners/hungry"),
       alt: "Hungry logo",
     },
     {
       name: "CaterValley",
-      image: "/images/food/partners/catervalley.png",
+      image: getCloudinaryUrl("food/partners/catervalley"),
       alt: "CaterValley logo",
     },
     {
       name: "Conviva",
-      image: "/images/food/partners/conviva.png",
+      image: getCloudinaryUrl("food/partners/conviva"),
       alt: "Conviva logo",
     },
     {
       name: "Roost Roast",
-      image: "/images/food/partners/roostroast.png",
+      image: getCloudinaryUrl("food/partners/roostroast"),
       alt: "Roost Roast logo",
     },
     {
       name: "Noor Indian Fusion Kitchen",
-      image: "/images/food/partners/noor.png",
+      image: getCloudinaryUrl("food/partners/noor"),
       alt: "Noor Indian Fusion Kitchen logo",
     },
     {
       name: "Food.ee",
-      image: "/images/food/partners/foodee.jpg",
+      image: getCloudinaryUrl("food/partners/foodee"),
       alt: "Food.ee logo",
     },
   ];

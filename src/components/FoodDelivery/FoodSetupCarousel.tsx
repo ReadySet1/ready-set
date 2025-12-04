@@ -8,6 +8,7 @@ import {
   CarouselItem,
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const FoodSetupCarousel: React.FC = () => {
   // Generate array of food setup images (foodsetup1.png through foodsetup10.png)
@@ -15,7 +16,7 @@ const FoodSetupCarousel: React.FC = () => {
   const foodSetupImages = useMemo(
     () =>
       Array.from({ length: 10 }, (_, i) => ({
-        src: `/images/food/foodsetup/foodsetup${i + 1}.png`,
+        src: getCloudinaryUrl(`food/foodsetup/foodsetup${i + 1}`),
         alt: `Food setup ${i + 1}`,
       })),
     [],

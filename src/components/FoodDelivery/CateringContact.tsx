@@ -6,6 +6,7 @@ import Image from "next/image";
 import ScheduleDialog from "@/components/Logistics/Schedule";
 import sendEmail from "@/app/actions/email";
 import { loadRecaptchaScript, executeRecaptcha } from "@/lib/recaptcha";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 // Logistics calendar URL for scheduling appointments
 const LOGISTICS_CALENDAR_URL =
@@ -432,7 +433,7 @@ const CateringContact: React.FC = () => {
               <div className="mb-8 flex justify-center">
                 <div className="relative h-32 w-64">
                   <Image
-                    src="/images/logo/logo.png"
+                    src={getCloudinaryUrl("logo/logo")}
                     alt="Ready Set"
                     fill
                     className="object-contain"

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import ScheduleDialog from "../Logistics/Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface BakeryHeroProps {
   onRequestQuote?: () => void;
@@ -83,7 +84,7 @@ const BakeryHero: React.FC<BakeryHeroProps> = ({ onRequestQuote }) => {
       {/* Background image */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="/images/food/truckbg.png"
+          src={getCloudinaryUrl("food/truckbg")}
           alt="Delivery truck background"
           fill
           sizes="100vw"
@@ -140,7 +141,7 @@ const BakeryHero: React.FC<BakeryHeroProps> = ({ onRequestQuote }) => {
                   className={`absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 overflow-visible ${imageContainerClass}`}
                 >
                   <Image
-                    src="/images/bakery/breadbasket.png"
+                    src={getCloudinaryUrl("bakery/breadbasket")}
                     alt="Basket of fresh bread and bakery products"
                     fill
                     sizes="(max-width: 640px) 350px, (max-width: 1024px) 450px, 600px"

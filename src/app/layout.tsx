@@ -16,8 +16,10 @@ import { CONSTANTS } from "@/constants";
 import UmamiAnalytics from "@/components/Analytics/UmamiAnalytics";
 import QueryProvider from "@/providers/QueryProvider";
 import type { Metadata } from "next";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://readysetllc.com";
+const ogImageUrl = getCloudinaryUrl("og-image");
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -37,7 +39,7 @@ export const metadata: Metadata = {
       "On-demand courier that specializes in delivery for all your needs. We are Food Safety, and HIPPA Certified. Our team can meet all your Bay Area delivery needs.",
     images: [
       {
-        url: "/images/og-image.jpg",
+        url: ogImageUrl,
         width: 1200,
         height: 630,
         alt: "Ready Set LLC",
@@ -49,7 +51,7 @@ export const metadata: Metadata = {
     title: "Ready Set LLC - Always Ready",
     description:
       "On-demand courier that specializes in delivery for all your needs. We are Food Safety, and HIPPA Certified.",
-    images: ["/images/og-image.jpg"],
+    images: [ogImageUrl],
   },
   robots: {
     index: true,

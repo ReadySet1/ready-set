@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { PhoneCall } from "lucide-react";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 import Link from "next/link";
 import AppointmentDialog from "../VirtualAssistant/Appointment";
 import {
@@ -34,7 +35,7 @@ interface AdCardProps {
 }
 
 const BookNow: React.FC<AdCardProps> = ({
-  logoSrc = "/images/logo/logo-white.png",
+  logoSrc = getCloudinaryUrl("logo/logo-white"),
   blogTitle,
   currentUrl,
 }) => {

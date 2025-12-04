@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import AppointmentDialog from '@/components/VirtualAssistant/Appointment';
 import { DownloadPopup } from '../ui/DownloadPopup';
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const DeliveryNetwork = () => {
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
@@ -104,12 +105,7 @@ const DeliveryNetwork = () => {
               {/* Logo at the top with more space */}
               <div className="mb-12">
                 <img
-                  src="/images/logo/new-logo-ready-set.webp"
-                  onError={(e) => {
-                    const img = e.target as HTMLImageElement;
-                    img.onerror = null;
-                    img.src = "/images/logo/new-logo-ready-set.png";
-                  }}
+                  src={getCloudinaryUrl("logo/new-logo-ready-set")}
                   alt="Company logo"
                   className="h-auto w-32"
                 />
@@ -120,12 +116,7 @@ const DeliveryNetwork = () => {
                 <div className="rounded-3xl bg-white p-4 shadow-xl">
                   <div className="overflow-hidden rounded-2xl">
                     <img
-                      src="/images/resources/9.webp"
-                      onError={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        img.onerror = null;
-                        img.src = "/images/resources/9.png";
-                      }}
+                      src={getCloudinaryUrl("resources/9")}
                       alt="A loading machine carrying boxes"
                       className="w-full"
                     />

@@ -1,6 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const NotFound = () => {
   return (
@@ -10,13 +11,13 @@ const NotFound = () => {
           <div className="w-full px-4 md:w-5/12 lg:w-6/12">
             <div className="relative mx-auto aspect-[129/138] max-w-[357px] text-center">
               <Image
-                src="/images/404.svg"
+                src={getCloudinaryUrl("404")}
                 alt="image"
                 fill
                 className="mx-auto max-w-full dark:hidden"
               />
               <Image
-                src="/images/404-dark.svg"
+                src={getCloudinaryUrl("404-dark")}
                 alt="image"
                 fill
                 className="mx-auto hidden max-w-full dark:block"

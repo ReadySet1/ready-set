@@ -8,6 +8,7 @@ import {
   CarouselItem,
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface Partner {
   name: string;
@@ -17,14 +18,14 @@ interface Partner {
 const SpecialtyPartners: React.FC = () => {
   const partners: Partner[] = useMemo(
     () => [
-      { name: "Deli", logo: "/images/food/partners/Deli.jpg" },
-      { name: "Bobcha", logo: "/images/food/partners/bobcha.jpg" },
-      { name: "Foodee", logo: "/images/food/partners/foodee.jpg" },
-      { name: "Destino", logo: "/images/food/partners/destino.png" },
-      { name: "Conviva", logo: "/images/food/partners/conviva.png" },
-      { name: "Kasa Indian Eatery", logo: "/images/food/partners/kasa.png" },
-      { name: "CaterValley", logo: "/images/food/partners/catervalley.png" },
-      { name: "Quivx", logo: "/images/food/partners/quivx.png" },
+      { name: "Deli", logo: getCloudinaryUrl("food/partners/Deli") },
+      { name: "Bobcha", logo: getCloudinaryUrl("food/partners/bobcha") },
+      { name: "Foodee", logo: getCloudinaryUrl("food/partners/foodee") },
+      { name: "Destino", logo: getCloudinaryUrl("food/partners/destino") },
+      { name: "Conviva", logo: getCloudinaryUrl("food/partners/conviva") },
+      { name: "Kasa Indian Eatery", logo: getCloudinaryUrl("food/partners/kasa") },
+      { name: "CaterValley", logo: getCloudinaryUrl("food/partners/catervalley") },
+      { name: "Quivx", logo: getCloudinaryUrl("food/partners/quivx") },
     ],
     [],
   );
@@ -64,7 +65,7 @@ const SpecialtyPartners: React.FC = () => {
       {/* Background Image with flowers */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="/images/specialty/specialtydelivery1.png"
+          src={getCloudinaryUrl("specialty/specialtydelivery1")}
           alt="Flower shop background"
           fill
           style={{ objectFit: "cover" }}
@@ -79,7 +80,7 @@ const SpecialtyPartners: React.FC = () => {
           style={{ marginTop: topImageMargin }}
         >
           <Image
-            src="/images/bakery/deliverysupport1.png"
+            src={getCloudinaryUrl("bakery/deliverysupport1")}
             alt="Delivery Support"
             width={800}
             height={400}

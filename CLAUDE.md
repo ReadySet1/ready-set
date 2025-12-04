@@ -96,11 +96,48 @@ API Route → Server Action → Service Layer → Utils → Prisma
 ### External Integrations
 
 - **CaterValley**: Catering order API (`src/app/api/cater-valley/`)
+- **Cloudinary**: Image CDN (see below)
 - **Stripe**: Payment processing
 - **Sentry**: Error monitoring
 - **SendGrid/Resend**: Email notifications
 - **Mapbox**: Maps and geocoding
 - **Supabase Realtime**: WebSocket-based live tracking
+
+### Cloudinary Image CDN
+
+Static images are served from Cloudinary CDN for optimized delivery.
+
+**Configuration**:
+- Cloud name: `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`
+- Images stored under `ready-set/` folder in Cloudinary
+- Module: `src/lib/cloudinary/`
+
+**Usage**:
+```typescript
+import { getCloudinaryUrl } from '@/lib/cloudinary';
+
+// Basic usage - auto optimization (WebP/AVIF, quality)
+<Image src={getCloudinaryUrl('logo/logo-dark')} alt="Logo" width={140} height={30} />
+
+// With transformations
+<Image
+  src={getCloudinaryUrl('hero/hero-bg', {
+    width: 1920,
+    height: 1080,
+    crop: 'fill',
+    quality: 80
+  })}
+  alt="Hero"
+  fill
+/>
+```
+
+**Path Mapping**:
+- Local: `/images/logo/logo-dark.png`
+- Cloudinary public ID: `logo/logo-dark`
+- Full URL: `https://res.cloudinary.com/{cloud}/image/upload/f_auto,q_auto/ready-set/logo/logo-dark`
+
+**Migration Script**: `scripts/migrate-images-to-cloudinary.ts`
 
 ### TypeScript Paths
 

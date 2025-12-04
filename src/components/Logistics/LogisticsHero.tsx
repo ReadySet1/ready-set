@@ -5,6 +5,7 @@ import { Clock, Truck, Shield } from "lucide-react";
 import ServiceFeaturesSection from "@/components/ui/ServiceFeaturesSection";
 import ScrollToSection from "@/components/Common/ScrollToSection";
 import ScheduleDialog from "./Schedule";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const LogisticsPage: React.FC = () => {
   const [shouldScroll, setShouldScroll] = useState(false);
@@ -42,7 +43,7 @@ const LogisticsPage: React.FC = () => {
       <ServiceFeaturesSection
         title="Premium Logistics Services"
         subtitle="Bay Area's Most Trusted Delivery Partner Since 2019"
-        backgroundImage="/images/logistics/bg-hero.png"
+        backgroundImage={getCloudinaryUrl("logistics/bg-hero")}
         features={logisticsFeatures}
         primaryButtonText="Get Quote"
         secondaryButtonText="Schedule a Call"
