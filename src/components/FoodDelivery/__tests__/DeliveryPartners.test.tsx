@@ -388,7 +388,7 @@ describe("DeliveryPartners", () => {
   describe("Partner Links", () => {
     const expectedPartnerLinks = [
       { name: "Destino", url: "https://www.destinosf.com/" },
-      { name: "Grace Deli & Cafe", url: "https://www.ezcater.com/" },
+      { name: "Grace Deli & Cafe", url: "https://www.grace303.com/" },
       { name: "Kasa Indian Eatery", url: "https://kasaindian.com/" },
       { name: "Hungry", url: "https://www.tryhungry.com/" },
       { name: "CaterValley", url: "https://catervalley.com/" },
