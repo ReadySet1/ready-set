@@ -39,7 +39,7 @@ const FoodSetupCarousel: React.FC = () => {
   }, [foodSetupImages]);
 
   return (
-    <div className="relative w-full bg-yellow-400 py-8 md:py-12 lg:py-16">
+    <div className="relative w-full bg-[#343434] py-8 md:py-12 lg:py-16">
       <div className="mx-auto max-w-7xl px-4">
         <Carousel
           opts={{
@@ -87,7 +87,9 @@ const FoodSetupCarousel: React.FC = () => {
                         fill
                         className="object-cover"
                         sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                        onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                        onError={(
+                          e: React.SyntheticEvent<HTMLImageElement>,
+                        ) => {
                           const target = e.target as HTMLImageElement;
                           target.style.display = "none";
                         }}

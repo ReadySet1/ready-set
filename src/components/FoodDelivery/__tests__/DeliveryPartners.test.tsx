@@ -5,6 +5,29 @@ import DeliveryPartners from "../DeliveryPartners";
 // Mock framer-motion is already configured in jest.setup.ts
 // The mock converts motion components to regular divs
 
+// Mock ScheduleDialog component
+jest.mock("@/components/Logistics/Schedule", () => {
+  const React = require("react");
+  return function MockScheduleDialog({
+    buttonText,
+    calendarUrl,
+    className,
+  }: {
+    buttonText: string;
+    calendarUrl: string;
+    className?: string;
+  }) {
+    return (
+      <div data-testid="schedule-dialog">
+        <button className={className} data-testid="schedule-dialog-button">
+          {buttonText}
+        </button>
+        <div data-testid="schedule-dialog-calendar-url">{calendarUrl}</div>
+      </div>
+    );
+  };
+});
+
 describe("DeliveryPartners", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -169,9 +192,9 @@ describe("DeliveryPartners", () => {
       render(<DeliveryPartners />);
 
       const centeredContainer = document.querySelector(".mt-8.flex.justify-center");
-      const innerDiv = centeredContainer?.querySelector(".relative.h-24");
+      const innerLink = centeredContainer?.querySelector("a.relative.h-24");
       
-      expect(innerDiv).toHaveClass(
+      expect(innerLink).toHaveClass(
         "relative",
         "h-24",
         "w-full",
@@ -217,14 +240,14 @@ describe("DeliveryPartners", () => {
       });
     });
 
-    it("renders partner containers with correct dimensions", () => {
+    it("renders partner link containers with correct dimensions", () => {
       render(<DeliveryPartners />);
 
-      const containers = document.querySelectorAll(".relative.h-24.w-full");
-      expect(containers).toHaveLength(9);
+      const links = screen.getAllByRole("link");
+      expect(links).toHaveLength(9);
 
-      containers.forEach((container) => {
-        expect(container).toHaveClass(
+      links.forEach((link) => {
+        expect(link).toHaveClass(
           "relative",
           "h-24",
           "w-full",
@@ -286,6 +309,34 @@ describe("DeliveryPartners", () => {
         expect(img).toHaveAttribute("sizes", "(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 200px");
       });
     });
+
+    it("all partner links have aria-labels for screen readers", () => {
+      render(<DeliveryPartners />);
+
+      const links = screen.getAllByRole("link");
+      links.forEach((link) => {
+        expect(link).toHaveAttribute("aria-label");
+        expect(link.getAttribute("aria-label")).toMatch(/^Visit .+ website$/);
+      });
+    });
+
+    it("partner links are keyboard accessible", () => {
+      render(<DeliveryPartners />);
+
+      const links = screen.getAllByRole("link");
+      // All links should be focusable by default (no tabindex=-1)
+      links.forEach((link) => {
+        expect(link).not.toHaveAttribute("tabindex", "-1");
+      });
+    });
+
+    it("Partner With Us button is accessible", () => {
+      render(<DeliveryPartners />);
+
+      const partnerButton = screen.getByTestId("schedule-dialog-button");
+      expect(partnerButton).toBeInTheDocument();
+      expect(partnerButton.tagName).toBe("BUTTON");
+    });
   });
 
   describe("Responsive Design", () => {
@@ -317,12 +368,12 @@ describe("DeliveryPartners", () => {
       expect(title).toHaveClass("text-3xl", "md:text-4xl", "lg:text-5xl");
     });
 
-    it("applies responsive height to partner containers", () => {
+    it("applies responsive height to partner link containers", () => {
       render(<DeliveryPartners />);
 
-      const containers = document.querySelectorAll(".relative.h-24");
-      containers.forEach((container) => {
-        expect(container).toHaveClass("h-24", "md:h-32", "lg:h-36");
+      const links = screen.getAllByRole("link");
+      links.forEach((link) => {
+        expect(link).toHaveClass("h-24", "md:h-32", "lg:h-36");
       });
     });
 
@@ -331,6 +382,152 @@ describe("DeliveryPartners", () => {
 
       const centeredContainer = document.querySelector(".mt-8.flex.justify-center");
       expect(centeredContainer).toHaveClass("mt-8", "md:mt-10");
+    });
+  });
+
+  describe("Partner Links", () => {
+    const expectedPartnerLinks = [
+      { name: "Destino", url: "https://www.destinosf.com/" },
+      { name: "Grace Deli & Cafe", url: "https://www.grace303.com/" },
+      { name: "Kasa Indian Eatery", url: "https://kasaindian.com/" },
+      { name: "Hungry", url: "https://www.tryhungry.com/" },
+      { name: "CaterValley", url: "https://catervalley.com/" },
+      { name: "Conviva", url: "https://www.conviva.com/" },
+      { name: "Roost Roast", url: "https://www.roostandroast.com/" },
+      { name: "Noor Indian Fusion Kitchen", url: "https://noorfusionkitchen.com/" },
+      { name: "Food.ee", url: "https://specials.tryhungry.com/foodeeandhungry" },
+    ];
+
+    it("renders all partner logos as clickable links", () => {
+      render(<DeliveryPartners />);
+
+      const links = screen.getAllByRole("link");
+      expect(links).toHaveLength(9);
+    });
+
+    it("renders partner links with correct href URLs", () => {
+      render(<DeliveryPartners />);
+
+      expectedPartnerLinks.forEach(({ url }) => {
+        const link = document.querySelector(`a[href="${url}"]`);
+        expect(link).toBeInTheDocument();
+      });
+    });
+
+    it("renders partner links with target=_blank to open in new tab", () => {
+      render(<DeliveryPartners />);
+
+      const links = screen.getAllByRole("link");
+      links.forEach((link) => {
+        expect(link).toHaveAttribute("target", "_blank");
+      });
+    });
+
+    it("renders partner links with rel=noopener noreferrer for security", () => {
+      render(<DeliveryPartners />);
+
+      const links = screen.getAllByRole("link");
+      links.forEach((link) => {
+        expect(link).toHaveAttribute("rel", "noopener noreferrer");
+      });
+    });
+
+    it("renders partner links with accessible aria-labels", () => {
+      render(<DeliveryPartners />);
+
+      expectedPartnerLinks.forEach(({ name }) => {
+        const link = screen.getByRole("link", { name: `Visit ${name} website` });
+        expect(link).toBeInTheDocument();
+      });
+    });
+
+    it("renders each partner link containing the correct image", () => {
+      render(<DeliveryPartners />);
+
+      expectedPartnerLinks.forEach(({ name, url }) => {
+        const link = document.querySelector(`a[href="${url}"]`);
+        expect(link).toBeInTheDocument();
+        
+        const image = link?.querySelector("img");
+        expect(image).toBeInTheDocument();
+        expect(image).toHaveAttribute("alt", `${name} logo`);
+      });
+    });
+
+    it("applies correct styling to partner link containers", () => {
+      render(<DeliveryPartners />);
+
+      const links = screen.getAllByRole("link");
+      links.forEach((link) => {
+        expect(link).toHaveClass(
+          "relative",
+          "h-24",
+          "w-full",
+          "max-w-[200px]",
+          "transition-transform",
+          "hover:scale-105"
+        );
+      });
+    });
+
+    it("renders Destino link with correct URL", () => {
+      render(<DeliveryPartners />);
+
+      const destinoLink = screen.getByRole("link", { name: /visit destino website/i });
+      expect(destinoLink).toHaveAttribute("href", "https://www.destinosf.com/");
+    });
+
+    it("renders Food.ee link with correct URL in centered section", () => {
+      render(<DeliveryPartners />);
+
+      const foodeeLink = screen.getByRole("link", { name: /visit food\.ee website/i });
+      expect(foodeeLink).toHaveAttribute("href", "https://specials.tryhungry.com/foodeeandhungry");
+    });
+  });
+
+  describe("Partner With Us Button", () => {
+    it("renders the ScheduleDialog component", () => {
+      render(<DeliveryPartners />);
+
+      expect(screen.getByTestId("schedule-dialog")).toBeInTheDocument();
+    });
+
+    it("renders Partner With Us button text", () => {
+      render(<DeliveryPartners />);
+
+      const partnerButton = screen.getByTestId("schedule-dialog-button");
+      expect(partnerButton).toHaveTextContent("Partner With Us");
+    });
+
+    it("renders Partner With Us button with correct styling", () => {
+      render(<DeliveryPartners />);
+
+      const partnerButton = screen.getByTestId("schedule-dialog-button");
+      expect(partnerButton).toHaveClass(
+        "rounded-lg",
+        "bg-yellow-400",
+        "px-8",
+        "py-4",
+        "font-extrabold",
+        "text-gray-800"
+      );
+    });
+
+    it("passes correct calendar URL to ScheduleDialog", () => {
+      render(<DeliveryPartners />);
+
+      const calendarUrl = screen.getByTestId("schedule-dialog-calendar-url");
+      expect(calendarUrl).toHaveTextContent(
+        "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+      );
+    });
+
+    it("renders Partner With Us button in a centered container", () => {
+      render(<DeliveryPartners />);
+
+      const scheduleDialog = screen.getByTestId("schedule-dialog");
+      const parentContainer = scheduleDialog.closest(".mt-12.flex.justify-center");
+      expect(parentContainer).toBeInTheDocument();
     });
   });
 

@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **EzCater GraphQL API Integration**: New delivery API client for EzCater platform
+  - GraphQL client with resilience patterns (circuit breaker, exponential backoff retry)
+  - Type-safe mutations for courier assignment, tracking events, and image uploads
+  - Comprehensive error handling with `EzCaterApiError` class
+  - Environment variables: `EZCATER_API_TOKEN`, `EZCATER_API_URL`, `EZCATER_WEBHOOK_SECRET`
+  - Full test coverage for client, operations, and error handling
+
 - **User Audit History (REA-173)**: Comprehensive audit trail for user profile changes
   - New `UserAudit` model tracking all user modifications with before/after state
   - `UserAuditService` for creating and querying audit entries
@@ -69,6 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `PROGRESS_REVIEW.md` - Executive summary and metrics
 
 ### Changed
+- **DeliveryPartners Component**: Partner logos now clickable with external links
+  - Added "Partner With Us" CTA button with ScheduleDialog integration
+  - Improved accessibility with aria-labels and proper link attributes
+- **FoodSetupCarousel**: Background color changed from yellow (`bg-yellow-400`) to dark gray (`#343434`)
 - **Apply Page (REA-190)**: Changed 'Amazing' text from orange gradient to black
 - **Catering Services Modal**: Updated modal text and added comprehensive tests
 - **Console Logging (REA-127)**: Converted console statements to Sentry error tracking
@@ -101,7 +112,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Promotional Banners (REA-193)**: Permanently removed promotional banner components and tests from all pages
 
 ### Security
-- No critical or high severity vulnerabilities (moderate vulnerabilities exist in dependencies)
+- Fixed 5 high-severity npm vulnerabilities via pnpm overrides
+  - `node-forge@<1.3.2` → `>=1.3.2` (ASN.1 vulnerabilities in firebase-admin)
+  - `valibot@>=0.31.0 <1.2.0` → `>=1.2.0` (ReDoS in next-sanity)
+  - `jws@<4.0.1` → `>=4.0.1` (HMAC signature verification in firebase-admin)
+- Updated `next-sanity` from 11.5.5 to 11.6.10
 
 ## Test Status
 

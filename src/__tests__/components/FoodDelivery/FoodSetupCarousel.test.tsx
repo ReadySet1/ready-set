@@ -165,7 +165,7 @@ describe("FoodSetupCarousel Component", () => {
       const { container } = render(<FoodSetupCarousel />);
 
       const section = container.firstChild as HTMLElement;
-      expect(section).toHaveClass("bg-yellow-400");
+      expect(section).toHaveClass("bg-[#343434]");
     });
 
     it("applies correct padding classes", () => {
