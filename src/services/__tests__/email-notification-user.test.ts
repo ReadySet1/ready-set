@@ -139,6 +139,89 @@ describe.skip("Email Notification Service - User Welcome", () => {
         });
       });
 
+      it("should include vendor details in confirmation email (REA-104)", async () => {
+        const userData = {
+          email: "vendor@example.com",
+          name: "Jane Vendor",
+          userType: "vendor" as const,
+          isAdminCreated: false,
+          vendorDetails: {
+            companyName: "Best Catering Co",
+            contactName: "Jane Vendor",
+            phoneNumber: "555-123-4567",
+            address: {
+              street1: "123 Main Street",
+              street2: "Suite 100",
+              city: "Austin",
+              state: "TX",
+              zip: "78701",
+            },
+            countiesServed: ["Travis", "Williamson", "Hays"],
+            timeNeeded: ["Breakfast", "Lunch", "Dinner"],
+            frequency: "Daily",
+            website: "https://bestcatering.co",
+            cateringBrokerage: ["EZCater", "CaterValley"],
+            provisions: ["Setup", "Delivery", "Cleanup"],
+          },
+        };
+
+        const result = await sendUserWelcomeEmail(userData);
+
+        expect(result).toBe(true);
+        expectEmailSent(mockResendClient.emails.send, {
+          to: userData.email,
+          subject: "Welcome to Ready Set - Your Vendor Account is Ready!",
+        });
+
+        // Verify vendor details are included in email content
+        expectEmailContains(mockResendClient.emails.send, [
+          "Best Catering Co",
+          "Jane Vendor",
+          "555-123-4567",
+          "123 Main Street",
+          "Austin",
+          "TX",
+          "78701",
+          "Travis",
+          "Breakfast",
+          "Daily",
+          "EZCater",
+          "Setup",
+        ]);
+      });
+
+      it("should handle vendor registration without optional details", async () => {
+        const userData = {
+          email: "vendor@example.com",
+          name: "Simple Vendor",
+          userType: "vendor" as const,
+          isAdminCreated: false,
+          vendorDetails: {
+            companyName: "Simple Restaurant",
+            contactName: "Simple Vendor",
+            phoneNumber: "555-999-8888",
+            address: {
+              street1: "456 Oak Avenue",
+              city: "Dallas",
+              state: "TX",
+              zip: "75001",
+            },
+            // Optional fields not provided
+          },
+        };
+
+        const result = await sendUserWelcomeEmail(userData);
+
+        expect(result).toBe(true);
+        expectEmailContains(mockResendClient.emails.send, [
+          "Simple Restaurant",
+          "Simple Vendor",
+          "555-999-8888",
+          "456 Oak Avenue",
+          "Dallas",
+        ]);
+      });
+
       it("should send welcome email to driver (self-registration)", async () => {
         const userData = {
           email: "driver@example.com",

@@ -36,8 +36,20 @@ export async function GET(request: Request) {
       
       // Log the successful authentication
             
-      // If we have a session, determine the correct dashboard based on user role
+      // If we have a session, determine where to redirect
       if (session) {
+        // If 'next' is explicitly set (e.g., for password reset), use it directly
+        // This allows password reset flow to work without being redirected to dashboard
+        if (next && next !== '/' && next.startsWith('/')) {
+          // Set Sentry user context for error tracking
+          setSentryUser({
+            id: session.user.id,
+            email: session.user.email || undefined,
+            role: undefined
+          });
+          return NextResponse.redirect(new URL(next, requestUrl.origin));
+        }
+
         try {
           // Get user's role from profiles table (or create if missing)
           const { data: profile, error: profileError } = await supabase
@@ -50,7 +62,7 @@ export async function GET(request: Request) {
 
           // If no profile exists, create one with default values
           if (profileError || !profile) {
-            
+
             try {
               // Create a default profile for the user
               const { data: newProfile, error: createError } = await supabase

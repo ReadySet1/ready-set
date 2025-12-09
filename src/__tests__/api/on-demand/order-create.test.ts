@@ -440,6 +440,9 @@ describe('POST /api/on-demand/create - Create On-Demand Order', () => {
     });
 
     it('should return 400 when promo code is invalid', async () => {
+      // Mock Math.random to ensure items are always available (avoids flaky test)
+      const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(1.0);
+
       const request = createPostRequest(
         'http://localhost:3000/api/on-demand/create',
         {
@@ -457,6 +460,8 @@ describe('POST /api/on-demand/create - Create On-Demand Order', () => {
 
       const response = await POST(request);
       await expectErrorResponse(response, 400, /Invalid promo code/i);
+
+      randomSpy.mockRestore();
     });
   });
 
