@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import clsx from "clsx";
 
 const scheduleBullets = [
@@ -44,7 +45,7 @@ const pickupBullets = [
 const cardData: Array<{
   title: string;
   bullets: string[];
-  icon: JSX.Element;
+  icon: ReactNode;
   className?: string;
 }> = [
   {
