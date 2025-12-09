@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/utils/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -107,7 +108,10 @@ export default function UpdatePasswordPage() {
       }, 2000)
 
     } catch (err: unknown) {
-      console.error('Password update error:', err)
+      Sentry.captureException(err, {
+        tags: { feature: 'password-reset' },
+        extra: { action: 'update-password' }
+      })
       const errorMessage = err instanceof Error ? err.message : 'Failed to update password. Please try again.'
       setError(errorMessage)
     } finally {
