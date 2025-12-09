@@ -51,8 +51,10 @@ export default function ForgotPasswordPage() {
   }
   
   return (
-    <div className="flex justify-center items-center min-h-screen p-4">
-      <Card className="w-full max-w-md">
+    <section className="bg-[#F4F7FF] py-14 dark:bg-dark lg:py-20">
+      <div className="container">
+        <div className="flex justify-center">
+          <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Forgot Password</CardTitle>
           <CardDescription>Enter your email to reset your password</CardDescription>
@@ -105,6 +107,8 @@ export default function ForgotPasswordPage() {
           </form>
         </CardContent>
       </Card>
-    </div>
+        </div>
+      </div>
+    </section>
   )
 }
