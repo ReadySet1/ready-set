@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -91,6 +92,15 @@ export default function ForgotPasswordPage() {
               >
                 {isSubmitting ? 'Sending...' : 'Send Reset Link'}
               </Button>
+
+              <div className="mt-4 text-center">
+                <Link
+                  href="/sign-in"
+                  className="text-sm text-primary hover:underline"
+                >
+                  Back to Sign In
+                </Link>
+              </div>
             </div>
           </form>
         </CardContent>
