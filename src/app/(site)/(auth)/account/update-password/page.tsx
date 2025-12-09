@@ -8,6 +8,17 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from '@/components/ui/use-toast'
+
+// Define home routes for each user type
+const USER_HOME_ROUTES: Record<string, string> = {
+  admin: '/admin',
+  super_admin: '/admin',
+  driver: '/driver',
+  helpdesk: '/helpdesk',
+  vendor: '/client',
+  client: '/client'
+}
 
 export default function UpdatePasswordPage() {
   const [password, setPassword] = useState('')
@@ -16,9 +27,10 @@ export default function UpdatePasswordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [isSessionValid, setIsSessionValid] = useState<boolean | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const router = useRouter()
 
-  // Verify user has a valid recovery session
+  // Verify user has a valid recovery session and get their role
   useEffect(() => {
     const checkSession = async () => {
       const supabase = await createClient()
@@ -30,6 +42,17 @@ export default function UpdatePasswordPage() {
         setIsSessionValid(false)
       } else {
         setIsSessionValid(true)
+
+        // Fetch user's role from profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('type')
+          .eq('id', session.user.id)
+          .maybeSingle()
+
+        if (profile?.type) {
+          setUserRole(profile.type.toLowerCase())
+        }
       }
     }
 
@@ -71,9 +94,16 @@ export default function UpdatePasswordPage() {
 
       setIsSuccess(true)
 
-      // Redirect to sign-in after a short delay
+      // Show toast notification
+      toast({
+        title: 'Password Updated',
+        description: 'Your password has been successfully updated.',
+      })
+
+      // Redirect to appropriate dashboard based on user role
       setTimeout(() => {
-        router.push('/sign-in?message=Password updated successfully. Please sign in with your new password.')
+        const redirectPath = userRole ? (USER_HOME_ROUTES[userRole] || '/') : '/'
+        router.push(redirectPath)
       }, 2000)
 
     } catch (err: unknown) {
@@ -144,7 +174,7 @@ export default function UpdatePasswordPage() {
               </CardHeader>
               <CardContent>
                 <Alert className="mb-4 border-green-400 bg-green-50 text-green-700">
-                  <AlertDescription>Redirecting you to sign in...</AlertDescription>
+                  <AlertDescription>Redirecting you to your dashboard...</AlertDescription>
                 </Alert>
               </CardContent>
             </Card>
