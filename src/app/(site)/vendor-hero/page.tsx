@@ -5,6 +5,7 @@ import {
   VendorHero,
   VendorServiceDrivers,
 } from "@/components/VendorLanding";
+import BakeryTerms from "@/components/BakeryDelivery/BakeryTerms";
 
 export const metadata: Metadata = {
   title: "Vendor Partnership | Ready Set",
@@ -18,6 +19,7 @@ export default function VendorHeroPage() {
       <VendorHero id="vendor-hero" />
       <VendorDeliveriesShowcase />
       <VendorServiceDrivers />
+      <BakeryTerms variant="vendor" formType="food" />
     </div>
   );
 }
