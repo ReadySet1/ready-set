@@ -597,7 +597,7 @@ describe("/api/register", () => {
   });
 
   describe("POST /api/register - Email Notification", () => {
-    it("should send welcome email to new user", async () => {
+    it("should send welcome email to new user with vendor details (REA-104)", async () => {
       const request = createPostRequest(
         "http://localhost:3000/api/register",
         validVendorData
@@ -605,12 +605,30 @@ describe("/api/register", () => {
 
       await POST(request);
 
-      // Verify email was sent
+      // Verify email was sent with vendor details (REA-104 - Vendor Registration Email)
       expect(mockSendEmail).toHaveBeenCalledWith({
         email: validVendorData.email.toLowerCase(),
         name: validVendorData.contact_name,
         userType: "vendor",
         isAdminCreated: false,
+        vendorDetails: {
+          companyName: validVendorData.company,
+          contactName: validVendorData.contact_name,
+          phoneNumber: validVendorData.phoneNumber,
+          address: {
+            street1: validVendorData.street1,
+            street2: undefined,
+            city: validVendorData.city,
+            state: validVendorData.state,
+            zip: validVendorData.zip,
+          },
+          countiesServed: validVendorData.countiesServed,
+          timeNeeded: validVendorData.timeNeeded,
+          frequency: validVendorData.frequency,
+          website: validVendorData.website,
+          cateringBrokerage: undefined,
+          provisions: undefined,
+        },
       });
     });
 

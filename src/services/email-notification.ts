@@ -38,6 +38,28 @@ const fromEmail = process.env.EMAIL_FROM || "solutions@updates.readysetllc.com";
 const adminEmail = process.env.ADMIN_EMAIL || "info@ready-set.co";
 
 /**
+ * Vendor-specific details for registration email
+ */
+interface VendorRegistrationDetails {
+  companyName: string;
+  contactName: string;
+  phoneNumber: string;
+  address: {
+    street1: string;
+    street2?: string;
+    city: string;
+    state: string;
+    zip: string;
+  };
+  countiesServed?: string[];
+  timeNeeded?: string[];
+  frequency?: string;
+  website?: string;
+  cateringBrokerage?: string[];
+  provisions?: string[];
+}
+
+/**
  * User Registration Email Data
  */
 interface UserRegistrationData {
@@ -46,6 +68,7 @@ interface UserRegistrationData {
   userType: 'vendor' | 'client' | 'driver' | 'helpdesk' | 'admin' | 'super_admin';
   temporaryPassword?: string;
   isAdminCreated?: boolean;
+  vendorDetails?: VendorRegistrationDetails;
 }
 
 /**
@@ -110,6 +133,88 @@ interface CustomerOrderConfirmationData {
 }
 
 /**
+ * Helper to format address for display
+ */
+function formatVendorAddress(address: VendorRegistrationDetails['address']): string {
+  const parts = [
+    address.street1,
+    address.street2,
+    `${address.city}, ${address.state} ${address.zip}`
+  ].filter(Boolean);
+  return parts.join('<br>');
+}
+
+/**
+ * Helper to format array fields for display
+ */
+function formatArrayField(arr?: string[]): string {
+  if (!arr || arr.length === 0) return 'Not specified';
+  return arr.join(', ');
+}
+
+/**
+ * Generate vendor details section for registration email
+ */
+function generateVendorDetailsSection(details: VendorRegistrationDetails): string {
+  // Vendor Profile section
+  const profileDetails = [
+    { label: 'Business Name', value: details.companyName },
+    { label: 'Contact Person', value: details.contactName },
+    { label: 'Phone', value: details.phoneNumber || 'Not provided' },
+  ];
+
+  if (details.website) {
+    profileDetails.push({ label: 'Website', value: details.website });
+  }
+
+  // Business Address section
+  const addressDetails = [
+    { label: 'Address', value: formatVendorAddress(details.address) },
+  ];
+
+  // Vendor Details section - only include fields that have values
+  const vendorSpecificDetails: Array<{ label: string; value: string }> = [];
+
+  if (details.countiesServed && details.countiesServed.length > 0) {
+    vendorSpecificDetails.push({ label: 'Service Areas', value: formatArrayField(details.countiesServed) });
+  }
+  if (details.timeNeeded && details.timeNeeded.length > 0) {
+    vendorSpecificDetails.push({ label: 'Availability', value: formatArrayField(details.timeNeeded) });
+  }
+  if (details.frequency) {
+    vendorSpecificDetails.push({ label: 'Service Frequency', value: details.frequency });
+  }
+  if (details.provisions && details.provisions.length > 0) {
+    vendorSpecificDetails.push({ label: 'Services Provided', value: formatArrayField(details.provisions) });
+  }
+  if (details.cateringBrokerage && details.cateringBrokerage.length > 0) {
+    vendorSpecificDetails.push({ label: 'Catering Brokerage', value: formatArrayField(details.cateringBrokerage) });
+  }
+
+  return `
+    <h3 style="color: ${BRAND_COLORS.text.primary}; font-size: 18px; margin-top: 30px; border-bottom: 2px solid ${BRAND_COLORS.primary}; padding-bottom: 10px;">
+      Your Registration Details
+    </h3>
+
+    <h4 style="color: ${BRAND_COLORS.text.primary}; font-size: 16px; margin-top: 20px;">Vendor Profile</h4>
+    ${generateDetailsTable(profileDetails)}
+
+    <h4 style="color: ${BRAND_COLORS.text.primary}; font-size: 16px; margin-top: 20px;">Business Address</h4>
+    ${generateDetailsTable(addressDetails)}
+
+    ${vendorSpecificDetails.length > 0 ? `
+      <h4 style="color: ${BRAND_COLORS.text.primary}; font-size: 16px; margin-top: 20px;">Vendor Details</h4>
+      ${generateDetailsTable(vendorSpecificDetails)}
+    ` : ''}
+
+    ${generateInfoBox(
+      'Please review your information above. If anything is incorrect, you can update it in your dashboard after logging in.',
+      'info'
+    )}
+  `;
+}
+
+/**
  * Send welcome email to newly registered users (all roles)
  */
 export async function sendUserWelcomeEmail(data: UserRegistrationData): Promise<boolean> {
@@ -163,6 +268,8 @@ export async function sendUserWelcomeEmail(data: UserRegistrationData): Promise<
 
       <h3 style="color: ${BRAND_COLORS.text.primary}; font-size: 18px; margin-top: 25px;">Your account has been created successfully!</h3>
       ${accountDetails}
+
+      ${data.userType === 'vendor' && data.vendorDetails ? generateVendorDetailsSection(data.vendorDetails) : ''}
 
       ${generateOrderedList([
         'Check your email for the confirmation link from Supabase',
