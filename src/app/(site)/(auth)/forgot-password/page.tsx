@@ -30,8 +30,8 @@ export default function ForgotPasswordPage() {
       
       // Use the resetPasswordForEmail function
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        // Make sure this redirectTo is set to your site's base URL + the confirm path
-        redirectTo: `${window.location.origin}/auth/confirm?next=/account/update-password`,
+        // Use auth/callback for PKCE flow which handles the code exchange
+        redirectTo: `${window.location.origin}/auth/callback?next=/account/update-password`,
       })
       
       if (error) {
