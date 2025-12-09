@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,8 +30,8 @@ export default function ForgotPasswordPage() {
       
       // Use the resetPasswordForEmail function
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        // Make sure this redirectTo is set to your site's base URL + the confirm path
-        redirectTo: `${window.location.origin}/auth/confirm?next=/account/update-password`,
+        // Use auth/callback for PKCE flow which handles the code exchange
+        redirectTo: `${window.location.origin}/auth/callback?next=/account/update-password`,
       })
       
       if (error) {
@@ -50,8 +51,10 @@ export default function ForgotPasswordPage() {
   }
   
   return (
-    <div className="flex justify-center items-center min-h-screen p-4">
-      <Card className="w-full max-w-md">
+    <section className="bg-[#F4F7FF] pb-14 pt-[120px] dark:bg-dark sm:pt-[140px] md:pt-[160px] lg:pb-20 lg:pt-[180px]">
+      <div className="container">
+        <div className="flex justify-center">
+          <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Forgot Password</CardTitle>
           <CardDescription>Enter your email to reset your password</CardDescription>
@@ -91,10 +94,21 @@ export default function ForgotPasswordPage() {
               >
                 {isSubmitting ? 'Sending...' : 'Send Reset Link'}
               </Button>
+
+              <div className="mt-4 text-center">
+                <Link
+                  href="/sign-in"
+                  className="text-sm text-primary hover:underline"
+                >
+                  Back to Sign In
+                </Link>
+              </div>
             </div>
           </form>
         </CardContent>
       </Card>
-    </div>
+        </div>
+      </div>
+    </section>
   )
 }
