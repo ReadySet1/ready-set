@@ -1,6 +1,6 @@
 /**
  * Catering Request Status Update API
- * Updates order status and triggers webhooks for external partners like CaterValley
+ * Updates order status and triggers webhooks for external partners like CaterValley and ezCater
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,12 +11,14 @@ import { DriverStatus } from '@/types/prisma';
 import { getEmailPreferencesForUser } from "@/lib/email-preferences";
 import { sendDeliveryStatusEmail } from "@/services/notifications/email";
 import { invalidateVendorCacheOnStatusUpdate } from '@/lib/cache/cache-invalidation';
+import { courierEventService, CourierEventService } from '@/services/ezcater';
 
 // Validation schema for status update request
 const StatusUpdateSchema = z.object({
   driverStatus: z.enum([
     'ASSIGNED',
     'ARRIVED_AT_VENDOR',
+    'PICKED_UP',
     'EN_ROUTE_TO_CLIENT',
     'ARRIVED_TO_CLIENT',
     'COMPLETED',
@@ -45,6 +47,11 @@ interface StatusUpdateResponse {
     caterValley?: {
       success: boolean;
       attempts: number;
+      error?: string;
+    };
+    ezCater?: {
+      success: boolean;
+      eventType?: string;
       error?: string;
     };
   };
@@ -93,6 +100,7 @@ export async function PATCH(
           include: {
             driver: {
               select: {
+                id: true,
                 name: true,
               },
             },
@@ -163,6 +171,65 @@ export async function PATCH(
           success: false,
           attempts: 0,
           error: error instanceof Error ? error.message : 'Unknown webhook error',
+        };
+      }
+    }
+
+    // 5b. Handle ezCater event reporting (if applicable)
+    if (CourierEventService.isEzCaterOrder(order.orderNumber) && order.ezCaterDeliveryId) {
+      try {
+        // Get driver info from dispatch or request
+        const dispatch = order.dispatches[0];
+        const driverProfile = dispatch?.driver;
+
+        if (driverProfile) {
+          // Get full driver record with profile info
+          const driverRecord = await prisma.driver.findFirst({
+            where: {
+              profileId: driverProfile.id,
+              deletedAt: null,
+            },
+            include: {
+              profile: {
+                select: {
+                  id: true,
+                  name: true,
+                  contactNumber: true,
+                },
+              },
+            },
+          });
+
+          if (driverRecord) {
+            const nameParts = (driverRecord.profile?.name || '').split(' ');
+            const driverInfo = {
+              id: driverRecord.id,
+              firstName: nameParts[0] || undefined,
+              lastName: nameParts.slice(1).join(' ') || undefined,
+              phone: driverRecord.phoneNumber || driverRecord.profile?.contactNumber || undefined,
+            };
+
+            const ezCaterResult = await courierEventService.reportStatusChange(
+              order.ezCaterDeliveryId,
+              validatedData.driverStatus,
+              driverInfo,
+              validatedData.location
+            );
+
+            if (ezCaterResult) {
+              webhookResults.ezCater = {
+                success: ezCaterResult.success,
+                eventType: ezCaterResult.eventType,
+                error: ezCaterResult.error,
+              };
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error reporting ezCater event:', error);
+        webhookResults.ezCater = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown ezCater error',
         };
       }
     }
@@ -263,7 +330,8 @@ function canUpdateToStatus(currentStatus: DriverStatus | null, newStatus: Driver
   const validTransitions: Record<string, DriverStatus[]> = {
     'null': ['ASSIGNED'],
     'ASSIGNED': ['ARRIVED_AT_VENDOR', 'COMPLETED'], // Can skip directly to completed if needed
-    'ARRIVED_AT_VENDOR': ['EN_ROUTE_TO_CLIENT', 'COMPLETED'],
+    'ARRIVED_AT_VENDOR': ['PICKED_UP', 'EN_ROUTE_TO_CLIENT', 'COMPLETED'],
+    'PICKED_UP': ['EN_ROUTE_TO_CLIENT', 'COMPLETED'],
     'EN_ROUTE_TO_CLIENT': ['ARRIVED_TO_CLIENT', 'COMPLETED'],
     'ARRIVED_TO_CLIENT': ['COMPLETED'],
     'COMPLETED': [], // Terminal status - no further transitions
@@ -271,7 +339,7 @@ function canUpdateToStatus(currentStatus: DriverStatus | null, newStatus: Driver
 
   const currentKey = currentStatus || 'null';
   const allowedStatuses = validTransitions[currentKey] || [];
-  
+
   return allowedStatuses.includes(newStatus);
 }
 

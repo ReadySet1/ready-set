@@ -38,6 +38,7 @@ export class CaterValleyWebhookService {
     const statusMap: Record<DriverStatus, CaterValleyStatus | null> = {
       ASSIGNED: 'CONFIRM',
       ARRIVED_AT_VENDOR: 'READY',
+      PICKED_UP: 'READY', // Order picked up, mapped to READY for CaterValley
       EN_ROUTE_TO_CLIENT: 'ON_THE_WAY',
       ARRIVED_TO_CLIENT: 'ON_THE_WAY', // Still on the way until confirmed delivered
       COMPLETED: 'COMPLETED',
