@@ -32,6 +32,7 @@ export const CARRIER_CONFIGS: Record<string, CarrierConfig> = {
     statusMapping: {
       ASSIGNED: 'CONFIRM',
       ARRIVED_AT_VENDOR: 'READY',
+      PICKED_UP: 'ON_THE_WAY',
       EN_ROUTE_TO_CLIENT: 'ON_THE_WAY',
       ARRIVED_TO_CLIENT: 'ON_THE_WAY',
       COMPLETED: 'COMPLETED',
@@ -45,6 +46,31 @@ export const CARRIER_CONFIGS: Record<string, CarrierConfig> = {
       maxAttempts: 3,
       baseDelayMs: 1000,
       timeoutMs: 10000,
+    },
+  },
+  ezcater: {
+    id: 'ezcater',
+    name: 'ezCater',
+    // ezCater uses GraphQL API, not webhooks - this URL is for reference only
+    webhookUrl: process.env.EZCATER_API_URL || 'https://api.ezcater.com/graphql',
+    apiKey: process.env.EZCATER_API_TOKEN,
+    enabled: true,
+    statusMapping: {
+      ASSIGNED: 'COURIER_ASSIGNED',
+      ARRIVED_AT_VENDOR: 'ARRIVED_AT_PICKUP',
+      PICKED_UP: 'ORDER_PICKED_UP',
+      EN_ROUTE_TO_CLIENT: 'EN_ROUTE_TO_DROPOFF',
+      ARRIVED_TO_CLIENT: 'ARRIVED_AT_DROPOFF',
+      COMPLETED: 'ORDER_DELIVERED',
+    },
+    orderPrefix: 'EZ-',
+    webhookHeaders: {
+      'Content-Type': 'application/json',
+    },
+    retryPolicy: {
+      maxAttempts: 3,
+      baseDelayMs: 1000,
+      timeoutMs: 20000, // ezCater GraphQL can be slower
     },
   },
 };

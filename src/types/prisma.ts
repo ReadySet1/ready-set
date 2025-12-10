@@ -22,9 +22,10 @@ export const UserStatus = {
   DELETED: 'DELETED' as const,
 };
 
-export type DriverStatus = 'ARRIVED_AT_VENDOR' | 'EN_ROUTE_TO_CLIENT' | 'ARRIVED_TO_CLIENT' | 'ASSIGNED' | 'COMPLETED';
+export type DriverStatus = 'ARRIVED_AT_VENDOR' | 'PICKED_UP' | 'EN_ROUTE_TO_CLIENT' | 'ARRIVED_TO_CLIENT' | 'ASSIGNED' | 'COMPLETED';
 export const DriverStatus = {
   ARRIVED_AT_VENDOR: 'ARRIVED_AT_VENDOR' as const,
+  PICKED_UP: 'PICKED_UP' as const,
   EN_ROUTE_TO_CLIENT: 'EN_ROUTE_TO_CLIENT' as const,
   ARRIVED_TO_CLIENT: 'ARRIVED_TO_CLIENT' as const,
   ASSIGNED: 'ASSIGNED' as const,
