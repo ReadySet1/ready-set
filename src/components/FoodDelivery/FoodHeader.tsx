@@ -104,10 +104,10 @@ const FoodHeader: React.FC = () => {
         animate="visible"
       >
         <Image
-          src={getCloudinaryUrl("food/food-containers")}
+          src={getCloudinaryUrl("food/food-containers-v2")}
           alt="Food containers with various prepared meals"
           fill
-          className="object-cover object-right md:object-center"
+          className="object-cover object-center"
           priority
         />
       </motion.div>
