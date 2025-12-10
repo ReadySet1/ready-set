@@ -612,6 +612,14 @@ const Signin = ({
                         {errors.password}
                       </p>
                     )}
+                    <div className="mt-2 flex justify-end">
+                      <Link
+                        href="/forgot-password"
+                        className="text-sm text-primary hover:underline"
+                      >
+                        Forgot Password?
+                      </Link>
+                    </div>
                   </div>
                   <div className="mb-6">
                     <button

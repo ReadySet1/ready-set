@@ -343,11 +343,32 @@ export async function POST(request: Request) {
       ? (body as DriverFormData | HelpDeskFormData).name
       : (body as VendorFormData | ClientFormData).contact_name;
 
+    // Build vendor details for the confirmation email (REA-104)
+    const vendorDetails = userType === 'vendor' ? {
+      companyName: (body as VendorFormData).company,
+      contactName: (body as VendorFormData).contact_name,
+      phoneNumber: phoneNumber,
+      address: {
+        street1: body.street1,
+        street2: body.street2,
+        city: body.city,
+        state: body.state,
+        zip: body.zip,
+      },
+      countiesServed: (body as VendorFormData).countiesServed,
+      timeNeeded: (body as VendorFormData).timeNeeded,
+      frequency: (body as VendorFormData).frequency,
+      website: (body as VendorFormData).website,
+      cateringBrokerage: (body as VendorFormData).cateringBrokerage,
+      provisions: (body as VendorFormData).provisions,
+    } : undefined;
+
     const emailSent = await sendUserWelcomeEmail({
       email: email.toLowerCase(),
       name: userName,
       userType: userType as 'vendor' | 'client' | 'driver' | 'helpdesk' | 'admin' | 'super_admin',
       isAdminCreated: false,
+      vendorDetails,
     });
 
     console.log(`📧 User registration complete. Email sent: ${emailSent}`);
