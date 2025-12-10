@@ -290,6 +290,17 @@ export async function PUT(
       }
     }
 
+    // Validate email format if provided
+    if (requestBody.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(requestBody.email)) {
+        return NextResponse.json(
+          { error: 'Invalid email format. Please enter a valid email address.' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Prepare data for create/update
     let userTypeEnum: UserType | undefined = undefined;
 

@@ -1,9 +1,44 @@
 import { useEffect } from "react";
 import { useForm, UseFormReturn } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import toast from "react-hot-toast";
 import { UserFormValues } from "../types";
 import { createClient } from "@/utils/supabase/client";
 import { useUser } from "@/contexts/UserContext";
+
+// Validation schema for user form
+const userFormSchema = z.object({
+  id: z.string(),
+  displayName: z.string(),
+  name: z.string().nullable().optional(),
+  contact_name: z.string().nullable().optional(),
+  email: z
+    .string()
+    .email("Please enter a valid email address")
+    .nullable()
+    .or(z.literal("")),
+  contact_number: z.string().nullable(),
+  company_name: z.string().nullable().optional(),
+  website: z.string().nullable().optional(),
+  street1: z.string().nullable().optional(),
+  street2: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  zip: z.string().nullable().optional(),
+  location_number: z.string().nullable().optional(),
+  parking_loading: z.string().nullable().optional(),
+  type: z.enum(["client", "vendor", "driver", "helpdesk", "admin", "super_admin"]).nullable(),
+  status: z.enum(["active", "pending", "deleted"]).optional(),
+  countiesServed: z.array(z.string()).nullable(),
+  counties: z.array(z.string()).nullable(),
+  timeNeeded: z.array(z.string()).nullable(),
+  cateringBrokerage: z.array(z.string()).nullable(),
+  provisions: z.array(z.string()).nullable(),
+  headCount: z.number().nullable(),
+  frequency: z.string().nullable(),
+  sideNotes: z.string().nullable().optional(),
+});
 
 // Define a type that extends UseFormReturn with our custom properties
 type ExtendedUseFormReturn = UseFormReturn<UserFormValues> & {
@@ -20,8 +55,9 @@ export const useUserForm = (
   // Get user session from context
   const { session } = useUser();
   
-  // Create the form with react-hook-form
+  // Create the form with react-hook-form and Zod validation
   const methods = useForm<UserFormValues>({
+    resolver: zodResolver(userFormSchema),
     defaultValues: {
       id: "",
       displayName: "",
