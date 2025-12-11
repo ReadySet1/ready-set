@@ -290,6 +290,17 @@ export async function PUT(
       }
     }
 
+    // Validate email format if provided
+    if (requestBody.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(requestBody.email)) {
+        return NextResponse.json(
+          { error: 'Invalid email format. Please enter a valid email address.' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Validate phone number format if provided
     if (requestBody.contact_number) {
       const digitsOnly = requestBody.contact_number.replace(/\D/g, '');
