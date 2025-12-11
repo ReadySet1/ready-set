@@ -113,9 +113,26 @@ export const useUserForm = (
     loadUserData();
   }, [fetchUser, methods]);
 
+  // Phone validation helper
+  const validatePhoneNumber = (phone: string | null | undefined): string | null => {
+    if (!phone) return null; // Optional field
+    const digitsOnly = phone.replace(/\D/g, '');
+    if (digitsOnly.length !== 10) {
+      return 'Phone number must be exactly 10 digits';
+    }
+    return null;
+  };
+
   // Form submission
   const onSubmit = async (data: UserFormValues) => {
-    try {      
+    try {
+      // Validate phone number before submission
+      const phoneError = validatePhoneNumber(data.contact_number);
+      if (phoneError) {
+        toast.error(phoneError);
+        return;
+      }
+
       // Destructure known fields
       const {
         displayName,

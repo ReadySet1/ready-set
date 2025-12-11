@@ -301,6 +301,19 @@ export async function PUT(
       }
     }
 
+    // Validate phone number format if provided
+    if (requestBody.contact_number) {
+      const digitsOnly = requestBody.contact_number.replace(/\D/g, '');
+      if (digitsOnly.length !== 10) {
+        return NextResponse.json(
+          { error: 'Invalid phone number format. Phone number must be exactly 10 digits.' },
+          { status: 400 }
+        );
+      }
+      // Store the cleaned digits-only version
+      requestBody.contact_number = digitsOnly;
+    }
+
     // Prepare data for create/update
     let userTypeEnum: UserType | undefined = undefined;
 
@@ -665,7 +678,20 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    
+
+    // Validate phone number format if provided
+    if (requestBody.contact_number) {
+      const digitsOnly = requestBody.contact_number.replace(/\D/g, '');
+      if (digitsOnly.length !== 10) {
+        return NextResponse.json(
+          { error: 'Invalid phone number format. Phone number must be exactly 10 digits.' },
+          { status: 400 }
+        );
+      }
+      // Store the cleaned digits-only version
+      requestBody.contact_number = digitsOnly;
+    }
+
     // Prepare data for update
     let userTypeEnum: UserType | undefined = undefined;
     

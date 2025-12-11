@@ -38,6 +38,14 @@ export const ValidationPatterns = {
     .min(10, 'Phone number too short')
     .max(20, 'Phone number too long'),
 
+  // US Phone number (10 digits, numeric only after stripping formatting)
+  usPhone: z.string()
+    .transform((val) => val?.replace(/\D/g, '') || '')
+    .refine(
+      (val) => val === '' || val.length === 10,
+      'Phone number must be exactly 10 digits'
+    ),
+
   // URL validation
   url: z.string()
     .url('Invalid URL format')

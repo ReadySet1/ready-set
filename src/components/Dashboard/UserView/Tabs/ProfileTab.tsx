@@ -4,15 +4,28 @@ import { Controller, useFormContext } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserFormValues } from "../types";
-import { Control } from "react-hook-form";
+import { Control, FieldErrors } from "react-hook-form";
+
+// Phone validation helper
+const validatePhoneNumber = (phone: string | null | undefined): string | null => {
+  if (!phone) return null; // Optional field
+  const digitsOnly = phone.replace(/\D/g, '');
+  if (digitsOnly.length !== 10) {
+    return 'Phone number must be exactly 10 digits';
+  }
+  return null;
+};
 
 interface ProfileTabProps {
   control: Control<UserFormValues>;
   watchedValues: UserFormValues;
+  errors?: FieldErrors<UserFormValues>;
 }
 
 export default function ProfileTab({ control, watchedValues }: ProfileTabProps) {
   const { formState: { errors } } = useFormContext<UserFormValues>();
+  // Get phone validation error
+  const phoneError = validatePhoneNumber(watchedValues.contact_number);
   return (
     <div className="space-y-6">
       <div className="grid gap-6 sm:grid-cols-2">
@@ -61,12 +74,16 @@ export default function ProfileTab({ control, watchedValues }: ProfileTabProps) 
             render={({ field }) => (
               <Input
                 id="contact_number"
-                placeholder="Enter phone number"
+                placeholder="Enter 10-digit phone number"
+                className={phoneError ? "border-red-500 focus-visible:ring-red-500" : ""}
                 {...field}
                 value={field.value || ""}
               />
             )}
           />
+          {phoneError && (
+            <p className="text-sm text-red-500">{phoneError}</p>
+          )}
         </div>
 
         <div className="space-y-2">
