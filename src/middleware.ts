@@ -37,7 +37,8 @@ export async function middleware(request: NextRequest) {
 
   // Skip middleware for specific paths
   if (request.nextUrl.pathname.startsWith('/auth/callback') ||
-      request.nextUrl.pathname === "/complete-profile") {
+      request.nextUrl.pathname === "/complete-profile" ||
+      request.nextUrl.pathname === "/force-password-change") {
     return NextResponse.next();
   }
 
@@ -88,6 +89,24 @@ export async function middleware(request: NextRequest) {
             id: user.id,
             email: user.email || undefined
           });
+        }
+
+        // Check if user has a temporary password and needs to change it
+        // This check applies to ALL protected routes
+        const { data: tempPasswordProfile } = await supabase
+          .from('profiles')
+          .select('isTemporaryPassword')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (tempPasswordProfile?.isTemporaryPassword) {
+          // User has temporary password - redirect to force password change page
+          const redirectUrl = new URL('/force-password-change', request.url);
+          const response = NextResponse.redirect(redirectUrl);
+          response.headers.set('x-auth-redirect', 'true');
+          response.headers.set('x-redirect-from', pathname);
+          response.headers.set('x-redirect-reason', 'temporary-password');
+          return response;
         }
 
         // Enhanced session validation using session manager (disabled for server-side)
