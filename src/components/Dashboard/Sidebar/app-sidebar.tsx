@@ -22,7 +22,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@/utils/supabase/client";
+import { createClient, getCachedUserProfile } from "@/utils/supabase/client";
 import Image from "next/image";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 
@@ -69,6 +69,10 @@ export function AppSidebar() {
   const [isLoading, setIsLoading] = useState(false);
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const { user } = useUser();
+
+  // Get display name from cache or user_metadata (REA-142)
+  const cachedProfile = user?.id ? getCachedUserProfile(user.id) : null;
+  const displayName = cachedProfile?.name || user?.user_metadata?.name || "User";
 
   // Initialize Supabase client
   useEffect(() => {
@@ -320,15 +324,12 @@ export function AppSidebar() {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton>
                   <Avatar className="h-6 w-6">
-                    {/* FIX: Access avatarUrl from user_metadata */}
                     <AvatarImage src={user?.user_metadata?.avatarUrl} />
-                    {/* FIX: Access name from user_metadata for fallback */}
                     <AvatarFallback>
-                      {user?.user_metadata?.name?.charAt(0) || "U"}
+                      {displayName.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  {/* FIX: Access name from user_metadata for display */}
-                  <span>{user?.user_metadata?.name || "User"}</span>
+                  <span>{displayName}</span>
                   <ChevronDown className="ml-auto h-4 w-4" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>

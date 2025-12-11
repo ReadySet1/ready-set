@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { createClient, createAdminClient } from "@/utils/supabase/server";
 
 /**
  * GET: Fetch a user by ID, with authorization.
@@ -795,8 +795,20 @@ export async function PATCH(
       where: { id: userId },
       data: updateData,
     });
-    
-    
+
+    // Sync name to Supabase user_metadata for sidebar display (REA-142)
+    if (updateData.name !== undefined) {
+      try {
+        const adminSupabase = await createAdminClient();
+        await adminSupabase.auth.admin.updateUserById(userId, {
+          user_metadata: { name: updateData.name }
+        });
+      } catch (metadataError) {
+        // Log but don't fail the request - profile is already updated
+        console.warn('[PATCH /api/users] Failed to sync name to user_metadata:', metadataError);
+      }
+    }
+
     // Transform the response to match frontend expectations (snake_case)
     const transformedProfile = {
       id: updatedProfile.id,
