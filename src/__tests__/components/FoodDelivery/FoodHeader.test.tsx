@@ -76,7 +76,7 @@ describe("FoodHeader Component", () => {
 
       const image = screen.getByAltText("Food containers with various prepared meals");
       expect(image).toBeInTheDocument();
-      expect(image).toHaveAttribute("src", "/images/food/food-containers");
+      expect(image).toHaveAttribute("src", expect.stringContaining("food/food-containers-v2"));
     });
 
     it("renders the Get a Quote button", () => {
@@ -194,6 +194,20 @@ describe("FoodHeader Component", () => {
 
       const heading = screen.getByRole("heading", { level: 1 });
       expect(heading.className).toMatch(/text-xl|md:text-2xl|lg:text-3xl/);
+    });
+
+    it("centers the background image on mobile", () => {
+      Object.defineProperty(window, "innerWidth", {
+        writable: true,
+        configurable: true,
+        value: 430,
+      });
+
+      render(<FoodHeader />);
+
+      const image = screen.getByAltText("Food containers with various prepared meals");
+      expect(image).toHaveClass("object-center");
+      expect(image).not.toHaveClass("object-right");
     });
 
     it("has responsive text sizing for description", () => {
@@ -425,7 +439,7 @@ describe("FoodHeader Component", () => {
       render(<FoodHeader />);
 
       const image = screen.getByAltText("Food containers with various prepared meals");
-      expect(image).toHaveAttribute("src", "/images/food/food-containers");
+      expect(image).toHaveAttribute("src", expect.stringContaining("food/food-containers-v2"));
     });
   });
 

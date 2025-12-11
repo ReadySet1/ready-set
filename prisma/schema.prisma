@@ -290,6 +290,7 @@ model CateringRequest {
   createdAt         DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt         DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
   driverStatus      DriverStatus?
+  ezCaterDeliveryId String?          @map("ezcater_delivery_id")
   deletedAt         DateTime?        @db.Timestamptz(6)
   deliveryAddress   Address          @relation("CateringDelivery", fields: [deliveryAddressId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   pickupAddress     Address          @relation("CateringPickup", fields: [pickupAddressId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -547,6 +548,7 @@ enum UserStatus {
 
 enum DriverStatus {
   ARRIVED_AT_VENDOR
+  PICKED_UP
   EN_ROUTE_TO_CLIENT
   ARRIVED_TO_CLIENT
   ASSIGNED

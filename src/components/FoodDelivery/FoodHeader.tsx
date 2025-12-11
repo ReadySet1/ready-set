@@ -13,11 +13,6 @@ const FoodHeader: React.FC = () => {
   const { openForm, DialogForm } = FormManager();
 
   useEffect(() => {
-    const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-      updateMarginTopClass(window.innerWidth);
-    };
-
     const updateMarginTopClass = (width: number) => {
       if (width < 768) {
         setMarginTopClass("mt-6");
@@ -26,6 +21,11 @@ const FoodHeader: React.FC = () => {
       } else {
         setMarginTopClass("mt-4");
       }
+    };
+
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      updateMarginTopClass(window.innerWidth);
     };
 
     checkIfMobile();
@@ -98,16 +98,16 @@ const FoodHeader: React.FC = () => {
     >
       {/* Background image container */}
       <motion.div
-        className="absolute inset-0 z-0"
+        className="absolute inset-0 z-0 overflow-hidden"
         variants={imageVariants}
         initial="hidden"
         animate="visible"
       >
         <Image
-          src={getCloudinaryUrl("food/food-containers")}
+          src={getCloudinaryUrl("food/food-containers-v2")}
           alt="Food containers with various prepared meals"
           fill
-          className="object-cover object-right md:object-center"
+          className="object-cover object-center md:scale-[1.28] md:object-[85%_50%] lg:scale-[1.35] lg:object-[85%_50%]"
           priority
         />
       </motion.div>
