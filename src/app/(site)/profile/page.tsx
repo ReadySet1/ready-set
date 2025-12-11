@@ -180,7 +180,7 @@ const formatFileSize = (bytes: number): string => {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { session, isLoading: isUserLoading, user } = useUser();
+  const { session, isLoading: isUserLoading, user, updateProfileName } = useUser();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -433,6 +433,12 @@ export default function ProfilePage() {
       setProfile(updatedProfile);
       setEditedProfile(updatedProfile);
       setIsEditing(false);
+
+      // Update UserContext to reflect name change in sidebar immediately (REA-142)
+      if (updatedProfile.name) {
+        updateProfileName(updatedProfile.name);
+      }
+
       toast.success("Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
