@@ -1,6 +1,6 @@
 // src/components/Dashboard/UserView/Tabs/ProfileTab.tsx
 
-import { Controller } from "react-hook-form";
+import { Controller, useFormContext } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserFormValues } from "../types";
@@ -12,6 +12,7 @@ interface ProfileTabProps {
 }
 
 export default function ProfileTab({ control, watchedValues }: ProfileTabProps) {
+  const { formState: { errors } } = useFormContext<UserFormValues>();
   return (
     <div className="space-y-6">
       <div className="grid gap-6 sm:grid-cols-2">
@@ -78,11 +79,15 @@ export default function ProfileTab({ control, watchedValues }: ProfileTabProps) 
                 id="email"
                 type="email"
                 placeholder="Enter email address"
+                className={errors.email ? "border-red-500 focus-visible:ring-red-500" : ""}
                 {...field}
                 value={field.value || ""}
               />
             )}
           />
+          {errors.email && (
+            <p className="text-sm text-red-500">{errors.email.message}</p>
+          )}
         </div>
 
         <div className="space-y-2">
