@@ -593,6 +593,7 @@ const CateringOrdersPage: React.FC = () => {
                     placeholder={getSearchPlaceholder()}
                     className="pl-9 h-10 w-full"
                     value={searchTerm}
+                    maxLength={100}
                     onChange={(e) => {
                       setSearchTerm(e.target.value);
                       if (e.target.value) {
