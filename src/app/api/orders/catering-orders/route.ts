@@ -165,14 +165,22 @@ export async function GET(req: NextRequest) {
     }
 
     // Handle field-specific search
-    // Note: For relation filters (user.name, user.email), we need to use 'is' syntax in Prisma
     if (searchTerm) {
+      // Build search conditions based on selected field
+      let searchConditions: any;
+
       switch (searchField) {
         case 'order_number':
-          whereClause.orderNumber = { contains: searchTerm, mode: 'insensitive' };
+          searchConditions = { orderNumber: { contains: searchTerm, mode: 'insensitive' } };
           break;
         case 'client_name':
-          whereClause.user = { is: { name: { contains: searchTerm, mode: 'insensitive' } } };
+          // Search clientAttention field (the order recipient name) and user.name as fallback
+          searchConditions = {
+            OR: [
+              { clientAttention: { contains: searchTerm, mode: 'insensitive' } },
+              { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
+            ]
+          };
           break;
         case 'amount': {
           // Parse the amount - remove currency symbols and commas
@@ -180,9 +188,11 @@ export async function GET(req: NextRequest) {
           const amount = parseFloat(cleanedAmount);
           if (!isNaN(amount)) {
             // Search for amounts within a small range to handle decimal precision
-            whereClause.orderTotal = {
-              gte: amount - 0.01,
-              lte: amount + 0.01
+            searchConditions = {
+              orderTotal: {
+                gte: amount - 0.01,
+                lte: amount + 0.01
+              }
             };
           }
           break;
@@ -195,19 +205,31 @@ export async function GET(req: NextRequest) {
             startOfDay.setHours(0, 0, 0, 0);
             const endOfDay = new Date(parsedDate);
             endOfDay.setHours(23, 59, 59, 999);
-            whereClause.pickupDateTime = { gte: startOfDay, lte: endOfDay };
+            searchConditions = { pickupDateTime: { gte: startOfDay, lte: endOfDay } };
           }
           break;
         }
         default: // 'all' - search across multiple fields
-          // Use AND to combine base conditions with OR search
-          // Prisma requires 'is' for relation filters in nested queries
-          whereClause.OR = [
-            { orderNumber: { contains: searchTerm, mode: 'insensitive' } },
-            { user: { is: { name: { contains: searchTerm, mode: 'insensitive' } } } },
-            { user: { is: { email: { contains: searchTerm, mode: 'insensitive' } } } },
-          ];
+          searchConditions = {
+            OR: [
+              { orderNumber: { contains: searchTerm, mode: 'insensitive' } },
+              { clientAttention: { contains: searchTerm, mode: 'insensitive' } },
+              { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
+              { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
+            ]
+          };
       }
+
+      // Merge search conditions with existing whereClause using AND
+      if (searchConditions) {
+        whereClause = {
+          AND: [
+            whereClause,
+            searchConditions
+          ]
+        };
+      }
+
     }
 
     // Build order by clause
