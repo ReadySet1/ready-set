@@ -165,13 +165,14 @@ export async function GET(req: NextRequest) {
     }
 
     // Handle field-specific search
+    // Note: For relation filters (user.name, user.email), we need to use 'is' syntax in Prisma
     if (searchTerm) {
       switch (searchField) {
         case 'order_number':
           whereClause.orderNumber = { contains: searchTerm, mode: 'insensitive' };
           break;
         case 'client_name':
-          whereClause.user = { name: { contains: searchTerm, mode: 'insensitive' } };
+          whereClause.user = { is: { name: { contains: searchTerm, mode: 'insensitive' } } };
           break;
         case 'amount': {
           // Parse the amount - remove currency symbols and commas
@@ -199,10 +200,12 @@ export async function GET(req: NextRequest) {
           break;
         }
         default: // 'all' - search across multiple fields
+          // Use AND to combine base conditions with OR search
+          // Prisma requires 'is' for relation filters in nested queries
           whereClause.OR = [
             { orderNumber: { contains: searchTerm, mode: 'insensitive' } },
-            { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
-            { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
+            { user: { is: { name: { contains: searchTerm, mode: 'insensitive' } } } },
+            { user: { is: { email: { contains: searchTerm, mode: 'insensitive' } } } },
           ];
       }
     }
