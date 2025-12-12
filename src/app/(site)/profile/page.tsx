@@ -180,7 +180,7 @@ const formatFileSize = (bytes: number): string => {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { session, isLoading: isUserLoading, user } = useUser();
+  const { session, isLoading: isUserLoading, user, updateProfileName } = useUser();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -188,7 +188,18 @@ export default function ProfilePage() {
   const [editedProfile, setEditedProfile] = useState<UserProfile | null>(null);
   const [files, setFiles] = useState<UserFile[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const supabase = createClient();
+
+  // Phone number validation helper
+  const validatePhoneNumber = (phone: string | null | undefined): string | null => {
+    if (!phone) return null; // Optional field
+    const digitsOnly = phone.replace(/\D/g, '');
+    if (digitsOnly.length !== 10) {
+      return 'Phone number must be exactly 10 digits';
+    }
+    return null;
+  };
 
   const {
     status: pushStatus,
@@ -375,6 +386,16 @@ export default function ProfilePage() {
   const handleSave = async () => {
     if (!editedProfile || !user?.id) return;
 
+    // Validate phone number before saving
+    if (editedProfile.contact_number) {
+      const phoneValidationError = validatePhoneNumber(editedProfile.contact_number);
+      if (phoneValidationError) {
+        setPhoneError(phoneValidationError);
+        toast.error(phoneValidationError);
+        return;
+      }
+    }
+
     try {
       setIsSaving(true);
       const {
@@ -412,6 +433,12 @@ export default function ProfilePage() {
       setProfile(updatedProfile);
       setEditedProfile(updatedProfile);
       setIsEditing(false);
+
+      // Update UserContext to reflect name change in sidebar immediately (REA-142)
+      if (updatedProfile.name) {
+        updateProfileName(updatedProfile.name);
+      }
+
       toast.success("Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -428,6 +455,13 @@ export default function ProfilePage() {
 
   const handleInputChange = (field: keyof UserProfile, value: string) => {
     if (!editedProfile) return;
+
+    // Validate phone number on change
+    if (field === 'contact_number') {
+      const error = validatePhoneNumber(value);
+      setPhoneError(error);
+    }
+
     setEditedProfile({
       ...editedProfile,
       [field]: value || null,
@@ -730,15 +764,22 @@ export default function ProfilePage() {
                       Phone Number
                     </Label>
                     {isEditing ? (
-                      <Input
-                        id="contact_number"
-                        value={editedProfile?.contact_number || ""}
-                        onChange={(e) =>
-                          handleInputChange("contact_number", e.target.value)
-                        }
-                        placeholder="Enter your phone number"
-                        className="rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500"
-                      />
+                      <>
+                        <Input
+                          id="contact_number"
+                          value={editedProfile?.contact_number || ""}
+                          onChange={(e) =>
+                            handleInputChange("contact_number", e.target.value)
+                          }
+                          placeholder="Enter 10-digit phone number"
+                          className={`rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 ${
+                            phoneError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""
+                          }`}
+                        />
+                        {phoneError && (
+                          <p className="text-sm text-red-500">{phoneError}</p>
+                        )}
+                      </>
                     ) : (
                       <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-slate-800">
                         <Phone className="h-4 w-4 text-slate-400" />

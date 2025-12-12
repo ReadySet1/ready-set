@@ -33,6 +33,7 @@ export interface FormState {
   success?: boolean;
   userType?: string;
   message?: string;
+  requiresPasswordChange?: boolean;
 }
 
 export async function login(
@@ -254,10 +255,10 @@ export async function login(
       };
     }
 
-    // Get user profile to determine user type
+    // Get user profile to determine user type and check for temporary password
         const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("type, email")
+      .select("type, email, isTemporaryPassword")
       .eq("id", user.id)
       .single();
 
@@ -384,6 +385,20 @@ export async function login(
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 7, // 7 days
   });
+
+    // Check if user needs to change their temporary password
+    if (profile?.isTemporaryPassword) {
+      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
+        console.log(`🔐 [${requestId}] User has temporary password, redirecting to force-password-change`);
+      }
+      return {
+        success: true,
+        redirectTo: '/force-password-change',
+        userType: userType,
+        requiresPasswordChange: true,
+        message: 'Please change your temporary password to continue.'
+      };
+    }
 
     // Determine where to redirect the user
     let redirectPath: string;
