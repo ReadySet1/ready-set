@@ -26,17 +26,18 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { 
-  ClipboardList, 
-  AlertCircle, 
-  Search, 
-  ChevronDown, 
-  Calendar, 
-  User, 
+import {
+  ClipboardList,
+  AlertCircle,
+  Search,
+  ChevronDown,
+  Calendar,
+  User,
   DollarSign,
   PlusCircle,
   Filter,
-  ArrowUpDown
+  ArrowUpDown,
+  X
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -200,6 +201,12 @@ const LoadingSkeleton = () => (
   </div>
 );
 
+// Search field type for filtering
+type SearchFieldType = 'all' | 'date' | 'amount' | 'order_number' | 'client_name';
+
+// Quick filter type for preset filters
+type QuickFilterType = 'today' | 'week' | 'month' | 'high_value' | null;
+
 const CateringOrdersPage: React.FC = () => {
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -208,6 +215,8 @@ const CateringOrdersPage: React.FC = () => {
   const [statusTabFilter, setStatusTabFilter] = useState<StatusTabFilter>('all_open');
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchField, setSearchField] = useState<SearchFieldType>("all");
+  const [quickFilter, setQuickFilter] = useState<QuickFilterType>(null);
   const [sortField, setSortField] = useState<string>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [limit] = useState(10); // Default limit for pagination
@@ -249,9 +258,15 @@ const CateringOrdersPage: React.FC = () => {
           queryParams.append('statusFilter', statusTabFilter);
         }
 
-        // Add search term if present
+        // Add search term and search field if present
         if (searchTerm) {
           queryParams.append('search', searchTerm);
+          queryParams.append('searchField', searchField);
+        }
+
+        // Add quick filter if present
+        if (quickFilter) {
+          queryParams.append('quickFilter', quickFilter);
         }
 
         // Get current user for auth token
@@ -283,7 +298,7 @@ const CateringOrdersPage: React.FC = () => {
     };
 
     fetchOrders();
-  }, [page, statusTabFilter, searchTerm, sortField, sortDirection, limit]);
+  }, [page, statusTabFilter, searchTerm, searchField, quickFilter, sortField, sortDirection, limit]);
 
   // New useEffect to fetch user roles
   useEffect(() => {
@@ -336,6 +351,54 @@ const CateringOrdersPage: React.FC = () => {
     } else {
       setSortField(field);
       setSortDirection("asc");
+    }
+  };
+
+  // Handle quick filter selection
+  const handleQuickFilter = (filter: QuickFilterType) => {
+    setQuickFilter(filter);
+    setSearchTerm(""); // Clear search term when using quick filters
+    setSearchField("all"); // Reset search field
+    setPage(1); // Reset to first page
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSearchField("all");
+    setQuickFilter(null);
+    setPage(1);
+  };
+
+  // Get search placeholder based on selected field
+  const getSearchPlaceholder = (): string => {
+    switch (searchField) {
+      case 'date':
+        return "Enter date (e.g., 10/22/2025)...";
+      case 'amount':
+        return "Enter amount (e.g., 700.00)...";
+      case 'order_number':
+        return "Enter order number...";
+      case 'client_name':
+        return "Enter client name...";
+      default:
+        return "Search order #, client...";
+    }
+  };
+
+  // Get quick filter label for display
+  const getQuickFilterLabel = (): string | null => {
+    switch (quickFilter) {
+      case 'today':
+        return "Today's Orders";
+      case 'week':
+        return "This Week";
+      case 'month':
+        return "This Month";
+      case 'high_value':
+        return "High Value (>$1000)";
+      default:
+        return null;
     }
   };
 
@@ -527,50 +590,108 @@ const CateringOrdersPage: React.FC = () => {
                 <div className="relative flex-1 min-w-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Search order #, client..."
+                    placeholder={getSearchPlaceholder()}
                     className="pl-9 h-10 w-full"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    maxLength={100}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      if (e.target.value) {
+                        setQuickFilter(null); // Clear quick filter when typing
+                      }
+                    }}
                   />
+                  {searchTerm && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                      onClick={() => setSearchTerm("")}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-                
+
                 {/* Filter Controls - Responsive layout */}
                 <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+                  {/* Quick Filters Dropdown */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="gap-2 h-10 flex-1 sm:flex-none">
+                      <Button
+                        variant={quickFilter ? "default" : "outline"}
+                        className={`gap-2 h-10 flex-1 sm:flex-none ${quickFilter ? 'bg-amber-500 hover:bg-amber-600' : ''}`}
+                      >
                         <Filter className="h-4 w-4" />
-                        <span className="sm:hidden md:inline">Filters</span>
+                        <span className="sm:hidden md:inline">
+                          {getQuickFilterLabel() || "Filters"}
+                        </span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem>Today's Orders</DropdownMenuItem>
-                      <DropdownMenuItem>This Week's Orders</DropdownMenuItem>
-                      <DropdownMenuItem>This Month's Orders</DropdownMenuItem>
-                      <DropdownMenuItem>High Value ({'>'}$1000)</DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleQuickFilter('today')}
+                        className={quickFilter === 'today' ? 'bg-amber-100' : ''}
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Today&apos;s Orders
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleQuickFilter('week')}
+                        className={quickFilter === 'week' ? 'bg-amber-100' : ''}
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        This Week&apos;s Orders
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleQuickFilter('month')}
+                        className={quickFilter === 'month' ? 'bg-amber-100' : ''}
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        This Month&apos;s Orders
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleQuickFilter('high_value')}
+                        className={quickFilter === 'high_value' ? 'bg-amber-100' : ''}
+                      >
+                        <DollarSign className="h-4 w-4 mr-2" />
+                        High Value ({'>'}$1000)
+                      </DropdownMenuItem>
+                      {quickFilter && (
+                        <>
+                          <div className="my-1 border-t" />
+                          <DropdownMenuItem onClick={() => handleQuickFilter(null)}>
+                            <X className="h-4 w-4 mr-2" />
+                            Clear Filter
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  
+
                   <div className="flex gap-2 flex-1 sm:flex-none">
+                    {/* Search Field Selector */}
                     <Select
-                      value={sortField}
-                      onValueChange={(value) => { handleSort(value); }}
+                      value={searchField}
+                      onValueChange={(value) => setSearchField(value as SearchFieldType)}
                     >
-                      <SelectTrigger className="h-10 min-w-[100px] flex-1 sm:min-w-[120px]">
-                        <SelectValue placeholder="Sort by" />
+                      <SelectTrigger className="h-10 min-w-[100px] flex-1 sm:min-w-[130px]">
+                        <SelectValue placeholder="Search by" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="all">All Fields</SelectItem>
                         <SelectItem value="date">Date</SelectItem>
-                        <SelectItem value="order_total">Amount</SelectItem>
+                        <SelectItem value="amount">Amount</SelectItem>
                         <SelectItem value="order_number">Order Number</SelectItem>
-                        <SelectItem value="user.name">Client Name</SelectItem>
+                        <SelectItem value="client_name">Client Name</SelectItem>
                       </SelectContent>
                     </Select>
-                    
-                    <Button variant="ghost" onClick={() => handleSort(sortField)} className="h-10 px-2 flex-shrink-0">
-                      {sortDirection === 'asc' ? 
-                        <ChevronDown className="h-4 w-4 opacity-70 rotate-180" /> : 
-                        <ChevronDown className="h-4 w-4 opacity-70" /> 
+
+                    {/* Sort Direction Toggle */}
+                    <Button variant="ghost" onClick={() => handleSort(sortField)} className="h-10 px-2 flex-shrink-0" title={`Sort ${sortDirection === 'asc' ? 'Descending' : 'Ascending'}`}>
+                      {sortDirection === 'asc' ?
+                        <ChevronDown className="h-4 w-4 opacity-70 rotate-180" /> :
+                        <ChevronDown className="h-4 w-4 opacity-70" />
                       }
                       <span className="sr-only">Toggle Sort Direction</span>
                     </Button>
@@ -578,6 +699,28 @@ const CateringOrdersPage: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Active Filters Display */}
+            {(searchTerm || quickFilter) && (
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200">
+                <span className="text-sm text-slate-500">Active filters:</span>
+                {quickFilter && (
+                  <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 cursor-pointer" onClick={() => handleQuickFilter(null)}>
+                    {getQuickFilterLabel()}
+                    <X className="h-3 w-3 ml-1" />
+                  </Badge>
+                )}
+                {searchTerm && (
+                  <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer" onClick={() => setSearchTerm("")}>
+                    {searchField !== 'all' ? `${searchField.replace('_', ' ')}: ` : ''}{searchTerm}
+                    <X className="h-3 w-3 ml-1" />
+                  </Badge>
+                )}
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-slate-500 hover:text-slate-700">
+                  Clear all
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* CateringOrdersTable Component */}
