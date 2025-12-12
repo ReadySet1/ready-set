@@ -69,8 +69,9 @@ export async function GET(req: NextRequest) {
       deletedAt: null
     };
 
-    // Handle statusFilter=active (fetches all orders with active-like statuses)
+    // Handle statusFilter parameter for grouped status filtering
     if (statusFilter === 'active') {
+      // Legacy: fetches all orders with active-like statuses
       whereClause.status = {
         in: [
           CateringStatus.ACTIVE,
@@ -78,6 +79,36 @@ export async function GET(req: NextRequest) {
           CateringStatus.PENDING,
           CateringStatus.CONFIRMED,
           CateringStatus.IN_PROGRESS,
+        ]
+      };
+    } else if (statusFilter === 'all_open') {
+      // All open orders (everything except completed and cancelled)
+      whereClause.status = {
+        in: [
+          CateringStatus.PENDING,
+          CateringStatus.CONFIRMED,
+          CateringStatus.ACTIVE,
+          CateringStatus.ASSIGNED,
+          CateringStatus.IN_PROGRESS,
+          CateringStatus.DELIVERED,
+        ]
+      };
+    } else if (statusFilter === 'new') {
+      // New orders awaiting processing
+      whereClause.status = {
+        in: [
+          CateringStatus.PENDING,
+          CateringStatus.CONFIRMED,
+        ]
+      };
+    } else if (statusFilter === 'in_transit') {
+      // Orders being worked on / in transit
+      whereClause.status = {
+        in: [
+          CateringStatus.ACTIVE,
+          CateringStatus.ASSIGNED,
+          CateringStatus.IN_PROGRESS,
+          CateringStatus.DELIVERED,
         ]
       };
     } else if (statusParam && statusParam !== 'all') {

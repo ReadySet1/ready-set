@@ -713,7 +713,7 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
 
                 {/* --- Add User Button (only show on active tab) --- */}
                 {activeTab === "active" && (
-                  <Link href="/admin/users/new">
+                  <Link href="/admin/users/new-user">
                     <Button size="sm" className="whitespace-nowrap">
                       <PlusCircle className="mr-1 h-4 w-4" />
                       Add User
@@ -999,7 +999,7 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                       No active users match your current filters. Try adjusting
                       your search or filters.
                     </p>
-                    <Link href="/admin/users/new" className="mt-4">
+                    <Link href="/admin/users/new-user" className="mt-4">
                       <Button variant="outline" className="mt-2">
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Add New User

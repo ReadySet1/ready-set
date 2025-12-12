@@ -257,8 +257,11 @@ export const useUserData = (
 
     const onUpload = async (files: FileWithPath[]): Promise<void> => {
       try {
-        await uploadHook.onUpload(files);
-        handleUploadSuccess();
+        const uploadedFiles = await uploadHook.onUpload(files);
+        // Only show success if files were actually uploaded
+        if (uploadedFiles && uploadedFiles.length > 0) {
+          handleUploadSuccess();
+        }
       } catch (error) {
         console.error("Upload failed:", error);
         toast.error("File upload failed. Please try again.");
