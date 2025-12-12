@@ -19,6 +19,7 @@ const PUBLIC_ROUTES = [
   '/forgot-password',
   '/reset-password',
   '/account/update-password',
+  '/force-password-change',
   '/contact',
   '/about',
   '/apply',

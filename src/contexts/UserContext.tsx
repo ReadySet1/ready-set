@@ -76,6 +76,8 @@ type UserContextType = {
   revokeSession: (sessionId: string) => Promise<void>;
   // Activity tracking
   updateActivity: () => void;
+  // Profile name update (REA-142)
+  updateProfileName: (name: string) => void;
 };
 
 // Create the context
@@ -109,6 +111,7 @@ export const UserContext = createContext<UserContextType>({
   getActiveSessions: async () => [],
   revokeSession: async () => {},
   updateActivity: () => {},
+  updateProfileName: () => {},
 });
 
 // Export the hook for using the context
@@ -1091,6 +1094,27 @@ function UserProviderClient({ children }: { children: ReactNode }) {
     }));
   };
 
+  // Update profile name in user object and cache (REA-142)
+  const updateProfileName = (name: string) => {
+    // Update the user object in memory to reflect the new name
+    setUser((prev) =>
+      prev
+        ? {
+            ...prev,
+            user_metadata: { ...prev.user_metadata, name },
+          }
+        : null
+    );
+
+    // Also update the cached profile if it exists
+    if (user?.id) {
+      const cachedProfile = getCachedUserProfile(user.id);
+      if (cachedProfile) {
+        setCachedUserProfile(user.id, { ...cachedProfile, name }, true);
+      }
+    }
+  };
+
   // Allow hydration to proceed even when not isHydrated initially
   // The hydration useEffect will set isHydrated to true after checking for session data
 
@@ -1115,6 +1139,7 @@ function UserProviderClient({ children }: { children: ReactNode }) {
         getActiveSessions,
         revokeSession,
         updateActivity,
+        updateProfileName,
       }}
     >
       {children}
