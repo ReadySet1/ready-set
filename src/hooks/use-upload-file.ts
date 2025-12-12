@@ -201,12 +201,36 @@ export function useUploadFile({
   const onUpload = useCallback(
     async (files: FileWithPath[]): Promise<UploadedFile[]> => {
       // Check if adding these files would exceed the limit
-      if (uploadedFiles.length + files.length > maxFileCount) {
+      // Special case: when maxFileCount is 1 and uploading 1 file, treat it as a replacement
+      const isReplacement = maxFileCount === 1 && files.length === 1 && uploadedFiles.length > 0;
+
+      if (!isReplacement && uploadedFiles.length + files.length > maxFileCount) {
         toast.error(`Cannot upload ${files.length} more files. Maximum ${maxFileCount} allowed.`);
         return [];
       }
 
-            
+      // If this is a replacement, delete the existing file(s) first
+      if (isReplacement && uploadedFiles.length > 0) {
+        try {
+          for (const existingFile of uploadedFiles) {
+            if (existingFile.key) {
+              // Delete via API
+              const response = await fetch(`/api/file-uploads?fileId=${encodeURIComponent(existingFile.key)}`, {
+                method: "DELETE"
+              });
+              if (!response.ok) {
+                console.warn(`Failed to delete existing file ${existingFile.name}, continuing with upload`);
+              }
+            }
+          }
+          // Clear local state of existing files
+          setUploadedFiles([]);
+        } catch (error) {
+          console.warn("Error deleting existing files during replacement:", error);
+          // Continue with upload even if deletion fails
+        }
+      }
+
       // Create upload session for progress tracking
       const sessionId = uuidv4();
       const session: UploadSession = {
