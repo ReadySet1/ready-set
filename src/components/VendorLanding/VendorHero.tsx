@@ -1,8 +1,10 @@
+"use client";
+
 import Image from "next/image";
-import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import ScheduleDialog from "@/components/Logistics/Schedule";
 
 const DEFAULT_PARTNER_URL =
   "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true";
@@ -71,19 +73,20 @@ const VendorHero = ({
           </p>
 
           <div className="flex justify-center lg:justify-start">
-            <Button
-              asChild
-              className="h-auto rounded-full bg-yellow-400 px-8 py-3 font-[Montserrat] text-base font-extrabold text-gray-900 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg focus-visible:ring-yellow-500 focus-visible:ring-offset-2"
-            >
-              <Link
-                href={ctaHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`${ctaLabel} with Ready Set`}
-              >
-                {ctaLabel}
-              </Link>
-            </Button>
+            <ScheduleDialog
+              buttonText={ctaLabel}
+              dialogTitle="Partner With Ready Set"
+              dialogDescription="Schedule a consultation to discuss how we can support your catering logistics needs."
+              calendarUrl={ctaHref}
+              customButton={
+                <Button
+                  className="h-auto rounded-full bg-yellow-400 px-8 py-3 font-[Montserrat] text-base font-extrabold text-gray-900 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg focus-visible:ring-yellow-500 focus-visible:ring-offset-2"
+                  aria-label={`${ctaLabel} with Ready Set`}
+                >
+                  {ctaLabel}
+                </Button>
+              }
+            />
           </div>
         </div>
       </div>
