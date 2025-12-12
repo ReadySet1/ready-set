@@ -264,7 +264,14 @@ export function useUploadFile({
             maxSize: maxFileSize,
             allowedTypes: allowedFileTypes.length > 0 ? allowedFileTypes : DEFAULT_VALIDATION_CONFIG.allowedTypes,
             allowedExtensions: allowedFileTypes.length > 0 ?
-              allowedFileTypes.map(type => '.' + type.split('/')[1]) :
+              allowedFileTypes.flatMap(type => {
+                const ext = '.' + type.split('/')[1];
+                // Include both .jpg and .jpeg for image/jpeg since both are valid JPEG extensions
+                if (type === 'image/jpeg') {
+                  return ['.jpeg', '.jpg'];
+                }
+                return [ext];
+              }) :
               DEFAULT_VALIDATION_CONFIG.allowedExtensions
           });
 
