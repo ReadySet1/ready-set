@@ -146,15 +146,20 @@ interface CateringOrdersApiResponse {
   totalPages: number;
 }
 
-type OrderStatus = 'ACTIVE' | 'PENDING' | 'CONFIRMED' | 'ASSIGNED' | 'CANCELLED' | 'COMPLETED';
+type OrderStatus = 'ACTIVE' | 'PENDING' | 'CONFIRMED' | 'ASSIGNED' | 'IN_PROGRESS' | 'DELIVERED' | 'CANCELLED' | 'COMPLETED';
+
+// Tab filter type for grouped status filtering
+type StatusTabFilter = 'all_open' | 'new' | 'in_transit' | 'completed' | 'cancelled';
 
 const statusConfig = {
   ACTIVE: { className: "bg-amber-100 text-amber-800 hover:bg-amber-200", icon: <AlertCircle className="h-3 w-3 mr-1" /> },
   PENDING: { className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200", icon: <AlertCircle className="h-3 w-3 mr-1" /> },
   CONFIRMED: { className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-200", icon: <ClipboardList className="h-3 w-3 mr-1" /> },
   ASSIGNED: { className: "bg-blue-100 text-blue-800 hover:bg-blue-200", icon: <User className="h-3 w-3 mr-1" /> },
+  IN_PROGRESS: { className: "bg-purple-100 text-purple-800 hover:bg-purple-200", icon: <AlertCircle className="h-3 w-3 mr-1" /> },
+  DELIVERED: { className: "bg-teal-100 text-teal-800 hover:bg-teal-200", icon: <ClipboardList className="h-3 w-3 mr-1" /> },
   CANCELLED: { className: "bg-red-100 text-red-800 hover:bg-red-200", icon: <AlertCircle className="h-3 w-3 mr-1" /> },
-  COMPLETED: { className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-200", icon: <ClipboardList className="h-3 w-3 mr-1" /> },
+  COMPLETED: { className: "bg-green-100 text-green-800 hover:bg-green-200", icon: <ClipboardList className="h-3 w-3 mr-1" /> },
 };
 
 const getStatusConfig = (status: string) => {
@@ -200,7 +205,7 @@ const CateringOrdersPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<OrderStatus>('ACTIVE');
+  const [statusTabFilter, setStatusTabFilter] = useState<StatusTabFilter>('all_open');
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<string>("date");
@@ -212,14 +217,13 @@ const CateringOrdersPage: React.FC = () => {
     helpdesk: false
   });
 
-  // Add status tabs
-  const statusTabs = [
-    { value: 'ACTIVE', label: 'Active' },
-    { value: 'PENDING', label: 'Pending' },
-    { value: 'CONFIRMED', label: 'Confirmed' },
-    { value: 'ASSIGNED', label: 'Assigned' },
-    { value: 'CANCELLED', label: 'Cancelled' },
-    { value: 'COMPLETED', label: 'Completed' }
+  // Grouped status tabs for better organization
+  const statusTabs: { value: StatusTabFilter; label: string; description: string }[] = [
+    { value: 'all_open', label: 'All Open', description: 'All active orders' },
+    { value: 'new', label: 'New', description: 'Pending & Confirmed' },
+    { value: 'in_transit', label: 'In Transit', description: 'Active, Assigned, In Progress & Delivered' },
+    { value: 'completed', label: 'Completed', description: 'Finished orders' },
+    { value: 'cancelled', label: 'Cancelled', description: 'Cancelled orders' }
   ];
 
   useEffect(() => {
@@ -233,8 +237,17 @@ const CateringOrdersPage: React.FC = () => {
           limit: limit.toString(),
           sort: sortField,
           direction: sortDirection,
-          status: statusFilter,
         });
+
+        // Use statusFilter for grouped tabs, or status for single status
+        if (statusTabFilter === 'completed') {
+          queryParams.append('status', 'COMPLETED');
+        } else if (statusTabFilter === 'cancelled') {
+          queryParams.append('status', 'CANCELLED');
+        } else {
+          // Use the grouped statusFilter parameter
+          queryParams.append('statusFilter', statusTabFilter);
+        }
 
         // Add search term if present
         if (searchTerm) {
@@ -244,7 +257,7 @@ const CateringOrdersPage: React.FC = () => {
         // Get current user for auth token
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         // Make API call with authentication
         const response = await fetch(`/api/orders/catering-orders?${queryParams}`, {
           headers: {
@@ -253,7 +266,7 @@ const CateringOrdersPage: React.FC = () => {
             'Authorization': session ? `Bearer ${session.access_token}` : '',
           }
         });
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch orders');
         }
@@ -270,7 +283,7 @@ const CateringOrdersPage: React.FC = () => {
     };
 
     fetchOrders();
-  }, [page, statusFilter, searchTerm, sortField, sortDirection, limit]);
+  }, [page, statusTabFilter, searchTerm, sortField, sortDirection, limit]);
 
   // New useEffect to fetch user roles
   useEffect(() => {
@@ -311,9 +324,9 @@ const CateringOrdersPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Update status filter handler
-  const handleStatusFilter = (status: OrderStatus) => {
-    setStatusFilter(status);
+  // Update status tab filter handler
+  const handleStatusTabFilter = (filter: StatusTabFilter) => {
+    setStatusTabFilter(filter);
     setPage(1); // Reset to first page when changing filters
   };
 
@@ -376,8 +389,16 @@ const CateringOrdersPage: React.FC = () => {
           limit: limit.toString(),
           sort: sortField,
           direction: sortDirection,
-          status: statusFilter,
         });
+
+        // Use statusFilter for grouped tabs, or status for single status
+        if (statusTabFilter === 'completed') {
+          queryParams.append('status', 'COMPLETED');
+        } else if (statusTabFilter === 'cancelled') {
+          queryParams.append('status', 'CANCELLED');
+        } else {
+          queryParams.append('statusFilter', statusTabFilter);
+        }
 
         // Add search term if present
         if (searchTerm) {
@@ -387,7 +408,7 @@ const CateringOrdersPage: React.FC = () => {
         // Get current user for auth token
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         // Make API call with authentication
         const response = await fetch(`/api/orders/catering-orders?${queryParams}`, {
           headers: {
@@ -395,7 +416,7 @@ const CateringOrdersPage: React.FC = () => {
             'Authorization': session ? `Bearer ${session.access_token}` : '',
           }
         });
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch orders');
         }
@@ -481,10 +502,11 @@ const CateringOrdersPage: React.FC = () => {
           {statusTabs.map((tab) => (
             <button
               key={tab.value}
-              onClick={() => handleStatusFilter(tab.value as OrderStatus)}
+              onClick={() => handleStatusTabFilter(tab.value)}
+              title={tab.description}
               className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0
-                ${statusFilter === tab.value 
-                  ? 'bg-blue-100 text-blue-800' 
+                ${statusTabFilter === tab.value
+                  ? 'bg-blue-100 text-blue-800'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
               {tab.label}
@@ -571,11 +593,11 @@ const CateringOrdersPage: React.FC = () => {
                 </Alert>
               </div>
             ) : orders.length > 0 ? (
-              <CateringOrdersTable 
+              <CateringOrdersTable
                 orders={mapToOrderType(orders)}
                 isLoading={isLoading}
-                statusFilter={statusFilter.toLowerCase() as StatusFilter}
-                onStatusFilterChange={(status) => handleStatusFilter(status.toUpperCase() as OrderStatus)}
+                statusFilter={'active' as StatusFilter}
+                onStatusFilterChange={() => {/* Tab filtering handled by parent */}}
                 userRoles={userRoles}
                 onOrderDeleted={handleOrderDeleted}
               />
@@ -587,7 +609,7 @@ const CateringOrdersPage: React.FC = () => {
                 </div>
                 <h3 className="text-lg font-semibold text-slate-800">No orders found</h3>
                 <p className="text-slate-500 max-w-md mt-1 text-sm sm:text-base">
-                  No {statusFilter !== 'ACTIVE' ? <span className="capitalize font-medium">{statusFilter}</span> : ''} orders match your current filters.
+                  No <span className="font-medium">{statusTabs.find(t => t.value === statusTabFilter)?.label}</span> orders match your current filters.
                 </p>
                 <Link href="/admin/catering-orders/new" className="mt-4">
                   <Button variant="outline" className="mt-2">
