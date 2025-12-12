@@ -388,9 +388,6 @@ export async function login(
 
     // Check if user needs to change their temporary password
     if (profile?.isTemporaryPassword) {
-      if (process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug') {
-        console.log(`🔐 [${requestId}] User has temporary password, redirecting to force-password-change`);
-      }
       return {
         success: true,
         redirectTo: '/force-password-change',
