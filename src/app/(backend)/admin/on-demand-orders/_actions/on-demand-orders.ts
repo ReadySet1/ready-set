@@ -220,6 +220,7 @@ export async function getClients(): Promise<ClientListItem[] | ActionError> {
         name: {
           not: null,
         },
+        deletedAt: null,
       },
       select: {
         id: true,

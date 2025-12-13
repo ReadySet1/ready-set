@@ -482,9 +482,24 @@ const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
                 <PlusCircle className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h4 className="font-medium text-gray-900">New Order</h4>
+                <h4 className="font-medium text-gray-900">New Catering Order</h4>
                 <p className="text-xs text-gray-500">
-                  Create a new delivery request
+                  Schedule a catering delivery
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              href="/client/orders/new"
+              className="flex items-center rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
+            >
+              <div className="mr-3 rounded-md bg-emerald-50 p-2">
+                <Truck className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900">New On-Demand Order</h4>
+                <p className="text-xs text-gray-500">
+                  Request immediate delivery
                 </p>
               </div>
             </Link>

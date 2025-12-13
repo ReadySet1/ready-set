@@ -93,6 +93,10 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
   // Get and store the session for userId in useUploadFile
   const [session, setSession] = useState<any>(null);
 
+  // Track selected address IDs for visual feedback
+  const [selectedPickupAddressId, setSelectedPickupAddressId] = useState<string | undefined>();
+  const [selectedDeliveryAddressId, setSelectedDeliveryAddressId] = useState<string | undefined>();
+
   useEffect(() => {
     const getSession = async () => {
       const { data } = await supabase.auth.getSession();
@@ -755,7 +759,9 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
             <AddressSelector
               mode={preSelectedUserId ? "client" : "admin"}
               type="pickup"
+              selectedAddressId={selectedPickupAddressId}
               onSelect={(address: Address) => {
+                setSelectedPickupAddressId(address.id);
                 form.setValue("pickupAddress.street1", address.street1);
                 form.setValue("pickupAddress.street2", address.street2 || "");
                 form.setValue("pickupAddress.city", address.city);
@@ -775,7 +781,9 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
             <AddressSelector
               mode={preSelectedUserId ? "client" : "admin"}
               type="delivery"
+              selectedAddressId={selectedDeliveryAddressId}
               onSelect={(address: Address) => {
+                setSelectedDeliveryAddressId(address.id);
                 form.setValue("deliveryAddress.street1", address.street1);
                 form.setValue("deliveryAddress.street2", address.street2 || "");
                 form.setValue("deliveryAddress.city", address.city);
