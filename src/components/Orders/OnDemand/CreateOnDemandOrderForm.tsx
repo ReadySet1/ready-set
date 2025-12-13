@@ -67,6 +67,44 @@ interface CreateOnDemandOrderFormProps {
   clients?: ClientListItem[]; // Optional when preSelectedUserId is provided
   preSelectedUserId?: string; // For client-facing form
 }
+
+// Client-side form values type (uses Date objects, not serialized strings)
+interface FormValues {
+  userId: string;
+  clientAttention: string;
+  pickupDateTime?: Date;
+  arrivalDateTime?: Date;
+  completeDateTime?: Date | null;
+  vehicleType: "CAR" | "VAN" | "TRUCK";
+  pickupAddress: {
+    street1: string;
+    street2?: string | null;
+    city: string;
+    state: string;
+    zip: string;
+    county?: string | null;
+  };
+  deliveryAddress: {
+    street1: string;
+    street2?: string | null;
+    city: string;
+    state: string;
+    zip: string;
+    county?: string | null;
+  };
+  orderNumber?: string;
+  tempEntityId?: string;
+  hoursNeeded?: number | null;
+  itemDelivered?: string | null;
+  pickupNotes?: string | null;
+  specialNotes?: string | null;
+  orderTotal?: number | null;
+  tip?: number | null;
+  length?: number | null;
+  width?: number | null;
+  height?: number | null;
+  weight?: number | null;
+}
 // Vehicle type options
 const VEHICLE_TYPE_OPTIONS = [
   { value: "CAR", label: "Car" },
@@ -131,10 +169,11 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
     userId: session?.user?.id,
   });
 
-  const form = useForm({
-    resolver: zodResolver(createOnDemandOrderSchema),
+  const form = useForm<FormValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(createOnDemandOrderSchema) as any,
     defaultValues: {
-      vehicleType: "CAR" as const,
+      vehicleType: "CAR",
       pickupAddress: { street1: "", city: "", state: "", zip: "" },
       deliveryAddress: { street1: "", city: "", state: "", zip: "" },
       pickupDateTime: undefined,
@@ -489,11 +528,10 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                   <span className="truncate">
-                    {watch("pickupDateTime") ? (
-                      format(watch("pickupDateTime"), "PPPp")
-                    ) : (
-                      "Pick a date and time"
-                    )}
+                    {(() => {
+                      const pickupDate = watch("pickupDateTime");
+                      return pickupDate ? format(pickupDate, "PPPp") : "Pick a date and time";
+                    })()}
                   </span>
                 </Button>
               </PopoverTrigger>
@@ -535,11 +573,10 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
                       id="pickupTime"
                       type="time"
                       className="w-32"
-                      value={
-                        watch("pickupDateTime")
-                          ? format(watch("pickupDateTime"), "HH:mm")
-                          : ""
-                      }
+                      value={(() => {
+                        const pickupDate = watch("pickupDateTime");
+                        return pickupDate ? format(pickupDate, "HH:mm") : "";
+                      })()}
                       onChange={(e) => {
                         const timeValue = e.target.value;
                         if (!timeValue) return;
@@ -597,11 +634,10 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                   <span className="truncate">
-                    {watch("arrivalDateTime") ? (
-                      format(watch("arrivalDateTime"), "PPPp")
-                    ) : (
-                      "Pick a date and time"
-                    )}
+                    {(() => {
+                      const arrivalDate = watch("arrivalDateTime");
+                      return arrivalDate ? format(arrivalDate, "PPPp") : "Pick a date and time";
+                    })()}
                   </span>
                 </Button>
               </PopoverTrigger>
@@ -643,11 +679,10 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
                       id="arrivalTime"
                       type="time"
                       className="w-32"
-                      value={
-                        watch("arrivalDateTime")
-                          ? format(watch("arrivalDateTime"), "HH:mm")
-                          : ""
-                      }
+                      value={(() => {
+                        const arrivalDate = watch("arrivalDateTime");
+                        return arrivalDate ? format(arrivalDate, "HH:mm") : "";
+                      })()}
                       onChange={(e) => {
                         const timeValue = e.target.value;
                         if (!timeValue) return;

@@ -71,7 +71,7 @@ interface ApiOnDemandOrder {
     email: string;
     contactNumber?: string | null;
   };
-  pickupAddress: {
+  pickupAddress?: {
     id: string;
     street1: string;
     street2?: string | null;
@@ -80,7 +80,7 @@ interface ApiOnDemandOrder {
     zip: string;
     county?: string | null;
   };
-  deliveryAddress: {
+  deliveryAddress?: {
     id: string;
     street1: string;
     street2?: string | null;
@@ -249,7 +249,7 @@ const OnDemandOrdersPageNew: React.FC = () => {
         email: order.user.email,
         contactNumber: order.user.contactNumber
       } : undefined,
-      pickupAddress: {
+      pickupAddress: order.pickupAddress ? {
         id: order.pickupAddress.id,
         street1: order.pickupAddress.street1,
         street2: order.pickupAddress.street2,
@@ -257,8 +257,8 @@ const OnDemandOrdersPageNew: React.FC = () => {
         state: order.pickupAddress.state,
         zip: order.pickupAddress.zip,
         county: order.pickupAddress.county
-      },
-      deliveryAddress: {
+      } : undefined,
+      deliveryAddress: order.deliveryAddress ? {
         id: order.deliveryAddress.id,
         street1: order.deliveryAddress.street1,
         street2: order.deliveryAddress.street2,
@@ -266,7 +266,7 @@ const OnDemandOrdersPageNew: React.FC = () => {
         state: order.deliveryAddress.state,
         zip: order.deliveryAddress.zip,
         county: order.deliveryAddress.county
-      }
+      } : undefined
     }));
   };
 

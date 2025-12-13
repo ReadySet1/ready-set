@@ -14,6 +14,19 @@ export interface ActionError {
 // Vehicle type enum matching Prisma schema
 const VehicleTypeEnum = z.enum(['CAR', 'VAN', 'TRUCK']);
 
+// Helper to coerce date strings (from server action serialization) to Date objects
+const dateSchema = z.preprocess(
+  (val) => {
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' && val.length > 0) {
+      const parsed = new Date(val);
+      return isNaN(parsed.getTime()) ? undefined : parsed;
+    }
+    return undefined;
+  },
+  z.date({ message: "Date and time are required" })
+);
+
 // Base address schema
 export const addressSchema = z.object({
   street1: z.string().min(1, "Street address is required"),
@@ -32,8 +45,8 @@ export const createOnDemandOrderSchema = z.object({
     z.string().min(1, "Client is required").uuid("Invalid client ID")
   ),
   clientAttention: z.string().min(1, "Client attention/contact name is required"),
-  pickupDateTime: z.date({ message: "Pickup date and time are required" }),
-  arrivalDateTime: z.date({ message: "Arrival date and time are required" }),
+  pickupDateTime: dateSchema,
+  arrivalDateTime: dateSchema,
   vehicleType: VehicleTypeEnum,
   pickupAddress: addressSchema,
   deliveryAddress: addressSchema,
@@ -41,7 +54,18 @@ export const createOnDemandOrderSchema = z.object({
   // Optional fields
   orderNumber: z.string().optional(),
   tempEntityId: z.string().optional(),
-  completeDateTime: z.date().optional().nullable(),
+  completeDateTime: z.preprocess(
+    (val) => {
+      if (val === null || val === undefined) return null;
+      if (val instanceof Date) return val;
+      if (typeof val === 'string' && val.length > 0) {
+        const parsed = new Date(val);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      }
+      return null;
+    },
+    z.date().optional().nullable()
+  ),
   hoursNeeded: z.preprocess(
     (val) => (val === '' || val === null || val === undefined || Number.isNaN(Number(val)) ? null : Number(val)),
     z.union([

@@ -121,6 +121,9 @@ export function AddressSelector({
   const sections: AddressSection[] = useMemo(() => {
     const result: AddressSection[] = [];
 
+    // Track IDs of addresses shown in priority sections to avoid duplicates
+    const shownAddressIds = new Set<string>();
+
     // Favorites section (only when not searching)
     if (showFavorites && favoriteAddresses.length > 0 && !debouncedSearch) {
       result.push({
@@ -131,6 +134,8 @@ export function AddressSelector({
         count: favoriteAddresses.length,
         emptyMessage: 'No favorite addresses yet',
       });
+      // Mark these addresses as shown
+      favoriteAddresses.forEach((a) => shownAddressIds.add(a.id));
     }
 
     // Recents section (only when not searching)
@@ -143,15 +148,22 @@ export function AddressSelector({
         count: recentAddresses.length,
         emptyMessage: 'No recent addresses',
       });
+      // Mark these addresses as shown
+      recentAddresses.forEach((a) => shownAddressIds.add(a.id));
     }
 
     // All addresses section (only if showAllAddressesSection is true)
+    // Filter out addresses already shown in favorites/recents sections
     if (showAllAddressesSection) {
+      const filteredAddresses = debouncedSearch
+        ? addresses // When searching, show all results (no duplicates since other sections are hidden)
+        : addresses.filter((a) => !shownAddressIds.has(a.id));
+
       result.push({
         id: 'all',
         title: 'All Addresses',
         icon: MapPin,
-        addresses: addresses.map((a) => ({ ...a, isFavorite: favoriteIds.includes(a.id) })),
+        addresses: filteredAddresses.map((a) => ({ ...a, isFavorite: favoriteIds.includes(a.id) })),
         count: pagination?.totalCount || addresses.length,
         emptyMessage: debouncedSearch ? 'No addresses found matching your search' : 'No addresses available',
       });
