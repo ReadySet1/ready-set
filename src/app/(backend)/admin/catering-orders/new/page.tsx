@@ -13,6 +13,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Plus, Users, ClipboardList } from 'lucide-react';
 import NewCateringOrderClient from './NewCateringOrderClient';
 
+// Force dynamic rendering to ensure database queries run at runtime
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'New Catering Order | Admin Dashboard',
   description: 'Create a new catering order.',

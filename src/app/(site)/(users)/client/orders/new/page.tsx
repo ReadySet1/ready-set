@@ -9,6 +9,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from 'lucide-react';
 import NewOrderClient from './NewOrderClient';
 
+// Force dynamic rendering to ensure database queries run at runtime
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'New On-Demand Order | Ready Set',
   description: 'Create a new on-demand delivery order.',
