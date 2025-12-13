@@ -3,7 +3,16 @@
 import { prisma } from '@/lib/db/prisma';
 import { revalidatePath } from 'next/cache';
 import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@/utils/supabase/server';
+import {
+  ClientListItem,
+  ActionError,
+  createOnDemandOrderSchema,
+  CreateOnDemandOrderInput,
+  CreateOrderResult
+} from './schemas';
 
 // Define UserType enum locally to match schema
 enum UserType {
@@ -196,6 +205,382 @@ export async function deleteOnDemandOrder(orderId: string): Promise<DeleteOrderR
     return {
       success: false,
       error: "Database error: Failed to delete on-demand order."
+    };
+  }
+}
+
+/**
+ * Fetches a list of potential clients (Profiles with type CLIENT).
+ */
+export async function getClients(): Promise<ClientListItem[] | ActionError> {
+  try {
+    const clients = await prisma.profile.findMany({
+      where: {
+        type: 'CLIENT',
+        name: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    console.log(`[getClients] Successfully fetched ${clients.length} client(s)`);
+
+    if (clients.length === 0) {
+      console.warn("[getClients] No CLIENT profiles found in database. Please ensure CLIENT profiles exist.");
+    }
+
+    return clients as ClientListItem[];
+  } catch (error) {
+    console.error("[getClients] Failed to fetch clients:", error);
+    return { error: "Database error: Failed to fetch clients." };
+  }
+}
+
+/**
+ * Creates a new OnDemand order.
+ */
+export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): Promise<CreateOrderResult> {
+  // 1. Validate the input data
+  const validationResult = createOnDemandOrderSchema.safeParse(formData);
+  if (!validationResult.success) {
+    console.error("Validation failed:", validationResult.error.format());
+    return {
+      success: false,
+      error: "Validation failed. Please check the form fields.",
+      fieldErrors: validationResult.error.format(),
+    };
+  }
+
+  const data = validationResult.data;
+
+  // Generate a unique order number using UUID
+  const orderNumber = data.orderNumber || `OD-${uuidv4()}`;
+
+  // Get Supabase client for session information and file operations
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Extract temp entity ID from form data if it exists
+  // This is the temp ID used for file uploads before the order was created
+  const tempEntityId = data.tempEntityId || null;
+
+  try {
+    // 2. Perform database operations within a transaction
+    const newOrder = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Create pickup address
+      const pickupAddress = await tx.address.create({
+        data: {
+          street1: data.pickupAddress.street1,
+          street2: data.pickupAddress.street2 ?? null,
+          city: data.pickupAddress.city,
+          state: data.pickupAddress.state,
+          zip: data.pickupAddress.zip,
+          county: data.pickupAddress.county ?? null,
+        },
+      });
+
+      // Create delivery address
+      const deliveryAddress = await tx.address.create({
+        data: {
+          street1: data.deliveryAddress.street1,
+          street2: data.deliveryAddress.street2 ?? null,
+          city: data.deliveryAddress.city,
+          state: data.deliveryAddress.state,
+          zip: data.deliveryAddress.zip,
+          county: data.deliveryAddress.county ?? null,
+        },
+      });
+
+      // Create the OnDemand order
+      const order = await tx.onDemand.create({
+        data: {
+          userId: data.userId,
+          orderNumber: orderNumber,
+          status: 'ACTIVE',
+          vehicleType: data.vehicleType,
+          pickupDateTime: data.pickupDateTime,
+          arrivalDateTime: data.arrivalDateTime,
+          completeDateTime: data.completeDateTime ?? null,
+          hoursNeeded: data.hoursNeeded ?? null,
+          itemDelivered: data.itemDelivered ?? null,
+          clientAttention: data.clientAttention,
+          pickupNotes: data.pickupNotes ?? null,
+          specialNotes: data.specialNotes ?? null,
+          orderTotal: data.orderTotal,
+          tip: data.tip ?? null,
+          length: data.length ?? null,
+          width: data.width ?? null,
+          height: data.height ?? null,
+          weight: data.weight ?? null,
+          pickupAddressId: pickupAddress.id,
+          deliveryAddressId: deliveryAddress.id,
+        },
+      });
+
+      return order;
+    });
+
+    // 3. Update any temporary file associations
+    if (tempEntityId && user) {
+      try {
+        // Call the API to update file associations
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://ready-set.vercel.app';
+        const updateUrl = `${baseUrl}/api/file-uploads/update-entity`;
+
+        const updateData = {
+          oldEntityId: tempEntityId,
+          newEntityId: newOrder.id,
+          entityType: 'on_demand',
+        };
+
+        const response = await fetch(updateUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('[createOnDemandOrder] File associations updated:', result);
+        } else {
+          const errorText = await response.text();
+          console.error(`Failed to update file associations: ${response.status} - ${errorText}`);
+
+          // Add retry logic in case of failure
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          const retryResponse = await fetch(updateUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updateData),
+          });
+
+          if (retryResponse.ok) {
+            console.log('[createOnDemandOrder] File associations updated on retry');
+          } else {
+            console.error('Retry failed to update file associations:', await retryResponse.text());
+          }
+        }
+      } catch (error) {
+        // Log but don't fail the order creation if file update fails
+        console.error('Error updating file associations:', error);
+
+        if (error instanceof Error) {
+          console.error(`Error stack: ${error.stack}`);
+        }
+      }
+
+      // Also try to update storage paths for any temporary files
+      try {
+        // Format the tempEntityId to ensure consistency
+        const formattedTempId = tempEntityId.startsWith('temp-')
+          ? tempEntityId
+          : `temp-${tempEntityId}`;
+
+        const supabaseClient = await createClient();
+
+        // Try multiple possible paths for temp files
+        const possibleTempPaths = [
+          `on_demand/${formattedTempId}`,
+          `orders/on_demand/${formattedTempId}`,
+          `on_demand/temp-${tempEntityId}`,
+          `orders/on_demand/temp-${tempEntityId}`
+        ];
+
+        let foundFiles = false;
+
+        // First check for files in the possible temp paths
+        for (const tempPath of possibleTempPaths) {
+          const { data: tempFiles, error: listError } = await supabaseClient.storage
+            .from('fileUploader')
+            .list(tempPath);
+
+          if (listError) {
+            continue; // Try next path
+          }
+
+          if (tempFiles && tempFiles.length > 0) {
+            foundFiles = true;
+
+            // Move each file to the new path
+            for (const file of tempFiles) {
+              const oldPath = `${tempPath}/${file.name}`;
+              const newPath = `on_demand/${newOrder.id}/${file.name}`;
+
+              try {
+                const { error: moveError } = await supabaseClient.storage
+                  .from('fileUploader')
+                  .move(oldPath, newPath);
+
+                if (moveError) {
+                  console.error(`Error moving file ${oldPath} to ${newPath}:`, moveError);
+                } else {
+                  // Update file URL in database if needed
+                  const { data: { publicUrl } } = supabaseClient.storage
+                    .from('fileUploader')
+                    .getPublicUrl(newPath);
+
+                  try {
+                    // Update the file record in the database with the new URL
+                    await prisma.fileUpload.updateMany({
+                      where: {
+                        fileUrl: {
+                          contains: oldPath
+                        },
+                        isTemporary: true
+                      },
+                      data: {
+                        fileUrl: publicUrl,
+                        isTemporary: false,
+                        onDemandId: newOrder.id
+                      }
+                    });
+                  } catch (dbError) {
+                    console.error('Error updating file URL in database:', dbError);
+                  }
+                }
+              } catch (moveError) {
+                console.error(`Exception moving file ${oldPath} to ${newPath}:`, moveError);
+              }
+            }
+          }
+        }
+
+        // If we didn't find any files by path, check the database for files with encoded category
+        if (!foundFiles) {
+          // Look for files with the temp ID encoded in the category field
+          const encodedTempFiles = await prisma.fileUpload.findMany({
+            where: {
+              isTemporary: true,
+              OR: [
+                { category: { contains: formattedTempId } },
+                { category: { contains: tempEntityId } }
+              ]
+            }
+          });
+
+          if (encodedTempFiles.length > 0) {
+            // Update them to use the new order ID
+            for (const file of encodedTempFiles) {
+              try {
+                await prisma.fileUpload.update({
+                  where: { id: file.id },
+                  data: {
+                    isTemporary: false,
+                    onDemandId: newOrder.id,
+                    category: "on-demand-order"
+                  }
+                });
+
+                // If the file has a URL that contains the temp ID, try to move it
+                if (file.fileUrl && (file.fileUrl.includes(formattedTempId) || file.fileUrl.includes(tempEntityId))) {
+                  const url = new URL(file.fileUrl);
+                  const parts = url.pathname.split('/');
+                  let tempPath = '';
+                  let fileName = '';
+
+                  // Try to extract the path and filename
+                  const publicIndex = parts.findIndex(part => part === 'public');
+                  if (publicIndex >= 0 && publicIndex + 2 < parts.length) {
+                    const bucketName = parts[publicIndex + 1] || 'fileUploader';
+                    const pathParts = parts.slice(publicIndex + 2);
+                    fileName = pathParts[pathParts.length - 1] || '';
+                    tempPath = pathParts.slice(0, -1).join('/');
+
+                    if (tempPath && fileName) {
+                      const oldPath = `${tempPath}/${fileName}`;
+                      const newPath = `on_demand/${newOrder.id}/${fileName}`;
+
+                      try {
+                        const { error: moveError } = await supabaseClient.storage
+                          .from(bucketName)
+                          .move(oldPath, newPath);
+
+                        if (!moveError) {
+                          // Update URL in database
+                          const { data: { publicUrl } } = supabaseClient.storage
+                            .from(bucketName)
+                            .getPublicUrl(newPath);
+
+                          await prisma.fileUpload.update({
+                            where: { id: file.id },
+                            data: { fileUrl: publicUrl }
+                          });
+                        } else {
+                          console.error(`Error moving file: ${moveError.message}`);
+                        }
+                      } catch (moveError) {
+                        console.error('Error moving file:', moveError);
+                      }
+                    }
+                  }
+                }
+              } catch (updateError) {
+                console.error(`Error updating file ${file.id}:`, updateError);
+              }
+            }
+          }
+        }
+      } catch (storageError) {
+        console.error('Error updating storage paths:', storageError);
+      }
+    }
+
+    // 4. Revalidate relevant paths
+    revalidatePath('/admin/on-demand-orders');
+    revalidatePath('/account/orders');
+
+    // 5. Return success result
+    return {
+      success: true,
+      orderId: newOrder.id,
+      orderNumber: newOrder.orderNumber,
+    };
+
+  } catch (error) {
+    console.error("Failed to create on-demand order:", error);
+
+    // Print the full error details
+    if (error instanceof Error) {
+      console.error("Error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
+    } else {
+      console.error("Unknown error type:", error);
+    }
+
+    // Check if the error is a Prisma unique constraint violation on orderNumber
+    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
+      const targetFields = error.meta?.target as string[] | undefined;
+      if (targetFields?.includes('orderNumber')) {
+        return {
+          success: false,
+          error: `Order number '${orderNumber}' already exists. Please use a unique order number.`,
+          fieldErrors: {
+            orderNumber: { _errors: [`Order number '${orderNumber}' already exists.`] },
+            _errors: []
+          }
+        };
+      }
+    }
+
+    // Generic database error
+    return {
+      success: false,
+      error: "Database error: Failed to create on-demand order.",
     };
   }
 }

@@ -350,7 +350,7 @@ const OnDemandOrdersPageNew: React.FC = () => {
           </p>
         </div>
         <div className="flex-shrink-0 w-full sm:w-auto">
-          <Link href="/on-demand-request" passHref>
+          <Link href="/admin/on-demand-orders/new" passHref>
             <Button
               className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white shadow-md transition-all hover:shadow-lg w-full sm:w-auto"
             >
@@ -475,7 +475,7 @@ const OnDemandOrdersPageNew: React.FC = () => {
                 <p className="text-slate-500 max-w-md mt-1 text-sm sm:text-base">
                   No {statusFilter !== 'ACTIVE' ? <span className="capitalize font-medium">{statusFilter.toLowerCase()}</span> : ''} orders match your current filters.
                 </p>
-                <Link href="/on-demand-request" className="mt-4">
+                <Link href="/admin/on-demand-orders/new" className="mt-4">
                   <Button variant="outline" className="mt-2">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Create New Order
