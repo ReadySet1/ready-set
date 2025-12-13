@@ -71,7 +71,7 @@ interface ApiOnDemandOrder {
     email: string;
     contactNumber?: string | null;
   };
-  pickupAddress: {
+  pickupAddress?: {
     id: string;
     street1: string;
     street2?: string | null;
@@ -80,7 +80,7 @@ interface ApiOnDemandOrder {
     zip: string;
     county?: string | null;
   };
-  deliveryAddress: {
+  deliveryAddress?: {
     id: string;
     street1: string;
     street2?: string | null;
@@ -249,7 +249,7 @@ const OnDemandOrdersPageNew: React.FC = () => {
         email: order.user.email,
         contactNumber: order.user.contactNumber
       } : undefined,
-      pickupAddress: {
+      pickupAddress: order.pickupAddress ? {
         id: order.pickupAddress.id,
         street1: order.pickupAddress.street1,
         street2: order.pickupAddress.street2,
@@ -257,8 +257,8 @@ const OnDemandOrdersPageNew: React.FC = () => {
         state: order.pickupAddress.state,
         zip: order.pickupAddress.zip,
         county: order.pickupAddress.county
-      },
-      deliveryAddress: {
+      } : undefined,
+      deliveryAddress: order.deliveryAddress ? {
         id: order.deliveryAddress.id,
         street1: order.deliveryAddress.street1,
         street2: order.deliveryAddress.street2,
@@ -266,7 +266,7 @@ const OnDemandOrdersPageNew: React.FC = () => {
         state: order.deliveryAddress.state,
         zip: order.deliveryAddress.zip,
         county: order.deliveryAddress.county
-      }
+      } : undefined
     }));
   };
 
@@ -350,7 +350,7 @@ const OnDemandOrdersPageNew: React.FC = () => {
           </p>
         </div>
         <div className="flex-shrink-0 w-full sm:w-auto">
-          <Link href="/on-demand-request" passHref>
+          <Link href="/admin/on-demand-orders/new" passHref>
             <Button
               className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white shadow-md transition-all hover:shadow-lg w-full sm:w-auto"
             >
@@ -475,7 +475,7 @@ const OnDemandOrdersPageNew: React.FC = () => {
                 <p className="text-slate-500 max-w-md mt-1 text-sm sm:text-base">
                   No {statusFilter !== 'ACTIVE' ? <span className="capitalize font-medium">{statusFilter.toLowerCase()}</span> : ''} orders match your current filters.
                 </p>
-                <Link href="/on-demand-request" className="mt-4">
+                <Link href="/admin/on-demand-orders/new" className="mt-4">
                   <Button variant="outline" className="mt-2">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Create New Order
