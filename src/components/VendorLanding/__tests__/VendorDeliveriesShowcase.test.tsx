@@ -2,44 +2,64 @@ import { render, screen } from "@testing-library/react";
 import VendorDeliveriesShowcase from "../VendorDeliveriesShowcase";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 
+// Mock the Cloudinary utility
+jest.mock("@/lib/cloudinary", () => ({
+  getCloudinaryUrl: jest.fn(),
+}));
+
 // Mock Next.js Image component
 jest.mock("next/image", () => ({
   __esModule: true,
   default: (props: any) => {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img {...props} alt={props.alt} />;
+    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+    return <img {...props} />;
   },
 }));
 
-// Mock Cloudinary utility
-jest.mock("@/lib/cloudinary", () => ({
-  getCloudinaryUrl: jest.fn((publicId: string) => `https://res.cloudinary.com/test/${publicId}`),
-}));
-
 describe("VendorDeliveriesShowcase", () => {
+  const mockCloudinaryUrl =
+    "https://res.cloudinary.com/test/image/upload/food/gallery-food-2";
+
   beforeEach(() => {
+    (getCloudinaryUrl as jest.Mock).mockReturnValue(mockCloudinaryUrl);
+  });
+
+  afterEach(() => {
     jest.clearAllMocks();
   });
 
-  describe("Basic Rendering", () => {
+  describe("Rendering", () => {
     it("should render without crashing", () => {
-      render(<VendorDeliveriesShowcase />);
-      expect(screen.getByRole("region")).toBeInTheDocument();
+      const { container } = render(<VendorDeliveriesShowcase />);
+      expect(container).toBeInTheDocument();
     });
 
-    it("should have correct aria-labelledby attribute", () => {
+    it("should render the section with correct aria-labelledby", () => {
       render(<VendorDeliveriesShowcase />);
-      const section = screen.getByRole("region");
+      const section = screen.getByRole("region", {
+        name: /catering deliveries we handle/i,
+      });
+      expect(section).toBeInTheDocument();
       expect(section).toHaveAttribute("aria-labelledby", "deliveries-heading");
     });
 
-    it("should render header content", () => {
+    it("should render the main heading with correct text", () => {
       render(<VendorDeliveriesShowcase />);
-      expect(screen.getByText("Catering Deliveries", { selector: "p" })).toBeInTheDocument();
+      const heading = screen.getByRole("heading", {
+        level: 2,
+        name: /catering deliveries we handle/i,
+      });
+      expect(heading).toBeInTheDocument();
+      expect(heading).toHaveAttribute("id", "deliveries-heading");
+    });
+
+    it("should render the uppercase label text", () => {
+      render(<VendorDeliveriesShowcase />);
+      expect(screen.getByText("Catering Deliveries")).toBeInTheDocument();
     });
   });
 
-  describe("Content Tests - Delivery Types", () => {
+  describe("Delivery Types Display", () => {
     const deliveryTypes = [
       "Corporate catering",
       "Group orders",
@@ -50,269 +70,236 @@ describe("VendorDeliveriesShowcase", () => {
       "Custom requests",
     ];
 
-    it("should render all 7 delivery types", () => {
+    it("should render all delivery types", () => {
       render(<VendorDeliveriesShowcase />);
-      
+
       deliveryTypes.forEach((type) => {
         expect(screen.getByText(type)).toBeInTheDocument();
       });
     });
 
-    it("should render bullet separators between items", () => {
-      const { container } = render(<VendorDeliveriesShowcase />);
-      
-      // Find all bullet separators (should be 6 for 7 items)
-      const bullets = container.querySelectorAll('span[aria-hidden="true"]');
-      // Filter only the bullets in the delivery types section (not market dots)
-      const deliveryBullets = Array.from(bullets).filter(
-        (bullet) => bullet.textContent === "•"
-      );
-      
-      expect(deliveryBullets).toHaveLength(6);
+    it("should render correct number of delivery types", () => {
+      render(<VendorDeliveriesShowcase />);
+
+      deliveryTypes.forEach((type) => {
+        const elements = screen.getAllByText(type);
+        expect(elements).toHaveLength(1);
+      });
     });
 
-    it("should have mx-3 class on bullet separators for proper spacing", () => {
+    it("should render bullet separators between items but not after the last item", () => {
       const { container } = render(<VendorDeliveriesShowcase />);
-      
-      const bullets = container.querySelectorAll('span[aria-hidden="true"].mx-3');
-      expect(bullets.length).toBeGreaterThan(0);
+
+      // Find all bullet separators (aria-hidden spans containing '•')
+      // Use more specific selector to avoid market indicators
+      const bullets = Array.from(
+        container.querySelectorAll('span[aria-hidden="true"]'),
+      ).filter((el) => el.textContent?.includes("•"));
+
+      // Should have 6 bullets for 7 items (no bullet after last item)
+      expect(bullets.length).toBe(6);
+
+      bullets.forEach((bullet) => {
+        expect(bullet.textContent).toContain("•");
+      });
+    });
+
+    it("should render delivery types in the correct order", () => {
+      const { container } = render(<VendorDeliveriesShowcase />);
+
+      const paragraph = container.querySelector("p.mx-auto.mt-6");
+      const text = paragraph?.textContent || "";
+
+      // Check that each type appears before the next one
+      let lastIndex = -1;
+      deliveryTypes.forEach((type) => {
+        const index = text.indexOf(type);
+        expect(index).toBeGreaterThan(lastIndex);
+        lastIndex = index;
+      });
     });
   });
 
-  describe("Content Tests - Markets", () => {
-    const markets = [
-      "San Francisco Bay Area",
-      "Atlanta",
-      "Austin",
-      "Dallas",
-    ];
+  describe("Markets Display", () => {
+    const markets = ["San Francisco Bay Area", "Atlanta", "Austin", "Dallas"];
 
-    it("should render all 4 markets", () => {
+    it("should render all market cities", () => {
       render(<VendorDeliveriesShowcase />);
-      
+
       markets.forEach((market) => {
         expect(screen.getByText(market)).toBeInTheDocument();
       });
     });
 
-    it("should render market dot indicators", () => {
+    it("should render correct number of market indicators", () => {
       const { container } = render(<VendorDeliveriesShowcase />);
-      
-      // Find all dot indicators (should be 4 for 4 markets)
-      const dots = container.querySelectorAll(".h-2.w-2.rounded-full.bg-gray-900");
-      expect(dots).toHaveLength(4);
-    });
-  });
 
-  describe("Title Tests", () => {
-    it("should render the main title with correct text", () => {
-      render(<VendorDeliveriesShowcase />);
-      const heading = screen.getByRole("heading", { level: 2 });
-      
-      // Check that the title contains both parts
-      expect(heading).toHaveTextContent("Catering Deliveries");
-      expect(heading).toHaveTextContent("We Handle");
+      // Find all indicator dots (small rounded elements)
+      const indicators = container.querySelectorAll(
+        ".h-2.w-2.rounded-full.bg-gray-900",
+      );
+
+      // Should have 4 indicators for 4 markets
+      expect(indicators.length).toBe(4);
     });
 
-    it("should have correct ID on title", () => {
-      render(<VendorDeliveriesShowcase />);
-      const heading = screen.getByRole("heading", { level: 2 });
-      expect(heading).toHaveAttribute("id", "deliveries-heading");
-    });
-
-    it("should apply correct font styling classes", () => {
-      render(<VendorDeliveriesShowcase />);
-      const heading = screen.getByRole("heading", { level: 2 });
-      
-      expect(heading).toHaveClass("font-black");
-      expect(heading).toHaveClass("text-gray-900");
-      expect(heading).toHaveClass("tracking-tight");
-    });
-
-    it("should have responsive text size classes", () => {
-      render(<VendorDeliveriesShowcase />);
-      const heading = screen.getByRole("heading", { level: 2 });
-      
-      expect(heading).toHaveClass("text-3xl");
-      expect(heading).toHaveClass("sm:text-4xl");
-      expect(heading).toHaveClass("lg:text-5xl");
-    });
-
-    it("should have correct font family style", () => {
-      render(<VendorDeliveriesShowcase />);
-      const heading = screen.getByRole("heading", { level: 2 });
-      
-      // Check that heading has an inline style with fontFamily
-      expect(heading).toHaveAttribute("style");
-      const style = heading.getAttribute("style");
-      expect(style).toContain("font-family");
-    });
-  });
-
-  describe("Image Gallery Tests", () => {
-    it("should render all 7 gallery images", () => {
+    it("should render market indicators with aria-hidden", () => {
       const { container } = render(<VendorDeliveriesShowcase />);
-      const images = container.querySelectorAll("img");
-      
-      expect(images).toHaveLength(7);
-    });
 
-    it("should generate Cloudinary URLs correctly", () => {
-      render(<VendorDeliveriesShowcase />);
-      
-      // Check that getCloudinaryUrl was called for each image
-      expect(getCloudinaryUrl).toHaveBeenCalledWith("food/gallery/food-4");
-      expect(getCloudinaryUrl).toHaveBeenCalledWith("food/gallery/food-6");
-      expect(getCloudinaryUrl).toHaveBeenCalledWith("food/gallery/food-2");
-      expect(getCloudinaryUrl).toHaveBeenCalledWith("food/gallery/food-3");
-      expect(getCloudinaryUrl).toHaveBeenCalledWith("food/gallery/food-8");
-      expect(getCloudinaryUrl).toHaveBeenCalledWith("food/gallery/food-9");
-      expect(getCloudinaryUrl).toHaveBeenCalledWith("food/gallery/food-10");
-    });
+      const indicators = container.querySelectorAll(
+        ".h-2.w-2.rounded-full.bg-gray-900",
+      );
 
-    it("should have alt text on all images", () => {
-      const { container } = render(<VendorDeliveriesShowcase />);
-      const images = container.querySelectorAll("img");
-      
-      images.forEach((img) => {
-        expect(img).toHaveAttribute("alt");
-        expect(img.getAttribute("alt")).toBeTruthy();
+      indicators.forEach((indicator) => {
+        expect(indicator).toHaveAttribute("aria-hidden", "true");
       });
     });
 
-    it("should apply slanted card style with clip-path", () => {
+    it("should render markets with whitespace-nowrap class", () => {
       const { container } = render(<VendorDeliveriesShowcase />);
-      
-      // Find elements with the slanted card style
-      const slantedCards = Array.from(container.querySelectorAll("[style*='clip-path']"));
-      expect(slantedCards.length).toBeGreaterThan(0);
-    });
 
-    it("should have proper responsive sizing classes on image containers", () => {
-      const { container } = render(<VendorDeliveriesShowcase />);
-      
-      // Check for responsive width classes
-      const imageContainers = container.querySelectorAll(".w-\\[140px\\]");
-      expect(imageContainers.length).toBeGreaterThan(0);
+      markets.forEach((market) => {
+        const marketElement = screen.getByText(market);
+        expect(marketElement).toHaveClass("whitespace-nowrap");
+      });
     });
   });
 
-  describe("Accessibility Tests", () => {
-    it("should have aria-hidden on decorative bullet separators", () => {
+  describe("Image Integration", () => {
+    it("should call getCloudinaryUrl with correct path", () => {
+      render(<VendorDeliveriesShowcase />);
+
+      expect(getCloudinaryUrl).toHaveBeenCalledWith("food/gallery-food-2");
+      expect(getCloudinaryUrl).toHaveBeenCalledTimes(1);
+    });
+
+    it("should render image with correct alt text", () => {
+      render(<VendorDeliveriesShowcase />);
+
+      const image = screen.getByAltText("Catering delivery showcase");
+      expect(image).toBeInTheDocument();
+    });
+
+    it("should render image with correct src from Cloudinary", () => {
+      render(<VendorDeliveriesShowcase />);
+
+      const image = screen.getByAltText("Catering delivery showcase");
+      expect(image).toHaveAttribute("src", mockCloudinaryUrl);
+    });
+
+    it("should render image container with correct aspect ratio", () => {
       const { container } = render(<VendorDeliveriesShowcase />);
-      
+
+      // Verify the image is in a container with aspect ratio classes
+      const imageContainer = container.querySelector(".aspect-\\[16\\/9\\]");
+      expect(imageContainer).toBeInTheDocument();
+
+      // Verify the image exists within the container
+      const image = screen.getByAltText("Catering delivery showcase");
+      expect(imageContainer).toContainElement(image);
+    });
+
+    it("should render image with correct sizes attribute", () => {
+      render(<VendorDeliveriesShowcase />);
+
+      const image = screen.getByAltText("Catering delivery showcase");
+      expect(image).toHaveAttribute(
+        "sizes",
+        "(max-width: 768px) 100vw, (max-width: 1280px) 1200px, 1400px",
+      );
+    });
+
+    it("should render image with object-cover class", () => {
+      render(<VendorDeliveriesShowcase />);
+
+      const image = screen.getByAltText("Catering delivery showcase");
+      expect(image).toHaveClass("object-cover");
+    });
+  });
+
+  describe("Accessibility", () => {
+    it("should have proper semantic HTML structure", () => {
+      const { container } = render(<VendorDeliveriesShowcase />);
+
+      // Check for section element
+      const section = container.querySelector("section");
+      expect(section).toBeInTheDocument();
+
+      // Check for header element inside section
+      const header = section?.querySelector("header");
+      expect(header).toBeInTheDocument();
+
+      // Check for h2 inside header
+      const h2 = header?.querySelector("h2");
+      expect(h2).toBeInTheDocument();
+    });
+
+    it("should connect heading with aria-labelledby", () => {
+      render(<VendorDeliveriesShowcase />);
+
+      const section = screen.getByRole("region");
+      const heading = screen.getByRole("heading", { level: 2 });
+
+      expect(section).toHaveAttribute("aria-labelledby", "deliveries-heading");
+      expect(heading).toHaveAttribute("id", "deliveries-heading");
+    });
+
+    it("should mark decorative elements with aria-hidden", () => {
+      const { container } = render(<VendorDeliveriesShowcase />);
+
+      // Check bullet separators
       const bullets = container.querySelectorAll('span[aria-hidden="true"]');
       expect(bullets.length).toBeGreaterThan(0);
-      
+
       bullets.forEach((bullet) => {
         expect(bullet).toHaveAttribute("aria-hidden", "true");
       });
     });
 
-    it("should have proper heading hierarchy with h2", () => {
+    it("should have descriptive alt text for image", () => {
       render(<VendorDeliveriesShowcase />);
-      const heading = screen.getByRole("heading", { level: 2 });
-      
-      expect(heading).toBeInTheDocument();
-      expect(heading.tagName).toBe("H2");
-    });
 
-    it("should use semantic HTML with section element", () => {
-      render(<VendorDeliveriesShowcase />);
-      const section = screen.getByRole("region");
-      
-      expect(section.tagName).toBe("SECTION");
-    });
+      const image = screen.getByAltText("Catering delivery showcase");
+      expect(image).toBeInTheDocument();
 
-    it("should have proper header landmark", () => {
-      const { container } = render(<VendorDeliveriesShowcase />);
-      const header = container.querySelector("header");
-      
-      expect(header).toBeInTheDocument();
+      // Alt text should be descriptive, not empty
+      expect(image.getAttribute("alt")).toBeTruthy();
+      expect(image.getAttribute("alt")?.length).toBeGreaterThan(0);
     });
   });
 
-  describe("Responsive and Styling Tests", () => {
-    it("should have responsive padding classes on section", () => {
+  describe("Styling and Layout", () => {
+    it("should have correct container classes for responsive design", () => {
       const { container } = render(<VendorDeliveriesShowcase />);
+
       const section = container.querySelector("section");
-      
-      expect(section).toHaveClass("py-14");
-      expect(section).toHaveClass("sm:py-16");
-      expect(section).toHaveClass("lg:py-20");
+      expect(section).toHaveClass("w-full", "bg-white");
     });
 
-    it("should have max-width constraint on content container", () => {
+    it("should have responsive padding classes", () => {
       const { container } = render(<VendorDeliveriesShowcase />);
-      const contentContainer = container.querySelector(".max-w-6xl");
-      
-      expect(contentContainer).toBeInTheDocument();
+
+      const section = container.querySelector("section");
+      expect(section).toHaveClass("py-14", "sm:py-16", "lg:py-20");
     });
 
-    it("should apply vertical offset to gallery images for alternating pattern", () => {
+    it("should have correct image container aspect ratio classes", () => {
       const { container } = render(<VendorDeliveriesShowcase />);
-      
-      // Check for translate-y classes
-      const translatedElements = container.querySelectorAll('[class*="translate-y"]');
-      expect(translatedElements.length).toBeGreaterThan(0);
+
+      const imageContainer = container.querySelector(".aspect-\\[16\\/9\\]");
+      expect(imageContainer).toBeInTheDocument();
+      expect(imageContainer).toHaveClass("sm:aspect-[21/9]");
     });
 
-    it("should have proper gap spacing between gallery images", () => {
-      const { container } = render(<VendorDeliveriesShowcase />);
-      const galleryContainer = container.querySelector(".gap-2");
-      
-      expect(galleryContainer).toBeInTheDocument();
-    });
-  });
-
-  describe("Data Integrity Tests", () => {
-    it("should export exactly 7 delivery types", () => {
+    it("should apply custom font styles to heading", () => {
       render(<VendorDeliveriesShowcase />);
-      const deliveryTypesText = screen.getByText(/Corporate catering/);
-      const paragraph = deliveryTypesText.closest("p");
-      
-      // Count the number of delivery type items
-      const deliveryItems = [
-        "Corporate catering",
-        "Group orders",
-        "Large food deliveries",
-        "Bakery & deli catering",
-        "Pantry restocking",
-        "Event catering",
-        "Custom requests",
-      ];
-      
-      deliveryItems.forEach((item) => {
-        expect(paragraph).toHaveTextContent(item);
-      });
-    });
 
-    it("should export exactly 4 markets", () => {
-      render(<VendorDeliveriesShowcase />);
-      
-      const markets = ["San Francisco Bay Area", "Atlanta", "Austin", "Dallas"];
-      markets.forEach((market) => {
-        expect(screen.getByText(market)).toBeInTheDocument();
-      });
-    });
-
-    it("should have exactly 7 gallery images with correct public IDs", () => {
-      render(<VendorDeliveriesShowcase />);
-      
-      const expectedPublicIds = [
-        "food/gallery/food-4",
-        "food/gallery/food-6",
-        "food/gallery/food-2",
-        "food/gallery/food-3",
-        "food/gallery/food-8",
-        "food/gallery/food-9",
-        "food/gallery/food-10",
-      ];
-      
-      expectedPublicIds.forEach((publicId) => {
-        expect(getCloudinaryUrl).toHaveBeenCalledWith(publicId);
+      const heading = screen.getByRole("heading", { level: 2 });
+      expect(heading).toHaveStyle({
+        fontFamily:
+          "Inter, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', system-ui, sans-serif",
+        fontWeight: 900,
       });
     });
   });
 });
-
