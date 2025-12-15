@@ -134,25 +134,25 @@ const mockAddress = {
   zip: "12345",
 };
 
-/**
- * TODO: REA-211 - These tests need AddressSelector mocking to be fixed
- * The CateringRequestForm component uses AddressSelector which has complex
- * dependencies (useAddresses, useAddressSearch, etc.). The Jest mock isn't
- * being applied correctly due to barrel export issues.
- *
- * Options to fix:
- * 1. Add data-testid to AddressSelector component and update tests
- * 2. Create a proper mock module in __mocks__ directory
- * 3. Use jest.isolateModules for proper mock isolation
- */
-/**
- * TODO: REA-259 - 10/11 tests failing due to UI changes
- */
-describe.skip("CateringRequestForm", () => {
+describe("CateringRequestForm", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockClear();
     mockHandleAddressSelect.mockClear();
+
+    // Default mock for useUser - tests can override as needed
+    mockUseUser.mockReturnValue({
+      userRole: UserType.CLIENT,
+      session: null,
+      user: null,
+      isLoading: false,
+      error: null,
+      refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
+    });
 
     // Default successful fetch mock
     mockFetch.mockImplementation(
@@ -192,14 +192,18 @@ describe.skip("CateringRequestForm", () => {
     });
 
     // Check that key form elements are rendered
-    expect(screen.getByTestId("mock-address-manager")).toBeInTheDocument();
-    expect(screen.getByLabelText(/brokerage.*direct/i)).toBeInTheDocument();
+    // There are 2 AddressSelectors (pickup and delivery)
+    expect(screen.getAllByTestId("mock-address-manager")).toHaveLength(2);
+    // Form labels - component uses "Brokerage / Direct" label
+    expect(screen.getByLabelText(/brokerage/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/order number/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/date/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/headcount/i)).toBeInTheDocument();
   });
 
-  it("redirects to client dashboard for client users after successful form submission", async () => {
+  // TODO: REA-268 - Form submission now shows OrderConfirmationModal first, redirect happens on modal close
+  // These tests need to be updated to handle modal interaction
+  it.skip("redirects to client dashboard for client users after successful form submission", async () => {
     // Mock user context for client role
     mockUseUser.mockReturnValue({
       userRole: UserType.CLIENT,
@@ -268,7 +272,8 @@ describe.skip("CateringRequestForm", () => {
     });
   });
 
-  it("redirects to vendor dashboard for vendor users after successful form submission", async () => {
+  // TODO: REA-268 - Form submission now shows OrderConfirmationModal first, redirect happens on modal close
+  it.skip("redirects to vendor dashboard for vendor users after successful form submission", async () => {
     // Mock user context for vendor role
     mockUseUser.mockReturnValue({
       userRole: UserType.VENDOR,
@@ -402,7 +407,8 @@ describe.skip("CateringRequestForm", () => {
     });
   });
 
-  it("submits the form with correct data structure", async () => {
+  // TODO: REA-268 - Form submission now shows OrderConfirmationModal first, redirect happens on modal close
+  it.skip("submits the form with correct data structure", async () => {
     const user = userEvent.setup();
     await act(async () => {
       render(<CateringRequestForm />);
@@ -444,7 +450,9 @@ describe.skip("CateringRequestForm", () => {
     });
   });
 
-  describe("Manage Addresses Button", () => {
+  // TODO: REA-268 - "Manage Addresses Button" feature was removed from component
+  // Skip these tests as the UI element no longer exists
+  describe.skip("Manage Addresses Button", () => {
     it("renders the Manage Addresses button in the delivery details section", async () => {
       await act(async () => {
         render(<CateringRequestForm />);
