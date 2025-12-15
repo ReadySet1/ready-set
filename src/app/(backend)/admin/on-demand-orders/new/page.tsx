@@ -1,31 +1,27 @@
-// src/app/(backend)/admin/catering-orders/new/page.tsx
-// Create order from admin side
+// src/app/(backend)/admin/on-demand-orders/new/page.tsx
+// Create on-demand order from admin side
 
 import React from 'react';
 import { Metadata } from 'next';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { PageHeader } from '@/components/Dashboard/ui/PageHeader';
-import { CreateCateringOrderForm } from '@/components/Orders/CateringOrders/CreateCateringOrderForm';
-import { getClients } from '../_actions/catering-orders';
+import { getClients } from '../_actions/on-demand-orders';
 import { ClientListItem } from '../_actions/schemas';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Plus, Users, ClipboardList } from 'lucide-react';
-import NewCateringOrderClient from './NewCateringOrderClient';
+import { AlertCircle } from 'lucide-react';
+import NewOnDemandOrderClient from './NewOnDemandOrderClient';
 
 // Force dynamic rendering to ensure database queries run at runtime
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'New Catering Order | Admin Dashboard',
-  description: 'Create a new catering order.',
+  title: 'New On-Demand Order | Admin Dashboard',
+  description: 'Create a new on-demand delivery order.',
 };
 
-const NewCateringOrderPage = async () => {
+const NewOnDemandOrderPage = async () => {
   const clientResult = await getClients();
 
   if ('error' in clientResult) {
-    console.error('[NewCateringOrderPage] Failed to load clients:', clientResult.error);
+    console.error('[NewOnDemandOrderPage] Failed to load clients:', clientResult.error);
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -51,12 +47,12 @@ const NewCateringOrderPage = async () => {
 
   // Log warning if no clients are available
   if (clients.length === 0) {
-    console.warn('[NewCateringOrderPage] No clients available. Users will not be able to create orders.');
+    console.warn('[NewOnDemandOrderPage] No clients available. Users will not be able to create orders.');
   } else {
-    console.log(`[NewCateringOrderPage] Loaded ${clients.length} client(s)`);
+    console.log(`[NewOnDemandOrderPage] Loaded ${clients.length} client(s)`);
   }
 
-  return <NewCateringOrderClient clients={clients} />;
+  return <NewOnDemandOrderClient clients={clients} />;
 };
 
-export default NewCateringOrderPage; 
+export default NewOnDemandOrderPage;
