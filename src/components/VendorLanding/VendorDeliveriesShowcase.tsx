@@ -1,5 +1,4 @@
 import Image from "next/image";
-import type { CSSProperties } from "react";
 
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 
@@ -14,41 +13,6 @@ const DELIVERY_TYPES = [
 ];
 
 const MARKETS = ["San Francisco Bay Area", "Atlanta", "Austin", "Dallas"];
-
-const GALLERY_IMAGES = [
-  {
-    publicId: "food/gallery/food-4",
-    alt: "Fresh jars of salad with vibrant ingredients ready for delivery",
-  },
-  {
-    publicId: "food/gallery/food-6",
-    alt: "Chafing dishes filled with warm catering trays",
-  },
-  {
-    publicId: "food/gallery/food-2",
-    alt: "Individual meal boxes lined up for group delivery",
-  },
-  {
-    publicId: "food/gallery/food-3",
-    alt: "Pasta trays prepared for large event catering",
-  },
-  {
-    publicId: "food/gallery/food-8",
-    alt: "Sweet and savory bites arranged for buffet service",
-  },
-  {
-    publicId: "food/gallery/food-9",
-    alt: "Dessert shooters with berries for corporate catering",
-  },
-  {
-    publicId: "food/gallery/food-10",
-    alt: "Fresh pizzas boxed and stacked for group orders",
-  },
-];
-
-const slantedCardStyle: CSSProperties = {
-  clipPath: "polygon(12% 0, 100% 0, 88% 100%, 0 100%)",
-};
 
 const VendorDeliveriesShowcase = () => {
   return (
@@ -88,35 +52,16 @@ const VendorDeliveriesShowcase = () => {
           </p>
         </header>
 
-        <div className="w-full overflow-hidden rounded-3xl bg-white shadow-[0_20px_55px_rgba(0,0,0,0.08)]">
-          <div className="flex h-[240px] items-stretch gap-2 sm:h-[280px] sm:gap-3 md:h-[340px]">
-            {GALLERY_IMAGES.map((image, index) => {
-              const verticalOffset =
-                index % 2 === 0
-                  ? "translate-y-3 md:translate-y-4"
-                  : "-translate-y-3 md:-translate-y-4";
-
-              return (
-                <div
-                  key={image.publicId}
-                  className={`relative flex h-full w-[140px] shrink-0 items-center justify-center sm:w-[170px] md:w-[200px] ${verticalOffset}`}
-                >
-                  <div
-                    className="relative h-full w-full overflow-hidden rounded-2xl shadow-xl"
-                    style={slantedCardStyle}
-                  >
-                    <Image
-                      src={getCloudinaryUrl(image.publicId)}
-                      alt={image.alt}
-                      fill
-                      sizes="(max-width: 768px) 160px, (max-width: 1024px) 190px, 220px"
-                      className="object-cover"
-                      priority={index === 0}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+        <div className="relative w-full overflow-hidden rounded-3xl bg-white shadow-[0_20px_55px_rgba(0,0,0,0.08)]">
+          <div className="relative aspect-[16/9] w-full sm:aspect-[21/9]">
+            <Image
+              src={getCloudinaryUrl("food/gallery-food-2")}
+              alt="Catering delivery showcase"
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 1200px, 1400px"
+              className="object-cover"
+              priority
+            />
           </div>
         </div>
 
