@@ -43,7 +43,6 @@ export async function deleteOnDemandOrder(orderId: string): Promise<DeleteOrderR
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user?.id) {
-      console.error("Unauthorized: No authenticated user");
       return { success: false, error: "Unauthorized: You must be logged in to perform this action." };
     }
 
@@ -54,7 +53,6 @@ export async function deleteOnDemandOrder(orderId: string): Promise<DeleteOrderR
     });
 
     if (!userProfile || (userProfile.type !== UserType.ADMIN && userProfile.type !== UserType.SUPER_ADMIN)) {
-      console.error(`Unauthorized: User ${user.id} with type ${userProfile?.type} attempted to delete order`);
       return {
         success: false,
         error: "Unauthorized: Only Admin or Super Admin can delete on-demand orders."
@@ -120,10 +118,7 @@ export async function deleteOnDemandOrder(orderId: string): Promise<DeleteOrderR
 
               // Attempt to delete from standard path
               if (filePath) {
-                const { error } = await supabase.storage.from(bucketName).remove([filePath]);
-                if (error) {
-                  console.error(`Error deleting file from standard path:`, error);
-                }
+                await supabase.storage.from(bucketName).remove([filePath]);
               }
             }
             else if (tempFolderMatch) {
@@ -172,12 +167,12 @@ export async function deleteOnDemandOrder(orderId: string): Promise<DeleteOrderR
                 filePath = url.pathname.split('/').slice(1).join('/');
 
                 await supabase.storage.from(bucketName).remove([filePath]);
-              } catch (e) {
-                console.error(`Fallback method failed:`, e);
+              } catch {
+                // Silently ignore fallback failures
               }
             }
-          } catch (error) {
-            console.error(`Error processing file URL ${file.fileUrl}:`, error);
+          } catch {
+            // Silently ignore file processing errors
           }
         }
       }
@@ -191,17 +186,7 @@ export async function deleteOnDemandOrder(orderId: string): Promise<DeleteOrderR
       success: true,
       message: "Order and associated data deleted successfully"
     };
-  } catch (error) {
-    console.error("Failed to delete on-demand order:", error);
-
-    if (error instanceof Error) {
-      console.error("Error details:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      });
-    }
-
+  } catch {
     return {
       success: false,
       error: "Database error: Failed to delete on-demand order."
@@ -231,15 +216,8 @@ export async function getClients(): Promise<ClientListItem[] | ActionError> {
       },
     });
 
-    console.log(`[getClients] Successfully fetched ${clients.length} client(s)`);
-
-    if (clients.length === 0) {
-      console.warn("[getClients] No CLIENT profiles found in database. Please ensure CLIENT profiles exist.");
-    }
-
     return clients as ClientListItem[];
-  } catch (error) {
-    console.error("[getClients] Failed to fetch clients:", error);
+  } catch {
     return { error: "Database error: Failed to fetch clients." };
   }
 }
@@ -251,7 +229,6 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
   // 1. Validate the input data
   const validationResult = createOnDemandOrderSchema.safeParse(formData);
   if (!validationResult.success) {
-    console.error("Validation failed:", validationResult.error.format());
     return {
       success: false,
       error: "Validation failed. Please check the form fields.",
@@ -349,37 +326,20 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
           body: JSON.stringify(updateData),
         });
 
-        if (response.ok) {
-          const result = await response.json();
-          console.log('[createOnDemandOrder] File associations updated:', result);
-        } else {
-          const errorText = await response.text();
-          console.error(`Failed to update file associations: ${response.status} - ${errorText}`);
-
+        if (!response.ok) {
           // Add retry logic in case of failure
           await new Promise(resolve => setTimeout(resolve, 1000));
 
-          const retryResponse = await fetch(updateUrl, {
+          await fetch(updateUrl, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(updateData),
           });
-
-          if (retryResponse.ok) {
-            console.log('[createOnDemandOrder] File associations updated on retry');
-          } else {
-            console.error('Retry failed to update file associations:', await retryResponse.text());
-          }
         }
-      } catch (error) {
-        // Log but don't fail the order creation if file update fails
-        console.error('Error updating file associations:', error);
-
-        if (error instanceof Error) {
-          console.error(`Error stack: ${error.stack}`);
-        }
+      } catch {
+        // Silently ignore file association errors - don't fail the order creation
       }
 
       // Also try to update storage paths for any temporary files
@@ -424,9 +384,7 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
                   .from('fileUploader')
                   .move(oldPath, newPath);
 
-                if (moveError) {
-                  console.error(`Error moving file ${oldPath} to ${newPath}:`, moveError);
-                } else {
+                if (!moveError) {
                   // Update file URL in database if needed
                   const { data: { publicUrl } } = supabaseClient.storage
                     .from('fileUploader')
@@ -447,12 +405,12 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
                         onDemandId: newOrder.id
                       }
                     });
-                  } catch (dbError) {
-                    console.error('Error updating file URL in database:', dbError);
+                  } catch {
+                    // Silently ignore database update errors
                   }
                 }
-              } catch (moveError) {
-                console.error(`Exception moving file ${oldPath} to ${newPath}:`, moveError);
+              } catch {
+                // Silently ignore file move errors
               }
             }
           }
@@ -518,23 +476,21 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
                             where: { id: file.id },
                             data: { fileUrl: publicUrl }
                           });
-                        } else {
-                          console.error(`Error moving file: ${moveError.message}`);
                         }
-                      } catch (moveError) {
-                        console.error('Error moving file:', moveError);
+                      } catch {
+                        // Silently ignore file move errors
                       }
                     }
                   }
                 }
-              } catch (updateError) {
-                console.error(`Error updating file ${file.id}:`, updateError);
+              } catch {
+                // Silently ignore file update errors
               }
             }
           }
         }
-      } catch (storageError) {
-        console.error('Error updating storage paths:', storageError);
+      } catch {
+        // Silently ignore storage path update errors
       }
     }
 
@@ -550,19 +506,6 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
     };
 
   } catch (error) {
-    console.error("Failed to create on-demand order:", error);
-
-    // Print the full error details
-    if (error instanceof Error) {
-      console.error("Error details:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      });
-    } else {
-      console.error("Unknown error type:", error);
-    }
-
     // Check if the error is a Prisma unique constraint violation on orderNumber
     if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
       const targetFields = error.meta?.target as string[] | undefined;
