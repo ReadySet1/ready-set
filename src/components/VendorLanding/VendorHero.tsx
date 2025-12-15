@@ -27,7 +27,7 @@ const VendorHero = ({
   description = `Our service goes beyond food delivery as we provide solutions for restaurants, caterers, grocers, and foodservice providers from pickup all the way to complete setup.`,
   ctaLabel = "Partner With Us",
   ctaHref = DEFAULT_PARTNER_URL,
-  imagePublicId = "food/catering-about",
+  imagePublicId = "food/catering-about-2",
   imageAlt = "Restaurant owners reviewing catering orders together",
 }: VendorHeroProps) => {
   const heroImageSrc = getCloudinaryUrl(imagePublicId, { quality: 85 });
@@ -40,7 +40,7 @@ const VendorHero = ({
     >
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 sm:px-6 lg:flex-row lg:items-center lg:gap-16">
         {/* Image Column */}
-        <div className="relative w-full overflow-hidden rounded-3xl shadow-xl lg:w-1/2">
+        <div className="relative w-full lg:w-1/2">
           <div className="relative aspect-[4/3] w-full">
             <Image
               src={heroImageSrc}

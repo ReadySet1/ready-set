@@ -33,62 +33,16 @@ const timelineSteps: Array<{ title: string; description: string }> = [
   },
 ];
 
-const defaultImage = getCloudinaryUrl("bakery/bakerybg2");
+const defaultImage = getCloudinaryUrl("food/food-delivery");
 
 const VendorOnboarding = ({
   imageSrc = defaultImage,
   imageAlt = "Vendor delivering catered food",
 }: VendorOnboardingProps) => {
   return (
-    <section className="bg-white px-4 py-16 sm:px-6 lg:px-8">
-      <div className="mx-auto grid max-w-6xl gap-10 rounded-2xl bg-gray-50 p-6 shadow-xl sm:p-10 lg:grid-cols-[1.05fr_1fr]">
-        <div className="space-y-6">
-          <div className="relative h-[260px] overflow-hidden rounded-2xl sm:h-[320px]">
-            <Image
-              src={imageSrc}
-              alt={imageAlt}
-              fill
-              sizes="(max-width: 1024px) 100vw, 560px"
-              className="object-cover"
-              priority
-            />
-          </div>
-
-          <div>
-            <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl">
-              Order Setup &amp; Scheduling
-            </h2>
-            <ul className="mt-4 space-y-3 text-sm leading-relaxed text-gray-700 sm:mt-6 sm:text-base">
-              <li>
-                Orders should be submitted at least one week in advance to
-                ensure driver availability and optimal service quality.
-              </li>
-              <li>
-                Late submissions may be accepted with a minimum of 24
-                hours&apos; notice.
-              </li>
-              <li>
-                We accept same-day delivery requests; however, we cannot
-                guarantee driver availability.
-              </li>
-              <li>
-                Backup drivers may be available, but are not guaranteed for
-                short-notice requests.
-              </li>
-              <li>
-                Orders may be submitted via your website dashboard, Slack, text,
-                or any preferred communication method — we recommend the website
-                for seamless operations.
-              </li>
-              <li>
-                Our support team will confirm each order and verify all delivery
-                details.
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="rounded-2xl bg-gray-300 p-6 sm:p-8">
+    <section className="bg-white py-16">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr_1.05fr] lg:px-8">
+        <div className="rounded-2xl bg-gray-300 p-6 sm:p-8 lg:order-2">
           <div className="flex flex-col gap-6">
             <div className="text-center">
               <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
@@ -138,6 +92,52 @@ const VendorOnboarding = ({
                 }
               />
             </div>
+          </div>
+        </div>
+
+        <div className="space-y-6 lg:order-1 lg:-ml-8">
+          <div className="relative h-[260px] sm:h-[320px]">
+            <Image
+              src={imageSrc}
+              alt={imageAlt}
+              fill
+              sizes="(max-width: 1024px) 100vw, 560px"
+              className="object-cover"
+              priority
+            />
+          </div>
+
+          <div>
+            <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl">
+              Order Setup &amp; Scheduling
+            </h2>
+            <ul className="mt-4 space-y-3 text-sm leading-relaxed text-gray-700 sm:mt-6 sm:text-base">
+              <li>
+                Orders should be submitted at least one week in advance to
+                ensure driver availability and optimal service quality.
+              </li>
+              <li>
+                Late submissions may be accepted with a minimum of 24
+                hours&apos; notice.
+              </li>
+              <li>
+                We accept same-day delivery requests; however, we cannot
+                guarantee driver availability.
+              </li>
+              <li>
+                Backup drivers may be available, but are not guaranteed for
+                short-notice requests.
+              </li>
+              <li>
+                Orders may be submitted via your website dashboard, Slack, text,
+                or any preferred communication method — we recommend the website
+                for seamless operations.
+              </li>
+              <li>
+                Our support team will confirm each order and verify all delivery
+                details.
+              </li>
+            </ul>
           </div>
         </div>
       </div>

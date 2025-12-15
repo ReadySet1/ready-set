@@ -172,7 +172,7 @@ const BakeryTerms = ({
     <div className="relative">
       <div className="relative">
         <Image
-          src={getCloudinaryUrl("bakery/bakerybg2")}
+          src={getCloudinaryUrl("food/food-dishes")}
           alt="Food dishes"
           width={1200}
           height={800}
