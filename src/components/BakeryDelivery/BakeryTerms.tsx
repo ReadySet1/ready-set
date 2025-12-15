@@ -31,7 +31,7 @@ const BakeryTerms = ({
         <h2 className="mb-3 text-xl font-bold text-white md:mb-6 md:text-5xl">
           Package Delivery Terms <br /> & Pricing Chart
         </h2>
-        <div className="flex flex-row items-center justify-center gap-3 md:gap-6">
+        <div className="flex flex-row items-center justify-center gap-6 md:gap-8">
           <button
             className="rounded-lg bg-yellow-500 px-4 py-2 text-sm font-bold text-gray-900 shadow-lg transition-all duration-200 hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 md:px-6 md:py-3 md:text-lg"
             onClick={handleQuoteClick}
@@ -74,16 +74,16 @@ const BakeryTerms = ({
   );
 
   const renderVendorContent = () => (
-    <div className="absolute inset-0 flex items-center justify-center px-4 py-10 sm:py-14">
-      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center gap-6">
-        <div className="w-full rounded-2xl border-[10px] border-gray-400 bg-[#f3f3f3] p-4 shadow-2xl sm:p-6 lg:p-8">
-          <div className="rounded-xl bg-white px-6 py-10 shadow-md sm:px-10 sm:py-12 lg:px-14">
+    <div className="absolute inset-0 flex items-center justify-center px-4 pb-32 pt-24 sm:pb-40 sm:pt-32">
+      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center gap-8">
+        <div className="w-full rounded-2xl border-[10px] border-gray-300 bg-[#f3f3f3] p-4 shadow-2xl sm:p-6 lg:p-8">
+          <div className="rounded-xl bg-white px-6 py-6 shadow-md sm:px-10 sm:py-8 lg:px-14">
             <div className="flex flex-col items-center text-center">
               <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
                 Package Delivery Terms
                 <br />& Pricing Chart
               </h2>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-6 md:gap-8">
                 <button
                   className="rounded-lg bg-yellow-400 px-6 py-3 text-base font-extrabold text-gray-900 shadow-md transition hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2"
                   onClick={handleQuoteClick}
@@ -157,10 +157,10 @@ const BakeryTerms = ({
           </div>
         </div>
 
-        <div className="w-full max-w-4xl">
+        <div className="w-full max-w-2xl">
           <ScheduleDialog
-            buttonText="Hosting Services? Let’s Talk"
-            className="block w-full rounded-lg bg-yellow-400 px-6 py-3 text-center text-base font-extrabold text-gray-900 shadow-md transition hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 sm:text-lg"
+            buttonText="Hosting Services? Let's Talk"
+            className="block w-full rounded-lg bg-yellow-400 px-6 py-2.5 text-center text-base font-bold text-gray-900 shadow-md transition hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 sm:text-lg"
             calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
           />
         </div>

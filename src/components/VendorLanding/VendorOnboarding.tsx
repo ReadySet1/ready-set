@@ -1,6 +1,7 @@
 import Image from "next/image";
 
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import ScheduleDialog from "@/components/Logistics/Schedule";
 
 interface VendorOnboardingProps {
   /**
@@ -87,12 +88,12 @@ const VendorOnboarding = ({
           </div>
         </div>
 
-        <div className="rounded-2xl bg-gray-100 p-6 sm:p-8">
+        <div className="rounded-2xl bg-gray-300 p-6 sm:p-8">
           <div className="flex flex-col gap-6">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-[#58a2c2]">
+            <div className="text-center">
+              <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
                 How to Get Started
-              </p>
+              </h2>
               <p className="mt-2 text-sm text-gray-700 sm:text-base">
                 We make setup simple so you can focus on your catering
                 operations.
@@ -124,13 +125,18 @@ const VendorOnboarding = ({
               ))}
             </ol>
 
-            <div>
-              <button
-                type="button"
-                className="mt-2 w-full rounded-lg bg-yellow-400 px-6 py-3 text-center text-base font-extrabold text-gray-900 shadow-md transition hover:bg-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 sm:text-lg"
-              >
-                Get Started
-              </button>
+            <div className="flex justify-center">
+              <ScheduleDialog
+                buttonText="Get Started"
+                dialogTitle="Schedule Your Consultation"
+                dialogDescription="Choose a convenient time to discuss your catering delivery needs."
+                calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
+                customButton={
+                  <button className="rounded-lg bg-yellow-400 px-8 py-2.5 text-center text-base font-extrabold text-gray-900 shadow-md transition hover:bg-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500">
+                    Get Started
+                  </button>
+                }
+              />
             </div>
           </div>
         </div>

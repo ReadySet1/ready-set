@@ -177,12 +177,18 @@ const VendorDeliveryFlow = () => {
     <section className="bg-[#f7cd2a] px-4 py-16 sm:px-6 lg:px-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-10">
         <div className="text-center text-gray-900">
-          <h2 className="text-2xl font-extrabold sm:text-3xl">
-            End-to-End Delivery Service
+          <h2 className="text-2xl font-extrabold leading-tight sm:text-3xl">
+            End-to-End
+            <br />
+            Delivery Service
           </h2>
-          <p className="mt-3 text-sm leading-relaxed sm:text-base">
-            We handle everything from orders to setup, making catering deliveries
-            easy, reliable, and stress-free for restaurants and caterers.
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed sm:text-base">
+            We handle everything from orders to setup, making catering
+            deliveries
+            <br />
+            easy, reliable, and stress-free for
+            <br />
+            restaurants and caterers.
           </p>
         </div>
 
@@ -190,15 +196,15 @@ const VendorDeliveryFlow = () => {
           {/* Connector lines for large screens */}
           <div className="pointer-events-none absolute inset-0 hidden lg:block">
             {/* Horizontal dashed line top row */}
-            <span className="absolute left-[8%] right-[8%] top-[26%] border-t-2 border-white border-dashed" />
+            <span className="absolute left-[8%] right-[8%] top-[26%] border-t-2 border-dashed border-white" />
             {/* Horizontal dashed line bottom row */}
-            <span className="absolute left-[8%] right-[8%] bottom-[33%] border-t-2 border-white border-dashed" />
+            <span className="absolute bottom-[33%] left-[8%] right-[8%] border-t-2 border-dashed border-white" />
             {/* Vertical dashed line middle column */}
-            <span className="absolute left-1/2 top-[26%] bottom-[34%] -translate-x-1/2 border-l-2 border-white border-dashed" />
+            <span className="absolute bottom-[34%] left-1/2 top-[26%] -translate-x-1/2 border-l-2 border-dashed border-white" />
             {/* Vertical dashed line left column */}
-            <span className="absolute left-[16.5%] top-[26%] bottom-[34%] border-l-2 border-white border-dashed" />
+            <span className="absolute bottom-[34%] left-[16.5%] top-[26%] border-l-2 border-dashed border-white" />
             {/* Vertical dashed line right column */}
-            <span className="absolute right-[16.5%] top-[26%] bottom-[34%] border-l-2 border-white border-dashed" />
+            <span className="absolute bottom-[34%] right-[16.5%] top-[26%] border-l-2 border-dashed border-white" />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -206,8 +212,8 @@ const VendorDeliveryFlow = () => {
               <div
                 key={card.title}
                 className={clsx(
-                  "relative flex h-full flex-col gap-4 rounded-2xl border-2 border-[#d6d9e7] bg-white p-6 shadow-md",
-                  card.className
+                  "relative flex h-full flex-col gap-4 rounded-3xl border-[3px] border-gray-400 bg-white p-6 shadow-[0_0_0_4px_rgba(156,163,175,0.4)]",
+                  card.className,
                 )}
               >
                 <div className="flex items-start gap-3">
@@ -219,7 +225,10 @@ const VendorDeliveryFlow = () => {
                 <ul className="ml-1 space-y-2 text-sm leading-relaxed text-gray-700 sm:text-base">
                   {card.bullets.map((item) => (
                     <li key={item} className="flex items-start gap-2">
-                      <span aria-hidden className="mt-2 h-1.5 w-1.5 rounded-full bg-gray-700" />
+                      <span
+                        aria-hidden
+                        className="mt-2 h-1.5 w-1.5 rounded-full bg-gray-700"
+                      />
                       <span>{item}</span>
                     </li>
                   ))}
@@ -229,19 +238,22 @@ const VendorDeliveryFlow = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-[#f7cd2a] px-5 py-6 text-center text-gray-900 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.25)] sm:px-8 sm:py-7">
+        <div className="rounded-2xl bg-[#f7cd2a] px-5 py-6 text-center text-gray-900 sm:px-8 sm:py-7">
           <div className="mx-auto flex max-w-4xl flex-col gap-2 sm:gap-3">
             <div className="flex items-center justify-center gap-3">
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-900 text-lg font-extrabold">
                 !
               </span>
-              <p className="text-lg font-extrabold sm:text-xl">Same-Day Delivery</p>
+              <p className="text-lg font-extrabold sm:text-xl">
+                Same-Day Delivery
+              </p>
             </div>
             <p className="text-sm leading-relaxed sm:text-base">
               Please note that while we may accept same-day delivery requests,
-              driver availability cannot be guaranteed. To secure driver and ensure
-              optimal service quality, we highly recommend submitting orders at least
-              one week in advance or with a minimum of 24 hours notice.
+              driver availability cannot be guaranteed. To secure driver and
+              ensure optimal service quality, we highly recommend submitting
+              orders at least one week in advance or with a minimum of 24 hours
+              notice.
             </p>
           </div>
         </div>
@@ -251,4 +263,3 @@ const VendorDeliveryFlow = () => {
 };
 
 export default VendorDeliveryFlow;
-
