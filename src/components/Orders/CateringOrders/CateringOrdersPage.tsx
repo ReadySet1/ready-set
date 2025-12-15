@@ -26,17 +26,18 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { 
-  ClipboardList, 
-  AlertCircle, 
-  Search, 
-  ChevronDown, 
-  Calendar, 
-  User, 
+import {
+  ClipboardList,
+  AlertCircle,
+  Search,
+  ChevronDown,
+  Calendar,
+  User,
   DollarSign,
   PlusCircle,
   Filter,
-  ArrowUpDown
+  ArrowUpDown,
+  X
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -146,15 +147,20 @@ interface CateringOrdersApiResponse {
   totalPages: number;
 }
 
-type OrderStatus = 'ACTIVE' | 'PENDING' | 'CONFIRMED' | 'ASSIGNED' | 'CANCELLED' | 'COMPLETED';
+type OrderStatus = 'ACTIVE' | 'PENDING' | 'CONFIRMED' | 'ASSIGNED' | 'IN_PROGRESS' | 'DELIVERED' | 'CANCELLED' | 'COMPLETED';
+
+// Tab filter type for grouped status filtering
+type StatusTabFilter = 'all_open' | 'new' | 'in_transit' | 'completed' | 'cancelled';
 
 const statusConfig = {
   ACTIVE: { className: "bg-amber-100 text-amber-800 hover:bg-amber-200", icon: <AlertCircle className="h-3 w-3 mr-1" /> },
   PENDING: { className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200", icon: <AlertCircle className="h-3 w-3 mr-1" /> },
   CONFIRMED: { className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-200", icon: <ClipboardList className="h-3 w-3 mr-1" /> },
   ASSIGNED: { className: "bg-blue-100 text-blue-800 hover:bg-blue-200", icon: <User className="h-3 w-3 mr-1" /> },
+  IN_PROGRESS: { className: "bg-purple-100 text-purple-800 hover:bg-purple-200", icon: <AlertCircle className="h-3 w-3 mr-1" /> },
+  DELIVERED: { className: "bg-teal-100 text-teal-800 hover:bg-teal-200", icon: <ClipboardList className="h-3 w-3 mr-1" /> },
   CANCELLED: { className: "bg-red-100 text-red-800 hover:bg-red-200", icon: <AlertCircle className="h-3 w-3 mr-1" /> },
-  COMPLETED: { className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-200", icon: <ClipboardList className="h-3 w-3 mr-1" /> },
+  COMPLETED: { className: "bg-green-100 text-green-800 hover:bg-green-200", icon: <ClipboardList className="h-3 w-3 mr-1" /> },
 };
 
 const getStatusConfig = (status: string) => {
@@ -195,14 +201,22 @@ const LoadingSkeleton = () => (
   </div>
 );
 
+// Search field type for filtering
+type SearchFieldType = 'all' | 'date' | 'amount' | 'order_number' | 'client_name';
+
+// Quick filter type for preset filters
+type QuickFilterType = 'today' | 'week' | 'month' | 'high_value' | null;
+
 const CateringOrdersPage: React.FC = () => {
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<OrderStatus>('ACTIVE');
+  const [statusTabFilter, setStatusTabFilter] = useState<StatusTabFilter>('all_open');
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchField, setSearchField] = useState<SearchFieldType>("all");
+  const [quickFilter, setQuickFilter] = useState<QuickFilterType>(null);
   const [sortField, setSortField] = useState<string>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [limit] = useState(10); // Default limit for pagination
@@ -212,14 +226,13 @@ const CateringOrdersPage: React.FC = () => {
     helpdesk: false
   });
 
-  // Add status tabs
-  const statusTabs = [
-    { value: 'ACTIVE', label: 'Active' },
-    { value: 'PENDING', label: 'Pending' },
-    { value: 'CONFIRMED', label: 'Confirmed' },
-    { value: 'ASSIGNED', label: 'Assigned' },
-    { value: 'CANCELLED', label: 'Cancelled' },
-    { value: 'COMPLETED', label: 'Completed' }
+  // Grouped status tabs for better organization
+  const statusTabs: { value: StatusTabFilter; label: string; description: string }[] = [
+    { value: 'all_open', label: 'All Open', description: 'All active orders' },
+    { value: 'new', label: 'New', description: 'Pending & Confirmed' },
+    { value: 'in_transit', label: 'In Transit', description: 'Active, Assigned, In Progress & Delivered' },
+    { value: 'completed', label: 'Completed', description: 'Finished orders' },
+    { value: 'cancelled', label: 'Cancelled', description: 'Cancelled orders' }
   ];
 
   useEffect(() => {
@@ -233,18 +246,33 @@ const CateringOrdersPage: React.FC = () => {
           limit: limit.toString(),
           sort: sortField,
           direction: sortDirection,
-          status: statusFilter,
         });
 
-        // Add search term if present
+        // Use statusFilter for grouped tabs, or status for single status
+        if (statusTabFilter === 'completed') {
+          queryParams.append('status', 'COMPLETED');
+        } else if (statusTabFilter === 'cancelled') {
+          queryParams.append('status', 'CANCELLED');
+        } else {
+          // Use the grouped statusFilter parameter
+          queryParams.append('statusFilter', statusTabFilter);
+        }
+
+        // Add search term and search field if present
         if (searchTerm) {
           queryParams.append('search', searchTerm);
+          queryParams.append('searchField', searchField);
+        }
+
+        // Add quick filter if present
+        if (quickFilter) {
+          queryParams.append('quickFilter', quickFilter);
         }
 
         // Get current user for auth token
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         // Make API call with authentication
         const response = await fetch(`/api/orders/catering-orders?${queryParams}`, {
           headers: {
@@ -253,7 +281,7 @@ const CateringOrdersPage: React.FC = () => {
             'Authorization': session ? `Bearer ${session.access_token}` : '',
           }
         });
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch orders');
         }
@@ -270,7 +298,7 @@ const CateringOrdersPage: React.FC = () => {
     };
 
     fetchOrders();
-  }, [page, statusFilter, searchTerm, sortField, sortDirection, limit]);
+  }, [page, statusTabFilter, searchTerm, searchField, quickFilter, sortField, sortDirection, limit]);
 
   // New useEffect to fetch user roles
   useEffect(() => {
@@ -311,9 +339,9 @@ const CateringOrdersPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Update status filter handler
-  const handleStatusFilter = (status: OrderStatus) => {
-    setStatusFilter(status);
+  // Update status tab filter handler
+  const handleStatusTabFilter = (filter: StatusTabFilter) => {
+    setStatusTabFilter(filter);
     setPage(1); // Reset to first page when changing filters
   };
 
@@ -323,6 +351,54 @@ const CateringOrdersPage: React.FC = () => {
     } else {
       setSortField(field);
       setSortDirection("asc");
+    }
+  };
+
+  // Handle quick filter selection
+  const handleQuickFilter = (filter: QuickFilterType) => {
+    setQuickFilter(filter);
+    setSearchTerm(""); // Clear search term when using quick filters
+    setSearchField("all"); // Reset search field
+    setPage(1); // Reset to first page
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSearchField("all");
+    setQuickFilter(null);
+    setPage(1);
+  };
+
+  // Get search placeholder based on selected field
+  const getSearchPlaceholder = (): string => {
+    switch (searchField) {
+      case 'date':
+        return "Enter date (e.g., 10/22/2025)...";
+      case 'amount':
+        return "Enter amount (e.g., 700.00)...";
+      case 'order_number':
+        return "Enter order number...";
+      case 'client_name':
+        return "Enter client name...";
+      default:
+        return "Search order #, client...";
+    }
+  };
+
+  // Get quick filter label for display
+  const getQuickFilterLabel = (): string | null => {
+    switch (quickFilter) {
+      case 'today':
+        return "Today's Orders";
+      case 'week':
+        return "This Week";
+      case 'month':
+        return "This Month";
+      case 'high_value':
+        return "High Value (>$1000)";
+      default:
+        return null;
     }
   };
 
@@ -376,8 +452,16 @@ const CateringOrdersPage: React.FC = () => {
           limit: limit.toString(),
           sort: sortField,
           direction: sortDirection,
-          status: statusFilter,
         });
+
+        // Use statusFilter for grouped tabs, or status for single status
+        if (statusTabFilter === 'completed') {
+          queryParams.append('status', 'COMPLETED');
+        } else if (statusTabFilter === 'cancelled') {
+          queryParams.append('status', 'CANCELLED');
+        } else {
+          queryParams.append('statusFilter', statusTabFilter);
+        }
 
         // Add search term if present
         if (searchTerm) {
@@ -387,7 +471,7 @@ const CateringOrdersPage: React.FC = () => {
         // Get current user for auth token
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         // Make API call with authentication
         const response = await fetch(`/api/orders/catering-orders?${queryParams}`, {
           headers: {
@@ -395,7 +479,7 @@ const CateringOrdersPage: React.FC = () => {
             'Authorization': session ? `Bearer ${session.access_token}` : '',
           }
         });
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch orders');
         }
@@ -481,10 +565,11 @@ const CateringOrdersPage: React.FC = () => {
           {statusTabs.map((tab) => (
             <button
               key={tab.value}
-              onClick={() => handleStatusFilter(tab.value as OrderStatus)}
+              onClick={() => handleStatusTabFilter(tab.value)}
+              title={tab.description}
               className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0
-                ${statusFilter === tab.value 
-                  ? 'bg-blue-100 text-blue-800' 
+                ${statusTabFilter === tab.value
+                  ? 'bg-blue-100 text-blue-800'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
               {tab.label}
@@ -505,50 +590,108 @@ const CateringOrdersPage: React.FC = () => {
                 <div className="relative flex-1 min-w-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Search order #, client..."
+                    placeholder={getSearchPlaceholder()}
                     className="pl-9 h-10 w-full"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    maxLength={100}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      if (e.target.value) {
+                        setQuickFilter(null); // Clear quick filter when typing
+                      }
+                    }}
                   />
+                  {searchTerm && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                      onClick={() => setSearchTerm("")}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-                
+
                 {/* Filter Controls - Responsive layout */}
                 <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+                  {/* Quick Filters Dropdown */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="gap-2 h-10 flex-1 sm:flex-none">
+                      <Button
+                        variant={quickFilter ? "default" : "outline"}
+                        className={`gap-2 h-10 flex-1 sm:flex-none ${quickFilter ? 'bg-amber-500 hover:bg-amber-600' : ''}`}
+                      >
                         <Filter className="h-4 w-4" />
-                        <span className="sm:hidden md:inline">Filters</span>
+                        <span className="sm:hidden md:inline">
+                          {getQuickFilterLabel() || "Filters"}
+                        </span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem>Today's Orders</DropdownMenuItem>
-                      <DropdownMenuItem>This Week's Orders</DropdownMenuItem>
-                      <DropdownMenuItem>This Month's Orders</DropdownMenuItem>
-                      <DropdownMenuItem>High Value ({'>'}$1000)</DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleQuickFilter('today')}
+                        className={quickFilter === 'today' ? 'bg-amber-100' : ''}
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Today&apos;s Orders
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleQuickFilter('week')}
+                        className={quickFilter === 'week' ? 'bg-amber-100' : ''}
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        This Week&apos;s Orders
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleQuickFilter('month')}
+                        className={quickFilter === 'month' ? 'bg-amber-100' : ''}
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        This Month&apos;s Orders
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleQuickFilter('high_value')}
+                        className={quickFilter === 'high_value' ? 'bg-amber-100' : ''}
+                      >
+                        <DollarSign className="h-4 w-4 mr-2" />
+                        High Value ({'>'}$1000)
+                      </DropdownMenuItem>
+                      {quickFilter && (
+                        <>
+                          <div className="my-1 border-t" />
+                          <DropdownMenuItem onClick={() => handleQuickFilter(null)}>
+                            <X className="h-4 w-4 mr-2" />
+                            Clear Filter
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  
+
                   <div className="flex gap-2 flex-1 sm:flex-none">
+                    {/* Search Field Selector */}
                     <Select
-                      value={sortField}
-                      onValueChange={(value) => { handleSort(value); }}
+                      value={searchField}
+                      onValueChange={(value) => setSearchField(value as SearchFieldType)}
                     >
-                      <SelectTrigger className="h-10 min-w-[100px] flex-1 sm:min-w-[120px]">
-                        <SelectValue placeholder="Sort by" />
+                      <SelectTrigger className="h-10 min-w-[100px] flex-1 sm:min-w-[130px]">
+                        <SelectValue placeholder="Search by" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="all">All Fields</SelectItem>
                         <SelectItem value="date">Date</SelectItem>
-                        <SelectItem value="order_total">Amount</SelectItem>
+                        <SelectItem value="amount">Amount</SelectItem>
                         <SelectItem value="order_number">Order Number</SelectItem>
-                        <SelectItem value="user.name">Client Name</SelectItem>
+                        <SelectItem value="client_name">Client Name</SelectItem>
                       </SelectContent>
                     </Select>
-                    
-                    <Button variant="ghost" onClick={() => handleSort(sortField)} className="h-10 px-2 flex-shrink-0">
-                      {sortDirection === 'asc' ? 
-                        <ChevronDown className="h-4 w-4 opacity-70 rotate-180" /> : 
-                        <ChevronDown className="h-4 w-4 opacity-70" /> 
+
+                    {/* Sort Direction Toggle */}
+                    <Button variant="ghost" onClick={() => handleSort(sortField)} className="h-10 px-2 flex-shrink-0" title={`Sort ${sortDirection === 'asc' ? 'Descending' : 'Ascending'}`}>
+                      {sortDirection === 'asc' ?
+                        <ChevronDown className="h-4 w-4 opacity-70 rotate-180" /> :
+                        <ChevronDown className="h-4 w-4 opacity-70" />
                       }
                       <span className="sr-only">Toggle Sort Direction</span>
                     </Button>
@@ -556,6 +699,28 @@ const CateringOrdersPage: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Active Filters Display */}
+            {(searchTerm || quickFilter) && (
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200">
+                <span className="text-sm text-slate-500">Active filters:</span>
+                {quickFilter && (
+                  <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 cursor-pointer" onClick={() => handleQuickFilter(null)}>
+                    {getQuickFilterLabel()}
+                    <X className="h-3 w-3 ml-1" />
+                  </Badge>
+                )}
+                {searchTerm && (
+                  <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer" onClick={() => setSearchTerm("")}>
+                    {searchField !== 'all' ? `${searchField.replace('_', ' ')}: ` : ''}{searchTerm}
+                    <X className="h-3 w-3 ml-1" />
+                  </Badge>
+                )}
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-slate-500 hover:text-slate-700">
+                  Clear all
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* CateringOrdersTable Component */}
@@ -571,11 +736,11 @@ const CateringOrdersPage: React.FC = () => {
                 </Alert>
               </div>
             ) : orders.length > 0 ? (
-              <CateringOrdersTable 
+              <CateringOrdersTable
                 orders={mapToOrderType(orders)}
                 isLoading={isLoading}
-                statusFilter={statusFilter.toLowerCase() as StatusFilter}
-                onStatusFilterChange={(status) => handleStatusFilter(status.toUpperCase() as OrderStatus)}
+                statusFilter={'active' as StatusFilter}
+                onStatusFilterChange={() => {/* Tab filtering handled by parent */}}
                 userRoles={userRoles}
                 onOrderDeleted={handleOrderDeleted}
               />
@@ -587,7 +752,7 @@ const CateringOrdersPage: React.FC = () => {
                 </div>
                 <h3 className="text-lg font-semibold text-slate-800">No orders found</h3>
                 <p className="text-slate-500 max-w-md mt-1 text-sm sm:text-base">
-                  No {statusFilter !== 'ACTIVE' ? <span className="capitalize font-medium">{statusFilter}</span> : ''} orders match your current filters.
+                  No <span className="font-medium">{statusTabs.find(t => t.value === statusTabFilter)?.label}</span> orders match your current filters.
                 </p>
                 <Link href="/admin/catering-orders/new" className="mt-4">
                   <Button variant="outline" className="mt-2">

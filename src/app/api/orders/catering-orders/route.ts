@@ -60,6 +60,8 @@ export async function GET(req: NextRequest) {
     const statusParam = url.searchParams.get('status');
     const statusFilter = url.searchParams.get('statusFilter'); // 'active' for all active statuses
     const searchTerm = url.searchParams.get('search') || '';
+    const searchField = url.searchParams.get('searchField') || 'all'; // Field to search: 'all', 'date', 'amount', 'order_number', 'client_name'
+    const quickFilter = url.searchParams.get('quickFilter'); // Quick filter: 'today', 'week', 'month', 'high_value'
     const sortField = url.searchParams.get('sort') || 'pickupDateTime';
     const sortDirection = url.searchParams.get('direction') || 'desc';
     const recentOnly = url.searchParams.get('recentOnly') === 'true';
@@ -69,8 +71,9 @@ export async function GET(req: NextRequest) {
       deletedAt: null
     };
 
-    // Handle statusFilter=active (fetches all orders with active-like statuses)
+    // Handle statusFilter parameter for grouped status filtering
     if (statusFilter === 'active') {
+      // Legacy: fetches all orders with active-like statuses
       whereClause.status = {
         in: [
           CateringStatus.ACTIVE,
@@ -78,6 +81,36 @@ export async function GET(req: NextRequest) {
           CateringStatus.PENDING,
           CateringStatus.CONFIRMED,
           CateringStatus.IN_PROGRESS,
+        ]
+      };
+    } else if (statusFilter === 'all_open') {
+      // All open orders (everything except completed and cancelled)
+      whereClause.status = {
+        in: [
+          CateringStatus.PENDING,
+          CateringStatus.CONFIRMED,
+          CateringStatus.ACTIVE,
+          CateringStatus.ASSIGNED,
+          CateringStatus.IN_PROGRESS,
+          CateringStatus.DELIVERED,
+        ]
+      };
+    } else if (statusFilter === 'new') {
+      // New orders awaiting processing
+      whereClause.status = {
+        in: [
+          CateringStatus.PENDING,
+          CateringStatus.CONFIRMED,
+        ]
+      };
+    } else if (statusFilter === 'in_transit') {
+      // Orders being worked on / in transit
+      whereClause.status = {
+        in: [
+          CateringStatus.ACTIVE,
+          CateringStatus.ASSIGNED,
+          CateringStatus.IN_PROGRESS,
+          CateringStatus.DELIVERED,
         ]
       };
     } else if (statusParam && statusParam !== 'all') {
@@ -96,12 +129,107 @@ export async function GET(req: NextRequest) {
       };
     }
 
+    // Handle quick filters
+    if (quickFilter) {
+      const now = new Date();
+      switch (quickFilter) {
+        case 'today': {
+          const startOfDay = new Date(now);
+          startOfDay.setHours(0, 0, 0, 0);
+          const endOfDay = new Date(now);
+          endOfDay.setHours(23, 59, 59, 999);
+          whereClause.pickupDateTime = { gte: startOfDay, lte: endOfDay };
+          break;
+        }
+        case 'week': {
+          const startOfWeek = new Date(now);
+          startOfWeek.setDate(now.getDate() - now.getDay()); // Start from Sunday
+          startOfWeek.setHours(0, 0, 0, 0);
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 6);
+          endOfWeek.setHours(23, 59, 59, 999);
+          whereClause.pickupDateTime = { gte: startOfWeek, lte: endOfWeek };
+          break;
+        }
+        case 'month': {
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+          whereClause.pickupDateTime = { gte: startOfMonth, lte: endOfMonth };
+          break;
+        }
+        case 'high_value': {
+          whereClause.orderTotal = { gt: 1000 };
+          break;
+        }
+      }
+    }
+
+    // Handle field-specific search
     if (searchTerm) {
-      whereClause.OR = [
-        { orderNumber: { contains: searchTerm, mode: 'insensitive' } },
-        { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
-        { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
-      ];
+      // Build search conditions based on selected field
+      let searchConditions: any;
+
+      switch (searchField) {
+        case 'order_number':
+          searchConditions = { orderNumber: { contains: searchTerm, mode: 'insensitive' } };
+          break;
+        case 'client_name':
+          // Search clientAttention field (the order recipient name) and user.name as fallback
+          searchConditions = {
+            OR: [
+              { clientAttention: { contains: searchTerm, mode: 'insensitive' } },
+              { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
+            ]
+          };
+          break;
+        case 'amount': {
+          // Parse the amount - remove currency symbols and commas
+          const cleanedAmount = searchTerm.replace(/[$,]/g, '').trim();
+          const amount = parseFloat(cleanedAmount);
+          if (!isNaN(amount)) {
+            // Search for amounts within a small range to handle decimal precision
+            searchConditions = {
+              orderTotal: {
+                gte: amount - 0.01,
+                lte: amount + 0.01
+              }
+            };
+          }
+          break;
+        }
+        case 'date': {
+          // Try to parse the date from various formats
+          const parsedDate = new Date(searchTerm);
+          if (!isNaN(parsedDate.getTime())) {
+            const startOfDay = new Date(parsedDate);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(parsedDate);
+            endOfDay.setHours(23, 59, 59, 999);
+            searchConditions = { pickupDateTime: { gte: startOfDay, lte: endOfDay } };
+          }
+          break;
+        }
+        default: // 'all' - search across multiple fields
+          searchConditions = {
+            OR: [
+              { orderNumber: { contains: searchTerm, mode: 'insensitive' } },
+              { clientAttention: { contains: searchTerm, mode: 'insensitive' } },
+              { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
+              { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
+            ]
+          };
+      }
+
+      // Merge search conditions with existing whereClause using AND
+      if (searchConditions) {
+        whereClause = {
+          AND: [
+            whereClause,
+            searchConditions
+          ]
+        };
+      }
+
     }
 
     // Build order by clause
@@ -112,8 +240,11 @@ export async function GET(req: NextRequest) {
       pickupDateTime: { pickupDateTime: effectiveSortDirection },
       date: { pickupDateTime: effectiveSortDirection },
       orderTotal: { orderTotal: effectiveSortDirection },
+      order_total: { orderTotal: effectiveSortDirection }, // Support underscore naming
       orderNumber: { orderNumber: effectiveSortDirection },
+      order_number: { orderNumber: effectiveSortDirection }, // Support underscore naming
       'user.name': { user: { name: effectiveSortDirection } },
+      client_name: { user: { name: effectiveSortDirection } }, // Support underscore naming
       createdAt: { createdAt: effectiveSortDirection },
     };
 
