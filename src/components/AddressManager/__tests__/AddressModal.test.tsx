@@ -65,7 +65,8 @@ const mockAddress: Address = {
 };
 
 /**
- * TODO: REA-211 - AddressModal tests have Supabase mocking issues
+ * TODO: REA-259 - Tests need updates for component UI changes (tabs -> buttons)
+ * 16 tests failing due to UI element changes
  */
 describe.skip("AddressModal", () => {
   beforeEach(() => {

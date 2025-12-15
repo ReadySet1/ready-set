@@ -145,6 +145,9 @@ const mockAddress = {
  * 2. Create a proper mock module in __mocks__ directory
  * 3. Use jest.isolateModules for proper mock isolation
  */
+/**
+ * TODO: REA-259 - 10/11 tests failing due to UI changes
+ */
 describe.skip("CateringRequestForm", () => {
   beforeEach(() => {
     jest.clearAllMocks();

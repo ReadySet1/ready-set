@@ -105,7 +105,9 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * TODO: REA-211 - AddressSelector tests have hook mocking issues
+ * TODO: REA-259 - Tests need updates for component UI changes
+ * - Placeholder text changed from "search addresses" to "Search..."
+ * - 6 tests passing, 13 need updates
  */
 describe.skip('AddressSelector', () => {
   const defaultProps = {

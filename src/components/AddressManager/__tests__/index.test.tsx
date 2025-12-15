@@ -72,7 +72,7 @@ const defaultProps = {
 };
 
 /**
- * TODO: REA-211 - AddressManager tests have Supabase auth mocking issues
+ * TODO: REA-259 - Tests need updates for component UI changes
  */
 describe.skip("AddressManager Refresh Functionality", () => {
   beforeEach(() => {
@@ -307,7 +307,7 @@ describe.skip("AddressManager Refresh Functionality", () => {
 });
 
 /**
- * TODO: REA-211 - AddressManager pagination tests have Supabase auth mocking issues
+ * TODO: REA-259 - Tests need updates for component UI changes
  */
 describe.skip("AddressManager Pagination", () => {
   beforeEach(() => {

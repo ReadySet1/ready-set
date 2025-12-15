@@ -100,10 +100,7 @@ const setupDefaultMocks = () => {
   });
 };
 
-/**
- * TODO: REA-211 - AddressManager refresh tests have Supabase mocking issues
- */
-describe.skip("AddressManager Refresh Functionality", () => {
+describe("AddressManager Refresh Functionality", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (fetch as jest.Mock).mockClear();
@@ -142,7 +139,7 @@ describe.skip("AddressManager Refresh Functionality", () => {
     });
   });
 
-  // TODO: Fix test isolation issue - passes individually but fails in suite
+  // TODO: REA-259 - Test needs component behavior verification
   it.skip("refreshes addresses when refresh function is called", async () => {
     const capturedRefreshFunctions: Array<() => void> = [];
 
@@ -307,7 +304,7 @@ describe.skip("AddressManager Refresh Functionality", () => {
     });
   });
 
-  // TODO: Fix test isolation issue - passes individually but fails in suite
+  // TODO: REA-259 - Test needs component behavior verification
   it.skip("resets fetch attempts when refresh is called manually", async () => {
     const capturedRefreshFunctions: Array<() => void> = [];
 
@@ -355,7 +352,7 @@ describe.skip("AddressManager Refresh Functionality", () => {
     });
   });
 
-  // TODO: Fix test isolation issue - passes individually but fails in suite
+  // TODO: REA-259 - Test needs component behavior verification
   it.skip("shows filter buttons for address types", async () => {
     render(<AddressManager {...defaultProps} />);
 
@@ -374,7 +371,7 @@ describe.skip("AddressManager Refresh Functionality", () => {
     expect(screen.getByText("Office")).toBeInTheDocument();
   });
 
-  // TODO: Fix test isolation issue - passes individually but fails in suite
+  // TODO: REA-259 - Test needs component behavior verification
   it.skip("handles empty address list gracefully", async () => {
     (fetch as jest.Mock).mockResolvedValue({
       ok: true,
