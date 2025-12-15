@@ -74,37 +74,37 @@ const BakeryTerms = ({
   );
 
   const renderVendorContent = () => (
-    <div className="absolute inset-0 flex items-center justify-center px-4 pb-32 pt-24 sm:pb-40 sm:pt-32">
-      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center gap-8">
-        <div className="w-full rounded-2xl border-[10px] border-gray-300 bg-[#f3f3f3] p-4 shadow-2xl sm:p-6 lg:p-8">
-          <div className="rounded-xl bg-white px-6 py-6 shadow-md sm:px-10 sm:py-8 lg:px-14">
+    <div className="absolute inset-0 flex items-center justify-center px-3 pb-24 pt-16 sm:px-4 sm:pb-32 sm:pt-24 md:pb-40 md:pt-32">
+      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center gap-6 sm:gap-8">
+        <div className="w-full rounded-2xl border-[6px] border-gray-300 bg-[#f3f3f3] p-3 shadow-2xl sm:border-[10px] sm:p-6 lg:p-8">
+          <div className="rounded-xl bg-white px-4 py-5 shadow-md sm:px-10 sm:py-8 lg:px-14">
             <div className="flex flex-col items-center text-center">
-              <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
+              <h2 className="text-2xl font-extrabold leading-tight text-gray-900 sm:text-3xl md:text-4xl">
                 Package Delivery Terms
                 <br />& Pricing Chart
               </h2>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-6 md:gap-8">
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-4 sm:gap-6 md:mt-6 md:gap-8">
                 <button
-                  className="rounded-lg bg-yellow-400 px-6 py-3 text-base font-extrabold text-gray-900 shadow-md transition hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2"
+                  className="rounded-lg bg-yellow-400 px-5 py-2.5 text-sm font-extrabold text-gray-900 shadow-md transition hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 sm:px-6 sm:py-3 sm:text-base"
                   onClick={handleQuoteClick}
                 >
                   Get a Quote
                 </button>
                 <ScheduleDialog
                   buttonText="Book a Call"
-                  className="rounded-lg bg-yellow-400 px-6 py-3 text-base font-extrabold text-gray-900 shadow-md transition hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2"
+                  className="rounded-lg bg-yellow-400 px-5 py-2.5 text-sm font-extrabold text-gray-900 shadow-md transition hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 sm:px-6 sm:py-3 sm:text-base"
                   calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
                 />
               </div>
             </div>
 
-            <div className="mt-10 grid gap-10 text-gray-900 md:grid-cols-2">
-              <div className="space-y-6">
+            <div className="mt-6 grid gap-6 text-gray-900 sm:mt-8 md:mt-10 md:grid-cols-2 md:gap-10">
+              <div className="space-y-5 md:space-y-6">
                 <div>
-                  <h3 className="text-base font-extrabold sm:text-lg">
+                  <h3 className="text-sm font-extrabold sm:text-base md:text-lg">
                     Headcount vs Food Cost
                   </h3>
-                  <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed sm:text-base">
+                  <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs leading-relaxed sm:text-sm md:mt-3 md:space-y-2 md:text-base">
                     <li>
                       Delivery cost is based on the lesser, please make sure to
                       update your order sheet weekly by end of day Friday.
@@ -113,19 +113,19 @@ const BakeryTerms = ({
                 </div>
 
                 <div>
-                  <h3 className="text-base font-extrabold sm:text-lg">
+                  <h3 className="text-sm font-extrabold sm:text-base md:text-lg">
                     Mileage Rate
                   </h3>
-                  <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed sm:text-base">
+                  <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs leading-relaxed sm:text-sm md:mt-3 md:space-y-2 md:text-base">
                     <li>$3.00 per mile after 10 miles</li>
                   </ul>
                 </div>
 
                 <div>
-                  <h3 className="text-base font-extrabold sm:text-lg">
+                  <h3 className="text-sm font-extrabold sm:text-base md:text-lg">
                     Daily Drive Discount
                   </h3>
-                  <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed sm:text-base">
+                  <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs leading-relaxed sm:text-sm md:mt-3 md:space-y-2 md:text-base">
                     <li>2 Drives/Day-$5/drive</li>
                     <li>3 Drives/Day-$10/drive</li>
                     <li>4 Drives/Day-$15/drive</li>
@@ -134,7 +134,7 @@ const BakeryTerms = ({
               </div>
 
               <div>
-                <ol className="list-decimal space-y-4 pl-5 text-sm leading-relaxed sm:text-base">
+                <ol className="list-decimal space-y-3 pl-5 text-xs leading-relaxed sm:text-sm md:space-y-4 md:text-base">
                   <li>
                     If the drive is batched together with the same driver, we
                     only charge tolls/mileage once for the total trip.
@@ -160,7 +160,7 @@ const BakeryTerms = ({
         <div className="w-full max-w-2xl">
           <ScheduleDialog
             buttonText="Hosting Services? Let's Talk"
-            className="block w-full rounded-lg bg-yellow-400 px-6 py-2.5 text-center text-base font-bold text-gray-900 shadow-md transition hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 sm:text-lg"
+            className="block w-full rounded-lg bg-yellow-400 px-5 py-2.5 text-center text-sm font-bold text-gray-900 shadow-md transition hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 sm:px-6 sm:text-base md:text-lg"
             calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
           />
         </div>
