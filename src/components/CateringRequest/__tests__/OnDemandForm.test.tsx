@@ -82,22 +82,28 @@ const mockAddress = {
 };
 
 /**
- * TODO: REA-211 - These tests need AddressManager mocking to be fixed
- * Issues:
- * 1. Mock passes address object to onAddressSelected, but component expects address ID string
- * 2. The addresses state needs to be populated via onAddressesLoaded for lookup to work
- * 3. User authentication mock isn't properly setting user.id for form submission
- *
- * Options to fix:
- * 1. Update AddressManager mock to properly simulate ID-based selection flow
- * 2. Create proper mock that calls both onAddressesLoaded and onAddressSelected
- * 3. Add integration tests that test the actual component behavior
+ * REA-270 - OnDemandOrderForm tests
+ * Note: Complex form submission tests are skipped due to AddressManager mock limitations
  */
-describe.skip("OnDemandOrderForm", () => {
+describe("OnDemandOrderForm", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockClear();
     mockHandleAddressSelect.mockClear();
+
+    // Default mock for useUser
+    mockUseUser.mockReturnValue({
+      userRole: UserType.CLIENT,
+      session: null,
+      user: null,
+      isLoading: false,
+      error: null,
+      refreshUserData: jest.fn(),
+      isAuthenticating: false,
+      authProgress: { step: "idle", message: "" },
+      clearAuthError: jest.fn(),
+      setAuthProgress: jest.fn(),
+    });
 
     // Default successful fetch mock
     // Note: The component submits to /api/orders with order_type: "on_demand"
@@ -143,7 +149,8 @@ describe.skip("OnDemandOrderForm", () => {
     expect(screen.getByLabelText(/order number/i)).toBeInTheDocument();
   });
 
-  it("redirects to client dashboard for client users after successful form submission", async () => {
+  // TODO: REA-270 - Skipped due to AddressManager mock limitations
+  it.skip("redirects to client dashboard for client users after successful form submission", async () => {
     // Mock user context for client role
     mockUseUser.mockReturnValue({
       userRole: UserType.CLIENT,
@@ -190,7 +197,8 @@ describe.skip("OnDemandOrderForm", () => {
     });
   });
 
-  it("redirects to vendor dashboard for vendor users after successful form submission", async () => {
+  // TODO: REA-270 - Skipped due to AddressManager mock limitations
+  it.skip("redirects to vendor dashboard for vendor users after successful form submission", async () => {
     // Mock user context for vendor role
     mockUseUser.mockReturnValue({
       userRole: UserType.VENDOR,
@@ -237,7 +245,8 @@ describe.skip("OnDemandOrderForm", () => {
     });
   });
 
-  it("does not redirect on submission failure", async () => {
+  // TODO: REA-270 - Skipped due to AddressManager mock limitations
+  it.skip("does not redirect on submission failure", async () => {
     const user = userEvent.setup();
 
     // Mock fetch to return error
@@ -293,7 +302,8 @@ describe.skip("OnDemandOrderForm", () => {
     });
   });
 
-  it("submits the form with correct data structure", async () => {
+  // TODO: REA-270 - Skipped due to AddressManager mock limitations
+  it.skip("submits the form with correct data structure", async () => {
     const user = userEvent.setup();
     await act(async () => {
       render(<OnDemandOrderForm />);

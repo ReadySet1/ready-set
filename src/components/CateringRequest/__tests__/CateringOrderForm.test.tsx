@@ -100,9 +100,9 @@ jest.mock("@/contexts/UserContext");
 const mockUseUser = useUser as jest.MockedFunction<typeof useUser>;
 
 /**
- * TODO: REA-211 - CateringOrderForm tests have user context mocking issues
+ * REA-269 - CateringOrderForm tests
  */
-describe.skip("CateringOrderForm", () => {
+describe("CateringOrderForm", () => {
   beforeEach(() => {
     // Reset all mocks before each test
     jest.clearAllMocks();
@@ -213,7 +213,7 @@ describe.skip("CateringOrderForm", () => {
   });
 
   /**
-   * TODO: REA-211 - This test needs AddressManager mocking to be fixed
+   * TODO: REA-269 - This test needs AddressManager mocking to be fixed
    * The test fails because:
    * 1. AddressManager mock doesn't call onAddressesLoaded, so the address lookup fails
    * 2. Form submission depends on address being properly set in form state
