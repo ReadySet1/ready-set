@@ -13,12 +13,7 @@ const DELIVERY_TYPES = [
   "Custom requests",
 ];
 
-const MARKETS = [
-  "San Francisco Bay Area",
-  "Atlanta",
-  "Austin",
-  "Dallas",
-];
+const MARKETS = ["San Francisco Bay Area", "Atlanta", "Austin", "Dallas"];
 
 const GALLERY_IMAGES = [
   {
@@ -68,7 +63,12 @@ const VendorDeliveriesShowcase = () => {
           </p>
           <h2
             id="deliveries-heading"
-            className="mt-2 font-[Montserrat] text-3xl font-black leading-tight text-gray-900 sm:text-4xl lg:text-5xl"
+            className="mt-2 text-3xl font-black leading-[1.1] tracking-tight text-gray-900 sm:text-4xl lg:text-5xl"
+            style={{
+              fontFamily:
+                "Inter, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', system-ui, sans-serif",
+              fontWeight: 900,
+            }}
           >
             Catering Deliveries
             <br />
@@ -79,7 +79,9 @@ const VendorDeliveriesShowcase = () => {
               <span key={item}>
                 {item}
                 {index < DELIVERY_TYPES.length - 1 && (
-                  <span aria-hidden="true"> • </span>
+                  <span aria-hidden="true" className="mx-3 inline-block">
+                    •
+                  </span>
                 )}
               </span>
             ))}
@@ -90,7 +92,9 @@ const VendorDeliveriesShowcase = () => {
           <div className="flex h-[240px] items-stretch gap-2 sm:h-[280px] sm:gap-3 md:h-[340px]">
             {GALLERY_IMAGES.map((image, index) => {
               const verticalOffset =
-                index % 2 === 0 ? "translate-y-3 md:translate-y-4" : "-translate-y-3 md:-translate-y-4";
+                index % 2 === 0
+                  ? "translate-y-3 md:translate-y-4"
+                  : "-translate-y-3 md:-translate-y-4";
 
               return (
                 <div
@@ -133,4 +137,3 @@ const VendorDeliveriesShowcase = () => {
 };
 
 export default VendorDeliveriesShowcase;
-
