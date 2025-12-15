@@ -1,0 +1,254 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`VendorServiceArea Snapshot Testing matches snapshot 1`] = `
+<div>
+  <section
+    aria-labelledby="vendor-service-area-heading"
+    class="bg-white px-4 py-16 sm:px-6 lg:px-10"
+  >
+    <div
+      class="mx-auto max-w-6xl space-y-10"
+    >
+      <div
+        class="text-center"
+      >
+        <h2
+          class="text-2xl font-extrabold text-gray-900 sm:text-3xl"
+          id="vendor-service-area-heading"
+        >
+          Our Service Area
+        </h2>
+      </div>
+      <div
+        class="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+      >
+        <article
+          class="flex flex-col rounded-2xl border border-gray-200 bg-white shadow-[0_12px_35px_-20px_rgba(15,23,42,0.35)]"
+        >
+          <header
+            class="border-b border-gray-200 px-5 py-4"
+          >
+            <h3
+              class="text-lg font-semibold text-gray-900 sm:text-xl"
+            >
+              Bay Area California
+            </h3>
+          </header>
+          <div
+            class="flex-1 space-y-4 px-5 py-5"
+          >
+            <p
+              class="text-sm font-semibold text-gray-800"
+            >
+              Areas
+            </p>
+            <ul
+              class="space-y-2"
+            >
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  SAN FRANCISCO
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  MARIN
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  CONTRA COSTA
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  ALAMEDA
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  SANTA CLARA
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  SAN MATEO
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  SANTA CRUZ
+                </div>
+              </li>
+            </ul>
+          </div>
+        </article>
+        <article
+          class="flex flex-col rounded-2xl border border-gray-200 bg-white shadow-[0_12px_35px_-20px_rgba(15,23,42,0.35)]"
+        >
+          <header
+            class="border-b border-gray-200 px-5 py-4"
+          >
+            <h3
+              class="text-lg font-semibold text-gray-900 sm:text-xl"
+            >
+              Austin Texas
+            </h3>
+          </header>
+          <div
+            class="flex-1 space-y-4 px-5 py-5"
+          >
+            <p
+              class="text-sm font-semibold text-gray-800"
+            >
+              Areas
+            </p>
+            <ul
+              class="space-y-2"
+            >
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  Northwest Austin
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  North Austin
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  Northeast Austin
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  East Austin
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  Central Austin
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  Southeast Austin
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  South Austin
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  Southwest Austin
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  West Austin
+                </div>
+              </li>
+            </ul>
+          </div>
+        </article>
+        <article
+          class="flex flex-col rounded-2xl border border-gray-200 bg-white shadow-[0_12px_35px_-20px_rgba(15,23,42,0.35)]"
+        >
+          <header
+            class="border-b border-gray-200 px-5 py-4"
+          >
+            <h3
+              class="text-lg font-semibold text-gray-900 sm:text-xl"
+            >
+              Dallas Area
+            </h3>
+          </header>
+          <div
+            class="flex-1 space-y-4 px-5 py-5"
+          >
+            <p
+              class="text-sm font-semibold text-gray-800"
+            >
+              Areas
+            </p>
+            <ul
+              class="space-y-2"
+            >
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  Collin County
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  Dallas County
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  Denton County
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  Rockwall County
+                </div>
+              </li>
+              <li>
+                <div
+                  class="rounded-md bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                >
+                  Tarrant County
+                </div>
+              </li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+</div>
+`;
