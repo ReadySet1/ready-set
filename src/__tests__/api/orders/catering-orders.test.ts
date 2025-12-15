@@ -187,6 +187,7 @@ describe('GET /api/orders/catering-orders - List Catering Orders', () => {
       expect(prisma.cateringRequest.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
+            deletedAt: null,
             OR: [
               { orderNumber: { contains: 'john', mode: 'insensitive' } },
               { user: { name: { contains: 'john', mode: 'insensitive' } } },
@@ -488,6 +489,7 @@ describe('GET /api/orders/catering-orders - List Catering Orders', () => {
           where: expect.objectContaining({
             status: CateringStatus.PENDING,
             createdAt: expect.any(Object),
+            deletedAt: null,
             OR: expect.any(Array),
           }),
         })
