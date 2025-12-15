@@ -40,10 +40,10 @@ const VendorOnboarding = ({
   imageAlt = "Vendor delivering catered food",
 }: VendorOnboardingProps) => {
   return (
-    <section className="bg-white py-16">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr_1.05fr] lg:px-8">
-        <div className="rounded-2xl bg-gray-300 p-6 sm:p-8 lg:order-2">
-          <div className="flex flex-col gap-6">
+    <section className="bg-white py-12 sm:py-16">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:gap-10 sm:px-6 lg:grid-cols-[1fr_1.05fr] lg:px-8">
+        <div className="rounded-2xl bg-gray-300 p-5 sm:p-6 md:p-8 lg:order-2">
+          <div className="flex flex-col gap-5 sm:gap-6">
             <div className="text-center">
               <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
                 How to Get Started
@@ -54,24 +54,27 @@ const VendorOnboarding = ({
               </p>
             </div>
 
-            <ol className="relative mt-2 space-y-8">
+            <ol className="relative mt-1 space-y-6 sm:mt-2 sm:space-y-8">
               <span
                 aria-hidden
-                className="absolute left-[17px] top-4 h-[calc(100%-20px)] w-[2px] bg-gray-300 sm:left-6"
+                className="absolute left-[9px] top-4 h-[calc(100%-24px)] w-[2px] bg-gray-400 sm:left-[11px]"
               />
               {timelineSteps.map((step, index) => (
-                <li key={step.title} className="relative flex gap-4 sm:gap-6">
+                <li
+                  key={step.title}
+                  className="relative flex gap-3 sm:gap-4 md:gap-6"
+                >
                   <span
                     aria-hidden
-                    className="mt-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-gray-700 bg-white text-sm font-bold text-gray-900 sm:h-6 sm:w-6"
+                    className="relative z-10 mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 border-gray-700 bg-white text-xs font-bold text-gray-900 sm:h-6 sm:w-6 sm:text-sm"
                   >
                     {index + 1}
                   </span>
-                  <div className="space-y-1">
-                    <h3 className="text-lg font-extrabold text-gray-900 sm:text-xl">
+                  <div className="flex-1 space-y-1 pb-1">
+                    <h3 className="text-base font-extrabold leading-tight text-gray-900 sm:text-lg md:text-xl">
                       {step.title}
                     </h3>
-                    <p className="text-sm leading-relaxed text-gray-700 sm:text-base">
+                    <p className="text-xs leading-relaxed text-gray-700 sm:text-sm md:text-base">
                       {step.description}
                     </p>
                   </div>
@@ -79,14 +82,14 @@ const VendorOnboarding = ({
               ))}
             </ol>
 
-            <div className="flex justify-center">
+            <div className="mt-2 flex justify-center">
               <ScheduleDialog
                 buttonText="Get Started"
                 dialogTitle="Schedule Your Consultation"
                 dialogDescription="Choose a convenient time to discuss your catering delivery needs."
                 calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
                 customButton={
-                  <button className="rounded-lg bg-yellow-400 px-8 py-2.5 text-center text-base font-extrabold text-gray-900 shadow-md transition hover:bg-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500">
+                  <button className="rounded-lg bg-yellow-400 px-6 py-2.5 text-center text-sm font-extrabold text-gray-900 shadow-md transition hover:bg-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-500 sm:px-8 sm:text-base">
                     Get Started
                   </button>
                 }
@@ -95,8 +98,8 @@ const VendorOnboarding = ({
           </div>
         </div>
 
-        <div className="space-y-6 lg:order-1 lg:-ml-8">
-          <div className="relative h-[260px] sm:h-[320px]">
+        <div className="space-y-5 sm:space-y-6 lg:order-1 lg:-ml-8">
+          <div className="relative h-[220px] sm:h-[260px] md:h-[320px]">
             <Image
               src={imageSrc}
               alt={imageAlt}
@@ -108,10 +111,10 @@ const VendorOnboarding = ({
           </div>
 
           <div>
-            <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl">
+            <h2 className="text-xl font-extrabold text-gray-900 sm:text-2xl md:text-3xl">
               Order Setup &amp; Scheduling
             </h2>
-            <ul className="mt-4 space-y-3 text-sm leading-relaxed text-gray-700 sm:mt-6 sm:text-base">
+            <ul className="mt-3 space-y-2.5 text-xs leading-relaxed text-gray-700 sm:mt-4 sm:space-y-3 sm:text-sm md:mt-6 md:text-base">
               <li>
                 Orders should be submitted at least one week in advance to
                 ensure driver availability and optimal service quality.

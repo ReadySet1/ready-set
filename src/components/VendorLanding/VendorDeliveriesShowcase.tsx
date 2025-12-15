@@ -52,17 +52,15 @@ const VendorDeliveriesShowcase = () => {
           </p>
         </header>
 
-        <div className="relative w-full overflow-hidden rounded-3xl bg-white shadow-[0_20px_55px_rgba(0,0,0,0.08)]">
-          <div className="relative aspect-[16/9] w-full sm:aspect-[21/9]">
-            <Image
-              src={getCloudinaryUrl("food/gallery-food-2")}
-              alt="Catering delivery showcase"
-              fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 1200px, 1400px"
-              className="object-cover"
-              priority
-            />
-          </div>
+        <div className="relative aspect-[16/9] w-full overflow-hidden rounded-3xl sm:aspect-[21/9]">
+          <Image
+            src={getCloudinaryUrl("food/gallery-food-2")}
+            alt="Catering delivery showcase"
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 1200px, 1400px"
+            className="object-cover"
+            priority
+          />
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-semibold uppercase tracking-[0.2em] text-gray-700 sm:gap-6">
