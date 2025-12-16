@@ -8,6 +8,7 @@ import {
   MessageSquare,
   PlusCircle,
   User,
+  XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
@@ -32,6 +33,8 @@ import {
 interface DashboardStats {
   activeOrders: number;
   completedOrders: number;
+  pendingOrders: number;
+  cancelledOrders: number;
   savedLocations: number;
 }
 
@@ -185,6 +188,10 @@ async function getClientDashboardData(
         activeOnDemandCount,
         completedCateringCount,
         completedOnDemandCount,
+        pendingCateringCount,
+        pendingOnDemandCount,
+        cancelledCateringCount,
+        cancelledOnDemandCount,
         savedLocationsCount,
       ] = await Promise.all([
         prisma.cateringRequest.count({
@@ -223,6 +230,38 @@ async function getClientDashboardData(
           },
         }),
 
+        prisma.cateringRequest.count({
+          where: {
+            userId,
+            status: CateringStatus.PENDING,
+            deletedAt: null,
+          },
+        }),
+
+        prisma.onDemand.count({
+          where: {
+            userId,
+            status: OnDemandStatus.PENDING,
+            deletedAt: null,
+          },
+        }),
+
+        prisma.cateringRequest.count({
+          where: {
+            userId,
+            status: CateringStatus.CANCELLED,
+            deletedAt: null,
+          },
+        }),
+
+        prisma.onDemand.count({
+          where: {
+            userId,
+            status: OnDemandStatus.CANCELLED,
+            deletedAt: null,
+          },
+        }),
+
         prisma.userAddress.count({
           where: { userId },
         }),
@@ -233,6 +272,10 @@ async function getClientDashboardData(
         activeOnDemandCount,
         completedCateringCount,
         completedOnDemandCount,
+        pendingCateringCount,
+        pendingOnDemandCount,
+        cancelledCateringCount,
+        cancelledOnDemandCount,
         savedLocationsCount,
       };
     },
@@ -248,6 +291,11 @@ async function getClientDashboardData(
       completedOrders:
         (stats.completedCateringCount ?? 0) +
         (stats.completedOnDemandCount ?? 0),
+      pendingOrders:
+        (stats.pendingCateringCount ?? 0) + (stats.pendingOnDemandCount ?? 0),
+      cancelledOrders:
+        (stats.cancelledCateringCount ?? 0) +
+        (stats.cancelledOnDemandCount ?? 0),
       savedLocations: stats.savedLocationsCount ?? 0,
     },
   };
@@ -336,7 +384,9 @@ const UpcomingOrderCard = ({ order }: { order: CombinedOrder }) => {
 const ClientDashboardSkeleton: React.FC = () => (
   <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
     {/* Stats Section Skeleton */}
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-3 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-3 lg:grid-cols-5">
+      <DashboardCardSkeleton />
+      <DashboardCardSkeleton />
       <DashboardCardSkeleton />
       <DashboardCardSkeleton />
       <DashboardCardSkeleton />
@@ -379,7 +429,7 @@ const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
       {/* Stats Section */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-3 lg:grid-cols-5">
         <div className="rounded-lg border border-gray-100 bg-white p-5 shadow-sm">
           <div className="flex items-center">
             <div className="bg-primary-lighter mr-4 rounded-lg p-3">
@@ -396,6 +446,20 @@ const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
 
         <div className="rounded-lg border border-gray-100 bg-white p-5 shadow-sm">
           <div className="flex items-center">
+            <div className="mr-4 rounded-lg bg-yellow-50 p-3">
+              <Clock className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Pending</p>
+              <h4 className="text-2xl font-bold text-gray-900">
+                {data.stats.pendingOrders}
+              </h4>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center">
             <div className="mr-4 rounded-lg bg-green-50 p-3">
               <Calendar className="h-6 w-6 text-green-600" />
             </div>
@@ -403,6 +467,20 @@ const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
               <p className="text-sm text-gray-500">Completed</p>
               <h4 className="text-2xl font-bold text-gray-900">
                 {data.stats.completedOrders}
+              </h4>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center">
+            <div className="mr-4 rounded-lg bg-red-50 p-3">
+              <XCircle className="h-6 w-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Cancelled</p>
+              <h4 className="text-2xl font-bold text-gray-900">
+                {data.stats.cancelledOrders}
               </h4>
             </div>
           </div>
