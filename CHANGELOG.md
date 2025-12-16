@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **On-Demand Order Creation (REA-155)**: Admin and client-side on-demand order creation
+  - New admin order creation page at `/admin/on-demand-orders/new`
+  - New client order creation page at `/client/orders/new`
+  - Zod validation schemas for on-demand order forms
+  - File upload support with cleanup on navigation
+  - Client search/selection with combobox interface
+
+- **Dashboard Order Metrics (REA-157)**: Enhanced dashboard with complete order status visibility
+  - Added pending and cancelled order counts to Client/Vendor dashboards
+  - Updated dashboard grid layout from 3 to 5 metric cards
+  - Consistent styling with existing metric cards
+
+- **Catering Orders Filter Enhancement (REA-154)**: Improved search functionality
+  - Added `clientAttention` field to search filters
+  - Updated search to use AND/OR query structure for better precision
+  - Added support for field-specific search (order_number, client_name, amount, date)
+
 - **EzCater GraphQL API Integration**: New delivery API client for EzCater platform
   - GraphQL client with resilience patterns (circuit breaker, exponential backoff retry)
   - Type-safe mutations for courier assignment, tracking events, and image uploads

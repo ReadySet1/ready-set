@@ -21,7 +21,6 @@ const NewOnDemandOrderPage = async () => {
   const clientResult = await getClients();
 
   if ('error' in clientResult) {
-    console.error('[NewOnDemandOrderPage] Failed to load clients:', clientResult.error);
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
         <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -44,13 +43,6 @@ const NewOnDemandOrderPage = async () => {
   }
 
   const clients = clientResult as ClientListItem[];
-
-  // Log warning if no clients are available
-  if (clients.length === 0) {
-    console.warn('[NewOnDemandOrderPage] No clients available. Users will not be able to create orders.');
-  } else {
-    console.log(`[NewOnDemandOrderPage] Loaded ${clients.length} client(s)`);
-  }
 
   return <NewOnDemandOrderClient clients={clients} />;
 };

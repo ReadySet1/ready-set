@@ -60,6 +60,7 @@ import { cn } from "@/lib/utils";
 import { AddressSelector } from "@/components/AddressSelector";
 import { Address, AddressFormData } from "@/types/address";
 import { createClient } from "@/utils/supabase/client";
+import { Session } from "@supabase/supabase-js";
 import { useUploadFile, UploadedFile } from "@/hooks/use-upload-file";
 import { FileWithPath } from "react-dropzone";
 
@@ -129,7 +130,7 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
   const supabase = createClient();
 
   // Get and store the session for userId in useUploadFile
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   // Track selected address IDs for visual feedback
   const [selectedPickupAddressId, setSelectedPickupAddressId] = useState<string | undefined>();
@@ -248,7 +249,7 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-  const handleFormSubmit = async (data: any) => {
+  const handleFormSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     setGeneralError(null);
 
