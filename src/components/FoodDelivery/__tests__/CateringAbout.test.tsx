@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import "@testing-library/jest-dom";
 import CateringAbout from "../CateringAbout";
 
 // Mock framer-motion since it's mocked in jest.setup.ts
@@ -27,10 +28,14 @@ jest.mock("@/components/Logistics/Schedule", () => {
         <div data-testid="schedule-dialog">
           <div data-testid="schedule-dialog-button-text">{buttonText}</div>
           <div data-testid="schedule-dialog-title">{dialogTitle}</div>
-          <div data-testid="schedule-dialog-description">{dialogDescription}</div>
+          <div data-testid="schedule-dialog-description">
+            {dialogDescription}
+          </div>
           <div data-testid="schedule-dialog-calendar-url">{calendarUrl}</div>
           {customButton && (
-            <div data-testid="schedule-dialog-custom-button">{customButton}</div>
+            <div data-testid="schedule-dialog-custom-button">
+              {customButton}
+            </div>
           )}
         </div>
       );
@@ -48,7 +53,13 @@ describe("CateringAbout", () => {
       const { container } = render(<CateringAbout />);
 
       const mainContainer = container.querySelector(".w-full.bg-white");
-      expect(mainContainer).toHaveClass("w-full", "bg-white", "py-16", "md:py-20", "lg:py-24");
+      expect(mainContainer).toHaveClass(
+        "w-full",
+        "bg-white",
+        "py-16",
+        "md:py-20",
+        "lg:py-24",
+      );
     });
 
     it("renders the max-width wrapper", () => {
@@ -67,7 +78,7 @@ describe("CateringAbout", () => {
         "grid-cols-1",
         "gap-12",
         "lg:grid-cols-2",
-        "lg:gap-16"
+        "lg:gap-16",
       );
     });
   });
@@ -84,7 +95,9 @@ describe("CateringAbout", () => {
     it("renders the image with correct props", () => {
       render(<CateringAbout />);
 
-      const image = screen.getByAltText("Restaurant owners reviewing catering orders");
+      const image = screen.getByAltText(
+        "Restaurant owners reviewing catering orders",
+      );
       expect(image).toBeInTheDocument();
       expect(image).toHaveAttribute("src", "/images/food/catering-about");
       expect(image).toHaveAttribute("width", "800");
@@ -95,7 +108,9 @@ describe("CateringAbout", () => {
     it("renders the stats description text", () => {
       render(<CateringAbout />);
 
-      const statsText = screen.getByText(/Since 2019, we've completed over 338,000 successful catering deliveries/);
+      const statsText = screen.getByText(
+        /Since 2019, we've completed over 338,000 successful catering deliveries/,
+      );
       expect(statsText).toHaveClass(
         "mb-8",
         "text-center",
@@ -103,7 +118,7 @@ describe("CateringAbout", () => {
         "text-base",
         "font-medium",
         "text-gray-700",
-        "md:text-lg"
+        "md:text-lg",
       );
     });
 
@@ -113,7 +128,13 @@ describe("CateringAbout", () => {
       const statsGrids = container.querySelectorAll(".grid");
       // First grid is the main layout, second is top stats, third is bottom stats
       const topStatsGrid = statsGrids[1];
-      expect(topStatsGrid).toHaveClass("grid", "grid-cols-1", "gap-4", "sm:grid-cols-3", "mb-4");
+      expect(topStatsGrid).toHaveClass(
+        "grid",
+        "grid-cols-1",
+        "gap-4",
+        "sm:grid-cols-3",
+        "mb-4",
+      );
     });
 
     it("renders the bottom stats grid container with 2 columns and max-width", () => {
@@ -121,7 +142,13 @@ describe("CateringAbout", () => {
 
       const statsGrids = container.querySelectorAll(".grid");
       const bottomStatsGrid = statsGrids[2];
-      expect(bottomStatsGrid).toHaveClass("grid", "grid-cols-1", "gap-4", "sm:grid-cols-2", "sm:max-w-[66%]");
+      expect(bottomStatsGrid).toHaveClass(
+        "grid",
+        "grid-cols-1",
+        "gap-4",
+        "sm:grid-cols-2",
+        "sm:max-w-[66%]",
+      );
     });
   });
 
@@ -188,7 +215,9 @@ describe("CateringAbout", () => {
 
       const statsGrids = container.querySelectorAll(".grid");
       const topStatsGrid = statsGrids[1];
-      const topStatCards = topStatsGrid?.querySelectorAll('[data-testid="stat-card"]');
+      const topStatCards = topStatsGrid?.querySelectorAll(
+        '[data-testid="stat-card"]',
+      );
 
       expect(topStatCards).toHaveLength(3);
     });
@@ -198,7 +227,9 @@ describe("CateringAbout", () => {
 
       const statsGrids = container.querySelectorAll(".grid");
       const bottomStatsGrid = statsGrids[2];
-      const bottomStatCards = bottomStatsGrid?.querySelectorAll('[data-testid="stat-card"]');
+      const bottomStatCards = bottomStatsGrid?.querySelectorAll(
+        '[data-testid="stat-card"]',
+      );
 
       expect(bottomStatCards).toHaveLength(2);
     });
@@ -210,7 +241,7 @@ describe("CateringAbout", () => {
 
       const grid = container.querySelector(".grid");
       const rightColumn = grid?.children[1];
-      expect(rightColumn).toHaveClass("flex", "flex-col", "justify-center");
+      expect(rightColumn).toHaveClass("flex", "flex-col", "justify-start");
     });
 
     it("renders the main title with correct styling", () => {
@@ -225,33 +256,40 @@ describe("CateringAbout", () => {
         "leading-tight",
         "text-gray-800",
         "md:text-4xl",
-        "lg:text-5xl"
+        "lg:text-5xl",
       );
     });
 
     it("renders the first description paragraph", () => {
       render(<CateringAbout />);
 
-      const paragraph = screen.getByText(/At Ready Set, we specialize in catering delivery logistics/);
+      const paragraph = screen.getByText(
+        /At Ready Set, we specialize in catering delivery logistics/,
+      );
       expect(paragraph).toHaveClass(
         "font-[Montserrat]",
         "text-base",
         "leading-relaxed",
         "text-gray-700",
-        "md:text-lg"
+        "md:text-lg",
       );
     });
 
-    it("renders the second description paragraph", () => {
+    it("renders the second description paragraph with highlighted text", () => {
       render(<CateringAbout />);
 
-      const paragraph = screen.getByText(/We're not a marketplace or broker/);
+      // The text "We're not a marketplace or broker" is now wrapped in a <strong> tag
+      const strongText = screen.getByText(/We're not a marketplace or broker/);
+      expect(strongText.tagName).toBe("STRONG");
+
+      // The parent paragraph should have the styling classes
+      const paragraph = strongText.closest("p");
       expect(paragraph).toHaveClass(
         "font-[Montserrat]",
         "text-base",
         "leading-relaxed",
         "text-gray-700",
-        "md:text-lg"
+        "md:text-lg",
       );
     });
   });
@@ -260,7 +298,9 @@ describe("CateringAbout", () => {
     it("renders the How Our Service Works button section", () => {
       render(<CateringAbout />);
 
-      const button = screen.getByRole("button", { name: "How Our Service Works" });
+      const button = screen.getByRole("button", {
+        name: "How Our Service Works",
+      });
       expect(button).toBeInTheDocument();
 
       // Verify the button has the correct styling
@@ -269,7 +309,7 @@ describe("CateringAbout", () => {
         "bg-yellow-400",
         "px-12",
         "py-4",
-        "font-extrabold"
+        "font-extrabold",
       );
     });
 
@@ -279,10 +319,20 @@ describe("CateringAbout", () => {
       const scheduleDialog = screen.getByTestId("schedule-dialog");
       expect(scheduleDialog).toBeInTheDocument();
 
-      expect(screen.getByTestId("schedule-dialog-button-text")).toHaveTextContent("How Our Service Works");
-      expect(screen.getByTestId("schedule-dialog-title")).toHaveTextContent("Schedule an Appointment");
-      expect(screen.getByTestId("schedule-dialog-description")).toHaveTextContent("Choose a convenient time for your appointment.");
-      expect(screen.getByTestId("schedule-dialog-calendar-url")).toHaveTextContent("https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true");
+      expect(
+        screen.getByTestId("schedule-dialog-button-text"),
+      ).toHaveTextContent("How Our Service Works");
+      expect(screen.getByTestId("schedule-dialog-title")).toHaveTextContent(
+        "Schedule an Appointment",
+      );
+      expect(
+        screen.getByTestId("schedule-dialog-description"),
+      ).toHaveTextContent("Choose a convenient time for your appointment.");
+      expect(
+        screen.getByTestId("schedule-dialog-calendar-url"),
+      ).toHaveTextContent(
+        "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true",
+      );
     });
 
     it("renders the custom button within ScheduleDialog with correct text", () => {
@@ -302,7 +352,7 @@ describe("CateringAbout", () => {
         "text-lg",
         "font-extrabold",
         "text-gray-800",
-        "shadow-md"
+        "shadow-md",
       );
     });
   });
@@ -325,7 +375,7 @@ describe("CateringAbout", () => {
         "px-6",
         "py-8",
         "text-center",
-        "shadow-sm"
+        "shadow-sm",
       );
     });
 
@@ -344,7 +394,7 @@ describe("CateringAbout", () => {
         "font-black",
         "italic",
         "text-yellow-400",
-        "md:text-4xl"
+        "md:text-4xl",
       );
     });
 
@@ -361,7 +411,7 @@ describe("CateringAbout", () => {
         "text-base",
         "font-semibold",
         "text-gray-800",
-        "md:text-lg"
+        "md:text-lg",
       );
     });
   });
@@ -388,7 +438,9 @@ describe("CateringAbout", () => {
     it("applies motion props to stat description", () => {
       render(<CateringAbout />);
 
-      const statsText = screen.getByText(/Since 2019, we've completed over 338,000 successful catering deliveries/);
+      const statsText = screen.getByText(
+        /Since 2019, we've completed over 338,000 successful catering deliveries/,
+      );
       expect(statsText).toBeInTheDocument();
       // Since framer-motion is mocked, we just verify the text exists
     });
@@ -396,7 +448,9 @@ describe("CateringAbout", () => {
     it("applies motion props to How Our Service Works button section", () => {
       render(<CateringAbout />);
 
-      const button = screen.getByRole("button", { name: "How Our Service Works" });
+      const button = screen.getByRole("button", {
+        name: "How Our Service Works",
+      });
       expect(button).toBeInTheDocument();
       // Since framer-motion is mocked, we just verify the button exists
     });
@@ -407,7 +461,9 @@ describe("CateringAbout", () => {
       render(<CateringAbout />);
 
       // Check that images have alt text
-      const image = screen.getByAltText("Restaurant owners reviewing catering orders");
+      const image = screen.getByAltText(
+        "Restaurant owners reviewing catering orders",
+      );
       expect(image).toBeInTheDocument();
 
       // Check that headings are properly structured
@@ -424,7 +480,7 @@ describe("CateringAbout", () => {
 
       const statCards = screen.getAllByTestId("stat-card");
 
-      statCards.forEach(card => {
+      statCards.forEach((card) => {
         const heading = card.querySelector("h3");
         expect(heading).toBeInTheDocument();
         expect(heading?.tagName).toBe("H3");
@@ -500,7 +556,9 @@ describe("CateringAbout", () => {
     it("applies responsive text classes", () => {
       render(<CateringAbout />);
 
-      const paragraph = screen.getByText(/At Ready Set, we specialize in catering delivery logistics/);
+      const paragraph = screen.getByText(
+        /At Ready Set, we specialize in catering delivery logistics/,
+      );
       expect(paragraph).toHaveClass("text-base", "md:text-lg");
     });
   });
@@ -527,23 +585,39 @@ describe("CateringAbout", () => {
     it("displays correct company description", () => {
       render(<CateringAbout />);
 
-      expect(screen.getByText(/Since launching in 2019 in the San Francisco Bay Area/)).toBeInTheDocument();
-      expect(screen.getByText(/we've expanded to Austin, Atlanta, and Dallas/)).toBeInTheDocument();
-      expect(screen.getByText(/we specialize in catering delivery logistics/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Since launching in 2019 in the San Francisco Bay Area/,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/we've expanded to Austin, Atlanta, and Dallas/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/we specialize in catering delivery logistics/i),
+      ).toBeInTheDocument();
     });
 
     it("displays correct service description", () => {
       render(<CateringAbout />);
 
-      expect(screen.getByText(/We're not a marketplace or broker/)).toBeInTheDocument();
-      expect(screen.getByText(/we don't take customer orders or list you on apps/)).toBeInTheDocument();
-      expect(screen.getByText(/we act as your behind-the-scenes delivery partner/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/We're not a marketplace or broker/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/we don't take customer orders or list you on apps/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/we act as your behind-the-scenes delivery partner/),
+      ).toBeInTheDocument();
     });
 
     it("displays correct button text (How Our Service Works)", () => {
       render(<CateringAbout />);
 
-      const button = screen.getByRole("button", { name: "How Our Service Works" });
+      const button = screen.getByRole("button", {
+        name: "How Our Service Works",
+      });
       expect(button).toBeInTheDocument();
       expect(button).toHaveTextContent("How Our Service Works");
     });

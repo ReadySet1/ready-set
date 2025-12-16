@@ -127,11 +127,13 @@ const CateringAbout: React.FC = () => {
               </p>
 
               <p className="font-[Montserrat] text-base leading-relaxed text-gray-700 md:text-lg">
-                We're not a marketplace or broker — we don't take customer
-                orders or list you on apps. Instead, we act as your
-                behind-the-scenes delivery partner, managing every step from
-                pickup to setup so your team can focus on the food and the
-                experience.
+                <strong>
+                  We're not a marketplace or broker — we don't take customer
+                  orders or list you on apps.
+                </strong>{" "}
+                Instead, we act as your behind-the-scenes delivery partner,
+                managing every step from pickup to setup so your team can focus
+                on the food and the experience.
               </p>
             </div>
 
