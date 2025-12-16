@@ -104,10 +104,7 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * TODO: REA-211 - AddressSelector tests have hook mocking issues
- */
-describe.skip('AddressSelector', () => {
+describe('AddressSelector', () => {
   const defaultProps = {
     mode: 'client' as const,
     onSelect: jest.fn(),
@@ -125,7 +122,7 @@ describe.skip('AddressSelector', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByPlaceholderText(/search addresses/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/Search\.\.\./i)).toBeInTheDocument();
     });
 
     it('renders quick filter buttons', () => {
@@ -135,9 +132,10 @@ describe.skip('AddressSelector', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByRole('button', { name: /all/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /shared/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /private/i })).toBeInTheDocument();
+      // Filter buttons have aria-labels like "Filter by All addresses. X addresses."
+      expect(screen.getByRole('button', { name: /Filter by All/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Filter by Shared/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Filter by Private/i })).toBeInTheDocument();
     });
 
     it('renders address sections', async () => {
@@ -154,19 +152,21 @@ describe.skip('AddressSelector', () => {
       });
     });
 
-    it('shows placeholder when allowAddNew is true', () => {
+    it('shows Add New button when allowAddNew is true', () => {
       render(
         <TestWrapper>
           <AddressSelector {...defaultProps} allowAddNew={true} />
         </TestWrapper>
       );
 
-      expect(screen.getByText(/add new address functionality coming soon/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Add New/i })).toBeInTheDocument();
     });
   });
 
   describe('Search Functionality', () => {
-    it('filters addresses based on search query', async () => {
+    // Note: Component uses server-side search via useAddresses hook
+    // These tests verify search input behavior, not actual filtering
+    it('updates search input value when typing', async () => {
       const user = userEvent.setup();
 
       render(
@@ -175,22 +175,16 @@ describe.skip('AddressSelector', () => {
         </TestWrapper>
       );
 
-      const searchInput = screen.getByPlaceholderText(/search addresses/i);
+      const searchInput = screen.getByPlaceholderText(/Search\.\.\./i);
 
       // Type in search query
-      await user.type(searchInput, 'Test Restaurant 1');
+      await user.type(searchInput, 'Test Restaurant');
 
-      // Wait for debounce (300ms) and filtering
-      await waitFor(
-        () => {
-          expect(screen.getByText(/Test Restaurant 1/i)).toBeInTheDocument();
-          expect(screen.queryByText(/Test Restaurant 2/i)).not.toBeInTheDocument();
-        },
-        { timeout: 500 }
-      );
+      // Verify input value is updated
+      expect(searchInput).toHaveValue('Test Restaurant');
     });
 
-    it('shows all addresses when search is cleared', async () => {
+    it('clears search input value when cleared', async () => {
       const user = userEvent.setup();
 
       render(
@@ -199,21 +193,20 @@ describe.skip('AddressSelector', () => {
         </TestWrapper>
       );
 
-      const searchInput = screen.getByPlaceholderText(/search addresses/i);
+      const searchInput = screen.getByPlaceholderText(/Search\.\.\./i);
 
       // Type and then clear
       await user.type(searchInput, 'Test');
       await user.clear(searchInput);
 
-      await waitFor(() => {
-        expect(screen.getByText(/Test Restaurant 1/i)).toBeInTheDocument();
-        expect(screen.getByText(/Test Restaurant 2/i)).toBeInTheDocument();
-      });
+      expect(searchInput).toHaveValue('');
     });
   });
 
   describe('Filter Functionality', () => {
-    it('filters to show only shared addresses', async () => {
+    // Note: Quick filters are UI state - actual filtering uses server-side logic
+    // These tests verify button interaction, not data filtering
+    it('activates shared filter button when clicked', async () => {
       const user = userEvent.setup();
 
       render(
@@ -223,17 +216,14 @@ describe.skip('AddressSelector', () => {
       );
 
       // Click the "Shared" filter
-      const sharedButton = screen.getByRole('button', { name: /shared/i });
+      const sharedButton = screen.getByRole('button', { name: /Filter by Shared/i });
       await user.click(sharedButton);
 
-      await waitFor(() => {
-        expect(screen.getByText(/Test Restaurant 1/i)).toBeInTheDocument();
-        expect(screen.getByText(/Test Restaurant 2/i)).toBeInTheDocument();
-        expect(screen.queryByText(/Private Address/i)).not.toBeInTheDocument();
-      });
+      // Verify the button is now pressed
+      expect(sharedButton).toHaveAttribute('aria-pressed', 'true');
     });
 
-    it('filters to show only private addresses', async () => {
+    it('activates private filter button when clicked', async () => {
       const user = userEvent.setup();
 
       render(
@@ -243,14 +233,11 @@ describe.skip('AddressSelector', () => {
       );
 
       // Click the "Private" filter
-      const privateButton = screen.getByRole('button', { name: /private/i });
+      const privateButton = screen.getByRole('button', { name: /Filter by Private/i });
       await user.click(privateButton);
 
-      await waitFor(() => {
-        expect(screen.queryByText(/Test Restaurant 1/i)).not.toBeInTheDocument();
-        expect(screen.queryByText(/Test Restaurant 2/i)).not.toBeInTheDocument();
-        expect(screen.getByText(/Private Address/i)).toBeInTheDocument();
-      });
+      // Verify the button is now pressed
+      expect(privateButton).toHaveAttribute('aria-pressed', 'true');
     });
   });
 
@@ -299,7 +286,8 @@ describe.skip('AddressSelector', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByPlaceholderText(/search pickup addresses/i)).toBeInTheDocument();
+      // Component uses "Search pickup..." format
+      expect(screen.getByPlaceholderText(/Search pickup\.\.\./i)).toBeInTheDocument();
     });
 
     it('shows delivery-specific placeholder when type is delivery', () => {
@@ -309,7 +297,8 @@ describe.skip('AddressSelector', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByPlaceholderText(/search delivery addresses/i)).toBeInTheDocument();
+      // Component uses "Search delivery..." format
+      expect(screen.getByPlaceholderText(/Search delivery\.\.\./i)).toBeInTheDocument();
     });
   });
 
@@ -327,13 +316,24 @@ describe.skip('AddressSelector', () => {
         </TestWrapper>
       );
 
-      // Loading skeletons should be rendered
-      // The exact selector depends on your Skeleton component implementation
-      expect(screen.getByPlaceholderText(/search addresses/i)).toBeDisabled();
+      // Search input should be disabled during loading
+      expect(screen.getByPlaceholderText(/Search\.\.\./i)).toBeDisabled();
     });
   });
 
   describe('Favorites and Recents', () => {
+    // Reset useAddresses mock before each test in this group
+    beforeEach(() => {
+      const useAddresses = require('@/hooks/useAddresses').useAddresses;
+      useAddresses.mockReturnValue({
+        data: {
+          addresses: mockAddresses,
+          totalCount: mockAddresses.length,
+        },
+        isLoading: false,
+      });
+    });
+
     it('hides favorites section when showFavorites is false', () => {
       render(
         <TestWrapper>
@@ -341,7 +341,7 @@ describe.skip('AddressSelector', () => {
         </TestWrapper>
       );
 
-      expect(screen.queryByText(/favorites/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Favorites$/i)).not.toBeInTheDocument();
     });
 
     it('hides recents section when showRecents is false', () => {
@@ -354,20 +354,31 @@ describe.skip('AddressSelector', () => {
       expect(screen.queryByText(/recently used/i)).not.toBeInTheDocument();
     });
 
-    it('shows favorites section when showFavorites is true', async () => {
+    it('shows favorites section when showFavorites is true', () => {
       render(
         <TestWrapper>
           <AddressSelector {...defaultProps} showFavorites={true} />
         </TestWrapper>
       );
 
-      await waitFor(() => {
-        expect(screen.getByText(/favorites/i)).toBeInTheDocument();
-      });
+      // Favorites section should be rendered (though may be collapsed)
+      // The section title "Favorites" appears in the header
+      expect(screen.getByText(/^Favorites$/i)).toBeInTheDocument();
     });
   });
 
   describe('Admin Mode', () => {
+    beforeEach(() => {
+      const useAddresses = require('@/hooks/useAddresses').useAddresses;
+      useAddresses.mockReturnValue({
+        data: {
+          addresses: mockAddresses,
+          totalCount: mockAddresses.length,
+        },
+        isLoading: false,
+      });
+    });
+
     it('works in admin mode', () => {
       render(
         <TestWrapper>
@@ -375,11 +386,22 @@ describe.skip('AddressSelector', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByPlaceholderText(/search addresses/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/Search\.\.\./i)).toBeInTheDocument();
     });
   });
 
   describe('Accessibility', () => {
+    beforeEach(() => {
+      const useAddresses = require('@/hooks/useAddresses').useAddresses;
+      useAddresses.mockReturnValue({
+        data: {
+          addresses: mockAddresses,
+          totalCount: mockAddresses.length,
+        },
+        isLoading: false,
+      });
+    });
+
     it('has accessible form controls', () => {
       render(
         <TestWrapper>
@@ -387,7 +409,7 @@ describe.skip('AddressSelector', () => {
         </TestWrapper>
       );
 
-      const searchInput = screen.getByPlaceholderText(/search addresses/i);
+      const searchInput = screen.getByPlaceholderText(/Search\.\.\./i);
       expect(searchInput).toHaveAttribute('type', 'text');
     });
 
@@ -400,14 +422,14 @@ describe.skip('AddressSelector', () => {
         </TestWrapper>
       );
 
-      const allButton = screen.getByRole('button', { name: /all/i });
+      const allButton = screen.getByRole('button', { name: /Filter by All/i });
       allButton.focus();
 
       expect(allButton).toHaveFocus();
 
       // Tab to next filter
       await user.tab();
-      const sharedButton = screen.getByRole('button', { name: /shared/i });
+      const sharedButton = screen.getByRole('button', { name: /Filter by Shared/i });
       expect(sharedButton).toHaveFocus();
     });
   });

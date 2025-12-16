@@ -250,7 +250,15 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild>
                       <Link href="/admin/catering-orders/new">
                         <Truck className="h-5 w-5" />
-                        <span>New Order</span>
+                        <span>New Catering Order</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href="/admin/on-demand-orders/new">
+                        <Zap className="h-5 w-5" />
+                        <span>New On-Demand Order</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

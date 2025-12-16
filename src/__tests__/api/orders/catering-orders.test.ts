@@ -171,7 +171,7 @@ describe('GET /api/orders/catering-orders - List Catering Orders', () => {
       );
     });
 
-    it('should filter by search term (orderNumber, user.name, user.email)', async () => {
+    it('should filter by search term (orderNumber, clientAttention, user.name, user.email)', async () => {
       mockSupabaseClient.auth.getUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
       });
@@ -184,14 +184,21 @@ describe('GET /api/orders/catering-orders - List Catering Orders', () => {
 
       await GET(request);
 
+      // Search uses AND wrapper: { AND: [baseConditions, { OR: searchConditions }] }
       expect(prisma.cateringRequest.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            OR: [
-              { orderNumber: { contains: 'john', mode: 'insensitive' } },
-              { user: { name: { contains: 'john', mode: 'insensitive' } } },
-              { user: { email: { contains: 'john', mode: 'insensitive' } } },
-            ],
+            AND: expect.arrayContaining([
+              expect.objectContaining({ deletedAt: null }),
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  { orderNumber: { contains: 'john', mode: 'insensitive' } },
+                  { clientAttention: { contains: 'john', mode: 'insensitive' } },
+                  { user: { name: { contains: 'john', mode: 'insensitive' } } },
+                  { user: { email: { contains: 'john', mode: 'insensitive' } } },
+                ]),
+              }),
+            ]),
           }),
         })
       );
@@ -483,12 +490,20 @@ describe('GET /api/orders/catering-orders - List Catering Orders', () => {
 
       await GET(request);
 
+      // Combined filters use AND wrapper: { AND: [baseConditions, { OR: searchConditions }] }
       expect(prisma.cateringRequest.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            status: CateringStatus.PENDING,
-            createdAt: expect.any(Object),
-            OR: expect.any(Array),
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                status: CateringStatus.PENDING,
+                createdAt: expect.any(Object),
+                deletedAt: null,
+              }),
+              expect.objectContaining({
+                OR: expect.any(Array),
+              }),
+            ]),
           }),
         })
       );
