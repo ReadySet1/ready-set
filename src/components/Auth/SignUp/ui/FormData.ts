@@ -9,9 +9,13 @@ export interface Option {
 export const COUNTIES: readonly Option[] = [
   { label: "Alameda", value: "Alameda" },
   { label: "Contra Costa", value: "Contra Costa" },
+  { label: "Marin", value: "Marin" },
+  { label: "Napa", value: "Napa" },
   { label: "San Francisco", value: "San Francisco" },
   { label: "San Mateo", value: "San Mateo" },
   { label: "Santa Clara", value: "Santa Clara" },
+  { label: "Solano", value: "Solano" },
+  { label: "Sonoma", value: "Sonoma" },
 ] as const;
 
 export const US_STATES: readonly Option[] = [
