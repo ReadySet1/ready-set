@@ -319,10 +319,142 @@ describe("VendorServiceArea", () => {
     });
   });
 
-  describe("Snapshot Testing", () => {
-    it("matches snapshot", () => {
+  describe("Structural Integrity", () => {
+    it("should maintain consistent DOM structure", () => {
       const { container } = render(<VendorServiceArea />);
-      expect(container).toMatchSnapshot();
+      
+      // Verify main section structure
+      const section = container.querySelector("section.bg-white");
+      expect(section).toBeInTheDocument();
+      expect(section).toHaveAttribute("aria-labelledby", "vendor-service-area-heading");
+      
+      // Verify main container structure
+      const mainContainer = section?.querySelector(".mx-auto.max-w-6xl");
+      expect(mainContainer).toBeInTheDocument();
+      
+      // Verify heading structure
+      const heading = mainContainer?.querySelector("h2#vendor-service-area-heading");
+      expect(heading).toBeInTheDocument();
+      expect(heading).toHaveTextContent("Our Service Area");
+      
+      // Verify grid structure
+      const grid = mainContainer?.querySelector(".grid.gap-6.md\\:grid-cols-2.lg\\:grid-cols-3");
+      expect(grid).toBeInTheDocument();
+      
+      // Verify article cards
+      const articles = grid?.querySelectorAll("article");
+      expect(articles).toHaveLength(3);
+    });
+
+    it("should maintain consistent article card structure", () => {
+      const { container } = render(<VendorServiceArea />);
+      const articles = container.querySelectorAll("article");
+      
+      expect(articles).toHaveLength(3);
+      
+      articles.forEach((article) => {
+        // Each article should have proper classes
+        expect(article).toHaveClass("rounded-2xl", "border", "border-gray-200", "bg-white");
+        
+        // Each article should have a header with h3
+        const header = article.querySelector("header");
+        expect(header).toBeInTheDocument();
+        
+        const h3 = header?.querySelector("h3");
+        expect(h3).toBeInTheDocument();
+        expect(h3?.textContent).not.toBe("");
+        
+        // Each article should have "Areas" label (in the content div, not header)
+        const contentDiv = article.querySelector(".flex-1.space-y-4");
+        expect(contentDiv).toBeInTheDocument();
+        
+        const areasLabel = contentDiv?.querySelector(".text-sm.font-semibold");
+        expect(areasLabel).toBeInTheDocument();
+        expect(areasLabel).toHaveTextContent("Areas");
+        
+        // Each article should have a list
+        const list = article.querySelector("ul");
+        expect(list).toBeInTheDocument();
+        
+        const listItems = list?.querySelectorAll("li");
+        expect(listItems && listItems.length).toBeGreaterThan(0);
+      });
+    });
+
+    it("should maintain consistent location list item structure", () => {
+      const { container } = render(<VendorServiceArea />);
+      const allListItems = container.querySelectorAll("ul > li");
+      
+      // Total should be 21 locations
+      expect(allListItems).toHaveLength(21);
+      
+      allListItems.forEach((item) => {
+        // Each item should be a list item
+        expect(item.tagName).toBe("LI");
+        
+        // Each item should contain a div with the location
+        const locationDiv = item.querySelector("div");
+        expect(locationDiv).toBeInTheDocument();
+        expect(locationDiv).toHaveClass("rounded-md", "bg-gray-50");
+        
+        // Each item should have text content
+        expect(item.textContent).not.toBe("");
+        expect(item.textContent?.trim().length).toBeGreaterThan(0);
+      });
+    });
+
+    it("should maintain correct region distribution", () => {
+      const { container } = render(<VendorServiceArea />);
+      const articles = container.querySelectorAll("article");
+      
+      // Bay Area (7 locations)
+      const bayAreaList = articles[0]?.querySelector("ul");
+      expect(bayAreaList?.children).toHaveLength(7);
+      
+      // Austin (9 locations)
+      const austinList = articles[1]?.querySelector("ul");
+      expect(austinList?.children).toHaveLength(9);
+      
+      // Dallas (5 locations)
+      const dallasList = articles[2]?.querySelector("ul");
+      expect(dallasList?.children).toHaveLength(5);
+    });
+
+    it("should maintain semantic HTML structure", () => {
+      const { container } = render(<VendorServiceArea />);
+      
+      // Should use section element
+      const section = container.querySelector("section");
+      expect(section).toBeInTheDocument();
+      expect(section?.tagName).toBe("SECTION");
+      
+      // Should use article elements
+      const articles = container.querySelectorAll("article");
+      expect(articles).toHaveLength(3);
+      articles.forEach(article => {
+        expect(article.tagName).toBe("ARTICLE");
+      });
+      
+      // Should use header elements
+      const headers = container.querySelectorAll("article > header");
+      expect(headers).toHaveLength(3);
+      headers.forEach(header => {
+        expect(header.tagName).toBe("HEADER");
+      });
+      
+      // Should use proper heading hierarchy
+      const h2 = container.querySelector("h2");
+      expect(h2).toBeInTheDocument();
+      
+      const h3Elements = container.querySelectorAll("h3");
+      expect(h3Elements).toHaveLength(3);
+      
+      // Should use unordered lists
+      const lists = container.querySelectorAll("ul");
+      expect(lists).toHaveLength(3);
+      lists.forEach(list => {
+        expect(list.tagName).toBe("UL");
+      });
     });
   });
 });

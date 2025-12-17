@@ -521,10 +521,102 @@ describe("VendorDeliveryFlow", () => {
     });
   });
 
-  describe("Snapshot Test", () => {
-    it("should match snapshot", () => {
+  describe("Structural Integrity", () => {
+    it("should maintain consistent DOM structure", () => {
       const { container } = render(<VendorDeliveryFlow />);
-      expect(container).toMatchSnapshot();
+      
+      // Verify main section structure
+      const section = container.querySelector("section.bg-\\[\\#f7cd2a\\]");
+      expect(section).toBeInTheDocument();
+      
+      // Verify content container structure
+      const contentContainer = section?.querySelector(".max-w-6xl.mx-auto");
+      expect(contentContainer).toBeInTheDocument();
+      
+      // Verify header structure
+      const header = contentContainer?.querySelector(".text-center.text-gray-900");
+      expect(header).toBeInTheDocument();
+      expect(header?.querySelector("h2")).toBeInTheDocument();
+      expect(header?.querySelector("p.mx-auto.mt-3")).toBeInTheDocument();
+      
+      // Verify grid structure
+      const grid = contentContainer?.querySelector(".grid.gap-4.sm\\:grid-cols-2.lg\\:grid-cols-3");
+      expect(grid).toBeInTheDocument();
+      
+      // Verify cards structure
+      const cards = grid?.querySelectorAll(".rounded-3xl.border-\\[3px\\].border-gray-400");
+      expect(cards).toHaveLength(6);
+      
+      // Verify connector lines structure (desktop only)
+      const connectorContainer = container.querySelector(".pointer-events-none.absolute.inset-0.hidden.lg\\:block");
+      expect(connectorContainer).toBeInTheDocument();
+      
+      // Verify same-day notice structure
+      const sameDayNotice = contentContainer?.querySelector(".rounded-2xl.bg-\\[\\#f7cd2a\\]");
+      expect(sameDayNotice).toBeInTheDocument();
+    });
+
+    it("should maintain consistent card structure", () => {
+      const { container } = render(<VendorDeliveryFlow />);
+      const cards = container.querySelectorAll(".rounded-3xl.bg-white.p-6");
+      
+      cards.forEach((card) => {
+        // Each card should have icon, title, and list
+        const iconContainer = card.querySelector(".rounded-xl.bg-\\[\\#f1f2f8\\]");
+        expect(iconContainer).toBeInTheDocument();
+        
+        const icon = iconContainer?.querySelector("svg");
+        expect(icon).toBeInTheDocument();
+        expect(icon).toHaveAttribute("aria-hidden");
+        
+        const titleContainer = card.querySelector(".flex.items-start.gap-3");
+        expect(titleContainer).toBeInTheDocument();
+        
+        const h3 = card.querySelector("h3");
+        expect(h3).toBeInTheDocument();
+        
+        const list = card.querySelector("ul");
+        expect(list).toBeInTheDocument();
+      });
+    });
+
+    it("should maintain consistent bullet point structure", () => {
+      const { container } = render(<VendorDeliveryFlow />);
+      const listItems = container.querySelectorAll("ul > li");
+      
+      // Should have exactly 23 bullet points across all cards
+      expect(listItems).toHaveLength(23);
+      
+      listItems.forEach((item) => {
+        // Each item should have flex layout with gap
+        expect(item).toHaveClass("flex", "items-start", "gap-2");
+        
+        // Each item should have a bullet dot
+        const bulletDot = item.querySelector(".h-1\\.5.w-1\\.5.rounded-full.bg-gray-700");
+        expect(bulletDot).toBeInTheDocument();
+        expect(bulletDot).toHaveAttribute("aria-hidden");
+        
+        // Each item should have text content
+        const span = item.querySelector("span:not([aria-hidden])");
+        expect(span).toBeInTheDocument();
+        expect(span?.textContent).not.toBe("");
+      });
+    });
+
+    it("should have complete connector line structure", () => {
+      const { container } = render(<VendorDeliveryFlow />);
+      const connectorContainer = container.querySelector(".pointer-events-none.absolute");
+      
+      // Should have horizontal lines
+      const topLine = connectorContainer?.querySelector('span.absolute.left-\\[8\\%\\].right-\\[8\\%\\].top-\\[26\\%\\]');
+      expect(topLine).toBeInTheDocument();
+      
+      const bottomLine = connectorContainer?.querySelector('span.absolute.bottom-\\[33\\%\\].left-\\[8\\%\\].right-\\[8\\%\\]');
+      expect(bottomLine).toBeInTheDocument();
+      
+      // Should have vertical lines
+      const verticalLines = connectorContainer?.querySelectorAll("span.border-l-2.border-dashed.border-white");
+      expect(verticalLines).toHaveLength(3);
     });
   });
 });

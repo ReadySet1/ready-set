@@ -444,20 +444,156 @@ describe("VendorOnboarding", () => {
     });
   });
 
-  describe("Snapshot Testing", () => {
-    it("should match snapshot with default props", () => {
+  describe("Structural Integrity", () => {
+    it("should maintain consistent DOM structure with default props", () => {
       const { container } = render(<VendorOnboarding />);
-      expect(container).toMatchSnapshot();
+      
+      // Verify main section structure
+      const section = container.querySelector("section");
+      expect(section).toBeInTheDocument();
+      expect(section).toHaveClass("bg-white");
+      
+      // Verify main container structure
+      const mainContainer = section?.querySelector(".mx-auto.max-w-6xl");
+      expect(mainContainer).toBeInTheDocument();
+      
+      // Verify grid layout structure - the mainContainer itself has the grid classes
+      expect(mainContainer).toHaveClass("lg:grid-cols-[1fr_1.05fr]");
+      expect(mainContainer?.children).toHaveLength(2);
+      
+      // Verify right column structure (gray box with timeline) - order-2
+      const rightColumn = mainContainer?.querySelector(".lg\\:order-2");
+      expect(rightColumn).toBeInTheDocument();
+      
+      // Verify left column structure (content and image) - order-1
+      const leftColumn = mainContainer?.querySelector(".lg\\:order-1");
+      expect(leftColumn).toBeInTheDocument();
+
+      
+      // Right column (gray box) should contain timeline
+      const mainHeading = rightColumn?.querySelector("h2");
+      expect(mainHeading).toBeInTheDocument();
+      expect(mainHeading).toHaveTextContent("How to Get Started");
+      
+      // Verify timeline structure - orderedList has 4 li elements + 1 span for connector line
+      const orderedList = rightColumn?.querySelector("ol");
+      expect(orderedList).toBeInTheDocument();
+      // The ol contains: 1 connector span + 4 list items = 5 children
+      const listItems = orderedList?.querySelectorAll("li");
+      expect(listItems).toHaveLength(4);
+      
+      // Left column should contain image and secondary heading
+      const imageContainer = leftColumn?.querySelector(".relative");
+      expect(imageContainer).toBeInTheDocument();
+      
+      const image = imageContainer?.querySelector("img");
+      expect(image).toBeInTheDocument();
+      
+      // Verify secondary section heading
+      const secondaryHeading = Array.from(leftColumn?.querySelectorAll("h2") || []).find(
+        h => h.textContent?.includes("Order Setup")
+      );
+      expect(secondaryHeading).toBeInTheDocument();
     });
 
-    it("should match snapshot with custom props", () => {
+    it("should maintain consistent timeline step structure", () => {
+      const { container } = render(<VendorOnboarding />);
+      const timelineSteps = container.querySelectorAll("ol > li");
+      
+      expect(timelineSteps).toHaveLength(4);
+      
+      timelineSteps.forEach((step, index) => {
+        // Each step should have a numbered circle with specific classes
+        const numberCircle = step.querySelector("span.flex.h-5.w-5");
+        expect(numberCircle).toBeInTheDocument();
+        expect(numberCircle).toHaveTextContent(String(index + 1));
+        expect(numberCircle).toHaveAttribute("aria-hidden");
+        
+        // Each step should have an h3 title
+        const title = step.querySelector("h3");
+        expect(title).toBeInTheDocument();
+        expect(title?.textContent).not.toBe("");
+        
+        // Each step should have a description paragraph
+        const description = step.querySelector("p.text-xs");
+        expect(description).toBeInTheDocument();
+        expect(description?.textContent).not.toBe("");
+      });
+    });
+
+    it("should maintain consistent order setup list structure", () => {
+      const { container } = render(<VendorOnboarding />);
+      const unorderedLists = container.querySelectorAll("ul");
+      
+      // Should have at least one unordered list for order setup
+      expect(unorderedLists.length).toBeGreaterThanOrEqual(1);
+      
+      unorderedLists.forEach((list) => {
+        const listItems = list.querySelectorAll("li");
+        expect(listItems.length).toBeGreaterThan(0);
+        
+        listItems.forEach((item) => {
+          // Each item should be a list item
+          expect(item.tagName).toBe("LI");
+          
+          // Each item should have text content
+          expect(item.textContent).not.toBe("");
+          expect(item.textContent?.trim().length).toBeGreaterThan(0);
+        });
+      });
+    });
+
+    it("should maintain consistent structure with custom props", () => {
       const { container } = render(
         <VendorOnboarding
           imageSrc="https://example.com/custom.jpg"
           imageAlt="Custom image description"
         />
       );
-      expect(container).toMatchSnapshot();
+
+      
+      // Structure should remain the same regardless of props
+      const section = container.querySelector("section");
+      expect(section).toBeInTheDocument();
+      
+      const mainContainer = section?.querySelector(".mx-auto.max-w-6xl");
+      expect(mainContainer).toBeInTheDocument();
+      expect(mainContainer).toHaveClass("lg:grid-cols-[1fr_1.05fr]");
+      expect(mainContainer?.children).toHaveLength(2);
+      
+      const orderedList = container.querySelector("ol");
+      expect(orderedList).toBeInTheDocument();
+      const listItems = orderedList?.querySelectorAll("li");
+      expect(listItems).toHaveLength(4);
+      
+      // Image should use custom props
+      const image = container.querySelector("img");
+      expect(image).toHaveAttribute("src", "https://example.com/custom.jpg");
+      expect(image).toHaveAttribute("alt", "Custom image description");
+    });
+
+    it("should maintain ScheduleDialog integration structure", () => {
+      render(<VendorOnboarding />);
+      
+      const scheduleDialog = screen.getByTestId("schedule-dialog");
+      expect(scheduleDialog).toBeInTheDocument();
+      
+      // Verify all required props are passed
+      expect(screen.getByTestId("dialog-button-text")).toBeInTheDocument();
+      expect(screen.getByTestId("dialog-title")).toBeInTheDocument();
+      expect(screen.getByTestId("dialog-description")).toBeInTheDocument();
+      expect(screen.getByTestId("dialog-calendar-url")).toBeInTheDocument();
+      expect(screen.getByTestId("custom-button")).toBeInTheDocument();
+    });
+
+    it("should maintain connector line structure between timeline steps", () => {
+      const { container } = render(<VendorOnboarding />);
+      
+      // Should have connecting line between steps - using the actual classes from component
+      const connectorLine = container.querySelector("span.absolute.left-\\[9px\\].top-4");
+      expect(connectorLine).toBeInTheDocument();
+      expect(connectorLine).toHaveAttribute("aria-hidden");
+      expect(connectorLine).toHaveClass("bg-gray-400");
     });
   });
 });
