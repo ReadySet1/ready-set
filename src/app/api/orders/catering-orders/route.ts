@@ -167,7 +167,7 @@ export async function GET(req: NextRequest) {
     // Handle field-specific search
     if (searchTerm) {
       // Build search conditions based on selected field
-      let searchConditions: any;
+      let searchConditions: Prisma.CateringRequestWhereInput | undefined;
 
       switch (searchField) {
         case 'order_number':
