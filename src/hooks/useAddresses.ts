@@ -19,6 +19,11 @@ interface AddressesResponse {
     hasPrevPage: boolean;
     limit: number;
   };
+  counts: {
+    all: number;
+    shared: number;
+    private: number;
+  };
 }
 
 interface UseAddressesOptions {
@@ -27,7 +32,8 @@ interface UseAddressesOptions {
 }
 
 // Fetch addresses with proper error handling and authentication
-const fetchAddresses = async (params: AddressesQueryParams): Promise<AddressesResponse> => {
+// Exported so components can use it directly with fetchQuery for guaranteed network requests
+export const fetchAddresses = async (params: AddressesQueryParams): Promise<AddressesResponse> => {
   const supabase = await createClient();
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 
@@ -48,6 +54,7 @@ const fetchAddresses = async (params: AddressesQueryParams): Promise<AddressesRe
     `/api/addresses?${searchParams.toString()}`,
     {
       credentials: 'include',
+      cache: 'no-store', // Bypass browser cache to ensure fresh data
       headers: {
         'Content-Type': 'application/json',
       },
@@ -75,6 +82,8 @@ const fetchAddresses = async (params: AddressesQueryParams): Promise<AddressesRe
   // Handle both old format (array) and new format (paginated object)
   if (Array.isArray(data)) {
     // Old format - backward compatibility
+    const sharedCount = data.filter((a: Address) => a.isShared).length;
+    const privateCount = data.filter((a: Address) => !a.isShared).length;
     return {
       addresses: data,
       pagination: {
@@ -85,10 +94,22 @@ const fetchAddresses = async (params: AddressesQueryParams): Promise<AddressesRe
         hasPrevPage: false,
         limit: data.length,
       },
+      counts: {
+        all: data.length,
+        shared: sharedCount,
+        private: privateCount,
+      },
     };
   } else if (data.addresses && data.pagination) {
-    // New paginated format
-    return data;
+    // New paginated format - ensure counts are present
+    return {
+      ...data,
+      counts: data.counts || {
+        all: data.pagination.totalCount,
+        shared: 0,
+        private: 0,
+      },
+    };
   } else {
     throw new Error('Unexpected data format from API');
   }
@@ -175,7 +196,7 @@ export function useAddresses(
 ) {
   const {
     enabled = true,
-    staleTime = 5 * 60 * 1000, // 5 minutes default
+    staleTime = 0, // Always consider data stale to ensure fresh fetches
   } = options;
 
   return useQuery({
@@ -183,10 +204,12 @@ export function useAddresses(
     queryFn: () => fetchAddresses(params),
     enabled,
     staleTime,
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes - reduced from 10
+    refetchOnMount: 'always', // ALWAYS refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
     retry: (failureCount, error: any) => {
       // Don't retry on client errors (4xx)
-      if (error?.message?.includes('Authentication') || 
+      if (error?.message?.includes('Authentication') ||
           error?.message?.includes('Access denied') ||
           error?.message?.includes('not found')) {
         return false;
@@ -214,29 +237,10 @@ export function useCreateAddress() {
 }
 
 export function useUpdateAddress() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: updateAddress,
-    onSuccess: (updatedAddress) => {
-      // Update the cache with the new data
-      queryClient.setQueryData(
-        ['addresses'],
-        (oldData: AddressesResponse | undefined) => {
-          if (!oldData) return oldData;
-          
-          return {
-            ...oldData,
-            addresses: oldData.addresses.map(addr =>
-              addr.id === updatedAddress.id ? updatedAddress : addr
-            ),
-          };
-        }
-      );
-      
-      // Also invalidate to ensure consistency
-      queryClient.invalidateQueries({ queryKey: ['addresses'] });
-    },
+    // Note: No onSuccess cache manipulation here - component handles refresh
+    // using fetchQuery with staleTime: 0 for guaranteed network request
     onError: (error: Error) => {
       console.error('Failed to update address:', error);
     },
@@ -248,26 +252,19 @@ export function useDeleteAddress() {
 
   return useMutation({
     mutationFn: deleteAddress,
-    onSuccess: (_, deletedId) => {
-      // Update the cache by removing the deleted address
-      queryClient.setQueryData(
-        ['addresses'],
-        (oldData: AddressesResponse | undefined) => {
-          if (!oldData) return oldData;
-          
-          return {
-            ...oldData,
-            addresses: oldData.addresses.filter(addr => addr.id !== deletedId),
-            pagination: {
-              ...oldData.pagination,
-              totalCount: Math.max(0, oldData.pagination.totalCount - 1),
-            },
-          };
-        }
-      );
-      
-      // Also invalidate to ensure consistency
+    onSuccess: async (_, deletedId) => {
+      console.log('useDeleteAddress - Success, deleted address:', deletedId);
+
+      // First invalidate the cache to mark data as stale
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
+
+      // Then force an immediate refetch of all address queries
+      await queryClient.refetchQueries({
+        queryKey: ['addresses'],
+        type: 'active',
+      });
+
+      console.log('useDeleteAddress - Cache invalidated and refetched');
     },
     onError: (error: Error) => {
       console.error('Failed to delete address:', error);

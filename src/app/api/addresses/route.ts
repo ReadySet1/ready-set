@@ -253,10 +253,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Execute the query with pagination using withDatabaseRetry to handle prepared statement conflicts
-    const [addresses, totalCount] = await withDatabaseRetry(async () => {
+    // Also fetch counts for all filter types to support accurate tab counts
+    const [addresses, totalCount, allCount, sharedCount, privateCount] = await withDatabaseRetry(async () => {
+      // Build the "all" filter condition (shared OR owned by current user)
+      const allCondition = { OR: [{ isShared: true }, { createdBy: currentUser.id }] };
+
       return await Promise.all([
         prisma.address.findMany(addressesQuery),
         prisma.address.count({ where: addressesQuery.where }),
+        // Count for "all" filter - addresses user can access (shared OR their own)
+        prisma.address.count({ where: allCondition }),
+        // Count for "shared" filter - only shared addresses
+        prisma.address.count({ where: { isShared: true } }),
+        // Count for "private" filter - user's own non-shared addresses
+        prisma.address.count({ where: { createdBy: currentUser.id, isShared: false } }),
       ]);
     });
 
@@ -265,7 +275,7 @@ export async function GET(request: NextRequest) {
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
 
-    
+
     // Return paginated response with cache headers
     const response = NextResponse.json({
       addresses,
@@ -276,6 +286,11 @@ export async function GET(request: NextRequest) {
         hasNextPage,
         hasPrevPage,
         limit,
+      },
+      counts: {
+        all: allCount,
+        shared: sharedCount,
+        private: privateCount,
       },
     });
 
@@ -466,40 +481,70 @@ export async function PUT(request: NextRequest) {
 
     const formData: Partial<AddressFormData> = await request.json();
 
-    // Update the address
-    const updatedAddress = await prisma.address.update({
-      where: { id },
-      data: formData,
-    });
+    console.log("PUT /api/addresses - Received data:", JSON.stringify(formData, null, 2));
+    console.log("PUT /api/addresses - Updating address ID:", id);
 
-    // If the isShared status has changed, update userAddress relations
-    if (
-      formData.isShared !== undefined &&
-      formData.isShared !== existingAddress.isShared
-    ) {
-      if (formData.isShared) {
-        // If now shared, we could remove userAddress relations if desired
-      } else {
-        // If no longer shared, ensure there's a userAddress relation for the creator
-        const userAddressExists = await prisma.userAddress.findFirst({
-          where: {
-            userId: currentUser.id,
-            addressId: id,
-          },
+    // Use withDatabaseRetry to handle prepared statement conflicts
+    const updatedAddress = await withDatabaseRetry(async () => {
+      return await prisma.$transaction(async (tx) => {
+        // Build update data - only include fields that are actually provided
+        const updateData: Record<string, unknown> = {};
+
+        if (formData.name !== undefined) updateData.name = formData.name;
+        if (formData.street1 !== undefined) updateData.street1 = formData.street1;
+        if (formData.street2 !== undefined) updateData.street2 = formData.street2;
+        if (formData.city !== undefined) updateData.city = formData.city;
+        if (formData.state !== undefined) updateData.state = formData.state;
+        if (formData.zip !== undefined) updateData.zip = formData.zip;
+        if (formData.county !== undefined) updateData.county = formData.county;
+        if (formData.locationNumber !== undefined) updateData.locationNumber = formData.locationNumber;
+        if (formData.parkingLoading !== undefined) updateData.parkingLoading = formData.parkingLoading;
+        if (formData.isRestaurant !== undefined) updateData.isRestaurant = formData.isRestaurant;
+        if (formData.isShared !== undefined) updateData.isShared = formData.isShared;
+
+        console.log("PUT /api/addresses - Update data being applied:", JSON.stringify(updateData, null, 2));
+
+        // Update the address
+        const updated = await tx.address.update({
+          where: { id },
+          data: updateData,
         });
 
-        if (!userAddressExists) {
-          await prisma.userAddress.create({
-            data: {
-              userId: currentUser.id,
-              addressId: id,
-              isDefault: false,
-            },
-          });
-        }
-      }
-    }
+        console.log("PUT /api/addresses - Updated address result:", JSON.stringify(updated, null, 2));
 
+        // If the isShared status has changed, update userAddress relations
+        if (
+          formData.isShared !== undefined &&
+          formData.isShared !== existingAddress.isShared
+        ) {
+          if (formData.isShared) {
+            // If now shared, we could remove userAddress relations if desired
+          } else {
+            // If no longer shared, ensure there's a userAddress relation for the creator
+            const userAddressExists = await tx.userAddress.findFirst({
+              where: {
+                userId: currentUser.id,
+                addressId: id,
+              },
+            });
+
+            if (!userAddressExists) {
+              await tx.userAddress.create({
+                data: {
+                  userId: currentUser.id,
+                  addressId: id,
+                  isDefault: false,
+                },
+              });
+            }
+          }
+        }
+
+        return updated;
+      });
+    });
+
+    console.log("PUT /api/addresses - Final response:", updatedAddress.id);
     return NextResponse.json(updatedAddress);
   } catch (error) {
     console.error("Error updating address:", error);
