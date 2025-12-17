@@ -27,12 +27,7 @@ const VendorDeliveriesShowcase = () => {
           </p>
           <h2
             id="deliveries-heading"
-            className="mt-2 text-3xl font-black leading-[1.1] tracking-tight text-gray-900 sm:text-4xl lg:text-5xl"
-            style={{
-              fontFamily:
-                "Inter, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', system-ui, sans-serif",
-              fontWeight: 900,
-            }}
+            className="mt-2 font-sans text-3xl font-black leading-[1.1] tracking-tight text-gray-900 sm:text-4xl lg:text-5xl"
           >
             Catering Deliveries
             <br />
