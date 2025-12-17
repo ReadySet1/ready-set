@@ -252,9 +252,7 @@ export function useDeleteAddress() {
 
   return useMutation({
     mutationFn: deleteAddress,
-    onSuccess: async (_, deletedId) => {
-      console.log('useDeleteAddress - Success, deleted address:', deletedId);
-
+    onSuccess: async () => {
       // First invalidate the cache to mark data as stale
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
 
@@ -263,8 +261,6 @@ export function useDeleteAddress() {
         queryKey: ['addresses'],
         type: 'active',
       });
-
-      console.log('useDeleteAddress - Cache invalidated and refetched');
     },
     onError: (error: Error) => {
       console.error('Failed to delete address:', error);

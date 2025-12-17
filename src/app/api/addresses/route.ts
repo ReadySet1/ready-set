@@ -483,9 +483,6 @@ export async function PUT(request: NextRequest) {
 
     const formData: Partial<AddressFormData> = await request.json();
 
-    console.log("PUT /api/addresses - Received data:", JSON.stringify(formData, null, 2));
-    console.log("PUT /api/addresses - Updating address ID:", id);
-
     // Use withDatabaseRetry to handle prepared statement conflicts
     const updatedAddress = await withDatabaseRetry(async () => {
       return await prisma.$transaction(async (tx) => {
@@ -504,15 +501,11 @@ export async function PUT(request: NextRequest) {
         if (formData.isRestaurant !== undefined) updateData.isRestaurant = formData.isRestaurant;
         if (formData.isShared !== undefined) updateData.isShared = formData.isShared;
 
-        console.log("PUT /api/addresses - Update data being applied:", JSON.stringify(updateData, null, 2));
-
         // Update the address
         const updated = await tx.address.update({
           where: { id },
           data: updateData,
         });
-
-        console.log("PUT /api/addresses - Updated address result:", JSON.stringify(updated, null, 2));
 
         // If the isShared status has changed, update userAddress relations
         if (
@@ -546,7 +539,6 @@ export async function PUT(request: NextRequest) {
       });
     });
 
-    console.log("PUT /api/addresses - Final response:", updatedAddress.id);
     return NextResponse.json(updatedAddress);
   } catch (error) {
     console.error("Error updating address:", error);
