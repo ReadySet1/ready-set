@@ -131,8 +131,8 @@ export async function GET(request: NextRequest) {
     // If requesting a specific address by ID
     if (id) {
       const address = await withDatabaseRetry(async () => {
-        return await prisma.address.findUnique({
-          where: { id },
+        return await prisma.address.findFirst({
+          where: { id, deletedAt: null }, // Exclude soft-deleted addresses
           // Optimize query by selecting only needed fields
           select: {
             id: true,
@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
         });
       });
 
-      // Check if address exists
+      // Check if address exists (or was soft-deleted)
       if (!address) {
         return NextResponse.json(
           { error: "Address not found" },
@@ -226,26 +226,28 @@ export async function GET(request: NextRequest) {
       },
     };
 
-    // Build the query based on the filter
+    // Build the query based on the filter (always exclude soft-deleted addresses)
+    const notDeleted = { deletedAt: null };
+
     switch (filterParam) {
       case "shared":
-        // Only fetch shared addresses
+        // Only fetch shared addresses (not soft-deleted)
         addressesQuery.where = searchConditions
-          ? { AND: [{ isShared: true }, searchConditions] }
-          : { isShared: true };
+          ? { AND: [{ isShared: true, ...notDeleted }, searchConditions] }
+          : { isShared: true, ...notDeleted };
         break;
 
       case "private":
-        // Only fetch user's private addresses
+        // Only fetch user's private addresses (not soft-deleted)
         addressesQuery.where = searchConditions
-          ? { AND: [{ createdBy: currentUser.id, isShared: false }, searchConditions] }
-          : { createdBy: currentUser.id, isShared: false };
+          ? { AND: [{ createdBy: currentUser.id, isShared: false, ...notDeleted }, searchConditions] }
+          : { createdBy: currentUser.id, isShared: false, ...notDeleted };
         break;
 
       case "all":
       default:
-        // Fetch both shared addresses and user's private addresses
-        const accessCondition = { OR: [{ isShared: true }, { createdBy: currentUser.id }] };
+        // Fetch both shared addresses and user's private addresses (not soft-deleted)
+        const accessCondition = { OR: [{ isShared: true }, { createdBy: currentUser.id }], ...notDeleted };
         addressesQuery.where = searchConditions
           ? { AND: [accessCondition, searchConditions] }
           : accessCondition;
@@ -255,18 +257,18 @@ export async function GET(request: NextRequest) {
     // Execute the query with pagination using withDatabaseRetry to handle prepared statement conflicts
     // Also fetch counts for all filter types to support accurate tab counts
     const [addresses, totalCount, allCount, sharedCount, privateCount] = await withDatabaseRetry(async () => {
-      // Build the "all" filter condition (shared OR owned by current user)
-      const allCondition = { OR: [{ isShared: true }, { createdBy: currentUser.id }] };
+      // Build the "all" filter condition (shared OR owned by current user, not soft-deleted)
+      const allCondition = { OR: [{ isShared: true }, { createdBy: currentUser.id }], ...notDeleted };
 
       return await Promise.all([
         prisma.address.findMany(addressesQuery),
         prisma.address.count({ where: addressesQuery.where }),
-        // Count for "all" filter - addresses user can access (shared OR their own)
+        // Count for "all" filter - addresses user can access (shared OR their own, not soft-deleted)
         prisma.address.count({ where: allCondition }),
-        // Count for "shared" filter - only shared addresses
-        prisma.address.count({ where: { isShared: true } }),
-        // Count for "private" filter - user's own non-shared addresses
-        prisma.address.count({ where: { createdBy: currentUser.id, isShared: false } }),
+        // Count for "shared" filter - only shared addresses (not soft-deleted)
+        prisma.address.count({ where: { isShared: true, ...notDeleted } }),
+        // Count for "private" filter - user's own non-shared addresses (not soft-deleted)
+        prisma.address.count({ where: { createdBy: currentUser.id, isShared: false, ...notDeleted } }),
       ]);
     });
 
@@ -603,14 +605,16 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    // Delete any userAddress relations
-    await prisma.userAddress.deleteMany({
-      where: { addressId: id },
+    // Soft delete the address by setting deletedAt timestamp
+    // This preserves referential integrity with catering_requests and on_demand orders
+    await prisma.address.update({
+      where: { id },
+      data: { deletedAt: new Date() },
     });
 
-    // Delete the address
-    await prisma.address.delete({
-      where: { id },
+    // Also remove userAddress relations since the address is no longer active
+    await prisma.userAddress.deleteMany({
+      where: { addressId: id },
     });
 
     return NextResponse.json({ success: true });
