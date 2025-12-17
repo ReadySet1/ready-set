@@ -4,7 +4,6 @@ import {
   VendorDeliveriesShowcase,
   VendorHero,
   VendorServiceDrivers,
-  VendorTestimonial,
 } from "@/components/VendorLanding";
 import BakeryTerms from "@/components/BakeryDelivery/BakeryTerms";
 import VendorOnboarding from "@/components/VendorLanding/VendorOnboarding";
@@ -27,7 +26,6 @@ export default function VendorHeroPage() {
       <VendorOnboarding />
       <VendorDeliveryFlow />
       <VendorServiceArea />
-      <VendorTestimonial />
     </div>
   );
 }
