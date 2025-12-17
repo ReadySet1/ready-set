@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
 import { Address, AddressFilter } from "@/types/address";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -10,6 +11,7 @@ import {
   useCreateAddress,
   useUpdateAddress,
   useDeleteAddress,
+  fetchAddresses,
 } from "@/hooks/useAddresses";
 import {
   AlertDialog,
@@ -48,6 +50,7 @@ interface PaginationData {
 }
 
 const UserAddresses: React.FC = () => {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<UserType | null>(null);
   const [addressToEdit, setAddressToEdit] = useState<Address | null>(null);
@@ -117,7 +120,7 @@ const UserAddresses: React.FC = () => {
     },
     {
       enabled: !!user,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      // staleTime defaults to 0 in the hook - always fetch fresh data
     },
   );
 
@@ -144,14 +147,15 @@ const UserAddresses: React.FC = () => {
   };
 
   // Memoize the handleAddressUpdated callback to prevent unnecessary re-renders
-  const handleAddressUpdated = useCallback(() => {
-    // Use React Query refetch to get fresh data
-    if (user) {
-      refetch();
-    }
+  const handleAddressUpdated = useCallback(async () => {
+    // Close modal first
     setAddressToEdit(null);
     setIsModalOpen(false);
-  }, [user, refetch]);
+
+    // Invalidate and refetch addresses from the network
+    // With cache: 'no-store' on fetch, this will make a fresh network request
+    await queryClient.invalidateQueries({ queryKey: ['addresses'] });
+  }, [queryClient]);
 
   const handleEditAddress = (address: Address) => {
     setAddressToEdit(address);
@@ -219,15 +223,8 @@ const UserAddresses: React.FC = () => {
     );
   }
 
-  // Get filter counts
-  const getFilterCounts = () => {
-    const all = data?.pagination?.totalCount || 0;
-    const shared = addresses.filter((a) => a.isShared).length;
-    const private_ = addresses.filter((a) => !a.isShared).length;
-    return { all, shared, private: private_ };
-  };
-
-  const filterCounts = getFilterCounts();
+  // Use filter counts from API (accurate across all pages)
+  const filterCounts = data?.counts || { all: 0, shared: 0, private: 0 };
 
   // Get the dashboard route based on user role
   const dashboardRoute = getDashboardRouteByRole(userRole);
