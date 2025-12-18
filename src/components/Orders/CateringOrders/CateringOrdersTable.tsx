@@ -72,7 +72,7 @@ export const CateringOrdersTable: React.FC<CateringOrdersTableProps> = ({
             <TableRow>
               <TableHead>Order Number</TableHead>
               <TableHead className="hidden sm:table-cell">Status</TableHead>
-              <TableHead className="hidden md:table-cell">Date</TableHead>
+              <TableHead className="hidden md:table-cell">Delivery Date</TableHead>
               <TableHead className="text-right">Total</TableHead>
               {(userRoles.isAdmin ||
                 userRoles.isSuperAdmin ||

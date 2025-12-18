@@ -504,7 +504,7 @@ const CateringOrdersPage: React.FC = () => {
       id: order.id,
       order_number: order.orderNumber,
       status: order.status.toLowerCase(),
-      date: order.pickupDateTime || order.createdAt,
+      date: order.arrivalDateTime || order.pickupDateTime || order.createdAt,
       order_total: order.orderTotal ? Number(order.orderTotal) : 0,
       client_attention: order.clientAttention || undefined,
       user: order.user ? {
