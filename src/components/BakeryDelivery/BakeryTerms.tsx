@@ -21,7 +21,7 @@ const BakeryTerms = ({
 
   const handleQuoteClick = () => {
     onRequestQuote?.(formType);
-    openForm(formType ?? "bakery");
+    openForm(formType);
   };
 
   const renderBakeryContent = () => (
@@ -31,7 +31,7 @@ const BakeryTerms = ({
         <h2 className="mb-3 text-xl font-bold text-white md:mb-6 md:text-5xl">
           Package Delivery Terms <br /> & Pricing Chart
         </h2>
-        <div className="flex flex-row items-center justify-center gap-6 md:gap-8">
+        <div className="flex flex-row items-center justify-center gap-3 md:gap-6">
           <button
             className="rounded-lg bg-yellow-500 px-4 py-2 text-sm font-bold text-gray-900 shadow-lg transition-all duration-200 hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 md:px-6 md:py-3 md:text-lg"
             onClick={handleQuoteClick}

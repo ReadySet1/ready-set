@@ -29,7 +29,7 @@ exports[`BakeryTerms Snapshot Tests should match snapshot for bakery variant 1`]
            & Pricing Chart
         </h2>
         <div
-          class="flex flex-row items-center justify-center gap-6 md:gap-8"
+          class="flex flex-row items-center justify-center gap-3 md:gap-6"
         >
           <button
             class="rounded-lg bg-yellow-500 px-4 py-2 text-sm font-bold text-gray-900 shadow-lg transition-all duration-200 hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-offset-2 md:px-6 md:py-3 md:text-lg"
