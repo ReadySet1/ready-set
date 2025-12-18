@@ -291,15 +291,11 @@ describe("VendorDeliveriesShowcase", () => {
       expect(imageContainer).toHaveClass("sm:aspect-[21/9]");
     });
 
-    it("should apply custom font styles to heading", () => {
+    it("should apply custom font classes to heading", () => {
       render(<VendorDeliveriesShowcase />);
 
       const heading = screen.getByRole("heading", { level: 2 });
-      expect(heading).toHaveStyle({
-        fontFamily:
-          "Inter, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', system-ui, sans-serif",
-        fontWeight: 900,
-      });
+      expect(heading).toHaveClass("font-sans", "font-black");
     });
   });
 });
