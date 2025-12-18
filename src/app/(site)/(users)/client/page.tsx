@@ -3,10 +3,13 @@ import Breadcrumb from "@/components/Common/Breadcrumb";
 import {
   Calendar,
   Clock,
-  Truck,
+  DollarSign,
   MapPin,
   MessageSquare,
   PlusCircle,
+  TrendingDown,
+  TrendingUp,
+  Truck,
   User,
   XCircle,
 } from "lucide-react";
@@ -36,6 +39,8 @@ interface DashboardStats {
   pendingOrders: number;
   cancelledOrders: number;
   savedLocations: number;
+  totalRevenue: number;
+  orderGrowth: number;
 }
 
 interface ClientDashboardData {
@@ -179,10 +184,17 @@ async function getClientDashboardData(
     )
     .slice(0, 3);
 
+  // Calculate date ranges for growth tracking
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const sixtyDaysAgo = new Date();
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
   // Get stats with simplified retry logic to avoid nested retries
   const stats = await withDatabaseRetry(
     async () => {
-      // Execute all count queries in parallel without nested retries
+      // Execute all count and aggregate queries in parallel without nested retries
       const [
         activeCateringCount,
         activeOnDemandCount,
@@ -193,6 +205,12 @@ async function getClientDashboardData(
         cancelledCateringCount,
         cancelledOnDemandCount,
         savedLocationsCount,
+        cateringRevenue,
+        onDemandRevenue,
+        recentCateringOrders,
+        recentOnDemandOrders,
+        previousCateringOrders,
+        previousOnDemandOrders,
       ] = await Promise.all([
         prisma.cateringRequest.count({
           where: {
@@ -265,7 +283,82 @@ async function getClientDashboardData(
         prisma.userAddress.count({
           where: { userId },
         }),
+
+        // Revenue aggregation from completed catering orders
+        prisma.cateringRequest.aggregate({
+          where: {
+            userId,
+            status: CateringStatus.COMPLETED,
+            deletedAt: null,
+          },
+          _sum: {
+            orderTotal: true,
+            tip: true,
+          },
+        }),
+
+        // Revenue aggregation from completed on-demand orders
+        prisma.onDemand.aggregate({
+          where: {
+            userId,
+            status: OnDemandStatus.COMPLETED,
+            deletedAt: null,
+          },
+          _sum: {
+            orderTotal: true,
+            tip: true,
+          },
+        }),
+
+        // Recent orders (last 30 days) for growth calculation
+        prisma.cateringRequest.count({
+          where: {
+            userId,
+            createdAt: { gte: thirtyDaysAgo },
+            deletedAt: null,
+          },
+        }),
+
+        prisma.onDemand.count({
+          where: {
+            userId,
+            createdAt: { gte: thirtyDaysAgo },
+            deletedAt: null,
+          },
+        }),
+
+        // Previous period orders (30-60 days ago) for growth calculation
+        prisma.cateringRequest.count({
+          where: {
+            userId,
+            createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+            deletedAt: null,
+          },
+        }),
+
+        prisma.onDemand.count({
+          where: {
+            userId,
+            createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+            deletedAt: null,
+          },
+        }),
       ]);
+
+      // Calculate total revenue
+      const totalRevenue =
+        Number(cateringRevenue._sum.orderTotal || 0) +
+        Number(cateringRevenue._sum.tip || 0) +
+        Number(onDemandRevenue._sum.orderTotal || 0) +
+        Number(onDemandRevenue._sum.tip || 0);
+
+      // Calculate order growth percentage
+      const recentOrdersTotal = recentCateringOrders + recentOnDemandOrders;
+      const previousOrdersTotal = previousCateringOrders + previousOnDemandOrders;
+      const orderGrowth =
+        previousOrdersTotal > 0
+          ? ((recentOrdersTotal - previousOrdersTotal) / previousOrdersTotal) * 100
+          : 0;
 
       return {
         activeCateringCount,
@@ -277,6 +370,8 @@ async function getClientDashboardData(
         cancelledCateringCount,
         cancelledOnDemandCount,
         savedLocationsCount,
+        totalRevenue,
+        orderGrowth,
       };
     },
     3,
@@ -297,6 +392,8 @@ async function getClientDashboardData(
         (stats.cancelledCateringCount ?? 0) +
         (stats.cancelledOnDemandCount ?? 0),
       savedLocations: stats.savedLocationsCount ?? 0,
+      totalRevenue: stats.totalRevenue ?? 0,
+      orderGrowth: stats.orderGrowth ?? 0,
     },
   };
 }
@@ -384,7 +481,9 @@ const UpcomingOrderCard = ({ order }: { order: CombinedOrder }) => {
 const ClientDashboardSkeleton: React.FC = () => (
   <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
     {/* Stats Section Skeleton */}
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-3 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-3 lg:grid-cols-4 xl:grid-cols-7">
+      <DashboardCardSkeleton />
+      <DashboardCardSkeleton />
       <DashboardCardSkeleton />
       <DashboardCardSkeleton />
       <DashboardCardSkeleton />
@@ -426,10 +525,24 @@ const ClientDashboardSkeleton: React.FC = () => (
 const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
   const hasRecentOrders = data.recentOrders.length > 0;
 
+  // Format currency for display
+  const formatRevenue = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  // Determine growth indicator styles
+  const isPositiveGrowth = data.stats.orderGrowth >= 0;
+  const GrowthIcon = isPositiveGrowth ? TrendingUp : TrendingDown;
+
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
       {/* Stats Section */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-3 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-3 lg:grid-cols-4 xl:grid-cols-7">
         <div className="rounded-lg border border-gray-100 bg-white p-5 shadow-sm">
           <div className="flex items-center">
             <div className="bg-primary-lighter mr-4 rounded-lg p-3">
@@ -495,6 +608,49 @@ const ClientDashboardContent = ({ data }: { data: ClientDashboardData }) => {
               <p className="text-sm text-gray-500">Saved Locations</p>
               <h4 className="text-2xl font-bold text-gray-900">
                 {data.stats.savedLocations}
+              </h4>
+            </div>
+          </div>
+        </div>
+
+        {/* Total Revenue Card */}
+        <div className="rounded-lg border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center">
+            <div className="mr-4 rounded-lg bg-emerald-50 p-3">
+              <DollarSign className="h-6 w-6 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Total Revenue</p>
+              <h4 className="text-2xl font-bold text-gray-900">
+                {formatRevenue(data.stats.totalRevenue)}
+              </h4>
+            </div>
+          </div>
+        </div>
+
+        {/* Order Growth Card */}
+        <div className="rounded-lg border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center">
+            <div
+              className={`mr-4 rounded-lg p-3 ${
+                isPositiveGrowth ? "bg-green-50" : "bg-red-50"
+              }`}
+            >
+              <GrowthIcon
+                className={`h-6 w-6 ${
+                  isPositiveGrowth ? "text-green-600" : "text-red-600"
+                }`}
+              />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">30-Day Growth</p>
+              <h4
+                className={`text-2xl font-bold ${
+                  isPositiveGrowth ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {isPositiveGrowth ? "+" : ""}
+                {data.stats.orderGrowth.toFixed(1)}%
               </h4>
             </div>
           </div>
