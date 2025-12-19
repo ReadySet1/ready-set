@@ -468,6 +468,12 @@ See [Deployment Checklist](deployment-checklist-phase-4.md) for complete pre-dep
 
 - [Audit Report](driver-dashboard-audit-2025-01.md)
 - [Quick Reference](driver-dashboard-quick-reference.md)
+- [Architecture Diagrams](architecture-phase-4.md)
+- [Deployment Checklist](deployment-checklist-phase-4.md)
+- [Test Plan](driver-dashboard-test-plan.md)
+
+### Setup Guides
+
 - [Mapbox Setup](setup/mapbox-integration.md)
 - [WebSocket Setup](setup/websocket-setup.md)
 - [Notifications Setup](setup/notifications.md)

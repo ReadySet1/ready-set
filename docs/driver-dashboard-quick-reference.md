@@ -24,6 +24,7 @@ A quick reference guide for the Driver Dashboard tracking system APIs, events, a
 | `POST` | `/api/tracking/deliveries/[id]/pod` | Upload proof of delivery |
 | `GET` | `/api/tracking/deliveries/[id]/pod` | Get POD metadata |
 | `DELETE` | `/api/tracking/deliveries/[id]/pod` | Delete POD image |
+| `GET` | `/api/tracking/deliveries/pod-gallery` | Paginated POD gallery (params: page, pageSize, search, driverId, dateFrom, dateTo) |
 
 ### Shifts
 
@@ -44,8 +45,9 @@ A quick reference guide for the Driver Dashboard tracking system APIs, events, a
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/notifications/push/register` | Register push token |
-| `POST` | `/api/notifications/push/validate` | Validate push token |
-| `GET` | `/api/notifications/preferences` | Get preferences |
+| `GET` | `/api/notifications/push/firebase-config` | Get Firebase web config |
+| `GET` | `/api/notifications/push/preferences` | Get push preferences & devices |
+| `PATCH` | `/api/notifications/push/preferences` | Update push preferences (revokes tokens if disabled) |
 
 ---
 
@@ -138,9 +140,9 @@ FIREBASE_CLIENT_EMAIL=firebase-adminsdk@xxx.iam.gserviceaccount.com
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 ```
 
-### SendGrid (Email)
+### Resend (Email)
 ```bash
-SENDGRID_API_KEY=SG.xxx
+RESEND_API_KEY=re_xxx
 ```
 
 ### Sentry (Error Monitoring)
@@ -187,6 +189,8 @@ SENTRY_PROJECT=your-project
 |------|------|---------|
 | useRealtimeLocationTracking | `src/hooks/tracking/useRealtimeLocationTracking.ts` | Location tracking |
 | useAdminRealtimeTracking | `src/hooks/tracking/useAdminRealtimeTracking.ts` | Admin tracking |
+| useLocationTracking | `src/hooks/tracking/useLocationTracking.ts` | GPS tracking (REST fallback) |
+| usePODOfflineQueue | `src/hooks/tracking/usePODOfflineQueue.ts` | Offline POD upload queue |
 | usePushNotifications | `src/hooks/usePushNotifications.ts` | Push notifications |
 | useCameraPermission | `src/hooks/useCameraPermission.ts` | Camera access |
 
@@ -243,7 +247,12 @@ echo $NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES  # Should be "true"
 
 - [Audit Report](driver-dashboard-audit-2025-01.md)
 - [Implementation Guide](phase-4-implementation-guide.md)
+- [Architecture Diagrams](architecture-phase-4.md)
+- [Deployment Checklist](deployment-checklist-phase-4.md)
+- [Test Plan](driver-dashboard-test-plan.md)
+
+### Setup Guides
+
 - [Mapbox Setup](setup/mapbox-integration.md)
 - [WebSocket Setup](setup/websocket-setup.md)
 - [Notifications Setup](setup/notifications.md)
-- [Deployment Checklist](deployment-checklist-phase-4.md)

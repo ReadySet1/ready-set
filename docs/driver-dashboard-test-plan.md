@@ -256,6 +256,55 @@ pnpm test:e2e -- --grep "realtime-driver-tracking"
 
 ---
 
+### TC-008: Offline POD Upload
+
+**Preconditions:**
+- Mobile device with camera
+- Active delivery assigned
+- Network connection available initially
+
+**Steps:**
+1. Navigate to driver portal
+2. Open active delivery
+3. Turn on airplane mode (simulate offline)
+4. Capture POD photo
+5. Verify "Queued for upload" indicator appears
+6. Turn off airplane mode
+7. Wait for background sync
+8. Verify photo appears in admin gallery
+
+**Expected Results:**
+- Photo captured successfully offline
+- Queue indicator visible (badge count)
+- Auto-sync when online (within 30 seconds)
+- Photo visible in gallery after sync
+
+---
+
+### TC-009: Notification Preferences
+
+**Preconditions:**
+- Logged in user
+- Firebase configured
+- HTTPS enabled
+
+**Steps:**
+1. Navigate to profile settings
+2. Locate "Notification Preferences" section
+3. Enable push notifications
+4. Grant browser permission
+5. Verify device registered
+6. Disable push notifications
+7. Verify all devices removed
+
+**Expected Results:**
+- Toggle enables/disables notifications
+- Permission prompt appears on enable
+- Device appears in preferences list
+- Disable revokes all tokens
+
+---
+
 ## Performance Tests
 
 ### PT-001: Map Load Time
@@ -354,13 +403,16 @@ pnpm lint
 
 ## Test Coverage Goals
 
-| Component | Target | Current |
-|-----------|--------|---------|
-| Map components | 70% | TBD |
-| Tracking APIs | 80% | TBD |
-| Notification service | 75% | TBD |
-| Mileage calculation | 80% | TBD |
-| POD upload | 70% | TBD |
+| Component | Target | Notes |
+|-----------|--------|-------|
+| Map components | 70% | LiveDriverMap, DriverLiveMap, helpers |
+| Tracking APIs | 80% | All /api/tracking/* routes |
+| Notification service | 75% | Push + email + dedup |
+| Mileage calculation | 80% | Core calculation + quality filters |
+| POD upload | 70% | Upload, offline queue, gallery |
+| Realtime channels | 70% | Connection, broadcast, presence |
+
+Run `pnpm test:coverage` for current metrics.
 
 ---
 
@@ -369,4 +421,11 @@ pnpm lint
 - [Audit Report](driver-dashboard-audit-2025-01.md)
 - [Quick Reference](driver-dashboard-quick-reference.md)
 - [Implementation Guide](phase-4-implementation-guide.md)
+- [Architecture Diagrams](architecture-phase-4.md)
 - [Deployment Checklist](deployment-checklist-phase-4.md)
+
+### Setup Guides
+
+- [Mapbox Setup](setup/mapbox-integration.md)
+- [WebSocket Setup](setup/websocket-setup.md)
+- [Notifications Setup](setup/notifications.md)
