@@ -1,6 +1,6 @@
 # Notifications Setup Guide
 
-Complete setup instructions for push notifications (Firebase) and email notifications (SendGrid) in the Driver Dashboard.
+Complete setup instructions for push notifications (Firebase) and email notifications (Resend) in the Driver Dashboard.
 
 ---
 
@@ -9,7 +9,7 @@ Complete setup instructions for push notifications (Firebase) and email notifica
 The notification system keeps drivers and customers informed about delivery status changes through:
 
 1. **Push Notifications** - Firebase Cloud Messaging (FCM) for real-time alerts
-2. **Email Notifications** - SendGrid for delivery status emails
+2. **Email Notifications** - Resend for delivery status emails
 
 ---
 
@@ -243,58 +243,45 @@ export async function POST(request: Request) {
 
 ---
 
-## Email Notifications (SendGrid)
+## Email Notifications (Resend)
 
-### 1. Create SendGrid Account
+### 1. Create Resend Account
 
-1. Go to https://sendgrid.com/
-2. Sign up for free account
-3. Complete sender verification
+1. Go to https://resend.com/
+2. Sign up with GitHub or email
+3. Verify your email address
 
 ### 2. Create API Key
 
-1. Go to **Settings** > **API Keys**
+1. Go to **API Keys** in dashboard
 2. Click **"Create API Key"**
 3. Name it (e.g., "Ready Set Production")
-4. Select **"Restricted Access"**
-5. Enable **Mail Send** permission
-6. Copy the key
+4. Select permissions (Full access or Sending access)
+5. Copy the key (starts with `re_`)
 
 ### 3. Environment Variables
 
 ```bash
-SENDGRID_API_KEY=SG.xxx...
+RESEND_API_KEY=re_xxxxxxxxxxxxx
 ```
 
-### 4. Sender Verification
+### 4. Domain Verification (Recommended)
 
-1. Go to **Settings** > **Sender Authentication**
-2. Choose **Domain Authentication** (recommended) or **Single Sender Verification**
-3. Follow verification steps
+1. Go to **Domains** in dashboard
+2. Click **"Add Domain"**
+3. Add your domain (e.g., `readyset.com`)
+4. Add the DNS records shown:
+   - SPF record
+   - DKIM records
+5. Click **"Verify"**
 
-### 5. Create Email Templates
-
-1. Go to **Email API** > **Dynamic Templates**
-2. Click **"Create a Dynamic Template"**
-3. Design your template with variables:
-
-```html
-<h1>Your Delivery Update</h1>
-<p>Hi {{customerName}},</p>
-<p>Your delivery is {{status}}.</p>
-<p>Driver: {{driverName}}</p>
-<p>ETA: {{eta}}</p>
-```
-
-4. Copy the Template ID
-
-### 6. Implementation
+### 5. Implementation
 
 ```typescript
 // src/services/notifications/email.ts
-import sgMail from '@sendgrid/mail';
+import { Resend } from 'resend';
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 interface DeliveryEmailData {
   to: string;
@@ -302,29 +289,75 @@ interface DeliveryEmailData {
   status: string;
   driverName: string;
   eta: string;
+  trackingUrl?: string;
 }
 
 export async function sendDeliveryStatusEmail(data: DeliveryEmailData) {
   try {
-    await sgMail.send({
+    const { data: result, error } = await resend.emails.send({
+      from: 'Ready Set <noreply@readyset.com>',
       to: data.to,
-      from: {
-        email: 'noreply@readyset.com',
-        name: 'Ready Set Delivery'
-      },
-      templateId: 'd-xxxxxxxxxxxx', // Your template ID
-      dynamicTemplateData: {
-        customerName: data.customerName,
-        status: data.status,
-        driverName: data.driverName,
-        eta: data.eta
-      }
+      subject: `Delivery Update: ${data.status}`,
+      html: `
+        <h1>Your Delivery Update</h1>
+        <p>Hi ${data.customerName},</p>
+        <p>Your delivery is <strong>${data.status}</strong>.</p>
+        <p>Driver: ${data.driverName}</p>
+        <p>ETA: ${data.eta}</p>
+        ${data.trackingUrl ? `<p><a href="${data.trackingUrl}">Track your delivery</a></p>` : ''}
+      `
     });
-    return { success: true };
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { success: false, error };
+    }
+
+    return { success: true, messageId: result?.id };
   } catch (error) {
     console.error('Failed to send email:', error);
     return { success: false, error };
   }
+}
+```
+
+### 6. React Email Templates (Optional)
+
+For more complex templates, use React Email:
+
+```typescript
+// src/emails/DeliveryStatusEmail.tsx
+import { Html, Head, Body, Container, Text, Link } from '@react-email/components';
+
+interface DeliveryStatusEmailProps {
+  customerName: string;
+  status: string;
+  driverName: string;
+  eta: string;
+  trackingUrl?: string;
+}
+
+export function DeliveryStatusEmail({
+  customerName,
+  status,
+  driverName,
+  eta,
+  trackingUrl
+}: DeliveryStatusEmailProps) {
+  return (
+    <Html>
+      <Head />
+      <Body>
+        <Container>
+          <Text>Hi {customerName},</Text>
+          <Text>Your delivery is {status}.</Text>
+          <Text>Driver: {driverName}</Text>
+          <Text>ETA: {eta}</Text>
+          {trackingUrl && <Link href={trackingUrl}>Track your delivery</Link>}
+        </Container>
+      </Body>
+    </Html>
+  );
 }
 ```
 
@@ -455,10 +488,11 @@ curl -X POST http://localhost:3000/api/notifications/email/test \
 
 ### Emails Not Sending
 
-1. **Check API key** - Verify SENDGRID_API_KEY is set
-2. **Sender verification** - Ensure sender email is verified
+1. **Check API key** - Verify RESEND_API_KEY is set and starts with `re_`
+2. **Domain verification** - Ensure sender domain is verified in Resend dashboard
 3. **Check spam** - Test emails may go to spam folder
-4. **View activity** - Check SendGrid dashboard for delivery status
+4. **View activity** - Check Resend dashboard (Logs section) for delivery status
+5. **Rate limits** - Free tier has limits; check usage in dashboard
 
 ### Token Validation Errors
 
@@ -475,6 +509,8 @@ if (error.code === 'messaging/registration-token-not-registered') {
 ## Related Documentation
 
 - [Firebase Cloud Messaging Docs](https://firebase.google.com/docs/cloud-messaging)
-- [SendGrid API Docs](https://docs.sendgrid.com/)
+- [Resend API Docs](https://resend.com/docs)
+- [React Email](https://react.email/)
 - [Push Notifications Implementation](../push-notifications-REA-124.md)
 - [Email Template Usage](../email/EMAIL_TEMPLATE_USAGE.md)
+- [Driver Dashboard Audit](../driver-dashboard-audit-2025-01.md)
