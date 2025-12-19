@@ -92,7 +92,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `TEST_FAILURE_REPORT.md` - Categorized failure analysis
   - `PROGRESS_REVIEW.md` - Executive summary and metrics
 
+- **Vendor Dashboard Metrics (REA-159)**: Revenue calculation and growth tracking
+  - Total Revenue card showing completed order revenue
+  - 30-Day Growth card with percentage change indicator
+  - Green/red coloring for positive/negative growth trends
+  - Unified dashboard for both Client and Vendor users
+
 ### Changed
+- **Orders Date Display (REA-158)**: Display delivery date instead of creation date
+  - `CateringOrdersTable` now shows `arrivalDateTime` instead of `createdAt`
+  - `CateringOrdersPage` updated for delivery date display
+  - `UserOrdersTable` updated for delivery date display
+- **Build Configuration**: ESLint disabled during Vercel builds
+  - Prevents 45+ minute build timeouts
+  - ESLint enforced in pre-commit hooks and CI pipeline instead
 - **DeliveryPartners Component**: Partner logos now clickable with external links
   - Added "Partner With Us" CTA button with ScheduleDialog integration
   - Improved accessibility with aria-labels and proper link attributes
