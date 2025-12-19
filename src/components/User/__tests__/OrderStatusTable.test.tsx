@@ -7,10 +7,7 @@ import OrderStatusTable from "../OrderStatusTable";
 global.fetch = jest.fn();
 const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
 
-/**
- * TODO: REA-211 - OrderStatusTable tests have fetch mocking issues
- */
-describe.skip("OrderStatusTable - Address rendering for driver", () => {
+describe("OrderStatusTable - Address rendering for driver", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });

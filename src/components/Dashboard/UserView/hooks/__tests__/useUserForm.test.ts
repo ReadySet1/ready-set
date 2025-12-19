@@ -33,10 +33,7 @@ jest.mock('@/utils/supabase/client', () => ({
 // Mock fetch
 global.fetch = jest.fn();
 
-/**
- * TODO: REA-211 - useUserForm hook tests have Supabase mocking issues
- */
-describe.skip('useUserForm', () => {
+describe('useUserForm', () => {
   const mockFetchUser = jest.fn();
   const mockOnSaveSuccess = jest.fn();
 
@@ -85,7 +82,7 @@ describe.skip('useUserForm', () => {
 
     mockFetchUser.mockResolvedValue(mockUserData);
 
-    const { result } = renderHook(() => 
+    const { result } = renderHook(() =>
       useUserForm('user-1', mockFetchUser, mockOnSaveSuccess)
     );
 
@@ -99,6 +96,7 @@ describe.skip('useUserForm', () => {
       await result.current.onSubmit(mockUserData);
     });
 
+    // Verify fetch was called with the correct endpoint and method
     expect(fetch).toHaveBeenCalledWith(
       '/api/users/user-1',
       expect.objectContaining({
@@ -106,10 +104,21 @@ describe.skip('useUserForm', () => {
         headers: expect.objectContaining({
           'Content-Type': 'application/json',
           Authorization: 'Bearer mock-token'
-        }),
-        body: JSON.stringify(mockUserData)
+        })
       })
     );
+
+    // Verify the body contains transformed data
+    const fetchCall = (fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(fetchCall[1].body);
+
+    // Hook transforms displayName -> name and contact_name for client type
+    expect(body.name).toBe('Test User');
+    expect(body.contact_name).toBe('Test User');
+    expect(body.type).toBe('client');
+    // Arrays are joined to strings (empty arrays become empty strings)
+    expect(body.counties).toBe('');
+    expect(body.timeNeeded).toBe('');
 
     expect(toast.success).toHaveBeenCalledWith('User saved successfully!');
   });

@@ -7,10 +7,7 @@ import UserOrdersTable from "../UserOrdersTable";
 global.fetch = jest.fn();
 const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
 
-/**
- * TODO: REA-211 - UserOrdersTable tests have fetch mocking issues
- */
-describe.skip("UserOrdersTable - Address rendering", () => {
+describe("UserOrdersTable - Address rendering", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
