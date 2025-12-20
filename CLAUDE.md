@@ -93,6 +93,19 @@ API Route → Server Action → Service Layer → Utils → Prisma
 - Auth state cached in `.auth/` via global setup
 - Base URL: `http://localhost:3000`
 
+### Git Workflow
+
+**IMPORTANT: Always create a Pull Request before merging into `main`.**
+
+- Never merge directly into `main` - always create a PR first
+- PRs require passing CI checks before merge
+- Use feature branches: `feature/REA-XXX-description`
+- Run quality gates before creating PR:
+  ```bash
+  pnpm pre-push-check    # typecheck + lint + prisma validate
+  pnpm test:ci           # run all unit tests
+  ```
+
 ### External Integrations
 
 - **CaterValley**: Catering order API (`src/app/api/cater-valley/`)
