@@ -43,6 +43,7 @@ jest.mock("@/lib/db/prisma-client", () => ({
   prisma: {
     address: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -122,6 +123,7 @@ describe("/api/addresses", () => {
     mockPrisma.address.findMany.mockResolvedValue([]);
     mockPrisma.address.count.mockResolvedValue(0);
     mockPrisma.address.findUnique.mockResolvedValue(mockAddress);
+    mockPrisma.address.findFirst.mockResolvedValue(mockAddress);
     mockPrisma.address.create.mockResolvedValue(mockAddress);
     mockPrisma.address.update.mockResolvedValue(mockAddress);
     mockPrisma.address.delete.mockResolvedValue(mockAddress);
@@ -178,7 +180,7 @@ describe("/api/addresses", () => {
     });
 
     it("should return specific address by ID", async () => {
-      mockPrisma.address.findUnique.mockResolvedValue(mockAddress);
+      mockPrisma.address.findFirst.mockResolvedValue(mockAddress);
 
       const request = createRequestWithParams("http://localhost:3000/api/addresses", {
         id: mockAddress.id,
@@ -188,14 +190,14 @@ describe("/api/addresses", () => {
       const data = await expectSuccessResponse(response, 200);
 
       expect(data.id).toBe(mockAddress.id);
-      expect(mockPrisma.address.findUnique).toHaveBeenCalledWith({
-        where: { id: mockAddress.id },
+      expect(mockPrisma.address.findFirst).toHaveBeenCalledWith({
+        where: { id: mockAddress.id, deletedAt: null },
         select: expect.any(Object),
       });
     });
 
     it("should return 404 when address not found", async () => {
-      mockPrisma.address.findUnique.mockResolvedValue(null);
+      mockPrisma.address.findFirst.mockResolvedValue(null);
 
       const request = createRequestWithParams("http://localhost:3000/api/addresses", {
         id: "non-existent-id",
@@ -212,7 +214,7 @@ describe("/api/addresses", () => {
         isShared: false,
       });
 
-      mockPrisma.address.findUnique.mockResolvedValue(otherUserAddress);
+      mockPrisma.address.findFirst.mockResolvedValue(otherUserAddress);
 
       const request = createRequestWithParams("http://localhost:3000/api/addresses", {
         id: otherUserAddress.id,
@@ -223,7 +225,7 @@ describe("/api/addresses", () => {
     });
 
     it("should allow accessing shared addresses", async () => {
-      mockPrisma.address.findUnique.mockResolvedValue(mockSharedAddress);
+      mockPrisma.address.findFirst.mockResolvedValue(mockSharedAddress);
 
       const request = createRequestWithParams("http://localhost:3000/api/addresses", {
         id: mockSharedAddress.id,
@@ -244,6 +246,7 @@ describe("/api/addresses", () => {
         expect.objectContaining({
           where: {
             OR: [{ isShared: true }, { createdBy: mockUser.id }],
+            deletedAt: null,
           },
         })
       );
@@ -258,7 +261,7 @@ describe("/api/addresses", () => {
 
       expect(mockPrisma.address.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { isShared: true },
+          where: { isShared: true, deletedAt: null },
         })
       );
     });
@@ -275,6 +278,7 @@ describe("/api/addresses", () => {
           where: {
             createdBy: mockUser.id,
             isShared: false,
+            deletedAt: null,
           },
         })
       );
@@ -720,7 +724,7 @@ describe("/api/addresses", () => {
       await expectNotFound(response);
     });
 
-    it("should allow creator to delete their address", async () => {
+    it("should allow creator to delete their address (soft delete)", async () => {
       const request = createDeleteRequest(
         `http://localhost:3000/api/addresses?id=${mockAddress.id}`
       );
@@ -728,11 +732,13 @@ describe("/api/addresses", () => {
       const response = await DELETE(request);
 
       await expectSuccessResponse(response, 200);
+      // Soft delete: update with deletedAt timestamp instead of hard delete
+      expect(mockPrisma.address.update).toHaveBeenCalledWith({
+        where: { id: mockAddress.id },
+        data: { deletedAt: expect.any(Date) },
+      });
       expect(mockPrisma.userAddress.deleteMany).toHaveBeenCalledWith({
         where: { addressId: mockAddress.id },
-      });
-      expect(mockPrisma.address.delete).toHaveBeenCalledWith({
-        where: { id: mockAddress.id },
       });
     });
 

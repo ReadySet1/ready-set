@@ -3,8 +3,8 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import ScheduleDialog from "@/components/Logistics/Schedule";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import Link from "next/link";
 
 interface StatProps {
   value: string;
@@ -144,21 +144,12 @@ const CateringAbout: React.FC = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.8 }}
             >
-              <ScheduleDialog
-                buttonText="How Our Service Works"
-                dialogTitle="Schedule an Appointment"
-                dialogDescription="Choose a convenient time for your appointment."
-                calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
-                customButton={
-                  <motion.button
-                    className="rounded-lg bg-yellow-400 px-12 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-500 hover:shadow-lg"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    How Our Service Works
-                  </motion.button>
-                }
-              />
+              <Link
+                href="/vendor-hero#vendor-hero"
+                className="inline-block rounded-lg bg-yellow-400 px-12 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2"
+              >
+                How Our Service Works
+              </Link>
             </motion.div>
           </motion.div>
         </div>

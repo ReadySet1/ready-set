@@ -1,8 +1,24 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AddressManager from "../index";
 import { Address } from "@/types/address";
+
+// Mock React Query hooks used by AddressModal
+const mockCreateMutateAsync = jest.fn();
+const mockUpdateMutateAsync = jest.fn();
+
+jest.mock("@/hooks/useAddresses", () => ({
+  useCreateAddress: () => ({
+    mutateAsync: mockCreateMutateAsync,
+    isPending: false,
+  }),
+  useUpdateAddress: () => ({
+    mutateAsync: mockUpdateMutateAsync,
+    isPending: false,
+  }),
+}));
 
 // Mock Supabase client
 const mockSupabase = {
@@ -21,6 +37,27 @@ jest.mock("@/utils/supabase/client", () => ({
 
 // Mock fetch
 global.fetch = jest.fn();
+
+// Create a test QueryClient
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+// Wrapper with QueryClientProvider
+const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = createTestQueryClient();
+  return (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+};
+
+// Custom render function with QueryClientProvider
+const customRender = (ui: React.ReactElement, options?: any) =>
+  render(ui, { wrapper: TestWrapper, ...options });
 
 const mockAddresses: Address[] = [
   {
@@ -110,7 +147,7 @@ describe("AddressManager Refresh Functionality", () => {
   });
 
   it("calls onRefresh with refresh function when provided", async () => {
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     await waitFor(() => {
       expect(mockOnRefresh).toHaveBeenCalledWith(expect.any(Function));
@@ -118,7 +155,7 @@ describe("AddressManager Refresh Functionality", () => {
   });
 
   it("loads addresses on mount and calls onAddressesLoaded", async () => {
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
@@ -145,7 +182,7 @@ describe("AddressManager Refresh Functionality", () => {
       capturedRefreshFunctions.push(fn);
     };
 
-    render(
+    customRender(
       <AddressManager {...defaultProps} onRefresh={captureRefreshFunction} />,
     );
 
@@ -249,7 +286,7 @@ describe("AddressManager Refresh Functionality", () => {
           }),
       });
 
-    render(
+    customRender(
       <AddressManager {...defaultProps} onRefresh={captureRefreshFunction} />,
     );
 
@@ -274,7 +311,7 @@ describe("AddressManager Refresh Functionality", () => {
       error: { message: "Unauthorized" },
     });
 
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     await waitFor(() => {
       expect(mockOnError).toHaveBeenCalledWith(
@@ -292,7 +329,7 @@ describe("AddressManager Refresh Functionality", () => {
       statusText: "Internal Server Error",
     });
 
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     // Wait for the error to be handled
     await waitFor(
@@ -341,7 +378,7 @@ describe("AddressManager Pagination", () => {
       json: () => Promise.resolve(mockPaginatedResponse),
     });
 
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
@@ -363,7 +400,7 @@ describe("AddressManager Pagination", () => {
       json: () => Promise.resolve(mockAddresses),
     });
 
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     await waitFor(() => {
       expect(mockOnAddressesLoaded).toHaveBeenCalledWith(mockAddresses);
@@ -388,7 +425,7 @@ describe("AddressManager Pagination", () => {
       json: () => Promise.resolve(mockPaginatedResponse),
     });
 
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     // Wait for initial load
     await waitFor(() => {

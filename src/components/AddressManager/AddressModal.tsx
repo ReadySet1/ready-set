@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   Dialog,
@@ -19,13 +19,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { COUNTIES, US_STATES } from "@/components/Auth/SignUp/ui/FormData";
-import { Address } from "@/types/address";
-import { createClient } from "@/utils/supabase/client";
+import { Address, AddressFormData } from "@/types/address";
+import { useCreateAddress, useUpdateAddress } from "@/hooks/useAddresses";
 import { MapPin, Loader2 } from "lucide-react";
 import AddressFormSection from "./AddressFormSection";
 
 interface AddressModalProps {
-  onAddressUpdated: () => void;
+  onAddressUpdated: () => void | Promise<void>;
   addressToEdit: Address | null;
   isOpen: boolean;
   onClose: () => void;
@@ -37,7 +37,12 @@ const AddressModal: React.FC<AddressModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Use React Query mutations for proper cache management and request deduplication
+  const createMutation = useCreateAddress();
+  const updateMutation = useUpdateAddress();
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
   const { control, register, handleSubmit, setValue, reset } =
     useForm<Address>();
 
@@ -56,52 +61,37 @@ const AddressModal: React.FC<AddressModalProps> = ({
   }, [addressToEdit, setValue, reset]);
 
   const onSubmit = async (data: Address) => {
-    setIsSubmitting(true);
+    // Prevent double submissions
+    if (isSubmitting) return;
+
+    const formData: AddressFormData = {
+      name: data.name || null,
+      street1: data.street1,
+      street2: data.street2 || null,
+      city: data.city,
+      state: data.state,
+      zip: data.zip,
+      county: data.county || "",
+      locationNumber: data.locationNumber || null,
+      parkingLoading: data.parkingLoading || null,
+      isRestaurant: data.isRestaurant === true,
+      isShared: data.isShared === true,
+    };
+
     try {
-      const supabase = await createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        throw new Error("Authentication required");
+      if (addressToEdit) {
+        await updateMutation.mutateAsync({
+          id: addressToEdit.id,
+          data: formData,
+        });
+      } else {
+        await createMutation.mutateAsync(formData);
       }
-
-      const url = addressToEdit
-        ? `/api/addresses?id=${addressToEdit.id}`
-        : "/api/addresses";
-      const method = addressToEdit ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          ...data,
-          county: data.county,
-          isRestaurant: Boolean(data.isRestaurant),
-          isShared: Boolean(data.isShared),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to ${addressToEdit ? "update" : "add"} address`,
-        );
-      }
-
-      await response.json();
 
       reset();
-      onAddressUpdated();
-      onClose();
+      await onAddressUpdated();
     } catch (error) {
-      // Error handling - silently fail for now
-      // TODO: Add proper error notification to user
-    } finally {
-      setIsSubmitting(false);
+      console.error("Address submission error:", error);
     }
   };
 

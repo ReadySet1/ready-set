@@ -85,6 +85,15 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
 
+  eslint: {
+    // Skip ESLint during builds to prevent deployment timeouts (was causing 45+ min builds)
+    // ESLint is enforced in:
+    // 1. Pre-commit hooks (husky)
+    // 2. CI/CD pipeline (.github/workflows/ci.yml)
+    // Running lint during build is redundant and significantly slows down deployments
+    ignoreDuringBuilds: true,
+  },
+
   experimental: {
     // Enable 'use cache' directive for static site generation
     useCache: true,

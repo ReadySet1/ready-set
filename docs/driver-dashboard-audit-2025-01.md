@@ -115,17 +115,21 @@ This document provides a comprehensive audit of the Driver Dashboard tracking sy
 | Feature | Implementation |
 |---------|---------------|
 | Push notifications | Firebase Cloud Messaging |
-| Email notifications | SendGrid |
-| Deduplication | 60-second TTL cache |
+| Email notifications | Resend |
+| Deduplication | 60-second TTL cache + distributed DB cache |
 | Event types | 6 delivery status events |
 | Token management | Auto-revocation on failure |
+| User preferences | Per-profile opt-in/out |
 
 **Key Files:**
 - `src/services/notifications/push.ts` (336 lines)
+- `src/services/notifications/email.ts` - Resend email delivery
 - `src/services/notifications/dedup.ts`
+- `src/services/notifications/delivery-status.ts`
 - `src/lib/firebase-admin.ts`
 - `src/lib/firebase-web.ts`
 - `src/hooks/usePushNotifications.ts`
+- `src/app/api/notifications/push/` - API routes
 
 ### 4.4 Automated Mileage Calculation
 
@@ -154,13 +158,16 @@ This document provides a comprehensive audit of the Driver Dashboard tracking sy
 | Image compression | Client-side before upload |
 | Cloud storage | Supabase Storage |
 | File validation | JPEG, PNG, WebP (max 2MB) |
-| Admin gallery | View all POD images |
+| Offline queue | IndexedDB with auto-sync |
+| Admin gallery | Paginated view with filters |
 
 **Key Files:**
 - `src/components/Driver/ProofOfDeliveryCapture.tsx`
 - `src/components/Driver/ProofOfDeliveryViewer.tsx`
 - `src/components/Dashboard/Tracking/AdminPODGallery.tsx`
 - `src/app/api/tracking/deliveries/[id]/pod/route.ts` (347 lines)
+- `src/app/api/tracking/deliveries/pod-gallery/route.ts` - Gallery API
+- `src/hooks/tracking/usePODOfflineQueue.ts` - Offline queue
 - `src/utils/supabase/storage.ts`
 
 ### 4.6 Error Monitoring (Sentry)
@@ -189,18 +196,29 @@ This document provides a comprehensive audit of the Driver Dashboard tracking sy
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | POST | `/api/tracking/locations` | Submit driver location |
+| GET | `/api/tracking/locations` | Get location history |
 | GET | `/api/tracking/drivers` | Get active drivers |
 | GET | `/api/tracking/deliveries` | Get delivery data |
 | GET | `/api/tracking/deliveries/[id]` | Get delivery details |
+| PUT | `/api/tracking/deliveries/[id]` | Update delivery status |
 | POST | `/api/tracking/deliveries/[id]/pod` | Upload POD image |
-| GET | `/api/tracking/mileage` | Calculate shift mileage |
+| GET | `/api/tracking/deliveries/[id]/pod` | Get POD metadata |
+| DELETE | `/api/tracking/deliveries/[id]/pod` | Delete POD image |
+| GET | `/api/tracking/deliveries/pod-gallery` | Get paginated POD gallery |
+| GET | `/api/tracking/mileage` | Calculate shift mileage (params: driverId, shiftId, startDate, endDate, format) |
 | GET | `/api/tracking/shifts` | Get shift data |
+| POST | `/api/tracking/shifts` | Start new shift |
+| PUT | `/api/tracking/shifts/[id]` | Update/end shift |
+| GET | `/api/tracking/live` | SSE real-time tracking stream |
+| GET | `/api/tracking/test` | Health check |
 
 ### Notification APIs
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | POST | `/api/notifications/push/register` | Register push token |
-| POST | `/api/notifications/push/validate` | Validate push token |
+| GET | `/api/notifications/push/firebase-config` | Get Firebase web config |
+| GET | `/api/notifications/push/preferences` | Get user push preferences |
+| PATCH | `/api/notifications/push/preferences` | Update push preferences |
 
 ---
 
@@ -209,27 +227,35 @@ This document provides a comprehensive audit of the Driver Dashboard tracking sy
 ### Required for Phase 4
 ```bash
 # Mapbox
-NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=
+NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=pk.xxx
 
-# Firebase (Push Notifications)
-NEXT_PUBLIC_FIREBASE_API_KEY=
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-FIREBASE_PROJECT_ID=
-FIREBASE_CLIENT_EMAIL=
-FIREBASE_PRIVATE_KEY=
+# Firebase (Push Notifications) - Client
+NEXT_PUBLIC_FIREBASE_API_KEY=xxx
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=project-id
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789
+NEXT_PUBLIC_FIREBASE_APP_ID=1:xxx:web:xxx
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=xxx
 
-# SendGrid (Email)
-SENDGRID_API_KEY=
+# Firebase (Push Notifications) - Server
+FIREBASE_PROJECT_ID=project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk@project.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+
+# Resend (Email)
+RESEND_API_KEY=re_xxx
 
 # Sentry
-NEXT_PUBLIC_SENTRY_DSN=
-SENTRY_AUTH_TOKEN=
-SENTRY_ORG=
-SENTRY_PROJECT=
+NEXT_PUBLIC_SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
+SENTRY_AUTH_TOKEN=sntryu_xxx
+SENTRY_ORG=your-org
+SENTRY_PROJECT=your-project
 
 # Feature Flags
 NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES=true
 NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD=true
+NEXT_PUBLIC_FF_REALTIME_FALLBACK_TO_SSE=true
+NEXT_PUBLIC_FF_REALTIME_FALLBACK_TO_REST=true
 ```
 
 ---
@@ -316,8 +342,12 @@ flowchart TD
 
 - [Quick Reference Guide](driver-dashboard-quick-reference.md)
 - [Phase 4 Implementation Guide](phase-4-implementation-guide.md)
+- [Architecture Diagrams](architecture-phase-4.md)
+- [Deployment Checklist](deployment-checklist-phase-4.md)
+- [Test Plan](driver-dashboard-test-plan.md)
+
+### Setup Guides
+
 - [Mapbox Integration](setup/mapbox-integration.md)
 - [WebSocket Setup](setup/websocket-setup.md)
 - [Notifications Setup](setup/notifications.md)
-- [Deployment Checklist](deployment-checklist-phase-4.md)
-- [Test Plan](driver-dashboard-test-plan.md)

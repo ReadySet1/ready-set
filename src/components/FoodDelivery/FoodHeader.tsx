@@ -10,9 +10,13 @@ import { getCloudinaryUrl } from "@/lib/cloudinary";
 const FoodHeader: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [marginTopClass, setMarginTopClass] = useState("mt-0");
+  const [imageScale, setImageScale] = useState(1.28);
+  const [mounted, setMounted] = useState(false);
   const { openForm, DialogForm } = FormManager();
 
   useEffect(() => {
+    setMounted(true);
+    
     const updateMarginTopClass = (width: number) => {
       if (width < 768) {
         setMarginTopClass("mt-6");
@@ -23,9 +27,20 @@ const FoodHeader: React.FC = () => {
       }
     };
 
+    const updateImageScale = (width: number) => {
+      if (width < 768) {
+        setImageScale(1);
+      } else if (width < 1024) {
+        setImageScale(1.28);
+      } else {
+        setImageScale(1.35);
+      }
+    };
+
     const checkIfMobile = () => {
       setIsMobile(window.innerWidth < 768);
       updateMarginTopClass(window.innerWidth);
+      updateImageScale(window.innerWidth);
     };
 
     checkIfMobile();
@@ -95,22 +110,26 @@ const FoodHeader: React.FC = () => {
   return (
     <section
       className={`relative min-h-[500px] w-full md:h-[70vh] md:min-h-[600px] ${marginTopClass} mb-16 md:mb-24 lg:mb-32`}
+      suppressHydrationWarning
     >
       {/* Background image container */}
-      <motion.div
-        className="absolute inset-0 z-0 overflow-hidden"
-        variants={imageVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <Image
-          src={getCloudinaryUrl("food/food-containers-v2")}
-          alt="Food containers with various prepared meals"
-          fill
-          className="object-cover object-center md:scale-[1.28] md:object-[85%_50%] lg:scale-[1.35] lg:object-[85%_50%]"
-          priority
-        />
-      </motion.div>
+      <div className="absolute inset-0 z-0 overflow-hidden" suppressHydrationWarning>
+        <div
+          className="relative h-full w-full"
+          style={{
+            transform: mounted ? `scale(${imageScale})` : 'scale(1.28)',
+          }}
+          suppressHydrationWarning
+        >
+          <Image
+            src={getCloudinaryUrl("food/food-containers-v2")}
+            alt="Food containers with various prepared meals"
+            fill
+            className="object-cover object-center md:object-[85%_50%] lg:object-[85%_50%]"
+            priority
+          />
+        </div>
+      </div>
 
       {/* Text content overlay */}
       <motion.div

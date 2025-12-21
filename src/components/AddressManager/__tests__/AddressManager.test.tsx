@@ -1,8 +1,24 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AddressManager from "../index";
 import { Address } from "@/types/address";
+
+// Mock React Query hooks used by AddressModal
+const mockCreateMutateAsync = jest.fn();
+const mockUpdateMutateAsync = jest.fn();
+
+jest.mock("@/hooks/useAddresses", () => ({
+  useCreateAddress: () => ({
+    mutateAsync: mockCreateMutateAsync,
+    isPending: false,
+  }),
+  useUpdateAddress: () => ({
+    mutateAsync: mockUpdateMutateAsync,
+    isPending: false,
+  }),
+}));
 
 // Mock Supabase client
 const mockSupabase = {
@@ -18,6 +34,27 @@ const mockSupabase = {
 jest.mock("@/utils/supabase/client", () => ({
   createClient: () => mockSupabase,
 }));
+
+// Create a test QueryClient
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+// Wrapper with QueryClientProvider
+const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = createTestQueryClient();
+  return (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+};
+
+// Custom render function with QueryClientProvider
+const customRender = (ui: React.ReactElement, options?: any) =>
+  render(ui, { wrapper: TestWrapper, ...options });
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -112,7 +149,7 @@ describe("AddressManager Refresh Functionality", () => {
   });
 
   it("calls onRefresh with refresh function when provided", async () => {
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     await waitFor(() => {
       expect(mockOnRefresh).toHaveBeenCalledWith(expect.any(Function));
@@ -120,7 +157,7 @@ describe("AddressManager Refresh Functionality", () => {
   });
 
   it("loads addresses on mount and calls onAddressesLoaded", async () => {
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
@@ -147,7 +184,7 @@ describe("AddressManager Refresh Functionality", () => {
       capturedRefreshFunctions.push(fn);
     };
 
-    render(
+    customRender(
       <AddressManager {...defaultProps} onRefresh={captureRefreshFunction} />,
     );
 
@@ -229,7 +266,7 @@ describe("AddressManager Refresh Functionality", () => {
   });
 
   it("displays addresses as clickable cards", async () => {
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     // Wait for addresses to load (skeleton cards disappear and real addresses appear)
     await waitFor(() => {
@@ -244,7 +281,7 @@ describe("AddressManager Refresh Functionality", () => {
   });
 
   it("calls onAddressSelected when address card is clicked", async () => {
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     // Wait for addresses to load
     await waitFor(() => {
@@ -268,7 +305,7 @@ describe("AddressManager Refresh Functionality", () => {
       error: { message: "Unauthorized" },
     });
 
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     await waitFor(() => {
       expect(mockOnError).toHaveBeenCalledWith(
@@ -284,7 +321,7 @@ describe("AddressManager Refresh Functionality", () => {
       statusText: "Internal Server Error",
     });
 
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     await waitFor(() => {
       expect(mockOnError).toHaveBeenCalledWith(
@@ -294,7 +331,7 @@ describe("AddressManager Refresh Functionality", () => {
   });
 
   it("filters addresses correctly based on filter type", async () => {
-    render(<AddressManager {...defaultProps} defaultFilter="private" />);
+    customRender(<AddressManager {...defaultProps} defaultFilter="private" />);
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
@@ -333,7 +370,7 @@ describe("AddressManager Refresh Functionality", () => {
           }),
       });
 
-    render(
+    customRender(
       <AddressManager {...defaultProps} onRefresh={captureRefreshFunction} />,
     );
 
@@ -354,7 +391,7 @@ describe("AddressManager Refresh Functionality", () => {
 
   // TODO: REA-259 - Test needs component behavior verification
   it.skip("shows filter buttons for address types", async () => {
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     // Wait for addresses to load
     await waitFor(() => {
@@ -389,7 +426,7 @@ describe("AddressManager Refresh Functionality", () => {
         }),
     });
 
-    render(<AddressManager {...defaultProps} />);
+    customRender(<AddressManager {...defaultProps} />);
 
     await waitFor(() => {
       expect(mockOnAddressesLoaded).toHaveBeenCalledWith([]);

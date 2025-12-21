@@ -196,7 +196,12 @@ export default function ModernUserProfile({
                 handleRoleChange={handleRoleChange}
               />
 
-              <UserArchiveCard />
+              <UserArchiveCard
+                userId={userId}
+                userEmail={watchedValues.email ?? undefined}
+                userName={watchedValues.company_name || watchedValues.contact_name || undefined}
+                onArchiveSuccess={() => router.push("/admin/users")}
+              />
             </div>
           </div>
         </div>

@@ -7,39 +7,23 @@ import CateringAbout from "../CateringAbout";
 // Mock framer-motion since it's mocked in jest.setup.ts
 // The mock converts motion components to regular divs
 
-// Mock ScheduleDialog component
-jest.mock("@/components/Logistics/Schedule", () => {
+// Mock next/link component
+jest.mock("next/link", () => {
   return {
     __esModule: true,
-    default: function MockScheduleDialog({
-      buttonText,
-      dialogTitle,
-      dialogDescription,
-      calendarUrl,
-      customButton,
+    default: ({
+      children,
+      href,
+      className,
     }: {
-      buttonText: string;
-      dialogTitle: string;
-      dialogDescription: string;
-      calendarUrl: string;
-      customButton?: React.ReactNode;
-    }) {
-      return (
-        <div data-testid="schedule-dialog">
-          <div data-testid="schedule-dialog-button-text">{buttonText}</div>
-          <div data-testid="schedule-dialog-title">{dialogTitle}</div>
-          <div data-testid="schedule-dialog-description">
-            {dialogDescription}
-          </div>
-          <div data-testid="schedule-dialog-calendar-url">{calendarUrl}</div>
-          {customButton && (
-            <div data-testid="schedule-dialog-custom-button">
-              {customButton}
-            </div>
-          )}
-        </div>
-      );
-    },
+      children: React.ReactNode;
+      href: string;
+      className?: string;
+    }) => (
+      <a href={href} className={className}>
+        {children}
+      </a>
+    ),
   };
 });
 
@@ -294,17 +278,15 @@ describe("CateringAbout", () => {
     });
   });
 
-  describe("ScheduleDialog Integration", () => {
-    it("renders the How Our Service Works button section", () => {
+  describe("Service Link Integration", () => {
+    it("renders the How Our Service Works link section", () => {
       render(<CateringAbout />);
 
-      const button = screen.getByRole("button", {
-        name: "How Our Service Works",
-      });
-      expect(button).toBeInTheDocument();
+      const link = screen.getByRole("link", { name: "How Our Service Works" });
+      expect(link).toBeInTheDocument();
 
-      // Verify the button has the correct styling
-      expect(button).toHaveClass(
+      // Verify the link has the correct styling
+      expect(link).toHaveClass(
         "rounded-lg",
         "bg-yellow-400",
         "px-12",
@@ -313,37 +295,20 @@ describe("CateringAbout", () => {
       );
     });
 
-    it("renders the ScheduleDialog with correct props", () => {
+    it("renders the link with correct href to vendor-hero page", () => {
       render(<CateringAbout />);
 
-      const scheduleDialog = screen.getByTestId("schedule-dialog");
-      expect(scheduleDialog).toBeInTheDocument();
-
-      expect(
-        screen.getByTestId("schedule-dialog-button-text"),
-      ).toHaveTextContent("How Our Service Works");
-      expect(screen.getByTestId("schedule-dialog-title")).toHaveTextContent(
-        "Schedule an Appointment",
-      );
-      expect(
-        screen.getByTestId("schedule-dialog-description"),
-      ).toHaveTextContent("Choose a convenient time for your appointment.");
-      expect(
-        screen.getByTestId("schedule-dialog-calendar-url"),
-      ).toHaveTextContent(
-        "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true",
-      );
+      const link = screen.getByRole("link", { name: "How Our Service Works" });
+      expect(link).toHaveAttribute("href", "/vendor-hero#vendor-hero");
     });
 
-    it("renders the custom button within ScheduleDialog with correct text", () => {
+    it("renders the link with correct text and styling", () => {
       render(<CateringAbout />);
 
-      const customButton = screen.getByTestId("schedule-dialog-custom-button");
-      expect(customButton).toBeInTheDocument();
-
-      const button = customButton.querySelector("button");
-      expect(button).toHaveTextContent("How Our Service Works");
-      expect(button).toHaveClass(
+      const link = screen.getByRole("link", { name: "How Our Service Works" });
+      expect(link).toHaveTextContent("How Our Service Works");
+      expect(link).toHaveClass(
+        "inline-block",
         "rounded-lg",
         "bg-yellow-400",
         "px-12",
@@ -445,14 +410,12 @@ describe("CateringAbout", () => {
       // Since framer-motion is mocked, we just verify the text exists
     });
 
-    it("applies motion props to How Our Service Works button section", () => {
+    it("applies motion props to How Our Service Works link section", () => {
       render(<CateringAbout />);
 
-      const button = screen.getByRole("button", {
-        name: "How Our Service Works",
-      });
-      expect(button).toBeInTheDocument();
-      // Since framer-motion is mocked, we just verify the button exists
+      const link = screen.getByRole("link", { name: "How Our Service Works" });
+      expect(link).toBeInTheDocument();
+      // Since framer-motion is mocked, we just verify the link exists
     });
   });
 
@@ -612,14 +575,12 @@ describe("CateringAbout", () => {
       ).toBeInTheDocument();
     });
 
-    it("displays correct button text (How Our Service Works)", () => {
+    it("displays correct link text (How Our Service Works)", () => {
       render(<CateringAbout />);
 
-      const button = screen.getByRole("button", {
-        name: "How Our Service Works",
-      });
-      expect(button).toBeInTheDocument();
-      expect(button).toHaveTextContent("How Our Service Works");
+      const link = screen.getByRole("link", { name: "How Our Service Works" });
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveTextContent("How Our Service Works");
     });
   });
 

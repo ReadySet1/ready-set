@@ -13,7 +13,7 @@ interface PartnerLogo {
 
 /**
  * ServedPartners Component
- * 
+ *
  * Displays a grid of marketplace and company logos that Ready Set has served.
  * This component shows logos without clickable links and without a CTA button,
  * focusing purely on brand credibility and social proof.
@@ -27,7 +27,7 @@ const ServedPartners: React.FC = () => {
     },
     {
       name: "EazyCater",
-      image: getCloudinaryUrl("food/served/eazycater"),
+      image: getCloudinaryUrl("food/served/ezcater"),
       alt: "EazyCater logo",
     },
     {
@@ -68,7 +68,7 @@ const ServedPartners: React.FC = () => {
 
         {/* Partner Logos Grid */}
         <div className="mt-12">
-          <div className="grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-5 md:gap-8 lg:gap-10">
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-3 md:gap-8 lg:grid-cols-5 lg:gap-10">
             {partners.map((partner, index) => (
               <motion.div
                 key={partner.name}
@@ -91,11 +91,6 @@ const ServedPartners: React.FC = () => {
                     fill
                     className="object-contain grayscale transition-all duration-300 hover:grayscale-0"
                     sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 200px"
-                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                      // Hide image if it fails to load
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = "none";
-                    }}
                   />
                 </div>
               </motion.div>
@@ -108,4 +103,3 @@ const ServedPartners: React.FC = () => {
 };
 
 export default ServedPartners;
-
