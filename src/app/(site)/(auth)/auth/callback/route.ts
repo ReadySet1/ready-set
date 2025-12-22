@@ -17,6 +17,8 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
   const next = requestUrl.searchParams.get('next') || '/';
+  // Capture userType from signup flow (passed by GoogleAuthButton)
+  const userTypeParam = requestUrl.searchParams.get('userType');
   
   if (code) {
     try {
@@ -64,6 +66,11 @@ export async function GET(request: Request) {
           if (profileError || !profile) {
 
             try {
+              // Determine user type: use userType from signup flow, or default to CLIENT
+              const resolvedUserType = userTypeParam?.toUpperCase() === 'VENDOR' ? 'VENDOR' :
+                                       userTypeParam?.toUpperCase() === 'CLIENT' ? 'CLIENT' :
+                                       'CLIENT'; // Default to CLIENT if not specified
+
               // Create a default profile for the user
               const { data: newProfile, error: createError } = await supabase
                 .from('profiles')
@@ -71,7 +78,7 @@ export async function GET(request: Request) {
                   id: session.user.id,
                   email: session.user.email || '',
                   name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
-                  type: 'CLIENT', // Default to CLIENT as the most common user type
+                  type: resolvedUserType, // Use userType from signup flow
                   status: 'ACTIVE',
                   updatedAt: new Date().toISOString()
                 })
