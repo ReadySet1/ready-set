@@ -63,13 +63,13 @@ const CateringPage = () => {
     };
   }, [supabase]); // Depend on supabase client
 
-  // Allow form to be shown without authentication for now
-  // TODO: Decide if authentication should be required for catering requests
-  // useEffect(() => {
-  //   if (!isLoading && !session) {
-  //     router.push("/sign-in?redirect=/catering-request");
-  //   }
-  // }, [session, isLoading, router]);
+  // Authentication is now enforced at the middleware level
+  // This client-side check is kept as a fallback for edge cases
+  useEffect(() => {
+    if (!isLoading && !session) {
+      router.push("/sign-in?returnTo=/catering-request");
+    }
+  }, [session, isLoading, router]);
 
   if (isLoading) {
     return (
@@ -80,10 +80,10 @@ const CateringPage = () => {
     );
   }
 
-  // Allow form to be shown without authentication for now
-  // if (!session) {
-  //   return null;
-  // }
+  // Don't render content until authentication is verified
+  if (!session) {
+    return null;
+  }
 
   return (
     <section
