@@ -64,7 +64,7 @@ const ServedPartners: React.FC = () => {
             We Served the Top Marketplace and Company
           </h2>
           <p className="font-[Montserrat] text-base font-medium text-gray-600 md:text-lg">
-            Zerocater, EazyCater, Google, Netflix, Apple
+            Zerocater, EzCater, Google, Netflix, Apple
           </p>
         </motion.div>
 

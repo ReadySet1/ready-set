@@ -21,7 +21,7 @@ describe("ServedPartners", () => {
         "bg-white",
         "py-16",
         "md:py-20",
-        "lg:py-24"
+        "lg:py-24",
       );
     });
 
@@ -47,7 +47,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const title = screen.getByText(
-        "We Served the Top Marketplace and Company"
+        "We Served the Top Marketplace and Company",
       );
       expect(title).toHaveClass(
         "mb-3",
@@ -55,7 +55,7 @@ describe("ServedPartners", () => {
         "font-black",
         "text-gray-800",
         "md:text-4xl",
-        "lg:text-5xl"
+        "lg:text-5xl",
       );
     });
 
@@ -63,7 +63,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const subtitle = screen.getByText(
-        /zerocater, eazycater, google, netflix, apple/i
+        /zerocater, eazycater, google, netflix, apple/i,
       );
       expect(subtitle).toBeInTheDocument();
     });
@@ -72,13 +72,13 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const subtitle = screen.getByText(
-        /zerocater, eazycater, google, netflix, apple/i
+        /zerocater, eazycater, google, netflix, apple/i,
       );
       expect(subtitle).toHaveClass(
         "text-base",
         "font-medium",
         "text-gray-600",
-        "md:text-lg"
+        "md:text-lg",
       );
     });
 
@@ -86,10 +86,10 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const title = screen.getByText(
-        "We Served the Top Marketplace and Company"
+        "We Served the Top Marketplace and Company",
       );
       const subtitle = screen.getByText(
-        /zerocater, eazycater, google, netflix, apple/i
+        /zerocater, eazycater, google, netflix, apple/i,
       );
 
       expect(title).toHaveClass("font-[Montserrat]");
@@ -110,7 +110,7 @@ describe("ServedPartners", () => {
         "md:grid-cols-3",
         "md:gap-10",
         "lg:grid-cols-5",
-        "lg:gap-12"
+        "lg:gap-12",
       );
     });
 
@@ -178,7 +178,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const gridItems = document.querySelectorAll(
-        ".flex.items-center.justify-center"
+        ".flex.items-center.justify-center",
       );
       expect(gridItems.length).toBeGreaterThan(0);
 
@@ -251,7 +251,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const imageContainers = document.querySelectorAll(
-        ".relative.h-28.w-full"
+        ".relative.h-28.w-full",
       );
       expect(imageContainers.length).toBeGreaterThan(0);
 
@@ -264,7 +264,7 @@ describe("ServedPartners", () => {
           "max-w-[240px]",
           "sm:h-32",
           "md:h-40",
-          "lg:h-44"
+          "lg:h-44",
         );
       });
     });
@@ -276,7 +276,7 @@ describe("ServedPartners", () => {
       images.forEach((img) => {
         expect(img).toHaveAttribute(
           "sizes",
-          "(max-width: 640px) 45vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 240px"
+          "(max-width: 640px) 45vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 240px",
         );
       });
     });
@@ -293,7 +293,7 @@ describe("ServedPartners", () => {
 
       // Each grid item should be wrapped in a motion div (now regular div)
       const gridItems = grid?.querySelectorAll(
-        ".flex.items-center.justify-center"
+        ".flex.items-center.justify-center",
       );
       expect(gridItems).toHaveLength(5);
     });
@@ -322,7 +322,7 @@ describe("ServedPartners", () => {
       const heading = screen.getByRole("heading", { level: 2 });
       expect(heading).toBeInTheDocument();
       expect(heading).toHaveTextContent(
-        "We Served the Top Marketplace and Company"
+        "We Served the Top Marketplace and Company",
       );
     });
 
@@ -350,7 +350,7 @@ describe("ServedPartners", () => {
 
       // Since there are no interactive elements, verify no tab traps
       const focusableElements = document.querySelectorAll(
-        'button, a, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button, a, input, select, textarea, [tabindex]:not([tabindex="-1"])',
       );
       // Should have no focusable elements in this display-only component
       expect(focusableElements).toHaveLength(0);
@@ -376,7 +376,7 @@ describe("ServedPartners", () => {
       expect(grid).toHaveClass(
         "grid-cols-2",
         "md:grid-cols-3",
-        "lg:grid-cols-5"
+        "lg:grid-cols-5",
       );
     });
 
@@ -398,7 +398,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const title = screen.getByText(
-        "We Served the Top Marketplace and Company"
+        "We Served the Top Marketplace and Company",
       );
       expect(title).toHaveClass("text-3xl", "md:text-4xl", "lg:text-5xl");
     });
@@ -407,7 +407,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const subtitle = screen.getByText(
-        /zerocater, eazycater, google, netflix, apple/i
+        /zerocater, eazycater, google, netflix, apple/i,
       );
       expect(subtitle).toHaveClass("text-base", "md:text-lg");
     });
@@ -425,7 +425,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const gridItems = document.querySelectorAll(
-        ".flex.items-center.justify-center.px-2"
+        ".flex.items-center.justify-center.px-2",
       );
       gridItems.forEach((item) => {
         expect(item).toHaveClass("px-2", "sm:px-4");
@@ -497,9 +497,7 @@ describe("ServedPartners", () => {
 
       const marketplaces = ["Zerocater", "EzCater"];
       marketplaces.forEach((marketplace) => {
-        expect(
-          screen.getByAltText(`${marketplace} logo`)
-        ).toBeInTheDocument();
+        expect(screen.getByAltText(`${marketplace} logo`)).toBeInTheDocument();
       });
     });
 
@@ -525,7 +523,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const title = screen.getByText(
-        "We Served the Top Marketplace and Company"
+        "We Served the Top Marketplace and Company",
       );
       expect(title).toHaveClass("font-black");
     });
@@ -534,7 +532,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const subtitle = screen.getByText(
-        /zerocater, eazycater, google, netflix, apple/i
+        /zerocater, eazycater, google, netflix, apple/i,
       );
       expect(subtitle).toHaveClass("font-medium");
     });
@@ -543,10 +541,10 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const title = screen.getByText(
-        "We Served the Top Marketplace and Company"
+        "We Served the Top Marketplace and Company",
       );
       const subtitle = screen.getByText(
-        /zerocater, eazycater, google, netflix, apple/i
+        /zerocater, eazycater, google, netflix, apple/i,
       );
 
       expect(title).toHaveClass("text-gray-800");
@@ -601,4 +599,3 @@ describe("ServedPartners", () => {
     });
   });
 });
-
