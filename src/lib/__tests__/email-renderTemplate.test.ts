@@ -4,10 +4,7 @@ import {
   type DeliveryEmailTemplateId,
 } from "@/lib/email/renderTemplate";
 
-/**
- * TODO: REA-211 - Email template tests have template rendering issues
- */
-describe.skip("renderDeliveryTemplate", () => {
+describe("renderDeliveryTemplate", () => {
   const vars: DeliveryTemplateVariables = {
     customerName: "Jane Doe",
     orderNumber: "ORD-999",
