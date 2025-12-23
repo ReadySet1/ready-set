@@ -12,6 +12,7 @@ import {
 
 /**
  * TODO: REA-211 - Calculator verification tests have calculation precision issues
+ * 4 tests fail: driver pay expectations don't match actual implementation
  */
 describe.skip('Calculator Fix Verification', () => {
   describe('Test 1: Standard Delivery (Children\'s Council of SF)', () => {

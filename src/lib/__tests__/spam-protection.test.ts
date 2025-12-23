@@ -14,7 +14,8 @@ import { SpamProtectionManager, extractClientIp } from '../spam-protection';
  */
 
 /**
- * TODO: REA-211 - Some tests fail due to implementation changes (private IP rejection, pattern detection)
+ * TODO: REA-211 - 7 tests fail: private IP rejection, gambling/phishing/XSS pattern detection changes
+ * 30 tests pass, 7 fail - implementation has evolved
  */
 describe.skip('Spam Protection System', () => {
   // Reset rate limits before each test

@@ -35,7 +35,7 @@ type PrismaMock = {
 const mockPrisma = prisma as unknown as PrismaMock;
 
 /**
- * TODO: REA-211 - File uploads delete API tests have Prisma mocking issues
+ * TODO: REA-211 - File uploads delete API needs auth middleware mocking
  */
 describe.skip('DELETE /api/file-uploads', () => {
   beforeEach(() => {

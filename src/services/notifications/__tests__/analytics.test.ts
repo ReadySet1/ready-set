@@ -36,10 +36,7 @@ import { prisma } from "@/lib/db/prisma";
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 const mockSentry = Sentry as jest.Mocked<typeof Sentry>;
 
-/**
- * TODO: REA-211 - Notification analytics tests have Prisma mocking issues
- */
-describe.skip("notification analytics service", () => {
+describe("notification analytics service", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
