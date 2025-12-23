@@ -113,16 +113,18 @@ const FoodHeader: React.FC = () => {
       {/* Text content overlay */}
       <motion.div
         className="relative z-10 mx-auto flex h-full max-w-[1600px] items-center px-4 py-8 md:px-8 md:py-16 lg:px-12 lg:py-20"
-        initial="hidden"
+        initial={false}
         animate="visible"
         variants={containerVariants}
       >
         <motion.div
           className="relative z-10 ml-4 mt-40 w-full max-w-[55%] space-y-3 rounded-lg bg-white/80 p-4 backdrop-blur-sm sm:ml-8 sm:mt-44 sm:max-w-[50%] md:ml-28 md:mt-24 md:max-w-md md:bg-transparent md:p-0 md:backdrop-blur-none lg:ml-32 lg:mt-28"
+          initial={false}
           variants={containerVariants}
         >
           <motion.h1
             className="font-[Montserrat] text-xl font-black leading-tight tracking-tight text-gray-800 md:text-2xl lg:text-3xl"
+            initial={false}
             variants={itemVariants}
           >
             From Pickup to Complete Setup
@@ -130,6 +132,7 @@ const FoodHeader: React.FC = () => {
 
           <motion.p
             className="font-[Montserrat] text-xs font-medium leading-relaxed text-gray-700 md:text-sm lg:text-base"
+            initial={false}
             variants={itemVariants}
           >
             More than delivery — we&apos;re a trusted partner helping
@@ -139,11 +142,13 @@ const FoodHeader: React.FC = () => {
 
           <motion.div
             className="flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4"
+            initial={false}
             variants={itemVariants}
           >
             <motion.button
               onClick={handleQuoteClick}
               className="rounded-lg bg-yellow-300 px-6 py-2.5 font-[Montserrat] text-sm font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-400 hover:shadow-lg sm:px-8 sm:py-3 sm:text-base md:px-10 md:py-4 md:text-lg"
+              initial={false}
               variants={buttonVariants}
               whileHover="hover"
               whileTap="tap"

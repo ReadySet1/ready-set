@@ -22,13 +22,15 @@ const ServedPartners: React.FC = () => {
   const partners: PartnerLogo[] = [
     {
       name: "Zerocater",
-      image: getCloudinaryUrl("food/served/zerocater"),
+      // Use fit to scale up logo while adding white background to remove borders
+      image: `${getCloudinaryUrl("food/served/zerocater").replace("/f_auto,q_auto/", "/f_auto,q_auto,b_white,w_600,h_600,c_fit/")}`,
       alt: "Zerocater logo",
     },
     {
-      name: "EazyCater",
-      image: getCloudinaryUrl("food/served/ezcater"),
-      alt: "EazyCater logo",
+      name: "EzCater",
+      // Use fit to scale up logo while adding white background to remove borders
+      image: `${getCloudinaryUrl("food/served/ezcater").replace("/f_auto,q_auto/", "/f_auto,q_auto,b_white,w_600,h_600,c_fit/")}`,
+      alt: "EzCater logo",
     },
     {
       name: "Google",
@@ -68,11 +70,11 @@ const ServedPartners: React.FC = () => {
 
         {/* Partner Logos Grid */}
         <div className="mt-12">
-          <div className="grid grid-cols-2 gap-6 md:grid-cols-3 md:gap-8 lg:grid-cols-5 lg:gap-10">
+          <div className="grid grid-cols-2 gap-8 md:grid-cols-3 md:gap-10 lg:grid-cols-5 lg:gap-12">
             {partners.map((partner, index) => (
               <motion.div
                 key={partner.name}
-                className="flex items-center justify-center overflow-hidden"
+                className="flex items-center justify-center px-2 py-4 sm:px-4"
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
@@ -81,20 +83,13 @@ const ServedPartners: React.FC = () => {
                   delay: index * 0.1,
                 }}
               >
-                <div
-                  className={`relative h-24 w-full max-w-[200px] overflow-hidden md:h-32 lg:h-36 ${
-                    partner.name === "Zerocater" || partner.name === "EazyCater"
-                      ? "scale-[1.15] p-4"
-                      : ""
-                  }`}
-                  aria-label={partner.name}
-                >
+                <div className="relative h-28 w-full min-w-[160px] max-w-[240px] sm:h-32 md:h-40 lg:h-44">
                   <Image
                     src={partner.image}
                     alt={partner.alt}
                     fill
-                    className="object-contain transition-all duration-300"
-                    sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 200px"
+                    className="object-contain"
+                    sizes="(max-width: 640px) 45vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 240px"
                   />
                 </div>
               </motion.div>
