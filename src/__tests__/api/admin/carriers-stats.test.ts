@@ -34,7 +34,7 @@ jest.mock('@/lib/services/webhook-logger', () => ({
 }));
 
 /**
- * TODO: REA-211 - Carrier stats API tests have Prisma mocking issues
+ * TODO: REA-211 - Carrier stats API tests have route expectation mismatches
  */
 describe.skip('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', () => {
   beforeEach(() => {

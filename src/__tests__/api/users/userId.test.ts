@@ -24,7 +24,7 @@ jest.mock('@/utils/prismaDB', () => ({
 import { prisma } from '@/utils/prismaDB';
 
 /**
- * TODO: REA-211 - Users userId API tests have Supabase mocking issues
+ * TODO: REA-211 - Tests expect different status codes than implementation returns
  */
 describe.skip('/api/users/[userId] API', () => {
   beforeEach(() => {
