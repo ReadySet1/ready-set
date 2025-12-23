@@ -14,7 +14,7 @@ import { SpamProtectionManager, extractClientIp } from '../spam-protection';
  */
 
 /**
- * TODO: REA-211 - Spam protection tests have rate limiting state issues
+ * TODO: REA-211 - Some tests fail due to implementation changes (private IP rejection, pattern detection)
  */
 describe.skip('Spam Protection System', () => {
   // Reset rate limits before each test
