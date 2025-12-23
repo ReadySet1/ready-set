@@ -123,7 +123,9 @@ describe("/api/addresses", () => {
     mockPrisma.address.findMany.mockResolvedValue([]);
     mockPrisma.address.count.mockResolvedValue(0);
     mockPrisma.address.findUnique.mockResolvedValue(mockAddress);
-    mockPrisma.address.findFirst.mockResolvedValue(mockAddress);
+    // Default findFirst to null to allow POST to create new addresses
+    // GET tests that need specific addresses should override this
+    mockPrisma.address.findFirst.mockResolvedValue(null);
     mockPrisma.address.create.mockResolvedValue(mockAddress);
     mockPrisma.address.update.mockResolvedValue(mockAddress);
     mockPrisma.address.delete.mockResolvedValue(mockAddress);
@@ -180,7 +182,8 @@ describe("/api/addresses", () => {
     });
 
     it("should return specific address by ID", async () => {
-      mockPrisma.address.findFirst.mockResolvedValue(mockAddress);
+      // Override default to return a specific address for this test
+      mockPrisma.address.findFirst.mockResolvedValueOnce(mockAddress);
 
       const request = createRequestWithParams("http://localhost:3000/api/addresses", {
         id: mockAddress.id,
@@ -197,7 +200,8 @@ describe("/api/addresses", () => {
     });
 
     it("should return 404 when address not found", async () => {
-      mockPrisma.address.findFirst.mockResolvedValue(null);
+      // Default is already null, but be explicit
+      mockPrisma.address.findFirst.mockResolvedValueOnce(null);
 
       const request = createRequestWithParams("http://localhost:3000/api/addresses", {
         id: "non-existent-id",
@@ -214,7 +218,7 @@ describe("/api/addresses", () => {
         isShared: false,
       });
 
-      mockPrisma.address.findFirst.mockResolvedValue(otherUserAddress);
+      mockPrisma.address.findFirst.mockResolvedValueOnce(otherUserAddress);
 
       const request = createRequestWithParams("http://localhost:3000/api/addresses", {
         id: otherUserAddress.id,
@@ -225,7 +229,7 @@ describe("/api/addresses", () => {
     });
 
     it("should allow accessing shared addresses", async () => {
-      mockPrisma.address.findFirst.mockResolvedValue(mockSharedAddress);
+      mockPrisma.address.findFirst.mockResolvedValueOnce(mockSharedAddress);
 
       const request = createRequestWithParams("http://localhost:3000/api/addresses", {
         id: mockSharedAddress.id,
@@ -591,6 +595,126 @@ describe("/api/addresses", () => {
 
       const data = await expectValidationError(response);
       expect(data.error).toContain("Invalid user reference");
+    });
+
+    describe("duplicate detection", () => {
+      it("should return existing address when duplicate is found", async () => {
+        const existingAddress = createMockAddress({
+          id: "existing-address-id",
+          street1: "123 main street",
+          city: "san francisco",
+          state: "CA",
+          zip: "94102",
+          isShared: true,
+        });
+
+        // First call (duplicate check) returns the existing address
+        mockPrisma.address.findFirst.mockResolvedValue(existingAddress);
+
+        const request = createPostRequest(
+          "http://localhost:3000/api/addresses",
+          validAddressData
+        );
+        const response = await POST(request);
+
+        // Should return 200 with existing address (not 201 for new)
+        const data = await expectSuccessResponse(response, 200);
+        expect(data.id).toBe(existingAddress.id);
+
+        // Should NOT create a new address
+        expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      });
+
+      it("should create new address when no duplicate exists", async () => {
+        // First call (duplicate check) returns null - no existing address
+        mockPrisma.address.findFirst.mockResolvedValue(null);
+
+        const request = createPostRequest(
+          "http://localhost:3000/api/addresses",
+          validAddressData
+        );
+        const response = await POST(request);
+
+        // Should return 201 for newly created
+        await expectSuccessResponse(response, 201);
+        expect(mockPrisma.$transaction).toHaveBeenCalled();
+      });
+
+      it("should perform case-insensitive duplicate check", async () => {
+        // Return null to allow creation (we're testing the query parameters)
+        mockPrisma.address.findFirst.mockResolvedValue(null);
+
+        const mixedCaseData = {
+          ...validAddressData,
+          street1: "123 MAIN ST",
+          city: "SAN FRANCISCO",
+          state: "ca",
+        };
+
+        const request = createPostRequest(
+          "http://localhost:3000/api/addresses",
+          mixedCaseData
+        );
+        await POST(request);
+
+        // Verify findFirst was called with case-insensitive mode
+        expect(mockPrisma.address.findFirst).toHaveBeenCalledWith({
+          where: expect.objectContaining({
+            deletedAt: null,
+            street1: expect.objectContaining({ mode: 'insensitive' }),
+            city: expect.objectContaining({ mode: 'insensitive' }),
+            state: expect.objectContaining({ mode: 'insensitive' }),
+          }),
+        });
+      });
+
+      it("should match addresses with different street abbreviations", async () => {
+        // The normalization should handle "St" vs "Street" etc.
+        // Return null to allow creation (testing query params)
+        mockPrisma.address.findFirst.mockResolvedValue(null);
+
+        const dataWithAbbreviation = {
+          ...validAddressData,
+          street1: "123 Main St",
+        };
+
+        const request = createPostRequest(
+          "http://localhost:3000/api/addresses",
+          dataWithAbbreviation
+        );
+        await POST(request);
+
+        // The normalized street should be used in the query
+        expect(mockPrisma.address.findFirst).toHaveBeenCalledWith({
+          where: expect.objectContaining({
+            street1: expect.objectContaining({
+              equals: expect.stringContaining("main"),
+            }),
+          }),
+        });
+      });
+
+      it("should only match first 5 digits of zip code", async () => {
+        mockPrisma.address.findFirst.mockResolvedValue(null);
+
+        const dataWithExtendedZip = {
+          ...validAddressData,
+          zip: "94102-1234",
+        };
+
+        const request = createPostRequest(
+          "http://localhost:3000/api/addresses",
+          dataWithExtendedZip
+        );
+        await POST(request);
+
+        // Should use startsWith for first 5 digits
+        expect(mockPrisma.address.findFirst).toHaveBeenCalledWith({
+          where: expect.objectContaining({
+            zip: expect.objectContaining({ startsWith: "94102" }),
+          }),
+        });
+      });
     });
   });
 

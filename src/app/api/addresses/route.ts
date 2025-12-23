@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma-client";
 import { withDatabaseRetry } from "@/utils/prismaDB";
 import { AddressFormData } from "@/types/address";
 import { createClient } from "@/utils/supabase/server";
+import { normalizeAddress } from "@/utils/address-normalization";
 
 // Simple in-memory rate limiting (in production, use Redis)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -358,6 +359,31 @@ export async function POST(request: NextRequest) {
         { error: "Validation failed", details: validationErrors },
         { status: 400 },
       );
+    }
+
+    // Normalize address for duplicate detection
+    const normalized = normalizeAddress({
+      street1: formData.street1,
+      city: formData.city,
+      state: formData.state,
+      zip: formData.zip,
+    });
+
+    // Check for existing address with same normalized values
+    // If found, silently return the existing address instead of creating a duplicate
+    const existingAddress = await prisma.address.findFirst({
+      where: {
+        deletedAt: null,
+        street1: { equals: normalized.street1, mode: 'insensitive' },
+        city: { equals: normalized.city, mode: 'insensitive' },
+        state: { equals: normalized.state, mode: 'insensitive' },
+        zip: { startsWith: normalized.zip },
+      },
+    });
+
+    if (existingAddress) {
+      // Return the existing address - user won't notice duplicate attempt
+      return NextResponse.json(existingAddress, { status: 200 });
     }
 
     // Use database transaction with retry mechanism to ensure data consistency

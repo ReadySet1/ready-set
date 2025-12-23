@@ -27,6 +27,13 @@ const PUBLIC_ROUTES = [
   '/terms-of-service'
 ];
 
+// Routes that require authentication but are not role-specific
+// Any authenticated user can access these routes
+const AUTH_REQUIRED_ROUTES = [
+  '/catering-request',
+  '/on-demand'
+];
+
 export async function protectRoutes(request: Request) {
   try {
     const { pathname } = new URL(request.url);
@@ -40,8 +47,11 @@ export async function protectRoutes(request: Request) {
 
     // Check if the current path is a protected role-specific route
     const isProtectedRoute = Object.values(PROTECTED_ROUTES).some(pattern => pattern.test(pathname));
-    
-    if (!isProtectedRoute) {
+
+    // Check if the current path requires authentication (but not role-specific)
+    const isAuthRequiredRoute = AUTH_REQUIRED_ROUTES.includes(pathname);
+
+    if (!isProtectedRoute && !isAuthRequiredRoute) {
       return null; // Allow access to non-protected routes
     }
 
@@ -79,8 +89,13 @@ export async function protectRoutes(request: Request) {
       return NextResponse.redirect(url);
     }
 
+    // For auth-required routes (not role-specific), allow access after authentication
+    if (isAuthRequiredRoute) {
+      return null; // User is authenticated and account is active, allow access
+    }
+
     // Add debug logging
-        
+
     // Convert the user type to lowercase to match our route keys
     const userTypeKey = profile.type.toLowerCase();
     

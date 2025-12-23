@@ -190,6 +190,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     isClient: false,
     isDriver: false,
   });
+  const [rolesLoaded, setRolesLoaded] = useState(false);
 
   // Check for bucket existence but don't try to create it (requires admin privileges)
   const ensureStorageBucketExists = useCallback(async () => {
@@ -420,11 +421,17 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   }, [fetchOrderDetails, ensureStorageBucketExists]);
 
   // Fetch drivers on mount - only for non-VENDOR users
+  // Wait for rolesLoaded to ensure we know the user's role before making the API call
   useEffect(() => {
     const fetchDrivers = async () => {
+      // Wait for roles to be loaded before checking
+      if (!rolesLoaded) {
+        return;
+      }
+
       // Skip driver fetching for VENDOR users since they don't have access to driver data
       if (userRoles.isVendor) {
-                return;
+        return;
       }
 
       try {
@@ -457,7 +464,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
             return;
           }
           if (response.status === 403) {
-                        // For 403 errors, silently skip driver loading instead of showing an error
+            // For 403 errors, silently skip driver loading instead of showing an error
             return;
           }
           console.error("Failed to fetch drivers");
@@ -470,7 +477,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     };
 
     fetchDrivers();
-  }, [setDrivers, supabase.auth, router, userRoles.isVendor]);
+  }, [setDrivers, supabase.auth, router, rolesLoaded, userRoles.isVendor]);
 
   const handleOpenDriverDialog = () => {
     setIsDriverDialogOpen(true);
@@ -721,6 +728,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
       if (!user) {
         console.error("No authenticated user found");
+        setRolesLoaded(true);
         return;
       }
 
@@ -742,6 +750,8 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       }
     } catch (error) {
       console.error("Error fetching user roles:", error);
+    } finally {
+      setRolesLoaded(true);
     }
   }, [supabase]);
 
