@@ -75,10 +75,7 @@ jest.mock("@/components/ScrollToTop", () => ({
 
 const { usePathname } = require("next/navigation");
 
-/**
- * TODO: REA-211 - ClientLayout Footer tests have navigation mocking issues
- */
-describe.skip("ClientLayout Footer Conditional Rendering", () => {
+describe("ClientLayout Footer Conditional Rendering", () => {
   const renderClientLayout = (children = <div>Test Content</div>) => {
     return render(<ClientLayout>{children}</ClientLayout>);
   };

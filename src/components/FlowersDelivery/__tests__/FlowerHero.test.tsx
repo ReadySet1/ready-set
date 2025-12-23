@@ -32,10 +32,7 @@ jest.mock("framer-motion", () => ({
 // Now import FlowerHero after all mocks are set up
 import FlowerHero from "../FlowerHero";
 
-/**
- * TODO: REA-211 - FlowerHero tests have framer-motion mocking issues
- */
-describe.skip("FlowerHero - Minimal Test", () => {
+describe("FlowerHero - Minimal Test", () => {
   it("should render without crashing", () => {
     expect(() => render(<FlowerHero />)).not.toThrow();
   });
