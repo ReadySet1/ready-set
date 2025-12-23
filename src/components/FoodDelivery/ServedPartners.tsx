@@ -72,7 +72,7 @@ const ServedPartners: React.FC = () => {
             {partners.map((partner, index) => (
               <motion.div
                 key={partner.name}
-                className="flex items-center justify-center"
+                className="flex items-center justify-center overflow-hidden"
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
@@ -82,14 +82,18 @@ const ServedPartners: React.FC = () => {
                 }}
               >
                 <div
-                  className="relative h-24 w-full max-w-[200px] md:h-32 lg:h-36"
+                  className={`relative h-24 w-full max-w-[200px] overflow-hidden md:h-32 lg:h-36 ${
+                    partner.name === "Zerocater" || partner.name === "EazyCater"
+                      ? "scale-[1.15] p-4"
+                      : ""
+                  }`}
                   aria-label={partner.name}
                 >
                   <Image
                     src={partner.image}
                     alt={partner.alt}
                     fill
-                    className="object-contain grayscale transition-all duration-300 hover:grayscale-0"
+                    className="object-contain transition-all duration-300"
                     sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 200px"
                   />
                 </div>
