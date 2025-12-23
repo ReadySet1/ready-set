@@ -123,53 +123,40 @@ const DeliveryPartners: React.FC = () => {
                     fill
                     className="object-contain"
                     sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 200px"
-                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                      // Hide image if it fails to load
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = "none";
-                    }}
                   />
                 </a>
               </motion.div>
             ))}
           </div>
           {/* Last logo centered */}
-          {(() => {
-            const lastPartner = partners[8];
-            return lastPartner ? (
-              <motion.div
-                className="mt-8 flex justify-center md:mt-10"
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{
-                  duration: 0.5,
-                  delay: 0.8,
-                }}
+          {partners[8] && (
+            <motion.div
+              className="mt-8 flex justify-center md:mt-10"
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{
+                duration: 0.5,
+                delay: 0.8,
+              }}
+            >
+              <a
+                href={partners[8].url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative h-24 w-full max-w-[200px] transition-transform hover:scale-105 md:h-32 lg:h-36"
+                aria-label={`Visit ${partners[8].name} website`}
               >
-                <a
-                  href={lastPartner.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="relative h-24 w-full max-w-[200px] transition-transform hover:scale-105 md:h-32 lg:h-36"
-                  aria-label={`Visit ${lastPartner.name} website`}
-                >
-                  <Image
-                    src={lastPartner.image}
-                    alt={lastPartner.alt}
-                    fill
-                    className="object-contain"
-                    sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 200px"
-                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                      // Hide image if it fails to load
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = "none";
-                    }}
-                  />
-                </a>
-              </motion.div>
-            ) : null;
-          })()}
+                <Image
+                  src={partners[8].image}
+                  alt={partners[8].alt}
+                  fill
+                  className="object-contain"
+                  sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 200px"
+                />
+              </a>
+            </motion.div>
+          )}
         </div>
 
         {/* Partner With Us Button */}
