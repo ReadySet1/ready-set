@@ -41,7 +41,7 @@ jest.mock('@/lib/cache/http-cache', () => ({
 }));
 
 /**
- * TODO: REA-211 - Vendor metrics API tests have Prisma mocking issues
+ * TODO: REA-211 - Response structure mismatch (stringified vs parsed JSON)
  */
 describe.skip('/api/vendor/metrics API', () => {
   beforeEach(() => {
