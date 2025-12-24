@@ -80,10 +80,7 @@ const mockDelivery: DeliveryTracking = {
   assignedDriverId: 'driver-1'
 };
 
-/**
- * TODO: REA-211 - LiveDriverMap tests have mapbox-gl mocking issues
- */
-describe.skip('LiveDriverMap', () => {
+describe('LiveDriverMap', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
