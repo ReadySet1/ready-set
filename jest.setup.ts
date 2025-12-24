@@ -492,14 +492,85 @@ global.Request = jest.fn().mockImplementation((url, options) => ({
   text: () => Promise.resolve(options?.body || ''),
 }));
 
-// @ts-ignore - Mock Response constructor for tests
-global.Response = jest.fn().mockImplementation((body, options) => ({
-  ok: true,
-  status: options?.status || 200,
-  headers: new Headers(options?.headers),
-  json: () => Promise.resolve(body),
-  text: () => Promise.resolve(body),
-}));
+// @ts-ignore - Mock Response constructor for tests with complete Web API
+class MockResponse {
+  private _body: any;
+  readonly ok: boolean;
+  readonly status: number;
+  readonly statusText: string;
+  readonly headers: Headers;
+  readonly type: ResponseType = 'basic';
+  readonly url: string = '';
+  readonly redirected: boolean = false;
+  readonly bodyUsed: boolean = false;
+  readonly body: ReadableStream<Uint8Array> | null = null;
+
+  constructor(body?: BodyInit | null, options?: ResponseInit) {
+    this._body = body;
+    this.status = options?.status || 200;
+    this.statusText = options?.statusText || 'OK';
+    this.ok = this.status >= 200 && this.status < 300;
+    this.headers = new Headers(options?.headers);
+  }
+
+  async json(): Promise<any> {
+    if (typeof this._body === 'string') {
+      return JSON.parse(this._body);
+    }
+    return this._body;
+  }
+
+  async text(): Promise<string> {
+    if (this._body === null || this._body === undefined) return '';
+    if (typeof this._body === 'string') return this._body;
+    return JSON.stringify(this._body);
+  }
+
+  async arrayBuffer(): Promise<ArrayBuffer> {
+    const text = await this.text();
+    return new TextEncoder().encode(text).buffer as ArrayBuffer;
+  }
+
+  async blob(): Promise<Blob> {
+    const text = await this.text();
+    return new Blob([text]);
+  }
+
+  async formData(): Promise<FormData> {
+    return new FormData();
+  }
+
+  clone(): Response {
+    return new MockResponse(this._body, {
+      status: this.status,
+      statusText: this.statusText,
+      headers: this.headers,
+    }) as unknown as Response;
+  }
+
+  static json(data: any, init?: ResponseInit): Response {
+    const headers = new Headers(init?.headers);
+    if (!headers.has('content-type')) {
+      headers.set('content-type', 'application/json');
+    }
+    return new MockResponse(data, { ...init, headers }) as unknown as Response;
+  }
+
+  static redirect(url: string | URL, status: number = 302): Response {
+    return new MockResponse(null, {
+      status,
+      headers: { Location: typeof url === 'string' ? url : url.toString() },
+    }) as unknown as Response;
+  }
+
+  static error(): Response {
+    const response = new MockResponse(null, { status: 0 });
+    (response as any).type = 'error';
+    return response as unknown as Response;
+  }
+}
+
+global.Response = MockResponse as unknown as typeof Response;
 
 // Mock NextResponse with constructor support
 class MockNextResponse {

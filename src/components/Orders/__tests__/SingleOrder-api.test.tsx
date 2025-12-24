@@ -1,5 +1,5 @@
 import React from "react";
-import { renderHook, waitFor, render, screen } from "@testing-library/react";
+import { waitFor, render, screen } from "@testing-library/react";
 import { act } from "@testing-library/react";
 
 // Mock Next.js navigation hooks
@@ -70,7 +70,15 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 /**
- * TODO: REA-211 - SingleOrder API encoding tests have fetch mocking issues
+ * SingleOrder API encoding tests - verify proper URL encoding for order numbers
+ *
+ * TODO: REA-281 - These tests need comprehensive mock setup for all component API calls:
+ * - /api/orders/:id (order details)
+ * - /api/orders/:id/files (file uploads)
+ * - /api/drivers (driver list)
+ * - Supabase auth and storage
+ *
+ * The component makes many async calls during render, all need proper mocking.
  */
 describe.skip("SingleOrder - API Encoding Tests", () => {
   beforeEach(() => {
@@ -132,8 +140,8 @@ describe.skip("SingleOrder - API Encoding Tests", () => {
       "@/components/Orders/SingleOrder"
     );
 
-    const { rerender } = await act(async () => {
-      return renderHook(() => <SingleOrder onDeleteSuccess={() => {}} />);
+    await act(async () => {
+      render(<SingleOrder onDeleteSuccess={() => {}} />);
     });
 
     // Wait for the component to make API calls
@@ -160,7 +168,7 @@ describe.skip("SingleOrder - API Encoding Tests", () => {
     );
 
     await act(async () => {
-      renderHook(() => <SingleOrder onDeleteSuccess={() => {}} />);
+      render(<SingleOrder onDeleteSuccess={() => {}} />);
     });
 
     await waitFor(() => {
@@ -202,7 +210,7 @@ describe.skip("SingleOrder - API Encoding Tests", () => {
       mockPathname.mockReturnValue(testCase.pathname);
 
       await act(async () => {
-        renderHook(() => <SingleOrder onDeleteSuccess={() => {}} />);
+        render(<SingleOrder onDeleteSuccess={() => {}} />);
       });
 
       await waitFor(() => {
@@ -224,7 +232,7 @@ describe.skip("SingleOrder - API Encoding Tests", () => {
     );
 
     await act(async () => {
-      renderHook(() => <SingleOrder onDeleteSuccess={() => {}} />);
+      render(<SingleOrder onDeleteSuccess={() => {}} />);
     });
 
     await waitFor(() => {
@@ -262,7 +270,7 @@ describe.skip("SingleOrder - API Encoding Tests", () => {
     );
 
     await act(async () => {
-      renderHook(() => <SingleOrder onDeleteSuccess={() => {}} />);
+      render(<SingleOrder onDeleteSuccess={() => {}} />);
     });
 
     // Wait for initial load
@@ -296,7 +304,7 @@ describe.skip("SingleOrder - API Encoding Tests", () => {
     );
 
     await act(async () => {
-      renderHook(() => <SingleOrder onDeleteSuccess={() => {}} />);
+      render(<SingleOrder onDeleteSuccess={() => {}} />);
     });
 
     await waitFor(() => {
@@ -318,7 +326,7 @@ describe.skip("SingleOrder - API Encoding Tests", () => {
     );
 
     await act(async () => {
-      renderHook(() => <SingleOrder onDeleteSuccess={() => {}} />);
+      render(<SingleOrder onDeleteSuccess={() => {}} />);
     });
 
     // Should decode CV-0GF59K%2F1%2F2 to CV-0GF59K/1/2 then re-encode for API
@@ -334,7 +342,9 @@ describe.skip("SingleOrder - API Encoding Tests", () => {
 });
 
 /**
- * TODO: REA-211 - SingleOrder driver info tests have fetch mocking issues
+ * SingleOrder driver information tests - verify driver data display
+ *
+ * TODO: REA-281 - Needs comprehensive component mock setup (see above)
  */
 describe.skip("SingleOrder - Driver Information API Tests", () => {
   const mockDriverData = {
@@ -523,7 +533,9 @@ describe.skip("SingleOrder - Driver Information API Tests", () => {
 });
 
 /**
- * TODO: REA-211 - SingleOrder order data tests have fetch mocking issues
+ * SingleOrder order data tests - verify order information display
+ *
+ * TODO: REA-281 - Needs comprehensive component mock setup (see above)
  */
 describe.skip("SingleOrder - Order Data API Tests", () => {
   const mockOrderData = {
@@ -744,7 +756,11 @@ describe.skip("SingleOrder - Order Data API Tests", () => {
   });
 });
 
-// TODO: Fix test isolation and timeout issues - these tests hang for 60+ seconds
+/**
+ * SingleOrder role-based visibility tests - verify user role permissions
+ *
+ * TODO: REA-281 - Needs comprehensive component mock setup (see above)
+ */
 describe.skip("SingleOrder - Role-based Visibility Tests", () => {
   const mockOrderData = {
     id: "1",
@@ -820,12 +836,11 @@ describe.skip("SingleOrder - Role-based Visibility Tests", () => {
       render(<SingleOrder onDeleteSuccess={() => {}} />);
     });
 
-    // Increase timeout and add better error messages
     await waitFor(() => {
       // Should show all order information for admin
       expect(screen.queryByText(/Catering Request/i) || screen.queryByText(/CV-PBMD00\/1/i)).toBeInTheDocument();
-    }, { timeout: 10000 });
-  }, 60000); // Increase test timeout to 60s
+    }, { timeout: 5000 });
+  }, 15000);
 
   it("should show order information for super admin users", async () => {
     // Mock super admin user role
@@ -853,8 +868,8 @@ describe.skip("SingleOrder - Role-based Visibility Tests", () => {
     await waitFor(() => {
       // Should show all order information for super admin
       expect(screen.queryByText(/Catering Request/i) || screen.queryByText(/CV-PBMD00\/1/i)).toBeInTheDocument();
-    }, { timeout: 10000 });
-  }, 60000);
+    }, { timeout: 5000 });
+  }, 15000);
 
   it("should hide order information for non-admin users", async () => {
     // Mock regular user role
@@ -882,8 +897,8 @@ describe.skip("SingleOrder - Role-based Visibility Tests", () => {
     await waitFor(() => {
       // Component should render (might show limited info or redirect)
       expect(document.body).toBeInTheDocument();
-    }, { timeout: 10000 });
-  }, 60000);
+    }, { timeout: 5000 });
+  }, 15000);
 
   it("should allow granular permission overrides", async () => {
     // Mock regular user role but with explicit permissions
@@ -920,6 +935,6 @@ describe.skip("SingleOrder - Role-based Visibility Tests", () => {
     await waitFor(() => {
       // Should show order information when explicitly granted permissions
       expect(screen.queryByText(/Catering Request/i) || screen.queryByText(/CV-PBMD00\/1/i)).toBeInTheDocument();
-    }, { timeout: 10000 });
-  }, 60000);
+    }, { timeout: 5000 });
+  }, 15000);
 });
