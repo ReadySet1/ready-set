@@ -28,10 +28,7 @@ jest.mock("@/components/Dashboard/CarrierManagement/CarrierOrdersBadge", () => (
   ),
 }));
 
-/**
- * TODO: REA-211 - CateringOrdersTable tests have component rendering issues
- */
-describe.skip("CateringOrdersTable - URL Encoding", () => {
+describe("CateringOrdersTable - URL Encoding", () => {
   const mockUserRoles: UserRole = {
     isAdmin: true,
     isSuperAdmin: false,
@@ -213,8 +210,8 @@ describe.skip("CateringOrdersTable - URL Encoding", () => {
       />,
     );
 
-    // Verify table content is displayed
-    expect(screen.getByText("CV-0GF59K/1")).toBeInTheDocument();
+    // Verify table content is displayed (use getAllByText since order number appears multiple times)
+    expect(screen.getAllByText("CV-0GF59K/1").length).toBeGreaterThan(0);
     expect(screen.getByText("John Doe")).toBeInTheDocument();
     expect(screen.getByText("$250.00")).toBeInTheDocument();
   });
