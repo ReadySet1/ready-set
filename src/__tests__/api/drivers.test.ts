@@ -13,7 +13,7 @@ const mockCreateClient = createClient as jest.MockedFunction<typeof createClient
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 
 /**
- * TODO: REA-211 - Drivers API tests have Supabase mocking issues
+ * TODO: REA-211 - Drivers API tests have Supabase/Prisma mocking issues
  */
 describe.skip('/api/drivers', () => {
   beforeEach(() => {

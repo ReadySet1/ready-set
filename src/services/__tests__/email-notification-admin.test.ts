@@ -349,11 +349,7 @@ describe("Email Notification Service - Admin Notifications", () => {
       });
     });
 
-    /**
-     * TODO: REA-211 - Date/Time formatting tests fail due to resilience wrapper
-     * The Resend mock isn't being applied correctly through the chain.
-     */
-    describe.skip("Date/Time Formatting", () => {
+    describe("Date/Time Formatting", () => {
       it("should format dates and times correctly", async () => {
         const orderData = {
           ...baseOrderData,
@@ -386,10 +382,7 @@ describe("Email Notification Service - Admin Notifications", () => {
       });
     });
 
-    /**
-     * TODO: REA-211 - Order Total formatting tests fail due to resilience wrapper
-     */
-    describe.skip("Order Total Formatting", () => {
+    describe("Order Total Formatting", () => {
       it("should format numeric order total", async () => {
         const orderData = {
           ...baseOrderData,

@@ -18,11 +18,7 @@ jest.mock("@/components/ui/use-toast", () => ({
   toast: jest.fn(),
 }));
 
-/**
- * TODO: REA-211 - Tests expect "ACTIVE" but component shows "Active" (capitalized)
- * The status display format changed but tests weren't updated
- */
-describe.skip("OrderStatusCard - Change Status Feature", () => {
+describe("OrderStatusCard - Change Status Feature", () => {
   const mockOnStatusChange = jest.fn();
   const defaultProps = {
     order_type: "catering" as OrderType,
@@ -40,7 +36,7 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
       render(<OrderStatusCard {...defaultProps} />);
 
       expect(screen.getByText("Current Status:")).toBeInTheDocument();
-      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
     });
 
     it("should display different status badges correctly", () => {
@@ -50,7 +46,7 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
           initialStatus={OrderStatus.COMPLETED}
         />,
       );
-      expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
 
       rerender(
         <OrderStatusCard
@@ -58,7 +54,7 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
           initialStatus={OrderStatus.CANCELLED}
         />,
       );
-      expect(screen.getByText("CANCELLED")).toBeInTheDocument();
+      expect(screen.getByText("Cancelled")).toBeInTheDocument();
     });
   });
 
@@ -78,7 +74,8 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
       expect(screen.queryByText("Change Status:")).not.toBeInTheDocument();
     });
 
-    it("should show change status dropdown when canChangeStatus is true and onStatusChange is provided", () => {
+    // TODO: REA-267 - Radix UI Select combobox role mocking issue
+    it.skip("should show change status dropdown when canChangeStatus is true and onStatusChange is provided", () => {
       render(<OrderStatusCard {...defaultProps} canChangeStatus={true} />);
 
       expect(screen.getByText("Change Status:")).toBeInTheDocument();
@@ -86,7 +83,8 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
     });
   });
 
-  describe("Dropdown Interaction", () => {
+  // TODO: REA-267 - Radix UI Select combobox role mocking issue
+  describe.skip("Dropdown Interaction", () => {
     it("should open dropdown when clicked", async () => {
       const user = userEvent.setup();
       render(<OrderStatusCard {...defaultProps} canChangeStatus={true} />);
@@ -96,7 +94,7 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
 
       // Wait for dropdown content to appear
       await waitFor(() => {
-        expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+        expect(screen.getByText("Active")).toBeInTheDocument();
       });
     });
 
@@ -178,7 +176,7 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
 
     it("should handle status updates", () => {
       const { rerender } = render(<OrderStatusCard {...defaultProps} />);
-      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
 
       rerender(
         <OrderStatusCard
@@ -186,7 +184,7 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
           initialStatus={OrderStatus.COMPLETED}
         />,
       );
-      expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
     });
   });
 });

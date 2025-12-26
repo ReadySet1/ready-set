@@ -38,6 +38,8 @@ const { getUserRole } = require('@/lib/auth');
 
 /**
  * TODO: REA-211 - Middleware tests have complex next/server mocking issues
+ * The NextRequest.nextUrl.pathname is undefined in jest environment when
+ * calling the actual middleware function.
  */
 describe.skip('Middleware Route Protection', () => {
   let mockSupabase: any;
@@ -332,7 +334,7 @@ describe.skip('Middleware Route Protection', () => {
 /**
  * TODO: REA-211 - RBAC tests have auth mocking issues
  */
-describe.skip('Role-Based Access Control (RBAC)', () => {
+describe('Role-Based Access Control (RBAC)', () => {
   let mockSupabase: any;
 
   beforeEach(() => {
@@ -560,7 +562,7 @@ describe.skip('Role-Based Access Control (RBAC)', () => {
 /**
  * TODO: REA-211 - Multi-tenant isolation tests have auth mocking issues
  */
-describe.skip('Multi-Tenant Data Isolation', () => {
+describe('Multi-Tenant Data Isolation', () => {
   let mockSupabase: any;
 
   beforeEach(() => {
@@ -678,7 +680,7 @@ describe.skip('Multi-Tenant Data Isolation', () => {
 /**
  * TODO: REA-211 - Security edge case tests have auth mocking issues
  */
-describe.skip('Security Edge Cases', () => {
+describe('Security Edge Cases', () => {
   describe('CSRF Protection', () => {
     // Set the expected origin for CSRF validation
     const originalEnv = process.env.NEXT_PUBLIC_SITE_URL;

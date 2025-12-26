@@ -21,10 +21,7 @@ jest.mock("next/link", () => ({
   ),
 }));
 
-/**
- * TODO: REA-211 - Footer component tests have element rendering issues
- */
-describe.skip("Footer Component", () => {
+describe("Footer Component", () => {
   describe("Basic Rendering", () => {
     it("should render the footer component without crashing", () => {
       render(<Footer />);
@@ -63,7 +60,8 @@ describe.skip("Footer Component", () => {
       render(<Footer />);
       const logo = screen.getByAltText("logo");
       expect(logo).toBeInTheDocument();
-      expect(logo).toHaveAttribute("src", "/images/logo/logo-dark.png");
+      // Logo now uses Cloudinary path without extension
+      expect(logo).toHaveAttribute("src", expect.stringContaining("logo-dark"));
       expect(logo).toHaveAttribute("width", "140");
       expect(logo).toHaveAttribute("height", "30");
     });

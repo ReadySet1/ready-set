@@ -114,10 +114,7 @@ const TestBanner: React.FC<TestBannerProps> = ({
   );
 };
 
-/**
- * TODO: REA-211 - ConditionalRenderer tests have timer mocking issues
- */
-describe.skip('Conditional Rendering Logic', () => {
+describe('Conditional Rendering Logic', () => {
   beforeEach(() => {
     jest.useFakeTimers();
   });

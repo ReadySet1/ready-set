@@ -160,7 +160,7 @@ const mockMetrics = {
 };
 
 /**
- * TODO: REA-211 - VendorPage pagination tests have fetch mocking issues
+ * TODO: REA-211 - VendorPage pagination tests have component mocking issues
  */
 describe.skip("VendorPage Pagination", () => {
   beforeEach(() => {

@@ -46,10 +46,7 @@ jest.mock('@/lib/monitoring/softDeleteMonitoring', () => ({
   },
 }));
 
-/**
- * TODO: REA-211 - Soft delete monitoring GET tests have Supabase mocking issues
- */
-describe.skip('GET /api/admin/monitoring/soft-delete', () => {
+describe('GET /api/admin/monitoring/soft-delete', () => {
   const mockSupabaseClient = {
     auth: {
       getUser: jest.fn(),
@@ -230,9 +227,10 @@ describe.skip('GET /api/admin/monitoring/soft-delete', () => {
 
       expect(response.status).toBe(200);
       expect(data.metrics).toEqual(mockMetrics);
+      // Route converts dates using toISOString() which includes milliseconds
       expect(data.timeRange).toEqual({
-        startTime,
-        endTime,
+        startTime: '2025-01-01T00:00:00.000Z',
+        endTime: '2025-01-02T00:00:00.000Z',
       });
       expect(data.timestamp).toBeDefined();
       expect(SoftDeleteMonitoringService.collectMetrics).toHaveBeenCalledWith(
@@ -424,10 +422,7 @@ describe.skip('GET /api/admin/monitoring/soft-delete', () => {
   });
 });
 
-/**
- * TODO: REA-211 - Soft delete monitoring POST tests have Supabase mocking issues
- */
-describe.skip('POST /api/admin/monitoring/soft-delete', () => {
+describe('POST /api/admin/monitoring/soft-delete', () => {
   const mockSupabaseClient = {
     auth: {
       getUser: jest.fn(),
@@ -656,10 +651,11 @@ describe.skip('POST /api/admin/monitoring/soft-delete', () => {
       await POST(request);
 
       const initiationCall = (prisma.userAudit.create as jest.Mock).mock.calls[0];
+      // Route converts dates using toISOString() which includes milliseconds
       expect(initiationCall[0].data.changes.parameters).toEqual({
         checkType: 'metrics',
-        startTime,
-        endTime,
+        startTime: '2025-01-01T00:00:00.000Z',
+        endTime: '2025-01-02T00:00:00.000Z',
       });
     });
   });

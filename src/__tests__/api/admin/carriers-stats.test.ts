@@ -33,16 +33,14 @@ jest.mock('@/lib/services/webhook-logger', () => ({
   },
 }));
 
-/**
- * TODO: REA-211 - Carrier stats API tests have Prisma mocking issues
- */
-describe.skip('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', () => {
+describe('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statistics', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   describe('GET /api/admin/carriers/[carrierId]/stats - Get Carrier Stats', () => {
-    describe('✅ Successful Retrieval', () => {
+    // TODO: REA-211 - Success tests fail due to route/mock expectation mismatches
+    describe.skip('✅ Successful Retrieval', () => {
       it('should return carrier statistics with webhook success rate', async () => {
         (CarrierService.getCarrier as jest.Mock).mockReturnValue({
           id: 'carrier-1',
@@ -255,7 +253,8 @@ describe.skip('GET/POST /api/admin/carriers/[carrierId]/stats - Carrier Statisti
         await expectErrorResponse(response, 500, /Internal server error/i);
       });
 
-      it('should return null webhook success when webhook logger fails', async () => {
+      // TODO: REA-211 - Test expects 200 but implementation returns 500
+      it.skip('should return null webhook success when webhook logger fails', async () => {
         (CarrierService.getCarrier as jest.Mock).mockReturnValue({
           id: 'carrier-1',
           orderPrefix: 'CATER',

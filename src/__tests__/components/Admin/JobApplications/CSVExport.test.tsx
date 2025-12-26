@@ -71,6 +71,8 @@ document.body.removeChild = mockRemoveChild;
 
 /**
  * TODO: REA-211 - CSV Export tests have DOM mocking issues
+ * The test overrides document.createElement and document.body.appendChild/removeChild
+ * which breaks React Testing Library's render function ("Target container is not a DOM element")
  */
 describe.skip('JobApplications CSV Export Functionality', () => {
   const mockSession = {

@@ -2,14 +2,12 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import Breadcrumb from "@/components/Common/Breadcrumb";
 
-/**
- * TODO: REA-211 - Breadcrumb responsive tests have CSS class matching issues
- */
-describe.skip("Breadcrumb - Mobile Responsiveness", () => {
+describe("Breadcrumb - Mobile Responsiveness", () => {
   const mockPageName = "Test Page";
   const mockPageDescription = "This is a test page description";
 
-  describe("Responsive Layout and Sizing", () => {
+  // TODO: REA-211 - CSS classes differ from expectations (component uses different styling)
+  describe.skip("Responsive Layout and Sizing", () => {
     it("should have mobile-first responsive padding", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
@@ -123,7 +121,8 @@ describe.skip("Breadcrumb - Mobile Responsiveness", () => {
     });
   });
 
-  describe("Responsive Container Structure", () => {
+  // TODO: REA-211 - Container CSS classes differ from expectations
+  describe.skip("Responsive Container Structure", () => {
     it("should have responsive margin structure", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
@@ -141,7 +140,8 @@ describe.skip("Breadcrumb - Mobile Responsiveness", () => {
     });
   });
 
-  describe("Responsive Background and Styling", () => {
+  // TODO: REA-211 - Background/styling CSS classes differ from expectations
+  describe.skip("Responsive Background and Styling", () => {
     it("should maintain background image styling", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
@@ -168,7 +168,8 @@ describe.skip("Breadcrumb - Mobile Responsiveness", () => {
     });
   });
 
-  describe("Responsive Border and Divider", () => {
+  // TODO: REA-211 - Border/divider CSS classes differ from expectations
+  describe.skip("Responsive Border and Divider", () => {
     it("should maintain responsive border styling", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
@@ -201,7 +202,8 @@ describe.skip("Breadcrumb - Mobile Responsiveness", () => {
       expect(contentContainer).toHaveClass("text-center");
     });
 
-    it("should maintain flex layout structure", () => {
+    // TODO: REA-211 - Flex container CSS classes differ from expectations
+    it.skip("should maintain flex layout structure", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
       const flexContainer = screen
@@ -235,7 +237,8 @@ describe.skip("Breadcrumb - Mobile Responsiveness", () => {
     });
   });
 
-  describe("Responsive Breakpoint Behavior", () => {
+  // TODO: REA-211 - Responsive breakpoint CSS classes differ from expectations
+  describe.skip("Responsive Breakpoint Behavior", () => {
     it("should apply mobile-first responsive classes", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
@@ -286,7 +289,8 @@ describe.skip("Breadcrumb - Mobile Responsiveness", () => {
       expect(screen.getByText("Home")).toBeInTheDocument();
     });
 
-    it("should maintain responsive structure regardless of content", () => {
+    // TODO: REA-211 - Responsive structure CSS classes differ from expectations
+    it.skip("should maintain responsive structure regardless of content", () => {
       render(
         <Breadcrumb
           pageName={mockPageName}
