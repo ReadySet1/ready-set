@@ -849,36 +849,155 @@ jest.mock('@radix-ui/react-alert-dialog', () => {
   };
 });
 
-// Mock Radix UI Select
+// Mock Radix UI Select with interactive behavior for testing
 jest.mock('@radix-ui/react-select', () => {
   const React = require('react');
 
-  const createMockComponent = (name: string) => {
+  // Create context to share state between components
+  const SelectContext = React.createContext({ value: '', open: false, onValueChange: undefined, onOpenChange: undefined });
+
+  // Root component manages state
+  const Root = ({ children, value, defaultValue, onValueChange, open: controlledOpen, onOpenChange, ...props }: any) => {
+    const [internalValue, setInternalValue] = React.useState(defaultValue || '');
+    const [internalOpen, setInternalOpen] = React.useState(false);
+
+    const actualValue = value !== undefined ? value : internalValue;
+    const actualOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+
+    const handleValueChange = (newValue: string) => {
+      if (value === undefined) {
+        setInternalValue(newValue);
+      }
+      onValueChange?.(newValue);
+    };
+
+    const handleOpenChange = (newOpen: boolean) => {
+      if (controlledOpen === undefined) {
+        setInternalOpen(newOpen);
+      }
+      onOpenChange?.(newOpen);
+    };
+
+    return React.createElement(
+      SelectContext.Provider,
+      { value: { value: actualValue, onValueChange: handleValueChange, open: actualOpen, onOpenChange: handleOpenChange } },
+      React.createElement('div', { 'data-testid': 'select-root', ...props }, children)
+    );
+  };
+  Root.displayName = 'SelectRoot';
+
+  // Trigger opens the select
+  const Trigger = React.forwardRef(({ children, className, ...props }: any, ref: any) => {
+    const { open, onOpenChange } = React.useContext(SelectContext);
+    return React.createElement(
+      'button',
+      {
+        ref,
+        type: 'button',
+        role: 'combobox',
+        'aria-expanded': open,
+        'data-testid': 'select-trigger',
+        className,
+        onClick: () => onOpenChange?.(!open),
+        ...props,
+      },
+      children
+    );
+  });
+  Trigger.displayName = 'SelectTrigger';
+
+  // Value displays current selection
+  const Value = React.forwardRef(({ placeholder, children, ...props }: any, ref: any) => {
+    const { value } = React.useContext(SelectContext);
+    return React.createElement(
+      'span',
+      { ref, 'data-testid': 'select-value', placeholder, ...props },
+      value || children || placeholder
+    );
+  });
+  Value.displayName = 'SelectValue';
+
+  // Content wraps items (only visible when open)
+  const Content = React.forwardRef(({ children, ...props }: any, ref: any) => {
+    const { open } = React.useContext(SelectContext);
+    if (!open) return null;
+    return React.createElement(
+      'div',
+      { ref, role: 'listbox', 'data-testid': 'select-content', ...props },
+      children
+    );
+  });
+  Content.displayName = 'SelectContent';
+
+  // Portal just renders children
+  const Portal = ({ children }: any) => children;
+  Portal.displayName = 'SelectPortal';
+
+  // Viewport wraps items
+  const Viewport = React.forwardRef(({ children, ...props }: any, ref: any) => {
+    return React.createElement('div', { ref, 'data-testid': 'select-viewport', ...props }, children);
+  });
+  Viewport.displayName = 'SelectViewport';
+
+  // Item is selectable
+  const Item = React.forwardRef(({ children, value: itemValue, disabled, ...props }: any, ref: any) => {
+    const { value, onValueChange, onOpenChange } = React.useContext(SelectContext);
+    const isSelected = value === itemValue;
+
+    const handleClick = () => {
+      if (!disabled) {
+        onValueChange?.(itemValue);
+        onOpenChange?.(false);
+      }
+    };
+
+    return React.createElement(
+      'div',
+      {
+        ref,
+        role: 'option',
+        'aria-selected': isSelected,
+        'data-disabled': disabled ? '' : undefined,
+        'data-testid': 'select-item',
+        onClick: handleClick,
+        ...props,
+      },
+      children
+    );
+  });
+  Item.displayName = 'SelectItem';
+
+  // ItemText shows the text
+  const ItemText = React.forwardRef(({ children, ...props }: any, ref: any) => {
+    return React.createElement('span', { ref, 'data-testid': 'select-item-text', ...props }, children);
+  });
+  ItemText.displayName = 'SelectItemText';
+
+  // Simple passthrough components
+  const createSimpleComponent = (name: string, testId: string) => {
     const Component = React.forwardRef(({ children, ...props }: any, ref: any) => {
-      // Filter out Radix-specific props
-      const { asChild, onValueChange, onOpenChange, value, defaultValue, ...domProps } = props;
-      return React.createElement('div', { ref, 'data-testid': `select-${name.toLowerCase()}`, ...domProps }, children);
+      return React.createElement('div', { ref, 'data-testid': testId, ...props }, children);
     });
     Component.displayName = name;
     return Component;
   };
 
   return {
-    Root: createMockComponent('Root'),
-    Trigger: createMockComponent('Trigger'),
-    Value: createMockComponent('Value'),
-    Icon: createMockComponent('Icon'),
-    Portal: createMockComponent('Portal'),
-    Content: createMockComponent('Content'),
-    Viewport: createMockComponent('Viewport'),
-    Item: createMockComponent('Item'),
-    ItemText: createMockComponent('ItemText'),
-    ItemIndicator: createMockComponent('ItemIndicator'),
-    ScrollUpButton: createMockComponent('ScrollUpButton'),
-    ScrollDownButton: createMockComponent('ScrollDownButton'),
-    Group: createMockComponent('Group'),
-    Label: createMockComponent('Label'),
-    Separator: createMockComponent('Separator'),
+    Root,
+    Trigger,
+    Value,
+    Icon: createSimpleComponent('SelectIcon', 'select-icon'),
+    Portal,
+    Content,
+    Viewport,
+    Item,
+    ItemText,
+    ItemIndicator: createSimpleComponent('SelectItemIndicator', 'select-item-indicator'),
+    ScrollUpButton: createSimpleComponent('SelectScrollUpButton', 'select-scroll-up'),
+    ScrollDownButton: createSimpleComponent('SelectScrollDownButton', 'select-scroll-down'),
+    Group: createSimpleComponent('SelectGroup', 'select-group'),
+    Label: createSimpleComponent('SelectLabel', 'select-label'),
+    Separator: createSimpleComponent('SelectSeparator', 'select-separator'),
   };
 });
 

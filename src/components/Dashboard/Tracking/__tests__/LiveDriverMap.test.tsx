@@ -8,9 +8,6 @@ import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 // Enable automocking for mapbox-gl
 jest.mock('mapbox-gl');
 
-// Import mock instances
-const mockMapInstance = (mapboxgl.Map as jest.Mock).mock.results[0]?.value;
-
 // Mock data
 const mockDriver: TrackedDriver = {
   id: 'driver-1',
@@ -80,6 +77,10 @@ const mockDelivery: DeliveryTracking = {
   assignedDriverId: 'driver-1'
 };
 
+/**
+ * LiveDriverMap component tests
+ * Uses mapbox-gl mock from src/__mocks__/mapbox-gl.ts
+ */
 describe('LiveDriverMap', () => {
   beforeEach(() => {
     jest.clearAllMocks();
