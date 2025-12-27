@@ -447,26 +447,139 @@ jest.mock('@/lib/auth', () => ({
   getCurrentUser: jest.fn().mockResolvedValue(null),
 }));
 
-// Mock Prisma client
+// ============================================================================
+// Comprehensive Prisma Mock
+// ============================================================================
+
+/**
+ * Creates a mock Prisma model with all standard CRUD methods.
+ * Methods are jest.fn() without default return values - configure them in your tests.
+ * This matches the original minimal mock behavior where tests must explicitly set return values.
+ */
+const createMockPrismaModel = () => ({
+  findUnique: jest.fn(),
+  findUniqueOrThrow: jest.fn(),
+  findFirst: jest.fn(),
+  findFirstOrThrow: jest.fn(),
+  findMany: jest.fn(),
+  create: jest.fn(),
+  createMany: jest.fn(),
+  createManyAndReturn: jest.fn(),
+  update: jest.fn(),
+  updateMany: jest.fn(),
+  upsert: jest.fn(),
+  delete: jest.fn(),
+  deleteMany: jest.fn(),
+  count: jest.fn(),
+  aggregate: jest.fn(),
+  groupBy: jest.fn(),
+});
+
+/**
+ * Shared mock Prisma client instance with all models from schema.prisma.
+ * This object is shared across all mocked import paths for consistency.
+ */
+const mockPrismaClientInstance: any = {
+  // User/Auth models
+  profile: createMockPrismaModel(),
+  userAudit: createMockPrismaModel(),
+  emailPreferences: createMockPrismaModel(),
+  profilePushToken: createMockPrismaModel(),
+  notificationAnalytics: createMockPrismaModel(),
+  notificationDedup: createMockPrismaModel(),
+  account: createMockPrismaModel(),
+  session: createMockPrismaModel(),
+
+  // Address models
+  address: createMockPrismaModel(),
+  userAddress: createMockPrismaModel(),
+
+  // Order models
+  cateringRequest: createMockPrismaModel(),
+  onDemand: createMockPrismaModel(),
+  dispatch: createMockPrismaModel(),
+
+  // File models
+  fileUpload: createMockPrismaModel(),
+  uploadError: createMockPrismaModel(),
+
+  // Calculator models
+  pricingTier: createMockPrismaModel(),
+  calculatorTemplate: createMockPrismaModel(),
+  pricingRule: createMockPrismaModel(),
+  clientConfiguration: createMockPrismaModel(),
+  calculationHistory: createMockPrismaModel(),
+  deliveryConfiguration: createMockPrismaModel(),
+
+  // Driver/Tracking models
+  driver: createMockPrismaModel(),
+  driverLocation: createMockPrismaModel(),
+  driverShift: createMockPrismaModel(),
+  delivery: createMockPrismaModel(),
+
+  // Misc models
+  verificationToken: createMockPrismaModel(),
+  formSubmission: createMockPrismaModel(),
+  leadCapture: createMockPrismaModel(),
+  jobApplication: createMockPrismaModel(),
+  testimonial: createMockPrismaModel(),
+
+  // Prisma client methods
+  $connect: jest.fn().mockResolvedValue(undefined),
+  $disconnect: jest.fn().mockResolvedValue(undefined),
+  $transaction: jest.fn().mockImplementation(async (fnOrArray: any) => {
+    if (typeof fnOrArray === 'function') {
+      return fnOrArray(mockPrismaClientInstance);
+    }
+    return Promise.all(fnOrArray);
+  }),
+  $queryRaw: jest.fn().mockResolvedValue([]),
+  $executeRaw: jest.fn().mockResolvedValue(0),
+  $queryRawUnsafe: jest.fn().mockResolvedValue([]),
+  $executeRawUnsafe: jest.fn().mockResolvedValue(0),
+};
+
+// Mock @prisma/client
 jest.mock('@prisma/client', () => ({
-  PrismaClient: jest.fn().mockImplementation(() => ({
-    $transaction: jest.fn(),
-    cateringRequest: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
+  PrismaClient: jest.fn().mockImplementation(() => mockPrismaClientInstance),
+  Prisma: {
+    PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {
+      code: string;
+      meta?: Record<string, unknown>;
+      constructor(message: string, { code, meta }: { code: string; meta?: Record<string, unknown> }) {
+        super(message);
+        this.name = 'PrismaClientKnownRequestError';
+        this.code = code;
+        this.meta = meta;
+      }
     },
-    onDemand: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
+    PrismaClientValidationError: class extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'PrismaClientValidationError';
+      }
     },
-    address: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
+    PrismaClientInitializationError: class extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'PrismaClientInitializationError';
+      }
     },
-    $disconnect: jest.fn(),
-  })),
+  },
+}));
+
+// Mock @/utils/prismaDB (most common import path for tests)
+// Note: Only mock this path as it's specifically for test utilities.
+// Other paths (@/lib/db/prisma, etc.) are left unmocked so tests that need
+// database errors will get them, while tests that mock locally can override.
+jest.mock('@/utils/prismaDB', () => ({
+  prisma: mockPrismaClientInstance,
+  prismaPooled: mockPrismaClientInstance,
+  queryMetrics: { measureQuery: jest.fn((name: string, fn: () => any) => fn()) },
+  healthCheck: { checkConnection: jest.fn().mockResolvedValue(true) },
+  withDatabaseRetry: jest.fn((fn: () => any) => fn()),
+  connectPrisma: jest.fn().mockResolvedValue(undefined),
+  disconnectPrisma: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock email sender
