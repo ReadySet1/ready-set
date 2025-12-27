@@ -11,6 +11,9 @@ import type { TrackedDriver } from '@/types/tracking';
 import { DRIVER_STATUS_COLORS, BATTERY_STATUS_COLORS } from '@/constants/tracking-colors';
 import { MARKER_CONFIG } from '@/constants/tracking-config';
 
+// Enable automocking for mapbox-gl
+jest.mock('mapbox-gl');
+
 // Mock data
 const mockDriver: TrackedDriver = {
   id: 'driver-1',
@@ -52,6 +55,10 @@ const mockStationaryLocation = {
   speed: 0
 };
 
+/**
+ * LiveDriverMap helper function tests
+ * Uses mapbox-gl mock from src/__mocks__/mapbox-gl.ts
+ */
 describe('LiveDriverMap Helper Functions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
