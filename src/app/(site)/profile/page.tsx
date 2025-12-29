@@ -28,6 +28,7 @@ import {
   Download,
   Trash2,
   Bell,
+  Lock,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/utils/supabase/client";
@@ -35,6 +36,10 @@ import { useUploadFile } from "@/hooks/use-upload-file";
 import { FileUploader } from "@/components/Uploader/file-uploader";
 import { FileWithPath } from "react-dropzone";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import {
+  PasswordChangeModal,
+  PasswordChangeSuccessModal,
+} from "@/components/Profile";
 
 interface UserProfile {
   id: string;
@@ -189,6 +194,8 @@ export default function ProfilePage() {
   const [files, setFiles] = useState<UserFile[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isPasswordSuccessModalOpen, setIsPasswordSuccessModalOpen] = useState(false);
   const supabase = createClient();
 
   // Phone number validation helper
@@ -1345,11 +1352,35 @@ export default function ProfilePage() {
                   <FileText className="h-4 w-4" />
                   My Orders
                 </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2 rounded-xl hover:bg-slate-50"
+                  onClick={() => setIsPasswordModalOpen(true)}
+                >
+                  <Lock className="h-4 w-4" />
+                  Change Password
+                </Button>
                 {/* Account Settings button removed per Phase 2 */}
               </div>
             </div>
           </div>
         </div>
+
+        {/* Password Change Modals */}
+        <PasswordChangeModal
+          isOpen={isPasswordModalOpen}
+          onClose={() => setIsPasswordModalOpen(false)}
+          userEmail={profile?.email || ""}
+          onSuccess={() => {
+            setIsPasswordModalOpen(false);
+            setIsPasswordSuccessModalOpen(true);
+          }}
+        />
+        <PasswordChangeSuccessModal
+          isOpen={isPasswordSuccessModalOpen}
+          onClose={() => setIsPasswordSuccessModalOpen(false)}
+          userEmail={profile?.email || ""}
+        />
       </motion.div>
     </div>
   );
