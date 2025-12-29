@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useUser } from "@/contexts/UserContext";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   User,
   Mail,
@@ -28,6 +37,10 @@ import {
   Download,
   Trash2,
   Bell,
+  Lock,
+  Wrench,
+  ArrowLeft,
+  ChevronRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/utils/supabase/client";
@@ -35,6 +48,10 @@ import { useUploadFile } from "@/hooks/use-upload-file";
 import { FileUploader } from "@/components/Uploader/file-uploader";
 import { FileWithPath } from "react-dropzone";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import {
+  PasswordChangeModal,
+  PasswordChangeSuccessModal,
+} from "@/components/Profile";
 
 interface UserProfile {
   id: string;
@@ -90,39 +107,39 @@ const ProfileSkeleton: React.FC = () => (
   </div>
 );
 
-// User type configuration
+// User type configuration (keys match database enum values - uppercase)
 const userTypeConfig = {
-  client: {
+  CLIENT: {
     className:
       "bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-800 border border-emerald-200",
     icon: <Building className="mr-1 h-3 w-3" />,
     color: "emerald",
   },
-  vendor: {
+  VENDOR: {
     className:
       "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-800 border border-blue-200",
     icon: <Building className="mr-1 h-3 w-3" />,
     color: "blue",
   },
-  driver: {
+  DRIVER: {
     className:
       "bg-gradient-to-r from-amber-50 to-amber-100 text-amber-800 border border-amber-200",
     icon: <User className="mr-1 h-3 w-3" />,
     color: "amber",
   },
-  admin: {
+  ADMIN: {
     className:
       "bg-gradient-to-r from-purple-50 to-purple-100 text-purple-800 border border-purple-200",
     icon: <Shield className="mr-1 h-3 w-3" />,
     color: "purple",
   },
-  super_admin: {
+  SUPER_ADMIN: {
     className:
       "bg-gradient-to-r from-rose-50 to-rose-100 text-rose-800 border border-rose-200",
     icon: <Shield className="mr-1 h-3 w-3" />,
     color: "rose",
   },
-  helpdesk: {
+  HELPDESK: {
     className:
       "bg-gradient-to-r from-indigo-50 to-indigo-100 text-indigo-800 border border-indigo-200",
     icon: <User className="mr-1 h-3 w-3" />,
@@ -130,18 +147,19 @@ const userTypeConfig = {
   },
 };
 
+// Status configuration (keys match database enum values - uppercase)
 const statusConfig = {
-  active: {
+  ACTIVE: {
     className:
       "bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-800 border border-emerald-200",
     color: "emerald",
   },
-  pending: {
+  PENDING: {
     className:
       "bg-gradient-to-r from-amber-50 to-amber-100 text-amber-800 border border-amber-200",
     color: "amber",
   },
-  deleted: {
+  DELETED: {
     className:
       "bg-gradient-to-r from-red-50 to-red-100 text-red-800 border border-red-200",
     color: "red",
@@ -189,6 +207,18 @@ export default function ProfilePage() {
   const [files, setFiles] = useState<UserFile[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isPasswordSuccessModalOpen, setIsPasswordSuccessModalOpen] = useState(false);
+
+  // Admin settings state (for super_admin users)
+  const [adminSettings, setAdminSettings] = useState({
+    userType: null as string | null,
+    userStatus: null as string | null,
+    isTemporaryPassword: false,
+  });
+  const [isAdminSettingsChanged, setIsAdminSettingsChanged] = useState(false);
+  const [isAdminSettingsSaving, setIsAdminSettingsSaving] = useState(false);
+
   const supabase = createClient();
 
   // Phone number validation helper
@@ -317,6 +347,15 @@ export default function ProfilePage() {
       const profileData = await response.json();
       setProfile(profileData);
       setEditedProfile(profileData);
+
+      // Initialize admin settings if user is SUPER_ADMIN
+      if (profileData.type === "SUPER_ADMIN") {
+        setAdminSettings({
+          userType: profileData.type,
+          userStatus: profileData.status,
+          isTemporaryPassword: profileData.isTemporaryPassword || false,
+        });
+      }
     } catch (error) {
       console.error("Error fetching profile:", error);
       toast.error("Failed to load profile");
@@ -453,6 +492,60 @@ export default function ProfilePage() {
     setIsEditing(false);
   };
 
+  // Handler for saving admin settings (super_admin only)
+  const handleSaveAdminSettings = async () => {
+    if (!user?.id || !adminSettings.userType || !adminSettings.userStatus) {
+      toast.error("User type and status are required");
+      return;
+    }
+
+    setIsAdminSettingsSaving(true);
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        toast.error("Authentication error. Please try logging in again.");
+        router.push("/sign-in");
+        return;
+      }
+
+      const response = await fetch(`/api/users/${user.id}/settings`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: adminSettings.userType,
+          status: adminSettings.userStatus,
+          isTemporaryPassword: adminSettings.isTemporaryPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update admin settings");
+      }
+
+      toast.success("Admin settings updated successfully");
+      setIsAdminSettingsChanged(false);
+
+      // Refresh profile to reflect changes
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error updating admin settings:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update admin settings"
+      );
+    } finally {
+      setIsAdminSettingsSaving(false);
+    }
+  };
+
   const handleInputChange = (field: keyof UserProfile, value: string) => {
     if (!editedProfile) return;
 
@@ -572,7 +665,7 @@ export default function ProfilePage() {
 
   // Define upload fields based on user type
   const getUploadFields = () => {
-    if (profile.type === "driver") {
+    if (profile.type === "DRIVER") {
       return [
         {
           name: "driver_photo",
@@ -619,6 +712,31 @@ export default function ProfilePage() {
 
   const uploadFields = getUploadFields();
 
+  // Helper functions for user-type aware routing
+  // Note: Database uses uppercase types (SUPER_ADMIN, ADMIN, etc.)
+  const getDashboardRoute = () => {
+    const adminTypes = ["SUPER_ADMIN", "ADMIN", "HELPDESK"];
+    return adminTypes.includes(profile?.type || "") ? "/admin" : "/client";
+  };
+
+  const getOrdersRoute = () => {
+    const adminTypes = ["SUPER_ADMIN", "ADMIN", "HELPDESK"];
+    if (adminTypes.includes(profile?.type || "")) {
+      return "/admin/catering-orders";
+    }
+    if (profile?.type === "DRIVER") {
+      return "/driver/deliveries";
+    }
+    return "/client/orders";
+  };
+
+  const getOrdersLabel = () => {
+    if (profile?.type === "DRIVER") {
+      return "My Deliveries";
+    }
+    return "My Orders";
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <motion.div
@@ -629,6 +747,25 @@ export default function ProfilePage() {
       >
         {/* Modern Header */}
         <div className="mb-8">
+          {/* Back Navigation */}
+          <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()}
+              className="gap-1 px-2 hover:text-slate-700"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <span className="text-slate-300">|</span>
+            <Link href="/" className="hover:text-slate-700">
+              Home
+            </Link>
+            <ChevronRight className="h-4 w-4" />
+            <span className="text-slate-700 font-medium">Profile</span>
+          </div>
+
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="mb-3 flex items-center gap-4">
@@ -814,7 +951,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {(profile.type === "vendor" || profile.type === "client") && (
+                {(profile.type === "VENDOR" || profile.type === "CLIENT") && (
                   <div className="space-y-2">
                     <Label
                       htmlFor="website"
@@ -995,7 +1132,7 @@ export default function ProfilePage() {
                   Documents & Files
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  {profile.type === "driver"
+                  {profile.type === "DRIVER"
                     ? "Upload required documents for driver verification"
                     : "Upload and manage your account documents"}
                 </p>
@@ -1255,7 +1392,7 @@ export default function ProfilePage() {
                     {profile.status || "pending"}
                   </Badge>
                 </div>
-                {profile.type === "driver" && (
+                {profile.type === "DRIVER" && (
                   <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
                     <p className="text-xs text-amber-700">
                       <strong>Driver Requirements:</strong> Please upload all
@@ -1265,6 +1402,110 @@ export default function ProfilePage() {
                 )}
               </div>
             </div>
+
+            {/* Admin Settings - Super Admin Only */}
+            {profile.type === "SUPER_ADMIN" && (
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-100 p-6">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+                    <Wrench className="h-5 w-5 text-rose-600" />
+                    Admin Settings
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Manage your administrative privileges
+                  </p>
+                </div>
+                <div className="space-y-4 p-6">
+                  {/* User Role Select */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-slate-700">
+                      User Role
+                    </Label>
+                    <Select
+                      value={adminSettings.userType || undefined}
+                      onValueChange={(value) => {
+                        setAdminSettings((prev) => ({
+                          ...prev,
+                          userType: value,
+                        }));
+                        setIsAdminSettingsChanged(true);
+                      }}
+                    >
+                      <SelectTrigger className="w-full rounded-xl">
+                        <SelectValue placeholder="Select user role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                        <SelectItem value="ADMIN">Admin</SelectItem>
+                        <SelectItem value="HELPDESK">Helpdesk</SelectItem>
+                        <SelectItem value="CLIENT">Client</SelectItem>
+                        <SelectItem value="VENDOR">Vendor</SelectItem>
+                        <SelectItem value="DRIVER">Driver</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Account Status Select */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-slate-700">
+                      Account Status
+                    </Label>
+                    <Select
+                      value={adminSettings.userStatus || undefined}
+                      onValueChange={(value) => {
+                        setAdminSettings((prev) => ({
+                          ...prev,
+                          userStatus: value,
+                        }));
+                        setIsAdminSettingsChanged(true);
+                      }}
+                    >
+                      <SelectTrigger className="w-full rounded-xl">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ACTIVE">Active</SelectItem>
+                        <SelectItem value="PENDING">Pending</SelectItem>
+                        <SelectItem value="DELETED">Deleted</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Require Password Reset Toggle */}
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200 p-4">
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700">
+                        Require Password Reset
+                      </Label>
+                      <p className="text-xs text-slate-500">
+                        Prompt for new password on next login
+                      </p>
+                    </div>
+                    <Switch
+                      checked={adminSettings.isTemporaryPassword}
+                      onCheckedChange={(checked) => {
+                        setAdminSettings((prev) => ({
+                          ...prev,
+                          isTemporaryPassword: checked,
+                        }));
+                        setIsAdminSettingsChanged(true);
+                      }}
+                    />
+                  </div>
+
+                  {/* Save Button */}
+                  <Button
+                    className="w-full rounded-xl"
+                    disabled={!isAdminSettingsChanged || isAdminSettingsSaving}
+                    onClick={handleSaveAdminSettings}
+                  >
+                    {isAdminSettingsSaving
+                      ? "Saving..."
+                      : "Save Admin Settings"}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Account Timeline */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -1332,7 +1573,7 @@ export default function ProfilePage() {
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-2 rounded-xl hover:bg-slate-50"
-                  onClick={() => router.push("/client")}
+                  onClick={() => router.push(getDashboardRoute())}
                 >
                   <FileText className="h-4 w-4" />
                   View Dashboard
@@ -1340,16 +1581,40 @@ export default function ProfilePage() {
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-2 rounded-xl hover:bg-slate-50"
-                  onClick={() => router.push("/client/orders")}
+                  onClick={() => router.push(getOrdersRoute())}
                 >
                   <FileText className="h-4 w-4" />
-                  My Orders
+                  {getOrdersLabel()}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2 rounded-xl hover:bg-slate-50"
+                  onClick={() => setIsPasswordModalOpen(true)}
+                >
+                  <Lock className="h-4 w-4" />
+                  Change Password
                 </Button>
                 {/* Account Settings button removed per Phase 2 */}
               </div>
             </div>
           </div>
         </div>
+
+        {/* Password Change Modals */}
+        <PasswordChangeModal
+          isOpen={isPasswordModalOpen}
+          onClose={() => setIsPasswordModalOpen(false)}
+          userEmail={profile?.email || ""}
+          onSuccess={() => {
+            setIsPasswordModalOpen(false);
+            setIsPasswordSuccessModalOpen(true);
+          }}
+        />
+        <PasswordChangeSuccessModal
+          isOpen={isPasswordSuccessModalOpen}
+          onClose={() => setIsPasswordSuccessModalOpen(false)}
+          userEmail={profile?.email || ""}
+        />
       </motion.div>
     </div>
   );
