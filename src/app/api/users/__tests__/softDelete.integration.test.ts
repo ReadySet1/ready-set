@@ -42,8 +42,7 @@ describe('User Soft Delete API Integration Tests', () => {
   });
 
   describe('Request Structure Tests', () => {
-    // TODO: REA-211 - NextRequest instanceof check fails in jest environment
-    it.skip('should handle NextRequest objects', () => {
+    it('should handle NextRequest objects', () => {
       const req = new NextRequest('http://localhost:3000/api/users/test-id', {
         method: 'DELETE',
         headers: {
@@ -51,8 +50,11 @@ describe('User Soft Delete API Integration Tests', () => {
         },
       });
 
-      expect(req).toBeInstanceOf(NextRequest);
+      // Verify NextRequest has expected properties rather than instanceof check
+      // (instanceof can fail in Jest environment due to polyfills)
       expect(req.method).toBe('DELETE');
+      expect(req.url).toContain('/api/users/test-id');
+      expect(req.headers.get('Content-Type')).toBe('application/json');
     });
 
     it('should parse JSON body correctly', async () => {

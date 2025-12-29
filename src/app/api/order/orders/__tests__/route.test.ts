@@ -1,22 +1,21 @@
 import { GET } from "../route";
-import { NextRequest } from "next/server";
+import { createGetRequest, createRequestWithParams } from "@/__tests__/helpers/api-test-helpers";
 
 // Mock the vendor service - using jest.fn() directly in mock to avoid hoisting issues
 jest.mock("@/lib/services/vendor", () => ({
-  getVendorOrders: jest.fn(),
-  checkVendorAccess: jest.fn(),
+  getUserOrders: jest.fn(),
+  checkOrderAccess: jest.fn(),
 }));
 
 // Import mocked functions after the mock is defined
-import { getVendorOrders, checkVendorAccess } from "@/lib/services/vendor";
-const mockGetVendorOrders = getVendorOrders as jest.MockedFunction<typeof getVendorOrders>;
-const mockCheckVendorAccess = checkVendorAccess as jest.MockedFunction<typeof checkVendorAccess>;
+import { getUserOrders, checkOrderAccess } from "@/lib/services/vendor";
+const mockGetUserOrders = getUserOrders as jest.MockedFunction<typeof getUserOrders>;
+const mockCheckOrderAccess = checkOrderAccess as jest.MockedFunction<typeof checkOrderAccess>;
 
-describe.skip("Vendor Orders API Route", () => {
-  // TODO: Fix OrderData type mismatches in mock data
+describe("Vendor Orders API Route", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCheckVendorAccess.mockResolvedValue(true);
+    mockCheckOrderAccess.mockResolvedValue(true);
   });
 
   it("returns orders with pagination metadata for valid request", async () => {
@@ -51,10 +50,9 @@ describe.skip("Vendor Orders API Route", () => {
       total: 5
     };
 
-    mockGetVendorOrders.mockResolvedValue(mockOrdersResult);
+    mockGetUserOrders.mockResolvedValue(mockOrdersResult);
 
-    const url = new URL("http://localhost/api/vendor/orders?page=1&limit=1");
-    const request = new NextRequest(url);
+    const request = createRequestWithParams("http://localhost/api/vendor/orders", { page: 1, limit: 1 });
 
     const response = await GET(request);
     const data = await response.json();
@@ -68,7 +66,7 @@ describe.skip("Vendor Orders API Route", () => {
       limit: 1
     });
 
-    expect(mockGetVendorOrders).toHaveBeenCalledWith(1, 1);
+    expect(mockGetUserOrders).toHaveBeenCalledWith(1, 1);
   });
 
   it("uses default pagination values when not provided", async () => {
@@ -78,10 +76,9 @@ describe.skip("Vendor Orders API Route", () => {
       total: 0
     };
 
-    mockGetVendorOrders.mockResolvedValue(mockOrdersResult);
+    mockGetUserOrders.mockResolvedValue(mockOrdersResult);
 
-    const url = new URL("http://localhost/api/vendor/orders");
-    const request = new NextRequest(url);
+    const request = createGetRequest("http://localhost/api/vendor/orders");
 
     const response = await GET(request);
     const data = await response.json();
@@ -89,7 +86,7 @@ describe.skip("Vendor Orders API Route", () => {
     expect(response.status).toBe(200);
     expect(data.page).toBe(1);
     expect(data.limit).toBe(10);
-    expect(mockGetVendorOrders).toHaveBeenCalledWith(10, 1);
+    expect(mockGetUserOrders).toHaveBeenCalledWith(10, 1);
   });
 
   it("handles page parameter correctly", async () => {
@@ -99,14 +96,13 @@ describe.skip("Vendor Orders API Route", () => {
       total: 0
     };
 
-    mockGetVendorOrders.mockResolvedValue(mockOrdersResult);
+    mockGetUserOrders.mockResolvedValue(mockOrdersResult);
 
-    const url = new URL("http://localhost/api/vendor/orders?page=3");
-    const request = new NextRequest(url);
+    const request = createRequestWithParams("http://localhost/api/vendor/orders", { page: 3 });
 
     await GET(request);
 
-    expect(mockGetVendorOrders).toHaveBeenCalledWith(10, 3);
+    expect(mockGetUserOrders).toHaveBeenCalledWith(10, 3);
   });
 
   it("handles limit parameter correctly", async () => {
@@ -116,14 +112,13 @@ describe.skip("Vendor Orders API Route", () => {
       total: 0
     };
 
-    mockGetVendorOrders.mockResolvedValue(mockOrdersResult);
+    mockGetUserOrders.mockResolvedValue(mockOrdersResult);
 
-    const url = new URL("http://localhost/api/vendor/orders?limit=5");
-    const request = new NextRequest(url);
+    const request = createRequestWithParams("http://localhost/api/vendor/orders", { limit: 5 });
 
     await GET(request);
 
-    expect(mockGetVendorOrders).toHaveBeenCalledWith(5, 1);
+    expect(mockGetUserOrders).toHaveBeenCalledWith(5, 1);
   });
 
   it("handles both page and limit parameters", async () => {
@@ -133,38 +128,35 @@ describe.skip("Vendor Orders API Route", () => {
       total: 15
     };
 
-    mockGetVendorOrders.mockResolvedValue(mockOrdersResult);
+    mockGetUserOrders.mockResolvedValue(mockOrdersResult);
 
-    const url = new URL("http://localhost/api/vendor/orders?page=2&limit=5");
-    const request = new NextRequest(url);
+    const request = createRequestWithParams("http://localhost/api/vendor/orders", { page: 2, limit: 5 });
 
     const response = await GET(request);
     const data = await response.json();
 
     expect(data.page).toBe(2);
     expect(data.limit).toBe(5);
-    expect(mockGetVendorOrders).toHaveBeenCalledWith(5, 2);
+    expect(mockGetUserOrders).toHaveBeenCalledWith(5, 2);
   });
 
   it("returns 403 when vendor access is denied", async () => {
-    mockCheckVendorAccess.mockResolvedValue(false);
+    mockCheckOrderAccess.mockResolvedValue(false);
 
-    const url = new URL("http://localhost/api/vendor/orders");
-    const request = new NextRequest(url);
+    const request = createGetRequest("http://localhost/api/vendor/orders");
 
     const response = await GET(request);
     const data = await response.json();
 
     expect(response.status).toBe(403);
     expect(data.error).toBe("Unauthorized access");
-    expect(mockGetVendorOrders).not.toHaveBeenCalled();
+    expect(mockGetUserOrders).not.toHaveBeenCalled();
   });
 
   it("handles service errors gracefully", async () => {
-    mockGetVendorOrders.mockRejectedValue(new Error("Database connection failed"));
+    mockGetUserOrders.mockRejectedValue(new Error("Database connection failed"));
 
-    const url = new URL("http://localhost/api/vendor/orders");
-    const request = new NextRequest(url);
+    const request = createGetRequest("http://localhost/api/vendor/orders");
 
     const response = await GET(request);
     const data = await response.json();
@@ -174,10 +166,9 @@ describe.skip("Vendor Orders API Route", () => {
   });
 
   it("handles service errors without message", async () => {
-    mockGetVendorOrders.mockRejectedValue(new Error());
+    mockGetUserOrders.mockRejectedValue(new Error());
 
-    const url = new URL("http://localhost/api/vendor/orders");
-    const request = new NextRequest(url);
+    const request = createGetRequest("http://localhost/api/vendor/orders");
 
     const response = await GET(request);
     const data = await response.json();
@@ -193,16 +184,15 @@ describe.skip("Vendor Orders API Route", () => {
       total: 0
     };
 
-    mockGetVendorOrders.mockResolvedValue(mockOrdersResult);
+    mockGetUserOrders.mockResolvedValue(mockOrdersResult);
 
-    const url = new URL("http://localhost/api/vendor/orders?page=invalid");
-    const request = new NextRequest(url);
+    const request = createRequestWithParams("http://localhost/api/vendor/orders", { page: "invalid" });
 
     const response = await GET(request);
     const data = await response.json();
 
-    expect(data.page).toBe(1); // Should default to 1 for invalid input
-    expect(mockGetVendorOrders).toHaveBeenCalledWith(10, 1);
+    expect(data.page).toBe(1); // Should default to 1 for invalid input (NaN becomes falsy, defaults to 1)
+    expect(mockGetUserOrders).toHaveBeenCalledWith(10, 1);
   });
 
   it("parses invalid limit parameter as default", async () => {
@@ -212,16 +202,15 @@ describe.skip("Vendor Orders API Route", () => {
       total: 0
     };
 
-    mockGetVendorOrders.mockResolvedValue(mockOrdersResult);
+    mockGetUserOrders.mockResolvedValue(mockOrdersResult);
 
-    const url = new URL("http://localhost/api/vendor/orders?limit=invalid");
-    const request = new NextRequest(url);
+    const request = createRequestWithParams("http://localhost/api/vendor/orders", { limit: "invalid" });
 
     const response = await GET(request);
     const data = await response.json();
 
-    expect(data.limit).toBe(10); // Should default to 10 for invalid input
-    expect(mockGetVendorOrders).toHaveBeenCalledWith(10, 1);
+    expect(data.limit).toBe(10); // Should default to 10 for invalid input (NaN becomes falsy, defaults to 10)
+    expect(mockGetUserOrders).toHaveBeenCalledWith(10, 1);
   });
 
   it("returns correct hasMore flag for last page", async () => {
@@ -255,10 +244,9 @@ describe.skip("Vendor Orders API Route", () => {
       total: 3
     };
 
-    mockGetVendorOrders.mockResolvedValue(mockOrdersResult);
+    mockGetUserOrders.mockResolvedValue(mockOrdersResult);
 
-    const url = new URL("http://localhost/api/vendor/orders?page=3&limit=1");
-    const request = new NextRequest(url);
+    const request = createRequestWithParams("http://localhost/api/vendor/orders", { page: 3, limit: 1 });
 
     const response = await GET(request);
     const data = await response.json();
@@ -282,7 +270,7 @@ describe.skip("Vendor Orders API Route", () => {
           pickupAddress: {
             id: "pickup-2",
             street1: "789 Pine St",
-            city: "San Jose", 
+            city: "San Jose",
             state: "CA",
             zip: "95114"
           },
@@ -290,7 +278,7 @@ describe.skip("Vendor Orders API Route", () => {
             id: "delivery-2",
             street1: "321 Elm St",
             city: "San Jose",
-            state: "CA", 
+            state: "CA",
             zip: "95115"
           }
         }
@@ -299,10 +287,9 @@ describe.skip("Vendor Orders API Route", () => {
       total: 5
     };
 
-    mockGetVendorOrders.mockResolvedValue(mockOrdersResult);
+    mockGetUserOrders.mockResolvedValue(mockOrdersResult);
 
-    const url = new URL("http://localhost/api/vendor/orders?page=2&limit=1");
-    const request = new NextRequest(url);
+    const request = createRequestWithParams("http://localhost/api/vendor/orders", { page: 2, limit: 1 });
 
     const response = await GET(request);
     const data = await response.json();

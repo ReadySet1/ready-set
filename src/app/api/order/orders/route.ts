@@ -14,12 +14,10 @@ export async function GET(req: NextRequest) {
 
     // Get limit from query params
     const searchParams = req.nextUrl.searchParams;
-    const page = searchParams.get("page") 
-      ? parseInt(searchParams.get("page") as string, 10) 
-      : 1;
-    const limit = searchParams.get("limit") 
-      ? parseInt(searchParams.get("limit") as string, 10) 
-      : 10;
+    const parsedPage = parseInt(searchParams.get("page") || "", 10);
+    const parsedLimit = parseInt(searchParams.get("limit") || "", 10);
+    const page = isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
+    const limit = isNaN(parsedLimit) || parsedLimit < 1 ? 10 : parsedLimit;
 
     // Get user orders
     const result = await getUserOrders(limit, page);
