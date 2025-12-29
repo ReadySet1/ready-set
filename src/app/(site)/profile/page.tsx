@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useUser } from "@/contexts/UserContext";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   User,
   Mail,
@@ -29,6 +38,9 @@ import {
   Trash2,
   Bell,
   Lock,
+  Wrench,
+  ArrowLeft,
+  ChevronRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/utils/supabase/client";
@@ -196,6 +208,16 @@ export default function ProfilePage() {
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isPasswordSuccessModalOpen, setIsPasswordSuccessModalOpen] = useState(false);
+
+  // Admin settings state (for super_admin users)
+  const [adminSettings, setAdminSettings] = useState({
+    userType: null as string | null,
+    userStatus: null as string | null,
+    isTemporaryPassword: false,
+  });
+  const [isAdminSettingsChanged, setIsAdminSettingsChanged] = useState(false);
+  const [isAdminSettingsSaving, setIsAdminSettingsSaving] = useState(false);
+
   const supabase = createClient();
 
   // Phone number validation helper
@@ -324,6 +346,15 @@ export default function ProfilePage() {
       const profileData = await response.json();
       setProfile(profileData);
       setEditedProfile(profileData);
+
+      // Initialize admin settings if user is super_admin
+      if (profileData.type === "super_admin") {
+        setAdminSettings({
+          userType: profileData.type,
+          userStatus: profileData.status,
+          isTemporaryPassword: profileData.isTemporaryPassword || false,
+        });
+      }
     } catch (error) {
       console.error("Error fetching profile:", error);
       toast.error("Failed to load profile");
@@ -458,6 +489,60 @@ export default function ProfilePage() {
   const handleCancel = () => {
     setEditedProfile(profile);
     setIsEditing(false);
+  };
+
+  // Handler for saving admin settings (super_admin only)
+  const handleSaveAdminSettings = async () => {
+    if (!user?.id || !adminSettings.userType || !adminSettings.userStatus) {
+      toast.error("User type and status are required");
+      return;
+    }
+
+    setIsAdminSettingsSaving(true);
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        toast.error("Authentication error. Please try logging in again.");
+        router.push("/sign-in");
+        return;
+      }
+
+      const response = await fetch(`/api/users/${user.id}/settings`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: adminSettings.userType,
+          status: adminSettings.userStatus,
+          isTemporaryPassword: adminSettings.isTemporaryPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update admin settings");
+      }
+
+      toast.success("Admin settings updated successfully");
+      setIsAdminSettingsChanged(false);
+
+      // Refresh profile to reflect changes
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error updating admin settings:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update admin settings"
+      );
+    } finally {
+      setIsAdminSettingsSaving(false);
+    }
   };
 
   const handleInputChange = (field: keyof UserProfile, value: string) => {
@@ -626,6 +711,30 @@ export default function ProfilePage() {
 
   const uploadFields = getUploadFields();
 
+  // Helper functions for user-type aware routing
+  const getDashboardRoute = () => {
+    const adminTypes = ["super_admin", "admin", "helpdesk"];
+    return adminTypes.includes(profile?.type || "") ? "/admin" : "/client";
+  };
+
+  const getOrdersRoute = () => {
+    const adminTypes = ["super_admin", "admin", "helpdesk"];
+    if (adminTypes.includes(profile?.type || "")) {
+      return "/admin/catering-orders";
+    }
+    if (profile?.type === "driver") {
+      return "/driver/deliveries";
+    }
+    return "/client/orders";
+  };
+
+  const getOrdersLabel = () => {
+    if (profile?.type === "driver") {
+      return "My Deliveries";
+    }
+    return "My Orders";
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <motion.div
@@ -636,6 +745,25 @@ export default function ProfilePage() {
       >
         {/* Modern Header */}
         <div className="mb-8">
+          {/* Back Navigation */}
+          <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()}
+              className="gap-1 px-2 hover:text-slate-700"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <span className="text-slate-300">|</span>
+            <Link href="/" className="hover:text-slate-700">
+              Home
+            </Link>
+            <ChevronRight className="h-4 w-4" />
+            <span className="text-slate-700 font-medium">Profile</span>
+          </div>
+
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="mb-3 flex items-center gap-4">
@@ -1273,6 +1401,110 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* Admin Settings - Super Admin Only */}
+            {profile.type === "super_admin" && (
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-100 p-6">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+                    <Wrench className="h-5 w-5 text-rose-600" />
+                    Admin Settings
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Manage your administrative privileges
+                  </p>
+                </div>
+                <div className="space-y-4 p-6">
+                  {/* User Role Select */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-slate-700">
+                      User Role
+                    </Label>
+                    <Select
+                      value={adminSettings.userType || undefined}
+                      onValueChange={(value) => {
+                        setAdminSettings((prev) => ({
+                          ...prev,
+                          userType: value,
+                        }));
+                        setIsAdminSettingsChanged(true);
+                      }}
+                    >
+                      <SelectTrigger className="w-full rounded-xl">
+                        <SelectValue placeholder="Select user role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="super_admin">Super Admin</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="helpdesk">Helpdesk</SelectItem>
+                        <SelectItem value="client">Client</SelectItem>
+                        <SelectItem value="vendor">Vendor</SelectItem>
+                        <SelectItem value="driver">Driver</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Account Status Select */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-slate-700">
+                      Account Status
+                    </Label>
+                    <Select
+                      value={adminSettings.userStatus || undefined}
+                      onValueChange={(value) => {
+                        setAdminSettings((prev) => ({
+                          ...prev,
+                          userStatus: value,
+                        }));
+                        setIsAdminSettingsChanged(true);
+                      }}
+                    >
+                      <SelectTrigger className="w-full rounded-xl">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="deleted">Deleted</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Require Password Reset Toggle */}
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200 p-4">
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700">
+                        Require Password Reset
+                      </Label>
+                      <p className="text-xs text-slate-500">
+                        Prompt for new password on next login
+                      </p>
+                    </div>
+                    <Switch
+                      checked={adminSettings.isTemporaryPassword}
+                      onCheckedChange={(checked) => {
+                        setAdminSettings((prev) => ({
+                          ...prev,
+                          isTemporaryPassword: checked,
+                        }));
+                        setIsAdminSettingsChanged(true);
+                      }}
+                    />
+                  </div>
+
+                  {/* Save Button */}
+                  <Button
+                    className="w-full rounded-xl"
+                    disabled={!isAdminSettingsChanged || isAdminSettingsSaving}
+                    onClick={handleSaveAdminSettings}
+                  >
+                    {isAdminSettingsSaving
+                      ? "Saving..."
+                      : "Save Admin Settings"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Account Timeline */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 p-6">
@@ -1339,7 +1571,7 @@ export default function ProfilePage() {
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-2 rounded-xl hover:bg-slate-50"
-                  onClick={() => router.push("/client")}
+                  onClick={() => router.push(getDashboardRoute())}
                 >
                   <FileText className="h-4 w-4" />
                   View Dashboard
@@ -1347,10 +1579,10 @@ export default function ProfilePage() {
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-2 rounded-xl hover:bg-slate-50"
-                  onClick={() => router.push("/client/orders")}
+                  onClick={() => router.push(getOrdersRoute())}
                 >
                   <FileText className="h-4 w-4" />
-                  My Orders
+                  {getOrdersLabel()}
                 </Button>
                 <Button
                   variant="outline"
