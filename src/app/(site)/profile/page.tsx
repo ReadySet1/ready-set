@@ -107,39 +107,39 @@ const ProfileSkeleton: React.FC = () => (
   </div>
 );
 
-// User type configuration
+// User type configuration (keys match database enum values - uppercase)
 const userTypeConfig = {
-  client: {
+  CLIENT: {
     className:
       "bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-800 border border-emerald-200",
     icon: <Building className="mr-1 h-3 w-3" />,
     color: "emerald",
   },
-  vendor: {
+  VENDOR: {
     className:
       "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-800 border border-blue-200",
     icon: <Building className="mr-1 h-3 w-3" />,
     color: "blue",
   },
-  driver: {
+  DRIVER: {
     className:
       "bg-gradient-to-r from-amber-50 to-amber-100 text-amber-800 border border-amber-200",
     icon: <User className="mr-1 h-3 w-3" />,
     color: "amber",
   },
-  admin: {
+  ADMIN: {
     className:
       "bg-gradient-to-r from-purple-50 to-purple-100 text-purple-800 border border-purple-200",
     icon: <Shield className="mr-1 h-3 w-3" />,
     color: "purple",
   },
-  super_admin: {
+  SUPER_ADMIN: {
     className:
       "bg-gradient-to-r from-rose-50 to-rose-100 text-rose-800 border border-rose-200",
     icon: <Shield className="mr-1 h-3 w-3" />,
     color: "rose",
   },
-  helpdesk: {
+  HELPDESK: {
     className:
       "bg-gradient-to-r from-indigo-50 to-indigo-100 text-indigo-800 border border-indigo-200",
     icon: <User className="mr-1 h-3 w-3" />,
@@ -147,18 +147,19 @@ const userTypeConfig = {
   },
 };
 
+// Status configuration (keys match database enum values - uppercase)
 const statusConfig = {
-  active: {
+  ACTIVE: {
     className:
       "bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-800 border border-emerald-200",
     color: "emerald",
   },
-  pending: {
+  PENDING: {
     className:
       "bg-gradient-to-r from-amber-50 to-amber-100 text-amber-800 border border-amber-200",
     color: "amber",
   },
-  deleted: {
+  DELETED: {
     className:
       "bg-gradient-to-r from-red-50 to-red-100 text-red-800 border border-red-200",
     color: "red",
@@ -347,8 +348,8 @@ export default function ProfilePage() {
       setProfile(profileData);
       setEditedProfile(profileData);
 
-      // Initialize admin settings if user is super_admin
-      if (profileData.type === "super_admin") {
+      // Initialize admin settings if user is SUPER_ADMIN
+      if (profileData.type === "SUPER_ADMIN") {
         setAdminSettings({
           userType: profileData.type,
           userStatus: profileData.status,
@@ -664,7 +665,7 @@ export default function ProfilePage() {
 
   // Define upload fields based on user type
   const getUploadFields = () => {
-    if (profile.type === "driver") {
+    if (profile.type === "DRIVER") {
       return [
         {
           name: "driver_photo",
@@ -712,24 +713,25 @@ export default function ProfilePage() {
   const uploadFields = getUploadFields();
 
   // Helper functions for user-type aware routing
+  // Note: Database uses uppercase types (SUPER_ADMIN, ADMIN, etc.)
   const getDashboardRoute = () => {
-    const adminTypes = ["super_admin", "admin", "helpdesk"];
+    const adminTypes = ["SUPER_ADMIN", "ADMIN", "HELPDESK"];
     return adminTypes.includes(profile?.type || "") ? "/admin" : "/client";
   };
 
   const getOrdersRoute = () => {
-    const adminTypes = ["super_admin", "admin", "helpdesk"];
+    const adminTypes = ["SUPER_ADMIN", "ADMIN", "HELPDESK"];
     if (adminTypes.includes(profile?.type || "")) {
       return "/admin/catering-orders";
     }
-    if (profile?.type === "driver") {
+    if (profile?.type === "DRIVER") {
       return "/driver/deliveries";
     }
     return "/client/orders";
   };
 
   const getOrdersLabel = () => {
-    if (profile?.type === "driver") {
+    if (profile?.type === "DRIVER") {
       return "My Deliveries";
     }
     return "My Orders";
@@ -949,7 +951,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {(profile.type === "vendor" || profile.type === "client") && (
+                {(profile.type === "VENDOR" || profile.type === "CLIENT") && (
                   <div className="space-y-2">
                     <Label
                       htmlFor="website"
@@ -1130,7 +1132,7 @@ export default function ProfilePage() {
                   Documents & Files
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  {profile.type === "driver"
+                  {profile.type === "DRIVER"
                     ? "Upload required documents for driver verification"
                     : "Upload and manage your account documents"}
                 </p>
@@ -1390,7 +1392,7 @@ export default function ProfilePage() {
                     {profile.status || "pending"}
                   </Badge>
                 </div>
-                {profile.type === "driver" && (
+                {profile.type === "DRIVER" && (
                   <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
                     <p className="text-xs text-amber-700">
                       <strong>Driver Requirements:</strong> Please upload all
@@ -1402,7 +1404,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Admin Settings - Super Admin Only */}
-            {profile.type === "super_admin" && (
+            {profile.type === "SUPER_ADMIN" && (
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-100 p-6">
                   <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
@@ -1433,12 +1435,12 @@ export default function ProfilePage() {
                         <SelectValue placeholder="Select user role" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="super_admin">Super Admin</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="helpdesk">Helpdesk</SelectItem>
-                        <SelectItem value="client">Client</SelectItem>
-                        <SelectItem value="vendor">Vendor</SelectItem>
-                        <SelectItem value="driver">Driver</SelectItem>
+                        <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                        <SelectItem value="ADMIN">Admin</SelectItem>
+                        <SelectItem value="HELPDESK">Helpdesk</SelectItem>
+                        <SelectItem value="CLIENT">Client</SelectItem>
+                        <SelectItem value="VENDOR">Vendor</SelectItem>
+                        <SelectItem value="DRIVER">Driver</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1462,9 +1464,9 @@ export default function ProfilePage() {
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="deleted">Deleted</SelectItem>
+                        <SelectItem value="ACTIVE">Active</SelectItem>
+                        <SelectItem value="PENDING">Pending</SelectItem>
+                        <SelectItem value="DELETED">Deleted</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
