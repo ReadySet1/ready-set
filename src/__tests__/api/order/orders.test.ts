@@ -171,9 +171,10 @@ describe('/api/order/orders GET API', () => {
       const response = await GET(request);
       const data = await response.json();
 
-      // Should default to page 1 when NaN
+      // Should default to page 1 when invalid
       expect(response.status).toBe(200);
-      expect(data.page).toBe(NaN);
+      expect(data.page).toBe(1);
+      expect(getUserOrders).toHaveBeenCalledWith(10, 1);
     });
 
     it('should handle invalid limit parameter gracefully', async () => {
@@ -191,8 +192,10 @@ describe('/api/order/orders GET API', () => {
       const response = await GET(request);
       const data = await response.json();
 
+      // Should default to limit 10 when invalid
       expect(response.status).toBe(200);
-      expect(data.limit).toBe(NaN);
+      expect(data.limit).toBe(10);
+      expect(getUserOrders).toHaveBeenCalledWith(10, 1);
     });
 
     it('should handle negative page numbers', async () => {
@@ -210,9 +213,10 @@ describe('/api/order/orders GET API', () => {
       const response = await GET(request);
       const data = await response.json();
 
+      // Should default to page 1 when negative
       expect(response.status).toBe(200);
-      expect(data.page).toBe(-1);
-      expect(getUserOrders).toHaveBeenCalledWith(10, -1);
+      expect(data.page).toBe(1);
+      expect(getUserOrders).toHaveBeenCalledWith(10, 1);
     });
 
     it('should handle zero as page number', async () => {
@@ -230,8 +234,10 @@ describe('/api/order/orders GET API', () => {
       const response = await GET(request);
       const data = await response.json();
 
+      // Should default to page 1 when zero
       expect(response.status).toBe(200);
-      expect(data.page).toBe(0);
+      expect(data.page).toBe(1);
+      expect(getUserOrders).toHaveBeenCalledWith(10, 1);
     });
   });
 
