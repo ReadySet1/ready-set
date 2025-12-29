@@ -1,546 +1,395 @@
 import React from "react";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-} from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import toast from "react-hot-toast";
-
-// Mock Next.js navigation hooks
-const mockPush = jest.fn();
-const mockPathname = jest.fn();
-
-jest.mock("next/navigation", () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
-  usePathname: () => mockPathname(),
-  useParams: () => ({ order_number: "OD-12345" }),
-}));
-
-// Mock Supabase client
-const mockSupabase = {
-  auth: {
-    getSession: jest.fn().mockResolvedValue({
-      data: { session: { access_token: "mock-token" } },
-      error: null,
-    }),
-    getUser: jest.fn().mockResolvedValue({
-      data: { user: { id: "test-user-id" } },
-      error: null,
-    }),
-    onAuthStateChange: jest.fn(() => ({
-      data: { subscription: { unsubscribe: jest.fn() } },
-    })),
-  },
-  from: jest.fn(() => ({
-    select: jest.fn(() => ({
-      eq: jest.fn(() => ({
-        single: jest.fn().mockResolvedValue({
-          data: { type: "admin" },
-          error: null,
-        }),
-      })),
-    })),
-  })),
-  storage: {
-    listBuckets: jest.fn().mockResolvedValue({
-      data: [{ name: "user-assets" }],
-      error: null,
-    }),
-  },
-};
-
-jest.mock("@/utils/supabase/client", () => ({
-  createClient: jest.fn(() => mockSupabase),
-}));
-
-// Mock broker sync service
-jest.mock("@/lib/services/brokerSyncService", () => ({
-  syncOrderStatusWithBroker: jest.fn().mockResolvedValue(undefined),
-}));
-
-// Mock fetch globally
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
 
 // Mock framer-motion
 jest.mock("framer-motion", () => ({
   motion: {
     div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    tr: ({ children, ...props }: any) => <tr {...props}>{children}</tr>,
   },
   AnimatePresence: ({ children }: any) => children,
 }));
 
-/**
- * TODO: REA-211 - OnDemand DriverAssignment tests have driver hook mocking issues
- */
-describe.skip("OnDemand Driver Assignment Functionality", () => {
-  const mockOrder = {
-    id: "ondemand-123-456-789",
-    orderNumber: "OD-12345",
-    status: "ACTIVE",
-    order_type: "on_demand",
-    orderTotal: 150.0,
-    pickupDateTime: "2025-09-25T14:00:00Z",
-    arrivalDateTime: null,
-    completeDateTime: null,
-    createdAt: "2025-09-23T11:00:00Z",
-    updatedAt: "2025-09-23T11:00:00Z",
-    userId: "9e5b3515-4e8b-4c6b-a9fc-f9388548a7dd",
-    dispatches: [],
-  };
+// Mock Dialog components
+jest.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ children, open }: any) =>
+    open ? <div data-testid="dialog">{children}</div> : null,
+  DialogContent: ({ children }: any) => (
+    <div data-testid="dialog-content">{children}</div>
+  ),
+  DialogHeader: ({ children }: any) => (
+    <div data-testid="dialog-header">{children}</div>
+  ),
+  DialogTitle: ({ children }: any) => (
+    <h2 data-testid="dialog-title">{children}</h2>
+  ),
+  DialogFooter: ({ children }: any) => (
+    <div data-testid="dialog-footer">{children}</div>
+  ),
+  DialogDescription: ({ children }: any) => (
+    <p data-testid="dialog-description">{children}</p>
+  ),
+}));
 
+// Mock Table components
+jest.mock("@/components/ui/table", () => ({
+  Table: ({ children }: any) => <table>{children}</table>,
+  TableBody: ({ children }: any) => <tbody>{children}</tbody>,
+  TableCell: ({ children }: any) => <td>{children}</td>,
+  TableHead: ({ children }: any) => <th>{children}</th>,
+  TableHeader: ({ children }: any) => <thead>{children}</thead>,
+  TableRow: ({ children }: any) => <tr>{children}</tr>,
+}));
+
+// Mock Pagination components
+jest.mock("@/components/ui/pagination", () => ({
+  Pagination: ({ children }: any) => <nav>{children}</nav>,
+  PaginationContent: ({ children }: any) => <ul>{children}</ul>,
+  PaginationItem: ({ children }: any) => <li>{children}</li>,
+  PaginationLink: ({ children, onClick }: any) => (
+    <button onClick={onClick}>{children}</button>
+  ),
+  PaginationNext: ({ onClick, className }: any) => (
+    <button onClick={onClick} className={className}>
+      Next
+    </button>
+  ),
+  PaginationPrevious: ({ onClick, className }: any) => (
+    <button onClick={onClick} className={className}>
+      Previous
+    </button>
+  ),
+}));
+
+// Mock Avatar components
+jest.mock("@/components/ui/avatar", () => ({
+  Avatar: ({ children, className }: any) => (
+    <div className={className}>{children}</div>
+  ),
+  AvatarFallback: ({ children, className }: any) => (
+    <span className={className}>{children}</span>
+  ),
+}));
+
+// Mock ScrollArea
+jest.mock("@/components/ui/scroll-area", () => ({
+  ScrollArea: ({ children }: any) => (
+    <div data-testid="scroll-area">{children}</div>
+  ),
+}));
+
+// Mock lib/utils
+jest.mock("@/lib/utils", () => ({
+  cn: (...args: any[]) => args.filter(Boolean).join(" "),
+}));
+
+describe("OnDemand Driver Assignment Dialog", () => {
   const mockDrivers = [
     {
-      id: "driver-123-456-789",
+      id: "driver-ondemand-1",
       name: "Maria Rodriguez",
-      email: "maria.rodriguez@example.com",
-      contactNumber: "5559876543",
+      email: "maria@example.com",
+      contactNumber: "5551234567",
     },
     {
-      id: "driver-987-654-321",
+      id: "driver-ondemand-2",
       name: "Carlos Mendez",
-      email: "carlos.mendez@example.com",
-      contactNumber: "5554567890",
+      email: "carlos@example.com",
+      contactNumber: "5559876543",
     },
   ];
 
+  const defaultProps = {
+    isOpen: true,
+    onOpenChange: jest.fn(),
+    isDriverAssigned: false,
+    drivers: mockDrivers,
+    selectedDriver: null,
+    onDriverSelection: jest.fn(),
+    onAssignOrEditDriver: jest.fn(),
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockPathname.mockReturnValue("/order-status/OD-12345");
+  });
 
-    // Setup default successful responses
-    mockFetch.mockImplementation((url: string) => {
-      if (url.includes("/api/orders/OD-12345?include=dispatch.driver")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockOrder),
-        });
-      }
+  it("should render dialog with on-demand order drivers", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
 
-      if (url.includes("/api/orders/OD-12345/files")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve([]),
-        });
-      }
+    render(<DriverAssignmentDialog {...defaultProps} />);
 
-      if (url.includes("/api/drivers")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockDrivers),
-        });
-      }
+    expect(screen.getByTestId("dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("dialog-title")).toHaveTextContent(
+      "Assign Driver",
+    );
+    // Verify drivers appear in both desktop and mobile views
+    expect(
+      screen.getAllByText("Maria Rodriguez").length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getAllByText("Carlos Mendez").length,
+    ).toBeGreaterThanOrEqual(1);
+  });
 
-      if (url.includes("/api/orders/assignDriver")) {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              updatedOrder: { ...mockOrder, status: "ASSIGNED" },
-              dispatch: {
-                id: "dispatch-ondemand-123",
-                driverId: "driver-123-456-789",
-                driver: mockDrivers[0],
-              },
-            }),
-        });
-      }
+  it("should call onDriverSelection with correct driver id", async () => {
+    const user = userEvent.setup();
+    const mockOnDriverSelection = jest.fn();
 
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(
+      <DriverAssignmentDialog
+        {...defaultProps}
+        onDriverSelection={mockOnDriverSelection}
+      />,
+    );
+
+    // Click the Select button for the first driver
+    const selectButtons = screen.getAllByText("Select");
+    await user.click(selectButtons[0]);
+
+    expect(mockOnDriverSelection).toHaveBeenCalledWith("driver-ondemand-1");
+  });
+
+  it("should call onAssignOrEditDriver when assigning driver", async () => {
+    const user = userEvent.setup();
+    const mockOnAssignOrEditDriver = jest.fn().mockResolvedValue(undefined);
+
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(
+      <DriverAssignmentDialog
+        {...defaultProps}
+        selectedDriver="driver-ondemand-1"
+        onAssignOrEditDriver={mockOnAssignOrEditDriver}
+      />,
+    );
+
+    const assignButton = screen.getByRole("button", { name: /assign driver/i });
+    await user.click(assignButton);
+
+    await waitFor(() => {
+      expect(mockOnAssignOrEditDriver).toHaveBeenCalled();
     });
   });
 
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
+  it("should filter drivers by search term", async () => {
+    const user = userEvent.setup();
 
-  describe("OnDemand Driver Assignment Flow", () => {
-    it("should successfully assign a driver to on-demand order", async () => {
-      const { default: SingleOnDemandOrder } = await import(
-        "@/components/Orders/OnDemand/SingleOnDemandOrder"
-      );
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
 
-      await act(async () => {
-        render(<SingleOnDemandOrder onDeleteSuccess={() => {}} />);
-      });
+    render(<DriverAssignmentDialog {...defaultProps} />);
 
-      // Open dialog
-      await waitFor(() => {
-        expect(screen.getByText("Assign Driver")).toBeInTheDocument();
-      });
+    // Both drivers visible initially
+    expect(
+      screen.getAllByText("Maria Rodriguez").length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getAllByText("Carlos Mendez").length,
+    ).toBeGreaterThanOrEqual(1);
 
-      const assignButton = screen.getByText("Assign Driver");
-      await userEvent.click(assignButton);
+    // Filter by name
+    const searchInput = screen.getByPlaceholderText(
+      "Search drivers by name or phone...",
+    );
+    await user.type(searchInput, "Maria");
 
-      // Wait for drivers to load and select one
-      await waitFor(() => {
-        expect(screen.getByText("Maria Rodriguez")).toBeInTheDocument();
-        expect(screen.getByText("Carlos Mendez")).toBeInTheDocument();
-      });
-
-      const driverSelectButton = screen.getAllByText("Select")[0];
-      expect(driverSelectButton).toBeInTheDocument();
-      await userEvent.click(driverSelectButton!);
-
-      // Wait for driver to be selected
-      await waitFor(() => {
-        expect(screen.getByText("Selected")).toBeInTheDocument();
-      });
-
-      // Click Assign Driver button in dialog
-      const assignDriverButton = screen.getByRole("button", {
-        name: /assign driver/i,
-      });
-      await userEvent.click(assignDriverButton);
-
-      // Verify API call was made with correct order type
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(
-          "/api/orders/assignDriver",
-          expect.objectContaining({
-            method: "POST",
-            headers: expect.objectContaining({
-              "Content-Type": "application/json",
-              Authorization: "Bearer mock-token",
-            }),
-            body: JSON.stringify({
-              orderId: "ondemand-123-456-789",
-              driverId: "driver-123-456-789",
-              orderType: "on_demand",
-            }),
-          }),
-        );
-      });
-
-      // Verify success toast is shown
-      expect(toast.success).toHaveBeenCalledWith(
-        "Driver assigned successfully!",
-      );
-
-      // Verify dialog closes
-      await waitFor(() => {
-        expect(
-          screen.queryByText("Select a driver to assign to this order."),
-        ).not.toBeInTheDocument();
-      });
-    });
-
-    it("should display driver information after successful assignment", async () => {
-      // Mock order with driver already assigned
-      const orderWithDriver = {
-        ...mockOrder,
-        dispatches: [
-          {
-            id: "dispatch-ondemand-123",
-            driverId: "driver-123-456-789",
-            driver: mockDrivers[0],
-          },
-        ],
-      };
-
-      mockFetch.mockImplementation((url: string) => {
-        if (url.includes("/api/orders/OD-12345?include=dispatch.driver")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(orderWithDriver),
-          });
-        }
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve([]),
-        });
-      });
-
-      const { default: SingleOnDemandOrder } = await import(
-        "@/components/Orders/OnDemand/SingleOnDemandOrder"
-      );
-
-      await act(async () => {
-        render(<SingleOnDemandOrder onDeleteSuccess={() => {}} />);
-      });
-
-      // Wait for driver info to be displayed
-      await waitFor(() => {
-        expect(screen.getByText("Maria Rodriguez")).toBeInTheDocument();
-        expect(
-          screen.getByText("maria.rodriguez@example.com"),
-        ).toBeInTheDocument();
-        expect(screen.getByText("5559876543")).toBeInTheDocument();
-      });
-    });
-
-    it("should show Update Driver button when driver is already assigned", async () => {
-      // Mock order with driver already assigned
-      const orderWithDriver = {
-        ...mockOrder,
-        dispatches: [
-          {
-            id: "dispatch-ondemand-123",
-            driverId: "driver-123-456-789",
-            driver: mockDrivers[0],
-          },
-        ],
-      };
-
-      mockFetch.mockImplementation((url: string) => {
-        if (url.includes("/api/orders/OD-12345?include=dispatch.driver")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(orderWithDriver),
-          });
-        }
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve([]),
-        });
-      });
-
-      const { default: SingleOnDemandOrder } = await import(
-        "@/components/Orders/OnDemand/SingleOnDemandOrder"
-      );
-
-      await act(async () => {
-        render(<SingleOnDemandOrder onDeleteSuccess={() => {}} />);
-      });
-
-      // Wait for Update Driver button to appear
-      await waitFor(() => {
-        expect(screen.getByText("Update Driver")).toBeInTheDocument();
-      });
-    });
-
-    it("should handle driver assignment API errors for on-demand orders", async () => {
-      // Mock API error
-      mockFetch.mockImplementation((url: string) => {
-        if (url.includes("/api/orders/assignDriver")) {
-          return Promise.resolve({
-            ok: false,
-            status: 500,
-            json: () =>
-              Promise.resolve({ error: "Database connection failed" }),
-          });
-        }
-        // Return successful responses for other calls
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockOrder),
-        });
-      });
-
-      const { default: SingleOnDemandOrder } = await import(
-        "@/components/Orders/OnDemand/SingleOnDemandOrder"
-      );
-
-      await act(async () => {
-        render(<SingleOnDemandOrder onDeleteSuccess={() => {}} />);
-      });
-
-      // Open dialog and select driver
-      await waitFor(() => {
-        expect(screen.getByText("Assign Driver")).toBeInTheDocument();
-      });
-
-      const assignButton = screen.getByText("Assign Driver");
-      await userEvent.click(assignButton);
-
-      await waitFor(() => {
-        expect(screen.getByText("Maria Rodriguez")).toBeInTheDocument();
-      });
-
-      const driverSelectButton = screen.getAllByText("Select")[0];
-      expect(driverSelectButton).toBeInTheDocument();
-      await userEvent.click(driverSelectButton!);
-
-      await waitFor(() => {
-        expect(screen.getByText("Selected")).toBeInTheDocument();
-      });
-
-      // Click Assign Driver button
-      const assignDriverButton = screen.getByRole("button", {
-        name: /assign driver/i,
-      });
-      await userEvent.click(assignDriverButton);
-
-      // Verify error toast is shown
-      await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          "Failed to assign/edit driver: Failed to assign/edit driver: Database connection failed",
-        );
-      });
-    });
-
-    it("should maintain dialog state correctly during assignment process", async () => {
-      const { default: SingleOnDemandOrder } = await import(
-        "@/components/Orders/OnDemand/SingleOnDemandOrder"
-      );
-
-      await act(async () => {
-        render(<SingleOnDemandOrder onDeleteSuccess={() => {}} />);
-      });
-
-      // Open dialog
-      await waitFor(() => {
-        expect(screen.getByText("Assign Driver")).toBeInTheDocument();
-      });
-
-      const assignButton = screen.getByText("Assign Driver");
-      await userEvent.click(assignButton);
-
-      // Wait for dialog to open
-      await waitFor(() => {
-        expect(
-          screen.getByText("Select a driver to assign to this order."),
-        ).toBeInTheDocument();
-      });
-
-      // Select a driver
-      await waitFor(() => {
-        expect(screen.getByText("Maria Rodriguez")).toBeInTheDocument();
-      });
-
-      const driverSelectButton = screen.getAllByText("Select")[0];
-      expect(driverSelectButton).toBeInTheDocument();
-      await userEvent.click(driverSelectButton!);
-
-      // Verify driver is selected and button is enabled
-      await waitFor(() => {
-        expect(screen.getByText("Selected")).toBeInTheDocument();
-        const assignDriverButton = screen.getByRole("button", {
-          name: /assign driver/i,
-        });
-        expect(assignDriverButton).not.toBeDisabled();
-      });
-
-      // Complete assignment
-      const assignDriverButton = screen.getByRole("button", {
-        name: /assign driver/i,
-      });
-      await userEvent.click(assignDriverButton);
-
-      // Verify dialog closes after successful assignment
-      await waitFor(() => {
-        expect(
-          screen.queryByText("Select a driver to assign to this order."),
-        ).not.toBeInTheDocument();
-      });
+    await waitFor(() => {
+      expect(
+        screen.getAllByText("Maria Rodriguez").length,
+      ).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByText("Carlos Mendez")).not.toBeInTheDocument();
     });
   });
 
-  describe("OnDemand Order Type Specific Tests", () => {
-    it("should use correct order type in API calls", async () => {
-      const { default: SingleOnDemandOrder } = await import(
-        "@/components/Orders/OnDemand/SingleOnDemandOrder"
-      );
+  it("should filter drivers by phone number", async () => {
+    const user = userEvent.setup();
 
-      await act(async () => {
-        render(<SingleOnDemandOrder onDeleteSuccess={() => {}} />);
-      });
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
 
-      // Open dialog and assign driver
-      await waitFor(() => {
-        expect(screen.getByText("Assign Driver")).toBeInTheDocument();
-      });
+    render(<DriverAssignmentDialog {...defaultProps} />);
 
-      const assignButton = screen.getByText("Assign Driver");
-      await userEvent.click(assignButton);
+    // Filter by phone number
+    const searchInput = screen.getByPlaceholderText(
+      "Search drivers by name or phone...",
+    );
+    await user.type(searchInput, "5559876543");
 
-      await waitFor(() => {
-        expect(screen.getByText("Maria Rodriguez")).toBeInTheDocument();
-      });
+    await waitFor(() => {
+      expect(
+        screen.getAllByText("Carlos Mendez").length,
+      ).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByText("Maria Rodriguez")).not.toBeInTheDocument();
+    });
+  });
 
-      const driverSelectButton = screen.getAllByText("Select")[0];
-      expect(driverSelectButton).toBeInTheDocument();
-      await userEvent.click(driverSelectButton!);
+  it("should show no drivers message when none match search", async () => {
+    const user = userEvent.setup();
 
-      await waitFor(() => {
-        expect(screen.getByText("Selected")).toBeInTheDocument();
-      });
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
 
-      const assignDriverButton = screen.getByRole("button", {
-        name: /assign driver/i,
-      });
-      await userEvent.click(assignDriverButton);
+    render(<DriverAssignmentDialog {...defaultProps} />);
 
-      // Verify the API call includes the correct order type
-      await waitFor(() => {
-        const assignDriverCall = mockFetch.mock.calls.find((call) =>
-          call[0].includes("/api/orders/assignDriver"),
-        );
+    // Search for non-existent driver
+    const searchInput = screen.getByPlaceholderText(
+      "Search drivers by name or phone...",
+    );
+    await user.type(searchInput, "NonExistentDriver");
 
-        expect(assignDriverCall).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByText("No drivers found")).toBeInTheDocument();
+    });
+  });
 
-        const requestBody = JSON.parse(assignDriverCall![1].body as string);
-        expect(requestBody.orderType).toBe("on_demand");
-        expect(requestBody.orderId).toBe("ondemand-123-456-789");
-      });
+  it("should show selected driver info when driver is selected", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(
+      <DriverAssignmentDialog
+        {...defaultProps}
+        selectedDriver="driver-ondemand-1"
+      />,
+    );
+
+    expect(screen.getByText("Selected Driver")).toBeInTheDocument();
+    expect(
+      screen.getAllByText("Selected").length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it("should disable assign button when no driver is selected", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(
+      <DriverAssignmentDialog {...defaultProps} selectedDriver={null} />,
+    );
+
+    const assignButton = screen.getByRole("button", { name: /assign driver/i });
+    expect(assignButton).toBeDisabled();
+  });
+
+  it("should show update title when editing existing assignment", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(
+      <DriverAssignmentDialog
+        {...defaultProps}
+        isDriverAssigned={true}
+        selectedDriver="driver-ondemand-1"
+      />,
+    );
+
+    expect(screen.getByText("Update Driver Assignment")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Select a different driver to update the current assignment.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("should close dialog when cancel is clicked", async () => {
+    const user = userEvent.setup();
+    const mockOnOpenChange = jest.fn();
+
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(
+      <DriverAssignmentDialog
+        {...defaultProps}
+        onOpenChange={mockOnOpenChange}
+      />,
+    );
+
+    const cancelButton = screen.getByRole("button", { name: /cancel/i });
+    await user.click(cancelButton);
+
+    expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("should display driver phone numbers correctly", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(<DriverAssignmentDialog {...defaultProps} />);
+
+    // Phone numbers appear in driver list
+    expect(
+      screen.getAllByText("5551234567").length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getAllByText("5559876543").length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it("should show loading state while assigning driver", async () => {
+    const user = userEvent.setup();
+    // Create a promise that we can control
+    let resolveAssignment: () => void;
+    const assignmentPromise = new Promise<void>((resolve) => {
+      resolveAssignment = resolve;
+    });
+    const mockOnAssignOrEditDriver = jest.fn(() => assignmentPromise);
+
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(
+      <DriverAssignmentDialog
+        {...defaultProps}
+        selectedDriver="driver-ondemand-1"
+        onAssignOrEditDriver={mockOnAssignOrEditDriver}
+      />,
+    );
+
+    const assignButton = screen.getByRole("button", { name: /assign driver/i });
+    await user.click(assignButton);
+
+    // Should show loading state
+    await waitFor(() => {
+      expect(screen.getByText(/assigning/i)).toBeInTheDocument();
     });
 
-    it("should handle on-demand order specific error scenarios", async () => {
-      // Mock specific on-demand order error
-      mockFetch.mockImplementation((url: string) => {
-        if (url.includes("/api/orders/assignDriver")) {
-          return Promise.resolve({
-            ok: false,
-            status: 400,
-            json: () =>
-              Promise.resolve({
-                error: "On-demand order not found or invalid status",
-              }),
-          });
-        }
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockOrder),
-        });
-      });
+    // Resolve the assignment
+    resolveAssignment!();
 
-      const { default: SingleOnDemandOrder } = await import(
-        "@/components/Orders/OnDemand/SingleOnDemandOrder"
-      );
-
-      await act(async () => {
-        render(<SingleOnDemandOrder onDeleteSuccess={() => {}} />);
-      });
-
-      // Attempt driver assignment
-      await waitFor(() => {
-        expect(screen.getByText("Assign Driver")).toBeInTheDocument();
-      });
-
-      const assignButton = screen.getByText("Assign Driver");
-      await userEvent.click(assignButton);
-
-      await waitFor(() => {
-        expect(screen.getByText("Maria Rodriguez")).toBeInTheDocument();
-      });
-
-      const driverSelectButton = screen.getAllByText("Select")[0];
-      expect(driverSelectButton).toBeInTheDocument();
-      await userEvent.click(driverSelectButton!);
-
-      await waitFor(() => {
-        expect(screen.getByText("Selected")).toBeInTheDocument();
-      });
-
-      const assignDriverButton = screen.getByRole("button", {
-        name: /assign driver/i,
-      });
-      await userEvent.click(assignDriverButton);
-
-      // Verify specific error handling
-      await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          "Failed to assign/edit driver: Failed to assign/edit driver: On-demand order not found or invalid status",
-        );
-      });
+    await waitFor(() => {
+      expect(mockOnAssignOrEditDriver).toHaveBeenCalled();
     });
+  });
+
+  it("should handle empty drivers list gracefully", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(<DriverAssignmentDialog {...defaultProps} drivers={[]} />);
+
+    expect(screen.getByText("No drivers found")).toBeInTheDocument();
+    expect(
+      screen.getByText("There are no drivers available to assign."),
+    ).toBeInTheDocument();
   });
 });
