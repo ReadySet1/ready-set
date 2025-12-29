@@ -33,15 +33,21 @@ jest.mock("@/components/Common/Breadcrumb", () => {
   };
 });
 
-// Mock the database functions
+// Mock the database functions with all required methods
 jest.mock("@/lib/db/prisma", () => ({
   prisma: {
-    order: {
-      findMany: jest.fn(),
-      count: jest.fn(),
+    cateringRequest: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { orderTotal: null, tip: null } }),
     },
-    address: {
-      count: jest.fn(),
+    onDemand: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { orderTotal: null, tip: null } }),
+    },
+    userAddress: {
+      count: jest.fn().mockResolvedValue(0),
     },
   },
 }));
@@ -51,6 +57,7 @@ const mockUser = {
   id: "test-user-id",
   email: "test@example.com",
   name: "Test User",
+  role: "CLIENT",
 };
 
 const mockDashboardData = {
@@ -73,41 +80,12 @@ const mockDashboardData = {
   ],
 };
 
-// Mock the Prisma client
-const mockPrisma = {
-  cateringRequest: {
-    findMany: jest.fn(),
-    count: jest.fn(),
-  },
-  onDemand: {
-    findMany: jest.fn(),
-    count: jest.fn(),
-  },
-  userAddress: {
-    count: jest.fn(),
-  },
-};
-
-/**
- * TODO: REA-211 - Client Dashboard Page tests have server component rendering issues
- */
-describe.skip("Client Dashboard Page", () => {
+describe("Client Dashboard Page", () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
     // Mock getCurrentUser to return a valid user
     (getCurrentUser as jest.Mock).mockResolvedValue(mockUser);
-
-    // Mock the Prisma client
-    const { prisma } = require("@/lib/db/prisma");
-    Object.assign(prisma, mockPrisma);
-
-    // Mock successful Prisma responses
-    mockPrisma.cateringRequest.findMany.mockResolvedValue([]);
-    mockPrisma.cateringRequest.count.mockResolvedValue(5);
-    mockPrisma.onDemand.findMany.mockResolvedValue([]);
-    mockPrisma.onDemand.count.mockResolvedValue(10);
-    mockPrisma.userAddress.count.mockResolvedValue(3);
   });
 
   describe("Quick Actions Links", () => {
@@ -147,14 +125,24 @@ describe.skip("Client Dashboard Page", () => {
       ).toBeInTheDocument();
     });
 
-    it('should render "New Order" link with correct href', async () => {
+    it('should render "New Catering Order" link with correct href', async () => {
       const ClientPageComponent = await ClientPage();
       render(ClientPageComponent);
 
-      const newOrderLink = screen.getByRole("link", { name: /new order/i });
+      const newCateringOrderLink = screen.getByRole("link", { name: /new catering order/i });
 
-      expect(newOrderLink).toBeInTheDocument();
-      expect(newOrderLink).toHaveAttribute("href", "/catering-request");
+      expect(newCateringOrderLink).toBeInTheDocument();
+      expect(newCateringOrderLink).toHaveAttribute("href", "/catering-request");
+    });
+
+    it('should render "New On-Demand Order" link with correct href', async () => {
+      const ClientPageComponent = await ClientPage();
+      render(ClientPageComponent);
+
+      const newOnDemandOrderLink = screen.getByRole("link", { name: /new on-demand order/i });
+
+      expect(newOnDemandOrderLink).toBeInTheDocument();
+      expect(newOnDemandOrderLink).toHaveAttribute("href", "/client/orders/new");
     });
 
     it('should render "Contact Us" link with correct href', async () => {
@@ -180,14 +168,16 @@ describe.skip("Client Dashboard Page", () => {
       const updateProfileLink = screen.getByRole("link", {
         name: /update profile/i,
       });
-      const newOrderLink = screen.getByRole("link", { name: /new order/i });
+      const newCateringOrderLink = screen.getByRole("link", { name: /new catering order/i });
+      const newOnDemandOrderLink = screen.getByRole("link", { name: /new on-demand order/i });
       const contactUsLink = screen.getByRole("link", { name: /contact us/i });
 
       // Check that quick action links have proper styling
       [
         manageAddressesLink,
         updateProfileLink,
-        newOrderLink,
+        newCateringOrderLink,
+        newOnDemandOrderLink,
         contactUsLink,
       ].forEach((link) => {
         expect(link).toHaveClass("hover:bg-gray-50");
@@ -257,7 +247,8 @@ describe.skip("Client Dashboard Page", () => {
     });
 
     it("should handle database errors gracefully", async () => {
-      mockPrisma.cateringRequest.findMany.mockRejectedValueOnce(
+      const { prisma } = require("@/lib/db/prisma");
+      prisma.cateringRequest.findMany.mockRejectedValueOnce(
         new Error("Database connection failed"),
       );
 
@@ -291,16 +282,24 @@ describe.skip("Client Dashboard Page", () => {
   });
 });
 
-/**
- * TODO: REA-211 - Client Dashboard Link Integration tests have server component issues
- */
-describe.skip("Client Dashboard Link Integration", () => {
+describe("Client Dashboard Link Integration", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getCurrentUser as jest.Mock).mockResolvedValue({
+      id: "test-user-id",
+      email: "test@example.com",
+      name: "Test User",
+      role: "CLIENT",
+    });
+  });
+
   it("should have all quick action links pointing to correct routes", async () => {
     const ClientPageComponent = await ClientPage();
     render(ClientPageComponent);
 
     const expectedLinks = [
-      { name: /new order/i, href: "/catering-request" },
+      { name: /new catering order/i, href: "/catering-request" },
+      { name: /new on-demand order/i, href: "/client/orders/new" },
       { name: /manage addresses/i, href: "/addresses" },
       { name: /update profile/i, href: "/profile" },
       { name: /contact us/i, href: "/contact" },
@@ -323,14 +322,16 @@ describe.skip("Client Dashboard Link Integration", () => {
     const updateProfileLink = screen.getByRole("link", {
       name: /update profile/i,
     });
-    const newOrderLink = screen.getByRole("link", { name: /new order/i });
+    const newCateringOrderLink = screen.getByRole("link", { name: /new catering order/i });
+    const newOnDemandOrderLink = screen.getByRole("link", { name: /new on-demand order/i });
     const contactUsLink = screen.getByRole("link", { name: /contact us/i });
 
     // Check that quick action links have consistent styling
     [
       manageAddressesLink,
       updateProfileLink,
-      newOrderLink,
+      newCateringOrderLink,
+      newOnDemandOrderLink,
       contactUsLink,
     ].forEach((link) => {
       expect(link).toHaveClass("flex");

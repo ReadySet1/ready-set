@@ -1,220 +1,286 @@
 import React from "react";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import toast from "react-hot-toast";
-
-// Mock Next.js navigation hooks
-const mockPush = jest.fn();
-const mockPathname = jest.fn();
-
-jest.mock("next/navigation", () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
-  usePathname: () => mockPathname(),
-  useParams: () => ({ order_number: "SF-56780" }),
-}));
-
-// Mock Supabase client
-const mockSupabase = {
-  auth: {
-    getSession: jest.fn().mockResolvedValue({
-      data: { session: { access_token: "mock-token" } },
-      error: null,
-    }),
-    getUser: jest.fn().mockResolvedValue({
-      data: { user: { id: "test-user-id" } },
-      error: null,
-    }),
-    onAuthStateChange: jest.fn(() => ({
-      data: { subscription: { unsubscribe: jest.fn() } },
-    })),
-  },
-  from: jest.fn(() => ({
-    select: jest.fn(() => ({
-      eq: jest.fn(() => ({
-        single: jest.fn().mockResolvedValue({
-          data: { type: "admin" },
-          error: null,
-        }),
-      })),
-    })),
-  })),
-  storage: {
-    listBuckets: jest.fn().mockResolvedValue({
-      data: [{ name: "user-assets" }],
-      error: null,
-    }),
-  },
-};
-
-jest.mock("@/utils/supabase/client", () => ({
-  createClient: jest.fn(() => mockSupabase),
-}));
-
-// Mock broker sync service
-jest.mock("@/lib/services/brokerSyncService", () => ({
-  syncOrderStatusWithBroker: jest.fn().mockResolvedValue(undefined),
-}));
-
-// Mock fetch globally
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
 
 // Mock framer-motion
 jest.mock("framer-motion", () => ({
   motion: {
     div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    tr: ({ children, ...props }: any) => <tr {...props}>{children}</tr>,
   },
   AnimatePresence: ({ children }: any) => children,
 }));
 
-// TODO: Fix test isolation issues - test fails due to component rendering issues
-describe.skip("Driver Assignment - Quick Test", () => {
-  const mockOrder = {
-    id: "6b5c977d-ee51-411a-a695-8c95d88735df",
-    orderNumber: "SF-56780",
-    status: "ACTIVE",
-    order_type: "catering",
-    orderTotal: 250.0,
-    pickupDateTime: "2025-09-25T12:00:00Z",
-    arrivalDateTime: null,
-    completeDateTime: null,
-    createdAt: "2025-09-23T10:00:00Z",
-    updatedAt: "2025-09-23T10:00:00Z",
-    userId: "9e5b3515-4e8b-4c6b-a9fc-f9388548a7dd",
-    dispatches: [],
-  };
+// Mock Dialog components
+jest.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ children, open }: any) =>
+    open ? <div data-testid="dialog">{children}</div> : null,
+  DialogContent: ({ children }: any) => (
+    <div data-testid="dialog-content">{children}</div>
+  ),
+  DialogHeader: ({ children }: any) => (
+    <div data-testid="dialog-header">{children}</div>
+  ),
+  DialogTitle: ({ children }: any) => (
+    <h2 data-testid="dialog-title">{children}</h2>
+  ),
+  DialogFooter: ({ children }: any) => (
+    <div data-testid="dialog-footer">{children}</div>
+  ),
+  DialogDescription: ({ children }: any) => (
+    <p data-testid="dialog-description">{children}</p>
+  ),
+}));
 
+// Mock Table components
+jest.mock("@/components/ui/table", () => ({
+  Table: ({ children }: any) => <table>{children}</table>,
+  TableBody: ({ children }: any) => <tbody>{children}</tbody>,
+  TableCell: ({ children }: any) => <td>{children}</td>,
+  TableHead: ({ children }: any) => <th>{children}</th>,
+  TableHeader: ({ children }: any) => <thead>{children}</thead>,
+  TableRow: ({ children }: any) => <tr>{children}</tr>,
+}));
+
+// Mock Pagination components
+jest.mock("@/components/ui/pagination", () => ({
+  Pagination: ({ children }: any) => <nav>{children}</nav>,
+  PaginationContent: ({ children }: any) => <ul>{children}</ul>,
+  PaginationItem: ({ children }: any) => <li>{children}</li>,
+  PaginationLink: ({ children, onClick }: any) => (
+    <button onClick={onClick}>{children}</button>
+  ),
+  PaginationNext: ({ onClick, className }: any) => (
+    <button onClick={onClick} className={className}>
+      Next
+    </button>
+  ),
+  PaginationPrevious: ({ onClick, className }: any) => (
+    <button onClick={onClick} className={className}>
+      Previous
+    </button>
+  ),
+}));
+
+// Mock Avatar components
+jest.mock("@/components/ui/avatar", () => ({
+  Avatar: ({ children, className }: any) => (
+    <div className={className}>{children}</div>
+  ),
+  AvatarFallback: ({ children, className }: any) => (
+    <span className={className}>{children}</span>
+  ),
+}));
+
+// Mock ScrollArea
+jest.mock("@/components/ui/scroll-area", () => ({
+  ScrollArea: ({ children }: any) => (
+    <div data-testid="scroll-area">{children}</div>
+  ),
+}));
+
+// Mock lib/utils
+jest.mock("@/lib/utils", () => ({
+  cn: (...args: any[]) => args.filter(Boolean).join(" "),
+}));
+
+describe("Driver Assignment Dialog", () => {
   const mockDrivers = [
     {
-      id: "d2e6f3ef-d801-4dd0-b840-c8de7754a6bd",
+      id: "driver-1",
       name: "David Sanchez",
-      email: "davids2002@gmail.com",
-      contactNumber: "4792608514",
+      email: "david@example.com",
+      contactNumber: "5551234567",
+    },
+    {
+      id: "driver-2",
+      name: "Maria Rodriguez",
+      email: "maria@example.com",
+      contactNumber: "5559876543",
     },
   ];
 
+  const defaultProps = {
+    isOpen: true,
+    onOpenChange: jest.fn(),
+    isDriverAssigned: false,
+    drivers: mockDrivers,
+    selectedDriver: null,
+    onDriverSelection: jest.fn(),
+    onAssignOrEditDriver: jest.fn(),
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockPathname.mockReturnValue("/order-status/SF-56780");
+  });
 
-    // Setup default successful responses
-    mockFetch.mockImplementation((url: string) => {
-      if (url.includes("/api/orders/SF-56780?include=dispatch.driver")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockOrder),
-        });
-      }
+  it("should render dialog when open", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
 
-      if (url.includes("/api/orders/SF-56780/files")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve([]),
-        });
-      }
+    render(<DriverAssignmentDialog {...defaultProps} />);
 
-      if (url.includes("/api/drivers")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockDrivers),
-        });
-      }
+    expect(screen.getByTestId("dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("dialog-title")).toHaveTextContent("Assign Driver");
+    expect(
+      screen.getByText("Select a driver to assign to this order."),
+    ).toBeInTheDocument();
+  });
 
-      if (url.includes("/api/orders/assignDriver")) {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              updatedOrder: { ...mockOrder, status: "ASSIGNED" },
-              dispatch: {
-                id: "dispatch-123",
-                driverId: "d2e6f3ef-d801-4dd0-b840-c8de7754a6bd",
-                driver: mockDrivers[0],
-              },
-            }),
-        });
-      }
+  it("should not render dialog when closed", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
 
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
+    render(<DriverAssignmentDialog {...defaultProps} isOpen={false} />);
+
+    expect(screen.queryByTestId("dialog")).not.toBeInTheDocument();
+  });
+
+  it("should display available drivers", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(<DriverAssignmentDialog {...defaultProps} />);
+
+    // Driver names appear in both desktop table and mobile cards
+    expect(screen.getAllByText("David Sanchez").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Maria Rodriguez").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("should call onDriverSelection when driver is selected", async () => {
+    const user = userEvent.setup();
+    const mockOnDriverSelection = jest.fn();
+
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(
+      <DriverAssignmentDialog
+        {...defaultProps}
+        onDriverSelection={mockOnDriverSelection}
+      />,
+    );
+
+    // Click the Select button for the first driver
+    const selectButtons = screen.getAllByText("Select");
+    await user.click(selectButtons[0]);
+
+    expect(mockOnDriverSelection).toHaveBeenCalledWith("driver-1");
+  });
+
+  it("should show selected state when driver is selected", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(
+      <DriverAssignmentDialog {...defaultProps} selectedDriver="driver-1" />,
+    );
+
+    // Should show "Selected" text and "Selected Driver" label
+    // "Selected" appears multiple times (in buttons and badges)
+    expect(screen.getAllByText("Selected").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Selected Driver")).toBeInTheDocument();
+  });
+
+  it("should call onAssignOrEditDriver when assign button is clicked", async () => {
+    const user = userEvent.setup();
+    const mockOnAssignOrEditDriver = jest.fn().mockResolvedValue(undefined);
+
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(
+      <DriverAssignmentDialog
+        {...defaultProps}
+        selectedDriver="driver-1"
+        onAssignOrEditDriver={mockOnAssignOrEditDriver}
+      />,
+    );
+
+    // Find and click the assign button in the footer
+    const assignButton = screen.getByRole("button", { name: /assign driver/i });
+    await user.click(assignButton);
+
+    await waitFor(() => {
+      expect(mockOnAssignOrEditDriver).toHaveBeenCalled();
     });
   });
 
-  it("should successfully assign a driver and close dialog", async () => {
-    const { default: SingleOrder } = await import(
-      "@/components/Orders/SingleOrder"
+  it("should disable assign button when no driver is selected", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
     );
 
-    await act(async () => {
-      render(<SingleOrder onDeleteSuccess={() => {}} />);
-    });
+    render(
+      <DriverAssignmentDialog {...defaultProps} selectedDriver={null} />,
+    );
 
-    // Wait for component to load
+    const assignButton = screen.getByRole("button", { name: /assign driver/i });
+    expect(assignButton).toBeDisabled();
+  });
+
+  it("should show update title when driver is already assigned", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(
+      <DriverAssignmentDialog {...defaultProps} isDriverAssigned={true} />,
+    );
+
+    expect(screen.getByText("Update Driver Assignment")).toBeInTheDocument();
+  });
+
+  it("should filter drivers by search term", async () => {
+    const user = userEvent.setup();
+
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(<DriverAssignmentDialog {...defaultProps} />);
+
+    // Both drivers should be visible initially (appear in both desktop and mobile views)
+    expect(screen.getAllByText("David Sanchez").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Maria Rodriguez").length).toBeGreaterThanOrEqual(1);
+
+    // Type in search
+    const searchInput = screen.getByPlaceholderText(
+      "Search drivers by name or phone...",
+    );
+    await user.type(searchInput, "David");
+
+    // Only David should be visible after filtering
     await waitFor(() => {
-      expect(screen.getByText("Assign Driver")).toBeInTheDocument();
+      expect(screen.getAllByText("David Sanchez").length).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByText("Maria Rodriguez")).not.toBeInTheDocument();
     });
+  });
 
-    // Click Assign Driver button
-    const assignButton = screen.getByText("Assign Driver");
-    await userEvent.click(assignButton);
+  it("should call onOpenChange when cancel is clicked", async () => {
+    const user = userEvent.setup();
+    const mockOnOpenChange = jest.fn();
 
-    // Wait for dialog to open
-    await waitFor(() => {
-      expect(
-        screen.getByText("Select a driver to assign to this order."),
-      ).toBeInTheDocument();
-    });
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
 
-    // Wait for drivers to load and select one
-    await waitFor(() => {
-      expect(screen.getByText("David Sanchez")).toBeInTheDocument();
-    });
+    render(
+      <DriverAssignmentDialog
+        {...defaultProps}
+        onOpenChange={mockOnOpenChange}
+      />,
+    );
 
-    const driverSelectButton = screen.getByText("Select");
-    await userEvent.click(driverSelectButton);
+    const cancelButton = screen.getByRole("button", { name: /cancel/i });
+    await user.click(cancelButton);
 
-    // Wait for driver to be selected
-    await waitFor(() => {
-      expect(screen.getByText("Selected")).toBeInTheDocument();
-    });
-
-    // Click Assign Driver button in dialog
-    const assignDriverButton = screen.getByRole("button", {
-      name: /assign driver/i,
-    });
-    await userEvent.click(assignDriverButton);
-
-    // Verify API call was made
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        "/api/orders/assignDriver",
-        expect.objectContaining({
-          method: "POST",
-          headers: expect.objectContaining({
-            "Content-Type": "application/json",
-            Authorization: "Bearer mock-token",
-          }),
-          body: JSON.stringify({
-            orderId: "6b5c977d-ee51-411a-a695-8c95d88735df",
-            driverId: "d2e6f3ef-d801-4dd0-b840-c8de7754a6bd",
-            orderType: "catering",
-          }),
-        }),
-      );
-    });
-
-    // Verify success toast is shown
-    expect(toast.success).toHaveBeenCalledWith("Driver assigned successfully!");
-
-    // Verify dialog closes
-    await waitFor(() => {
-      expect(
-        screen.queryByText("Select a driver to assign to this order."),
-      ).not.toBeInTheDocument();
-    });
-  }, 10000); // 10 second timeout
+    expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+  });
 });
