@@ -54,10 +54,7 @@ const mockFavoriteRow = {
   },
 };
 
-/**
- * TODO: REA-211 - useAddressFavorites tests have QueryClient mocking issues
- */
-describe.skip('useAddressFavorites', () => {
+describe('useAddressFavorites', () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {

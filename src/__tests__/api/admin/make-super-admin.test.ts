@@ -22,7 +22,8 @@ jest.mock('@/lib/db/prisma', () => ({
 const ORIGINAL_ENV = process.env;
 
 /**
- * TODO: REA-211 - Make super admin API tests have Prisma mocking issues
+ * TODO: REA-211 - Make super admin API tests need module reset for env var caching
+ * The route caches SUPER_ADMIN_SECRET at module import time, so beforeEach changes don't work
  */
 describe.skip('/api/admin/make-super-admin API', () => {
   beforeEach(() => {

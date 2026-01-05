@@ -32,10 +32,7 @@ jest.mock("framer-motion", () => ({
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-/**
- * TODO: REA-211 - OnDemandOrders tests have component rendering issues
- */
-describe.skip("OnDemandOrders - URL Encoding", () => {
+describe("OnDemandOrders - URL Encoding", () => {
   beforeEach(() => {
     jest.clearAllMocks();
 

@@ -11,31 +11,37 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
  * - Security considerations
  */
 
-// Mock Supabase client
+// Module-level mock functions
 const mockCreateSignedUrl = jest.fn();
 const mockGetPublicUrl = jest.fn();
 
-// Mock the createClient function
+// Mock Supabase server module with stable mock functions
 jest.mock('@/utils/supabase/server', () => ({
-  createClient: jest.fn(async () => ({
-    storage: {
-      from: jest.fn(() => ({
-        createSignedUrl: mockCreateSignedUrl,
-        getPublicUrl: mockGetPublicUrl
-      }))
-    }
-  }))
+  createClient: jest.fn(),
+  createAdminClient: jest.fn()
 }));
 
 // Import after mocking
 import { getSignedUrl, getFileUrl } from '@/utils/file-service';
+import { createClient, createAdminClient } from '@/utils/supabase/server';
 
-/**
- * TODO: REA-211 - Signed URL generation tests have Supabase storage mocking issues
- */
-describe.skip('Signed URL Generation', () => {
+describe('Signed URL Generation', () => {
   beforeEach(() => {
+    // Reset mock call history but keep implementations
     jest.clearAllMocks();
+
+    // Setup mock storage client with stable mock functions
+    const mockStorageClient = {
+      storage: {
+        from: jest.fn(() => ({
+          createSignedUrl: mockCreateSignedUrl,
+          getPublicUrl: mockGetPublicUrl
+        }))
+      }
+    };
+
+    (createClient as jest.Mock).mockResolvedValue(mockStorageClient);
+    (createAdminClient as jest.Mock).mockResolvedValue(mockStorageClient);
   });
 
   describe('getSignedUrl', () => {
@@ -74,9 +80,10 @@ describe.skip('Signed URL Generation', () => {
         error: { message: 'File not found' }
       });
 
+      // Supabase returns plain objects with message property, not Error instances
       await expect(
         getSignedUrl('test-bucket', 'non-existent-file.pdf')
-      ).rejects.toThrow('File not found');
+      ).rejects.toMatchObject({ message: 'File not found' });
     });
 
     it('should handle errors for invalid bucket name', async () => {
@@ -87,7 +94,7 @@ describe.skip('Signed URL Generation', () => {
 
       await expect(
         getSignedUrl('invalid-bucket', 'file.pdf')
-      ).rejects.toThrow('Bucket not found');
+      ).rejects.toMatchObject({ message: 'Bucket not found' });
     });
 
     it('should handle permission errors', async () => {
@@ -98,7 +105,7 @@ describe.skip('Signed URL Generation', () => {
 
       await expect(
         getSignedUrl('private-bucket', 'restricted-file.pdf')
-      ).rejects.toThrow('Permission denied');
+      ).rejects.toMatchObject({ message: 'Permission denied' });
     });
 
     it('should generate different URLs for the same file when called multiple times', async () => {
@@ -184,9 +191,10 @@ describe.skip('Signed URL Generation', () => {
         error: { message: 'Invalid expiration time' }
       });
 
+      // Supabase returns plain objects with message property, not Error instances
       await expect(
         getSignedUrl('test-bucket', 'file.pdf', -60)
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ message: 'Invalid expiration time' });
     });
 
     it('should handle very long expiration times', async () => {
@@ -291,9 +299,10 @@ describe.skip('Signed URL Generation', () => {
         error: { message: 'Service unavailable', status: 503 }
       });
 
+      // Supabase returns plain objects with message property, not Error instances
       await expect(
         getSignedUrl('test-bucket', 'file.pdf')
-      ).rejects.toThrow('Service unavailable');
+      ).rejects.toMatchObject({ message: 'Service unavailable' });
     });
 
     it('should handle quota exceeded errors', async () => {
@@ -304,20 +313,21 @@ describe.skip('Signed URL Generation', () => {
 
       await expect(
         getSignedUrl('test-bucket', 'file.pdf')
-      ).rejects.toThrow('Storage quota exceeded');
+      ).rejects.toMatchObject({ message: 'Storage quota exceeded' });
     });
   });
 
   describe('Edge Cases', () => {
-    it('should handle empty file paths', async () => {
+    it('should handle empty file paths by passing to storage API', async () => {
+      // Note: Validation for empty paths is done by Supabase storage, not application code
+      const mockSignedUrl = 'https://storage.example.com/signed/?token=abc';
       mockCreateSignedUrl.mockResolvedValueOnce({
-        data: null,
-        error: { message: 'Invalid file path' }
+        data: { signedUrl: mockSignedUrl },
+        error: null
       });
 
-      await expect(
-        getSignedUrl('test-bucket', '')
-      ).rejects.toThrow('Invalid file path');
+      const result = await getSignedUrl('test-bucket', '');
+      expect(result).toBe(mockSignedUrl);
     });
 
     it('should handle very long file paths', async () => {
@@ -342,15 +352,16 @@ describe.skip('Signed URL Generation', () => {
       expect(result).toContain('token=');
     });
 
-    it('should handle zero expiration time', async () => {
+    it('should handle zero expiration time by passing to storage API', async () => {
+      // Note: Validation for zero expiration is done by Supabase storage, not application code
+      const mockSignedUrl = 'https://storage.example.com/signed/file.pdf?token=abc';
       mockCreateSignedUrl.mockResolvedValueOnce({
-        data: null,
-        error: { message: 'Expiration time must be positive' }
+        data: { signedUrl: mockSignedUrl },
+        error: null
       });
 
-      await expect(
-        getSignedUrl('test-bucket', 'file.pdf', 0)
-      ).rejects.toThrow();
+      const result = await getSignedUrl('test-bucket', 'file.pdf', 0);
+      expect(result).toBe(mockSignedUrl);
     });
   });
 });

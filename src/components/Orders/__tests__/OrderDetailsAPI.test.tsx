@@ -75,9 +75,9 @@ const createMockResponse = (
   }) as Response;
 
 /**
- * TODO: REA-211 - OrderDetailsAPI tests have fetch mocking issues
+ * Order Details API integration tests - verify API response handling
  */
-describe.skip("Order Details API Integration Tests", () => {
+describe("Order Details API Integration Tests", () => {
   const mockDriverData = {
     id: "driver-123",
     name: "David Sanchez",

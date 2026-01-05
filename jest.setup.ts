@@ -447,26 +447,139 @@ jest.mock('@/lib/auth', () => ({
   getCurrentUser: jest.fn().mockResolvedValue(null),
 }));
 
-// Mock Prisma client
+// ============================================================================
+// Comprehensive Prisma Mock
+// ============================================================================
+
+/**
+ * Creates a mock Prisma model with all standard CRUD methods.
+ * Methods are jest.fn() without default return values - configure them in your tests.
+ * This matches the original minimal mock behavior where tests must explicitly set return values.
+ */
+const createMockPrismaModel = () => ({
+  findUnique: jest.fn(),
+  findUniqueOrThrow: jest.fn(),
+  findFirst: jest.fn(),
+  findFirstOrThrow: jest.fn(),
+  findMany: jest.fn(),
+  create: jest.fn(),
+  createMany: jest.fn(),
+  createManyAndReturn: jest.fn(),
+  update: jest.fn(),
+  updateMany: jest.fn(),
+  upsert: jest.fn(),
+  delete: jest.fn(),
+  deleteMany: jest.fn(),
+  count: jest.fn(),
+  aggregate: jest.fn(),
+  groupBy: jest.fn(),
+});
+
+/**
+ * Shared mock Prisma client instance with all models from schema.prisma.
+ * This object is shared across all mocked import paths for consistency.
+ */
+const mockPrismaClientInstance: any = {
+  // User/Auth models
+  profile: createMockPrismaModel(),
+  userAudit: createMockPrismaModel(),
+  emailPreferences: createMockPrismaModel(),
+  profilePushToken: createMockPrismaModel(),
+  notificationAnalytics: createMockPrismaModel(),
+  notificationDedup: createMockPrismaModel(),
+  account: createMockPrismaModel(),
+  session: createMockPrismaModel(),
+
+  // Address models
+  address: createMockPrismaModel(),
+  userAddress: createMockPrismaModel(),
+
+  // Order models
+  cateringRequest: createMockPrismaModel(),
+  onDemand: createMockPrismaModel(),
+  dispatch: createMockPrismaModel(),
+
+  // File models
+  fileUpload: createMockPrismaModel(),
+  uploadError: createMockPrismaModel(),
+
+  // Calculator models
+  pricingTier: createMockPrismaModel(),
+  calculatorTemplate: createMockPrismaModel(),
+  pricingRule: createMockPrismaModel(),
+  clientConfiguration: createMockPrismaModel(),
+  calculationHistory: createMockPrismaModel(),
+  deliveryConfiguration: createMockPrismaModel(),
+
+  // Driver/Tracking models
+  driver: createMockPrismaModel(),
+  driverLocation: createMockPrismaModel(),
+  driverShift: createMockPrismaModel(),
+  delivery: createMockPrismaModel(),
+
+  // Misc models
+  verificationToken: createMockPrismaModel(),
+  formSubmission: createMockPrismaModel(),
+  leadCapture: createMockPrismaModel(),
+  jobApplication: createMockPrismaModel(),
+  testimonial: createMockPrismaModel(),
+
+  // Prisma client methods
+  $connect: jest.fn().mockResolvedValue(undefined),
+  $disconnect: jest.fn().mockResolvedValue(undefined),
+  $transaction: jest.fn().mockImplementation(async (fnOrArray: any) => {
+    if (typeof fnOrArray === 'function') {
+      return fnOrArray(mockPrismaClientInstance);
+    }
+    return Promise.all(fnOrArray);
+  }),
+  $queryRaw: jest.fn().mockResolvedValue([]),
+  $executeRaw: jest.fn().mockResolvedValue(0),
+  $queryRawUnsafe: jest.fn().mockResolvedValue([]),
+  $executeRawUnsafe: jest.fn().mockResolvedValue(0),
+};
+
+// Mock @prisma/client
 jest.mock('@prisma/client', () => ({
-  PrismaClient: jest.fn().mockImplementation(() => ({
-    $transaction: jest.fn(),
-    cateringRequest: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
+  PrismaClient: jest.fn().mockImplementation(() => mockPrismaClientInstance),
+  Prisma: {
+    PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {
+      code: string;
+      meta?: Record<string, unknown>;
+      constructor(message: string, { code, meta }: { code: string; meta?: Record<string, unknown> }) {
+        super(message);
+        this.name = 'PrismaClientKnownRequestError';
+        this.code = code;
+        this.meta = meta;
+      }
     },
-    onDemand: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
+    PrismaClientValidationError: class extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'PrismaClientValidationError';
+      }
     },
-    address: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
+    PrismaClientInitializationError: class extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'PrismaClientInitializationError';
+      }
     },
-    $disconnect: jest.fn(),
-  })),
+  },
+}));
+
+// Mock @/utils/prismaDB (most common import path for tests)
+// Note: Only mock this path as it's specifically for test utilities.
+// Other paths (@/lib/db/prisma, etc.) are left unmocked so tests that need
+// database errors will get them, while tests that mock locally can override.
+jest.mock('@/utils/prismaDB', () => ({
+  prisma: mockPrismaClientInstance,
+  prismaPooled: mockPrismaClientInstance,
+  queryMetrics: { measureQuery: jest.fn((name: string, fn: () => any) => fn()) },
+  healthCheck: { checkConnection: jest.fn().mockResolvedValue(true) },
+  withDatabaseRetry: jest.fn((fn: () => any) => fn()),
+  connectPrisma: jest.fn().mockResolvedValue(undefined),
+  disconnectPrisma: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock email sender
@@ -492,14 +605,85 @@ global.Request = jest.fn().mockImplementation((url, options) => ({
   text: () => Promise.resolve(options?.body || ''),
 }));
 
-// @ts-ignore - Mock Response constructor for tests
-global.Response = jest.fn().mockImplementation((body, options) => ({
-  ok: true,
-  status: options?.status || 200,
-  headers: new Headers(options?.headers),
-  json: () => Promise.resolve(body),
-  text: () => Promise.resolve(body),
-}));
+// @ts-ignore - Mock Response constructor for tests with complete Web API
+class MockResponse {
+  private _body: any;
+  readonly ok: boolean;
+  readonly status: number;
+  readonly statusText: string;
+  readonly headers: Headers;
+  readonly type: ResponseType = 'basic';
+  readonly url: string = '';
+  readonly redirected: boolean = false;
+  readonly bodyUsed: boolean = false;
+  readonly body: ReadableStream<Uint8Array> | null = null;
+
+  constructor(body?: BodyInit | null, options?: ResponseInit) {
+    this._body = body;
+    this.status = options?.status || 200;
+    this.statusText = options?.statusText || 'OK';
+    this.ok = this.status >= 200 && this.status < 300;
+    this.headers = new Headers(options?.headers);
+  }
+
+  async json(): Promise<any> {
+    if (typeof this._body === 'string') {
+      return JSON.parse(this._body);
+    }
+    return this._body;
+  }
+
+  async text(): Promise<string> {
+    if (this._body === null || this._body === undefined) return '';
+    if (typeof this._body === 'string') return this._body;
+    return JSON.stringify(this._body);
+  }
+
+  async arrayBuffer(): Promise<ArrayBuffer> {
+    const text = await this.text();
+    return new TextEncoder().encode(text).buffer as ArrayBuffer;
+  }
+
+  async blob(): Promise<Blob> {
+    const text = await this.text();
+    return new Blob([text]);
+  }
+
+  async formData(): Promise<FormData> {
+    return new FormData();
+  }
+
+  clone(): Response {
+    return new MockResponse(this._body, {
+      status: this.status,
+      statusText: this.statusText,
+      headers: this.headers,
+    }) as unknown as Response;
+  }
+
+  static json(data: any, init?: ResponseInit): Response {
+    const headers = new Headers(init?.headers);
+    if (!headers.has('content-type')) {
+      headers.set('content-type', 'application/json');
+    }
+    return new MockResponse(data, { ...init, headers }) as unknown as Response;
+  }
+
+  static redirect(url: string | URL, status: number = 302): Response {
+    return new MockResponse(null, {
+      status,
+      headers: { Location: typeof url === 'string' ? url : url.toString() },
+    }) as unknown as Response;
+  }
+
+  static error(): Response {
+    const response = new MockResponse(null, { status: 0 });
+    (response as any).type = 'error';
+    return response as unknown as Response;
+  }
+}
+
+global.Response = MockResponse as unknown as typeof Response;
 
 // Mock NextResponse with constructor support
 class MockNextResponse {
@@ -665,36 +849,155 @@ jest.mock('@radix-ui/react-alert-dialog', () => {
   };
 });
 
-// Mock Radix UI Select
+// Mock Radix UI Select with interactive behavior for testing
 jest.mock('@radix-ui/react-select', () => {
   const React = require('react');
 
-  const createMockComponent = (name: string) => {
+  // Create context to share state between components
+  const SelectContext = React.createContext({ value: '', open: false, onValueChange: undefined, onOpenChange: undefined });
+
+  // Root component manages state
+  const Root = ({ children, value, defaultValue, onValueChange, open: controlledOpen, onOpenChange, ...props }: any) => {
+    const [internalValue, setInternalValue] = React.useState(defaultValue || '');
+    const [internalOpen, setInternalOpen] = React.useState(false);
+
+    const actualValue = value !== undefined ? value : internalValue;
+    const actualOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+
+    const handleValueChange = (newValue: string) => {
+      if (value === undefined) {
+        setInternalValue(newValue);
+      }
+      onValueChange?.(newValue);
+    };
+
+    const handleOpenChange = (newOpen: boolean) => {
+      if (controlledOpen === undefined) {
+        setInternalOpen(newOpen);
+      }
+      onOpenChange?.(newOpen);
+    };
+
+    return React.createElement(
+      SelectContext.Provider,
+      { value: { value: actualValue, onValueChange: handleValueChange, open: actualOpen, onOpenChange: handleOpenChange } },
+      React.createElement('div', { 'data-testid': 'select-root', ...props }, children)
+    );
+  };
+  Root.displayName = 'SelectRoot';
+
+  // Trigger opens the select
+  const Trigger = React.forwardRef(({ children, className, ...props }: any, ref: any) => {
+    const { open, onOpenChange } = React.useContext(SelectContext);
+    return React.createElement(
+      'button',
+      {
+        ref,
+        type: 'button',
+        role: 'combobox',
+        'aria-expanded': open,
+        'data-testid': 'select-trigger',
+        className,
+        onClick: () => onOpenChange?.(!open),
+        ...props,
+      },
+      children
+    );
+  });
+  Trigger.displayName = 'SelectTrigger';
+
+  // Value displays current selection
+  const Value = React.forwardRef(({ placeholder, children, ...props }: any, ref: any) => {
+    const { value } = React.useContext(SelectContext);
+    return React.createElement(
+      'span',
+      { ref, 'data-testid': 'select-value', placeholder, ...props },
+      value || children || placeholder
+    );
+  });
+  Value.displayName = 'SelectValue';
+
+  // Content wraps items (only visible when open)
+  const Content = React.forwardRef(({ children, ...props }: any, ref: any) => {
+    const { open } = React.useContext(SelectContext);
+    if (!open) return null;
+    return React.createElement(
+      'div',
+      { ref, role: 'listbox', 'data-testid': 'select-content', ...props },
+      children
+    );
+  });
+  Content.displayName = 'SelectContent';
+
+  // Portal just renders children
+  const Portal = ({ children }: any) => children;
+  Portal.displayName = 'SelectPortal';
+
+  // Viewport wraps items
+  const Viewport = React.forwardRef(({ children, ...props }: any, ref: any) => {
+    return React.createElement('div', { ref, 'data-testid': 'select-viewport', ...props }, children);
+  });
+  Viewport.displayName = 'SelectViewport';
+
+  // Item is selectable
+  const Item = React.forwardRef(({ children, value: itemValue, disabled, ...props }: any, ref: any) => {
+    const { value, onValueChange, onOpenChange } = React.useContext(SelectContext);
+    const isSelected = value === itemValue;
+
+    const handleClick = () => {
+      if (!disabled) {
+        onValueChange?.(itemValue);
+        onOpenChange?.(false);
+      }
+    };
+
+    return React.createElement(
+      'div',
+      {
+        ref,
+        role: 'option',
+        'aria-selected': isSelected,
+        'data-disabled': disabled ? '' : undefined,
+        'data-testid': 'select-item',
+        onClick: handleClick,
+        ...props,
+      },
+      children
+    );
+  });
+  Item.displayName = 'SelectItem';
+
+  // ItemText shows the text
+  const ItemText = React.forwardRef(({ children, ...props }: any, ref: any) => {
+    return React.createElement('span', { ref, 'data-testid': 'select-item-text', ...props }, children);
+  });
+  ItemText.displayName = 'SelectItemText';
+
+  // Simple passthrough components
+  const createSimpleComponent = (name: string, testId: string) => {
     const Component = React.forwardRef(({ children, ...props }: any, ref: any) => {
-      // Filter out Radix-specific props
-      const { asChild, onValueChange, onOpenChange, value, defaultValue, ...domProps } = props;
-      return React.createElement('div', { ref, 'data-testid': `select-${name.toLowerCase()}`, ...domProps }, children);
+      return React.createElement('div', { ref, 'data-testid': testId, ...props }, children);
     });
     Component.displayName = name;
     return Component;
   };
 
   return {
-    Root: createMockComponent('Root'),
-    Trigger: createMockComponent('Trigger'),
-    Value: createMockComponent('Value'),
-    Icon: createMockComponent('Icon'),
-    Portal: createMockComponent('Portal'),
-    Content: createMockComponent('Content'),
-    Viewport: createMockComponent('Viewport'),
-    Item: createMockComponent('Item'),
-    ItemText: createMockComponent('ItemText'),
-    ItemIndicator: createMockComponent('ItemIndicator'),
-    ScrollUpButton: createMockComponent('ScrollUpButton'),
-    ScrollDownButton: createMockComponent('ScrollDownButton'),
-    Group: createMockComponent('Group'),
-    Label: createMockComponent('Label'),
-    Separator: createMockComponent('Separator'),
+    Root,
+    Trigger,
+    Value,
+    Icon: createSimpleComponent('SelectIcon', 'select-icon'),
+    Portal,
+    Content,
+    Viewport,
+    Item,
+    ItemText,
+    ItemIndicator: createSimpleComponent('SelectItemIndicator', 'select-item-indicator'),
+    ScrollUpButton: createSimpleComponent('SelectScrollUpButton', 'select-scroll-up'),
+    ScrollDownButton: createSimpleComponent('SelectScrollDownButton', 'select-scroll-down'),
+    Group: createSimpleComponent('SelectGroup', 'select-group'),
+    Label: createSimpleComponent('SelectLabel', 'select-label'),
+    Separator: createSimpleComponent('SelectSeparator', 'select-separator'),
   };
 });
 

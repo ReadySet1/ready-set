@@ -7,6 +7,7 @@ import DriverDashboardPage from "../DriverOrder";
 jest.mock("next/navigation", () => ({
   usePathname: jest.fn(),
   useRouter: jest.fn(),
+  useParams: jest.fn(),
 }));
 
 // Mock fetch globally
@@ -95,6 +96,54 @@ jest.mock("lucide-react", () => ({
   CarIcon: () => <div data-testid="car-icon">Car</div>,
   UsersIcon: () => <div data-testid="users-icon">Users</div>,
   ArrowLeftIcon: () => <div data-testid="arrow-left-icon">ArrowLeft</div>,
+  Camera: () => <div data-testid="camera-icon">Camera</div>,
+}));
+
+// Mock Dialog components
+jest.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ children, open }: any) =>
+    open ? <div data-testid="dialog">{children}</div> : null,
+  DialogContent: ({ children }: any) => (
+    <div data-testid="dialog-content">{children}</div>
+  ),
+  DialogHeader: ({ children }: any) => (
+    <div data-testid="dialog-header">{children}</div>
+  ),
+  DialogTitle: ({ children }: any) => (
+    <h2 data-testid="dialog-title">{children}</h2>
+  ),
+  DialogFooter: ({ children }: any) => (
+    <div data-testid="dialog-footer">{children}</div>
+  ),
+  DialogDescription: ({ children }: any) => (
+    <p data-testid="dialog-description">{children}</p>
+  ),
+}));
+
+// Mock Supabase client
+jest.mock("@/utils/supabase/client", () => ({
+  createClient: jest.fn(() => ({
+    auth: {
+      getSession: jest.fn().mockResolvedValue({
+        data: { session: null },
+        error: null,
+      }),
+    },
+  })),
+}));
+
+// Mock order number utils
+jest.mock("@/utils/order", () => ({
+  decodeOrderNumber: jest.fn((orderNumber) => orderNumber),
+}));
+
+// Mock POD components
+jest.mock("../ProofOfDeliveryCapture", () => ({
+  ProofOfDeliveryCapture: () => <div data-testid="pod-capture">POD Capture</div>,
+}));
+
+jest.mock("../ProofOfDeliveryViewer", () => ({
+  ProofOfDeliveryViewer: () => <div data-testid="pod-viewer">POD Viewer</div>,
 }));
 
 // Mock lib/utils
@@ -102,13 +151,7 @@ jest.mock("@/lib/utils", () => ({
   cn: (...args: any) => args.filter(Boolean).join(" "),
 }));
 
-/**
- * TODO: REA-211 - DriverOrder tests have mock infrastructure issues
- * These tests have issues with:
- * 1. Fetch mock not matching component expectations
- * 2. Component rendering state not matching mock data
- */
-describe.skip("DriverDashboardPage", () => {
+describe("DriverDashboardPage", () => {
   const mockCateringOrder = {
     id: "1",
     orderNumber: "TEST1234",
@@ -170,13 +213,16 @@ describe.skip("DriverDashboardPage", () => {
     brokerage: undefined,
   };
 
-  const { usePathname, useRouter } = require("next/navigation");
+  const { usePathname, useRouter, useParams } = require("next/navigation");
 
   beforeEach(() => {
     jest.clearAllMocks();
     usePathname.mockReturnValue("/driver/TEST1234");
     useRouter.mockReturnValue({
       push: jest.fn(),
+    });
+    useParams.mockReturnValue({
+      order_number: "TEST1234",
     });
   });
 
@@ -190,7 +236,7 @@ describe.skip("DriverDashboardPage", () => {
       render(<DriverDashboardPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("Order Details")).toBeInTheDocument();
+        expect(screen.getByText("Order Dashboard")).toBeInTheDocument();
       });
     });
 

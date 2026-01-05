@@ -41,7 +41,8 @@ jest.mock('@/lib/cache/http-cache', () => ({
 }));
 
 /**
- * TODO: REA-211 - Vendor metrics API tests have Prisma mocking issues
+ * TODO: REA-211 - Response structure mismatch (double JSON stringification)
+ * 11 pass, 4 fail - createCachedResponse mock returns stringified data
  */
 describe.skip('/api/vendor/metrics API', () => {
   beforeEach(() => {

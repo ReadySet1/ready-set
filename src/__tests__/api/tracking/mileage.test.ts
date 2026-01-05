@@ -15,7 +15,7 @@ jest.mock('@/services/tracking/mileage', () => ({
 }));
 
 /**
- * TODO: REA-211 - Tracking mileage API tests have mileage service mocking issues
+ * TODO: REA-211 - Tracking mileage API tests need auth middleware mocking
  */
 describe.skip('/api/tracking/mileage', () => {
   const mockPrisma = prisma as unknown as { $queryRawUnsafe: jest.Mock };

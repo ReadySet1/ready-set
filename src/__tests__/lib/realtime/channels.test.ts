@@ -34,10 +34,7 @@ jest.mock('@/lib/realtime/client', () => ({
   getRealtimeClient: jest.fn(),
 }));
 
-/**
- * TODO: REA-211 - Realtime channel tests have Supabase mocking issues
- */
-describe.skip('Channel Classes', () => {
+describe('Channel Classes', () => {
   let mockClient: jest.Mocked<RealtimeClient>;
   let mockRealtimeChannel: jest.Mocked<RealtimeChannel>;
 
@@ -79,6 +76,7 @@ describe.skip('Channel Classes', () => {
 
         expect(mockClient.subscribe).toHaveBeenCalledWith(
           REALTIME_CHANNELS.DRIVER_LOCATIONS,
+          undefined,
           {
             onConnect,
             onDisconnect: undefined,
@@ -117,6 +115,7 @@ describe.skip('Channel Classes', () => {
 
         expect(mockClient.subscribe).toHaveBeenCalledWith(
           REALTIME_CHANNELS.DRIVER_LOCATIONS,
+          undefined,
           {
             onConnect: callbacks.onConnect,
             onDisconnect: callbacks.onDisconnect,
@@ -268,6 +267,7 @@ describe.skip('Channel Classes', () => {
 
         expect(mockClient.subscribe).toHaveBeenCalledWith(
           REALTIME_CHANNELS.DRIVER_STATUS,
+          undefined,
           {
             onConnect,
             onDisconnect: undefined,
@@ -440,6 +440,7 @@ describe.skip('Channel Classes', () => {
 
         expect(mockClient.subscribe).toHaveBeenCalledWith(
           REALTIME_CHANNELS.ADMIN_COMMANDS,
+          undefined,
           {
             onConnect,
             onDisconnect: undefined,

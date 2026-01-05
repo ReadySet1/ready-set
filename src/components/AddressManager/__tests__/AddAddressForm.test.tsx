@@ -42,14 +42,16 @@ describe("AddAddressForm County Dropdown", () => {
 
   // Helper to find County select - it's the first select (before State select)
   const getCountySelectTrigger = () => {
-    const countyLabel = screen.getByText("County", { exact: false });
+    // Find the label element with exact text "County" followed by required indicator
+    const countyLabel = screen.getByText((content, element) => {
+      return element?.tagName === 'LABEL' && content.startsWith('County');
+    });
     const countyContainer = countyLabel.closest(".space-y-2");
     return within(countyContainer!).getByTestId("select-trigger");
   };
 
-  // TODO: REA-267 - Select mock doesn't support interaction (clicking to open/select options)
-  // These tests require proper Radix Select behavior that the mock doesn't implement
-  it.skip("renders county dropdown with all available counties", async () => {
+  // These tests verify Radix Select interaction behavior
+  it("renders county dropdown with all available counties", async () => {
     render(<AddAddressForm {...defaultProps} />);
 
     await waitFor(() => {
@@ -67,7 +69,7 @@ describe("AddAddressForm County Dropdown", () => {
     });
   });
 
-  it.skip("allows county selection and preserves the value", async () => {
+  it("allows county selection and preserves the value", async () => {
     render(<AddAddressForm {...defaultProps} />);
 
     await waitFor(() => {
@@ -89,7 +91,7 @@ describe("AddAddressForm County Dropdown", () => {
     });
   });
 
-  it.skip("initializes with provided counties when allowedCounties prop is passed", async () => {
+  it("initializes with provided counties when allowedCounties prop is passed", async () => {
     const allowedCounties = ["San Francisco", "San Mateo"];
 
     render(
@@ -113,7 +115,7 @@ describe("AddAddressForm County Dropdown", () => {
     expect(screen.queryByRole("option", { name: "Alameda" })).not.toBeInTheDocument();
   });
 
-  it.skip("falls back to all counties when API call fails", async () => {
+  it("falls back to all counties when API call fails", async () => {
     (fetch as jest.Mock).mockResolvedValueOnce({
       ok: false,
       status: 500,
@@ -180,8 +182,7 @@ describe("AddAddressForm County Dropdown", () => {
     });
   });
 
-  // TODO: REA-267 - Select mock doesn't support interaction (clicking to open/select options)
-  it.skip("submits form successfully when all required fields including county are filled", async () => {
+  it("submits form successfully when all required fields including county are filled", async () => {
     mockOnSubmit.mockResolvedValueOnce(undefined);
 
     render(<AddAddressForm {...defaultProps} />);
@@ -197,11 +198,23 @@ describe("AddAddressForm County Dropdown", () => {
     });
     await userEvent.click(screen.getByRole("option", { name: "San Francisco" }));
 
-    await userEvent.type(screen.getByLabelText(/^Street Address/), "123 Main St");
-    await userEvent.type(screen.getByLabelText(/^City/), "San Francisco");
+    // Use specific selectors to avoid ambiguity with multiple Street Address fields
+    await userEvent.type(screen.getByRole("textbox", { name: /^Street Address \*$/i }), "123 Main St");
+    await userEvent.type(screen.getByRole("textbox", { name: /^City/i }), "San Francisco");
 
-    // State selection also requires Select interaction
-    await userEvent.type(screen.getByLabelText(/^ZIP Code/), "94103");
+    // State selection - click trigger and select an option
+    const stateLabel = screen.getByText((content, element) => {
+      return element?.tagName === 'LABEL' && content.startsWith('State');
+    });
+    const stateContainer = stateLabel.closest(".space-y-2");
+    const stateTrigger = within(stateContainer!).getByTestId("select-trigger");
+    await userEvent.click(stateTrigger);
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "California" })).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole("option", { name: "California" }));
+
+    await userEvent.type(screen.getByRole("textbox", { name: /^ZIP Code/i }), "94103");
 
     const submitButton = screen.getByRole("button", { name: /save address/i });
     await userEvent.click(submitButton);
@@ -212,11 +225,12 @@ describe("AddAddressForm County Dropdown", () => {
           county: "San Francisco",
           street1: "123 Main St",
           city: "San Francisco",
+          // State select sends the value, which corresponds to "California" label
           state: "CA",
           zip: "94103",
         }),
       );
-    });
+    }, { timeout: 3000 });
   });
 
   it("initializes form with provided initialValues including county", async () => {
@@ -239,8 +253,8 @@ describe("AddAddressForm County Dropdown", () => {
     // Check that initial values are populated in inputs
     expect(screen.getByDisplayValue("456 Oak Ave")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Redwood City")).toBeInTheDocument();
-    // State is a Select, so it shows the label not value
-    expect(screen.getByText("California")).toBeInTheDocument();
+    // State is a Select - the mock shows the value directly
+    expect(screen.getByText("CA")).toBeInTheDocument();
     expect(screen.getByDisplayValue("94402")).toBeInTheDocument();
   });
 

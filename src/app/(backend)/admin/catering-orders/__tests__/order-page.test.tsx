@@ -4,13 +4,13 @@ import OrderPage from "../[order_number]/page";
 
 // Mock Next.js navigation hooks
 const mockPush = jest.fn();
-const mockPathname = jest.fn();
+const mockParams = jest.fn();
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
   }),
-  usePathname: () => mockPathname(),
+  useParams: () => mockParams(),
 }));
 
 // Mock SingleOrder component
@@ -57,68 +57,110 @@ jest.mock("lucide-react", () => ({
   ClipboardList: () => <span data-testid="clipboard-icon">📋</span>,
 }));
 
-/**
- * TODO: REA-211 - CateringOrderPage tests have component rendering issues
- */
-describe.skip("CateringOrderPage - URL Decoding", () => {
+// Mock order utility
+jest.mock("@/utils/order", () => ({
+  decodeOrderNumber: (orderNumber: string) => decodeURIComponent(orderNumber),
+}));
+
+// Mock shadcn UI components
+jest.mock("@/components/ui/button", () => ({
+  Button: ({
+    children,
+    onClick,
+    ...props
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+  }) => (
+    <button onClick={onClick} {...props}>
+      {children}
+    </button>
+  ),
+}));
+
+jest.mock("@/components/ui/breadcrumb", () => ({
+  Breadcrumb: ({ children }: { children: React.ReactNode }) => (
+    <nav aria-label="Breadcrumb">{children}</nav>
+  ),
+  BreadcrumbList: ({ children }: { children: React.ReactNode }) => (
+    <ol>{children}</ol>
+  ),
+  BreadcrumbItem: ({ children }: { children: React.ReactNode }) => (
+    <li>{children}</li>
+  ),
+  BreadcrumbLink: ({
+    children,
+    asChild,
+  }: {
+    children: React.ReactNode;
+    asChild?: boolean;
+  }) => <>{children}</>,
+  BreadcrumbPage: ({ children }: { children: React.ReactNode }) => (
+    <span>{children}</span>
+  ),
+  BreadcrumbSeparator: () => <span>/</span>,
+}));
+
+describe("CateringOrderPage - URL Decoding", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("should decode order number with forward slash from URL", () => {
-    // Mock pathname to simulate encoded URL
-    mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%2F1");
+  it("should decode order number with forward slash from URL", async () => {
+    // Mock params with encoded order number
+    mockParams.mockReturnValue({ order_number: "CV-0GF59K%2F1" });
 
     render(<OrderPage />);
 
-    // Check that the breadcrumb displays the decoded order number
+    // Wait for useEffect to decode the order number
+    await screen.findByText("Order CV-0GF59K/1");
     expect(screen.getByText("Order CV-0GF59K/1")).toBeInTheDocument();
   });
 
-  it("should decode order number with multiple slashes from URL", () => {
-    mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%2F1%2F2");
+  it("should decode order number with multiple slashes from URL", async () => {
+    mockParams.mockReturnValue({ order_number: "CV-0GF59K%2F1%2F2" });
 
     render(<OrderPage />);
 
+    await screen.findByText("Order CV-0GF59K/1/2");
     expect(screen.getByText("Order CV-0GF59K/1/2")).toBeInTheDocument();
   });
 
-  it("should decode order number with various special characters", () => {
+  it("should decode order number with various special characters", async () => {
     // Test ampersand
-    mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%261");
-    const { rerender } = render(<OrderPage />);
+    mockParams.mockReturnValue({ order_number: "CV-0GF59K%261" });
+    const { rerender, unmount } = render(<OrderPage />);
+    await screen.findByText("Order CV-0GF59K&1");
     expect(screen.getByText("Order CV-0GF59K&1")).toBeInTheDocument();
 
-    // Test plus sign
-    mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%2B1");
-    rerender(<OrderPage />);
+    // Test plus sign - need to unmount and re-render for state reset
+    unmount();
+    mockParams.mockReturnValue({ order_number: "CV-0GF59K%2B1" });
+    render(<OrderPage />);
+    await screen.findByText("Order CV-0GF59K+1");
     expect(screen.getByText("Order CV-0GF59K+1")).toBeInTheDocument();
-
-    // Test hash symbol
-    mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%231");
-    rerender(<OrderPage />);
-    expect(screen.getByText("Order CV-0GF59K#1")).toBeInTheDocument();
   });
 
-  it("should handle normal order numbers without special characters", () => {
-    mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K1");
+  it("should handle normal order numbers without special characters", async () => {
+    mockParams.mockReturnValue({ order_number: "CV-0GF59K1" });
 
     render(<OrderPage />);
 
+    await screen.findByText("Order CV-0GF59K1");
     expect(screen.getByText("Order CV-0GF59K1")).toBeInTheDocument();
   });
 
-  it("should handle empty or invalid pathnames gracefully", () => {
-    mockPathname.mockReturnValue("");
+  it("should handle empty params gracefully", async () => {
+    mockParams.mockReturnValue({});
 
     render(<OrderPage />);
 
     // Should show empty order number
-    expect(screen.getByText("Order ")).toBeInTheDocument();
+    expect(screen.getByText("Order")).toBeInTheDocument();
   });
 
-  it("should render SingleOrder component with correct props", () => {
-    mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%2F1");
+  it("should render SingleOrder component with correct props", async () => {
+    mockParams.mockReturnValue({ order_number: "CV-0GF59K%2F1" });
 
     render(<OrderPage />);
 
@@ -127,8 +169,8 @@ describe.skip("CateringOrderPage - URL Decoding", () => {
     expect(screen.getByTestId("show-header")).toHaveTextContent("false");
   });
 
-  it("should handle delete success by redirecting to orders list", () => {
-    mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%2F1");
+  it("should handle delete success by redirecting to orders list", async () => {
+    mockParams.mockReturnValue({ order_number: "CV-0GF59K%2F1" });
 
     render(<OrderPage />);
 
@@ -139,10 +181,13 @@ describe.skip("CateringOrderPage - URL Decoding", () => {
     expect(mockPush).toHaveBeenCalledWith("/admin/catering-orders");
   });
 
-  it("should render navigation breadcrumbs correctly", () => {
-    mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%2F1");
+  it("should render navigation breadcrumbs correctly", async () => {
+    mockParams.mockReturnValue({ order_number: "CV-0GF59K%2F1" });
 
     render(<OrderPage />);
+
+    // Wait for order number to be decoded
+    await screen.findByText("Order CV-0GF59K/1");
 
     // Check navigation links
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
@@ -157,8 +202,8 @@ describe.skip("CateringOrderPage - URL Decoding", () => {
     expect(ordersLink).toHaveAttribute("href", "/admin/catering-orders");
   });
 
-  it("should render back button with correct navigation", () => {
-    mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%2F1");
+  it("should render back button with correct navigation", async () => {
+    mockParams.mockReturnValue({ order_number: "CV-0GF59K%2F1" });
 
     render(<OrderPage />);
 
@@ -172,22 +217,24 @@ describe.skip("CateringOrderPage - URL Decoding", () => {
     expect(mockPush).toHaveBeenCalledWith("/admin/catering-orders");
   });
 
-  it("should handle edge case with special characters at the end of URL", () => {
-    mockPathname.mockReturnValue("/admin/catering-orders/CV-0GF59K%2F1%2F");
+  it("should handle edge case with special characters at the end of URL", async () => {
+    mockParams.mockReturnValue({ order_number: "CV-0GF59K%2F1%2F" });
 
     render(<OrderPage />);
 
+    await screen.findByText("Order CV-0GF59K/1/");
     expect(screen.getByText("Order CV-0GF59K/1/")).toBeInTheDocument();
   });
 
-  it("should handle complex encoded order numbers", () => {
+  it("should handle complex encoded order numbers", async () => {
     // Test with multiple different special characters
-    mockPathname.mockReturnValue(
-      "/admin/catering-orders/CV-0GF59K%2F1%26test%2Bmore%23end",
-    );
+    mockParams.mockReturnValue({
+      order_number: "CV-0GF59K%2F1%26test%2Bmore%23end",
+    });
 
     render(<OrderPage />);
 
+    await screen.findByText("Order CV-0GF59K/1&test+more#end");
     expect(
       screen.getByText("Order CV-0GF59K/1&test+more#end"),
     ).toBeInTheDocument();

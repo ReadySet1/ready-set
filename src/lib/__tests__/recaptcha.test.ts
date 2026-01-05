@@ -15,10 +15,7 @@ import { verifyRecaptchaToken, getRecaptchaActionRecommendation } from '../recap
 // Mock global fetch
 global.fetch = jest.fn();
 
-/**
- * TODO: REA-211 - reCAPTCHA tests have fetch mocking issues
- */
-describe.skip('reCAPTCHA Integration', () => {
+describe('reCAPTCHA Integration', () => {
   beforeEach(() => {
     // Clear all mocks before each test
     jest.clearAllMocks();
@@ -180,9 +177,11 @@ describe.skip('reCAPTCHA Integration', () => {
 
       const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
       const body = fetchCall[1].body;
+      // Body is a URLSearchParams object, convert to string
+      const bodyString = body instanceof URLSearchParams ? body.toString() : String(body);
 
-      expect(body).toContain('secret=my-secret-key');
-      expect(body).toContain('response=test-token-123');
+      expect(bodyString).toContain('secret=my-secret-key');
+      expect(bodyString).toContain('response=test-token-123');
     });
 
     it('should handle timeout threshold correctly (0.7)', async () => {

@@ -39,11 +39,41 @@ jest.mock("react-hot-toast", () => ({
   },
 }));
 
+// Mock OrderConfirmationModal - capture props to verify modal is shown with correct data
+const mockOrderConfirmationModal = jest.fn();
+jest.mock("../OrderConfirmationModal", () => ({
+  __esModule: true,
+  default: (props: any) => {
+    mockOrderConfirmationModal(props);
+    if (props.isOpen) {
+      return (
+        <div data-testid="order-confirmation-modal">
+          <span data-testid="modal-order-number">{props.orderNumber}</span>
+          <button data-testid="modal-close" onClick={props.onClose}>Close</button>
+        </div>
+      );
+    }
+    return null;
+  },
+}));
+
 // Mock AddressSelector component (CateringRequestForm uses AddressSelector, not AddressManager)
-const mockHandleAddressSelect = jest.fn();
+// Store callbacks separately for pickup and delivery
+const addressCallbacks: { pickup?: (address: any) => void; delivery?: (address: any) => void } = {};
+const mockHandleAddressSelect = jest.fn((address: any) => {
+  // Call both callbacks when selecting an address (for convenience in tests)
+  addressCallbacks.pickup?.(address);
+  addressCallbacks.delivery?.(address);
+});
+
 jest.mock("@/components/AddressSelector", () => {
-  const MockSelector = (props: { onSelect: (address: any) => void }) => {
-    mockHandleAddressSelect.mockImplementation(props.onSelect);
+  const MockSelector = (props: { onSelect: (address: any) => void; type?: string }) => {
+    // Store callback based on type prop
+    if (props.type === "pickup") {
+      addressCallbacks.pickup = props.onSelect;
+    } else {
+      addressCallbacks.delivery = props.onSelect;
+    }
     return <div data-testid="mock-address-manager">Mock Address Selector</div>;
   };
   return {
@@ -64,26 +94,30 @@ jest.mock("@/hooks/use-job-application-upload", () => ({
   }),
 }));
 
-// Mock Supabase client
+// Mock Supabase client - must return a Promise since createClient is async
 jest.mock("@/utils/supabase/client", () => ({
-  createClient: jest.fn(() => ({
-    auth: {
-      getSession: jest.fn().mockResolvedValue({
-        data: {
-          session: {
-            user: {
-              id: "test-user-id",
-              email: "test@example.com",
-              app_metadata: { role: "vendor" },
+  createClient: jest.fn(() =>
+    Promise.resolve({
+      auth: {
+        getSession: jest.fn().mockResolvedValue({
+          data: {
+            session: {
+              user: {
+                id: "test-user-id",
+                email: "test@example.com",
+                user_metadata: { name: "Test User" },
+                app_metadata: { role: "vendor" },
+              },
             },
           },
-        },
-      }),
-      onAuthStateChange: jest.fn(() => ({
-        data: { subscription: { unsubscribe: jest.fn() } },
-      })),
-    },
-  })),
+          error: null,
+        }),
+        onAuthStateChange: jest.fn(() => ({
+          data: { subscription: { unsubscribe: jest.fn() } },
+        })),
+      },
+    })
+  ),
 }));
 
 // Mock fetch function
@@ -139,6 +173,10 @@ describe("CateringRequestForm", () => {
     jest.clearAllMocks();
     mockPush.mockClear();
     mockHandleAddressSelect.mockClear();
+    mockOrderConfirmationModal.mockClear();
+    // Clear address callbacks
+    addressCallbacks.pickup = undefined;
+    addressCallbacks.delivery = undefined;
 
     // Default mock for useUser - tests can override as needed
     mockUseUser.mockReturnValue({
@@ -201,9 +239,7 @@ describe("CateringRequestForm", () => {
     expect(screen.getByLabelText(/headcount/i)).toBeInTheDocument();
   });
 
-  // TODO: REA-268 - Form submission now shows OrderConfirmationModal first, redirect happens on modal close
-  // These tests need to be updated to handle modal interaction
-  it.skip("redirects to client dashboard for client users after successful form submission", async () => {
+  it("shows confirmation modal after successful form submission for client users", async () => {
     // Mock user context for client role
     mockUseUser.mockReturnValue({
       userRole: UserType.CLIENT,
@@ -223,6 +259,11 @@ describe("CateringRequestForm", () => {
       render(<CateringRequestForm />);
     });
 
+    // Wait for form to initialize (Supabase client and session)
+    await waitFor(() => {
+      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
+    });
+
     // Fill out the form with valid data
     await act(async () => {
       // Fill brokerage field
@@ -232,8 +273,10 @@ describe("CateringRequestForm", () => {
       // Fill order number
       await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
 
-      // Fill date
-      await user.type(screen.getByLabelText(/date/i), "2024-12-31");
+      // Fill date - clear first, then type
+      const dateInput = screen.getByLabelText(/date/i);
+      await user.clear(dateInput);
+      await user.type(dateInput, "2024-12-31");
 
       // Fill headcount
       await user.type(screen.getByLabelText(/headcount/i), "50");
@@ -254,7 +297,7 @@ describe("CateringRequestForm", () => {
       const hostNoRadio = screen.getByRole("radio", { name: /no/i });
       await user.click(hostNoRadio);
 
-      // Simulate address selection
+      // Simulate address selection for both pickup and delivery
       mockHandleAddressSelect(mockAddress);
     });
 
@@ -266,14 +309,14 @@ describe("CateringRequestForm", () => {
       await user.click(submitButton);
     });
 
-    // Verify that router.push was called with the client dashboard path for client users
+    // Verify that confirmation modal is shown with the order number
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/client");
-    });
+      expect(screen.getByTestId("order-confirmation-modal")).toBeInTheDocument();
+      expect(screen.getByTestId("modal-order-number")).toHaveTextContent("TEST-12345");
+    }, { timeout: 5000 });
   });
 
-  // TODO: REA-268 - Form submission now shows OrderConfirmationModal first, redirect happens on modal close
-  it.skip("redirects to vendor dashboard for vendor users after successful form submission", async () => {
+  it("shows confirmation modal after successful form submission for vendor users", async () => {
     // Mock user context for vendor role
     mockUseUser.mockReturnValue({
       userRole: UserType.VENDOR,
@@ -293,6 +336,11 @@ describe("CateringRequestForm", () => {
       render(<CateringRequestForm />);
     });
 
+    // Wait for form to initialize (Supabase client and session)
+    await waitFor(() => {
+      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
+    });
+
     // Fill out the form with valid data
     await act(async () => {
       // Fill brokerage field
@@ -302,8 +350,10 @@ describe("CateringRequestForm", () => {
       // Fill order number
       await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
 
-      // Fill date
-      await user.type(screen.getByLabelText(/date/i), "2024-12-31");
+      // Fill date - clear first, then type
+      const dateInput = screen.getByLabelText(/date/i);
+      await user.clear(dateInput);
+      await user.type(dateInput, "2024-12-31");
 
       // Fill headcount
       await user.type(screen.getByLabelText(/headcount/i), "50");
@@ -321,10 +371,10 @@ describe("CateringRequestForm", () => {
       await user.type(screen.getByLabelText(/order total/i), "1000");
 
       // Select "No" for host requirement
-      const hostNoRadio = screen.getByRole("button", { name: /no/i });
+      const hostNoRadio = screen.getByRole("radio", { name: /no/i });
       await user.click(hostNoRadio);
 
-      // Simulate address selection
+      // Simulate address selection for both pickup and delivery
       mockHandleAddressSelect(mockAddress);
     });
 
@@ -336,10 +386,11 @@ describe("CateringRequestForm", () => {
       await user.click(submitButton);
     });
 
-    // Verify that router.push was called with the vendor dashboard path for vendor users
+    // Verify that confirmation modal is shown with the order number
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/client");
-    });
+      expect(screen.getByTestId("order-confirmation-modal")).toBeInTheDocument();
+      expect(screen.getByTestId("modal-order-number")).toHaveTextContent("TEST-12345");
+    }, { timeout: 5000 });
   });
 
   it("does not redirect on submission failure", async () => {
@@ -407,11 +458,15 @@ describe("CateringRequestForm", () => {
     });
   });
 
-  // TODO: REA-268 - Form submission now shows OrderConfirmationModal first, redirect happens on modal close
-  it.skip("submits the form with correct data structure", async () => {
+  it("submits the form with correct data structure and shows modal", async () => {
     const user = userEvent.setup();
     await act(async () => {
       render(<CateringRequestForm />);
+    });
+
+    // Wait for form to initialize (Supabase client and session)
+    await waitFor(() => {
+      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
     });
 
     // Fill out the form
@@ -419,7 +474,12 @@ describe("CateringRequestForm", () => {
       const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
       await user.selectOptions(brokerageSelect, "Ez Cater");
       await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-      await user.type(screen.getByLabelText(/date/i), "2024-12-31");
+
+      // Clear date field first, then type
+      const dateInput = screen.getByLabelText(/date/i);
+      await user.clear(dateInput);
+      await user.type(dateInput, "2024-12-31");
+
       await user.type(screen.getByLabelText(/headcount/i), "50");
       await user.type(screen.getByLabelText(/pick up time/i), "10:00");
       await user.type(screen.getByLabelText(/arrival time/i), "11:00");
@@ -429,6 +489,7 @@ describe("CateringRequestForm", () => {
       const hostNoRadio = screen.getByRole("radio", { name: /no/i });
       await user.click(hostNoRadio);
 
+      // Simulate address selection for both pickup and delivery
       mockHandleAddressSelect(mockAddress);
 
       const submitButton = screen.getByRole("button", {
@@ -445,153 +506,8 @@ describe("CateringRequestForm", () => {
         body: expect.stringContaining("TEST-12345"),
       });
 
-      // Verify redirect happened
-      expect(mockPush).toHaveBeenCalledWith("/client");
-    });
-  });
-
-  // TODO: REA-268 - "Manage Addresses Button" feature was removed from component
-  // Skip these tests as the UI element no longer exists
-  describe.skip("Manage Addresses Button", () => {
-    it("renders the Manage Addresses button in the delivery details section", async () => {
-      await act(async () => {
-        render(<CateringRequestForm />);
-      });
-
-      // Check that the Delivery Details section is rendered
-      expect(screen.getByText(/delivery details/i)).toBeInTheDocument();
-
-      // Check that the Manage Addresses button is rendered
-      const manageAddressesButton = screen.getByRole("link", {
-        name: /manage addresses/i,
-      });
-      expect(manageAddressesButton).toBeInTheDocument();
-    });
-
-    it("has the correct href attribute pointing to /addresses", async () => {
-      await act(async () => {
-        render(<CateringRequestForm />);
-      });
-
-      const manageAddressesButton = screen.getByRole("link", {
-        name: /manage addresses/i,
-      });
-      expect(manageAddressesButton).toHaveAttribute("href", "/addresses");
-    });
-
-    it("has the correct styling classes", async () => {
-      await act(async () => {
-        render(<CateringRequestForm />);
-      });
-
-      const manageAddressesButton = screen.getByRole("link", {
-        name: /manage addresses/i,
-      });
-
-      // Check for the expected CSS classes
-      expect(manageAddressesButton).toHaveClass(
-        "rounded-md",
-        "bg-blue-500",
-        "px-4",
-        "py-2",
-        "text-white",
-        "transition",
-        "hover:bg-blue-600",
-      );
-    });
-
-    it("is accessible and properly labeled", async () => {
-      await act(async () => {
-        render(<CateringRequestForm />);
-      });
-
-      const manageAddressesButton = screen.getByRole("link", {
-        name: /manage addresses/i,
-      });
-
-      // Check that the button is accessible
-      expect(manageAddressesButton).toBeVisible();
-      expect(manageAddressesButton).not.toHaveAttribute("aria-disabled");
-
-      // Check that it has proper focus styles
-      expect(manageAddressesButton).toHaveClass(
-        "focus:outline-none",
-        "focus:ring-2",
-        "focus:ring-blue-500",
-        "focus:ring-offset-2",
-      );
-    });
-
-    it("is positioned correctly within the delivery details section", async () => {
-      await act(async () => {
-        render(<CateringRequestForm />);
-      });
-
-      // Find the delivery details section
-      const deliveryDetailsSection = screen
-        .getByText(/delivery details/i)
-        .closest("div");
-      expect(deliveryDetailsSection).toBeInTheDocument();
-
-      // Check that the Manage Addresses button is within the delivery details section
-      const manageAddressesButton = screen.getByRole("link", {
-        name: /manage addresses/i,
-      });
-
-      // The button should be a descendant of the delivery details section
-      expect(deliveryDetailsSection).toContainElement(manageAddressesButton);
-    });
-
-    it("does not interfere with form submission", async () => {
-      const user = userEvent.setup();
-      await act(async () => {
-        render(<CateringRequestForm />);
-      });
-
-      // First, verify the button is there
-      const manageAddressesButton = screen.getByRole("link", {
-        name: /manage addresses/i,
-      });
-      expect(manageAddressesButton).toBeInTheDocument();
-
-      // Fill out the form and submit (similar to existing tests)
-      await act(async () => {
-        const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
-        await user.selectOptions(brokerageSelect, "Ez Cater");
-        await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-        await user.type(screen.getByLabelText(/date/i), "2024-12-31");
-        await user.type(screen.getByLabelText(/headcount/i), "50");
-        await user.type(screen.getByLabelText(/pick up time/i), "10:00");
-        await user.type(screen.getByLabelText(/arrival time/i), "11:00");
-        await user.type(
-          screen.getByLabelText(/client.*attention/i),
-          "John Doe",
-        );
-        await user.type(screen.getByLabelText(/order total/i), "1000");
-
-        const hostNoRadio = screen.getByRole("radio", { name: /no/i });
-        await user.click(hostNoRadio);
-
-        mockHandleAddressSelect(mockAddress);
-      });
-
-      // Submit the form
-      await act(async () => {
-        const submitButton = screen.getByRole("button", {
-          name: /submit catering request/i,
-        });
-        await user.click(submitButton);
-      });
-
-      // Verify that form submission still works normally
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith("/api/catering-requests", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: expect.stringContaining("TEST-12345"),
-        });
-        expect(mockPush).toHaveBeenCalledWith("/client");
-      });
-    });
+      // Verify modal is shown instead of direct redirect
+      expect(screen.getByTestId("order-confirmation-modal")).toBeInTheDocument();
+    }, { timeout: 5000 });
   });
 });

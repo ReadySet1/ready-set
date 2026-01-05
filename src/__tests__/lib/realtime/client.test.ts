@@ -18,7 +18,8 @@ import { REALTIME_CHANNELS } from '@/lib/realtime/types';
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * TODO: REA-211 - RealtimeClient tests have Supabase realtime mocking issues
+ * TODO: REA-211 - RealtimeClient tests require authenticated user mocking
+ * The client throws UnauthorizedError when no user is authenticated
  */
 describe.skip('RealtimeClient', () => {
   let mockSupabaseClient: jest.Mocked<SupabaseClient>;

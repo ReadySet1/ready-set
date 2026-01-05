@@ -40,7 +40,7 @@ const mockAddress: Address = {
 };
 
 /**
- * TODO: REA-211 - AddressModal responsive tests have component rendering issues
+ * TODO: REA-211 - AddressModal responsive tests need QueryClientProvider wrapper
  */
 describe.skip("AddressModal - Mobile Responsiveness", () => {
   const mockOnAddressUpdated = jest.fn();

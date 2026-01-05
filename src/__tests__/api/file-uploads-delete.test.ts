@@ -35,7 +35,8 @@ type PrismaMock = {
 const mockPrisma = prisma as unknown as PrismaMock;
 
 /**
- * TODO: REA-211 - File uploads delete API tests have Prisma mocking issues
+ * TODO: REA-211 - File uploads DELETE test needs createAdminClient mock
+ * The route uses createAdminClient from @/utils/supabase/server but test only mocks createClient
  */
 describe.skip('DELETE /api/file-uploads', () => {
   beforeEach(() => {

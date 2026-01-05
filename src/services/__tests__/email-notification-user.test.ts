@@ -52,10 +52,7 @@ jest.mock("@/utils/email-templates", () => {
   };
 });
 
-/**
- * TODO: REA-211 - Email notification user tests have Resend mocking issues
- */
-describe.skip("Email Notification Service - User Welcome", () => {
+describe("Email Notification Service - User Welcome", () => {
   let mockResendClient: ReturnType<typeof createMockResendClient>;
   let consoleWarnSpy: jest.SpyInstance;
   let consoleErrorSpy: jest.SpyInstance;

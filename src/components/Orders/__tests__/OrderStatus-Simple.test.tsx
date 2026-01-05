@@ -18,11 +18,48 @@ jest.mock("@/components/ui/use-toast", () => ({
   toast: jest.fn(),
 }));
 
-/**
- * TODO: REA-211 - Tests expect "ACTIVE" but component shows "Active" (capitalized)
- * The status display format changed but tests weren't updated
- */
-describe.skip("OrderStatusCard - Change Status Feature", () => {
+// Mock Radix UI Select to provide testable elements
+jest.mock("@/components/ui/select", () => ({
+  Select: ({ children, onValueChange, value }: any) => (
+    <div data-testid="select-root" data-value={value}>
+      {React.Children.map(children, (child) =>
+        React.cloneElement(child, { onValueChange, value }),
+      )}
+    </div>
+  ),
+  SelectTrigger: ({ children, className, onClick, ...props }: any) => (
+    <button
+      data-testid="select-trigger"
+      className={className}
+      onClick={onClick}
+      role="combobox"
+      aria-expanded="false"
+      {...props}
+    >
+      {children}
+    </button>
+  ),
+  SelectValue: ({ placeholder }: any) => (
+    <span data-testid="select-value">{placeholder}</span>
+  ),
+  SelectContent: ({ children }: any) => (
+    <div data-testid="select-content" role="listbox">
+      {children}
+    </div>
+  ),
+  SelectItem: ({ children, value, onClick }: any) => (
+    <div
+      data-testid={`select-item-${value}`}
+      data-value={value}
+      role="option"
+      onClick={() => onClick?.(value)}
+    >
+      {children}
+    </div>
+  ),
+}));
+
+describe("OrderStatusCard - Change Status Feature", () => {
   const mockOnStatusChange = jest.fn();
   const defaultProps = {
     order_type: "catering" as OrderType,
@@ -40,7 +77,7 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
       render(<OrderStatusCard {...defaultProps} />);
 
       expect(screen.getByText("Current Status:")).toBeInTheDocument();
-      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
     });
 
     it("should display different status badges correctly", () => {
@@ -50,7 +87,7 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
           initialStatus={OrderStatus.COMPLETED}
         />,
       );
-      expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
 
       rerender(
         <OrderStatusCard
@@ -58,7 +95,7 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
           initialStatus={OrderStatus.CANCELLED}
         />,
       );
-      expect(screen.getByText("CANCELLED")).toBeInTheDocument();
+      expect(screen.getByText("Cancelled")).toBeInTheDocument();
     });
   });
 
@@ -87,34 +124,23 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
   });
 
   describe("Dropdown Interaction", () => {
-    it("should open dropdown when clicked", async () => {
-      const user = userEvent.setup();
+    it("should render dropdown trigger when canChangeStatus is true", async () => {
       render(<OrderStatusCard {...defaultProps} canChangeStatus={true} />);
 
       const dropdown = screen.getByRole("combobox");
-      await user.click(dropdown);
-
-      // Wait for dropdown content to appear
-      await waitFor(() => {
-        expect(screen.getByText("ACTIVE")).toBeInTheDocument();
-      });
+      expect(dropdown).toBeInTheDocument();
+      expect(screen.getByTestId("select-trigger")).toBeInTheDocument();
     });
 
-    it("should display status options when dropdown is opened", async () => {
-      const user = userEvent.setup();
+    it("should display status options in dropdown content", () => {
       render(<OrderStatusCard {...defaultProps} canChangeStatus={true} />);
 
-      const dropdown = screen.getByRole("combobox");
-      await user.click(dropdown);
-
+      // With our mock, the SelectContent is always rendered
       // Check that status options are available
-      await waitFor(() => {
-        // The dropdown should contain the available statuses
-        const dropdownContent = screen
-          .getByText("Change Status:")
-          .closest("div");
-        expect(dropdownContent).toBeInTheDocument();
-      });
+      expect(screen.getByTestId("select-content")).toBeInTheDocument();
+      expect(screen.getByTestId("select-item-ACTIVE")).toBeInTheDocument();
+      expect(screen.getByTestId("select-item-COMPLETED")).toBeInTheDocument();
+      expect(screen.getByTestId("select-item-CANCELLED")).toBeInTheDocument();
     });
   });
 
@@ -178,7 +204,7 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
 
     it("should handle status updates", () => {
       const { rerender } = render(<OrderStatusCard {...defaultProps} />);
-      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
 
       rerender(
         <OrderStatusCard
@@ -186,7 +212,7 @@ describe.skip("OrderStatusCard - Change Status Feature", () => {
           initialStatus={OrderStatus.COMPLETED}
         />,
       );
-      expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
     });
   });
 });

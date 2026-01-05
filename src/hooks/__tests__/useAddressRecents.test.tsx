@@ -55,10 +55,7 @@ const mockUsageHistoryRow = {
   },
 };
 
-/**
- * TODO: REA-211 - useAddressRecents tests have QueryClient mocking issues
- */
-describe.skip('useAddressRecents', () => {
+describe('useAddressRecents', () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {

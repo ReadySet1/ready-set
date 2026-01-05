@@ -177,10 +177,7 @@ Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
   configurable: true,
 });
 
-/**
- * TODO: REA-211 - CateringModal tests have scrollIntoView mocking issues
- */
-describe.skip("CateringModal", () => {
+describe("CateringModal", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockClear();

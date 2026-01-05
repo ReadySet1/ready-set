@@ -17,10 +17,7 @@ jest.mock('@/utils/supabase/server', () => ({
   })),
 }));
 
-/**
- * TODO: REA-211 - Upload security tests have Supabase storage mocking issues
- */
-describe.skip('UploadSecurityManager', () => {
+describe('UploadSecurityManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -144,7 +141,8 @@ describe.skip('UploadSecurityManager', () => {
       const result = await UploadSecurityManager.scanForMaliciousContent(file);
 
       expect(result.isClean).toBe(false);
-      expect(result.threats).toContain('Unusually large file size');
+      // The file is caught by MAX_SCAN_SIZE (10MB) check first
+      expect(result.threats).toContain('File too large for full content scan');
     });
 
     it('should flag unusually small files', async () => {

@@ -13,10 +13,7 @@ jest.mock('@/utils/supabase/server');
 jest.mock('@/utils/prismaDB');
 jest.mock('@/services/userSoftDeleteService');
 
-/**
- * TODO: REA-211 - Soft delete integration tests have module import issues
- */
-describe.skip('User Soft Delete API Integration Tests', () => {
+describe('User Soft Delete API Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -53,8 +50,11 @@ describe.skip('User Soft Delete API Integration Tests', () => {
         },
       });
 
-      expect(req).toBeInstanceOf(NextRequest);
+      // Verify NextRequest has expected properties rather than instanceof check
+      // (instanceof can fail in Jest environment due to polyfills)
       expect(req.method).toBe('DELETE');
+      expect(req.url).toContain('/api/users/test-id');
+      expect(req.headers.get('Content-Type')).toBe('application/json');
     });
 
     it('should parse JSON body correctly', async () => {

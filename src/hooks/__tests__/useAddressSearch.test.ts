@@ -46,10 +46,7 @@ const mockAddresses: Address[] = [
   },
 ];
 
-/**
- * TODO: REA-211 - useAddressSearch tests have hook rendering issues
- */
-describe.skip('useAddressSearch', () => {
+describe('useAddressSearch', () => {
   describe('Initial State', () => {
     it('returns all addresses when no filters applied', () => {
       const { result } = renderHook(() =>

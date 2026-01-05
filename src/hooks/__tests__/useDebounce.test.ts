@@ -3,10 +3,7 @@ import { useDebounce } from '../useDebounce';
 
 jest.useFakeTimers();
 
-/**
- * TODO: REA-211 - useDebounce tests have fake timer issues
- */
-describe.skip('useDebounce', () => {
+describe('useDebounce', () => {
   afterEach(() => {
     jest.clearAllTimers();
   });

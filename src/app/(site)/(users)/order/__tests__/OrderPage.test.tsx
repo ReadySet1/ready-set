@@ -1,7 +1,6 @@
 import React from "react";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-// Using standard Jest globals
 import VendorPage from "../page";
 
 // Mock Next.js router
@@ -160,7 +159,26 @@ const mockMetrics = {
 };
 
 /**
- * TODO: REA-211 - VendorPage pagination tests have fetch mocking issues
+ * VendorPage Pagination Tests - SKIPPED
+ *
+ * These tests are skipped due to complex component rendering issues:
+ * - The OrderDashboardPage uses many shadcn UI components (Card, Table, Button, Badge)
+ * - It uses lucide-react icons (Loader2, Package, Clock, etc.)
+ * - The component uses Button with asChild prop wrapping Next.js Link
+ * - All these create a complex mocking requirement
+ *
+ * Error: "Element type is invalid: expected a string (for built-in components)
+ * or a class/function (for composite components) but got: object."
+ *
+ * To fix these tests, a comprehensive mocking strategy is needed that:
+ * 1. Properly mocks @radix-ui/react-slot (used by Button's asChild)
+ * 2. Mocks all lucide-react icons as proper React components
+ * 3. Mocks the shadcn UI components while maintaining compatibility
+ *
+ * Alternatively, consider refactoring to test smaller units of functionality
+ * rather than the entire page component.
+ *
+ * @see REA-262 for tracking this issue
  */
 describe.skip("VendorPage Pagination", () => {
   beforeEach(() => {

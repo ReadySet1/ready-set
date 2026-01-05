@@ -49,6 +49,33 @@ jest.mock("@/components/Uploader/file-uploader", () => ({
   ),
 }));
 
+// Mock push notifications hook
+jest.mock("@/hooks/usePushNotifications", () => ({
+  usePushNotifications: () => ({
+    status: "disabled",
+    error: null,
+    isSupported: true,
+    enableOnThisDevice: jest.fn(),
+    disableAllDevices: jest.fn(),
+  }),
+}));
+
+// Mock pointer capture methods for Radix Dialog compatibility
+Object.defineProperty(HTMLElement.prototype, "hasPointerCapture", {
+  value: jest.fn(),
+  writable: true,
+});
+
+Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
+  value: jest.fn(),
+  writable: true,
+});
+
+Object.defineProperty(HTMLElement.prototype, "releasePointerCapture", {
+  value: jest.fn(),
+  writable: true,
+});
+
 // Utility: mock fetch for profile and files requests
 const originalFetch = global.fetch;
 beforeEach(() => {
@@ -113,6 +140,44 @@ describe("Profile Page Quick Actions", () => {
 
     await waitFor(() => {
       expect(pushMock).toHaveBeenCalledWith("/client/orders");
+    });
+  });
+
+  it("renders 'Change Password' button", async () => {
+    render(<ProfilePage />);
+
+    // Wait for the page to load by checking for Quick Actions section
+    await screen.findByText("Quick Actions");
+
+    // Get all buttons with "Change Password" text - the first one is in Quick Actions
+    const changePasswordButtons = await screen.findAllByRole("button", {
+      name: /change password/i,
+    });
+
+    // The Quick Actions button should be found first
+    expect(changePasswordButtons.length).toBeGreaterThanOrEqual(1);
+    expect(changePasswordButtons[0]).toBeInTheDocument();
+  });
+
+  it("opens password change modal when 'Change Password' is clicked", async () => {
+    render(<ProfilePage />);
+
+    // Wait for the page to load by checking for Quick Actions section
+    await screen.findByText("Quick Actions");
+
+    // Get all buttons with "Change Password" text - the first one is in Quick Actions
+    const changePasswordButtons = await screen.findAllByRole("button", {
+      name: /change password/i,
+    });
+
+    // Click the Quick Actions button (first one)
+    await userEvent.click(changePasswordButtons[0]);
+
+    // Modal should open - look for the modal description
+    await waitFor(() => {
+      expect(
+        screen.getByText("Enter your current password and choose a new one")
+      ).toBeInTheDocument();
     });
   });
 });

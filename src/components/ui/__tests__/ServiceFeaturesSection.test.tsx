@@ -93,10 +93,7 @@ const mockFeatures = [
   },
 ];
 
-/**
- * TODO: REA-211 - ServiceFeaturesSection tests have window dimension mocking issues
- */
-describe.skip("ServiceFeaturesSection", () => {
+describe("ServiceFeaturesSection", () => {
   beforeEach(() => {
     // Reset window dimensions to desktop default
     mockWindowDimensions(1920, 1080);

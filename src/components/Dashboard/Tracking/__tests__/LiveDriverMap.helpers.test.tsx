@@ -11,6 +11,9 @@ import type { TrackedDriver } from '@/types/tracking';
 import { DRIVER_STATUS_COLORS, BATTERY_STATUS_COLORS } from '@/constants/tracking-colors';
 import { MARKER_CONFIG } from '@/constants/tracking-config';
 
+// Enable automocking for mapbox-gl
+jest.mock('mapbox-gl');
+
 // Mock data
 const mockDriver: TrackedDriver = {
   id: 'driver-1',
@@ -53,9 +56,10 @@ const mockStationaryLocation = {
 };
 
 /**
- * TODO: REA-211 - Map helper tests have mapbox-gl mocking issues
+ * LiveDriverMap helper function tests
+ * Uses mapbox-gl mock from src/__mocks__/mapbox-gl.ts
  */
-describe.skip('LiveDriverMap Helper Functions', () => {
+describe('LiveDriverMap Helper Functions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN = 'pk.test.valid-token';
@@ -76,7 +80,7 @@ describe.skip('LiveDriverMap Helper Functions', () => {
 
       // The function is tested indirectly through marker creation
       // We check the console output or marker DOM for expected color
-      expect(DRIVER_STATUS_COLORS.offDuty).toBe('#9ca3af'); // gray-400
+      expect(DRIVER_STATUS_COLORS.offDuty).toBe('#94a3b8'); // slate-400
     });
 
     it('should return moving color when driver is on duty and location shows isMoving = true', () => {
@@ -351,7 +355,7 @@ describe.skip('LiveDriverMap Helper Functions', () => {
 
       // Colors should match status
       expect(DRIVER_STATUS_COLORS.moving).toBe('#22c55e');
-      expect(DRIVER_STATUS_COLORS.offDuty).toBe('#9ca3af');
+      expect(DRIVER_STATUS_COLORS.offDuty).toBe('#94a3b8');
     });
   });
 
