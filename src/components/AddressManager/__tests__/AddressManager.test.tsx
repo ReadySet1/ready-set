@@ -176,7 +176,8 @@ describe("AddressManager Refresh Functionality", () => {
     });
   });
 
-  // TODO: REA-259 - Test needs component behavior verification
+  // TODO: REA-259 - Skipped: Test clears mocks after initial render which breaks auth/fetch chain
+  // The refresh callback works, but verifying the subsequent fetch requires careful mock timing
   it.skip("refreshes addresses when refresh function is called", async () => {
     const capturedRefreshFunctions: Array<() => void> = [];
 
@@ -341,7 +342,8 @@ describe("AddressManager Refresh Functionality", () => {
     });
   });
 
-  // TODO: REA-259 - Test needs component behavior verification
+  // TODO: REA-259 - Skipped: Complex test with multiple fetch failures then success
+  // Requires investigation of how fetchAttempts.current interacts with mock timing
   it.skip("resets fetch attempts when refresh is called manually", async () => {
     const capturedRefreshFunctions: Array<() => void> = [];
 
@@ -389,7 +391,8 @@ describe("AddressManager Refresh Functionality", () => {
     });
   });
 
-  // TODO: REA-259 - Test needs component behavior verification
+  // TODO: REA-259 - Skipped: Filter buttons render correctly but addresses don't load
+  // Possibly test isolation issue - fetch mock from previous test affects this one
   it.skip("shows filter buttons for address types", async () => {
     customRender(<AddressManager {...defaultProps} />);
 
@@ -408,7 +411,8 @@ describe("AddressManager Refresh Functionality", () => {
     expect(screen.getByText("Office")).toBeInTheDocument();
   });
 
-  // TODO: REA-259 - Test needs component behavior verification
+  // TODO: REA-259 - Skipped: Mock override for empty addresses not working correctly
+  // onAddressesLoaded callback never called - needs investigation of fetch mock timing
   it.skip("handles empty address list gracefully", async () => {
     (fetch as jest.Mock).mockResolvedValue({
       ok: true,

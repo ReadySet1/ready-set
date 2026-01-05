@@ -21,37 +21,78 @@ jest.mock("next/navigation", () => ({
   useRouter: () => mockRouter,
 }));
 
-// Mock react-hot-toast
-jest.mock("react-hot-toast", () => ({
-  default: {
+// Mock react-hot-toast - need to mock the default export as a function with methods
+jest.mock("react-hot-toast", () => {
+  const mockToast = Object.assign(jest.fn(), {
     success: jest.fn(),
     error: jest.fn(),
-  },
-}));
+    loading: jest.fn(),
+    dismiss: jest.fn(),
+  });
+  return {
+    __esModule: true,
+    default: mockToast,
+  };
+});
 
-// Mock AddressManager component
-const mockHandleAddressSelect = jest.fn();
+// Mock AddressManager component - store callbacks for pickup and delivery
+// OnDemandForm uses onAddressSelected(addressId) which receives just an ID,
+// then looks up the address from addresses state populated by onAddressesLoaded
+const addressSelectCallbacks: { pickup?: (addressId: string) => void; delivery?: (addressId: string) => void } = {};
+const addressLoadCallbacks: { pickup?: (addresses: any[]) => void; delivery?: (addresses: any[]) => void } = {};
+let mockInstanceCount = 0;
+
 jest.mock("@/components/AddressManager", () => ({
   __esModule: true,
-  default: (props: { onAddressSelected: (address: any) => void }) => {
-    mockHandleAddressSelect.mockImplementation(props.onAddressSelected);
+  default: (props: {
+    onAddressSelected: (addressId: string) => void;
+    onAddressesLoaded?: (addresses: any[]) => void;
+    defaultFilter?: string;
+    showFilters?: boolean;
+    showManagementButtons?: boolean;
+  }) => {
+    // Track based on render order - first is pickup, second is delivery
+    const isPickup = mockInstanceCount % 2 === 0;
+    mockInstanceCount++;
+
+    if (isPickup) {
+      addressSelectCallbacks.pickup = props.onAddressSelected;
+      addressLoadCallbacks.pickup = props.onAddressesLoaded;
+    } else {
+      addressSelectCallbacks.delivery = props.onAddressSelected;
+      addressLoadCallbacks.delivery = props.onAddressesLoaded;
+    }
     return <div data-testid="mock-address-manager">Mock Address Manager</div>;
   },
 }));
 
-// Mock Supabase client
+// Mock Supabase client - must return a Promise since createClient is async
 jest.mock("@/utils/supabase/client", () => ({
-  createClient: jest.fn(() => ({
-    auth: {
-      getUser: jest.fn().mockResolvedValue({
-        data: { user: { id: "test-user-id", email: "test@example.com" } },
-        error: null,
-      }),
-      onAuthStateChange: jest.fn(() => ({
-        data: { subscription: { unsubscribe: jest.fn() } },
-      })),
-    },
-  })),
+  createClient: jest.fn(() =>
+    Promise.resolve({
+      auth: {
+        getUser: jest.fn().mockResolvedValue({
+          data: { user: { id: "test-user-id", email: "test@example.com" } },
+          error: null,
+        }),
+        getSession: jest.fn().mockResolvedValue({
+          data: {
+            session: {
+              user: {
+                id: "test-user-id",
+                email: "test@example.com",
+                user_metadata: { name: "Test User" },
+              },
+            },
+          },
+          error: null,
+        }),
+        onAuthStateChange: jest.fn(() => ({
+          data: { subscription: { unsubscribe: jest.fn() } },
+        })),
+      },
+    })
+  ),
 }));
 
 // Mock fetch function
@@ -83,13 +124,19 @@ const mockAddress = {
 
 /**
  * REA-270 - OnDemandOrderForm tests
- * Note: Complex form submission tests are skipped due to AddressManager mock limitations
+ * AddressManager mock properly captures both onAddressesLoaded and onAddressSelected callbacks
+ * for both pickup and delivery address managers using render order tracking.
  */
 describe("OnDemandOrderForm", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockClear();
-    mockHandleAddressSelect.mockClear();
+    // Reset address manager mock state
+    mockInstanceCount = 0;
+    addressSelectCallbacks.pickup = undefined;
+    addressSelectCallbacks.delivery = undefined;
+    addressLoadCallbacks.pickup = undefined;
+    addressLoadCallbacks.delivery = undefined;
 
     // Default mock for useUser
     mockUseUser.mockReturnValue({
@@ -149,8 +196,7 @@ describe("OnDemandOrderForm", () => {
     expect(screen.getByLabelText(/order number/i)).toBeInTheDocument();
   });
 
-  // TODO: REA-270 - Skipped due to AddressManager mock limitations
-  it.skip("redirects to client dashboard for client users after successful form submission", async () => {
+  it("redirects to client dashboard for client users after successful form submission", async () => {
     // Mock user context for client role
     mockUseUser.mockReturnValue({
       userRole: UserType.CLIENT,
@@ -170,6 +216,17 @@ describe("OnDemandOrderForm", () => {
       render(<OnDemandOrderForm />);
     });
 
+    // Wait for form to initialize (Supabase client and user)
+    await waitFor(() => {
+      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
+    });
+
+    // Simulate address loading (populates component's addresses state)
+    await act(async () => {
+      addressLoadCallbacks.pickup?.([mockAddress]);
+      addressLoadCallbacks.delivery?.([mockAddress]);
+    });
+
     // Fill out the form with valid data
     await act(async () => {
       // Fill brokerage/direct field
@@ -179,8 +236,33 @@ describe("OnDemandOrderForm", () => {
       // Fill order number
       await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
 
-      // Simulate address selection for pickup
-      mockHandleAddressSelect(mockAddress);
+      // Fill date
+      const dateInput = screen.getByLabelText(/date/i);
+      await user.clear(dateInput);
+      await user.type(dateInput, "2024-12-31");
+
+      // Fill pickup time
+      await user.type(screen.getByLabelText(/pickup time/i), "10:00");
+
+      // Fill arrival time
+      await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+
+      // Fill client attention
+      await user.type(screen.getByLabelText(/client attention/i), "John Doe");
+
+      // Fill item being delivered
+      await user.type(screen.getByLabelText(/item.*delivered/i), "Test Package");
+
+      // Fill vehicle type
+      const vehicleSelect = screen.getByLabelText(/vehicle type/i);
+      await user.selectOptions(vehicleSelect, "Car");
+
+      // Fill order total
+      await user.type(screen.getByLabelText(/order total/i), "100");
+
+      // Simulate address selection (calls component's onAddressSelected with ID)
+      addressSelectCallbacks.pickup?.(mockAddress.id);
+      addressSelectCallbacks.delivery?.(mockAddress.id);
     });
 
     // Submit the form
@@ -194,11 +276,10 @@ describe("OnDemandOrderForm", () => {
     // Verify that router.push was called with the client dashboard path for client users
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/client");
-    });
+    }, { timeout: 5000 });
   });
 
-  // TODO: REA-270 - Skipped due to AddressManager mock limitations
-  it.skip("redirects to vendor dashboard for vendor users after successful form submission", async () => {
+  it("redirects to vendor dashboard for vendor users after successful form submission", async () => {
     // Mock user context for vendor role
     mockUseUser.mockReturnValue({
       userRole: UserType.VENDOR,
@@ -218,6 +299,17 @@ describe("OnDemandOrderForm", () => {
       render(<OnDemandOrderForm />);
     });
 
+    // Wait for form to initialize (Supabase client and user)
+    await waitFor(() => {
+      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
+    });
+
+    // Simulate address loading (populates component's addresses state)
+    await act(async () => {
+      addressLoadCallbacks.pickup?.([mockAddress]);
+      addressLoadCallbacks.delivery?.([mockAddress]);
+    });
+
     // Fill out the form with valid data
     await act(async () => {
       // Fill brokerage/direct field
@@ -227,8 +319,33 @@ describe("OnDemandOrderForm", () => {
       // Fill order number
       await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
 
-      // Simulate address selection for pickup
-      mockHandleAddressSelect(mockAddress);
+      // Fill date
+      const dateInput = screen.getByLabelText(/date/i);
+      await user.clear(dateInput);
+      await user.type(dateInput, "2024-12-31");
+
+      // Fill pickup time
+      await user.type(screen.getByLabelText(/pickup time/i), "10:00");
+
+      // Fill arrival time
+      await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+
+      // Fill client attention
+      await user.type(screen.getByLabelText(/client attention/i), "John Doe");
+
+      // Fill item being delivered
+      await user.type(screen.getByLabelText(/item.*delivered/i), "Test Package");
+
+      // Fill vehicle type
+      const vehicleSelect = screen.getByLabelText(/vehicle type/i);
+      await user.selectOptions(vehicleSelect, "Car");
+
+      // Fill order total
+      await user.type(screen.getByLabelText(/order total/i), "100");
+
+      // Simulate address selection (calls component's onAddressSelected with ID)
+      addressSelectCallbacks.pickup?.(mockAddress.id);
+      addressSelectCallbacks.delivery?.(mockAddress.id);
     });
 
     // Submit the form
@@ -242,11 +359,10 @@ describe("OnDemandOrderForm", () => {
     // Verify that router.push was called with the vendor dashboard path for vendor users
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/client");
-    });
+    }, { timeout: 5000 });
   });
 
-  // TODO: REA-270 - Skipped due to AddressManager mock limitations
-  it.skip("does not redirect on submission failure", async () => {
+  it("does not redirect on submission failure", async () => {
     const user = userEvent.setup();
 
     // Mock fetch to return error
@@ -278,13 +394,50 @@ describe("OnDemandOrderForm", () => {
       render(<OnDemandOrderForm />);
     });
 
+    // Wait for form to initialize (Supabase client and user)
+    await waitFor(() => {
+      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
+    });
+
+    // Simulate address loading (populates component's addresses state)
+    await act(async () => {
+      addressLoadCallbacks.pickup?.([mockAddress]);
+      addressLoadCallbacks.delivery?.([mockAddress]);
+    });
+
     // Fill out the form with valid data
     await act(async () => {
       const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
       await user.selectOptions(brokerageSelect, "direct");
       await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
 
-      mockHandleAddressSelect(mockAddress);
+      // Fill date
+      const dateInput = screen.getByLabelText(/date/i);
+      await user.clear(dateInput);
+      await user.type(dateInput, "2024-12-31");
+
+      // Fill pickup time
+      await user.type(screen.getByLabelText(/pickup time/i), "10:00");
+
+      // Fill arrival time
+      await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+
+      // Fill client attention
+      await user.type(screen.getByLabelText(/client attention/i), "John Doe");
+
+      // Fill item being delivered
+      await user.type(screen.getByLabelText(/item.*delivered/i), "Test Package");
+
+      // Fill vehicle type
+      const vehicleSelect = screen.getByLabelText(/vehicle type/i);
+      await user.selectOptions(vehicleSelect, "Car");
+
+      // Fill order total
+      await user.type(screen.getByLabelText(/order total/i), "100");
+
+      // Simulate address selection
+      addressSelectCallbacks.pickup?.(mockAddress.id);
+      addressSelectCallbacks.delivery?.(mockAddress.id);
     });
 
     // Submit the form
@@ -302,11 +455,21 @@ describe("OnDemandOrderForm", () => {
     });
   });
 
-  // TODO: REA-270 - Skipped due to AddressManager mock limitations
-  it.skip("submits the form with correct data structure", async () => {
+  it("submits the form with correct data structure", async () => {
     const user = userEvent.setup();
     await act(async () => {
       render(<OnDemandOrderForm />);
+    });
+
+    // Wait for form to initialize (Supabase client and user)
+    await waitFor(() => {
+      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
+    });
+
+    // Simulate address loading (populates component's addresses state)
+    await act(async () => {
+      addressLoadCallbacks.pickup?.([mockAddress]);
+      addressLoadCallbacks.delivery?.([mockAddress]);
     });
 
     // Fill out the form
@@ -315,8 +478,37 @@ describe("OnDemandOrderForm", () => {
       await user.selectOptions(brokerageSelect, "direct");
       await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
 
-      mockHandleAddressSelect(mockAddress);
+      // Fill date
+      const dateInput = screen.getByLabelText(/date/i);
+      await user.clear(dateInput);
+      await user.type(dateInput, "2024-12-31");
 
+      // Fill pickup time
+      await user.type(screen.getByLabelText(/pickup time/i), "10:00");
+
+      // Fill arrival time
+      await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+
+      // Fill client attention
+      await user.type(screen.getByLabelText(/client attention/i), "John Doe");
+
+      // Fill item being delivered
+      await user.type(screen.getByLabelText(/item.*delivered/i), "Test Package");
+
+      // Fill vehicle type
+      const vehicleSelect = screen.getByLabelText(/vehicle type/i);
+      await user.selectOptions(vehicleSelect, "Car");
+
+      // Fill order total
+      await user.type(screen.getByLabelText(/order total/i), "100");
+
+      // Simulate address selection
+      addressSelectCallbacks.pickup?.(mockAddress.id);
+      addressSelectCallbacks.delivery?.(mockAddress.id);
+    });
+
+    // Submit the form
+    await act(async () => {
       const submitButton = screen.getByRole("button", {
         name: /submit.*request/i,
       });
@@ -334,7 +526,7 @@ describe("OnDemandOrderForm", () => {
 
       // Verify redirect happened
       expect(mockPush).toHaveBeenCalledWith("/client");
-    });
+    }, { timeout: 5000 });
   });
 
   it("validates required fields before submission", async () => {
