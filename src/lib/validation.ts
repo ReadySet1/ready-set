@@ -12,17 +12,19 @@ export const ValidationPatterns = {
     .max(254, 'Email must not exceed 254 characters'),
 
   // Password with complexity requirements
+  // NIST SP 800-63B aligned: allows any printable character including spaces for passphrases
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .max(128, 'Password must not exceed 128 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/,
       'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
 
   // Strong password (for sensitive operations)
+  // NIST SP 800-63B aligned: allows any printable character including spaces for passphrases
   strongPassword: z.string()
     .min(12, 'Password must be at least 12 characters')
     .max(128, 'Password must not exceed 128 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/,
       'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character')
     .regex(/^(?!.*(.)\1{2})/, 'Password must not contain repeated characters'),
 
