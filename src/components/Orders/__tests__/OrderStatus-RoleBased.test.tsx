@@ -9,11 +9,7 @@ jest.mock("@/components/ui/use-toast", () => ({
   toast: jest.fn(),
 }));
 
-/**
- * TODO: REA-211 - Tests expect "ACTIVE" but component shows "Active" (capitalized)
- * The status display format changed but tests weren't updated
- */
-describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
+describe("OrderStatusCard - Role-Based Status Change Tests", () => {
   const mockOnStatusChange = jest.fn();
   const defaultProps = {
     order_type: "catering" as OrderType,
@@ -39,7 +35,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
       render(<OrderStatusCard {...defaultProps} canChangeStatus={true} />);
 
       expect(screen.getByText("Current Status:")).toBeInTheDocument();
-      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
     });
 
     it("should handle status changes via component state", () => {
@@ -48,7 +44,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
       );
 
       // Verify initial state
-      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
       expect(mockOnStatusChange).not.toHaveBeenCalled();
 
       // Change status by updating props (this should trigger the useEffect)
@@ -61,7 +57,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
       );
 
       // The component should update its internal state when initialStatus changes
-      expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
       // Note: onStatusChange is only called when user manually changes status, not when props change
       expect(mockOnStatusChange).not.toHaveBeenCalled();
     });
@@ -75,7 +71,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         />,
       );
 
-      expect(screen.getByText("ASSIGNED")).toBeInTheDocument();
+      expect(screen.getByText("Assigned")).toBeInTheDocument();
 
       rerender(
         <OrderStatusCard
@@ -85,7 +81,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         />,
       );
 
-      expect(screen.getByText("CANCELLED")).toBeInTheDocument();
+      expect(screen.getByText("Cancelled")).toBeInTheDocument();
     });
   });
 
@@ -106,7 +102,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         />,
       );
 
-      expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
 
       rerender(
         <OrderStatusCard
@@ -116,7 +112,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         />,
       );
 
-      expect(screen.getByText("CANCELLED")).toBeInTheDocument();
+      expect(screen.getByText("Cancelled")).toBeInTheDocument();
       // Note: onStatusChange is only called when user manually changes status, not when props change
       expect(mockOnStatusChange).not.toHaveBeenCalled();
     });
@@ -183,7 +179,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         <OrderStatusCard {...defaultProps} canChangeStatus={true} />,
       );
 
-      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
       expect(mockOnStatusChange).not.toHaveBeenCalled();
 
       // Try to change to the same status
@@ -198,7 +194,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         <OrderStatusCard {...defaultProps} canChangeStatus={true} />,
       );
 
-      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
 
       // Change to ASSIGNED
       rerender(
@@ -209,7 +205,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         />,
       );
 
-      expect(screen.getByText("ASSIGNED")).toBeInTheDocument();
+      expect(screen.getByText("Assigned")).toBeInTheDocument();
       // Note: onStatusChange is only called when user manually changes status, not when props change
       expect(mockOnStatusChange).not.toHaveBeenCalled();
 
@@ -224,7 +220,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         />,
       );
 
-      expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
       // Note: onStatusChange is only called when user manually changes status, not when props change
       expect(mockOnStatusChange).not.toHaveBeenCalled();
     });
@@ -240,7 +236,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         />,
       );
 
-      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
 
       rerender(
         <OrderStatusCard
@@ -251,7 +247,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         />,
       );
 
-      expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
       // Note: onStatusChange is only called when user manually changes status, not when props change
       expect(mockOnStatusChange).not.toHaveBeenCalled();
     });
@@ -265,7 +261,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         />,
       );
 
-      expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
 
       rerender(
         <OrderStatusCard
@@ -276,7 +272,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         />,
       );
 
-      expect(screen.getByText("CANCELLED")).toBeInTheDocument();
+      expect(screen.getByText("Cancelled")).toBeInTheDocument();
       // Note: onStatusChange is only called when user manually changes status, not when props change
       expect(mockOnStatusChange).not.toHaveBeenCalled();
     });
@@ -333,7 +329,7 @@ describe.skip("OrderStatusCard - Role-Based Status Change Tests", () => {
         />,
       );
 
-      expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
     });
   });
 });

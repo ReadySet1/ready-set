@@ -21,6 +21,11 @@ jest.mock("next/image", () => ({
   },
 }));
 
+// Mock Cloudinary URL builder
+jest.mock("@/lib/cloudinary", () => ({
+  getCloudinaryUrl: (path: string) => `https://res.cloudinary.com/test/image/upload/f_auto,q_auto/ready-set/${path}`,
+}));
+
 describe("ModernPricingLandingPage", () => {
   describe("Component Rendering", () => {
     it("should render the component without crashing", () => {
@@ -28,12 +33,14 @@ describe("ModernPricingLandingPage", () => {
       expect(screen.getByText("Pricing That Works For You")).toBeInTheDocument();
     });
 
-    // TODO: REA-211 - Logo path changed (now uses Cloudinary: /images/logo/logo)
-    it.skip("should render the logo", () => {
+    it("should render the logo", () => {
       render(<ModernPricingLandingPage />);
       const logo = screen.getByAltText("Ready Set Logo");
       expect(logo).toBeInTheDocument();
-      expect(logo).toHaveAttribute("src", "/images/logo/logo.png");
+      expect(logo).toHaveAttribute(
+        "src",
+        "https://res.cloudinary.com/test/image/upload/f_auto,q_auto/ready-set/logo/logo"
+      );
     });
 
     it("should render tab navigation", () => {

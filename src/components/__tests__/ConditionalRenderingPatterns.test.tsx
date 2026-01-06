@@ -27,48 +27,50 @@ const ConditionalComponent: React.FC<ConditionalComponentProps> = ({
   onToggle,
 }) => {
   const [isVisible, setIsVisible] = React.useState(initialRender);
-  const [isReady, setIsReady] = React.useState(delay === 0);
+  // Treat negative delays as zero (immediate)
+  const effectiveDelay = Math.max(0, delay);
+  const [isReady, setIsReady] = React.useState(effectiveDelay === 0);
 
   // Handle auto-show with delay (similar to banner behavior)
   React.useEffect(() => {
-    if (autoShow && delay > 0) {
+    if (autoShow && effectiveDelay > 0) {
       const timer = setTimeout(() => {
         setIsVisible(true);
         setIsReady(true);
         onToggle?.(true);
-      }, delay);
+      }, effectiveDelay);
 
       return () => clearTimeout(timer);
-    } else if (autoShow && delay === 0) {
+    } else if (autoShow && effectiveDelay === 0) {
       setIsVisible(true);
       onToggle?.(true);
     }
-  }, [autoShow, delay, onToggle]);
+  }, [autoShow, effectiveDelay, onToggle]);
 
   // Handle initial delay
   React.useEffect(() => {
-    if (delay > 0 && !autoShow) {
+    if (effectiveDelay > 0 && !autoShow) {
       const timer = setTimeout(() => {
         setIsReady(true);
-      }, delay);
+      }, effectiveDelay);
 
       return () => clearTimeout(timer);
     }
-  }, [delay, autoShow]);
+  }, [effectiveDelay, autoShow]);
 
   const handleClose = () => {
     setIsVisible(false);
     onToggle?.(false);
   };
 
+  // Error state (prioritized over loading - errors should always be visible)
+  if (hasError) {
+    return <div data-testid="error">Error occurred</div>;
+  }
+
   // Loading state
   if (isLoading) {
     return <div data-testid="loading">Loading...</div>;
-  }
-
-  // Error state
-  if (hasError) {
-    return <div data-testid="error">Error occurred</div>;
   }
 
   // Not ready (delay not completed)
@@ -150,8 +152,7 @@ describe('Conditional Rendering Patterns', () => {
       expect(screen.queryByTestId('visible-content')).not.toBeInTheDocument();
     });
 
-    // TODO: REA-211 - Test expects error priority but component checks loading first
-    it.skip('prioritizes error state over loading and visibility', () => {
+    it('prioritizes error state over loading and visibility', () => {
       render(
         <ConditionalComponent
           shouldRender={true}
@@ -393,8 +394,7 @@ describe('Conditional Rendering Patterns', () => {
       expect(screen.getByTestId('visible-content')).toBeInTheDocument();
     });
 
-    // TODO: REA-211 - Component doesn't handle negative delay as zero
-    it.skip('handles negative delay as zero', () => {
+    it('handles negative delay as zero', () => {
       render(
         <ConditionalComponent
           shouldRender={true}

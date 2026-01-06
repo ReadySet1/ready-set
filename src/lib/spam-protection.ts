@@ -230,6 +230,10 @@ export class SpamProtectionManager {
     const detectedPatterns: string[] = [];
 
     for (const pattern of this.SPAM_PATTERNS) {
+      // Reset lastIndex to 0 before each test to handle global regex correctly
+      // Without this reset, subsequent calls to test() on the same regex may fail
+      // because global regexes maintain state between calls
+      pattern.lastIndex = 0;
       if (pattern.test(message)) {
         detectedPatterns.push(pattern.source);
       }
