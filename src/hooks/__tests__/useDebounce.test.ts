@@ -1,11 +1,14 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useDebounce } from '../useDebounce';
 
-jest.useFakeTimers();
-
 describe('useDebounce', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
   afterEach(() => {
-    jest.clearAllTimers();
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
   });
 
   it('returns the initial value immediately', () => {

@@ -1289,4 +1289,90 @@ if (typeof Request !== 'undefined' && Request.prototype) {
 }
 
 // Increase timeout for async operations
-jest.setTimeout(30000); 
+jest.setTimeout(30000);
+
+// ============================================================================
+// Timer Testing Utilities
+// ============================================================================
+
+/**
+ * Global configuration for fake timers that works well with React 19 and userEvent.
+ *
+ * Usage in tests:
+ *
+ * ```typescript
+ * beforeEach(() => {
+ *   jest.useFakeTimers();
+ * });
+ *
+ * afterEach(() => {
+ *   // Important: flush all pending timers inside act() before switching to real timers
+ *   jest.runOnlyPendingTimers();
+ *   jest.useRealTimers();
+ * });
+ *
+ * // For userEvent with fake timers:
+ * const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+ * ```
+ *
+ * Key patterns for timer testing:
+ * 1. Always wrap jest.advanceTimersByTime in act() when it triggers React state updates
+ * 2. Use jest.runOnlyPendingTimers() instead of jest.runAllTimers() to avoid infinite loops
+ * 3. Configure userEvent with advanceTimers for click handlers that use timers
+ * 4. Use waitFor() with fake timers for async assertions after timer advancement
+ */
+
+// Ensure fake timer configuration is consistent across tests
+// Using modern timers (default in Jest 27+) which works better with Promises
+if (typeof jest !== 'undefined' && jest.useFakeTimers) {
+  const originalUseFakeTimers = jest.useFakeTimers.bind(jest);
+  jest.useFakeTimers = function(options?: any) {
+    // Ensure we use modern timers and don't mock performance APIs by default
+    const defaultOptions = {
+      // Don't fake performance.now() as it can break React profiling
+      doNotFake: ['performance', 'queueMicrotask', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'],
+    };
+    return originalUseFakeTimers({ ...defaultOptions, ...options });
+  };
+}
+
+// ============================================================================
+// React Query Test Configuration
+// ============================================================================
+
+/**
+ * Default QueryClient configuration for tests.
+ * Use this pattern when creating QueryClient in test files:
+ *
+ * ```typescript
+ * const createTestQueryClient = () => new QueryClient({
+ *   defaultOptions: {
+ *     queries: {
+ *       retry: false, // Don't retry in tests
+ *       gcTime: Infinity, // Keep cache for test duration
+ *       staleTime: Infinity, // Don't mark as stale during tests
+ *     },
+ *     mutations: {
+ *       retry: false,
+ *     },
+ *   },
+ *   logger: {
+ *     log: console.log,
+ *     warn: console.warn,
+ *     error: () => {}, // Suppress error logging in tests
+ *   },
+ * });
+ * ```
+ */
+export const testQueryClientConfig = {
+  defaultOptions: {
+    queries: {
+      retry: false,
+      gcTime: Infinity,
+      staleTime: Infinity,
+    },
+    mutations: {
+      retry: false,
+    },
+  },
+}; 

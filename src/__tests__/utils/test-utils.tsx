@@ -1,5 +1,6 @@
 import React, { ReactElement } from 'react';
 import { render, RenderOptions } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Mock Next.js router
 export const mockRouter = {
@@ -68,16 +69,70 @@ export const resetMocks = () => {
   mockFetch.mockClear();
 };
 
+/**
+ * Creates a QueryClient configured for testing.
+ * - Disables retries to make tests deterministic
+ * - Keeps cache indefinitely to prevent refetches during tests
+ * - Suppresses error logging to reduce test noise
+ */
+export const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false, // Don't retry in tests
+        gcTime: Infinity, // Keep cache for test duration
+        staleTime: Infinity, // Don't mark as stale during tests
+      },
+      mutations: {
+        retry: false,
+      },
+    },
+    // Suppress React Query's default error logging in tests
+    logger: {
+      log: console.log,
+      warn: console.warn,
+      error: () => {}, // Suppress error logging in tests
+    },
+  });
+
+// Wrapper with QueryClientProvider for tests that need React Query
+interface TestProvidersProps {
+  children: React.ReactNode;
+  queryClient?: QueryClient;
+}
+
+export const TestProviders: React.FC<TestProvidersProps> = ({
+  children,
+  queryClient = createTestQueryClient(),
+}) => {
+  return (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+};
+
 // Custom render function with providers
 interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
-  // Add any additional options here
+  queryClient?: QueryClient;
+  withQueryClient?: boolean;
 }
 
 const customRender = (
   ui: ReactElement,
   options?: CustomRenderOptions
 ) => {
-  return render(ui, { ...options });
+  const { queryClient, withQueryClient = false, ...renderOptions } = options || {};
+
+  if (withQueryClient) {
+    const client = queryClient || createTestQueryClient();
+    return render(ui, {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+      ...renderOptions,
+    });
+  }
+
+  return render(ui, { ...renderOptions });
 };
 
 // Re-export everything
