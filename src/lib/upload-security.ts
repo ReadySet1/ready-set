@@ -1,6 +1,6 @@
 // src/lib/upload-security.ts
 import { createClient } from "@/utils/supabase/server";
-import { UploadError, SecurityScanResult } from "@/types/upload";
+import { UploadError, UploadErrorType, SecurityScanResult } from "@/types/upload";
 import type { TablesInsert, Json } from "@/types/supabase";
 import { SCAN_LIMITS } from "@/config/upload-config";
 
@@ -443,7 +443,7 @@ export class UploadSecurityManager {
           isSecure: false,
           quarantineRequired: false,
           error: {
-            type: 'VIRUS_ERROR' as any,
+            type: UploadErrorType.VIRUS_ERROR,
             message: 'Rate limit exceeded for security scanning',
             userMessage: 'Too many security scans. Please wait a moment and try again.',
             retryable: true,
@@ -478,7 +478,7 @@ export class UploadSecurityManager {
           isSecure: false,
           quarantineRequired,
           error: {
-            type: 'VIRUS_ERROR' as any,
+            type: UploadErrorType.VIRUS_ERROR,
             message: `Security threat detected: ${scanResults.threats[0] || 'Unknown threat'}`,
             userMessage: quarantined
               ? 'This file appears to contain potentially malicious content and has been quarantined for review.'
@@ -508,7 +508,7 @@ export class UploadSecurityManager {
         isSecure: false,
         quarantineRequired: true,
         error: {
-          type: 'VIRUS_ERROR' as any,
+          type: UploadErrorType.VIRUS_ERROR,
           message: 'Security scan failed',
           userMessage: 'Unable to scan file for security threats. File has been quarantined for review.',
           retryable: true,
