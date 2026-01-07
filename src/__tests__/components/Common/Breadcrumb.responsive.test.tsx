@@ -6,13 +6,26 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
   const mockPageName = "Test Page";
   const mockPageDescription = "This is a test page description";
 
-  // TODO: REA-211 - CSS classes differ from expectations (component uses different styling)
-  describe.skip("Responsive Layout and Sizing", () => {
-    it("should have mobile-first responsive padding", () => {
+  // Helper to get the main container (outermost styled div with background)
+  const getMainContainer = () => {
+    const title = screen.getByText(mockPageName);
+    // Navigate up: h1 -> text-center -> w-full px-3 -> flex -mx-3 -> relative px-3 -> main container
+    return title.closest("div")?.parentElement?.parentElement?.parentElement?.parentElement;
+  };
+
+  // Helper to get the content wrapper with responsive padding
+  const getContentWrapper = () => {
+    const title = screen.getByText(mockPageName);
+    // Navigate up: h1 -> text-center -> w-full px-3 -> flex -mx-3 -> relative px-3
+    return title.closest("div")?.parentElement?.parentElement?.parentElement;
+  };
+
+  describe("Responsive Layout and Sizing", () => {
+    it("should have mobile-first responsive padding on content wrapper", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
-      const mainContainer = screen.getByText(mockPageName).closest("div");
-      expect(mainContainer).toHaveClass(
+      const contentWrapper = getContentWrapper();
+      expect(contentWrapper).toHaveClass(
         "px-3",
         "sm:px-4",
         "md:px-6",
@@ -20,10 +33,10 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
       );
     });
 
-    it("should have responsive top and bottom padding", () => {
+    it("should have responsive top padding on main container", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
-      const mainContainer = screen.getByText(mockPageName).closest("div");
+      const mainContainer = getMainContainer();
       expect(mainContainer).toHaveClass(
         "pt-[80px]",
         "sm:pt-[100px]",
@@ -32,10 +45,10 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
       );
     });
 
-    it("should have responsive bottom padding", () => {
+    it("should have responsive bottom padding on main container", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
-      const mainContainer = screen.getByText(mockPageName).closest("div");
+      const mainContainer = getMainContainer();
       expect(mainContainer).toHaveClass(
         "pb-[40px]",
         "sm:pb-[50px]",
@@ -121,31 +134,31 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
     });
   });
 
-  // TODO: REA-211 - Container CSS classes differ from expectations
-  describe.skip("Responsive Container Structure", () => {
-    it("should have responsive margin structure", () => {
+  describe("Responsive Container Structure", () => {
+    it("should have responsive margin structure on flex container", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
-      const marginContainer = screen
+      // Navigate: h1 -> text-center -> w-full -> flex -mx-3
+      const flexContainer = screen
         .getByText(mockPageName)
-        .closest("div")?.parentElement;
-      expect(marginContainer).toHaveClass("-mx-3", "sm:-mx-4");
+        .closest("div")?.parentElement?.parentElement;
+      expect(flexContainer).toHaveClass("-mx-3", "sm:-mx-4");
     });
 
-    it("should have responsive padding structure", () => {
+    it("should have responsive padding structure on inner container", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
-      const paddingContainer = screen.getByText(mockPageName).closest("div");
-      expect(paddingContainer).toHaveClass("px-3", "sm:px-4");
+      // Navigate: h1 -> text-center -> w-full px-3
+      const innerContainer = screen.getByText(mockPageName).closest("div")?.parentElement;
+      expect(innerContainer).toHaveClass("px-3", "sm:px-4");
     });
   });
 
-  // TODO: REA-211 - Background/styling CSS classes differ from expectations
-  describe.skip("Responsive Background and Styling", () => {
-    it("should maintain background image styling", () => {
+  describe("Responsive Background and Styling", () => {
+    it("should maintain background image styling on main container", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
-      const mainContainer = screen.getByText(mockPageName).closest("div");
+      const mainContainer = getMainContainer();
       expect(mainContainer).toHaveClass(
         "bg-cover",
         "bg-center",
@@ -153,29 +166,28 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
       );
     });
 
-    it("should have responsive overflow handling", () => {
+    it("should have overflow handling on main container", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
-      const mainContainer = screen.getByText(mockPageName).closest("div");
+      const mainContainer = getMainContainer();
       expect(mainContainer).toHaveClass("overflow-hidden");
     });
 
-    it("should maintain z-index and positioning", () => {
+    it("should maintain z-index and positioning on main container", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
-      const mainContainer = screen.getByText(mockPageName).closest("div");
+      const mainContainer = getMainContainer();
       expect(mainContainer).toHaveClass("relative", "z-10");
     });
   });
 
-  // TODO: REA-211 - Border/divider CSS classes differ from expectations
-  describe.skip("Responsive Border and Divider", () => {
-    it("should maintain responsive border styling", () => {
+  describe("Responsive Border and Divider", () => {
+    it("should have gradient border styling", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
-      const borderDiv = screen
-        .getByText(mockPageName)
-        .closest("div")?.nextElementSibling;
+      // The border div is the first child of main container (absolute positioned)
+      const mainContainer = getMainContainer();
+      const borderDiv = mainContainer?.querySelector(".absolute");
       expect(borderDiv).toHaveClass(
         "bg-gradient-to-r",
         "from-stroke/0",
@@ -184,12 +196,11 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
       );
     });
 
-    it("should have responsive dark mode support", () => {
+    it("should have dark mode support for border", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
-      const borderDiv = screen
-        .getByText(mockPageName)
-        .closest("div")?.nextElementSibling;
+      const mainContainer = getMainContainer();
+      const borderDiv = mainContainer?.querySelector(".absolute");
       expect(borderDiv).toHaveClass("dark:via-dark-3");
     });
   });
@@ -202,13 +213,13 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
       expect(contentContainer).toHaveClass("text-center");
     });
 
-    // TODO: REA-211 - Flex container CSS classes differ from expectations
-    it.skip("should maintain flex layout structure", () => {
+    it("should maintain flex layout structure", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
+      // Navigate: h1 -> text-center -> w-full -> flex container
       const flexContainer = screen
         .getByText(mockPageName)
-        .closest("div")?.parentElement;
+        .closest("div")?.parentElement?.parentElement;
       expect(flexContainer).toHaveClass("flex", "flex-wrap", "items-center");
     });
   });
@@ -237,27 +248,30 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
     });
   });
 
-  // TODO: REA-211 - Responsive breakpoint CSS classes differ from expectations
-  describe.skip("Responsive Breakpoint Behavior", () => {
+  describe("Responsive Breakpoint Behavior", () => {
     it("should apply mobile-first responsive classes", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
-      const mainContainer = screen.getByText(mockPageName).closest("div");
+      const mainContainer = getMainContainer();
+      const contentWrapper = getContentWrapper();
 
-      // Mobile-first approach: base classes should be present
-      expect(mainContainer).toHaveClass("px-3", "pt-[80px]", "pb-[40px]");
+      // Mobile-first padding on main container
+      expect(mainContainer).toHaveClass("pt-[80px]", "pb-[40px]");
 
-      // Responsive variants should also be present
-      expect(mainContainer).toHaveClass("sm:px-4", "md:px-6", "lg:px-8");
+      // Responsive padding variants on content wrapper
+      expect(contentWrapper).toHaveClass("px-3", "sm:px-4", "md:px-6", "lg:px-8");
     });
 
     it("should handle all responsive breakpoints correctly", () => {
       render(<Breadcrumb pageName={mockPageName} />);
 
-      const mainContainer = screen.getByText(mockPageName).closest("div");
+      const mainContainer = getMainContainer();
+      const contentWrapper = getContentWrapper();
 
-      // Check all breakpoint variants are present
-      expect(mainContainer).toHaveClass("sm:px-4", "md:px-6", "lg:px-8");
+      // Check responsive padding on content wrapper
+      expect(contentWrapper).toHaveClass("sm:px-4", "md:px-6", "lg:px-8");
+
+      // Check responsive vertical padding on main container
       expect(mainContainer).toHaveClass(
         "sm:pt-[100px]",
         "md:pt-[130px]",
@@ -289,8 +303,7 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
       expect(screen.getByText("Home")).toBeInTheDocument();
     });
 
-    // TODO: REA-211 - Responsive structure CSS classes differ from expectations
-    it.skip("should maintain responsive structure regardless of content", () => {
+    it("should maintain responsive structure regardless of content", () => {
       render(
         <Breadcrumb
           pageName={mockPageName}
@@ -298,8 +311,8 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
         />,
       );
 
-      const mainContainer = screen.getByText(mockPageName).closest("div");
-      expect(mainContainer).toHaveClass(
+      const contentWrapper = getContentWrapper();
+      expect(contentWrapper).toHaveClass(
         "px-3",
         "sm:px-4",
         "md:px-6",

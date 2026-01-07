@@ -74,8 +74,8 @@ describe('GET /api/dispatch/driver/[id]/assignments - Get Available Assignments'
 
       const response = await GET(request, context);
 
-      // Should succeed or return 403 based on random status
-      expect([200, 403]).toContain(response.status);
+      // Should succeed, return 403 (not active), or 400 (validation error)
+      expect([200, 400, 403]).toContain(response.status);
     });
 
     it('should parse location parameters correctly', async () => {

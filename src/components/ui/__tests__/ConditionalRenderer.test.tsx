@@ -120,7 +120,10 @@ describe('Conditional Rendering Logic', () => {
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
+    // Wrap in act() to handle any pending React state updates from timers
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
     jest.useRealTimers();
   });
 
