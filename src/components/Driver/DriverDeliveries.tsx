@@ -31,7 +31,6 @@ import {
   CheckCircle2,
   ClipboardList,
   AlertTriangle,
-  User,
   Camera,
 } from "lucide-react";
 import {
@@ -207,22 +206,6 @@ const DriverDeliveries: React.FC = () => {
 
     setFilteredDeliveries(filtered);
   }, [deliveries, activeTab, statusFilter]);
-
-  // Format the user's first name (for future use if needed)
-  const getFirstName = (): string => {
-    const fullName = userProfile?.name;
-    if (!fullName) return "";
-    const nameParts = fullName.split(" ");
-    return nameParts[0] || "";
-  };
-
-  // Get time-based greeting
-  const getGreeting = (): string => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
 
   const handleNextPage = () => setPage((prev) => prev + 1);
   const handlePrevPage = () => setPage((prev) => Math.max(1, prev - 1));
@@ -424,45 +407,6 @@ const DriverDeliveries: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4">
-      {/* User Welcome */}
-      <div className="mb-6">
-        <Card className="border-0 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-sm dark:from-gray-800 dark:to-gray-700">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="mr-4 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900">
-                {userProfile?.image ? (
-                  <img
-                    src={userProfile.image}
-                    alt={userProfile.name || "Driver"}
-                    className="h-10 w-10 rounded-full"
-                  />
-                ) : (
-                  <User className="h-5 w-5 text-blue-600 dark:text-blue-300" />
-                )}
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold">
-                  {getGreeting()},{" "}
-                  {isProfileLoading ? (
-                    <span className="animate-pulse">Driver</span>
-                  ) : (
-                    getFirstName() || "Driver"
-                  )}
-                </h2>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                  Here's your delivery overview for{" "}
-                  {new Date().toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Account Status Alert */}
       {!isProfileLoading &&
         userProfile?.status &&
