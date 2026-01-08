@@ -106,12 +106,16 @@ export const adminTest = base.extend<AuthFixtures>({
 
 /**
  * DRIVER role fixture
+ * Used for driver shift workflow E2E tests
  */
 export const driverTest = base.extend<AuthFixtures>({
   authenticatedContext: async ({ browser }, use) => {
     const authFile = getAuthFile('DRIVER');
     const context = await browser.newContext({
       storageState: authFile,
+      // Grant geolocation permission for driver tracking tests
+      permissions: ['geolocation'],
+      geolocation: { latitude: 34.0522, longitude: -118.2437 }, // Default: Los Angeles
     });
     await use(context);
     await context.close();
