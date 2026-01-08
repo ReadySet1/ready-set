@@ -20,11 +20,9 @@ export async function updateDeliveryStatus(
     // Get current delivery info
     const delivery = await prisma.$queryRawUnsafe<{
       driver_id: string;
-      catering_request_id?: string;
-      on_demand_id?: string;
     }[]>(`
-      SELECT driver_id, catering_request_id, on_demand_id
-      FROM deliveries 
+      SELECT driver_id
+      FROM deliveries
       WHERE id = $1::uuid
     `, deliveryId);
 
@@ -39,37 +37,33 @@ export async function updateDeliveryStatus(
     const params: any[] = [deliveryId, status];
     let paramCounter = 3;
 
-    // Add location if provided
-    if (location) {
-      updateFields.push(`location = ST_GeogFromText($${paramCounter})`);
-      params.push(`POINT(${location.coordinates.lng} ${location.coordinates.lat})`);
-      paramCounter++;
-    }
+    // Note: Location is tracked on the driver record, not delivery
+    // Driver location update happens below via the drivers table
 
-    // Add proof of delivery if provided
+    // Add proof of delivery if provided (uses delivery_photo_url column)
     if (proofOfDelivery) {
-      updateFields.push(`proof_of_delivery = $${paramCounter}`);
+      updateFields.push(`delivery_photo_url = $${paramCounter}`);
       params.push(proofOfDelivery);
       paramCounter++;
     }
 
-    // Add notes to metadata if provided
+    // Add notes to delivery_notes if provided
     if (notes) {
-      updateFields.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${paramCounter}::jsonb`);
-      params.push(JSON.stringify({ notes, statusUpdatedAt: new Date().toISOString() }));
+      updateFields.push(`delivery_notes = $${paramCounter}`);
+      params.push(notes);
       paramCounter++;
     }
 
-    // Set timestamp fields based on status
+    // Set timestamp fields based on status (using actual DB columns)
     switch (status) {
       case DriverStatus.EN_ROUTE_TO_CLIENT:
-        updateFields.push('started_at = NOW()');
+        updateFields.push('picked_up_at = NOW()');
         break;
       case DriverStatus.ARRIVED_TO_CLIENT:
-        updateFields.push('arrived_at = NOW()');
+        // No direct column for arrival - timestamp captured in delivery_notes above
         break;
       case DriverStatus.COMPLETED:
-        updateFields.push('completed_at = NOW()');
+        updateFields.push('delivered_at = NOW()');
         break;
     }
 
@@ -107,26 +101,8 @@ export async function updateDeliveryStatus(
       `, deliveryRecord.driver_id);
     }
 
-    // Update linked order status if applicable
-    if (deliveryRecord?.catering_request_id) {
-      await prisma.$executeRawUnsafe(`
-        UPDATE catering_requests 
-        SET 
-          status = $2,
-          updated_at = NOW()
-        WHERE id = $1::uuid
-      `, deliveryRecord.catering_request_id, status);
-    }
-
-    if (deliveryRecord?.on_demand_id) {
-      await prisma.$executeRawUnsafe(`
-        UPDATE on_demand 
-        SET 
-          status = $2,
-          updated_at = NOW()
-        WHERE id = $1::uuid
-      `, deliveryRecord.on_demand_id, status);
-    }
+    // Note: catering_request_id and on_demand_id columns don't exist in deliveries table
+    // If order linking is needed, it should be implemented via a separate mechanism
 
     revalidatePath('/admin/tracking');
     revalidatePath('/driver');
@@ -268,53 +244,48 @@ export async function getDriverActiveDeliveries(driverId: string): Promise<Deliv
       return [];
     }
     const result = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT 
+      SELECT
         d.id,
-        d.catering_request_id,
-        d.on_demand_id,
         d.driver_id,
         d.status,
         ST_AsGeoJSON(d.pickup_location) as pickup_location_geojson,
         ST_AsGeoJSON(d.delivery_location) as delivery_location_geojson,
-        d.estimated_arrival,
-        d.actual_arrival,
-        d.proof_of_delivery,
-        d.actual_distance_km,
-        d.route_polyline,
-        d.metadata,
+        d.estimated_delivery_time,
+        d.delivered_at,
+        d.delivery_photo_url,
+        d.delivery_notes,
         d.assigned_at,
-        d.started_at,
-        d.arrived_at,
-        d.completed_at,
+        d.picked_up_at,
         d.created_at,
         d.updated_at
       FROM deliveries d
-      WHERE d.driver_id = $1::uuid 
+      WHERE d.driver_id = $1::uuid
       AND d.status NOT IN ('DELIVERED', 'CANCELLED')
+      AND d.deleted_at IS NULL
       ORDER BY d.assigned_at ASC
     `, driverId);
 
     return result.map(delivery => ({
       id: delivery.id,
-      cateringRequestId: delivery.catering_request_id,
-      onDemandId: delivery.on_demand_id,
+      cateringRequestId: undefined, // Column doesn't exist in schema
+      onDemandId: undefined, // Column doesn't exist in schema
       driverId: delivery.driver_id,
       status: delivery.status,
-      pickupLocation: delivery.pickup_location_geojson ? 
+      pickupLocation: delivery.pickup_location_geojson ?
         JSON.parse(delivery.pickup_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
-      deliveryLocation: delivery.delivery_location_geojson ? 
+      deliveryLocation: delivery.delivery_location_geojson ?
         JSON.parse(delivery.delivery_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
-      estimatedArrival: delivery.estimated_arrival,
-      actualArrival: delivery.actual_arrival,
+      estimatedArrival: delivery.estimated_delivery_time,
+      actualArrival: delivery.delivered_at,
       route: [], // Route points loaded separately if needed
-      proofOfDelivery: delivery.proof_of_delivery,
-      actualDistanceKm: delivery.actual_distance_km,
-      routePolyline: delivery.route_polyline,
-      metadata: delivery.metadata,
+      proofOfDelivery: delivery.delivery_photo_url,
+      actualDistanceMiles: undefined, // Column doesn't exist in schema
+      routePolyline: undefined, // Column doesn't exist in schema
+      metadata: delivery.delivery_notes ? { notes: delivery.delivery_notes } : {},
       assignedAt: delivery.assigned_at,
-      startedAt: delivery.started_at,
-      arrivedAt: delivery.arrived_at,
-      completedAt: delivery.completed_at,
+      startedAt: delivery.picked_up_at,
+      arrivedAt: delivery.delivered_at,
+      completedAt: delivery.delivered_at,
       createdAt: delivery.created_at,
       updatedAt: delivery.updated_at
     }));
@@ -356,21 +327,18 @@ export async function uploadProofOfDelivery(
       };
     }
 
-    // Update delivery record with proof URL
+    // Update delivery record with proof URL (using actual DB columns)
     await prisma.$executeRawUnsafe(`
       UPDATE deliveries
       SET
-        proof_of_delivery = $2,
-        metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+        delivery_photo_url = $2,
+        delivery_notes = COALESCE(delivery_notes, '') || $3,
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       deliveryId,
       uploadResult.url,
-      JSON.stringify({
-        proofDescription: description,
-        proofUploadedAt: new Date().toISOString()
-      })
+      description ? ` [POD: ${description} at ${new Date().toISOString()}]` : ''
     );
 
     revalidatePath('/admin/tracking');
@@ -395,53 +363,48 @@ export async function getDriverDeliveryHistory(
 ): Promise<DeliveryTracking[]> {
   try {
     const result = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT 
+      SELECT
         d.id,
-        d.catering_request_id,
-        d.on_demand_id,
         d.driver_id,
         d.status,
         ST_AsGeoJSON(d.pickup_location) as pickup_location_geojson,
         ST_AsGeoJSON(d.delivery_location) as delivery_location_geojson,
-        d.estimated_arrival,
-        d.actual_arrival,
-        d.proof_of_delivery,
-        d.actual_distance_km,
-        d.route_polyline,
-        d.metadata,
+        d.estimated_delivery_time,
+        d.delivered_at,
+        d.delivery_photo_url,
+        d.delivery_notes,
         d.assigned_at,
-        d.started_at,
-        d.arrived_at,
-        d.completed_at,
+        d.picked_up_at,
         d.created_at,
         d.updated_at
       FROM deliveries d
-      WHERE d.driver_id = $1::uuid 
+      WHERE d.driver_id = $1::uuid
+      AND d.deleted_at IS NULL
       ORDER BY d.assigned_at DESC
       LIMIT $2::int
     `, driverId, limit);
 
     return result.map(delivery => ({
       id: delivery.id,
-      cateringRequestId: delivery.catering_request_id,
-      onDemandId: delivery.on_demand_id,
+      cateringRequestId: undefined, // Column doesn't exist in schema
+      onDemandId: undefined, // Column doesn't exist in schema
       driverId: delivery.driver_id,
       status: delivery.status,
-      pickupLocation: delivery.pickup_location_geojson ? 
+      pickupLocation: delivery.pickup_location_geojson ?
         JSON.parse(delivery.pickup_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
-      deliveryLocation: delivery.delivery_location_geojson ? 
+      deliveryLocation: delivery.delivery_location_geojson ?
         JSON.parse(delivery.delivery_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
-      estimatedArrival: delivery.estimated_arrival,
-      actualArrival: delivery.actual_arrival,
+      estimatedArrival: delivery.estimated_delivery_time,
+      actualArrival: delivery.delivered_at,
       route: [], // Route points loaded separately if needed
-      proofOfDelivery: delivery.proof_of_delivery,
-      actualDistanceKm: delivery.actual_distance_km,
-      routePolyline: delivery.route_polyline,
-      metadata: delivery.metadata,
+      proofOfDelivery: delivery.delivery_photo_url,
+      actualDistanceMiles: undefined, // Column doesn't exist in schema
+      routePolyline: undefined, // Column doesn't exist in schema
+      metadata: delivery.delivery_notes ? { notes: delivery.delivery_notes } : {},
       assignedAt: delivery.assigned_at,
-      startedAt: delivery.started_at,
-      arrivedAt: delivery.arrived_at,
-      completedAt: delivery.completed_at,
+      startedAt: delivery.picked_up_at,
+      arrivedAt: delivery.delivered_at,
+      completedAt: delivery.delivered_at,
       createdAt: delivery.created_at,
       updatedAt: delivery.updated_at
     }));

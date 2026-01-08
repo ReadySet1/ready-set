@@ -105,11 +105,31 @@ export const adminTest = base.extend<AuthFixtures>({
 });
 
 /**
+ * DRIVER role fixture
+ */
+export const driverTest = base.extend<AuthFixtures>({
+  authenticatedContext: async ({ browser }, use) => {
+    const authFile = getAuthFile('DRIVER');
+    const context = await browser.newContext({
+      storageState: authFile,
+    });
+    await use(context);
+    await context.close();
+  },
+
+  authenticatedPage: async ({ authenticatedContext }, use) => {
+    const page = await authenticatedContext.newPage();
+    await use(page);
+    await page.close();
+  },
+});
+
+/**
  * Generic authenticated test that accepts a role parameter
  * Useful for tests that need to run with different roles
  */
 type RoleAuthFixtures = {
-  role: 'CLIENT' | 'VENDOR' | 'ADMIN';
+  role: 'CLIENT' | 'VENDOR' | 'ADMIN' | 'DRIVER';
   authenticatedPage: Page;
   authenticatedContext: BrowserContext;
 };
@@ -140,6 +160,7 @@ export const test = {
   client: clientTest,
   vendor: vendorTest,
   admin: adminTest,
+  driver: driverTest,
   withRole: roleBasedTest,
 };
 
