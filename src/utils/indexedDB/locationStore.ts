@@ -117,17 +117,15 @@ export class LocationStore {
 
   /**
    * Get all unsynced location updates
+   * Note: Uses manual filtering for Safari compatibility (Safari has issues with boolean IndexedDB keys)
    */
   async getUnsyncedLocations(): Promise<StoredLocationUpdate[]> {
     if (!this.db) await this.init();
 
     try {
-      const locations = await this.db!.getAllFromIndex(
-        this.STORE_NAME,
-        'by-synced',
-        false
-      );
-      return locations;
+      // Manual filter approach for Safari compatibility
+      const allLocations = await this.db!.getAll(this.STORE_NAME);
+      return allLocations.filter(loc => !loc.synced);
     } catch (error) {
       console.error('Failed to get unsynced locations:', error);
       return [];
@@ -136,17 +134,15 @@ export class LocationStore {
 
   /**
    * Get unsynced locations for a specific driver
+   * Note: Uses manual filtering for Safari compatibility
    */
   async getUnsyncedLocationsByDriver(driverId: string): Promise<StoredLocationUpdate[]> {
     if (!this.db) await this.init();
 
     try {
-      const locations = await this.db!.getAllFromIndex(
-        this.STORE_NAME,
-        'by-driver-synced',
-        [driverId, false]
-      );
-      return locations;
+      // Manual filter approach for Safari compatibility
+      const allLocations = await this.db!.getAll(this.STORE_NAME);
+      return allLocations.filter(loc => loc.driverId === driverId && !loc.synced);
     } catch (error) {
       console.error('Failed to get unsynced locations for driver:', error);
       return [];

@@ -35,22 +35,22 @@ export async function startDriverShift(
     const result = await prisma.$executeRawUnsafe(`
       INSERT INTO driver_shifts (
         driver_id,
-        start_time,
+        shift_start,
         start_location,
         status,
-        metadata
+        notes
       ) VALUES (
         $1::uuid,
         NOW(),
         ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
         'active',
-        $4::jsonb
+        $4
       ) RETURNING id
     `,
       driverId,
       startLocation.coordinates.lng,
       startLocation.coordinates.lat,
-      JSON.stringify(metadata)
+      metadata.notes || null
     );
 
     // Update driver status
@@ -62,7 +62,7 @@ export async function startDriverShift(
           SELECT id FROM driver_shifts
           WHERE driver_id = $1::uuid
           AND status = 'active'
-          ORDER BY start_time DESC
+          ORDER BY shift_start DESC
           LIMIT 1
         ),
         shift_start_time = NOW(),
@@ -78,10 +78,10 @@ export async function startDriverShift(
 
     // Get the created shift ID
     const shiftRecord = await prisma.$queryRawUnsafe<{ id: string }[]>(`
-      SELECT id FROM driver_shifts 
-      WHERE driver_id = $1::uuid 
-      AND status = 'active' 
-      ORDER BY start_time DESC 
+      SELECT id FROM driver_shifts
+      WHERE driver_id = $1::uuid
+      AND status = 'active'
+      ORDER BY shift_start DESC
       LIMIT 1
     `, driverId);
 
@@ -135,22 +135,17 @@ export async function endDriverShift(
     await prisma.$executeRawUnsafe(`
       UPDATE driver_shifts
       SET
-        end_time = NOW(),
+        shift_end = NOW(),
         end_location = ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
         status = 'completed',
-        metadata = COALESCE(metadata, '{}'::jsonb) || $4::jsonb,
+        notes = COALESCE(notes, '') || $4,
         updated_at = NOW()
       WHERE id = $1::uuid
     `,
       shiftId,
       endLocation.coordinates.lng,
       endLocation.coordinates.lat,
-      JSON.stringify({
-        ...metadata,
-        // Preserve any caller-provided finalMileage but treat it as an
-        // informational override rather than the canonical distance.
-        clientReportedMileageKm: finalMileage ?? undefined,
-      })
+      metadata.notes ? ` ${metadata.notes}` : (finalMileage ? ` [Client reported mileage: ${finalMileage} km]` : '')
     );
 
     // Calculate mileage from GPS trail. If finalMileage is provided (e.g., odometer reading),
@@ -191,17 +186,19 @@ export async function endDriverShift(
     }
 
     // Safety net: ensure mileage is persisted even if service had partial failure
+    // Uses total_distance column (stores in km for legacy compatibility)
     if (Number.isFinite(totalMiles) && totalMiles > 0) {
+      const totalKm = totalMiles / 0.621371; // Convert miles back to km for storage
       await prisma.$executeRawUnsafe(`
         UPDATE driver_shifts
         SET
-          total_distance_miles = COALESCE(total_distance_miles, $2::float),
+          total_distance = COALESCE(total_distance, $2::float),
           updated_at = NOW()
         WHERE id = $1::uuid
-          AND total_distance_miles IS NULL
+          AND total_distance IS NULL
       `,
       shiftId,
-      totalMiles);
+      totalKm);
     }
 
     // Update driver status
@@ -236,6 +233,7 @@ export async function endDriverShift(
 
 /**
  * Start a break during an active shift
+ * Note: Uses break_start/break_end columns on driver_shifts (supports single break per shift)
  */
 export async function startShiftBreak(
   shiftId: string,
@@ -245,75 +243,34 @@ export async function startShiftBreak(
   try {
     // Verify shift exists and is active
     const shiftExists = await prisma.$queryRawUnsafe<{ id: string }[]>(`
-      SELECT id FROM driver_shifts 
-      WHERE id = $1::uuid AND status = 'active'
+      SELECT id FROM driver_shifts
+      WHERE id = $1::uuid AND status = 'active' AND deleted_at IS NULL
     `, shiftId);
 
     if (shiftExists.length === 0) {
       return { success: false, error: 'Active shift not found' };
     }
 
-    // Insert break record
-    if (location) {
-      await prisma.$executeRawUnsafe(`
-        INSERT INTO shift_breaks (
-          shift_id,
-          start_time,
-          break_type,
-          location
-        ) VALUES (
-          $1::uuid,
-          NOW(),
-          $2,
-          ST_SetSRID(ST_MakePoint($3::float, $4::float), 4326)::geography
-        )
-      `,
-        shiftId,
-        breakType,
-        location.coordinates.lng,
-        location.coordinates.lat
-      );
-    } else {
-      await prisma.$executeRawUnsafe(`
-        INSERT INTO shift_breaks (
-          shift_id,
-          start_time,
-          break_type,
-          location
-        ) VALUES (
-          $1::uuid,
-          NOW(),
-          $2,
-          NULL
-        )
-      `,
-        shiftId,
-        breakType
-      );
-    }
-
-    // Update shift status to paused
+    // Update shift with break start time and set status to paused
     await prisma.$executeRawUnsafe(`
-      UPDATE driver_shifts 
-      SET status = 'paused', updated_at = NOW()
+      UPDATE driver_shifts
+      SET
+        break_start = NOW(),
+        status = 'paused',
+        notes = COALESCE(notes, '') || $2,
+        updated_at = NOW()
       WHERE id = $1::uuid
-    `, shiftId);
-
-    // Get the created break ID
-    const breakRecord = await prisma.$queryRawUnsafe<{ id: string }[]>(`
-      SELECT id FROM shift_breaks 
-      WHERE shift_id = $1::uuid 
-      AND end_time IS NULL 
-      ORDER BY start_time DESC 
-      LIMIT 1
-    `, shiftId);
+    `,
+      shiftId,
+      ` [Break started: ${breakType}]`
+    );
 
     revalidatePath('/admin/tracking');
     revalidatePath('/driver');
 
     return {
       success: true,
-      breakId: breakRecord[0]?.id
+      breakId: shiftId // Return shiftId as breakId since breaks are on the shift record
     };
   } catch (error) {
     console.error('Error starting shift break:', error);
@@ -326,44 +283,37 @@ export async function startShiftBreak(
 
 /**
  * End the current break and resume shift
+ * Note: breakId is actually the shiftId since breaks are stored on driver_shifts
  */
 export async function endShiftBreak(
-  breakId: string,
+  breakId: string, // This is actually the shiftId
   location?: LocationUpdate
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Get break and shift info
-    const breakInfo = await prisma.$queryRawUnsafe<{
-      shift_id: string;
-      break_type: string;
+    // Verify shift exists and is paused (on break)
+    const shiftInfo = await prisma.$queryRawUnsafe<{
+      id: string;
+      status: string;
     }[]>(`
-      SELECT shift_id, break_type
-      FROM shift_breaks 
-      WHERE id = $1::uuid AND end_time IS NULL
+      SELECT id, status
+      FROM driver_shifts
+      WHERE id = $1::uuid AND status = 'paused' AND deleted_at IS NULL
     `, breakId);
 
-    if (breakInfo.length === 0) {
-      return { success: false, error: 'Active break not found' };
+    if (shiftInfo.length === 0) {
+      return { success: false, error: 'Paused shift not found (no active break)' };
     }
 
-    const break_record = breakInfo[0];
-    if (!break_record) {
-      return { success: false, error: 'Break record not found' };
-    }
-
-    // End the break
+    // End the break and resume shift
     await prisma.$executeRawUnsafe(`
-      UPDATE shift_breaks 
-      SET end_time = NOW()
+      UPDATE driver_shifts
+      SET
+        break_end = NOW(),
+        status = 'active',
+        notes = COALESCE(notes, '') || ' [Break ended]',
+        updated_at = NOW()
       WHERE id = $1::uuid
     `, breakId);
-
-    // Resume the shift (set back to active)
-    await prisma.$executeRawUnsafe(`
-      UPDATE driver_shifts 
-      SET status = 'active', updated_at = NOW()
-      WHERE id = $1::uuid
-    `, break_record.shift_id);
 
     revalidatePath('/admin/tracking');
     revalidatePath('/driver');
@@ -397,15 +347,15 @@ export async function getActiveShift(driverId: string): Promise<DriverShift | nu
         ds.shift_end as end_time,
         ST_AsGeoJSON(ds.start_location) as start_location_geojson,
         ST_AsGeoJSON(ds.end_location) as end_location_geojson,
-        ds.total_distance_miles,
-        ds.delivery_count,
+        ds.total_distance,
         ds.status,
-        ds.metadata,
+        ds.notes,
         ds.created_at,
         ds.updated_at
       FROM driver_shifts ds
       WHERE ds.driver_id = $1::uuid
       AND ds.status IN ('active', 'paused')
+      AND ds.deleted_at IS NULL
       ORDER BY ds.shift_start DESC
       LIMIT 1
     `, driverId);
@@ -414,21 +364,7 @@ export async function getActiveShift(driverId: string): Promise<DriverShift | nu
 
     const shift = result[0];
 
-    // Get breaks for this shift
-    const breaks = await prisma.$queryRawUnsafe<any[]>(`
-      SELECT 
-        id,
-        shift_id,
-        start_time,
-        end_time,
-        break_type,
-        ST_AsGeoJSON(location) as location_geojson,
-        created_at
-      FROM shift_breaks
-      WHERE shift_id = $1::uuid
-      ORDER BY start_time DESC
-    `, shift.id);
-
+    // Note: shift_breaks table doesn't exist in schema - breaks are empty for now
     return {
       id: shift.id,
       driverId: shift.driver_id,
@@ -438,20 +374,11 @@ export async function getActiveShift(driverId: string): Promise<DriverShift | nu
         JSON.parse(shift.start_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
       endLocation: shift.end_location_geojson ?
         JSON.parse(shift.end_location_geojson).coordinates.reverse() : undefined,
-      totalDistanceMiles: shift.total_distance_miles,
-      deliveryCount: shift.delivery_count,
+      totalDistanceMiles: shift.total_distance ? shift.total_distance * 0.621371 : 0, // Convert km to miles
+      deliveryCount: 0, // Column doesn't exist in DB schema
       status: shift.status,
-      breaks: breaks.map(b => ({
-        id: b.id,
-        shiftId: b.shift_id,
-        startTime: b.start_time,
-        endTime: b.end_time,
-        breakType: b.break_type,
-        location: b.location_geojson ?
-          JSON.parse(b.location_geojson).coordinates.reverse() : undefined,
-        createdAt: b.created_at
-      })),
-      metadata: shift.metadata,
+      breaks: [], // shift_breaks table doesn't exist
+      metadata: shift.notes ? { notes: shift.notes } : {},
       createdAt: shift.created_at,
       updatedAt: shift.updated_at
     };
@@ -643,14 +570,14 @@ export async function getDriverShiftHistory(
         ds.shift_end as end_time,
         ST_AsGeoJSON(ds.start_location) as start_location_geojson,
         ST_AsGeoJSON(ds.end_location) as end_location_geojson,
-        ds.total_distance_miles,
-        ds.delivery_count,
+        ds.total_distance,
         ds.status,
-        ds.metadata,
+        ds.notes,
         ds.created_at,
         ds.updated_at
       FROM driver_shifts ds
       WHERE ds.driver_id = $1::uuid
+      AND ds.deleted_at IS NULL
       ORDER BY ds.shift_start DESC
       LIMIT $2::int
     `, driverId, limit);
@@ -664,11 +591,11 @@ export async function getDriverShiftHistory(
         JSON.parse(shift.start_location_geojson).coordinates.reverse() : { lat: 0, lng: 0 },
       endLocation: shift.end_location_geojson ?
         JSON.parse(shift.end_location_geojson).coordinates.reverse() : undefined,
-      totalDistanceMiles: shift.total_distance_miles,
-      deliveryCount: shift.delivery_count,
+      totalDistanceMiles: shift.total_distance ? shift.total_distance * 0.621371 : 0, // Convert km to miles
+      deliveryCount: 0, // Column doesn't exist in DB schema
       status: shift.status,
-      breaks: [], // Breaks loaded separately if needed
-      metadata: shift.metadata,
+      breaks: [], // shift_breaks table doesn't exist
+      metadata: shift.notes ? { notes: shift.notes } : {},
       createdAt: shift.created_at,
       updatedAt: shift.updated_at
     }));

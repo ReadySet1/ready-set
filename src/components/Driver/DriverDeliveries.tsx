@@ -482,41 +482,41 @@ const DriverDeliveries: React.FC = () => {
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="mb-6 grid grid-cols-3 gap-6">
+          <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
             <Card className="shadow-sm">
-              <CardHeader className="px-6 py-4">
-                <CardTitle className="text-lg font-medium">
+              <CardHeader className="px-4 sm:px-6 py-3 sm:py-4">
+                <CardTitle className="text-base sm:text-lg font-medium">
                   Today's Deliveries
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-6 pb-5 pt-0">
+              <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-0">
                 <div className="flex items-center">
-                  <Calendar className="mr-3 h-7 w-7 text-blue-500" />
-                  <div className="text-3xl font-bold">{todayCount}</div>
+                  <Calendar className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-blue-500" />
+                  <div className="text-2xl sm:text-3xl font-bold">{todayCount}</div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader className="px-6 py-4">
-                <CardTitle className="text-lg font-medium">Upcoming</CardTitle>
+              <CardHeader className="px-4 sm:px-6 py-3 sm:py-4">
+                <CardTitle className="text-base sm:text-lg font-medium">Upcoming</CardTitle>
               </CardHeader>
-              <CardContent className="px-6 pb-5 pt-0">
+              <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-0">
                 <div className="flex items-center">
-                  <Clock className="mr-3 h-7 w-7 text-purple-500" />
-                  <div className="text-3xl font-bold">{upcomingCount}</div>
+                  <Clock className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-purple-500" />
+                  <div className="text-2xl sm:text-3xl font-bold">{upcomingCount}</div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader className="px-6 py-4">
-                <CardTitle className="text-lg font-medium">Completed</CardTitle>
+              <CardHeader className="px-4 sm:px-6 py-3 sm:py-4">
+                <CardTitle className="text-base sm:text-lg font-medium">Completed</CardTitle>
               </CardHeader>
-              <CardContent className="px-6 pb-5 pt-0">
+              <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-0">
                 <div className="flex items-center">
-                  <CheckCircle2 className="mr-3 h-7 w-7 text-green-500" />
-                  <div className="text-3xl font-bold">{completedCount}</div>
+                  <CheckCircle2 className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-green-500" />
+                  <div className="text-2xl sm:text-3xl font-bold">{completedCount}</div>
                 </div>
               </CardContent>
             </Card>
