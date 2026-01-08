@@ -24,14 +24,9 @@ import type * as pg from 'pg';
 // Access the mock query function
 const { __mockQuery: mockQuery } = jest.requireMock<typeof pg & { __mockQuery: jest.Mock }>('pg');
 
-// Also get mockPool reference for tests that use it
-let mockPool: any;
-
 describe('/api/tracking/drivers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    const { Pool } = require('pg');
-    mockPool = new Pool();
   });
 
   describe('GET /api/tracking/drivers', () => {
@@ -177,9 +172,7 @@ describe('/api/tracking/drivers', () => {
     });
   });
 
-  // TODO: Update POST and PUT tests to use pg.Pool mocks instead of Supabase
-  // Commented out to prevent crashes until mocks are updated
-  describe.skip('POST /api/tracking/drivers', () => {
+  describe('POST /api/tracking/drivers', () => {
     it('creates a new driver successfully', async () => {
       const newDriver = {
         employee_id: 'EMP003',
@@ -202,7 +195,7 @@ describe('/api/tracking/drivers', () => {
         updated_at: new Date().toISOString(),
       };
 
-      mockPool.query.mockResolvedValue({
+      mockQuery.mockResolvedValue({
         rows: [createdDriver],
       });
 
@@ -248,7 +241,7 @@ describe('/api/tracking/drivers', () => {
       // Mock duplicate employee_id error (PostgreSQL unique constraint violation)
       const duplicateError = new Error('duplicate key value violates unique constraint') as any;
       duplicateError.code = '23505';
-      mockPool.query.mockRejectedValue(duplicateError);
+      mockQuery.mockRejectedValue(duplicateError);
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'POST',
@@ -283,14 +276,14 @@ describe('/api/tracking/drivers', () => {
     });
   });
 
-  describe.skip('PUT /api/tracking/drivers', () => {
+  describe('PUT /api/tracking/drivers', () => {
     it('updates driver information successfully', async () => {
       const driverId = 'driver-1';
       const updateData = {
         driver_id: driverId,
         location: {
           latitude: 40.7128,
-          longitude: -74.0060,
+          longitude: -74.006,
         },
         is_on_duty: true,
       };
@@ -300,11 +293,11 @@ describe('/api/tracking/drivers', () => {
         employee_id: 'EMP001',
         is_active: true,
         is_on_duty: true,
-        location_geojson: JSON.stringify({ type: 'Point', coordinates: [-74.0060, 40.7128] }),
+        location_geojson: JSON.stringify({ type: 'Point', coordinates: [-74.006, 40.7128] }),
         last_location_update: new Date().toISOString(),
       };
 
-      mockPool.query.mockResolvedValue({
+      mockQuery.mockResolvedValue({
         rows: [updatedDriver],
       });
 
@@ -325,7 +318,7 @@ describe('/api/tracking/drivers', () => {
     it('returns 400 for invalid update data', async () => {
       const invalidUpdate = {
         // Missing driver_id which is required
-        location: { latitude: 40.7128, longitude: -74.0060 },
+        location: { latitude: 40.7128, longitude: -74.006 },
       };
 
       const request = new NextRequest(`http://localhost:3000/api/tracking/drivers`, {
@@ -349,7 +342,7 @@ describe('/api/tracking/drivers', () => {
       };
 
       // Mock query returning no rows (driver not found)
-      mockPool.query.mockResolvedValue({
+      mockQuery.mockResolvedValue({
         rows: [],
       });
 
@@ -373,7 +366,7 @@ describe('/api/tracking/drivers', () => {
         is_on_duty: true,
       };
 
-      mockPool.query.mockRejectedValue(new Error('Update failed'));
+      mockQuery.mockRejectedValue(new Error('Update failed'));
 
       const request = new NextRequest(`http://localhost:3000/api/tracking/drivers`, {
         method: 'PUT',
@@ -387,9 +380,42 @@ describe('/api/tracking/drivers', () => {
       expect(data.success).toBe(false);
       expect(data.error).toBe('Failed to update driver');
     });
+
+    it('updates only is_on_duty when location not provided', async () => {
+      const driverId = 'driver-1';
+      const updateData = {
+        driver_id: driverId,
+        is_on_duty: false,
+      };
+
+      const updatedDriver = {
+        id: driverId,
+        employee_id: 'EMP001',
+        is_active: true,
+        is_on_duty: false,
+        location_geojson: null,
+        last_location_update: new Date().toISOString(),
+      };
+
+      mockQuery.mockResolvedValue({
+        rows: [updatedDriver],
+      });
+
+      const request = new NextRequest(`http://localhost:3000/api/tracking/drivers`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      });
+
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.data.is_on_duty).toBe(false);
+    });
   });
 
-  describe.skip('Error Handling', () => {
+  describe('Error Handling', () => {
     it('handles malformed JSON in request body', async () => {
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'POST',
@@ -420,7 +446,7 @@ describe('/api/tracking/drivers', () => {
     });
 
     it('handles database query errors gracefully', async () => {
-      mockPool.query.mockRejectedValue(new Error('Database connection error'));
+      mockQuery.mockRejectedValue(new Error('Database connection error'));
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers');
       const response = await GET(request);
@@ -429,6 +455,20 @@ describe('/api/tracking/drivers', () => {
       expect(response.status).toBe(500);
       expect(data.success).toBe(false);
       expect(data.error).toBe('Failed to fetch drivers');
+    });
+
+    it('handles PUT request with empty body', async () => {
+      const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
+        method: 'PUT',
+        body: JSON.stringify({}),
+      });
+
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.success).toBe(false);
+      expect(data.error).toContain('Missing driver_id');
     });
   });
 });
