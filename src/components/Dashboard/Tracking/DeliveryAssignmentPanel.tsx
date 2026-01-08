@@ -69,9 +69,9 @@ export default function DeliveryAssignmentPanel({
     driver.isOnDuty && (driver.activeDeliveries || 0) < 3 // Max 3 deliveries per driver
   );
 
-  // Handle delivery assignment
+  // Handle delivery assignment (or unassignment when driverId is empty)
   const handleAssignDelivery = async (deliveryId: string, driverId: string) => {
-    if (!deliveryId || !driverId) return;
+    if (!deliveryId) return;
 
     setAssignmentLoading(true);
     try {
