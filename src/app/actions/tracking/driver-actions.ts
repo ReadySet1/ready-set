@@ -455,6 +455,8 @@ export async function updateDriverLocation(
       INSERT INTO driver_locations (
         driver_id,
         location,
+        latitude,
+        longitude,
         accuracy,
         speed,
         heading,
@@ -465,24 +467,26 @@ export async function updateDriverLocation(
       ) VALUES (
         $1::uuid,
         ST_SetSRID(ST_MakePoint($2::float, $3::float), 4326)::geography,
+        $3::float,
+        $2::float,
         $4::float,
-        $5::float,
-        $6::float,
+        COALESCE($5::float, 0),
+        COALESCE($6::float, 0),
         $7::float,
-        $8::float,
-        $9::boolean,
+        $8::int,
+        COALESCE($9::boolean, false),
         $10::timestamptz
       )
     `,
       driverId,
       location.coordinates.lng,
       location.coordinates.lat,
-      location.accuracy,
-      location.speed,
-      location.heading,
-      location.altitude,
-      location.batteryLevel,
-      location.isMoving,
+      location.accuracy ?? 0,
+      location.speed ?? 0,
+      location.heading ?? 0,
+      location.altitude ?? null,
+      location.batteryLevel != null ? Math.round(location.batteryLevel) : null,
+      location.isMoving ?? false,
       location.timestamp
     );
 
