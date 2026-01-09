@@ -19,11 +19,12 @@ export enum UserStatus {
   DELETED = 'deleted',
 }
 
-export enum DriverStatus { 
+export enum DriverStatus {
+  ASSIGNED = 'ASSIGNED',
   ARRIVED_AT_VENDOR = 'ARRIVED_AT_VENDOR',
+  PICKED_UP = 'PICKED_UP',
   EN_ROUTE_TO_CLIENT = 'EN_ROUTE_TO_CLIENT',
   ARRIVED_TO_CLIENT = 'ARRIVED_TO_CLIENT',
-  ASSIGNED = 'ASSIGNED',
   COMPLETED = 'COMPLETED',
 }
 

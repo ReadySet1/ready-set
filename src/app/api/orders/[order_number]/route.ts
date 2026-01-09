@@ -3,8 +3,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from "@prisma/client";
+import { sendDispatchStatusNotification } from "@/services/notifications/delivery-status";
+import { DriverStatus } from "@/types/user";
 
 import { CateringRequestGetPayload, OnDemandGetPayload } from '@/types/prisma';
+
+// Map DriverStatus to dispatch notification status
+const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
+  [DriverStatus.PICKED_UP]: 'PICKUP_COMPLETE',
+  [DriverStatus.EN_ROUTE_TO_CLIENT]: 'EN_ROUTE_TO_DELIVERY',
+  [DriverStatus.ARRIVED_TO_CLIENT]: 'ARRIVED_AT_DELIVERY',
+  [DriverStatus.COMPLETED]: 'DELIVERY_COMPLETE',
+};
+
+// Statuses that should trigger customer notifications
+const CUSTOMER_NOTIFICATION_STATUSES = [
+  DriverStatus.PICKED_UP,
+  DriverStatus.EN_ROUTE_TO_CLIENT,
+  DriverStatus.ARRIVED_TO_CLIENT,
+  DriverStatus.COMPLETED,
+];
+
+// Statuses that should trigger admin notifications
+const ADMIN_NOTIFICATION_STATUSES = [
+  DriverStatus.COMPLETED,
+];
 
 type CateringRequest = CateringRequestGetPayload<{
   include: {
@@ -307,6 +330,41 @@ export async function PATCH(
     }
 
     if (updatedOrder) {
+      // Send notifications for driver status updates (non-blocking)
+      if (driverStatus) {
+        const dispatchStatus = DRIVER_STATUS_TO_DISPATCH_STATUS[driverStatus];
+        const dispatch = (updatedOrder as any).dispatches?.[0];
+
+        if (dispatchStatus && dispatch) {
+          const orderId = (updatedOrder as any).id;
+          const dispatchId = dispatch.id;
+
+          // Send customer notification for relevant statuses
+          if (CUSTOMER_NOTIFICATION_STATUSES.includes(driverStatus as DriverStatus)) {
+            sendDispatchStatusNotification({
+              status: dispatchStatus,
+              dispatchId,
+              orderId,
+              recipientType: 'CUSTOMER',
+            }).catch((err) => {
+              console.error('Failed to send customer notification:', err);
+            });
+          }
+
+          // Send admin notification for relevant statuses
+          if (ADMIN_NOTIFICATION_STATUSES.includes(driverStatus as DriverStatus)) {
+            sendDispatchStatusNotification({
+              status: dispatchStatus,
+              dispatchId,
+              orderId,
+              recipientType: 'ADMIN',
+            }).catch((err) => {
+              console.error('Failed to send admin notification:', err);
+            });
+          }
+        }
+      }
+
       const serializedOrder = serializeOrder(updatedOrder);
       return NextResponse.json(serializedOrder);
     }
