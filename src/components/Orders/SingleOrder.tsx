@@ -20,6 +20,7 @@ import {
   Package,
   Phone,
   Mail,
+  Pencil,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { DriverStatusCard } from "./DriverStatus";
@@ -29,6 +30,8 @@ import AddressInfo from "./ui/AddressInfo";
 import CustomerInfo from "./ui/CustomerInfo";
 import AdditionalInfo from "./ui/AdditionalInfo";
 import DriverAssignmentDialog from "./ui/DriverAssignmentDialog";
+import EditOrderDialog from "./ui/EditOrderDialog";
+import { TERMINAL_STATUSES } from "@/app/api/orders/[order_number]/schemas";
 import OrderStatusCard from "./OrderStatus";
 import { usePathname, useRouter, useParams } from "next/navigation";
 import { OrderFilesManager } from "./ui/OrderFiles";
@@ -149,6 +152,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [isDriverDialogOpen, setIsDriverDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDriverAssigned, setIsDriverAssigned] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
@@ -1110,6 +1114,18 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                 </h2>
               </div>
               <div className="space-y-3 p-6">
+                {/* Edit Order Button - visible for admin/helpdesk when order is not terminal */}
+                {(canEditOrder || userCanEditOrder()) &&
+                  !TERMINAL_STATUSES.includes(order.status.toUpperCase() as typeof TERMINAL_STATUSES[number]) && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 border-primary/20 bg-primary/5 hover:bg-primary/10"
+                    onClick={() => setIsEditDialogOpen(true)}
+                  >
+                    <Pencil className="h-4 w-4 text-primary" />
+                    Edit Order
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   className="w-full justify-start gap-2 hover:bg-slate-50"
@@ -1225,6 +1241,14 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         selectedDriver={selectedDriver}
         onDriverSelection={handleDriverSelection}
         onAssignOrEditDriver={handleAssignOrEditDriver}
+      />
+
+      {/* Edit Order Dialog */}
+      <EditOrderDialog
+        isOpen={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        order={order}
+        onSaveSuccess={fetchOrderDetails}
       />
     </div>
   );
