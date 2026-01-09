@@ -12,11 +12,23 @@ interface UseLocationTrackingReturn {
   error: string | null;
   unsyncedCount: number;
   isOnline: boolean;
+  permissionState: 'prompt' | 'granted' | 'denied' | 'unknown';
+  isRequestingPermission: boolean;
   startTracking: () => void;
   stopTracking: () => void;
   updateLocationManually: () => Promise<void>;
   syncOfflineLocations: () => Promise<void>;
+  requestLocationPermission: () => Promise<boolean>;
 }
+
+// Helper to detect iOS Safari
+const isIOSSafari = (): boolean => {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
+  return isIOS && isSafari;
+};
 
 const TRACKING_INTERVAL = 30000; // 30 seconds
 const HIGH_ACCURACY_OPTIONS: PositionOptions = {
@@ -32,6 +44,8 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const [error, setError] = useState<string | null>(null);
   const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
+  const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown');
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
   const watchIdRef = useRef<number | null>(null);
   const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
@@ -329,34 +343,109 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     }
   }, [getCurrentPosition, handlePositionUpdate, handleGeolocationError]);
 
+  // Request location permission explicitly (MUST be called from user interaction for iOS Safari)
+  const requestLocationPermission = useCallback(async (): Promise<boolean> => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by this browser');
+      setPermissionState('denied');
+      return false;
+    }
+
+    setIsRequestingPermission(true);
+    setError(null);
+
+    try {
+      // This call MUST be triggered by user interaction for iOS Safari to show the prompt
+      const position = await getCurrentPosition();
+
+      // If we get here, permission was granted
+      setPermissionState('granted');
+      await handlePositionUpdate(position);
+      setIsRequestingPermission(false);
+      return true;
+    } catch (err) {
+      setIsRequestingPermission(false);
+
+      const maybeError = err as Partial<GeolocationPositionError>;
+      if (maybeError.code === 1) {
+        // Permission denied
+        setPermissionState('denied');
+        if (isIOSSafari()) {
+          setError('Location access denied. Go to Settings > Safari > Location and enable location access for this website.');
+        } else {
+          setError('Location access denied. Please enable location permissions for this site.');
+        }
+        return false;
+      } else if (maybeError.code === 2) {
+        // Position unavailable - but permission might be granted
+        setPermissionState('granted');
+        setError('Location information unavailable. Check GPS settings or signal.');
+        return true; // Permission was granted, just couldn't get position
+      } else if (maybeError.code === 3) {
+        // Timeout - but permission might be granted
+        setPermissionState('granted');
+        setError('Location request timed out. Try again.');
+        return true; // Permission was granted, just timed out
+      }
+
+      handleGeolocationError(err);
+      return false;
+    }
+  }, [getCurrentPosition, handlePositionUpdate, handleGeolocationError]);
+
   // Check support and permissions on mount for better UX
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!('geolocation' in navigator)) {
       setError('Geolocation is not supported in this browser.');
+      setPermissionState('denied');
       return;
     }
+
+    // For iOS Safari, we can't reliably check permissions without user interaction
+    // Set state to 'prompt' and wait for user to explicitly request
+    if (isIOSSafari()) {
+      setPermissionState('prompt');
+      // Don't auto-request on iOS Safari - it won't work without user interaction
+      return;
+    }
+
+    // For other browsers, try to check permission state
     try {
       if ('permissions' in navigator && (navigator as any).permissions?.query) {
         (navigator as any).permissions
           .query({ name: 'geolocation' as PermissionName })
           .then((status: PermissionStatus) => {
+            setPermissionState(status.state as 'prompt' | 'granted' | 'denied');
             if (status.state === 'denied') {
               setError('Location permission is denied. Enable it in your browser settings.');
+            } else if (status.state === 'granted') {
+              // Permission already granted, get initial location
+              updateLocationManually();
             }
+            // Listen for permission changes
+            status.addEventListener('change', () => {
+              setPermissionState(status.state as 'prompt' | 'granted' | 'denied');
+              if (status.state === 'granted') {
+                setError(null);
+                updateLocationManually();
+              }
+            });
           })
           .catch(() => {
-            // Ignore permission query errors; not all browsers support it reliably
+            // Permissions API not reliable, try getting location directly
+            setPermissionState('unknown');
+            updateLocationManually();
           });
+      } else {
+        // No Permissions API, try getting location directly
+        setPermissionState('unknown');
+        updateLocationManually();
       }
     } catch {
-      // no-op
+      setPermissionState('unknown');
+      updateLocationManually();
     }
-  }, []);
-
-  // Get initial location on mount
-  useEffect(() => {
-    updateLocationManually();
   }, [updateLocationManually]);
 
   // Cleanup on unmount
@@ -450,9 +539,12 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     error,
     unsyncedCount,
     isOnline,
+    permissionState,
+    isRequestingPermission,
     startTracking,
     stopTracking,
     updateLocationManually,
-    syncOfflineLocations
+    syncOfflineLocations,
+    requestLocationPermission
   };
 }

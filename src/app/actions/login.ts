@@ -364,7 +364,7 @@ export async function login(
     path: '/',
     httpOnly: true, // Protect sensitive data from XSS attacks
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict', // Better CSRF protection
+    sameSite: 'lax', // 'lax' is more compatible with mobile Safari (ITP) than 'strict'
     maxAge: 60 * 60 * 24 * 7, // 7 days
     ...(process.env.NODE_ENV === 'production' && {
       domain: process.env.NEXT_PUBLIC_COOKIE_DOMAIN || undefined,

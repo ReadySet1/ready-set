@@ -385,6 +385,41 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
 }) => {
   const { user, userRole, isLoading } = useUser();
   const roleMenuItem = userRole ? ROLE_MENU_ITEMS[userRole] : null;
+  const [supabase, setSupabase] = useState<any>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  // Initialize Supabase client for sign-out
+  useEffect(() => {
+    const initSupabase = async () => {
+      try {
+        const client = await createClient();
+        setSupabase(client);
+      } catch (error) {
+        console.error("Error initializing Supabase client:", error);
+      }
+    };
+    initSupabase();
+  }, []);
+
+  const handleSignOut = async () => {
+    if (!supabase) {
+      console.error("Supabase client not initialized");
+      return;
+    }
+
+    try {
+      setIsSigningOut(true);
+      // Clear all authentication cookies before signing out
+      clearAuthCookies();
+      await supabase.auth.signOut();
+      navbarToggleHandler();
+      window.location.href = "/sign-in";
+    } catch (error) {
+      console.error("Error signing out:", error);
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   return (
     <>
@@ -652,15 +687,11 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                         whileTap={{ scale: 0.98 }}
                       >
                         <button
-                          onClick={() => {
-                            document.dispatchEvent(
-                              new CustomEvent("user-sign-out"),
-                            );
-                            closeNavbarOnNavigate();
-                          }}
-                          className="block w-full rounded-lg bg-amber-400 px-4 py-3 text-center font-medium text-white transition-colors hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-600"
+                          onClick={handleSignOut}
+                          disabled={isSigningOut}
+                          className="block w-full rounded-lg bg-amber-400 px-4 py-3 text-center font-medium text-white transition-colors hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-600 disabled:opacity-50"
                         >
-                          Sign Out
+                          {isSigningOut ? "Signing Out..." : "Sign Out"}
                         </button>
                       </motion.div>
                     </div>

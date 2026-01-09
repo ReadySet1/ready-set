@@ -31,7 +31,6 @@ import {
   CheckCircle2,
   ClipboardList,
   AlertTriangle,
-  User,
   Camera,
 } from "lucide-react";
 import {
@@ -207,22 +206,6 @@ const DriverDeliveries: React.FC = () => {
 
     setFilteredDeliveries(filtered);
   }, [deliveries, activeTab, statusFilter]);
-
-  // Format the user's first name (for future use if needed)
-  const getFirstName = (): string => {
-    const fullName = userProfile?.name;
-    if (!fullName) return "";
-    const nameParts = fullName.split(" ");
-    return nameParts[0] || "";
-  };
-
-  // Get time-based greeting
-  const getGreeting = (): string => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
 
   const handleNextPage = () => setPage((prev) => prev + 1);
   const handlePrevPage = () => setPage((prev) => Math.max(1, prev - 1));
@@ -424,45 +407,6 @@ const DriverDeliveries: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4">
-      {/* User Welcome */}
-      <div className="mb-6">
-        <Card className="border-0 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-sm dark:from-gray-800 dark:to-gray-700">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="mr-4 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900">
-                {userProfile?.image ? (
-                  <img
-                    src={userProfile.image}
-                    alt={userProfile.name || "Driver"}
-                    className="h-10 w-10 rounded-full"
-                  />
-                ) : (
-                  <User className="h-5 w-5 text-blue-600 dark:text-blue-300" />
-                )}
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold">
-                  {getGreeting()},{" "}
-                  {isProfileLoading ? (
-                    <span className="animate-pulse">Driver</span>
-                  ) : (
-                    getFirstName() || "Driver"
-                  )}
-                </h2>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                  Here's your delivery overview for{" "}
-                  {new Date().toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Account Status Alert */}
       {!isProfileLoading &&
         userProfile?.status &&
@@ -538,41 +482,41 @@ const DriverDeliveries: React.FC = () => {
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="mb-6 grid grid-cols-3 gap-6">
+          <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
             <Card className="shadow-sm">
-              <CardHeader className="px-6 py-4">
-                <CardTitle className="text-lg font-medium">
+              <CardHeader className="px-4 sm:px-6 py-3 sm:py-4">
+                <CardTitle className="text-base sm:text-lg font-medium">
                   Today's Deliveries
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-6 pb-5 pt-0">
+              <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-0">
                 <div className="flex items-center">
-                  <Calendar className="mr-3 h-7 w-7 text-blue-500" />
-                  <div className="text-3xl font-bold">{todayCount}</div>
+                  <Calendar className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-blue-500" />
+                  <div className="text-2xl sm:text-3xl font-bold">{todayCount}</div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader className="px-6 py-4">
-                <CardTitle className="text-lg font-medium">Upcoming</CardTitle>
+              <CardHeader className="px-4 sm:px-6 py-3 sm:py-4">
+                <CardTitle className="text-base sm:text-lg font-medium">Upcoming</CardTitle>
               </CardHeader>
-              <CardContent className="px-6 pb-5 pt-0">
+              <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-0">
                 <div className="flex items-center">
-                  <Clock className="mr-3 h-7 w-7 text-purple-500" />
-                  <div className="text-3xl font-bold">{upcomingCount}</div>
+                  <Clock className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-purple-500" />
+                  <div className="text-2xl sm:text-3xl font-bold">{upcomingCount}</div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-sm">
-              <CardHeader className="px-6 py-4">
-                <CardTitle className="text-lg font-medium">Completed</CardTitle>
+              <CardHeader className="px-4 sm:px-6 py-3 sm:py-4">
+                <CardTitle className="text-base sm:text-lg font-medium">Completed</CardTitle>
               </CardHeader>
-              <CardContent className="px-6 pb-5 pt-0">
+              <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-0">
                 <div className="flex items-center">
-                  <CheckCircle2 className="mr-3 h-7 w-7 text-green-500" />
-                  <div className="text-3xl font-bold">{completedCount}</div>
+                  <CheckCircle2 className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-green-500" />
+                  <div className="text-2xl sm:text-3xl font-bold">{completedCount}</div>
                 </div>
               </CardContent>
             </Card>

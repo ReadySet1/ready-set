@@ -6,10 +6,19 @@ import { parseCookies, setCookie } from 'nookies'
 import { cookies } from 'next/headers'
 import { type Database } from '@/types/supabase'
 
+// Cookie options optimized for mobile Safari compatibility (ITP)
+const getDefaultCookieOptions = (options?: CookieOptions): CookieOptions => ({
+  path: '/',
+  sameSite: 'lax', // 'lax' is more compatible with mobile Safari than 'strict'
+  secure: process.env.NODE_ENV === 'production',
+  httpOnly: true,
+  ...options,
+})
+
 // For App Router usage - this uses next/headers which only works in the App Router
 export async function createClient() {
   const cookieStore = await cookies()
-  
+
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -20,7 +29,9 @@ export async function createClient() {
         },
         set(name: string, value: string, options: CookieOptions) {
           try {
-            cookieStore.set(name, value, options)
+            // Apply default cookie options for mobile Safari compatibility
+            const cookieOptions = getDefaultCookieOptions(options)
+            cookieStore.set(name, value, cookieOptions)
           } catch (error) {
             // Log errors during cookie setting for debugging
             console.error(`Failed to set cookie "${name}":`, error)
@@ -31,7 +42,8 @@ export async function createClient() {
         },
         remove(name: string, options: CookieOptions) {
           try {
-            cookieStore.set(name, '', { ...options, maxAge: 0 })
+            const cookieOptions = getDefaultCookieOptions({ ...options, maxAge: 0 })
+            cookieStore.set(name, '', cookieOptions)
           } catch {
             // The `remove` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
@@ -115,17 +127,13 @@ export function createServerSupabaseClient(context: { req: NextApiRequest; res: 
           return parseCookies({ req })[name]
         },
         set(name: string, value: string, options: CookieOptions) {
-          setCookie({ res }, name, value, {
-            ...options,
-            path: '/'
-          })
+          // Apply default cookie options for mobile Safari compatibility
+          const cookieOptions = getDefaultCookieOptions(options)
+          setCookie({ res }, name, value, cookieOptions)
         },
         remove(name: string, options: CookieOptions) {
-          setCookie({ res }, name, '', {
-            ...options,
-            path: '/',
-            maxAge: 0
-          })
+          const cookieOptions = getDefaultCookieOptions({ ...options, maxAge: 0 })
+          setCookie({ res }, name, '', cookieOptions)
         }
       },
       auth: {
