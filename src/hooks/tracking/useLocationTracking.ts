@@ -31,10 +31,20 @@ const isIOSSafari = (): boolean => {
 };
 
 const TRACKING_INTERVAL = 30000; // 30 seconds
+const MAX_RETRY_ATTEMPTS = 3;
+
+// High accuracy options - for GPS when available
 const HIGH_ACCURACY_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
-  timeout: 10000,
+  timeout: 15000, // Increased from 10s to 15s for GPS acquisition
   maximumAge: 5000
+};
+
+// Low accuracy fallback - faster response using network/WiFi
+const LOW_ACCURACY_OPTIONS: PositionOptions = {
+  enableHighAccuracy: false,
+  timeout: 10000,
+  maximumAge: 30000 // Accept older cached positions as fallback
 };
 
 export function useLocationTracking(): UseLocationTrackingReturn {
@@ -52,6 +62,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const lastLocationRef = useRef<LocationUpdate | null>(null);
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const locationStoreRef = useRef(getLocationStore());
+  const isMountedRef = useRef(true); // Track if component is mounted
 
   // Get driver ID from session (simplified - you'll need to implement proper session management)
   const getDriverId = useCallback(async (): Promise<string | null> => {
@@ -71,8 +82,11 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     }
   }, []);
 
-  // Get current position
-  const getCurrentPosition = useCallback((): Promise<GeolocationPosition> => {
+  // Get current position with retry logic and accuracy fallback
+  const getCurrentPosition = useCallback((
+    options: PositionOptions = HIGH_ACCURACY_OPTIONS,
+    retryCount = 0
+  ): Promise<GeolocationPosition> => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error('Geolocation is not supported by this browser'));
@@ -81,8 +95,26 @@ export function useLocationTracking(): UseLocationTrackingReturn {
 
       navigator.geolocation.getCurrentPosition(
         resolve,
-        reject,
-        HIGH_ACCURACY_OPTIONS
+        (error) => {
+          // On timeout (code 3), retry with same or lower accuracy
+          if (error.code === 3 && retryCount < MAX_RETRY_ATTEMPTS) {
+            // First retries: keep trying high accuracy
+            // Last retry: fall back to low accuracy for faster response
+            const isLastRetry = retryCount === MAX_RETRY_ATTEMPTS - 1;
+            const retryOptions = isLastRetry ? LOW_ACCURACY_OPTIONS : options;
+
+            if (isLastRetry) {
+              console.debug(`Location timeout, falling back to low accuracy (attempt ${retryCount + 1}/${MAX_RETRY_ATTEMPTS})`);
+            }
+
+            getCurrentPosition(retryOptions, retryCount + 1)
+              .then(resolve)
+              .catch(reject);
+          } else {
+            reject(error);
+          }
+        },
+        options
       );
     });
   }, []);
@@ -94,19 +126,25 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       throw new Error('Driver ID not found');
     }
 
+    // Ensure numeric values are never null/undefined - use 0 as default
+    // This prevents database NOT NULL constraint violations
+    const speed = position.coords.speed ?? 0;
+    const heading = position.coords.heading ?? 0;
+    const accuracy = position.coords.accuracy ?? 0;
+
     return {
       driverId,
       coordinates: {
         lat: position.coords.latitude,
         lng: position.coords.longitude
       },
-      accuracy: position.coords.accuracy,
-      speed: position.coords.speed || 0,
-      heading: position.coords.heading || 0,
-      altitude: position.coords.altitude || undefined,
+      accuracy,
+      speed,
+      heading,
+      altitude: position.coords.altitude ?? undefined,
       batteryLevel: await getBatteryLevel(),
-      activityType: determineActivityType(position.coords.speed || 0),
-      isMoving: (position.coords.speed || 0) > 1, // Moving if speed > 1 m/s
+      activityType: determineActivityType(speed),
+      isMoving: speed > 1, // Moving if speed > 1 m/s
       timestamp: new Date(position.timestamp)
     };
   }, [getDriverId]);
@@ -200,9 +238,22 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     try {
       const result = await updateDriverLocation(location.driverId, location);
       if (!result.success) {
+        // Check if this is a rate limit error - handle silently since next update will succeed
+        if (result.error?.includes('Rate limit')) {
+          // Rate limiting is expected behavior - don't log as error
+          // The next update after the rate limit window will succeed
+          return;
+        }
         throw new Error(result.error || 'Failed to update location');
       }
     } catch (error) {
+      // Check if this is a rate limit error message
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('Rate limit')) {
+        // Rate limiting is expected - silently skip
+        return;
+      }
+
       console.error('Error syncing location to server:', error);
 
       // Store in IndexedDB for offline sync
@@ -241,7 +292,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   }, [formatLocationUpdate, isTracking, syncLocationToServer]);
 
   // Handle geolocation errors
-  const handleGeolocationError = useCallback((err: unknown) => {
+  const handleGeolocationError = useCallback((err: unknown, silent = false) => {
     // Normalize different error shapes to a readable message
     let code: number | undefined;
     let name: string | undefined;
@@ -262,7 +313,8 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     } else if (code === 2) {
       message = 'Location information unavailable. Check GPS settings or signal.';
     } else if (code === 3) {
-      message = 'Location request timed out. Try again.';
+      // Timeout after all retries exhausted
+      message = 'Location request timed out after multiple attempts. Check GPS signal and try again.';
     } else if (detailMessage) {
       message = `Location error: ${detailMessage}`;
     } else {
@@ -270,9 +322,19 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     }
 
     setError(message);
-    // Log structured details and multiple render-friendly forms to avoid empty {}
-    const toStringValue = (err as any)?.toString ? (err as any).toString() : undefined;
-    console.error('Geolocation error:', message, { code, name, detailMessage }, toStringValue);
+
+    // Only log to console for non-timeout errors or when not silent
+    // Timeout errors are expected and handled by retry logic, so we use a softer log level
+    if (!silent) {
+      if (code === 3) {
+        // Use warn for timeouts since they're recoverable and retries were attempted
+        console.warn('Geolocation timeout after retries:', message);
+      } else {
+        // Log structured details for other error types
+        const toStringValue = (err as any)?.toString ? (err as any).toString() : undefined;
+        console.error('Geolocation error:', message, { code, name, detailMessage }, toStringValue);
+      }
+    }
   }, []);
 
   // Start continuous location tracking
@@ -384,7 +446,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       } else if (maybeError.code === 3) {
         // Timeout - but permission might be granted
         setPermissionState('granted');
-        setError('Location request timed out. Try again.');
+        setError('Location request timed out. This can happen in areas with weak GPS signal. Try again or move to a better location.');
         return true; // Permission was granted, just timed out
       }
 
@@ -450,7 +512,9 @@ export function useLocationTracking(): UseLocationTrackingReturn {
 
   // Cleanup on unmount
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       stopTracking();
     };
   }, [stopTracking]);
@@ -497,29 +561,46 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   // Handle page visibility changes (pause tracking when hidden)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden && isTracking) {
+      // Skip if component is unmounting or not tracking
+      if (!isMountedRef.current || !isTracking) return;
+
+      if (document.hidden) {
         // Reduce update frequency when app is in background
         if (intervalIdRef.current) {
           clearInterval(intervalIdRef.current);
           intervalIdRef.current = setInterval(async () => {
+            // Check mounted state before async operations
+            if (!isMountedRef.current) return;
             try {
               const position = await getCurrentPosition();
-              await handlePositionUpdate(position);
+              if (isMountedRef.current) {
+                await handlePositionUpdate(position);
+              }
             } catch (error) {
-              console.error('Background location update failed:', error);
+              // Only log if still mounted (ignore errors during navigation)
+              if (isMountedRef.current) {
+                console.debug('Background location update skipped:', error);
+              }
             }
           }, TRACKING_INTERVAL * 2); // Double the interval when in background
         }
-      } else if (!document.hidden && isTracking) {
+      } else {
         // Resume normal frequency when app is visible
         if (intervalIdRef.current) {
           clearInterval(intervalIdRef.current);
           intervalIdRef.current = setInterval(async () => {
+            // Check mounted state before async operations
+            if (!isMountedRef.current) return;
             try {
               const position = await getCurrentPosition();
-              await handlePositionUpdate(position);
+              if (isMountedRef.current) {
+                await handlePositionUpdate(position);
+              }
             } catch (error) {
-              console.error('Foreground location update failed:', error);
+              // Only log if still mounted (ignore errors during navigation)
+              if (isMountedRef.current) {
+                console.debug('Foreground location update skipped:', error);
+              }
             }
           }, TRACKING_INTERVAL);
         }
