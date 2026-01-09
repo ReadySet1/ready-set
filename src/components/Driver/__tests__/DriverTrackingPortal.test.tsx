@@ -272,12 +272,14 @@ describe('DriverTrackingPortal', () => {
       expect(startButton).toBeInTheDocument();
     });
 
-    it('should disable Start Shift button when location is not available', () => {
+    it('should allow Start Shift button when location is not available (requests permission on click)', () => {
       render(<DriverTrackingPortal />);
 
       const startButton = screen.getByText('Start Shift').closest('button');
-      expect(startButton).toBeDisabled();
-      expect(screen.getByText('Please enable location services')).toBeInTheDocument();
+      // Button is enabled - clicking it will request location permission
+      expect(startButton).not.toBeDisabled();
+      // Shows hint about enabling location
+      expect(screen.getByText(/Tap.*Start Shift.*to allow location access/)).toBeInTheDocument();
     });
 
     it('should enable Start Shift button when location is available', () => {

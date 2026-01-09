@@ -129,13 +129,13 @@ describe('Driver Tracking Actions', () => {
       const result = await startDriverShift(validDriverId, mockLocationUpdate, metadata);
 
       expect(result.success).toBe(true);
-      // Verify metadata was passed to SQL query
+      // Verify notes from metadata was passed to SQL query
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO driver_shifts'),
         validDriverId,
         mockLocationUpdate.coordinates.lng,
         mockLocationUpdate.coordinates.lat,
-        JSON.stringify(metadata)
+        metadata.notes // Implementation uses metadata.notes directly
       );
     });
 
@@ -350,17 +350,14 @@ describe('Driver Tracking Actions', () => {
     it('starts a break with location successfully', async () => {
       // Mock SELECT to verify shift exists and is active
       (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validShiftId }]);
-      // Mock INSERT break with location
+      // Mock UPDATE shift status to paused with break_start
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
-      // Mock UPDATE shift status to paused
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
-      // Mock SELECT to get break ID
-      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validBreakId }]);
 
       const result = await startShiftBreak(validShiftId, 'meal', mockLocationUpdate);
 
       expect(result.success).toBe(true);
-      expect(result.breakId).toBe(validBreakId);
+      // Implementation returns shiftId as breakId since breaks are on the shift record
+      expect(result.breakId).toBe(validShiftId);
       expect(revalidatePath).toHaveBeenCalledWith('/admin/tracking');
       expect(revalidatePath).toHaveBeenCalledWith('/driver');
     });
@@ -368,13 +365,12 @@ describe('Driver Tracking Actions', () => {
     it('starts a break without location', async () => {
       (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validShiftId }]);
       (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValueOnce(1);
-      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validBreakId }]);
 
       const result = await startShiftBreak(validShiftId, 'rest');
 
       expect(result.success).toBe(true);
-      expect(result.breakId).toBe(validBreakId);
+      // Implementation returns shiftId as breakId since breaks are on the shift record
+      expect(result.breakId).toBe(validShiftId);
     });
 
     it('returns error when shift not found', async () => {
@@ -387,20 +383,19 @@ describe('Driver Tracking Actions', () => {
     });
 
     it('handles different break types', async () => {
-      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validShiftId }]);
-      (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
-      (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validBreakId }]);
-
       const breakTypes: Array<'rest' | 'meal' | 'fuel' | 'emergency'> = ['rest', 'meal', 'fuel', 'emergency'];
 
       for (const breakType of breakTypes) {
         jest.clearAllMocks();
+        // Mock SELECT to verify shift exists
         (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validShiftId }]);
+        // Mock UPDATE to set break_start and status=paused
         (mockPrisma.$executeRawUnsafe as jest.Mock).mockResolvedValue(1);
-        (mockPrisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([{ id: validBreakId }]);
 
         const result = await startShiftBreak(validShiftId, breakType);
         expect(result.success).toBe(true);
+        // Implementation returns shiftId as breakId
+        expect(result.breakId).toBe(validShiftId);
       }
     });
   });
@@ -430,7 +425,7 @@ describe('Driver Tracking Actions', () => {
       const result = await endShiftBreak(validBreakId);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Active break not found');
+      expect(result.error).toBe('Paused shift not found (no active break)');
     });
 
     it('handles database errors during end break', async () => {
@@ -533,24 +528,14 @@ describe('Driver Tracking Actions', () => {
         updated_at: new Date(),
       };
 
-      const mockBreakData = {
-        id: validBreakId,
-        shift_id: validShiftId,
-        start_time: new Date(),
-        end_time: null,
-        break_type: 'rest',
-        location_geojson: null,
-        created_at: new Date(),
-      };
-
       (mockPrisma.$queryRawUnsafe as jest.Mock)
-        .mockResolvedValueOnce([mockShiftData])
-        .mockResolvedValueOnce([mockBreakData]);
+        .mockResolvedValueOnce([mockShiftData]);
 
       const result = await getActiveShift(validDriverId);
 
-      expect(result?.breaks).toHaveLength(1);
-      expect(result?.breaks[0].breakType).toBe('rest');
+      // Note: shift_breaks table doesn't exist in schema, so breaks are always empty
+      expect(result?.breaks).toHaveLength(0);
+      expect(result?.status).toBe('paused');
     });
 
     it('handles database errors gracefully', async () => {
@@ -566,6 +551,8 @@ describe('Driver Tracking Actions', () => {
 
   describe('getDriverShiftHistory', () => {
     it('returns shift history for driver', async () => {
+      // Mock data uses total_distance in km (implementation converts to miles)
+      const totalDistanceKm = 41.0426; // ~25.5 miles
       const mockShifts = [
         {
           id: validShiftId,
@@ -574,10 +561,9 @@ describe('Driver Tracking Actions', () => {
           end_time: new Date(),
           start_location_geojson: null,
           end_location_geojson: null,
-          total_distance_miles: 25.5,
-          delivery_count: 5,
+          total_distance: totalDistanceKm,
           status: 'completed',
-          metadata: {},
+          notes: null,
           created_at: new Date(),
           updated_at: new Date(),
         },
@@ -588,8 +574,10 @@ describe('Driver Tracking Actions', () => {
       const result = await getDriverShiftHistory(validDriverId);
 
       expect(result).toHaveLength(1);
-      expect(result[0].totalDistanceMiles).toBe(25.5);
-      expect(result[0].deliveryCount).toBe(5);
+      // Implementation converts km to miles (total_distance * 0.621371)
+      expect(result[0].totalDistanceMiles).toBeCloseTo(25.5, 1);
+      // Note: deliveryCount column doesn't exist in DB schema, always returns 0
+      expect(result[0].deliveryCount).toBe(0);
     });
 
     it('returns empty array for invalid driver ID', async () => {
@@ -652,12 +640,13 @@ describe('Driver Tracking Actions', () => {
       await startDriverShift(validDriverId, mockLocationUpdate);
 
       // Verify longitude (lng) is passed before latitude (lat) for PostGIS ST_MakePoint
+      // The INSERT query is the first call
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
         expect.stringContaining('ST_MakePoint'),
         validDriverId,
         mockLocationUpdate.coordinates.lng, // lng first
         mockLocationUpdate.coordinates.lat, // lat second
-        expect.any(String)
+        null // notes is null when no metadata.notes provided
       );
     });
   });
