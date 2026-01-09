@@ -613,6 +613,61 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     };
   }, [isTracking, getCurrentPosition, handlePositionUpdate]);
 
+  // Listen for geolocation mock state changes (development only)
+  // When the location simulator enables/disables the mock, we need to restart our watch
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return;
+
+    const handleMockStateChange = () => {
+      console.debug('[useLocationTracking] Geolocation mock state changed, restarting watch');
+
+      // Clear existing watch
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+
+      // Clear existing intervals
+      if (intervalIdRef.current !== null) {
+        clearInterval(intervalIdRef.current);
+        intervalIdRef.current = null;
+      }
+
+      // If we were tracking, restart with the new geolocation (mocked or real)
+      if (isTracking) {
+        // Re-establish watch with (potentially) mocked geolocation
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          handlePositionUpdate,
+          handleGeolocationError,
+          HIGH_ACCURACY_OPTIONS
+        );
+
+        // Restart periodic updates
+        intervalIdRef.current = setInterval(async () => {
+          if (!isMountedRef.current) return;
+          try {
+            const position = await getCurrentPosition();
+            if (isMountedRef.current) {
+              await handlePositionUpdate(position);
+            }
+          } catch (error) {
+            if (isMountedRef.current) {
+              console.debug('Periodic location update failed:', error);
+            }
+          }
+        }, TRACKING_INTERVAL);
+      }
+
+      // Also trigger an immediate position update
+      updateLocationManually();
+    };
+
+    window.addEventListener('geolocation-mock-state-changed', handleMockStateChange);
+    return () => {
+      window.removeEventListener('geolocation-mock-state-changed', handleMockStateChange);
+    };
+  }, [isTracking, handlePositionUpdate, handleGeolocationError, getCurrentPosition, updateLocationManually]);
+
   return {
     currentLocation,
     isTracking,

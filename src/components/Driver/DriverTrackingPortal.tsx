@@ -285,8 +285,8 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
         </Alert>
       )}
 
-      {/* Live Map & Current Location */}
-      {(currentLocation || isShiftActive) && (
+      {/* Live Map & Current Location - Only show when shift is active */}
+      {isShiftActive && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
