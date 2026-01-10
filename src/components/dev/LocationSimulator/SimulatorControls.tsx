@@ -30,6 +30,8 @@ import {
   Power,
   PowerOff,
   Gauge,
+  AlertTriangle,
+  MapPin,
 } from 'lucide-react';
 
 interface SimulatorControlsProps {
@@ -77,8 +79,17 @@ export function SimulatorControls({ simulator }: SimulatorControlsProps) {
     }
   }, [isEnabled, deliveries.length, refreshDeliveries]);
 
+  // Filter to active deliveries and check for valid coordinates
   const activeDeliveries = deliveries.filter(
-    (d) => !['delivered', 'cancelled'].includes(d.status.toLowerCase())
+    (d) => !['delivered', 'cancelled', 'completed'].includes(d.status.toLowerCase())
+  );
+
+  // Separate deliveries with and without valid coordinates
+  const deliveriesWithCoords = activeDeliveries.filter(
+    (d) => d.pickupLocation && d.deliveryLocation
+  );
+  const deliveriesWithoutCoords = activeDeliveries.filter(
+    (d) => !d.pickupLocation || !d.deliveryLocation
   );
 
   return (
@@ -151,11 +162,14 @@ export function SimulatorControls({ simulator }: SimulatorControlsProps) {
                 <SelectValue placeholder="Select a route..." />
               </SelectTrigger>
               <SelectContent className="bg-slate-800 border-slate-700 z-[10000]" side="bottom" align="start">
-                {/* Active Deliveries */}
-                {activeDeliveries.length > 0 && (
+                {/* Active Deliveries with coordinates (ready to simulate) */}
+                {deliveriesWithCoords.length > 0 && (
                   <SelectGroup>
-                    <SelectLabel className="text-slate-400">Active Deliveries</SelectLabel>
-                    {activeDeliveries.map((delivery) => (
+                    <SelectLabel className="text-slate-400 flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      Active Deliveries
+                    </SelectLabel>
+                    {deliveriesWithCoords.map((delivery) => (
                       <SelectItem
                         key={delivery.id}
                         value={delivery.id}
@@ -174,14 +188,45 @@ export function SimulatorControls({ simulator }: SimulatorControlsProps) {
                   </SelectGroup>
                 )}
 
-                {activeDeliveries.length > 0 && presetRoutes.length > 0 && (
+                {/* Deliveries without coordinates (can't simulate) */}
+                {deliveriesWithoutCoords.length > 0 && (
+                  <>
+                    {deliveriesWithCoords.length > 0 && <SelectSeparator className="bg-slate-700" />}
+                    <SelectGroup>
+                      <SelectLabel className="text-amber-400 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Missing Coordinates
+                      </SelectLabel>
+                      {deliveriesWithoutCoords.map((delivery) => (
+                        <SelectItem
+                          key={delivery.id}
+                          value={delivery.id}
+                          className="text-sm text-slate-400 focus:bg-slate-700 focus:text-slate-300"
+                          disabled
+                        >
+                          <div className="flex flex-col">
+                            <span className="flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3 text-amber-500" />
+                              #{delivery.orderNumber} - {delivery.customerName || 'Customer'}
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              No GPS coordinates - update address in order
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </>
+                )}
+
+                {(deliveriesWithCoords.length > 0 || deliveriesWithoutCoords.length > 0) && presetRoutes.length > 0 && (
                   <SelectSeparator className="bg-slate-700" />
                 )}
 
                 {/* Preset Routes */}
                 {presetRoutes.length > 0 && (
                   <SelectGroup>
-                    <SelectLabel className="text-slate-400">Preset Routes</SelectLabel>
+                    <SelectLabel className="text-slate-400">Test Routes</SelectLabel>
                     {presetRoutes.map((route) => (
                       <SelectItem
                         key={route.name}

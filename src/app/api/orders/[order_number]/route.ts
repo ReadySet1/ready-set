@@ -89,42 +89,22 @@ type Order =
   | (OnDemandOrder & { order_type: "on_demand" });
 
 function serializeOrder(data: any): any {
-  // Helper function to format dates with timezone
-  const formatDate = (date: string | Date | null, state: string | null) => {
+  // Helper function to convert dates to ISO strings (preserves timezone info)
+  const toISOString = (date: string | Date | null) => {
     if (!date) return null;
-    
-    // Create a date object from the input
-    const utcDate = new Date(date);
-    
-    // Determine timezone based on state
-    let timezone = 'America/Los_Angeles'; // Default to PST
-    if (state === 'TX') {
-      timezone = 'America/Chicago'; // CST for Texas
-    }
-    
-    // Format the date in the correct timezone
-    return utcDate.toLocaleString('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      hour12: true
-    });
+    const d = date instanceof Date ? date : new Date(date);
+    return isNaN(d.getTime()) ? null : d.toISOString();
   };
 
-  // Get the state from the delivery address
-  const state = data.deliveryAddress?.state || null;
-
-  // Create a copy of the data with formatted dates
+  // Create a copy of the data with ISO date strings
+  // ISO strings are correctly parsed by clients in any timezone
   const formattedData = {
     ...data,
-    pickupDateTime: formatDate(data.pickupDateTime, state),
-    arrivalDateTime: formatDate(data.arrivalDateTime, state),
-    completeDateTime: formatDate(data.completeDateTime, state),
-    createdAt: formatDate(data.createdAt, state),
-    updatedAt: formatDate(data.updatedAt, state)
+    pickupDateTime: toISOString(data.pickupDateTime),
+    arrivalDateTime: toISOString(data.arrivalDateTime),
+    completeDateTime: toISOString(data.completeDateTime),
+    createdAt: toISOString(data.createdAt),
+    updatedAt: toISOString(data.updatedAt)
   };
 
   // Convert any BigInt values to strings

@@ -52,7 +52,7 @@ import toast from "react-hot-toast";
 import { createClient } from "@/utils/supabase/client";
 import { Order, OrderType, VehicleType } from "@/types/order";
 
-// Form schema for the edit dialog - uses simple types, conversions happen in form inputs
+// Form schema for the edit dialog - permissive validation, server will validate strictly
 const editOrderSchema = z.object({
   // Schedule
   pickupDateTime: z.date().optional().nullable(),
@@ -84,23 +84,23 @@ const editOrderSchema = z.object({
   pickupNotes: z.string().optional().nullable(),
   specialNotes: z.string().optional().nullable(),
 
-  // Addresses (simplified - update existing)
+  // Addresses - permissive validation, server validates strictly
   pickupAddress: z.object({
-    street1: z.string().min(1, "Street is required"),
+    street1: z.string(),
     street2: z.string().optional().nullable(),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2).max(2, "State must be 2 characters"),
-    zip: z.string().min(5, "Zip is required"),
+    city: z.string(),
+    state: z.string(),
+    zip: z.string(),
     county: z.string().optional().nullable(),
     locationNumber: z.string().optional().nullable(),
     parkingLoading: z.string().optional().nullable(),
   }).optional(),
   deliveryAddress: z.object({
-    street1: z.string().min(1, "Street is required"),
+    street1: z.string(),
     street2: z.string().optional().nullable(),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(2).max(2, "State must be 2 characters"),
-    zip: z.string().min(5, "Zip is required"),
+    city: z.string(),
+    state: z.string(),
+    zip: z.string(),
     county: z.string().optional().nullable(),
     locationNumber: z.string().optional().nullable(),
     parkingLoading: z.string().optional().nullable(),
@@ -184,6 +184,16 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
   });
 
   const { register, handleSubmit, watch, setValue, formState: { errors, isDirty } } = form;
+
+  // Handle form validation errors
+  const onFormError = (formErrors: typeof errors) => {
+    console.error("Form validation errors:", formErrors);
+    const firstError = Object.entries(formErrors)[0];
+    if (firstError) {
+      const [field, error] = firstError;
+      toast.error(`Validation error in ${field}: ${(error as any)?.message || 'Invalid value'}`);
+    }
+  };
 
   // Reset form when order changes
   useEffect(() => {
@@ -336,9 +346,10 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
     return (
       <div className="space-y-2">
         <Label>{label}</Label>
-        <Popover>
+        <Popover modal={false}>
           <PopoverTrigger asChild>
             <Button
+              type="button"
               variant="outline"
               className={cn(
                 "w-full h-11 justify-start text-left font-normal",
@@ -349,7 +360,7 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
               {value ? format(value, "PPPp") : "Select date and time"}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          <PopoverContent className="z-[1100] w-auto p-0" align="start" sideOffset={4}>
             <Calendar
               mode="single"
               selected={value || undefined}
@@ -368,13 +379,14 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
                 setValue(fieldName, newDate, { shouldDirty: true });
               }}
               captionLayout="dropdown"
+              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
             />
-            <div className="border-t p-3">
-              <div className="flex items-center justify-between">
-                <Label>Time</Label>
+            <div className="border-t p-4">
+              <div className="flex items-center gap-4">
+                <Label className="min-w-fit">Time</Label>
                 <Input
                   type="time"
-                  className="w-32"
+                  className="w-full"
                   value={value ? format(value, "HH:mm") : ""}
                   onChange={(e) => {
                     const timeValue = e.target.value;
@@ -410,7 +422,7 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit, onFormError)}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="border-b px-6">
               <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0">
