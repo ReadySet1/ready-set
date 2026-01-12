@@ -32,6 +32,8 @@ import {
   Gauge,
   AlertTriangle,
   MapPin,
+  User,
+  Truck,
 } from 'lucide-react';
 
 interface SimulatorControlsProps {
@@ -53,6 +55,9 @@ export function SimulatorControls({ simulator }: SimulatorControlsProps) {
     progress,
     speedMultiplier,
     error,
+    availableDrivers,
+    selectedDriver,
+    isLoadingDrivers,
     deliveries,
     selectedDelivery,
     presetRoutes,
@@ -61,6 +66,8 @@ export function SimulatorControls({ simulator }: SimulatorControlsProps) {
     estimatedDuration,
     enable,
     disable,
+    refreshDrivers,
+    selectDriver,
     refreshDeliveries,
     selectDelivery,
     selectPresetRoute,
@@ -78,6 +85,9 @@ export function SimulatorControls({ simulator }: SimulatorControlsProps) {
       refreshDeliveries();
     }
   }, [isEnabled, deliveries.length, refreshDeliveries]);
+
+  // DEBUG: Log what we're receiving
+  console.log('[SimulatorControls] deliveries:', deliveries.length, 'presetRoutes:', presetRoutes.length);
 
   // Filter to active deliveries and check for valid coordinates
   const activeDeliveries = deliveries.filter(
@@ -121,6 +131,88 @@ export function SimulatorControls({ simulator }: SimulatorControlsProps) {
           )}
         </Button>
       </div>
+
+      {/* Driver Selection - for admin users to select which driver to simulate */}
+      {isEnabled && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-slate-400 flex items-center gap-1">
+              <Truck className="h-3 w-3" />
+              Target Driver
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-slate-400 hover:text-white"
+              onClick={refreshDrivers}
+              disabled={isLoadingDrivers}
+            >
+              <RefreshCw
+                className={cn('h-3 w-3 mr-1', isLoadingDrivers && 'animate-spin')}
+              />
+              Refresh
+            </Button>
+          </div>
+
+          <Select
+            value={selectedDriver?.id || ''}
+            onValueChange={(value) => {
+              const driver = availableDrivers.find((d) => d.id === value);
+              selectDriver(driver || null);
+            }}
+            disabled={status === 'running'}
+          >
+            <SelectTrigger className="h-9 bg-slate-800 border-slate-700 text-sm">
+              <SelectValue placeholder="Select a driver to simulate..." />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-800 border-slate-700 z-[10000]" side="bottom" align="start">
+              {availableDrivers.length > 0 ? (
+                <SelectGroup>
+                  <SelectLabel className="text-slate-400 flex items-center gap-1">
+                    <User className="h-3 w-3" />
+                    On-Duty Drivers
+                  </SelectLabel>
+                  {availableDrivers.map((driver) => (
+                    <SelectItem
+                      key={driver.id}
+                      value={driver.id}
+                      className="text-sm text-slate-200 focus:bg-slate-700 focus:text-white"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            'w-2 h-2 rounded-full',
+                            driver.isOnDuty ? 'bg-green-500' : 'bg-slate-500'
+                          )}
+                        />
+                        {driver.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ) : (
+                <div className="px-2 py-4 text-center text-sm text-slate-400">
+                  {isLoadingDrivers ? 'Loading drivers...' : 'No on-duty drivers found'}
+                </div>
+              )}
+            </SelectContent>
+          </Select>
+
+          {selectedDriver && (
+            <div className="text-xs text-green-400 flex items-center gap-1">
+              <User className="h-3 w-3" />
+              Simulating as: {selectedDriver.name}
+            </div>
+          )}
+
+          {!selectedDriver && availableDrivers.length > 0 && (
+            <div className="text-xs text-amber-400 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              Select a driver to send location updates
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Route Selection */}
       {isEnabled && (

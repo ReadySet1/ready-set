@@ -8,6 +8,7 @@ import type { TrackedDriver } from '@/types/tracking';
 const mockDriver1: TrackedDriver = {
   id: 'driver-1',
   employeeId: 'EMP001',
+  name: 'John Smith',
   vehicleNumber: 'VEH-123',
   phoneNumber: '+1-555-0101',
   isOnDuty: true,
@@ -30,6 +31,7 @@ const mockDriver1: TrackedDriver = {
 const mockDriver2: TrackedDriver = {
   id: 'driver-2',
   employeeId: 'EMP002',
+  name: 'Jane Doe',
   vehicleNumber: 'VEH-456',
   phoneNumber: '+1-555-0102',
   isOnDuty: true,
@@ -53,10 +55,45 @@ const mockOffDutyDriver: TrackedDriver = {
   ...mockDriver1,
   id: 'driver-3',
   employeeId: 'EMP003',
+  name: 'Bob Wilson',
   vehicleNumber: 'VEH-789',
   isOnDuty: false,
   deliveryCount: 0,
   totalDistanceMiles: 0
+};
+
+// Mock driver without name (for fallback testing)
+const mockDriverWithoutName: TrackedDriver = {
+  id: 'driver-4',
+  employeeId: 'EMP004',
+  name: undefined,
+  vehicleNumber: 'VEH-101',
+  phoneNumber: '+1-555-0104',
+  isOnDuty: true,
+  lastKnownLocation: {
+    type: 'Point',
+    coordinates: [-118.2637, 34.0722]
+  },
+  totalDistanceMiles: 8.5,
+  deliveryCount: 2,
+  lastLocationUpdate: new Date().toISOString()
+};
+
+// Mock driver without name or employeeId (for Unknown fallback)
+const mockDriverUnknown: TrackedDriver = {
+  id: 'driver-5',
+  employeeId: '',
+  name: undefined,
+  vehicleNumber: 'VEH-102',
+  phoneNumber: '+1-555-0105',
+  isOnDuty: true,
+  lastKnownLocation: {
+    type: 'Point',
+    coordinates: [-118.2737, 34.0822]
+  },
+  totalDistanceMiles: 5.0,
+  deliveryCount: 1,
+  lastLocationUpdate: new Date().toISOString()
 };
 
 const mockLocationData1 = {
@@ -171,7 +208,7 @@ describe('DriverStatusList', () => {
   });
 
   describe('Component Rendering', () => {
-    it('should render the driver list', () => {
+    it('should render the driver list with names', () => {
       render(
         <DriverStatusList
           drivers={[mockDriver1, mockDriver2]}
@@ -179,8 +216,8 @@ describe('DriverStatusList', () => {
         />
       );
 
-      expect(screen.getByText('Driver #EMP001')).toBeInTheDocument();
-      expect(screen.getByText('Driver #EMP002')).toBeInTheDocument();
+      expect(screen.getByText('John Smith')).toBeInTheDocument();
+      expect(screen.getByText('Jane Doe')).toBeInTheDocument();
     });
 
     it('should apply custom className', () => {
@@ -204,6 +241,56 @@ describe('DriverStatusList', () => {
       );
 
       expect(screen.getByText('No drivers match your criteria')).toBeInTheDocument();
+    });
+  });
+
+  describe('Driver Name Display', () => {
+    it('should display driver name when available', () => {
+      render(
+        <DriverStatusList
+          drivers={[mockDriver1]}
+          recentLocations={[mockLocationData1]}
+        />
+      );
+
+      expect(screen.getByText('John Smith')).toBeInTheDocument();
+      // Should NOT show the fallback format when name is available
+      expect(screen.queryByText('Driver #EMP001')).not.toBeInTheDocument();
+    });
+
+    it('should fall back to Driver #employeeId when name is not available', () => {
+      render(
+        <DriverStatusList
+          drivers={[mockDriverWithoutName]}
+          recentLocations={[]}
+        />
+      );
+
+      expect(screen.getByText('Driver #EMP004')).toBeInTheDocument();
+    });
+
+    it('should fall back to Driver #Unknown when neither name nor employeeId is available', () => {
+      render(
+        <DriverStatusList
+          drivers={[mockDriverUnknown]}
+          recentLocations={[]}
+        />
+      );
+
+      expect(screen.getByText('Driver #Unknown')).toBeInTheDocument();
+    });
+
+    it('should display multiple drivers with their respective names or fallbacks', () => {
+      render(
+        <DriverStatusList
+          drivers={[mockDriver1, mockDriverWithoutName, mockDriverUnknown]}
+          recentLocations={[mockLocationData1]}
+        />
+      );
+
+      expect(screen.getByText('John Smith')).toBeInTheDocument();
+      expect(screen.getByText('Driver #EMP004')).toBeInTheDocument();
+      expect(screen.getByText('Driver #Unknown')).toBeInTheDocument();
     });
   });
 
@@ -499,8 +586,8 @@ describe('DriverStatusList', () => {
       const searchInput = screen.getByTestId('search-input');
       fireEvent.change(searchInput, { target: { value: 'EMP001' } });
 
-      expect(screen.getByText('Driver #EMP001')).toBeInTheDocument();
-      expect(screen.queryByText('Driver #EMP002')).not.toBeInTheDocument();
+      expect(screen.getByText('John Smith')).toBeInTheDocument();
+      expect(screen.queryByText('Jane Doe')).not.toBeInTheDocument();
     });
 
     it('should filter drivers by vehicle number', () => {
@@ -515,8 +602,8 @@ describe('DriverStatusList', () => {
       const searchInput = screen.getByTestId('search-input');
       fireEvent.change(searchInput, { target: { value: 'VEH-456' } });
 
-      expect(screen.queryByText('Driver #EMP001')).not.toBeInTheDocument();
-      expect(screen.getByText('Driver #EMP002')).toBeInTheDocument();
+      expect(screen.queryByText('John Smith')).not.toBeInTheDocument();
+      expect(screen.getByText('Jane Doe')).toBeInTheDocument();
     });
 
     it('should show no results message when search has no matches', () => {
@@ -548,8 +635,8 @@ describe('DriverStatusList', () => {
       const statusFilter = screen.getByDisplayValue('All Drivers');
       fireEvent.change(statusFilter, { target: { value: 'on_duty' } });
 
-      expect(screen.getByText('Driver #EMP001')).toBeInTheDocument();
-      expect(screen.queryByText('Driver #EMP003')).not.toBeInTheDocument();
+      expect(screen.getByText('John Smith')).toBeInTheDocument();
+      expect(screen.queryByText('Bob Wilson')).not.toBeInTheDocument();
     });
 
     it('should filter to off duty drivers only', () => {
@@ -564,8 +651,8 @@ describe('DriverStatusList', () => {
       const statusFilter = screen.getByDisplayValue('All Drivers');
       fireEvent.change(statusFilter, { target: { value: 'off_duty' } });
 
-      expect(screen.queryByText('Driver #EMP001')).not.toBeInTheDocument();
-      expect(screen.getByText('Driver #EMP003')).toBeInTheDocument();
+      expect(screen.queryByText('John Smith')).not.toBeInTheDocument();
+      expect(screen.getByText('Bob Wilson')).toBeInTheDocument();
     });
 
     it('should filter to moving drivers only', () => {
@@ -581,8 +668,8 @@ describe('DriverStatusList', () => {
       fireEvent.change(statusFilter, { target: { value: 'moving' } });
 
       // mockDriver1 is moving, mockDriver2 is stationary
-      expect(screen.getByText('Driver #EMP001')).toBeInTheDocument();
-      expect(screen.queryByText('Driver #EMP002')).not.toBeInTheDocument();
+      expect(screen.getByText('John Smith')).toBeInTheDocument();
+      expect(screen.queryByText('Jane Doe')).not.toBeInTheDocument();
     });
   });
 

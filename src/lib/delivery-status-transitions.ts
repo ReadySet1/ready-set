@@ -7,11 +7,11 @@ import { DriverStatus } from '@/types/user';
 
 /**
  * Ordered list of driver statuses representing the delivery lifecycle
+ * Flow: Assigned → At Vendor → En Route → Arrived → Completed
  */
 export const STATUS_ORDER: DriverStatus[] = [
   DriverStatus.ASSIGNED,
   DriverStatus.ARRIVED_AT_VENDOR,
-  DriverStatus.PICKED_UP,
   DriverStatus.EN_ROUTE_TO_CLIENT,
   DriverStatus.ARRIVED_TO_CLIENT,
   DriverStatus.COMPLETED,
@@ -31,11 +31,12 @@ export const STATUS_LABELS: Record<DriverStatus, string> = {
 
 /**
  * Short action labels for the "next step" button
+ * Matches the 5-step flow: Start → En Route → Arrived → Complete → Done
  */
 export const NEXT_ACTION_LABELS: Record<DriverStatus, string> = {
   [DriverStatus.ASSIGNED]: 'Start',
-  [DriverStatus.ARRIVED_AT_VENDOR]: 'Confirm Pickup',
-  [DriverStatus.PICKED_UP]: 'Start Delivery',
+  [DriverStatus.ARRIVED_AT_VENDOR]: 'En Route',
+  [DriverStatus.PICKED_UP]: 'En Route', // Legacy - kept for backwards compatibility
   [DriverStatus.EN_ROUTE_TO_CLIENT]: 'Arrived',
   [DriverStatus.ARRIVED_TO_CLIENT]: 'Complete',
   [DriverStatus.COMPLETED]: 'Done',
@@ -142,7 +143,7 @@ export function isDeliveryCompleted(status: DriverStatus | string | null | undef
  * Statuses that trigger customer notifications
  */
 export const CUSTOMER_NOTIFICATION_STATUSES: DriverStatus[] = [
-  DriverStatus.PICKED_UP,
+  DriverStatus.ARRIVED_AT_VENDOR,
   DriverStatus.EN_ROUTE_TO_CLIENT,
   DriverStatus.ARRIVED_TO_CLIENT,
   DriverStatus.COMPLETED,
