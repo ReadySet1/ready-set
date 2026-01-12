@@ -17,6 +17,13 @@ export async function GET(request: NextRequest) {
       return authResult.response;
     }
 
+    // DEBUG: Log auth context
+    console.log('[DEBUG /api/tracking/deliveries] Auth context:', {
+      userId: authResult.context.user.id,
+      userType: authResult.context.user.type,
+      email: authResult.context.user.email
+    });
+
     const { searchParams } = new URL(request.url);
     const driverId = searchParams.get('driver_id');
     const status = searchParams.get('status');
@@ -33,33 +40,25 @@ export async function GET(request: NextRequest) {
       let deliveryQuery = `
         SELECT
           d.id,
-          d.catering_request_id,
-          d.on_demand_id,
           d.driver_id,
           d.status,
           ST_AsGeoJSON(d.pickup_location) as pickup_location_geojson,
           ST_AsGeoJSON(d.delivery_location) as delivery_location_geojson,
-          d.estimated_arrival,
-          d.actual_arrival,
-          d.proof_of_delivery,
-          d.actual_distance_km,
-          d.route_polyline,
-          d.metadata,
+          d.estimated_delivery_time as estimated_arrival,
+          d.delivered_at as actual_arrival,
           d.assigned_at,
-          d.started_at,
-          d.arrived_at,
-          d.completed_at,
+          d.picked_up_at as started_at,
+          d.delivered_at as arrived_at,
+          d.delivered_at as completed_at,
           d.created_at,
           d.updated_at,
           d.order_number,
           d.customer_name,
           d.pickup_address,
           d.delivery_address,
-          dr.employee_id,
-          dr.vehicle_number,
+          d.delivery_photo_url as proof_of_delivery,
           'delivery' as source_type
         FROM deliveries d
-        LEFT JOIN drivers dr ON d.driver_id = dr.id
         WHERE d.deleted_at IS NULL
       `;
 
@@ -67,12 +66,13 @@ export async function GET(request: NextRequest) {
       let deliveryParamCounter = 1;
 
       // If user is DRIVER, only show their own deliveries
+      // Note: driver_id in deliveries table should match the profile/user ID
       if (authResult.context.user.type === 'DRIVER') {
-        deliveryQuery += ` AND d.driver_id = (SELECT id FROM drivers WHERE user_id = $${deliveryParamCounter})`;
+        deliveryQuery += ` AND d.driver_id = $${deliveryParamCounter}::uuid`;
         deliveryParams.push(authResult.context.user.id);
         deliveryParamCounter++;
       } else if (driverId) {
-        deliveryQuery += ` AND d.driver_id = $${deliveryParamCounter}`;
+        deliveryQuery += ` AND d.driver_id = $${deliveryParamCounter}::uuid`;
         deliveryParams.push(driverId);
         deliveryParamCounter++;
       }
@@ -91,8 +91,6 @@ export async function GET(request: NextRequest) {
         for (const delivery of deliveryResult) {
           allDeliveries.push({
             id: delivery.id,
-            cateringRequestId: delivery.catering_request_id,
-            onDemandId: delivery.on_demand_id,
             driverId: delivery.driver_id,
             status: delivery.status,
             pickupLocation: delivery.pickup_location_geojson ?
@@ -107,9 +105,6 @@ export async function GET(request: NextRequest) {
             actualArrival: delivery.actual_arrival,
             route: [],
             proofOfDelivery: delivery.proof_of_delivery,
-            actualDistanceKm: delivery.actual_distance_km,
-            routePolyline: delivery.route_polyline,
-            metadata: delivery.metadata,
             assignedAt: delivery.assigned_at,
             startedAt: delivery.started_at,
             arrivedAt: delivery.arrived_at,
@@ -117,10 +112,6 @@ export async function GET(request: NextRequest) {
             createdAt: delivery.created_at,
             updatedAt: delivery.updated_at,
             sourceType: 'delivery',
-            driverInfo: authResult.context.user.type !== 'DRIVER' ? {
-              employeeId: delivery.employee_id,
-              vehicleNumber: delivery.vehicle_number
-            } : undefined
           });
         }
       } catch (err) {
@@ -192,7 +183,7 @@ export async function GET(request: NextRequest) {
         LEFT JOIN catering_requests cr ON disp."cateringRequestId" = cr.id
         LEFT JOIN addresses pa_cr ON cr."pickupAddressId" = pa_cr.id
         LEFT JOIN addresses da_cr ON cr."deliveryAddressId" = da_cr.id
-        LEFT JOIN on_demand od ON disp."onDemandId" = od.id
+        LEFT JOIN on_demand_requests od ON disp."onDemandId" = od.id
         LEFT JOIN addresses pa_od ON od."pickupAddressId" = pa_od.id
         LEFT JOIN addresses da_od ON od."deliveryAddressId" = da_od.id
         LEFT JOIN profiles drv ON disp."driverId" = drv.id
@@ -204,11 +195,11 @@ export async function GET(request: NextRequest) {
 
       // If user is DRIVER, only show their own dispatches
       if (authResult.context.user.type === 'DRIVER') {
-        dispatchQuery += ` AND disp."driverId" = $${dispatchParamCounter}`;
+        dispatchQuery += ` AND disp."driverId" = $${dispatchParamCounter}::uuid`;
         dispatchParams.push(authResult.context.user.id);
         dispatchParamCounter++;
       } else if (driverId) {
-        dispatchQuery += ` AND disp."driverId" = $${dispatchParamCounter}`;
+        dispatchQuery += ` AND disp."driverId" = $${dispatchParamCounter}::uuid`;
         dispatchParams.push(driverId);
         dispatchParamCounter++;
       }
@@ -231,8 +222,17 @@ export async function GET(request: NextRequest) {
 
       dispatchQuery += ` ORDER BY disp."createdAt" DESC`;
 
+      // DEBUG: Log the query being executed
+      console.log('[DEBUG /api/tracking/deliveries] Dispatch query params:', dispatchParams);
+
       try {
         const dispatchResult = await prisma.$queryRawUnsafe<any[]>(dispatchQuery, ...dispatchParams);
+
+        // DEBUG: Log dispatch results
+        console.log('[DEBUG /api/tracking/deliveries] Dispatch results count:', dispatchResult.length);
+        if (dispatchResult.length > 0) {
+          console.log('[DEBUG /api/tracking/deliveries] First dispatch:', dispatchResult[0]?.cr_order_number);
+        }
 
         for (const dispatch of dispatchResult) {
           // Determine if this is catering or on-demand and extract relevant data

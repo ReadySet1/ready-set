@@ -58,6 +58,20 @@ jest.mock('@/constants/realtime-config', () => ({
   },
 }));
 
+// Mock Supabase client for auth check
+const mockGetSession = jest.fn().mockResolvedValue({
+  data: { session: { user: { id: 'test-user-id' } } },
+  error: null,
+});
+
+jest.mock('@/utils/supabase/client', () => ({
+  createClient: jest.fn(() => ({
+    auth: {
+      getSession: mockGetSession,
+    },
+  })),
+}));
+
 import { useRealTimeTracking } from '../useRealTimeTracking';
 import { createDriverLocationChannel } from '@/lib/realtime';
 import { isFeatureEnabled } from '@/lib/feature-flags';
@@ -84,6 +98,12 @@ describe('useAdminRealtimeTracking', () => {
     });
 
     (isFeatureEnabled as jest.Mock).mockReturnValue(true);
+
+    // Reset auth mock to return valid session
+    mockGetSession.mockResolvedValue({
+      data: { session: { user: { id: 'test-user-id' } } },
+      error: null,
+    });
 
     mockChannelSubscribe.mockImplementation(async (callbacks) => {
       channelCallbacks = callbacks;
@@ -229,12 +249,57 @@ describe('useAdminRealtimeTracking', () => {
       expect(result.current.connectionMode).toBe('hybrid');
       expect(result.current.error).toBe('Connection lost');
       expect(onRealtimeError).toHaveBeenCalledWith(error);
-      expect(realtimeLogger.error).toHaveBeenCalled();
+      // Changed from error to warn since errors gracefully fall back to SSE
+      expect(realtimeLogger.warn).toHaveBeenCalled();
+    });
+
+    it('should not show timeout errors to user', async () => {
+      const onRealtimeError = jest.fn();
+
+      const { result } = renderHook(() =>
+        useAdminRealtimeTracking({ onRealtimeError })
+      );
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      // Simulate timeout error
+      const error = new Error('Channel subscription timed out');
+      await act(async () => {
+        channelCallbacks.onError?.(error);
+      });
+
+      expect(result.current.isRealtimeConnected).toBe(false);
+      // Timeout errors should not show to user since SSE fallback works fine
+      expect(result.current.error).toBe(null);
+      expect(onRealtimeError).toHaveBeenCalledWith(error);
+    });
+
+    it('should skip Realtime initialization when no auth session', async () => {
+      // Mock no session
+      mockGetSession.mockResolvedValue({
+        data: { session: null },
+        error: null,
+      });
+
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.connectionMode).toBe('sse');
+      });
+
+      expect(realtimeLogger.warn).toHaveBeenCalledWith(
+        'Skipping Realtime initialization - no active session',
+        expect.any(Object)
+      );
     });
 
     it('should handle initialization error', async () => {
       const onRealtimeError = jest.fn();
-      mockChannelSubscribe.mockRejectedValueOnce(new Error('Init failed'));
+      // Reset the mock implementation and set it to reject
+      mockChannelSubscribe.mockReset();
+      mockChannelSubscribe.mockRejectedValue(new Error('Init failed'));
 
       const { result } = renderHook(() =>
         useAdminRealtimeTracking({ onRealtimeError })

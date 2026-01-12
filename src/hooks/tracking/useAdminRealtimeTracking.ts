@@ -181,6 +181,7 @@ export function useAdminRealtimeTracking(
 
   /**
    * Initialize Realtime channel
+   * Includes pre-connection auth check and graceful fallback handling
    */
   const initializeRealtime = useCallback(async () => {
     if (!isRealtimeEnabled) {
@@ -188,6 +189,20 @@ export function useAdminRealtimeTracking(
     }
 
     try {
+      // Pre-check: Verify authentication is established before attempting realtime connection
+      // This prevents timeout errors when auth is still loading
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+
+      if (authError || !session) {
+        realtimeLogger.warn('Skipping Realtime initialization - no active session', {
+          metadata: { hasError: !!authError, hasSession: !!session }
+        });
+        setConnectionMode('sse');
+        return;
+      }
+
       const channel = createDriverLocationChannel();
 
       await channel.subscribe({
@@ -205,9 +220,14 @@ export function useAdminRealtimeTracking(
         onError: (error) => {
           setIsRealtimeConnected(false);
           setConnectionMode('sse');
-          setRealtimeError(error.message);
+          // Only set error message if it's not a timeout (timeout is expected during fallback)
+          const isTimeoutError = error.message?.includes('timed out') || error.message?.includes('timeout');
+          if (!isTimeoutError) {
+            setRealtimeError(error.message);
+          }
           onRealtimeError?.(error);
-          realtimeLogger.error('Admin location channel error', { error });
+          // Log as warning since we gracefully fall back to SSE
+          realtimeLogger.warn('Admin location channel error - falling back to SSE', { error });
         },
         onLocationUpdate: (payload) => {
           handleLocationUpdate(payload);
@@ -216,9 +236,23 @@ export function useAdminRealtimeTracking(
 
       channelRef.current = channel;
     } catch (error) {
-      realtimeLogger.error('Admin failed to initialize location channel', { error });
+      // Log as warning since we gracefully fall back to SSE
+      const errorMessage = (error as Error).message || 'Unknown error';
+      const isTimeoutError = errorMessage.includes('timed out') || errorMessage.includes('timeout');
+
+      if (isTimeoutError) {
+        realtimeLogger.warn('Realtime connection timed out - using SSE fallback', {
+          metadata: { message: errorMessage }
+        });
+      } else {
+        realtimeLogger.warn('Admin failed to initialize location channel - using SSE fallback', { error });
+      }
+
       setConnectionMode('sse');
-      setRealtimeError((error as Error).message);
+      // Don't show timeout errors to user since SSE fallback works fine
+      if (!isTimeoutError) {
+        setRealtimeError(errorMessage);
+      }
       onRealtimeError?.(error as Error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
