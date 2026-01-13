@@ -63,7 +63,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const subtitle = screen.getByText(
-        /zerocater, eazycater, google, netflix, apple/i,
+        /zerocater, ezcater, google, netflix, apple/i,
       );
       expect(subtitle).toBeInTheDocument();
     });
@@ -72,7 +72,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const subtitle = screen.getByText(
-        /zerocater, eazycater, google, netflix, apple/i,
+        /zerocater, ezcater, google, netflix, apple/i,
       );
       expect(subtitle).toHaveClass(
         "text-base",
@@ -89,7 +89,7 @@ describe("ServedPartners", () => {
         "We Served the Top Marketplace and Company",
       );
       const subtitle = screen.getByText(
-        /zerocater, eazycater, google, netflix, apple/i,
+        /zerocater, ezcater, google, netflix, apple/i,
       );
 
       expect(title).toHaveClass("font-[Montserrat]");
@@ -407,7 +407,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const subtitle = screen.getByText(
-        /zerocater, eazycater, google, netflix, apple/i,
+        /zerocater, ezcater, google, netflix, apple/i,
       );
       expect(subtitle).toHaveClass("text-base", "md:text-lg");
     });
@@ -532,7 +532,7 @@ describe("ServedPartners", () => {
       render(<ServedPartners />);
 
       const subtitle = screen.getByText(
-        /zerocater, eazycater, google, netflix, apple/i,
+        /zerocater, ezcater, google, netflix, apple/i,
       );
       expect(subtitle).toHaveClass("font-medium");
     });
@@ -544,7 +544,7 @@ describe("ServedPartners", () => {
         "We Served the Top Marketplace and Company",
       );
       const subtitle = screen.getByText(
-        /zerocater, eazycater, google, netflix, apple/i,
+        /zerocater, ezcater, google, netflix, apple/i,
       );
 
       expect(title).toHaveClass("text-gray-800");

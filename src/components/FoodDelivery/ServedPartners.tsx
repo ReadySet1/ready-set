@@ -34,17 +34,20 @@ const ServedPartners: React.FC = () => {
     },
     {
       name: "Google",
-      image: getCloudinaryUrl("food/served/google"),
+      // Use fit with consistent dimensions for uniform sizing
+      image: `${getCloudinaryUrl("food/served/google").replace("/f_auto,q_auto/", "/f_auto,q_auto,w_600,h_600,c_fit/")}`,
       alt: "Google logo",
     },
     {
       name: "Netflix",
-      image: getCloudinaryUrl("food/served/netflix"),
+      // Use fit with consistent dimensions for uniform sizing
+      image: `${getCloudinaryUrl("food/served/netflix").replace("/f_auto,q_auto/", "/f_auto,q_auto,w_600,h_600,c_fit/")}`,
       alt: "Netflix logo",
     },
     {
       name: "Apple",
-      image: getCloudinaryUrl("food/served/apple"),
+      // Use fit with consistent dimensions for uniform sizing
+      image: `${getCloudinaryUrl("food/served/apple").replace("/f_auto,q_auto/", "/f_auto,q_auto,w_600,h_600,c_fit/")}`,
       alt: "Apple logo",
     },
   ];
