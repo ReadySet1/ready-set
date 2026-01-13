@@ -25,6 +25,16 @@ export interface RouteWaypoint {
 type PositionCallback = (position: GeolocationPosition) => void;
 type PositionErrorCallback = (error: GeolocationPositionError) => void;
 
+/**
+ * Generate a cryptographically secure random number between 0 and 1.
+ * Used instead of Math.random() to satisfy security scanners.
+ */
+function secureRandom(): number {
+  const array = new Uint32Array(1);
+  crypto.getRandomValues(array);
+  return (array[0] ?? 0) / (0xffffffff + 1);
+}
+
 interface WatchEntry {
   successCallback: PositionCallback;
   errorCallback?: PositionErrorCallback;
@@ -222,7 +232,7 @@ function updateSimulation(): void {
   currentPosition = {
     latitude: interpolated.latitude,
     longitude: interpolated.longitude,
-    accuracy: 10 + Math.random() * 5, // Simulate slight accuracy variation
+    accuracy: 10 + secureRandom() * 5, // Simulate slight accuracy variation
     speed: speedMps,
     heading,
   };

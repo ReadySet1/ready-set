@@ -9,6 +9,17 @@
 
 import type { RouteWaypoint } from './geolocation-mock';
 
+/**
+ * Generate a cryptographically secure random number between 0 and 1.
+ * Used instead of Math.random() to satisfy security scanners.
+ * Note: This is overkill for route jitter, but keeps CodeQL happy.
+ */
+function secureRandom(): number {
+  const array = new Uint32Array(1);
+  crypto.getRandomValues(array);
+  return (array[0] ?? 0) / (0xffffffff + 1);
+}
+
 export interface SimulatorDelivery {
   id: string;
   orderNumber: string;
@@ -148,7 +159,7 @@ export function generateIntermediateWaypoints(
     const lng = start.lng + (end.lng - start.lng) * t;
 
     // Add slight randomness to make route more realistic (simulate road curves)
-    const jitter = i > 0 && i < numSegments ? (Math.random() - 0.5) * 0.0002 : 0;
+    const jitter = i > 0 && i < numSegments ? (secureRandom() - 0.5) * 0.0002 : 0;
 
     waypoints.push({
       latitude: lat + jitter,
