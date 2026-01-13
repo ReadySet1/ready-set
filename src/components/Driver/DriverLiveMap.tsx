@@ -44,6 +44,8 @@ export default function DriverLiveMap({
 
   // Maintain an in-memory trail of recent coordinates for the session
   const trailRef = useRef<[number, number][]>([]);
+  // Track last centered position to detect large jumps
+  const lastCenteredRef = useRef<{ lng: number; lat: number } | null>(null);
 
   // Initialize the map
   useEffect(() => {
@@ -186,13 +188,40 @@ export default function DriverLiveMap({
         });
       }
 
-      // Center/zoom on the driver the first time we get a valid location
-      if (trailRef.current.length === 1) {
+      // Calculate distance from last centered position (for detecting large jumps)
+      const shouldRecenter = () => {
+        // Always center on first location
+        if (!lastCenteredRef.current) return true;
+
+        // Calculate approximate distance in km using Haversine-like formula
+        const lastLat = lastCenteredRef.current.lat;
+        const lastLng = lastCenteredRef.current.lng;
+        const latDiff = Math.abs(lat - lastLat);
+        const lngDiff = Math.abs(lng - lastLng);
+
+        // Approximate distance in km (rough calculation)
+        // 1 degree latitude ≈ 111km, 1 degree longitude varies by latitude
+        const distanceKm = Math.sqrt(
+          Math.pow(latDiff * 111, 2) +
+          Math.pow(lngDiff * 111 * Math.cos(lat * Math.PI / 180), 2)
+        );
+
+        // Re-center if position jumped more than 10km (e.g., mock location simulator)
+        return distanceKm > 10;
+      };
+
+      // Center/zoom on the driver when first loaded or position jumped significantly
+      if (shouldRecenter()) {
         mapRef.current.easeTo({
           center: [lng, lat],
           zoom: MAP_CONFIG.MAX_AUTO_ZOOM,
           duration: MAP_CONFIG.FIT_BOUNDS_DURATION,
         });
+        lastCenteredRef.current = { lng, lat };
+        // Clear the trail when position jumps significantly (it's not a continuous path)
+        if (trailRef.current.length > 1) {
+          trailRef.current = [[lng, lat]];
+        }
       }
     } catch (error) {
       captureException(error, {

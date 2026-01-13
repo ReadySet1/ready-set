@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2025-12-04T01:52:58.960Z",
+  "generatedAt": "2025-12-21T00:00:00.000Z",
   "cloudName": "dzm8qcnfd",
   "folder": "ready-set",
-  "totalImages": 227,
+  "totalImages": 232,
   "images": [
     {
       "localPath": "/images/404-dark.svg",
@@ -577,6 +577,41 @@
       "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/v1764813010/ready-set/food/salad-bowl.png",
       "format": "png",
       "size": 687829
+    },
+    {
+      "localPath": "/images/food/served/zerocater.png",
+      "publicId": "food/served/zerocater",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/food/served/zerocater.png",
+      "format": "png",
+      "size": 36690
+    },
+    {
+      "localPath": "/images/food/served/ezcater.png",
+      "publicId": "food/served/ezcater",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/food/served/ezcater.png",
+      "format": "png",
+      "size": 5000
+    },
+    {
+      "localPath": "/images/food/served/google.png",
+      "publicId": "food/served/google",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/food/served/google.png",
+      "format": "png",
+      "size": 2310
+    },
+    {
+      "localPath": "/images/food/served/netflix.png",
+      "publicId": "food/served/netflix",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/food/served/netflix.png",
+      "format": "png",
+      "size": 1450
+    },
+    {
+      "localPath": "/images/food/served/apple.png",
+      "publicId": "food/served/apple",
+      "cloudinaryUrl": "https://res.cloudinary.com/dzm8qcnfd/image/upload/ready-set/food/served/apple.png",
+      "format": "png",
+      "size": 1360
     },
     {
       "localPath": "/images/food/truckbg.png",

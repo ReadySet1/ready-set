@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,20 +15,17 @@ import {
   BatteryIcon,
   SignalIcon,
   PlayIcon,
-  PauseIcon,
   SquareIcon,
-  CoffeeIcon,
   AlertTriangleIcon,
-  CheckCircleIcon
+  HomeIcon,
+  ChevronLeftIcon,
+  PackageIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useRealtimeLocationTracking } from '@/hooks/tracking/useRealtimeLocationTracking';
-import { useDriverShift } from '@/hooks/tracking/useDriverShift';
-import { useDriverDeliveries } from '@/hooks/tracking/useDriverDeliveries';
-import { useOfflineQueue } from '@/hooks/tracking/useOfflineQueue';
+import { useDriverTracking } from '@/contexts/DriverTrackingContext';
 import { DriverStatus } from '@/types/user';
-import type { LocationUpdate, DriverShift } from '@/types/tracking';
 import DriverLiveMap from '@/components/Driver/DriverLiveMap';
+import { DeliveryStatusControl } from '@/components/Driver/DeliveryStatusControl';
 
 interface DriverTrackingPortalProps {
   className?: string;
@@ -36,45 +34,41 @@ interface DriverTrackingPortalProps {
 export default function DriverTrackingPortal({ className }: DriverTrackingPortalProps) {
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
-  
-  // Offline support
-  const { offlineStatus, queuedItems } = useOfflineQueue();
-  
+  const [updatingDeliveryId, setUpdatingDeliveryId] = useState<string | null>(null);
+
+  // Use the global tracking context - this persists across page navigations
   const {
+    // Location tracking
     currentLocation,
     isTracking,
     accuracy,
-    startTracking,
-    stopTracking,
-    error: locationError,
+    locationError,
     isRealtimeConnected,
     isRealtimeEnabled,
     connectionMode,
     permissionState,
     isRequestingPermission,
-    requestLocationPermission
-  } = useRealtimeLocationTracking();
+    startTracking,
+    stopTracking,
+    requestLocationPermission,
 
-  const {
+    // Shift management
     currentShift,
     isShiftActive,
+    shiftLoading,
+    shiftError,
     startShift,
     endShift,
-    startBreak,
-    endBreak,
-    loading: shiftLoading,
-    error: shiftError
-  } = useDriverShift();
 
-  const {
+    // Deliveries
     activeDeliveries,
+    deliveriesLoading,
+    deliveriesError,
     updateDeliveryStatus,
-    loading: deliveriesLoading,
-    error: deliveriesError
-  } = useDriverDeliveries();
 
-  // Use offline status from the hook
-  const isOnline = offlineStatus.isOnline;
+    // Offline support
+    isOnline,
+  } = useDriverTracking();
 
   // Monitor battery level
   useEffect(() => {
@@ -96,20 +90,23 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
     getBatteryInfo();
   }, []);
 
-  // Auto-request location when shift is active but location is not available
-  // This handles the case after page refresh where shift is active but tracking needs to be resumed
+  // Auto-resume tracking when shift is active but tracking isn't running
+  // This handles: page refresh, navigation back to tracking page, or tracking that stopped unexpectedly
   useEffect(() => {
-    if (isMounted && isShiftActive && !currentLocation && !isTracking && !isRequestingPermission) {
-      // Try to get location and resume tracking for active shift
+    if (isMounted && isShiftActive && !isTracking && !isRequestingPermission) {
+      // Try to resume tracking for active shift
       const resumeTracking = async () => {
-        const granted = await requestLocationPermission();
-        if (granted) {
-          startTracking();
+        // If we don't have permission yet, request it first
+        if (permissionState !== 'granted') {
+          const granted = await requestLocationPermission();
+          if (!granted) return;
         }
+        // Start the continuous GPS tracking
+        startTracking();
       };
       resumeTracking();
     }
-  }, [isMounted, isShiftActive, currentLocation, isTracking, isRequestingPermission, requestLocationPermission, startTracking]);
+  }, [isMounted, isShiftActive, isTracking, isRequestingPermission, permissionState, requestLocationPermission, startTracking]);
 
   // Handle location permission request
   const handleRequestLocationPermission = async () => {
@@ -179,19 +176,6 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
     }
   };
 
-  // Handle break start
-  const handleStartBreak = async (breakType: 'rest' | 'meal' | 'fuel' | 'emergency' = 'rest') => {
-    if (!currentShift?.id) return;
-    await startBreak(currentShift.id, breakType, currentLocation || undefined);
-  };
-
-  // Handle break end
-  const handleEndBreak = async () => {
-    const activeBreak = currentShift?.breaks.find(b => !b.endTime);
-    if (!activeBreak?.id) return;
-    await endBreak(activeBreak.id, currentLocation || undefined);
-  };
-
   // Calculate shift duration
   const getShiftDuration = () => {
     if (!currentShift?.startTime) return '0h 0m';
@@ -206,16 +190,36 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
     return `${hours}h ${minutes}m`;
   };
 
-  // Get current break
-  const getCurrentBreak = () => {
-    return currentShift?.breaks.find(b => !b.endTime);
+  // Handle delivery status change with loading state
+  const handleDeliveryStatusChange = async (deliveryId: string, newStatus: DriverStatus) => {
+    setUpdatingDeliveryId(deliveryId);
+    try {
+      await updateDeliveryStatus(deliveryId, newStatus, currentLocation || undefined);
+    } finally {
+      setUpdatingDeliveryId(null);
+    }
   };
-
-  const currentBreak = getCurrentBreak();
-  const isOnBreak = !!currentBreak;
 
   return (
     <div className={cn('w-full max-w-md mx-auto p-4 space-y-4', className)}>
+      {/* Navigation Header */}
+      <div className="flex items-center justify-between bg-background sticky top-0 z-10 -mx-4 px-4 py-2 border-b">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-9 w-9" asChild>
+            <Link href="/driver">
+              <ChevronLeftIcon className="h-5 w-5" />
+            </Link>
+          </Button>
+          <h1 className="text-lg font-semibold">Live Tracking</h1>
+        </div>
+        <Button variant="outline" size="sm" className="gap-2" asChild>
+          <Link href="/driver">
+            <HomeIcon className="h-4 w-4" />
+            Dashboard
+          </Link>
+        </Button>
+      </div>
+
       {/* Header Status Bar */}
       <Card>
         <CardContent className="p-4">
@@ -281,8 +285,8 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
         </Alert>
       )}
 
-      {/* Live Map & Current Location */}
-      {(currentLocation || isShiftActive) && (
+      {/* Live Map & Current Location - Only show when shift is active */}
+      {isShiftActive && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -366,9 +370,7 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
                     Started: {new Date(currentShift.startTime).toLocaleTimeString()}
                   </p>
                 </div>
-                <Badge variant={isOnBreak ? 'secondary' : 'default'}>
-                  {isOnBreak ? 'On Break' : 'Active'}
-                </Badge>
+                <Badge variant="default">Active</Badge>
               </div>
 
               <div className="grid grid-cols-3 gap-4 text-center">
@@ -391,45 +393,6 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
               </div>
 
               <Separator />
-
-              {/* Break Controls */}
-              <div className="space-y-2">
-                {isOnBreak && currentBreak ? (
-                  <div className="space-y-2">
-                    <p className="text-sm text-center text-muted-foreground">
-                      On {currentBreak.breakType} break since{' '}
-                      {new Date(currentBreak.startTime).toLocaleTimeString()}
-                    </p>
-                    <Button 
-                      onClick={handleEndBreak}
-                      className="w-full"
-                      variant="outline"
-                    >
-                      <PlayIcon className="w-4 h-4 mr-2" />
-                      End Break
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button 
-                      onClick={() => handleStartBreak('rest')}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <CoffeeIcon className="w-4 h-4 mr-1" />
-                      Break
-                    </Button>
-                    <Button 
-                      onClick={() => handleStartBreak('meal')}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <PauseIcon className="w-4 h-4 mr-1" />
-                      Meal
-                    </Button>
-                  </div>
-                )}
-              </div>
 
               <Button 
                 onClick={handleEndShift}
@@ -516,54 +479,49 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <MapPinIcon className="w-5 h-5" />
+              <PackageIcon className="w-5 h-5" />
               <span>Active Deliveries ({activeDeliveries.length})</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             {activeDeliveries.map((delivery) => (
-              <div key={delivery.id} className="border rounded-lg p-3 space-y-2">
+              <div key={delivery.id} className="border rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">
-                    Delivery #{delivery.id.slice(-6)}
-                  </span>
-                  <Badge variant="outline">
-                    {delivery.status}
-                  </Badge>
+                  <div>
+                    <span className="font-semibold text-base">
+                      #{delivery.cateringRequestId?.slice(-6) || delivery.onDemandId?.slice(-6) || delivery.id.slice(-6)}
+                    </span>
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {delivery.cateringRequestId ? 'Catering' : 'On Demand'}
+                    </span>
+                  </div>
                 </div>
-                
-                <div className="text-sm text-muted-foreground">
-                  <p>📍 {delivery.deliveryLocation.coordinates[1].toFixed(4)}, {delivery.deliveryLocation.coordinates[0].toFixed(4)}</p>
+
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p className="flex items-center gap-1">
+                    <MapPinIcon className="w-3 h-3" />
+                    {delivery.deliveryLocation.coordinates[1].toFixed(4)}, {delivery.deliveryLocation.coordinates[0].toFixed(4)}
+                  </p>
                   {delivery.estimatedArrival && (
-                    <p>⏰ ETA: {new Date(delivery.estimatedArrival).toLocaleTimeString()}</p>
+                    <p className="flex items-center gap-1">
+                      <ClockIcon className="w-3 h-3" />
+                      ETA: {new Date(delivery.estimatedArrival).toLocaleTimeString()}
+                    </p>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => updateDeliveryStatus(delivery.id, DriverStatus.EN_ROUTE_TO_CLIENT, currentLocation || undefined)}
-                  >
-                    En Route
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => updateDeliveryStatus(delivery.id, DriverStatus.ARRIVED_TO_CLIENT, currentLocation || undefined)}
-                  >
-                    Arrived
-                  </Button>
-                </div>
-                
-                <Button 
-                  size="sm" 
-                  className="w-full"
-                  onClick={() => updateDeliveryStatus(delivery.id, DriverStatus.COMPLETED, currentLocation || undefined)}
-                >
-                  <CheckCircleIcon className="w-4 h-4 mr-2" />
-                  Complete Delivery
-                </Button>
+                <Separator />
+
+                {/* Delivery Status Control */}
+                <DeliveryStatusControl
+                  deliveryId={delivery.id}
+                  orderNumber={delivery.cateringRequestId || delivery.onDemandId || delivery.id}
+                  orderType={delivery.cateringRequestId ? 'catering' : 'on_demand'}
+                  currentStatus={delivery.status}
+                  onStatusChange={(newStatus) => handleDeliveryStatusChange(delivery.id, newStatus)}
+                  isLoading={updatingDeliveryId === delivery.id}
+                  disabled={deliveriesLoading}
+                />
               </div>
             ))}
           </CardContent>

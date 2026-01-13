@@ -46,8 +46,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { UserStatus } from "@/types/user";
+import { useToast } from "@/components/ui/use-toast";
+import { UserStatus, DriverStatus } from "@/types/user";
 import { encodeOrderNumber } from "@/utils/order";
+import { DeliveryStatusControl } from "./DeliveryStatusControl";
+import { isDeliveryCompleted } from "@/lib/delivery-status-transitions";
 
 interface Delivery {
   id: string;
@@ -125,6 +128,8 @@ const DriverDeliveries: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<DeliveryStatus>("all");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState<boolean>(true);
+  const [updatingDeliveryId, setUpdatingDeliveryId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -206,6 +211,44 @@ const DriverDeliveries: React.FC = () => {
 
     setFilteredDeliveries(filtered);
   }, [deliveries, activeTab, statusFilter]);
+
+  // Handle status update for a delivery
+  const handleStatusUpdate = async (delivery: Delivery, newStatus: DriverStatus) => {
+    setUpdatingDeliveryId(delivery.id);
+
+    try {
+      const response = await fetch(`/api/orders/${encodeURIComponent(delivery.orderNumber)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driverStatus: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update status');
+      }
+
+      // Optimistically update local state
+      setDeliveries((prev) =>
+        prev.map((d) =>
+          d.id === delivery.id ? { ...d, driverStatus: newStatus } : d
+        )
+      );
+
+      toast({
+        title: "Status Updated",
+        description: `Order #${delivery.orderNumber} status updated to ${newStatus.replace(/_/g, ' ').toLowerCase()}`,
+      });
+    } catch (err) {
+      console.error('Error updating delivery status:', err);
+      toast({
+        title: "Update Failed",
+        description: "Could not update delivery status. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingDeliveryId(null);
+    }
+  };
 
   const handleNextPage = () => setPage((prev) => prev + 1);
   const handlePrevPage = () => setPage((prev) => Math.max(1, prev - 1));
@@ -622,6 +665,7 @@ const DriverDeliveries: React.FC = () => {
                               Status
                             </TableHead>
                             <TableHead className="text-right">Time</TableHead>
+                            <TableHead className="w-[180px]">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -830,6 +874,23 @@ const DriverDeliveries: React.FC = () => {
                                       </Badge>
                                     )}
                                   </div>
+                                </TableCell>
+                                <TableCell>
+                                  <DeliveryStatusControl
+                                    deliveryId={delivery.id}
+                                    orderNumber={delivery.orderNumber}
+                                    orderType={delivery.delivery_type}
+                                    currentStatus={delivery.driverStatus}
+                                    onStatusChange={(newStatus) =>
+                                      handleStatusUpdate(delivery, newStatus)
+                                    }
+                                    isLoading={updatingDeliveryId === delivery.id}
+                                    disabled={
+                                      isDeliveryCompleted(delivery.driverStatus) ||
+                                      userProfile?.status?.toString().toLowerCase() !== UserStatus.ACTIVE
+                                    }
+                                    compact
+                                  />
                                 </TableCell>
                               </TableRow>
                             );
