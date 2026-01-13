@@ -8,6 +8,7 @@ import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 const mockDriver1: TrackedDriver = {
   id: 'driver-1',
   employeeId: 'EMP001',
+  name: 'John Smith',
   vehicleNumber: 'VEH-123',
   phoneNumber: '+1-555-0101',
   isOnDuty: true,
@@ -30,6 +31,7 @@ const mockDriver1: TrackedDriver = {
 const mockDriver2: TrackedDriver = {
   id: 'driver-2',
   employeeId: 'EMP002',
+  name: 'Jane Doe',
   vehicleNumber: 'VEH-456',
   isOnDuty: true,
   activeDeliveries: 2,
@@ -39,6 +41,7 @@ const mockDriver2: TrackedDriver = {
 const mockOffDutyDriver: TrackedDriver = {
   id: 'driver-3',
   employeeId: 'EMP003',
+  name: 'Bob Wilson',
   vehicleNumber: 'VEH-789',
   isOnDuty: false,
   activeDeliveries: 0
@@ -47,6 +50,7 @@ const mockOffDutyDriver: TrackedDriver = {
 const mockOverloadedDriver: TrackedDriver = {
   id: 'driver-4',
   employeeId: 'EMP004',
+  name: 'Charlie Brown',
   vehicleNumber: 'VEH-999',
   isOnDuty: true,
   activeDeliveries: 3 // Max capacity
@@ -390,7 +394,8 @@ describe('DeliveryAssignmentPanel', () => {
       // "Assigned" appears in stat label, dropdown, and status badge
       const assignedElements = screen.getAllByText('Assigned');
       expect(assignedElements.length).toBeGreaterThanOrEqual(2);
-      expect(screen.getByText('Driver #EMP001')).toBeInTheDocument();
+      // Driver name appears in multiple places (status area and available drivers list)
+      expect(screen.getAllByText('John Smith').length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -582,11 +587,11 @@ describe('DeliveryAssignmentPanel', () => {
         />
       );
 
-      // Should show driver1 (on duty, capacity available)
-      expect(screen.getByText('#EMP001')).toBeInTheDocument();
+      // Should show driver1 (on duty, capacity available) - driver name is shown
+      expect(screen.getAllByText('John Smith').length).toBeGreaterThanOrEqual(1);
       // Should not show off-duty or overloaded drivers
-      expect(screen.queryByText('#EMP003')).not.toBeInTheDocument();
-      expect(screen.queryByText('#EMP004')).not.toBeInTheDocument();
+      expect(screen.queryByText('Bob Wilson')).not.toBeInTheDocument();
+      expect(screen.queryByText('Charlie Brown')).not.toBeInTheDocument();
     });
 
     it('should show no drivers message when none available', () => {
@@ -624,8 +629,9 @@ describe('DeliveryAssignmentPanel', () => {
       if (deliveryCard) {
         fireEvent.click(deliveryCard);
 
-        // Find and click the driver assignment row
-        const driverRow = screen.getByText('Driver #EMP001').closest('div[class*="border"]');
+        // Find and click the driver assignment row (first one is in the expanded delivery panel, which is clickable)
+        const driverElements = screen.getAllByText('John Smith');
+        const driverRow = driverElements[0].closest('div[class*="border"]');
         if (driverRow) {
           fireEvent.click(driverRow);
 
@@ -764,7 +770,9 @@ describe('DeliveryAssignmentPanel', () => {
       if (deliveryCard) {
         fireEvent.click(deliveryCard);
 
-        const driverRow = screen.getByText('Driver #EMP001').closest('div[class*="border"]');
+        // Find and click the driver assignment row (first one is in the expanded delivery panel, which is clickable)
+        const driverElements = screen.getAllByText('John Smith');
+        const driverRow = driverElements[0].closest('div[class*="border"]');
         if (driverRow) {
           fireEvent.click(driverRow);
 
@@ -795,7 +803,9 @@ describe('DeliveryAssignmentPanel', () => {
       if (deliveryCard) {
         fireEvent.click(deliveryCard);
 
-        const driverRow = screen.getByText('Driver #EMP001').closest('div[class*="border"]');
+        // Find and click the driver assignment row (first one is in the expanded delivery panel, which is clickable)
+        const driverElements = screen.getAllByText('John Smith');
+        const driverRow = driverElements[0].closest('div[class*="border"]');
         if (driverRow) {
           fireEvent.click(driverRow);
 

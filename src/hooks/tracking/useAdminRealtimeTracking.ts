@@ -94,6 +94,11 @@ interface UseAdminRealtimeTrackingReturn {
   isConnected: boolean;
 
   /**
+   * Whether initial data is still loading
+   */
+  isLoading: boolean;
+
+  /**
    * Whether Realtime is connected and active
    */
   isRealtimeConnected: boolean;
@@ -147,6 +152,7 @@ export function useAdminRealtimeTracking(
     recentLocations: sseRecentLocations,
     activeDeliveries: sseActiveDeliveries,
     isConnected: sseIsConnected,
+    isLoading: sseIsLoading,
     error: sseError,
     reconnect: sseReconnect,
   } = sseTracking;
@@ -179,8 +185,15 @@ export function useAdminRealtimeTracking(
   const channelRef = useRef<DriverLocationChannel | null>(null);
   const processedLocationsRef = useRef<Set<string>>(new Set());
 
+  // Ref to track SSE drivers for lookup in Realtime updates (avoids stale closure)
+  const sseActiveDriversRef = useRef<TrackedDriver[]>([]);
+
+  // Ref to track SSE deliveries for driver name enrichment (deliveries have more accurate driver assignments)
+  const sseActiveDeliveriesRef = useRef<DeliveryTracking[]>([]);
+
   /**
    * Initialize Realtime channel
+   * Includes pre-connection auth check and graceful fallback handling
    */
   const initializeRealtime = useCallback(async () => {
     if (!isRealtimeEnabled) {
@@ -188,6 +201,20 @@ export function useAdminRealtimeTracking(
     }
 
     try {
+      // Pre-check: Verify authentication is established before attempting realtime connection
+      // This prevents timeout errors when auth is still loading
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+
+      if (authError || !session) {
+        realtimeLogger.warn('Skipping Realtime initialization - no active session', {
+          metadata: { hasError: !!authError, hasSession: !!session }
+        });
+        setConnectionMode('sse');
+        return;
+      }
+
       const channel = createDriverLocationChannel();
 
       await channel.subscribe({
@@ -205,9 +232,14 @@ export function useAdminRealtimeTracking(
         onError: (error) => {
           setIsRealtimeConnected(false);
           setConnectionMode('sse');
-          setRealtimeError(error.message);
+          // Only set error message if it's not a timeout (timeout is expected during fallback)
+          const isTimeoutError = error.message?.includes('timed out') || error.message?.includes('timeout');
+          if (!isTimeoutError) {
+            setRealtimeError(error.message);
+          }
           onRealtimeError?.(error);
-          realtimeLogger.error('Admin location channel error', { error });
+          // Log as warning since we gracefully fall back to SSE
+          realtimeLogger.warn('Admin location channel error - falling back to SSE', { error });
         },
         onLocationUpdate: (payload) => {
           handleLocationUpdate(payload);
@@ -216,9 +248,23 @@ export function useAdminRealtimeTracking(
 
       channelRef.current = channel;
     } catch (error) {
-      realtimeLogger.error('Admin failed to initialize location channel', { error });
+      // Log as warning since we gracefully fall back to SSE
+      const errorMessage = (error as Error).message || 'Unknown error';
+      const isTimeoutError = errorMessage.includes('timed out') || errorMessage.includes('timeout');
+
+      if (isTimeoutError) {
+        realtimeLogger.warn('Realtime connection timed out - using SSE fallback', {
+          metadata: { message: errorMessage }
+        });
+      } else {
+        realtimeLogger.warn('Admin failed to initialize location channel - using SSE fallback', { error });
+      }
+
       setConnectionMode('sse');
-      setRealtimeError((error as Error).message);
+      // Don't show timeout errors to user since SSE fallback works fine
+      if (!isTimeoutError) {
+        setRealtimeError(errorMessage);
+      }
       onRealtimeError?.(error as Error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -233,6 +279,16 @@ export function useAdminRealtimeTracking(
       isMountedRef.current = false;
     };
   }, []);
+
+  // Keep SSE drivers ref up to date (for lookup in Realtime location updates)
+  useEffect(() => {
+    sseActiveDriversRef.current = sseActiveDrivers;
+  }, [sseActiveDrivers]);
+
+  // Keep SSE deliveries ref up to date (for driver name enrichment in Realtime mode)
+  useEffect(() => {
+    sseActiveDeliveriesRef.current = sseActiveDeliveries;
+  }, [sseActiveDeliveries]);
 
   /**
    * Cleanup Realtime channel with cancellation support
@@ -347,23 +403,74 @@ export function useAdminRealtimeTracking(
         const updated = new Map(prev);
         const existing = updated.get(payload.driverId);
 
+        // Look up driver info from SSE data first (has complete info like name, employeeId)
+        const sseDriver = sseActiveDriversRef.current.find(d => d.id === payload.driverId);
+
+        // Look up driver name from deliveries (more reliable than drivers.profile_id)
+        // Legacy dispatches have driverName from the actual dispatch assignment
+        // This handles the case where drivers.profile_id points to wrong profile
+        //
+        // Match criteria:
+        // 1. delivery.driverId === payload.driverId (direct driver ID match)
+        // 2. delivery.dispatchDriverId correlation (for legacy dispatches with profile ID)
+        const deliveryWithDriver = sseActiveDeliveriesRef.current.find((d) => {
+          const deliveryWithDriverInfo = d as DeliveryTracking & {
+            driverName?: string;
+            dispatchDriverId?: string;
+          };
+          if (!deliveryWithDriverInfo.driverName) return false;
+          // Try direct match first
+          if (d.driverId === payload.driverId) return true;
+          return false;
+        }) as (DeliveryTracking & { driverName?: string }) | undefined;
+
+        let deliveryDriverName = deliveryWithDriver?.driverName;
+
+        // Heuristic fallback: if no direct match found, look for delivery with
+        // driverName that doesn't exist in any SSE driver's name.
+        // This handles the case where driver record has wrong profile_id,
+        // resulting in SSE driver having wrong name but delivery having correct name.
+        if (!deliveryDriverName && sseActiveDeliveriesRef.current.length > 0) {
+          const sseDriverNames = new Set(
+            sseActiveDriversRef.current.map((d) => d.name).filter(Boolean),
+          );
+
+          const unmatchedDelivery = sseActiveDeliveriesRef.current.find((d) => {
+            const info = d as DeliveryTracking & { driverName?: string };
+            // Find delivery with driverName that's NOT in any SSE driver's name
+            return info.driverName && !sseDriverNames.has(info.driverName);
+          }) as (DeliveryTracking & { driverName?: string }) | undefined;
+
+          if (unmatchedDelivery) {
+            deliveryDriverName = unmatchedDelivery.driverName;
+          }
+        }
+
+        // Priority for driver name:
+        // 1. Delivery/dispatch name (most accurate - actual assignment)
+        // 2. Existing name from previous updates
+        // 3. SSE driver name (from drivers.profile_id - may be incorrect)
+        // 4. Payload driver name (from Realtime broadcast)
+        const resolvedName = deliveryDriverName ?? existing?.name ?? sseDriver?.name ?? payload.driverName;
+
         const updatedDriver: TrackedDriver = {
           id: payload.driverId,
-          userId: existing?.userId,
-          employeeId: existing?.employeeId ?? payload.driverName ?? 'Unknown',
-          vehicleNumber: payload.vehicleNumber ?? existing?.vehicleNumber,
-          phoneNumber: existing?.phoneNumber ?? '',
+          userId: existing?.userId ?? sseDriver?.userId,
+          employeeId: existing?.employeeId ?? sseDriver?.employeeId ?? 'Unknown',
+          name: resolvedName,
+          vehicleNumber: payload.vehicleNumber ?? existing?.vehicleNumber ?? sseDriver?.vehicleNumber,
+          phoneNumber: existing?.phoneNumber ?? sseDriver?.phoneNumber ?? '',
           isActive: true,
           isOnDuty: true, // Assume on duty if sending updates
           lastKnownLocation: {
             coordinates: [payload.lng, payload.lat],
           },
           lastLocationUpdate: new Date(payload.timestamp),
-          currentShiftId: existing?.currentShiftId,
-          shiftStartTime: existing?.shiftStartTime,
-          deliveryCount: existing?.deliveryCount,
-          totalDistanceMiles: existing?.totalDistanceMiles ?? 0,
-          activeDeliveries: existing?.activeDeliveries ?? 0,
+          currentShiftId: existing?.currentShiftId ?? sseDriver?.currentShiftId,
+          shiftStartTime: existing?.shiftStartTime ?? sseDriver?.shiftStartTime,
+          deliveryCount: existing?.deliveryCount ?? sseDriver?.deliveryCount,
+          totalDistanceMiles: existing?.totalDistanceMiles ?? sseDriver?.totalDistanceMiles ?? 0,
+          activeDeliveries: existing?.activeDeliveries ?? sseDriver?.activeDeliveries ?? 0,
           metadata: existing?.metadata ?? {},
           createdAt: existing?.createdAt ?? new Date(),
           updatedAt: new Date(),
@@ -533,6 +640,7 @@ export function useAdminRealtimeTracking(
     recentLocations,
     activeDeliveries,
     isConnected,
+    isLoading: sseIsLoading,
     isRealtimeConnected,
     // Expose global feature availability so the UI can always show the
     // WebSocket/SSE controls when Realtime is turned on for this environment.

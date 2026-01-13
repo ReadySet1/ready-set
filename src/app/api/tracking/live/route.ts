@@ -14,6 +14,7 @@ interface ActiveDriverRow {
   id: string;
   user_id: string | null;
   employee_id: string | null;
+  driver_name: string | null;
   vehicle_number: string | null;
   phone_number: string | null;
   is_on_duty: boolean;
@@ -65,6 +66,35 @@ interface ActiveDeliveryRow {
   delivered_at: Date | null;
   priority: string | null;
   delivery_instructions: string | null;
+}
+
+/**
+ * Typed result row for legacy dispatches query (catering_requests and on_demand).
+ */
+interface LegacyDispatchRow {
+  id: string;
+  driver_id: string | null;
+  dispatch_driver_id: string; // Original driverId from dispatches (profile id)
+  order_number: string;
+  status: string;
+  driver_status: string | null;
+  customer_name: string | null;
+  pickup_street: string | null;
+  pickup_city: string | null;
+  pickup_state: string | null;
+  pickup_lat: number | null;
+  pickup_lng: number | null;
+  delivery_street: string | null;
+  delivery_city: string | null;
+  delivery_state: string | null;
+  delivery_lat: number | null;
+  delivery_lng: number | null;
+  pickup_datetime: Date | null;
+  arrival_datetime: Date | null;
+  created_at: Date | null;
+  order_type: string;
+  driver_employee_id: string | null;
+  driver_name: string | null;
 }
 
 /**
@@ -132,11 +162,15 @@ export async function GET(request: NextRequest) {
 
           try {
             // Get active drivers with current locations and shifts
+            // Join with profiles via profile_id to get driver name
+            // Note: If drivers.profile_id is NULL, the name will be enriched client-side
+            // from delivery data (see useRealTimeTracking.enrichDriverNamesFromDeliveries)
             const activeDrivers = await prisma.$queryRawUnsafe<ActiveDriverRow[]>(`
               SELECT
                 d.id,
                 d.user_id,
                 d.employee_id,
+                p.name as driver_name,
                 d.vehicle_number,
                 d.phone_number,
                 d.is_on_duty,
@@ -149,10 +183,11 @@ export async function GET(request: NextRequest) {
                 ds.total_distance,
                 COUNT(CASE WHEN del.status NOT IN ('delivered', 'cancelled') THEN 1 END) as active_deliveries
               FROM drivers d
+              LEFT JOIN profiles p ON d.profile_id = p.id
               LEFT JOIN driver_shifts ds ON d.current_shift_id = ds.id
               LEFT JOIN deliveries del ON d.id = del.driver_id AND del.deleted_at IS NULL
               WHERE d.is_active = true AND d.deleted_at IS NULL
-              GROUP BY d.id, ds.id
+              GROUP BY d.id, p.name, ds.id
               ORDER BY d.is_on_duty DESC, d.last_location_update DESC
             `);
 
@@ -177,7 +212,7 @@ export async function GET(request: NextRequest) {
               ORDER BY dl.recorded_at DESC
             `);
 
-            // Get active deliveries with status updates
+            // Get active deliveries with status updates (new deliveries table)
             const activeDeliveries = await prisma.$queryRawUnsafe<ActiveDeliveryRow[]>(`
               SELECT
                 d.id,
@@ -206,6 +241,87 @@ export async function GET(request: NextRequest) {
               ORDER BY d.assigned_at DESC
             `);
 
+            // Get legacy dispatches (catering_requests and on_demand) with assigned drivers
+            // Note: Column names are camelCase in the database, so we need to quote them
+            // Join with drivers table to get the actual driver ID (dispatches.driverId references profiles.id)
+            const legacyDispatches = await prisma.$queryRawUnsafe<LegacyDispatchRow[]>(`
+              SELECT
+                disp.id,
+                drv.id as driver_id,
+                disp."driverId" as dispatch_driver_id,
+                cr."orderNumber" as order_number,
+                cr.status::text as status,
+                cr."driverStatus"::text as driver_status,
+                u.name as customer_name,
+                pa.street1 as pickup_street,
+                pa.city as pickup_city,
+                pa.state as pickup_state,
+                pa.latitude as pickup_lat,
+                pa.longitude as pickup_lng,
+                da.street1 as delivery_street,
+                da.city as delivery_city,
+                da.state as delivery_state,
+                da.latitude as delivery_lat,
+                da.longitude as delivery_lng,
+                cr."pickupDateTime" as pickup_datetime,
+                cr."arrivalDateTime" as arrival_datetime,
+                disp."createdAt" as created_at,
+                'catering' as order_type,
+                drv.employee_id as driver_employee_id,
+                dp.name as driver_name
+              FROM dispatches disp
+              INNER JOIN catering_requests cr ON disp."cateringRequestId" = cr.id
+              LEFT JOIN drivers drv ON drv.profile_id = disp."driverId"
+              LEFT JOIN profiles dp ON disp."driverId" = dp.id
+              LEFT JOIN profiles u ON cr."userId" = u.id
+              LEFT JOIN addresses pa ON cr."pickupAddressId" = pa.id
+              LEFT JOIN addresses da ON cr."deliveryAddressId" = da.id
+              WHERE disp."driverId" IS NOT NULL
+              AND cr.status NOT IN ('CANCELLED')
+              AND (cr."driverStatus" IS NULL OR cr."driverStatus" NOT IN ('COMPLETED'))
+              AND cr."deletedAt" IS NULL
+
+              UNION ALL
+
+              SELECT
+                disp.id,
+                drv.id as driver_id,
+                disp."driverId" as dispatch_driver_id,
+                od."orderNumber" as order_number,
+                od.status::text as status,
+                od."driverStatus"::text as driver_status,
+                u.name as customer_name,
+                pa.street1 as pickup_street,
+                pa.city as pickup_city,
+                pa.state as pickup_state,
+                pa.latitude as pickup_lat,
+                pa.longitude as pickup_lng,
+                da.street1 as delivery_street,
+                da.city as delivery_city,
+                da.state as delivery_state,
+                da.latitude as delivery_lat,
+                da.longitude as delivery_lng,
+                od."pickupDateTime" as pickup_datetime,
+                od."arrivalDateTime" as arrival_datetime,
+                disp."createdAt" as created_at,
+                'on_demand' as order_type,
+                drv.employee_id as driver_employee_id,
+                dp.name as driver_name
+              FROM dispatches disp
+              INNER JOIN on_demand_requests od ON disp."onDemandId" = od.id
+              LEFT JOIN drivers drv ON drv.profile_id = disp."driverId"
+              LEFT JOIN profiles dp ON disp."driverId" = dp.id
+              LEFT JOIN profiles u ON od."userId" = u.id
+              LEFT JOIN addresses pa ON od."pickupAddressId" = pa.id
+              LEFT JOIN addresses da ON od."deliveryAddressId" = da.id
+              WHERE disp."driverId" IS NOT NULL
+              AND od.status NOT IN ('CANCELLED')
+              AND (od."driverStatus" IS NULL OR od."driverStatus" NOT IN ('COMPLETED'))
+              AND od."deletedAt" IS NULL
+
+              ORDER BY created_at DESC
+            `);
+
             // Format the data for SSE
             const updateData = {
               type: 'driver_update',
@@ -215,6 +331,7 @@ export async function GET(request: NextRequest) {
                   id: driver.id,
                   userId: driver.user_id,
                   employeeId: driver.employee_id,
+                  name: driver.driver_name,
                   vehicleNumber: driver.vehicle_number,
                   phoneNumber: driver.phone_number,
                   isOnDuty: driver.is_on_duty,
@@ -244,29 +361,71 @@ export async function GET(request: NextRequest) {
                   source: loc.source,
                   recordedAt: loc.recorded_at
                 })),
-                activeDeliveries: activeDeliveries.map(delivery => ({
-                  id: delivery.id,
-                  driverId: delivery.driver_id,
-                  shiftId: delivery.shift_id,
-                  orderNumber: delivery.order_number,
-                  status: delivery.status,
-                  customerName: delivery.customer_name,
-                  customerPhone: delivery.customer_phone,
-                  pickupAddress: delivery.pickup_address,
-                  pickupLocation: delivery.pickup_location_geojson ?
-                    JSON.parse(delivery.pickup_location_geojson) : null,
-                  deliveryAddress: delivery.delivery_address,
-                  deliveryLocation: delivery.delivery_location_geojson ?
-                    JSON.parse(delivery.delivery_location_geojson) : null,
-                  estimatedPickupTime: delivery.estimated_pickup_time,
-                  estimatedDeliveryTime: delivery.estimated_delivery_time,
-                  assignedAt: delivery.assigned_at,
-                  acceptedAt: delivery.accepted_at,
-                  pickedUpAt: delivery.picked_up_at,
-                  deliveredAt: delivery.delivered_at,
-                  priority: delivery.priority,
-                  deliveryInstructions: delivery.delivery_instructions
-                }))
+                activeDeliveries: [
+                  // New deliveries table entries
+                  ...activeDeliveries.map(delivery => ({
+                    id: delivery.id,
+                    driverId: delivery.driver_id,
+                    shiftId: delivery.shift_id,
+                    orderNumber: delivery.order_number,
+                    status: delivery.status,
+                    customerName: delivery.customer_name,
+                    customerPhone: delivery.customer_phone,
+                    pickupAddress: delivery.pickup_address,
+                    pickupLocation: delivery.pickup_location_geojson ?
+                      JSON.parse(delivery.pickup_location_geojson) : null,
+                    deliveryAddress: delivery.delivery_address,
+                    deliveryLocation: delivery.delivery_location_geojson ?
+                      JSON.parse(delivery.delivery_location_geojson) : null,
+                    estimatedPickupTime: delivery.estimated_pickup_time,
+                    estimatedDeliveryTime: delivery.estimated_delivery_time,
+                    assignedAt: delivery.assigned_at,
+                    acceptedAt: delivery.accepted_at,
+                    pickedUpAt: delivery.picked_up_at,
+                    deliveredAt: delivery.delivered_at,
+                    priority: delivery.priority,
+                    deliveryInstructions: delivery.delivery_instructions,
+                    source: 'deliveries'
+                  })),
+                  // Legacy dispatches (catering_requests and on_demand)
+                  ...legacyDispatches.map(dispatch => ({
+                    id: dispatch.id,
+                    // Use driver table ID if available, otherwise use dispatch's driverId (profile id)
+                    driverId: dispatch.driver_id || dispatch.dispatch_driver_id,
+                    // Expose the original dispatch driverId (profile ID) for correlation
+                    // This helps client-side matching when drivers.profile_id is incorrect
+                    dispatchDriverId: dispatch.dispatch_driver_id,
+                    shiftId: null,
+                    orderNumber: dispatch.order_number,
+                    // Use driver_status for delivery tracking, fall back to order status
+                    status: dispatch.driver_status || dispatch.status,
+                    customerName: dispatch.customer_name,
+                    customerPhone: null,
+                    pickupAddress: [dispatch.pickup_street, dispatch.pickup_city, dispatch.pickup_state].filter(Boolean).join(', '),
+                    pickupLocation: dispatch.pickup_lat && dispatch.pickup_lng ? {
+                      type: 'Point',
+                      coordinates: [dispatch.pickup_lng, dispatch.pickup_lat]
+                    } : null,
+                    deliveryAddress: [dispatch.delivery_street, dispatch.delivery_city, dispatch.delivery_state].filter(Boolean).join(', '),
+                    deliveryLocation: dispatch.delivery_lat && dispatch.delivery_lng ? {
+                      type: 'Point',
+                      coordinates: [dispatch.delivery_lng, dispatch.delivery_lat]
+                    } : null,
+                    estimatedPickupTime: dispatch.pickup_datetime,
+                    estimatedDeliveryTime: dispatch.arrival_datetime,
+                    assignedAt: dispatch.created_at,
+                    acceptedAt: null,
+                    pickedUpAt: null,
+                    deliveredAt: null,
+                    priority: null,
+                    deliveryInstructions: null,
+                    orderType: dispatch.order_type,
+                    source: 'dispatches',
+                    // Include driver info for legacy dispatches
+                    driverEmployeeId: dispatch.driver_employee_id,
+                    driverName: dispatch.driver_name
+                  }))
+                ]
               }
             };
 

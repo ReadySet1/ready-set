@@ -7,18 +7,39 @@ import { sendDispatchStatusNotification } from "@/services/notifications/deliver
 import { DriverStatus } from "@/types/user";
 
 import { CateringRequestGetPayload, OnDemandGetPayload } from '@/types/prisma';
+import {
+  cateringUpdateSchema,
+  onDemandUpdateSchema,
+  addressUpdateSchema,
+  isTerminalStatus,
+  detectSignificantChanges,
+  hasSignificantChanges,
+  type AddressUpdate,
+  type FieldChange,
+} from './schemas';
 
 // Map DriverStatus to dispatch notification status
 const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
-  [DriverStatus.PICKED_UP]: 'PICKUP_COMPLETE',
+  [DriverStatus.ARRIVED_AT_VENDOR]: 'ARRIVED_AT_PICKUP',
+  [DriverStatus.PICKED_UP]: 'PICKUP_COMPLETE', // Legacy - kept for backwards compatibility
   [DriverStatus.EN_ROUTE_TO_CLIENT]: 'EN_ROUTE_TO_DELIVERY',
   [DriverStatus.ARRIVED_TO_CLIENT]: 'ARRIVED_AT_DELIVERY',
   [DriverStatus.COMPLETED]: 'DELIVERY_COMPLETE',
 };
 
+// Map DriverStatus transitions to order status updates
+// When driver starts working on delivery, order status should sync
+const DRIVER_STATUS_TO_ORDER_STATUS: Record<string, string> = {
+  [DriverStatus.ARRIVED_AT_VENDOR]: 'IN_PROGRESS',
+  [DriverStatus.PICKED_UP]: 'IN_PROGRESS',
+  [DriverStatus.EN_ROUTE_TO_CLIENT]: 'IN_PROGRESS',
+  [DriverStatus.ARRIVED_TO_CLIENT]: 'IN_PROGRESS',
+  [DriverStatus.COMPLETED]: 'DELIVERED',
+};
+
 // Statuses that should trigger customer notifications
 const CUSTOMER_NOTIFICATION_STATUSES = [
-  DriverStatus.PICKED_UP,
+  DriverStatus.ARRIVED_AT_VENDOR,
   DriverStatus.EN_ROUTE_TO_CLIENT,
   DriverStatus.ARRIVED_TO_CLIENT,
   DriverStatus.COMPLETED,
@@ -28,6 +49,9 @@ const CUSTOMER_NOTIFICATION_STATUSES = [
 const ADMIN_NOTIFICATION_STATUSES = [
   DriverStatus.COMPLETED,
 ];
+
+// Roles that can edit orders
+const ORDER_EDIT_ROLES = ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'];
 
 type CateringRequest = CateringRequestGetPayload<{
   include: {
@@ -76,42 +100,22 @@ type Order =
   | (OnDemandOrder & { order_type: "on_demand" });
 
 function serializeOrder(data: any): any {
-  // Helper function to format dates with timezone
-  const formatDate = (date: string | Date | null, state: string | null) => {
+  // Helper function to convert dates to ISO strings (preserves timezone info)
+  const toISOString = (date: string | Date | null) => {
     if (!date) return null;
-    
-    // Create a date object from the input
-    const utcDate = new Date(date);
-    
-    // Determine timezone based on state
-    let timezone = 'America/Los_Angeles'; // Default to PST
-    if (state === 'TX') {
-      timezone = 'America/Chicago'; // CST for Texas
-    }
-    
-    // Format the date in the correct timezone
-    return utcDate.toLocaleString('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      hour12: true
-    });
+    const d = date instanceof Date ? date : new Date(date);
+    return isNaN(d.getTime()) ? null : d.toISOString();
   };
 
-  // Get the state from the delivery address
-  const state = data.deliveryAddress?.state || null;
-
-  // Create a copy of the data with formatted dates
+  // Create a copy of the data with ISO date strings
+  // ISO strings are correctly parsed by clients in any timezone
   const formattedData = {
     ...data,
-    pickupDateTime: formatDate(data.pickupDateTime, state),
-    arrivalDateTime: formatDate(data.arrivalDateTime, state),
-    completeDateTime: formatDate(data.completeDateTime, state),
-    createdAt: formatDate(data.createdAt, state),
-    updatedAt: formatDate(data.updatedAt, state)
+    pickupDateTime: toISOString(data.pickupDateTime),
+    arrivalDateTime: toISOString(data.arrivalDateTime),
+    completeDateTime: toISOString(data.completeDateTime),
+    createdAt: toISOString(data.createdAt),
+    updatedAt: toISOString(data.updatedAt)
   };
 
   // Convert any BigInt values to strings
@@ -230,6 +234,36 @@ export async function GET(
   }
 }
 
+// Helper function to create or update an address
+async function upsertAddress(
+  addressData: AddressUpdate,
+  existingAddressId?: string
+): Promise<string> {
+  const { id, ...addressFields } = addressData;
+
+  // If we have an existing address ID, update it
+  if (existingAddressId) {
+    await prisma.address.update({
+      where: { id: existingAddressId },
+      data: addressFields,
+    });
+    return existingAddressId;
+  }
+
+  // Otherwise, create a new address
+  const newAddress = await prisma.address.create({
+    data: addressFields,
+  });
+  return newAddress.id;
+}
+
+// Helper function to check if this is just a status update (legacy behavior)
+function isStatusOnlyUpdate(body: Record<string, unknown>): boolean {
+  const statusFields = ['status', 'driverStatus'];
+  const providedFields = Object.keys(body).filter(key => body[key] !== undefined);
+  return providedFields.every(field => statusFields.includes(field));
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ order_number: string }> }
@@ -237,10 +271,10 @@ export async function PATCH(
   try {
     // Await params before accessing its properties
     const resolvedParams = await params;
-        
+
     // Initialize Supabase client
     const supabase = await createClient();
-    
+
     // Get user session from Supabase
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -250,34 +284,56 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-        
     // Extract order_number from params and decode it properly
     const { order_number: encodedOrderNumber } = resolvedParams;
     const order_number = decodeURIComponent(encodedOrderNumber);
-    
-    const body = await request.json();
-    const { status, driverStatus } = body;
 
-    if (!status && !driverStatus) {
+    const body = await request.json();
+    const { status, driverStatus, ...updateFields } = body;
+
+    // Check if any update data is provided
+    const hasStatusUpdate = status || driverStatus;
+    const hasFieldUpdates = Object.keys(updateFields).length > 0;
+
+    if (!hasStatusUpdate && !hasFieldUpdates) {
       return NextResponse.json(
         { message: "No update data provided" },
         { status: 400 },
       );
     }
 
-    let updatedOrder: Order | null = null;
+    // Find the order first to determine its type and check status
+    let existingOrder: Order | null = null;
+    let orderType: 'catering' | 'on_demand' = 'catering';
 
-    // Try updating catering request
-    const cateringRequest = await prisma.cateringRequest.findUnique({
-      where: { orderNumber: order_number },
+    const cateringRequest = await prisma.cateringRequest.findFirst({
+      where: {
+        orderNumber: { equals: order_number, mode: 'insensitive' },
+        deletedAt: null,
+      },
+      include: {
+        user: { select: { name: true, email: true } },
+        pickupAddress: true,
+        deliveryAddress: true,
+        dispatches: {
+          include: {
+            driver: {
+              select: { id: true, name: true, email: true, contactNumber: true },
+            },
+          },
+        },
+        fileUploads: true,
+      },
     });
 
     if (cateringRequest) {
-      const updated = await prisma.cateringRequest.update({
-        where: { orderNumber: order_number },
-        data: {
-          ...(status && { status: status as any }),
-          ...(driverStatus && { driverStatus: driverStatus as any }),
+      existingOrder = { ...cateringRequest, order_type: "catering" };
+      orderType = 'catering';
+    } else {
+      const onDemandOrder = await prisma.onDemand.findFirst({
+        where: {
+          orderNumber: { equals: order_number, mode: 'insensitive' },
+          deletedAt: null,
         },
         include: {
           user: { select: { name: true, email: true } },
@@ -286,12 +342,137 @@ export async function PATCH(
           dispatches: {
             include: {
               driver: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  contactNumber: true,
-                },
+                select: { id: true, name: true, email: true, contactNumber: true },
+              },
+            },
+          },
+          fileUploads: true,
+        },
+      });
+
+      if (onDemandOrder) {
+        existingOrder = { ...onDemandOrder, order_type: "on_demand" };
+        orderType = 'on_demand';
+      }
+    }
+
+    if (!existingOrder) {
+      return NextResponse.json({ message: "Order not found" }, { status: 404 });
+    }
+
+    // For full field updates (not just status), check permissions and terminal status
+    if (hasFieldUpdates) {
+      // Get user profile to check role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('type')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile?.type || !ORDER_EDIT_ROLES.includes(profile.type)) {
+        return NextResponse.json(
+          { message: "Insufficient permissions to edit orders" },
+          { status: 403 }
+        );
+      }
+
+      // Check if order is in a terminal status
+      if (isTerminalStatus(existingOrder.status)) {
+        return NextResponse.json(
+          { message: `Cannot edit order with status: ${existingOrder.status}. Orders that are completed, delivered, or cancelled cannot be modified.` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate update fields based on order type
+    let validatedFields: Record<string, unknown> = {};
+    if (hasFieldUpdates) {
+      const schema = orderType === 'catering' ? cateringUpdateSchema : onDemandUpdateSchema;
+      const result = schema.safeParse(updateFields);
+
+      if (!result.success) {
+        return NextResponse.json(
+          { message: "Validation error", errors: result.error.flatten() },
+          { status: 400 }
+        );
+      }
+      validatedFields = result.data as Record<string, unknown>;
+    }
+
+    // Build the update data
+    const updateData: Record<string, unknown> = {};
+
+    // Add status updates if provided
+    if (status) updateData.status = status;
+    if (driverStatus) {
+      updateData.driverStatus = driverStatus;
+
+      // Automatically sync order status based on driver status transitions
+      // This ensures the order status reflects the delivery progress
+      const mappedOrderStatus = DRIVER_STATUS_TO_ORDER_STATUS[driverStatus];
+      if (mappedOrderStatus && !status) {
+        // Only auto-update order status if not explicitly provided
+        updateData.status = mappedOrderStatus;
+      }
+    }
+
+    // Handle field updates
+    if (hasFieldUpdates) {
+      // Handle address updates separately
+      const { pickupAddress, deliveryAddress, pickupAddressId, deliveryAddressId, ...otherFields } = validatedFields;
+
+      // Add other fields to update data
+      for (const [key, value] of Object.entries(otherFields)) {
+        if (value !== undefined) {
+          updateData[key] = value;
+        }
+      }
+
+      // Handle pickup address update
+      if (pickupAddress) {
+        const existingPickupId = (existingOrder as any).pickupAddressId;
+        const newPickupId = await upsertAddress(pickupAddress as AddressUpdate, existingPickupId);
+        if (newPickupId !== existingPickupId) {
+          updateData.pickupAddressId = newPickupId;
+        }
+      } else if (pickupAddressId) {
+        updateData.pickupAddressId = pickupAddressId;
+      }
+
+      // Handle delivery address update
+      if (deliveryAddress) {
+        const existingDeliveryId = (existingOrder as any).deliveryAddressId;
+        const newDeliveryId = await upsertAddress(deliveryAddress as AddressUpdate, existingDeliveryId);
+        if (newDeliveryId !== existingDeliveryId) {
+          updateData.deliveryAddressId = newDeliveryId;
+        }
+      } else if (deliveryAddressId) {
+        updateData.deliveryAddressId = deliveryAddressId;
+      }
+    }
+
+    // Detect significant changes for notification
+    let changes: FieldChange[] = [];
+    if (hasFieldUpdates) {
+      changes = detectSignificantChanges(existingOrder as unknown as Record<string, unknown>, validatedFields);
+    }
+
+    // Perform the update
+    let updatedOrder: Order | null = null;
+
+    if (orderType === 'catering') {
+      const updated = await prisma.cateringRequest.update({
+        where: { orderNumber: order_number },
+        data: updateData as any,
+        include: {
+          user: { select: { name: true, email: true } },
+          pickupAddress: true,
+          deliveryAddress: true,
+          dispatches: {
+            include: {
+              driver: {
+                select: { id: true, name: true, email: true, contactNumber: true },
               },
             },
           },
@@ -300,13 +481,9 @@ export async function PATCH(
       });
       updatedOrder = { ...updated, order_type: "catering" };
     } else {
-      // If not found, try updating on-demand order
       const updated = await prisma.onDemand.update({
         where: { orderNumber: order_number },
-        data: {
-          ...(status && { status: status as any }),
-          ...(driverStatus && { driverStatus: driverStatus as any }),
-        },
+        data: updateData as any,
         include: {
           user: { select: { name: true, email: true } },
           pickupAddress: true,
@@ -314,12 +491,7 @@ export async function PATCH(
           dispatches: {
             include: {
               driver: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  contactNumber: true,
-                },
+                select: { id: true, name: true, email: true, contactNumber: true },
               },
             },
           },
@@ -362,6 +534,28 @@ export async function PATCH(
               console.error('Failed to send admin notification:', err);
             });
           }
+        }
+      }
+
+      // Send customer notification for significant field changes (non-blocking)
+      if (hasFieldUpdates && hasSignificantChanges(changes)) {
+        const customerEmail = (updatedOrder as any).user?.email;
+        const customerName = (updatedOrder as any).user?.name || 'Customer';
+
+        if (customerEmail) {
+          // Import dynamically to avoid circular dependencies
+          import('@/services/notifications/order-update').then(({ sendOrderUpdateNotification }) => {
+            sendOrderUpdateNotification({
+              order: updatedOrder as any,
+              changes,
+              customerEmail,
+              customerName,
+            }).catch((err) => {
+              console.error('Failed to send order update notification:', err);
+            });
+          }).catch((err) => {
+            console.error('Failed to import order update notification service:', err);
+          });
         }
       }
 

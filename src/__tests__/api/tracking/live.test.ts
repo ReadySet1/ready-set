@@ -254,4 +254,213 @@ describe('/api/tracking/live SSE Endpoint', () => {
       );
     });
   });
+
+  describe('Driver Data Query', () => {
+    it('should query for driver name from profiles table', async () => {
+      (withAuth as jest.Mock).mockResolvedValue({
+        success: true,
+        context: {
+          user: { id: 'admin-123', type: 'ADMIN' },
+        },
+      });
+
+      // Mock the database queries
+      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([]);
+
+      const { request, abortController } = createSSERequest(
+        'http://localhost:3000/api/tracking/live'
+      );
+
+      const response = await GET(request);
+      expect(response.status).toBe(200);
+
+      // Start reading from the stream to trigger data fetch
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No reader available');
+      }
+
+      // Read connection message
+      await reader.read();
+
+      // Advance timers to trigger the interval that fetches driver data
+      jest.advanceTimersByTime(5000);
+
+      // Wait for the async operations to complete
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Verify the SQL query includes join with profiles table for driver name
+      expect(prisma.$queryRawUnsafe).toHaveBeenCalled();
+
+      reader.releaseLock();
+
+      // Check that at least one of the queries includes the profiles join and driver_name
+      const calls = (prisma.$queryRawUnsafe as jest.Mock).mock.calls;
+      const activeDriversQuery = calls.find(call =>
+        call[0].includes('FROM drivers d') &&
+        call[0].includes('p.name as driver_name') &&
+        call[0].includes('LEFT JOIN profiles p ON d.profile_id = p.id')
+      );
+
+      expect(activeDriversQuery).toBeDefined();
+
+      // Cleanup
+      abortController.abort();
+    });
+
+    it('should include driver name in response data structure', async () => {
+      (withAuth as jest.Mock).mockResolvedValue({
+        success: true,
+        context: {
+          user: { id: 'admin-123', type: 'ADMIN' },
+        },
+      });
+
+      // Mock driver data with name
+      const mockDriverData = [{
+        id: 'driver-123',
+        user_id: 'user-456',
+        employee_id: 'EMP001',
+        driver_name: 'Test Driver',
+        vehicle_number: 'VEH-123',
+        phone_number: '+1-555-0101',
+        is_on_duty: true,
+        shift_start_time: new Date(),
+        current_shift_id: 'shift-789',
+        last_known_location_geojson: JSON.stringify({
+          type: 'Point',
+          coordinates: [-122.4194, 37.7749]
+        }),
+        last_location_update: new Date(),
+        shift_status: 'active',
+        shift_start: new Date(),
+        total_distance: 15.5,
+        active_deliveries: 2
+      }];
+
+      // Return mock data for the first query (active drivers), empty for others
+      (prisma.$queryRawUnsafe as jest.Mock)
+        .mockResolvedValueOnce(mockDriverData)  // activeDrivers query
+        .mockResolvedValueOnce([])               // recentLocations query
+        .mockResolvedValueOnce([])               // activeDeliveries query
+        .mockResolvedValueOnce([]);              // legacyDispatches query
+
+      const { request, abortController } = createSSERequest(
+        'http://localhost:3000/api/tracking/live'
+      );
+
+      const response = await GET(request);
+      expect(response.status).toBe(200);
+
+      // Read the first chunk from the stream
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No reader available');
+      }
+
+      // Read connection message
+      const { value: firstChunk } = await reader.read();
+      const firstMessage = new TextDecoder().decode(firstChunk);
+      expect(firstMessage).toContain('connection');
+
+      // Advance timers to trigger the interval
+      jest.advanceTimersByTime(5000);
+
+      // Read driver update message
+      const { value: secondChunk } = await reader.read();
+      if (secondChunk) {
+        const secondMessage = new TextDecoder().decode(secondChunk);
+
+        // Parse the SSE data
+        const dataMatch = secondMessage.match(/data: (.+)\n\n/);
+        if (dataMatch) {
+          const data = JSON.parse(dataMatch[1]);
+
+          if (data.type === 'driver_update') {
+            expect(data.data.activeDrivers).toBeDefined();
+            expect(data.data.activeDrivers.length).toBe(1);
+            expect(data.data.activeDrivers[0].name).toBe('Test Driver');
+            expect(data.data.activeDrivers[0].employeeId).toBe('EMP001');
+          }
+        }
+      }
+
+      // Cleanup
+      abortController.abort();
+      reader.releaseLock();
+    });
+
+    it('should handle null driver name gracefully', async () => {
+      (withAuth as jest.Mock).mockResolvedValue({
+        success: true,
+        context: {
+          user: { id: 'admin-123', type: 'ADMIN' },
+        },
+      });
+
+      // Mock driver data without name (null)
+      const mockDriverData = [{
+        id: 'driver-123',
+        user_id: 'user-456',
+        employee_id: 'EMP001',
+        driver_name: null,  // No name in profiles
+        vehicle_number: 'VEH-123',
+        phone_number: '+1-555-0101',
+        is_on_duty: true,
+        shift_start_time: new Date(),
+        current_shift_id: 'shift-789',
+        last_known_location_geojson: null,
+        last_location_update: new Date(),
+        shift_status: 'active',
+        shift_start: new Date(),
+        total_distance: 0,
+        active_deliveries: 0
+      }];
+
+      (prisma.$queryRawUnsafe as jest.Mock)
+        .mockResolvedValueOnce(mockDriverData)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const { request, abortController } = createSSERequest(
+        'http://localhost:3000/api/tracking/live'
+      );
+
+      const response = await GET(request);
+      expect(response.status).toBe(200);
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No reader available');
+      }
+
+      // Read connection message
+      await reader.read();
+
+      // Advance timers to trigger the interval
+      jest.advanceTimersByTime(5000);
+
+      // Read driver update message
+      const { value: secondChunk } = await reader.read();
+      if (secondChunk) {
+        const secondMessage = new TextDecoder().decode(secondChunk);
+        const dataMatch = secondMessage.match(/data: (.+)\n\n/);
+
+        if (dataMatch) {
+          const data = JSON.parse(dataMatch[1]);
+
+          if (data.type === 'driver_update') {
+            expect(data.data.activeDrivers[0].name).toBeNull();
+            expect(data.data.activeDrivers[0].employeeId).toBe('EMP001');
+          }
+        }
+      }
+
+      // Cleanup
+      abortController.abort();
+      reader.releaseLock();
+    });
+  });
 });

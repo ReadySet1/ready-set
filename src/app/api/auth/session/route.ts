@@ -1,23 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
 
-// Simplified session endpoint - replace with your actual auth implementation
+/**
+ * Session endpoint - returns current user session with profile and driver info
+ * Used by location simulator and other client-side code that needs session data
+ */
 export async function GET(request: NextRequest) {
   try {
-    // Temporary dev session: fetch a real driver UUID to avoid invalid-UUID errors
-    const driver = await prisma.$queryRawUnsafe<{ id: string; employee_id: string }[]>(
-      `SELECT id, employee_id FROM drivers ORDER BY created_at DESC LIMIT 1`
-    );
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    const driverId = driver[0]?.id ?? null;
+    if (authError || !user) {
+      // Return empty session for unauthenticated requests
+      return NextResponse.json({ user: null, expires: null });
+    }
+
+    // Fetch profile data
+    const profile = await prisma.$queryRawUnsafe<{
+      id: string;
+      email: string;
+      name: string;
+      type: string;
+    }[]>(`
+      SELECT id, email, name, type
+      FROM profiles
+      WHERE id = $1::uuid
+      LIMIT 1
+    `, user.id);
+
+    const userProfile = profile[0];
+    const userType = userProfile?.type || 'VENDOR';
+
+    // If user is a DRIVER, fetch their driver table ID
+    let driverId: string | null = null;
+
+    if (userType === 'DRIVER') {
+      const driverRecord = await prisma.$queryRawUnsafe<{
+        id: string;
+        employee_id: string;
+      }[]>(`
+        SELECT d.id, d.employee_id
+        FROM drivers d
+        WHERE d.profile_id = $1::uuid
+        AND d.deleted_at IS NULL
+        LIMIT 1
+      `, user.id);
+
+      if (driverRecord[0]) {
+        driverId = driverRecord[0].id;
+      }
+    }
 
     const session = {
       user: {
-        id: 'user-123',
-        email: 'driver@readyset.com',
-        type: 'DRIVER',
+        id: user.id,
+        email: user.email || userProfile?.email,
+        type: userType,
         driverId,
-        name: 'John Driver'
+        name: userProfile?.name || user.email?.split('@')[0] || 'User'
       },
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     };

@@ -58,6 +58,20 @@ jest.mock('@/constants/realtime-config', () => ({
   },
 }));
 
+// Mock Supabase client for auth check
+const mockGetSession = jest.fn().mockResolvedValue({
+  data: { session: { user: { id: 'test-user-id' } } },
+  error: null,
+});
+
+jest.mock('@/utils/supabase/client', () => ({
+  createClient: jest.fn(() => ({
+    auth: {
+      getSession: mockGetSession,
+    },
+  })),
+}));
+
 import { useRealTimeTracking } from '../useRealTimeTracking';
 import { createDriverLocationChannel } from '@/lib/realtime';
 import { isFeatureEnabled } from '@/lib/feature-flags';
@@ -84,6 +98,12 @@ describe('useAdminRealtimeTracking', () => {
     });
 
     (isFeatureEnabled as jest.Mock).mockReturnValue(true);
+
+    // Reset auth mock to return valid session
+    mockGetSession.mockResolvedValue({
+      data: { session: { user: { id: 'test-user-id' } } },
+      error: null,
+    });
 
     mockChannelSubscribe.mockImplementation(async (callbacks) => {
       channelCallbacks = callbacks;
@@ -229,12 +249,57 @@ describe('useAdminRealtimeTracking', () => {
       expect(result.current.connectionMode).toBe('hybrid');
       expect(result.current.error).toBe('Connection lost');
       expect(onRealtimeError).toHaveBeenCalledWith(error);
-      expect(realtimeLogger.error).toHaveBeenCalled();
+      // Changed from error to warn since errors gracefully fall back to SSE
+      expect(realtimeLogger.warn).toHaveBeenCalled();
+    });
+
+    it('should not show timeout errors to user', async () => {
+      const onRealtimeError = jest.fn();
+
+      const { result } = renderHook(() =>
+        useAdminRealtimeTracking({ onRealtimeError })
+      );
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      // Simulate timeout error
+      const error = new Error('Channel subscription timed out');
+      await act(async () => {
+        channelCallbacks.onError?.(error);
+      });
+
+      expect(result.current.isRealtimeConnected).toBe(false);
+      // Timeout errors should not show to user since SSE fallback works fine
+      expect(result.current.error).toBe(null);
+      expect(onRealtimeError).toHaveBeenCalledWith(error);
+    });
+
+    it('should skip Realtime initialization when no auth session', async () => {
+      // Mock no session
+      mockGetSession.mockResolvedValue({
+        data: { session: null },
+        error: null,
+      });
+
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.connectionMode).toBe('sse');
+      });
+
+      expect(realtimeLogger.warn).toHaveBeenCalledWith(
+        'Skipping Realtime initialization - no active session',
+        expect.any(Object)
+      );
     });
 
     it('should handle initialization error', async () => {
       const onRealtimeError = jest.fn();
-      mockChannelSubscribe.mockRejectedValueOnce(new Error('Init failed'));
+      // Reset the mock implementation and set it to reject
+      mockChannelSubscribe.mockReset();
+      mockChannelSubscribe.mockRejectedValue(new Error('Init failed'));
 
       const { result } = renderHook(() =>
         useAdminRealtimeTracking({ onRealtimeError })
@@ -280,6 +345,251 @@ describe('useAdminRealtimeTracking', () => {
       expect(result.current.recentLocations[0].driverId).toBe('driver-123');
       expect(result.current.activeDrivers).toHaveLength(1);
       expect(result.current.activeDrivers[0].id).toBe('driver-123');
+    });
+
+    it('should set driver name from payload', async () => {
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      const payload = {
+        driverId: 'driver-456',
+        lat: 37.7749,
+        lng: -122.4194,
+        timestamp: new Date().toISOString(),
+        driverName: 'Jane Smith',
+      };
+
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.(payload);
+      });
+
+      expect(result.current.activeDrivers).toHaveLength(1);
+      expect(result.current.activeDrivers[0].name).toBe('Jane Smith');
+      expect(result.current.activeDrivers[0].employeeId).toBe('Unknown');
+    });
+
+    it('should preserve existing driver name on subsequent updates', async () => {
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      // First update with driver name
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-789',
+          lat: 37.7749,
+          lng: -122.4194,
+          timestamp: new Date().toISOString(),
+          driverName: 'Original Name',
+        });
+      });
+
+      expect(result.current.activeDrivers[0].name).toBe('Original Name');
+
+      // Second update without driver name
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.({
+          driverId: 'driver-789',
+          lat: 37.7850,
+          lng: -122.4094,
+          timestamp: new Date(Date.now() + 1000).toISOString(),
+          // No driverName in this update
+        });
+      });
+
+      // Should preserve existing name
+      expect(result.current.activeDrivers).toHaveLength(1);
+      expect(result.current.activeDrivers[0].name).toBe('Original Name');
+    });
+
+    it('should handle driver update without name', async () => {
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      const payload = {
+        driverId: 'driver-no-name',
+        lat: 37.7749,
+        lng: -122.4194,
+        timestamp: new Date().toISOString(),
+        // No driverName provided
+      };
+
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.(payload);
+      });
+
+      expect(result.current.activeDrivers).toHaveLength(1);
+      expect(result.current.activeDrivers[0].name).toBeUndefined();
+      expect(result.current.activeDrivers[0].employeeId).toBe('Unknown');
+    });
+
+    it('should prefer driver name from delivery over SSE driver name', async () => {
+      // Setup: SSE returns a driver with wrong name from profile_id,
+      // but delivery has correct driver name from dispatch assignment
+      (useRealTimeTracking as jest.Mock).mockReturnValue({
+        ...mockSseTracking,
+        isConnected: true,
+        activeDrivers: [
+          {
+            id: 'driver-123',
+            userId: 'user-456',
+            employeeId: 'EMP001',
+            name: 'Elena Martinez', // Wrong name from drivers.profile_id
+            phoneNumber: '555-1234',
+            isActive: true,
+            isOnDuty: true,
+          },
+        ],
+        activeDeliveries: [
+          {
+            id: 'delivery-789',
+            driverId: 'driver-123', // Direct match by driver ID
+            status: 'assigned',
+            driverName: 'Test Driver', // Correct name from dispatch
+          },
+        ],
+      });
+
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      // Location update without driver name
+      const payload = {
+        driverId: 'driver-123',
+        lat: 37.7749,
+        lng: -122.4194,
+        timestamp: new Date().toISOString(),
+        // No driverName in payload
+      };
+
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.(payload);
+      });
+
+      // Should use driver name from delivery, not from SSE driver
+      expect(result.current.activeDrivers).toHaveLength(1);
+      expect(result.current.activeDrivers[0].name).toBe('Test Driver');
+      expect(result.current.activeDrivers[0].employeeId).toBe('EMP001');
+    });
+
+    it('should use heuristic fallback when delivery driverName is not in SSE drivers', async () => {
+      // Setup: driver record has wrong profile_id, so SSE driver has wrong name.
+      // Delivery has correct name from dispatch assignment.
+      // driverId doesn't match because delivery.driverId is a profile ID (when driver join fails)
+      // but delivery.driverName should be used because it's not in any SSE driver's name.
+      (useRealTimeTracking as jest.Mock).mockReturnValue({
+        ...mockSseTracking,
+        isConnected: true,
+        activeDrivers: [
+          {
+            id: 'driver-123',
+            userId: 'wrong-user-456', // Wrong userId due to bad profile_id
+            employeeId: 'EMP001',
+            name: 'Elena Martinez', // Wrong name from drivers.profile_id
+            phoneNumber: '555-1234',
+            isActive: true,
+            isOnDuty: true,
+          },
+        ],
+        activeDeliveries: [
+          {
+            id: 'delivery-789',
+            driverId: 'test-driver-profile-id', // Profile ID - doesn't match driver ID
+            status: 'assigned',
+            driverName: 'Test Driver', // Correct name from dispatch - NOT in SSE drivers
+          },
+        ],
+      });
+
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      // Location update from driver
+      const payload = {
+        driverId: 'driver-123',
+        lat: 37.7749,
+        lng: -122.4194,
+        timestamp: new Date().toISOString(),
+      };
+
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.(payload);
+      });
+
+      // Should use heuristic fallback: delivery driverName "Test Driver" is not
+      // in SSE driver names ("Elena Martinez"), so use delivery's name
+      expect(result.current.activeDrivers).toHaveLength(1);
+      expect(result.current.activeDrivers[0].name).toBe('Test Driver');
+    });
+
+    it('should not use heuristic fallback when delivery driverName matches an SSE driver', async () => {
+      // Setup: delivery.driverName matches an SSE driver's name,
+      // so heuristic should NOT apply for a different driver
+      (useRealTimeTracking as jest.Mock).mockReturnValue({
+        ...mockSseTracking,
+        isConnected: true,
+        activeDrivers: [
+          {
+            id: 'driver-123',
+            employeeId: 'EMP001',
+            name: 'Elena Martinez', // Name from SSE driver
+            isActive: true,
+            isOnDuty: true,
+          },
+          {
+            id: 'driver-456',
+            employeeId: 'EMP002',
+            name: 'Test Driver', // Another SSE driver with this name
+            isActive: true,
+            isOnDuty: true,
+          },
+        ],
+        activeDeliveries: [
+          {
+            id: 'delivery-789',
+            driverId: 'some-other-id', // Doesn't match any driver
+            status: 'assigned',
+            driverName: 'Test Driver', // Matches an SSE driver name
+          },
+        ],
+      });
+
+      const { result } = renderHook(() => useAdminRealtimeTracking());
+
+      await waitFor(() => {
+        expect(result.current.isRealtimeConnected).toBe(true);
+      });
+
+      // Location update from driver-123 (Elena Martinez in SSE)
+      const payload = {
+        driverId: 'driver-123',
+        lat: 37.7749,
+        lng: -122.4194,
+        timestamp: new Date().toISOString(),
+      };
+
+      await act(async () => {
+        channelCallbacks.onLocationUpdate?.(payload);
+      });
+
+      // Heuristic should NOT apply because "Test Driver" exists in SSE driver names
+      // So driver-123 should keep its SSE name "Elena Martinez"
+      expect(result.current.activeDrivers).toHaveLength(1);
+      expect(result.current.activeDrivers[0].name).toBe('Elena Martinez');
     });
 
     it('should reject invalid coordinates', async () => {

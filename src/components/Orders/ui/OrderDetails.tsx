@@ -1,6 +1,8 @@
 import { Separator } from "@/components/ui/separator";
 import { Order, isCateringRequest, isOnDemand } from "@/types/order";
 import { formatCurrency, withCurrencySymbol } from "@/utils/currency";
+import { formatDateTimeForDisplay } from "@/lib/utils/date-display";
+import { Clock, Truck } from "lucide-react";
 
 interface OrderDetailsProps {
   order: Order;
@@ -9,6 +11,38 @@ interface OrderDetailsProps {
 const OrderDetails: React.FC<OrderDetailsProps> = ({ order }) => {
   return (
     <div className="space-y-6">
+      {/* Pickup and Delivery Times */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {order.pickupDateTime && (
+          <div className="flex items-start gap-3 rounded-lg bg-slate-50 p-3">
+            <Clock className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Pickup Time
+              </div>
+              <div className="mt-0.5 text-sm font-semibold text-slate-800">
+                {formatDateTimeForDisplay(order.pickupDateTime)}
+              </div>
+            </div>
+          </div>
+        )}
+        {order.arrivalDateTime && (
+          <div className="flex items-start gap-3 rounded-lg bg-slate-50 p-3">
+            <Truck className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" />
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Delivery Time
+              </div>
+              <div className="mt-0.5 text-sm font-semibold text-slate-800">
+                {formatDateTimeForDisplay(order.arrivalDateTime)}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
       <div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           {isCateringRequest(order) && (

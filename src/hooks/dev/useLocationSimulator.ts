@@ -42,8 +42,16 @@ import {
   type SimulatorDelivery,
   type PresetRouteName,
 } from '@/lib/dev/route-utils';
+import { updateDriverLocation } from '@/app/actions/tracking/driver-actions';
 
 export type SimulatorStatus = 'idle' | 'loading' | 'ready' | 'running' | 'paused' | 'completed';
+
+// Driver info for simulator target selection
+export interface SimulatorDriver {
+  id: string;
+  name: string;
+  isOnDuty: boolean;
+}
 
 export interface UseLocationSimulatorReturn {
   // State
@@ -53,6 +61,11 @@ export interface UseLocationSimulatorReturn {
   progress: number;
   speedMultiplier: number;
   error: string | null;
+
+  // Driver selection (for admin users without a driver profile)
+  availableDrivers: SimulatorDriver[];
+  selectedDriver: SimulatorDriver | null;
+  isLoadingDrivers: boolean;
 
   // Delivery data
   deliveries: SimulatorDelivery[];
@@ -68,6 +81,8 @@ export interface UseLocationSimulatorReturn {
   // Actions
   enable: () => void;
   disable: () => void;
+  refreshDrivers: () => Promise<void>;
+  selectDriver: (driver: SimulatorDriver | null) => void;
   refreshDeliveries: () => Promise<void>;
   selectDelivery: (delivery: SimulatorDelivery | null) => void;
   selectPresetRoute: (routeName: PresetRouteName | null) => void;
@@ -85,6 +100,7 @@ const STORAGE_KEY = 'location-simulator-settings';
 interface StoredSettings {
   speedMultiplier: number;
   enabled: boolean;
+  selectedDriverId?: string;
 }
 
 function loadSettings(): StoredSettings {
@@ -100,6 +116,94 @@ function loadSettings(): StoredSettings {
     console.warn('[LocationSimulator] Failed to load settings:', e);
   }
   return { speedMultiplier: 1, enabled: false };
+}
+
+/**
+ * Fetch available drivers for simulator target selection
+ * For admins: fetches from tracking API
+ * For drivers: returns the current user's driver info from session
+ */
+async function fetchAvailableDrivers(): Promise<SimulatorDriver[]> {
+  // First, try to get the current session to check user type and get driver info
+  try {
+    const sessionResponse = await fetch('/api/auth/session');
+    if (sessionResponse.ok) {
+      const session = await sessionResponse.json();
+      const user = session.user;
+
+      // If user is a driver, return their own driver info
+      // They can only simulate their own location
+      if (user?.type === 'DRIVER' && user?.driverId) {
+        console.log('[LocationSimulator] User is a driver, using own driver info');
+        return [{
+          id: user.driverId,
+          name: user.name || user.email || `Driver ${user.driverId.slice(0, 8)}`,
+          isOnDuty: true,
+        }];
+      }
+
+      // For admins, try to fetch from tracking API
+      if (['ADMIN', 'SUPER_ADMIN', 'HELPDESK'].includes(user?.type)) {
+        const drivers = await fetchDriversFromTrackingAPI();
+        if (drivers.length > 0) {
+          return drivers;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[LocationSimulator] Error fetching session:', error);
+  }
+
+  return [];
+}
+
+/**
+ * Fetch drivers from the admin tracking API (SSE endpoint)
+ */
+async function fetchDriversFromTrackingAPI(): Promise<SimulatorDriver[]> {
+  try {
+    const response = await fetch('/api/tracking/live');
+    if (!response.ok) {
+      console.error('[LocationSimulator] Failed to fetch drivers from tracking API:', response.status);
+      return [];
+    }
+
+    // Read the SSE stream to get initial data
+    const reader = response.body?.getReader();
+    if (!reader) return [];
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    // Read until we get the first data event
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Look for data event in SSE stream
+      const dataMatch = buffer.match(/data: ({.*})/);
+      if (dataMatch && dataMatch[1]) {
+        const data = JSON.parse(dataMatch[1]);
+        reader.cancel(); // Close the stream
+
+        // Extract drivers from the tracking data
+        const drivers: SimulatorDriver[] = (data.activeDrivers || []).map((d: any) => ({
+          id: d.id,
+          name: d.name || `Driver ${d.id.slice(0, 8)}`,
+          isOnDuty: d.isOnDuty ?? true,
+        }));
+
+        return drivers;
+      }
+    }
+
+    return [];
+  } catch (error) {
+    console.error('[LocationSimulator] Error fetching drivers from tracking API:', error);
+    return [];
+  }
 }
 
 function saveSettings(settings: Partial<StoredSettings>): void {
@@ -124,6 +228,11 @@ export function useLocationSimulator(): UseLocationSimulatorReturn {
   const [speedMultiplier, setSpeedState] = useState(initialSettings.current.speedMultiplier);
   const [error, setError] = useState<string | null>(null);
 
+  // Driver selection state (for admin users without a driver profile)
+  const [availableDrivers, setAvailableDrivers] = useState<SimulatorDriver[]>([]);
+  const [selectedDriver, setSelectedDriver] = useState<SimulatorDriver | null>(null);
+  const [isLoadingDrivers, setIsLoadingDrivers] = useState(false);
+
   // Delivery state
   const [deliveries, setDeliveries] = useState<SimulatorDelivery[]>([]);
   const [selectedDelivery, setSelectedDelivery] = useState<SimulatorDelivery | null>(null);
@@ -136,6 +245,14 @@ export function useLocationSimulator(): UseLocationSimulatorReturn {
 
   // Progress update interval
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Ref to track selected driver for callbacks
+  const selectedDriverRef = useRef<SimulatorDriver | null>(null);
+
+  // Update ref when selected driver changes
+  useEffect(() => {
+    selectedDriverRef.current = selectedDriver;
+  }, [selectedDriver]);
 
   // Update progress periodically when running
   useEffect(() => {
@@ -160,8 +277,36 @@ export function useLocationSimulator(): UseLocationSimulatorReturn {
 
   // Set up position and end callbacks
   useEffect(() => {
-    onPosition((pos) => {
+    onPosition(async (pos) => {
       setCurrentPosition(pos);
+
+      // If a target driver is selected, send location update directly to server
+      // This bypasses the session-based driver ID check in useLocationTracking
+      const driver = selectedDriverRef.current;
+      if (driver) {
+        try {
+          const locationUpdate = {
+            driverId: driver.id,
+            coordinates: {
+              lat: pos.latitude,
+              lng: pos.longitude,
+            },
+            accuracy: pos.accuracy,
+            speed: pos.speed,
+            heading: pos.heading,
+            altitude: pos.altitude,
+            isMoving: pos.speed > 1,
+            timestamp: new Date(),
+          };
+
+          const result = await updateDriverLocation(driver.id, locationUpdate);
+          if (!result.success && result.error && !result.error.includes('Rate limit')) {
+            console.warn('[LocationSimulator] Failed to send location update:', result.error);
+          }
+        } catch (err) {
+          console.error('[LocationSimulator] Error sending location update:', err);
+        }
+      }
     });
 
     onEnd(() => {
@@ -217,6 +362,47 @@ export function useLocationSimulator(): UseLocationSimulatorReturn {
     setProgress(0);
     saveSettings({ enabled: false });
   }, []);
+
+  // Refresh available drivers from API
+  const refreshDrivers = useCallback(async () => {
+    setIsLoadingDrivers(true);
+    try {
+      const drivers = await fetchAvailableDrivers();
+      setAvailableDrivers(drivers);
+
+      // If we had a previously selected driver, try to restore it
+      const savedDriverId = initialSettings.current.selectedDriverId;
+      if (savedDriverId && !selectedDriver) {
+        const savedDriver = drivers.find(d => d.id === savedDriverId);
+        if (savedDriver) {
+          setSelectedDriver(savedDriver);
+        }
+      }
+    } catch (err) {
+      console.error('[LocationSimulator] Error refreshing drivers:', err);
+    } finally {
+      setIsLoadingDrivers(false);
+    }
+  }, [selectedDriver]);
+
+  // Select a target driver for location updates
+  const selectDriver = useCallback((driver: SimulatorDriver | null) => {
+    setSelectedDriver(driver);
+    saveSettings({ selectedDriverId: driver?.id });
+
+    if (driver) {
+      console.log(`[LocationSimulator] Target driver selected: ${driver.name} (${driver.id})`);
+    } else {
+      console.log('[LocationSimulator] Target driver cleared');
+    }
+  }, []);
+
+  // Auto-fetch drivers when enabled
+  useEffect(() => {
+    if (isEnabled && availableDrivers.length === 0) {
+      refreshDrivers();
+    }
+  }, [isEnabled, availableDrivers.length, refreshDrivers]);
 
   // Refresh deliveries from API
   const refreshDeliveries = useCallback(async () => {
@@ -362,6 +548,11 @@ export function useLocationSimulator(): UseLocationSimulatorReturn {
     speedMultiplier,
     error,
 
+    // Driver selection
+    availableDrivers,
+    selectedDriver,
+    isLoadingDrivers,
+
     // Delivery data
     deliveries,
     selectedDelivery,
@@ -376,6 +567,8 @@ export function useLocationSimulator(): UseLocationSimulatorReturn {
     // Actions
     enable,
     disable,
+    refreshDrivers,
+    selectDriver,
     refreshDeliveries,
     selectDelivery,
     selectPresetRoute,

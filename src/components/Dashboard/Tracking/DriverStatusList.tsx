@@ -151,7 +151,9 @@ export default function DriverStatusList({
                 })} />
                 
                 <div>
-                  <h4 className="font-medium">Driver #{driver.employeeId}</h4>
+                  <h4 className="font-medium">
+                    {driver.name || `Driver #${driver.employeeId || 'Unknown'}`}
+                  </h4>
                   {!compact && (
                     <div className="text-sm text-muted-foreground">
                       {driver.vehicleNumber && `Vehicle: ${driver.vehicleNumber}`}
