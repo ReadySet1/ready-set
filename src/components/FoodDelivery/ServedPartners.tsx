@@ -9,6 +9,7 @@ interface PartnerLogo {
   name: string;
   image: string;
   alt: string;
+  containerClassName?: string;
 }
 
 /**
@@ -41,8 +42,10 @@ const ServedPartners: React.FC = () => {
     {
       name: "Netflix",
       // Use fit with consistent dimensions for uniform sizing
+      // Square icon needs constrained height to match horizontal wordmarks
       image: `${getCloudinaryUrl("food/served/netflix").replace("/f_auto,q_auto/", "/f_auto,q_auto,w_600,h_600,c_fit/")}`,
       alt: "Netflix logo",
+      containerClassName: "max-h-16 sm:max-h-20 md:max-h-24 lg:max-h-28",
     },
     {
       name: "Apple",
@@ -86,7 +89,9 @@ const ServedPartners: React.FC = () => {
                   delay: index * 0.1,
                 }}
               >
-                <div className="relative h-28 w-full min-w-[160px] max-w-[240px] sm:h-32 md:h-40 lg:h-44">
+                <div
+                  className={`relative h-28 w-full min-w-[160px] max-w-[240px] sm:h-32 md:h-40 lg:h-44 ${partner.containerClassName || ""}`}
+                >
                   <Image
                     src={partner.image}
                     alt={partner.alt}
