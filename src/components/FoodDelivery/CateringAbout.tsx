@@ -107,7 +107,7 @@ const CateringAbout: React.FC = () => {
 
           {/* Right Column - Content */}
           <motion.div
-            className="flex flex-col justify-center"
+            className="flex flex-col justify-start"
             initial={{ opacity: 0, x: 20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
@@ -120,18 +120,20 @@ const CateringAbout: React.FC = () => {
             <div className="mb-6 space-y-4">
               <p className="font-[Montserrat] text-base leading-relaxed text-gray-700 md:text-lg">
                 At Ready Set, we specialize in catering delivery logistics.
-                Since launching in 2019 in the San Francisco Bay Area,
-                we&apos;ve expanded to Austin, Atlanta, and Dallas, partnering
-                with hundreds of restaurants and catering brands to ensure every
+                Since launching in 2019 in the San Francisco Bay Area, we've
+                expanded to Austin, Atlanta, and Dallas, partnering with
+                hundreds of restaurants and catering brands to ensure every
                 order arrives on time and perfectly presented.
               </p>
 
               <p className="font-[Montserrat] text-base leading-relaxed text-gray-700 md:text-lg">
-                We&apos;re not a marketplace or broker — we don&apos;t take
-                customer orders or list you on apps. Instead, we act as your
-                behind-the-scenes delivery partner, managing every step from
-                pickup to setup so your team can focus on the food and the
-                experience.
+                <strong>
+                  We're not a marketplace or broker — we don't take customer
+                  orders or list you on apps.
+                </strong>{" "}
+                Instead, we act as your behind-the-scenes delivery partner,
+                managing every step from pickup to setup so your team can focus
+                on the food and the experience.
               </p>
             </div>
 
