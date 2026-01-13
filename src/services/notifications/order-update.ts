@@ -207,7 +207,6 @@ export async function sendOrderUpdateNotification(
       });
     });
 
-    console.log(`✅ Sent order update notification for ${order.orderNumber} to ${customerEmail}`);
     return { success: true };
   } catch (error) {
     console.error("❌ Error sending order update notification email:", error);

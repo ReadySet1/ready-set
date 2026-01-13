@@ -17,13 +17,6 @@ export async function GET(request: NextRequest) {
       return authResult.response;
     }
 
-    // DEBUG: Log auth context
-    console.log('[DEBUG /api/tracking/deliveries] Auth context:', {
-      userId: authResult.context.user.id,
-      userType: authResult.context.user.type,
-      email: authResult.context.user.email
-    });
-
     const { searchParams } = new URL(request.url);
     const driverId = searchParams.get('driver_id');
     const status = searchParams.get('status');
@@ -222,17 +215,8 @@ export async function GET(request: NextRequest) {
 
       dispatchQuery += ` ORDER BY disp."createdAt" DESC`;
 
-      // DEBUG: Log the query being executed
-      console.log('[DEBUG /api/tracking/deliveries] Dispatch query params:', dispatchParams);
-
       try {
         const dispatchResult = await prisma.$queryRawUnsafe<any[]>(dispatchQuery, ...dispatchParams);
-
-        // DEBUG: Log dispatch results
-        console.log('[DEBUG /api/tracking/deliveries] Dispatch results count:', dispatchResult.length);
-        if (dispatchResult.length > 0) {
-          console.log('[DEBUG /api/tracking/deliveries] First dispatch:', dispatchResult[0]?.cr_order_number);
-        }
 
         for (const dispatch of dispatchResult) {
           // Determine if this is catering or on-demand and extract relevant data
