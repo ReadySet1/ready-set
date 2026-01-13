@@ -28,6 +28,24 @@ import { getLocationStore } from '@/utils/indexedDB/locationStore';
 
 const mockUpdateDriverLocation = updateDriverLocation as jest.MockedFunction<typeof updateDriverLocation>;
 
+// Helper to mock navigator properties
+const mockNavigatorProperty = (property: string, value: unknown) => {
+  Object.defineProperty(navigator, property, {
+    value,
+    configurable: true,
+    writable: true,
+  });
+};
+
+// Helper to mock window properties
+const mockWindowProperty = (property: string, value: unknown) => {
+  Object.defineProperty(window, property, {
+    value,
+    configurable: true,
+    writable: true,
+  });
+};
+
 describe('useLocationTracking', () => {
   // Mock geolocation position
   const mockPosition: GeolocationPosition = {
@@ -92,6 +110,13 @@ describe('useLocationTracking', () => {
       value: {
         query: jest.fn().mockResolvedValue({ state: 'granted' }),
       },
+      configurable: true,
+      writable: true,
+    });
+
+    // Mock window.isSecureContext (default to true for most tests)
+    Object.defineProperty(window, 'isSecureContext', {
+      value: true,
       configurable: true,
       writable: true,
     });
@@ -830,6 +855,232 @@ describe('useLocationTracking', () => {
       await waitFor(() => {
         expect(result.current.error).toBeTruthy();
       });
+    });
+  });
+
+  describe('iOS browser detection', () => {
+    const originalUserAgent = navigator.userAgent;
+    const originalPlatform = navigator.platform;
+    const originalMaxTouchPoints = navigator.maxTouchPoints;
+
+    afterEach(() => {
+      // Restore original values
+      mockNavigatorProperty('userAgent', originalUserAgent);
+      mockNavigatorProperty('platform', originalPlatform);
+      mockNavigatorProperty('maxTouchPoints', originalMaxTouchPoints);
+    });
+
+    it('should detect iPhone Safari and set permissionState to prompt', async () => {
+      mockNavigatorProperty('userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1');
+      mockNavigatorProperty('platform', 'iPhone');
+      mockNavigatorProperty('maxTouchPoints', 5);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await waitFor(() => {
+        // iOS browsers should get 'prompt' state and not auto-request
+        expect(result.current.permissionState).toBe('prompt');
+      });
+
+      // Should NOT attempt to query permissions on iOS
+      expect(navigator.permissions.query).not.toHaveBeenCalled();
+    });
+
+    it('should detect iPhone Chrome (CriOS) and set permissionState to prompt', async () => {
+      mockNavigatorProperty('userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/108.0.5359.112 Mobile/15E148 Safari/604.1');
+      mockNavigatorProperty('platform', 'iPhone');
+      mockNavigatorProperty('maxTouchPoints', 5);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await waitFor(() => {
+        expect(result.current.permissionState).toBe('prompt');
+      });
+
+      expect(navigator.permissions.query).not.toHaveBeenCalled();
+    });
+
+    it('should detect iPhone Firefox (FxiOS) and set permissionState to prompt', async () => {
+      mockNavigatorProperty('userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/108.0 Mobile/15E148 Safari/605.1.15');
+      mockNavigatorProperty('platform', 'iPhone');
+      mockNavigatorProperty('maxTouchPoints', 5);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await waitFor(() => {
+        expect(result.current.permissionState).toBe('prompt');
+      });
+
+      expect(navigator.permissions.query).not.toHaveBeenCalled();
+    });
+
+    it('should detect iPad Pro (MacIntel with touch) and set permissionState to prompt', async () => {
+      mockNavigatorProperty('userAgent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15');
+      mockNavigatorProperty('platform', 'MacIntel');
+      mockNavigatorProperty('maxTouchPoints', 5);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await waitFor(() => {
+        expect(result.current.permissionState).toBe('prompt');
+      });
+
+      expect(navigator.permissions.query).not.toHaveBeenCalled();
+    });
+
+    it('should NOT detect desktop Mac Safari as iOS', async () => {
+      mockNavigatorProperty('userAgent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15');
+      mockNavigatorProperty('platform', 'MacIntel');
+      mockNavigatorProperty('maxTouchPoints', 0); // No touch = desktop
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      // Desktop should use Permissions API
+      await waitFor(() => {
+        expect(navigator.permissions.query).toHaveBeenCalled();
+      });
+    });
+
+    it('should NOT detect Android Chrome as iOS', async () => {
+      mockNavigatorProperty('userAgent', 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Mobile Safari/537.36');
+      mockNavigatorProperty('platform', 'Linux armv8l');
+      mockNavigatorProperty('maxTouchPoints', 5);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      // Android should use Permissions API
+      await waitFor(() => {
+        expect(navigator.permissions.query).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('iOS browser-specific error messages', () => {
+    const originalUserAgent = navigator.userAgent;
+    const originalPlatform = navigator.platform;
+    const originalMaxTouchPoints = navigator.maxTouchPoints;
+
+    beforeEach(() => {
+      // Make getCurrentPosition fail with permission denied
+      (navigator.geolocation.getCurrentPosition as jest.Mock).mockImplementation(
+        (success: PositionCallback, error?: PositionErrorCallback) => {
+          error?.({ code: 1, message: 'User denied', PERMISSION_DENIED: 1 } as GeolocationPositionError);
+        }
+      );
+    });
+
+    afterEach(() => {
+      mockNavigatorProperty('userAgent', originalUserAgent);
+      mockNavigatorProperty('platform', originalPlatform);
+      mockNavigatorProperty('maxTouchPoints', originalMaxTouchPoints);
+    });
+
+    it('should show Safari-specific instructions for iOS Safari permission denied', async () => {
+      mockNavigatorProperty('userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1');
+      mockNavigatorProperty('platform', 'iPhone');
+      mockNavigatorProperty('maxTouchPoints', 5);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        await result.current.requestLocationPermission();
+      });
+
+      expect(result.current.error).toContain('Settings > Safari > Location');
+    });
+
+    it('should show Chrome-specific instructions for iOS Chrome permission denied', async () => {
+      mockNavigatorProperty('userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/108.0.5359.112 Mobile/15E148 Safari/604.1');
+      mockNavigatorProperty('platform', 'iPhone');
+      mockNavigatorProperty('maxTouchPoints', 5);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        await result.current.requestLocationPermission();
+      });
+
+      expect(result.current.error).toContain('Settings > Chrome > Location');
+    });
+
+    it('should show Firefox-specific instructions for iOS Firefox permission denied', async () => {
+      mockNavigatorProperty('userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/108.0 Mobile/15E148 Safari/605.1.15');
+      mockNavigatorProperty('platform', 'iPhone');
+      mockNavigatorProperty('maxTouchPoints', 5);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        await result.current.requestLocationPermission();
+      });
+
+      expect(result.current.error).toContain('Settings > Firefox > Location');
+    });
+
+    it('should show generic instructions for non-iOS permission denied', async () => {
+      mockNavigatorProperty('userAgent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
+      mockNavigatorProperty('platform', 'Win32');
+      mockNavigatorProperty('maxTouchPoints', 0);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        await result.current.requestLocationPermission();
+      });
+
+      expect(result.current.error).toBe('Location access denied. Please enable location permissions for this site.');
+    });
+  });
+
+  describe('secure context detection', () => {
+    const originalIsSecureContext = window.isSecureContext;
+
+    afterEach(() => {
+      mockWindowProperty('isSecureContext', originalIsSecureContext);
+    });
+
+    it('should set error when not in secure context', async () => {
+      mockWindowProperty('isSecureContext', false);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await waitFor(() => {
+        // Should show HTTPS requirement error
+        expect(result.current.error).toContain('HTTPS');
+      });
+
+      expect(result.current.permissionState).toBe('denied');
+    });
+
+    it('should deny permission request when not in secure context', async () => {
+      mockWindowProperty('isSecureContext', false);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await act(async () => {
+        const granted = await result.current.requestLocationPermission();
+        expect(granted).toBe(false);
+      });
+
+      expect(result.current.error).toContain('HTTPS');
+      expect(result.current.permissionState).toBe('denied');
+    });
+
+    it('should NOT set error when in secure context', async () => {
+      // Default is secure context (set in global beforeEach)
+      mockWindowProperty('isSecureContext', true);
+
+      const { result } = renderHook(() => useLocationTracking());
+
+      await waitFor(() => {
+        // Should attempt to query permissions (not be blocked by secure context check)
+        expect(navigator.permissions.query).toHaveBeenCalled();
+      });
+
+      // Error should not mention HTTPS requirement
+      if (result.current.error) {
+        expect(result.current.error).not.toContain('HTTPS');
+      }
     });
   });
 });
