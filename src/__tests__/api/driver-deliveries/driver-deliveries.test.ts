@@ -3,12 +3,21 @@
 import { GET } from '@/app/api/driver-deliveries/route';
 import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
+import { CONSTANTS } from '@/constants';
 import {
   createGetRequest,
   expectSuccessResponse,
   expectUnauthorized,
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
+
+// Helper to extract deliveries from new response format
+const getDeliveries = (data: any): any[] => {
+  if (data && typeof data === 'object' && 'deliveries' in data) {
+    return data.deliveries;
+  }
+  return Array.isArray(data) ? data : [];
+};
 
 // Mock dependencies
 jest.mock('@/utils/supabase/server');
@@ -112,12 +121,13 @@ describe('/api/driver-deliveries API', () => {
 
         const response = await GET(request);
         const data = await expectSuccessResponse(response, 200);
+        const deliveries = getDeliveries(data);
 
-        expect(data).toHaveLength(2);
-        const cateringDelivery = data.find(
+        expect(deliveries).toHaveLength(2);
+        const cateringDelivery = deliveries.find(
           (d: any) => d.delivery_type === 'catering'
         );
-        const onDemandDelivery = data.find(
+        const onDemandDelivery = deliveries.find(
           (d: any) => d.delivery_type === 'on_demand'
         );
 
@@ -164,9 +174,10 @@ describe('/api/driver-deliveries API', () => {
 
         const response = await GET(request);
         const data = await expectSuccessResponse(response, 200);
+        const deliveries = getDeliveries(data);
 
         // Should return items 5-9 (page 2, limit 5)
-        expect(data).toHaveLength(5);
+        expect(deliveries).toHaveLength(5);
       });
 
       it('should default to page 1 and limit 10', async () => {
@@ -185,11 +196,12 @@ describe('/api/driver-deliveries API', () => {
 
         const response = await GET(request);
         const data = await expectSuccessResponse(response, 200);
+        const deliveries = getDeliveries(data);
 
-        expect(Array.isArray(data)).toBe(true);
+        expect(Array.isArray(deliveries)).toBe(true);
       });
 
-      it('should return empty array when driver has no dispatches', async () => {
+      it('should return empty deliveries array when driver has no dispatches', async () => {
         mockSupabaseClient.auth.getUser.mockResolvedValue({
           data: { user: { id: 'driver-123' } },
           error: null,
@@ -202,9 +214,11 @@ describe('/api/driver-deliveries API', () => {
         );
 
         const response = await GET(request);
-        const data = await expectSuccessResponse(response, 200);
+        const data = await response.json();
+        const deliveries = getDeliveries(data);
 
-        expect(data).toEqual([]);
+        expect(response.status).toBe(200);
+        expect(deliveries).toEqual([]);
         expect(prisma.cateringRequest.findMany).not.toHaveBeenCalled();
         expect(prisma.onDemand.findMany).not.toHaveBeenCalled();
       });
@@ -269,11 +283,12 @@ describe('/api/driver-deliveries API', () => {
 
         const response = await GET(request);
         const data = await expectSuccessResponse(response, 200);
+        const deliveries = getDeliveries(data);
 
-        expect(data).toHaveLength(3);
-        expect(data[0].id).toBe('ondemand-1'); // Newest
-        expect(data[1].id).toBe('catering-2');
-        expect(data[2].id).toBe('catering-1'); // Oldest
+        expect(deliveries).toHaveLength(3);
+        expect(deliveries[0].id).toBe('ondemand-1'); // Newest
+        expect(deliveries[1].id).toBe('catering-2');
+        expect(deliveries[2].id).toBe('catering-1'); // Oldest
       });
 
       it('should handle BigInt serialization', async () => {
@@ -311,7 +326,8 @@ describe('/api/driver-deliveries API', () => {
         expect(response.status).toBe(200);
 
         const data = await response.json();
-        expect(typeof data[0].someNumberField).toBe('string');
+        const deliveries = getDeliveries(data);
+        expect(typeof deliveries[0].someNumberField).toBe('string');
       });
     });
 
@@ -392,10 +408,11 @@ describe('/api/driver-deliveries API', () => {
 
         const response = await GET(request);
         const data = await expectSuccessResponse(response, 200);
+        const deliveries = getDeliveries(data);
 
-        expect(data[0].delivery_type).toBe('catering');
-        expect(data[0].address.street1).toBe('123 Vendor St');
-        expect(data[0].delivery_address.street1).toBe('456 Client Ave');
+        expect(deliveries[0].delivery_type).toBe('catering');
+        expect(deliveries[0].address.street1).toBe('123 Vendor St');
+        expect(deliveries[0].delivery_address.street1).toBe('456 Client Ave');
       });
 
       it('should correctly map on-demand delivery addresses', async () => {
@@ -443,10 +460,11 @@ describe('/api/driver-deliveries API', () => {
 
         const response = await GET(request);
         const data = await expectSuccessResponse(response, 200);
+        const deliveries = getDeliveries(data);
 
-        expect(data[0].delivery_type).toBe('on_demand');
-        expect(data[0].address.street1).toBe('789 Store Rd');
-        expect(data[0].delivery_address.street1).toBe('321 Home Ln');
+        expect(deliveries[0].delivery_type).toBe('on_demand');
+        expect(deliveries[0].address.street1).toBe('789 Store Rd');
+        expect(deliveries[0].delivery_address.street1).toBe('321 Home Ln');
       });
     });
 
@@ -492,6 +510,150 @@ describe('/api/driver-deliveries API', () => {
 
         const response = await GET(request);
         await expectErrorResponse(response, 500);
+      });
+    });
+
+    describe('📅 Historical Data Filtering', () => {
+      it('should apply date filtering to catering queries', async () => {
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'driver-123' } },
+          error: null,
+        });
+
+        const mockDispatches = [
+          { cateringRequestId: 'catering-1', onDemandId: null },
+        ];
+
+        (prisma.dispatch.findMany as jest.Mock).mockResolvedValue(mockDispatches);
+        (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
+
+        const request = createGetRequest(
+          'http://localhost:3000/api/driver-deliveries'
+        );
+
+        await GET(request);
+
+        // Verify the query includes date filtering with OR clause
+        const cateringCall = (prisma.cateringRequest.findMany as jest.Mock).mock.calls[0][0];
+        expect(cateringCall.where).toHaveProperty('OR');
+        expect(cateringCall.where.OR).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ completeDateTime: null }),
+            expect.objectContaining({ createdAt: expect.any(Object) }),
+          ])
+        );
+      });
+
+      it('should apply date filtering to on-demand queries', async () => {
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'driver-123' } },
+          error: null,
+        });
+
+        const mockDispatches = [
+          { cateringRequestId: null, onDemandId: 'ondemand-1' },
+        ];
+
+        (prisma.dispatch.findMany as jest.Mock).mockResolvedValue(mockDispatches);
+        (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
+        (prisma.address.findMany as jest.Mock).mockResolvedValue([]);
+
+        const request = createGetRequest(
+          'http://localhost:3000/api/driver-deliveries'
+        );
+
+        await GET(request);
+
+        // Verify the query includes date filtering with OR clause
+        const onDemandCall = (prisma.onDemand.findMany as jest.Mock).mock.calls[0][0];
+        expect(onDemandCall.where).toHaveProperty('OR');
+        expect(onDemandCall.where.OR).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ completeDateTime: null }),
+            expect.objectContaining({ createdAt: expect.any(Object) }),
+          ])
+        );
+      });
+
+      it('should return metadata with historical days limit', async () => {
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'driver-123' } },
+          error: null,
+        });
+
+        (prisma.dispatch.findMany as jest.Mock).mockResolvedValue([]);
+
+        const request = createGetRequest(
+          'http://localhost:3000/api/driver-deliveries'
+        );
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(data).toHaveProperty('metadata');
+        expect(data.metadata).toHaveProperty('historicalDaysLimit');
+        expect(data.metadata.historicalDaysLimit).toBe(CONSTANTS.DRIVER_HISTORICAL_DAYS_LIMIT);
+        expect(data.metadata).toHaveProperty('cutoffDate');
+      });
+
+      it('should accept custom historicalDays parameter', async () => {
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'driver-123' } },
+          error: null,
+        });
+
+        (prisma.dispatch.findMany as jest.Mock).mockResolvedValue([]);
+
+        const request = createGetRequest(
+          'http://localhost:3000/api/driver-deliveries?historicalDays=7'
+        );
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(data.metadata.historicalDaysLimit).toBe(7);
+      });
+
+      it('should include incomplete deliveries regardless of age', async () => {
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: { id: 'driver-123' } },
+          error: null,
+        });
+
+        const mockDispatches = [
+          { cateringRequestId: 'catering-old', onDemandId: null },
+        ];
+
+        // Old but incomplete delivery (60 days ago)
+        const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+        const mockOldIncompleteDelivery = {
+          id: 'catering-old',
+          createdAt: sixtyDaysAgo,
+          completeDateTime: null, // Not completed - should be included
+          user: { name: 'User', email: 'user@example.com' },
+          pickupAddress: { street1: 'Street', city: 'Austin' },
+          deliveryAddress: { street1: 'Street', city: 'Austin' },
+        };
+
+        (prisma.dispatch.findMany as jest.Mock).mockResolvedValue(mockDispatches);
+        (prisma.cateringRequest.findMany as jest.Mock).mockResolvedValue([
+          mockOldIncompleteDelivery,
+        ]);
+        (prisma.onDemand.findMany as jest.Mock).mockResolvedValue([]);
+
+        const request = createGetRequest(
+          'http://localhost:3000/api/driver-deliveries'
+        );
+
+        const response = await GET(request);
+        const data = await response.json();
+        const deliveries = getDeliveries(data);
+
+        // Old but incomplete delivery should be included due to OR clause
+        expect(deliveries).toHaveLength(1);
+        expect(deliveries[0].id).toBe('catering-old');
       });
     });
   });

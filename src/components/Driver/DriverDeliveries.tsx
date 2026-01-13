@@ -32,7 +32,9 @@ import {
   ClipboardList,
   AlertTriangle,
   Camera,
+  Info,
 } from "lucide-react";
+import { CONSTANTS } from "@/constants";
 import {
   HoverCard,
   HoverCardContent,
@@ -129,6 +131,9 @@ const DriverDeliveries: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState<boolean>(true);
   const [updatingDeliveryId, setUpdatingDeliveryId] = useState<string | null>(null);
+  const [historicalDaysLimit, setHistoricalDaysLimit] = useState<number>(
+    CONSTANTS.DRIVER_HISTORICAL_DAYS_LIMIT
+  );
   const { toast } = useToast();
 
   useEffect(() => {
@@ -160,9 +165,19 @@ const DriverDeliveries: React.FC = () => {
         if (!response.ok) {
           throw new Error("Failed to fetch deliveries");
         }
-        const data: Delivery[] = await response.json();
-        // Ensure data is always an array
-        setDeliveries(Array.isArray(data) ? data : []);
+        const data = await response.json();
+
+        // Handle response with metadata (new format) or array (legacy format)
+        if (data && typeof data === "object" && "deliveries" in data) {
+          // New format with metadata
+          setDeliveries(Array.isArray(data.deliveries) ? data.deliveries : []);
+          if (data.metadata?.historicalDaysLimit) {
+            setHistoricalDaysLimit(data.metadata.historicalDaysLimit);
+          }
+        } else {
+          // Legacy format (array)
+          setDeliveries(Array.isArray(data) ? data : []);
+        }
       } catch (error) {
         setError(error instanceof Error ? error.message : "An error occurred");
         // Ensure deliveries is reset to empty array on error
@@ -645,7 +660,7 @@ const DriverDeliveries: React.FC = () => {
                         ? "You don't have any deliveries scheduled for today."
                         : activeTab === "upcoming"
                           ? "You don't have any upcoming deliveries scheduled."
-                          : "You don't have any completed deliveries yet."}
+                          : `You don't have any completed deliveries in the last ${historicalDaysLimit} days.`}
                     </p>
                   </div>
                 ) : (
@@ -898,6 +913,31 @@ const DriverDeliveries: React.FC = () => {
                         </TableBody>
                       </Table>
                     </div>
+
+                    {/* Historical Data Limit Notice - Only show in Completed tab */}
+                    {activeTab === "completed" && filteredDeliveries.length > 0 && (
+                      <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950">
+                        <div className="flex items-start space-x-3">
+                          <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                          <div>
+                            <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                              Showing Last {historicalDaysLimit} Days
+                            </h4>
+                            <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                              Your completed deliveries history is limited to the last {historicalDaysLimit} days.
+                              For older records, please contact our admin team at{" "}
+                              <a
+                                href="mailto:support@readysetllc.com"
+                                className="font-medium underline hover:text-blue-900 dark:hover:text-blue-100"
+                              >
+                                support@readysetllc.com
+                              </a>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {Array.isArray(deliveries) && deliveries.length > limit && (
                       <div className="mt-6 flex justify-between">
                         <Button
