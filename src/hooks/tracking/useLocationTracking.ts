@@ -21,13 +21,44 @@ interface UseLocationTrackingReturn {
   requestLocationPermission: () => Promise<boolean>;
 }
 
-// Helper to detect iOS Safari
-const isIOSSafari = (): boolean => {
+/**
+ * Detects if the current browser is running on iOS (iPhone, iPad, iPod)
+ * This includes ALL browsers on iOS since they all use WebKit and have the same
+ * geolocation limitations (Permissions API doesn't work without user interaction)
+ */
+const isIOSBrowser = (): boolean => {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent;
-  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
-  return isIOS && isSafari;
+  // Check for explicit iOS device identifiers
+  const isExplicitIOS = /iPad|iPhone|iPod/.test(ua);
+  // Check for iPad Pro running iPadOS 13+ which reports as MacIntel but has touch support
+  const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  return isExplicitIOS || isIPadOS;
+};
+
+/**
+ * Detects specifically iOS Safari (not Chrome, Firefox, etc. on iOS)
+ * Useful for Safari-specific instructions in error messages
+ */
+const isIOSSafari = (): boolean => {
+  if (!isIOSBrowser()) return false;
+  // Safari does not include CriOS (Chrome), FxiOS (Firefox), EdgiOS (Edge), or OPR (Opera)
+  return /^((?!crios|fxios|edgios|opr).)*safari/i.test(navigator.userAgent);
+};
+
+const isIOSChrome = (): boolean => isIOSBrowser() && /crios/i.test(navigator.userAgent);
+const isIOSFirefox = (): boolean => isIOSBrowser() && /fxios/i.test(navigator.userAgent);
+
+/**
+ * Gets a human-readable browser name for iOS browsers
+ * Used for providing browser-specific instructions in error messages
+ */
+const getIOSBrowserName = (): string => {
+  if (!isIOSBrowser()) return 'browser';
+  if (isIOSChrome()) return 'Chrome';
+  if (isIOSFirefox()) return 'Firefox';
+  if (/edgios/i.test(navigator.userAgent)) return 'Edge';
+  return 'Safari';
 };
 
 const TRACKING_INTERVAL = 30000; // 30 seconds
@@ -407,6 +438,18 @@ export function useLocationTracking(): UseLocationTrackingReturn {
 
   // Request location permission explicitly (MUST be called from user interaction for iOS Safari)
   const requestLocationPermission = useCallback(async (): Promise<boolean> => {
+    // Check for secure context first - this is the most common issue in development
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      const hostname = window.location.hostname;
+      if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+        setError(`Location requires HTTPS. Access via localhost:${window.location.port} instead of ${hostname}`);
+      } else {
+        setError('Location requires a secure connection (HTTPS).');
+      }
+      setPermissionState('denied');
+      return false;
+    }
+
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by this browser');
       setPermissionState('denied');
@@ -432,8 +475,10 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       if (maybeError.code === 1) {
         // Permission denied
         setPermissionState('denied');
-        if (isIOSSafari()) {
-          setError('Location access denied. Go to Settings > Safari > Location and enable location access for this website.');
+        if (isIOSBrowser()) {
+          // All iOS browsers use WebKit and require Settings app for location permissions
+          const browserName = getIOSBrowserName();
+          setError(`Location access denied. Go to Settings > ${browserName} > Location and enable access for this website.`);
         } else {
           setError('Location access denied. Please enable location permissions for this site.');
         }
@@ -458,17 +503,33 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   // Check support and permissions on mount for better UX
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    // Check for secure context (HTTPS or localhost) - required for Geolocation API
+    // This is a common issue when testing on local network IPs like 192.168.x.x
+    if (!window.isSecureContext) {
+      const hostname = window.location.hostname;
+      const isLocalIP = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|localhost|127\.)/.test(hostname);
+      if (isLocalIP && hostname !== 'localhost' && hostname !== '127.0.0.1') {
+        setError(`Location tracking requires HTTPS. You're accessing via ${hostname} which is not secure. Use localhost:${window.location.port} or set up HTTPS.`);
+      } else {
+        setError('Location tracking requires a secure connection (HTTPS). Please access this site via HTTPS.');
+      }
+      setPermissionState('denied');
+      return;
+    }
+
     if (!('geolocation' in navigator)) {
       setError('Geolocation is not supported in this browser.');
       setPermissionState('denied');
       return;
     }
 
-    // For iOS Safari, we can't reliably check permissions without user interaction
+    // For ALL iOS browsers, we can't reliably check permissions without user interaction
+    // All iOS browsers use WebKit and have the same limitation
     // Set state to 'prompt' and wait for user to explicitly request
-    if (isIOSSafari()) {
+    if (isIOSBrowser()) {
       setPermissionState('prompt');
-      // Don't auto-request on iOS Safari - it won't work without user interaction
+      // Don't auto-request on iOS - it won't work without user interaction
       return;
     }
 
