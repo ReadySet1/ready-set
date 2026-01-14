@@ -43,11 +43,11 @@ export interface DriverPayInput extends DeliveryCostInput {
 }
 
 export interface DriverPayBreakdown {
-  driverMaxPayPerDrop: number; // Cap on driver earnings per drop
+  driverMaxPayPerDrop: number | null; // Cap on driver earnings per drop (null = no cap)
   driverBasePayPerDrop: number; // Base pay rate (not used in actual calculation)
   driverTotalBasePay: number; // Actual base pay (0 if direct tip received)
   totalMileage: number; // Total miles driven
-  mileageRate: number; // $0.35/mile for driver (Destino)
+  mileageRate: number; // Driver mileage rate (CaterValley: $0.70, Destino: $0.35)
   totalMileagePay: number; // Driver mileage pay (all miles × rate)
   bridgeToll: number; // Bridge toll amount
   readySetFee: number; // Ready Set platform fee
@@ -609,10 +609,12 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
     }
   }
 
-  // Step 2: Calculate driver mileage pay - ALL miles at $0.35/mile
-  // No minimum - just straight calculation
+  // Step 2: Calculate driver mileage pay - ALL miles at configured rate
+  // Use client-specific rate if available, otherwise default to $0.35/mile
+  // CaterValley uses $0.70/mile, Destino uses $0.35/mile
+  const driverMileageRate = config.driverPaySettings.driverMileageRate ?? DRIVER_MILEAGE_RATE;
   // Round to 2 decimal places for currency precision
-  const totalMileagePay = Math.round(totalMileage * DRIVER_MILEAGE_RATE * 100) / 100;
+  const totalMileagePay = Math.round(totalMileage * driverMileageRate * 100) / 100;
 
   // Step 3: Driver bonus - apply percentage for infractions
   // If direct tip received, bonus is $0
@@ -643,7 +645,7 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
     driverBasePayPerDrop: driverBasePay,
     driverTotalBasePay,
     totalMileage,
-    mileageRate: DRIVER_MILEAGE_RATE,
+    mileageRate: driverMileageRate, // Use actual rate (client-specific or default)
     totalMileagePay,
     bridgeToll: effectiveBridgeToll,
     readySetFee,
