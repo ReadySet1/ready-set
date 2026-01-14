@@ -137,15 +137,17 @@ describe("/api/driver-deliveries", () => {
       await expectUnauthorized(response);
     });
 
-    it("should return empty array when driver has no dispatches", async () => {
+    it("should return empty deliveries array when driver has no dispatches", async () => {
       mockPrisma.dispatch.findMany.mockResolvedValue([]);
 
       const request = createGetRequest("http://localhost:3000/api/driver-deliveries");
       const response = await GET(request);
 
       const data = await expectSuccessResponse(response, 200);
-      expect(Array.isArray(data)).toBe(true);
-      expect(data).toHaveLength(0);
+      expect(data).toHaveProperty('deliveries');
+      expect(data).toHaveProperty('metadata');
+      expect(Array.isArray(data.deliveries)).toBe(true);
+      expect(data.deliveries).toHaveLength(0);
     });
 
     it("should fetch dispatches for the authenticated driver only", async () => {
@@ -172,8 +174,8 @@ describe("/api/driver-deliveries", () => {
 
       const data = await expectSuccessResponse(response, 200);
 
-      expect(data).toHaveLength(1);
-      expect(data[0]).toMatchObject({
+      expect(data.deliveries).toHaveLength(1);
+      expect(data.deliveries[0]).toMatchObject({
         id: mockCateringDelivery.id,
         orderNumber: mockCateringDelivery.orderNumber,
         delivery_type: "catering",
@@ -190,8 +192,8 @@ describe("/api/driver-deliveries", () => {
 
       const data = await expectSuccessResponse(response, 200);
 
-      expect(data).toHaveLength(1);
-      expect(data[0]).toMatchObject({
+      expect(data.deliveries).toHaveLength(1);
+      expect(data.deliveries[0]).toMatchObject({
         id: mockOnDemandDelivery.id,
         orderNumber: mockOnDemandDelivery.orderNumber,
         delivery_type: "on_demand",
@@ -212,9 +214,9 @@ describe("/api/driver-deliveries", () => {
 
       const data = await expectSuccessResponse(response, 200);
 
-      expect(data).toHaveLength(2);
-      expect(data.some((d: any) => d.delivery_type === "catering")).toBe(true);
-      expect(data.some((d: any) => d.delivery_type === "on_demand")).toBe(true);
+      expect(data.deliveries).toHaveLength(2);
+      expect(data.deliveries.some((d: any) => d.delivery_type === "catering")).toBe(true);
+      expect(data.deliveries.some((d: any) => d.delivery_type === "on_demand")).toBe(true);
     });
 
     it("should include user information in deliveries", async () => {
@@ -226,7 +228,7 @@ describe("/api/driver-deliveries", () => {
 
       const data = await expectSuccessResponse(response, 200);
 
-      expect(data[0].user).toMatchObject({
+      expect(data.deliveries[0].user).toMatchObject({
         name: "Customer Name",
         email: "customer@example.com",
       });
@@ -241,7 +243,7 @@ describe("/api/driver-deliveries", () => {
 
       const data = await expectSuccessResponse(response, 200);
 
-      expect(data[0].address).toMatchObject({
+      expect(data.deliveries[0].address).toMatchObject({
         id: mockPickupAddress.id,
         address: mockPickupAddress.address,
       });
@@ -256,7 +258,7 @@ describe("/api/driver-deliveries", () => {
 
       const data = await expectSuccessResponse(response, 200);
 
-      expect(data[0].delivery_address).toMatchObject({
+      expect(data.deliveries[0].delivery_address).toMatchObject({
         id: mockDeliveryAddress.id,
         address: mockDeliveryAddress.address,
       });
@@ -285,7 +287,7 @@ describe("/api/driver-deliveries", () => {
       const data = await expectSuccessResponse(response, 200);
 
       // Should return first 10 items
-      expect(data).toHaveLength(10);
+      expect(data.deliveries).toHaveLength(10);
     });
 
     it("should support custom limit parameter", async () => {
@@ -312,7 +314,7 @@ describe("/api/driver-deliveries", () => {
 
       const data = await expectSuccessResponse(response, 200);
 
-      expect(data).toHaveLength(5);
+      expect(data.deliveries).toHaveLength(5);
     });
 
     it("should support page parameter for pagination", async () => {
@@ -341,7 +343,7 @@ describe("/api/driver-deliveries", () => {
       const data = await expectSuccessResponse(response, 200);
 
       // Should skip first 5 and return next 5
-      expect(data).toHaveLength(5);
+      expect(data.deliveries).toHaveLength(5);
     });
 
     it("should sort deliveries by createdAt descending", async () => {
@@ -379,9 +381,9 @@ describe("/api/driver-deliveries", () => {
       const data = await expectSuccessResponse(response, 200);
 
       // Most recent should be first
-      expect(data[0].id).toBe("catering-3");
-      expect(data[1].id).toBe("catering-2");
-      expect(data[2].id).toBe("catering-1");
+      expect(data.deliveries[0].id).toBe("catering-3");
+      expect(data.deliveries[1].id).toBe("catering-2");
+      expect(data.deliveries[2].id).toBe("catering-1");
     });
 
     it("should serialize bigint values correctly", async () => {
@@ -399,7 +401,7 @@ describe("/api/driver-deliveries", () => {
       const data = await expectSuccessResponse(response, 200);
 
       // Should not throw JSON serialization error
-      expect(data).toHaveLength(1);
+      expect(data.deliveries).toHaveLength(1);
     });
 
     it("should handle database errors gracefully", async () => {

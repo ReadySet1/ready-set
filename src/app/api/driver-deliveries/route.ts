@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
+import { CONSTANTS } from "@/constants";
 
 import { CateringRequestGetPayload, OnDemandGetPayload } from '@/types/prisma';
 
@@ -49,6 +50,18 @@ export async function GET(req: NextRequest) {
   const page = parseInt(url.searchParams.get("page") || "1", 10);
   const skip = (page - 1) * limit;
 
+  // Parse historical days limit (default: 30 days)
+  const historicalDays = parseInt(
+    url.searchParams.get("historicalDays") ||
+    String(CONSTANTS.DRIVER_HISTORICAL_DAYS_LIMIT),
+    10
+  );
+
+  // Calculate the cutoff date for historical data
+  const historicalCutoffDate = new Date();
+  historicalCutoffDate.setDate(historicalCutoffDate.getDate() - historicalDays);
+  historicalCutoffDate.setHours(0, 0, 0, 0);
+
   try {
     // Fetch dispatches for the current driver
     const driverDispatches = await prisma.dispatch.findMany({
@@ -71,13 +84,24 @@ export async function GET(req: NextRequest) {
 
     // If no dispatches, short-circuit to avoid extra queries
     if (cateringIds.length === 0 && onDemandIds.length === 0) {
-      return NextResponse.json([], { status: 200 });
+      return NextResponse.json({
+        deliveries: [],
+        metadata: {
+          historicalDaysLimit: historicalDays,
+          cutoffDate: historicalCutoffDate.toISOString(),
+        },
+      }, { status: 200 });
     }
 
-    // Fetch catering deliveries
+    // Fetch catering deliveries with historical limit
+    // Filter: include incomplete deliveries OR recent completed deliveries
     const cateringDeliveries = await prisma.cateringRequest.findMany({
       where: {
         id: { in: cateringIds },
+        OR: [
+          { completeDateTime: null }, // Include incomplete deliveries regardless of age
+          { createdAt: { gte: historicalCutoffDate } }, // Include recent completed deliveries
+        ],
       },
       include: {
         user: { select: { name: true, email: true } },
@@ -90,10 +114,15 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Fetch on-demand deliveries
+    // Fetch on-demand deliveries with historical limit
+    // Filter: include incomplete deliveries OR recent completed deliveries
     const onDemandDeliveries = await prisma.onDemand.findMany({
       where: {
         id: { in: onDemandIds },
+        OR: [
+          { completeDateTime: null }, // Include incomplete deliveries regardless of age
+          { createdAt: { gte: historicalCutoffDate } }, // Include recent completed deliveries
+        ],
       },
       include: {
         user: { select: { name: true, email: true } },
@@ -146,7 +175,14 @@ export async function GET(req: NextRequest) {
       ),
     }));
 
-    return NextResponse.json(serializedDeliveries, { status: 200 });
+    // Return deliveries with metadata about the historical limit applied
+    return NextResponse.json({
+      deliveries: serializedDeliveries,
+      metadata: {
+        historicalDaysLimit: historicalDays,
+        cutoffDate: historicalCutoffDate.toISOString(),
+      },
+    }, { status: 200 });
   } catch (error) {
     console.error("Error fetching driver deliveries:", error);
     return NextResponse.json(

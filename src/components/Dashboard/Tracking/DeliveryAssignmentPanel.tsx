@@ -19,19 +19,22 @@ import {
   CalendarIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import { assignDeliveryToDriver } from '@/app/actions/tracking/delivery-actions';
 import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 
 interface DeliveryAssignmentPanelProps {
   drivers: TrackedDriver[];
   deliveries: DeliveryTracking[];
+  isLoading?: boolean;
   className?: string;
 }
 
-export default function DeliveryAssignmentPanel({ 
-  drivers, 
-  deliveries, 
-  className 
+export default function DeliveryAssignmentPanel({
+  drivers,
+  deliveries,
+  isLoading = false,
+  className
 }: DeliveryAssignmentPanelProps) {
   const [selectedDelivery, setSelectedDelivery] = useState<string | null>(null);
   const [assignmentLoading, setAssignmentLoading] = useState(false);
@@ -58,7 +61,15 @@ export default function DeliveryAssignmentPanel({
       case 'assigned':
         return delivery.driverId && delivery.status === 'ASSIGNED';
       case 'in_progress':
-        return delivery.driverId && ['EN_ROUTE_TO_CLIENT', 'ARRIVED_TO_CLIENT'].includes(delivery.status);
+        // Include all active delivery statuses (both new and legacy systems)
+        return delivery.driverId && [
+          'EN_ROUTE_TO_CLIENT',
+          'ARRIVED_TO_CLIENT',
+          'IN_PROGRESS',
+          'ACTIVE',
+          'ARRIVED_AT_VENDOR',
+          'PICKED_UP'
+        ].includes(delivery.status);
       default:
         return true;
     }
@@ -103,15 +114,28 @@ export default function DeliveryAssignmentPanel({
     return 'low';
   };
 
-  // Format address for display
-  const formatLocation = (location: { coordinates: [number, number] }) => {
-    // In a real implementation, you'd reverse geocode these coordinates
-    return `${location.coordinates[1].toFixed(4)}, ${location.coordinates[0].toFixed(4)}`;
+  // Format address for display - prefer address string over coordinates
+  const formatLocation = (
+    location: { coordinates: [number, number] } | null | undefined,
+    addressString?: string | null
+  ) => {
+    // If we have an address string, use it (better UX)
+    if (addressString) {
+      return addressString;
+    }
+    // Fall back to coordinates if available
+    if (location && location.coordinates) {
+      return `${location.coordinates[1].toFixed(4)}, ${location.coordinates[0].toFixed(4)}`;
+    }
+    return 'N/A';
   };
 
   const DeliveryCard = ({ delivery }: { delivery: DeliveryTracking }) => {
     const priority = getDeliveryPriority(delivery);
     const assignedDriver = drivers.find(d => d.id === delivery.driverId);
+    // For legacy dispatches, we might have driver info embedded in the delivery
+    const legacyDriverInfo = (delivery as any).driverName || (delivery as any).driverEmployeeId;
+    const hasAssignedDriver = assignedDriver || (delivery.driverId && legacyDriverInfo);
     const isSelected = selectedDelivery === delivery.id;
 
     return (
@@ -144,8 +168,8 @@ export default function DeliveryAssignmentPanel({
 
               {/* Order type */}
               <div className="text-sm text-muted-foreground mb-2">
-                {delivery.cateringRequestId && 'Catering Order'}
-                {delivery.onDemandId && 'On-Demand Order'}
+                {(delivery.cateringRequestId || (delivery as any).orderType === 'catering') && 'Catering Order'}
+                {(delivery.onDemandId || (delivery as any).orderType === 'on_demand') && 'On-Demand Order'}
               </div>
 
               {/* Locations */}
@@ -153,12 +177,12 @@ export default function DeliveryAssignmentPanel({
                 <div className="flex items-center space-x-2">
                   <MapPinIcon className="w-4 h-4 text-blue-500" />
                   <span className="text-muted-foreground">Pickup:</span>
-                  <span>{formatLocation(delivery.pickupLocation)}</span>
+                  <span>{formatLocation(delivery.pickupLocation, (delivery as any).pickupAddress)}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <MapPinIcon className="w-4 h-4 text-green-500" />
                   <span className="text-muted-foreground">Delivery:</span>
-                  <span>{formatLocation(delivery.deliveryLocation)}</span>
+                  <span>{formatLocation(delivery.deliveryLocation, (delivery as any).deliveryAddress)}</span>
                 </div>
               </div>
 
@@ -174,14 +198,19 @@ export default function DeliveryAssignmentPanel({
 
             {/* Assignment status */}
             <div className="flex flex-col items-end space-y-2">
-              {assignedDriver ? (
+              {hasAssignedDriver ? (
                 <div className="text-right">
                   <div className="flex items-center space-x-1 text-sm text-green-700">
                     <CheckCircleIcon className="w-4 h-4" />
                     <span>Assigned</span>
                   </div>
-                  <div className="text-sm font-medium">Driver #{assignedDriver.employeeId}</div>
-                  <div className="text-xs text-muted-foreground">{assignedDriver.vehicleNumber}</div>
+                  {/* Prefer driver name from legacy dispatch, then driver list, then employee ID */}
+                  <div className="text-sm font-medium">
+                    {(delivery as any).driverName || assignedDriver?.name || `Driver #${assignedDriver?.employeeId || 'Unknown'}`}
+                  </div>
+                  {assignedDriver?.vehicleNumber && (
+                    <div className="text-xs text-muted-foreground">{assignedDriver.vehicleNumber}</div>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center space-x-1 text-sm text-red-600">
@@ -195,7 +224,7 @@ export default function DeliveryAssignmentPanel({
           {/* Assignment panel */}
           {isSelected && (
             <div className="mt-4 pt-4 border-t">
-              {assignedDriver ? (
+              {hasAssignedDriver ? (
                 <div className="space-y-3">
                   <h5 className="font-medium">Current Assignment</h5>
                   <div className="flex items-center justify-between p-3 bg-green-100 rounded-lg">
@@ -204,20 +233,29 @@ export default function DeliveryAssignmentPanel({
                         <UserIcon className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <div className="font-medium">Driver #{assignedDriver.employeeId}</div>
+                        {/* Prefer driver name from legacy dispatch */}
+                        <div className="font-medium">
+                          {(delivery as any).driverName || assignedDriver?.name || `Driver #${assignedDriver?.employeeId || 'Unknown'}`}
+                        </div>
                         <div className="text-sm text-muted-foreground">
-                          {assignedDriver.vehicleNumber} • {assignedDriver.activeDeliveries || 0} active deliveries
+                          {assignedDriver ? (
+                            <>{assignedDriver.vehicleNumber} • {assignedDriver.activeDeliveries || 0} active deliveries</>
+                          ) : (
+                            <>Legacy dispatch assignment</>
+                          )}
                         </div>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleAssignDelivery(delivery.id, '')}
-                      disabled={assignmentLoading}
-                    >
-                      Unassign
-                    </Button>
+                    {assignedDriver && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleAssignDelivery(delivery.id, '')}
+                        disabled={assignmentLoading}
+                      >
+                        Unassign
+                      </Button>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -241,7 +279,7 @@ export default function DeliveryAssignmentPanel({
                               <UserIcon className="w-4 h-4 text-white" />
                             </div>
                             <div>
-                              <div className="font-medium">Driver #{driver.employeeId}</div>
+                              <div className="font-medium">{driver.name || `Driver #${driver.employeeId || 'Unknown'}`}</div>
                               <div className="text-sm text-muted-foreground">
                                 {driver.vehicleNumber} • {driver.activeDeliveries || 0} active • 
                                 {Math.round((driver.totalDistanceMiles || 0) * 10) / 10} mi today
@@ -298,39 +336,114 @@ export default function DeliveryAssignmentPanel({
       <div className="grid grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-3">
-            <div className="text-2xl font-bold">{deliveries.length}</div>
-            <div className="text-sm text-muted-foreground">Total</div>
+            {isLoading ? (
+              <>
+                <Skeleton className="h-8 w-10 mb-1" />
+                <Skeleton className="h-4 w-12" />
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{deliveries.length}</div>
+                <div className="text-sm text-muted-foreground">Total</div>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3">
-            <div className="text-2xl font-bold text-red-600">
-              {deliveries.filter(d => !d.driverId).length}
-            </div>
-            <div className="text-sm text-muted-foreground">Unassigned</div>
+            {isLoading ? (
+              <>
+                <Skeleton className="h-8 w-10 mb-1" />
+                <Skeleton className="h-4 w-20" />
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-red-600">
+                  {deliveries.filter(d => !d.driverId).length}
+                </div>
+                <div className="text-sm text-muted-foreground">Unassigned</div>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3">
-            <div className="text-2xl font-bold text-blue-600">
-              {deliveries.filter(d => d.driverId && d.status === 'ASSIGNED').length}
-            </div>
-            <div className="text-sm text-muted-foreground">Assigned</div>
+            {isLoading ? (
+              <>
+                <Skeleton className="h-8 w-10 mb-1" />
+                <Skeleton className="h-4 w-16" />
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-blue-600">
+                  {deliveries.filter(d => d.driverId && d.status === 'ASSIGNED').length}
+                </div>
+                <div className="text-sm text-muted-foreground">Assigned</div>
+              </>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3">
-            <div className="text-2xl font-bold text-green-600">
-              {deliveries.filter(d => ['EN_ROUTE_TO_CLIENT', 'ARRIVED_TO_CLIENT'].includes(d.status)).length}
-            </div>
-            <div className="text-sm text-muted-foreground">In Progress</div>
+            {isLoading ? (
+              <>
+                <Skeleton className="h-8 w-10 mb-1" />
+                <Skeleton className="h-4 w-20" />
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-green-600">
+                  {deliveries.filter(d => d.driverId && [
+                    'EN_ROUTE_TO_CLIENT',
+                    'ARRIVED_TO_CLIENT',
+                    'IN_PROGRESS',
+                    'ACTIVE',
+                    'ARRIVED_AT_VENDOR',
+                    'PICKED_UP'
+                  ].includes(d.status)).length}
+                </div>
+                <div className="text-sm text-muted-foreground">In Progress</div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Delivery list */}
       <div className="space-y-3">
-        {filteredDeliveries.length === 0 ? (
+        {isLoading ? (
+          // Skeleton loading for delivery cards
+          Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Skeleton className="h-5 w-20" />
+                      <Skeleton className="h-5 w-24" />
+                      <Skeleton className="h-5 w-20" />
+                    </div>
+                    <Skeleton className="h-4 w-28" />
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Skeleton className="h-4 w-4 rounded-full" />
+                        <Skeleton className="h-4 w-48" />
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Skeleton className="h-4 w-4 rounded-full" />
+                        <Skeleton className="h-4 w-56" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end space-y-2">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : filteredDeliveries.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <TruckIcon className="w-12 h-12 mx-auto mb-2" />
             <p>No deliveries match your criteria</p>
@@ -345,33 +458,56 @@ export default function DeliveryAssignmentPanel({
       {/* Available drivers summary */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Available Drivers ({availableDrivers.length})</CardTitle>
+          <CardTitle className="text-sm">
+            {isLoading ? (
+              <Skeleton className="h-5 w-36" />
+            ) : (
+              <>Available Drivers ({availableDrivers.length})</>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {availableDrivers.map(driver => (
-              <div key={driver.id} className="flex items-center space-x-3 p-2 border rounded">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                  <UserIcon className="w-4 h-4 text-white" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-sm">#{driver.employeeId}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {driver.activeDeliveries || 0}/3 deliveries
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center space-x-3 p-2 border rounded">
+                  <Skeleton className="w-8 h-8 rounded-full" />
+                  <div className="flex-1 space-y-1">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-3 w-24" />
                   </div>
+                  <Skeleton className="h-5 w-16 rounded-full" />
                 </div>
-                <Badge variant="secondary" className="text-xs">
-                  Available
-                </Badge>
-              </div>
-            ))}
-          </div>
-          
-          {availableDrivers.length === 0 && (
-            <div className="text-center py-4 text-muted-foreground">
-              <AlertTriangleIcon className="w-8 h-8 mx-auto mb-2" />
-              <p>No drivers available for assignment</p>
+              ))}
             </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {availableDrivers.map(driver => (
+                  <div key={driver.id} className="flex items-center space-x-3 p-2 border rounded">
+                    <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                      <UserIcon className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{driver.name || `#${driver.employeeId || 'Unknown'}`}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {driver.activeDeliveries || 0}/3 deliveries
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">
+                      Available
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+
+              {availableDrivers.length === 0 && (
+                <div className="text-center py-4 text-muted-foreground">
+                  <AlertTriangleIcon className="w-8 h-8 mx-auto mb-2" />
+                  <p>No drivers available for assignment</p>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

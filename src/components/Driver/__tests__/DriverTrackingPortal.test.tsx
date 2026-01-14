@@ -2,58 +2,60 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import DriverTrackingPortal from '../DriverTrackingPortal';
+import { useDriverTracking } from '@/contexts/DriverTrackingContext';
 
-// Mock the hooks
+// Mock the context hook directly
+jest.mock('@/contexts/DriverTrackingContext', () => ({
+  useDriverTracking: jest.fn(),
+  DriverTrackingProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+const mockUseDriverTracking = useDriverTracking as jest.MockedFunction<typeof useDriverTracking>;
+
+// Mock callback functions
 const mockStartTracking = jest.fn();
 const mockStopTracking = jest.fn();
-const mockStartShift = jest.fn();
-const mockEndShift = jest.fn();
-const mockStartBreak = jest.fn();
-const mockEndBreak = jest.fn();
-const mockUpdateDeliveryStatus = jest.fn();
+const mockRequestLocationPermission = jest.fn().mockResolvedValue(true);
+const mockUpdateLocationManually = jest.fn();
+const mockStartShift = jest.fn().mockResolvedValue(true);
+const mockEndShift = jest.fn().mockResolvedValue(true);
+const mockUpdateDeliveryStatus = jest.fn().mockResolvedValue(true);
 
-jest.mock('@/hooks/tracking/useRealtimeLocationTracking', () => ({
-  useRealtimeLocationTracking: jest.fn(() => ({
-    currentLocation: null,
-    isTracking: false,
-    accuracy: null,
-    startTracking: mockStartTracking,
-    stopTracking: mockStopTracking,
-    error: null,
-    isRealtimeConnected: false,
-    isRealtimeEnabled: true,
-    connectionMode: 'rest',
-  })),
-}));
+// Default mock context values
+const defaultMockContextValue = {
+  // Location tracking
+  currentLocation: null as any,
+  isTracking: false,
+  accuracy: null as number | null,
+  locationError: null as string | null,
+  isRealtimeConnected: false,
+  isRealtimeEnabled: true,
+  connectionMode: 'rest' as const,
+  permissionState: 'granted' as const,
+  isRequestingPermission: false,
+  startTracking: mockStartTracking,
+  stopTracking: mockStopTracking,
+  requestLocationPermission: mockRequestLocationPermission,
+  updateLocationManually: mockUpdateLocationManually,
 
-jest.mock('@/hooks/tracking/useDriverShift', () => ({
-  useDriverShift: jest.fn(() => ({
-    currentShift: null,
-    isShiftActive: false,
-    startShift: mockStartShift,
-    endShift: mockEndShift,
-    startBreak: mockStartBreak,
-    endBreak: mockEndBreak,
-    loading: false,
-    error: null,
-  })),
-}));
+  // Shift management
+  currentShift: null as any,
+  isShiftActive: false,
+  shiftLoading: false,
+  shiftError: null as string | null,
+  startShift: mockStartShift,
+  endShift: mockEndShift,
 
-jest.mock('@/hooks/tracking/useDriverDeliveries', () => ({
-  useDriverDeliveries: jest.fn(() => ({
-    activeDeliveries: [],
-    updateDeliveryStatus: mockUpdateDeliveryStatus,
-    loading: false,
-    error: null,
-  })),
-}));
+  // Deliveries
+  activeDeliveries: [] as any[],
+  deliveriesLoading: false,
+  deliveriesError: null as string | null,
+  updateDeliveryStatus: mockUpdateDeliveryStatus,
 
-jest.mock('@/hooks/tracking/useOfflineQueue', () => ({
-  useOfflineQueue: jest.fn(() => ({
-    offlineStatus: { isOnline: true },
-    queuedItems: [],
-  })),
-}));
+  // Offline support
+  isOnline: true,
+  queuedItems: 0,
+};
 
 // Mock DriverLiveMap
 jest.mock('@/components/Driver/DriverLiveMap', () => ({
@@ -61,6 +63,17 @@ jest.mock('@/components/Driver/DriverLiveMap', () => ({
   default: ({ currentLocation, activeDeliveries }: any) => (
     <div data-testid="driver-live-map">
       DriverLiveMap (deliveries: {activeDeliveries?.length || 0})
+    </div>
+  ),
+}));
+
+// Mock DeliveryStatusControl
+jest.mock('@/components/Driver/DeliveryStatusControl', () => ({
+  DeliveryStatusControl: ({ delivery, onStatusUpdate }: any) => (
+    <div data-testid="delivery-status-control">
+      <button onClick={() => onStatusUpdate?.('en_route_to_client')}>En Route</button>
+      <button onClick={() => onStatusUpdate?.('arrived_to_client')}>Arrived</button>
+      <button onClick={() => onStatusUpdate?.('completed')}>Complete Delivery</button>
     </div>
   ),
 }));
@@ -119,7 +132,7 @@ jest.mock('@/components/ui/alert', () => ({
   ),
 }));
 
-// Mock lucide-react icons
+// Mock lucide-react icons (all icons used by the component)
 jest.mock('lucide-react', () => ({
   NavigationIcon: () => <span data-testid="navigation-icon">Nav</span>,
   ClockIcon: () => <span data-testid="clock-icon">Clock</span>,
@@ -133,6 +146,9 @@ jest.mock('lucide-react', () => ({
   CoffeeIcon: () => <span data-testid="coffee-icon">Coffee</span>,
   AlertTriangleIcon: () => <span data-testid="alert-triangle-icon">Alert</span>,
   CheckCircleIcon: () => <span data-testid="check-circle-icon">Check</span>,
+  HomeIcon: () => <span data-testid="home-icon">Home</span>,
+  ChevronLeftIcon: () => <span data-testid="chevron-left-icon">ChevronLeft</span>,
+  PackageIcon: () => <span data-testid="package-icon">Package</span>,
 }));
 
 // Mock cn utility
@@ -149,46 +165,11 @@ jest.mock('@/types/user', () => ({
   },
 }));
 
-const { useRealtimeLocationTracking } = require('@/hooks/tracking/useRealtimeLocationTracking');
-const { useDriverShift } = require('@/hooks/tracking/useDriverShift');
-const { useDriverDeliveries } = require('@/hooks/tracking/useDriverDeliveries');
-const { useOfflineQueue } = require('@/hooks/tracking/useOfflineQueue');
-
 describe('DriverTrackingPortal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset default mock implementations
-    useRealtimeLocationTracking.mockReturnValue({
-      currentLocation: null,
-      isTracking: false,
-      accuracy: null,
-      startTracking: mockStartTracking,
-      stopTracking: mockStopTracking,
-      error: null,
-      isRealtimeConnected: false,
-      isRealtimeEnabled: true,
-      connectionMode: 'rest',
-    });
-    useDriverShift.mockReturnValue({
-      currentShift: null,
-      isShiftActive: false,
-      startShift: mockStartShift,
-      endShift: mockEndShift,
-      startBreak: mockStartBreak,
-      endBreak: mockEndBreak,
-      loading: false,
-      error: null,
-    });
-    useDriverDeliveries.mockReturnValue({
-      activeDeliveries: [],
-      updateDeliveryStatus: mockUpdateDeliveryStatus,
-      loading: false,
-      error: null,
-    });
-    useOfflineQueue.mockReturnValue({
-      offlineStatus: { isOnline: true },
-      queuedItems: [],
-    });
+    // Reset default mock implementation
+    mockUseDriverTracking.mockReturnValue(defaultMockContextValue);
   });
 
   describe('Component Rendering', () => {
@@ -213,9 +194,10 @@ describe('DriverTrackingPortal', () => {
     });
 
     it('should show offline status when offline', () => {
-      useOfflineQueue.mockReturnValue({
-        offlineStatus: { isOnline: false },
-        queuedItems: [],
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
+        isOnline: false,
+        queuedItems: 2,
       });
 
       render(<DriverTrackingPortal />);
@@ -226,21 +208,18 @@ describe('DriverTrackingPortal', () => {
 
   describe('GPS and Battery Status', () => {
     it('should display GPS accuracy when available', () => {
-      useRealtimeLocationTracking.mockReturnValue({
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         currentLocation: {
           coordinates: { lat: 37.7749, lng: -122.4194 },
           accuracy: 25,
           speed: 5,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
         },
         isTracking: true,
         accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
         isRealtimeConnected: true,
-        isRealtimeEnabled: true,
-        connectionMode: 'realtime',
+        connectionMode: 'realtime' as const,
       });
 
       render(<DriverTrackingPortal />);
@@ -283,21 +262,15 @@ describe('DriverTrackingPortal', () => {
     });
 
     it('should enable Start Shift button when location is available', () => {
-      useRealtimeLocationTracking.mockReturnValue({
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         currentLocation: {
           coordinates: { lat: 37.7749, lng: -122.4194 },
           accuracy: 25,
           speed: 0,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
         },
-        isTracking: false,
         accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
-        isRealtimeConnected: false,
-        isRealtimeEnabled: true,
-        connectionMode: 'rest',
       });
 
       render(<DriverTrackingPortal />);
@@ -310,7 +283,7 @@ describe('DriverTrackingPortal', () => {
   describe('Shift Status - Active', () => {
     const mockActiveShift = {
       id: 'shift-123',
-      startTime: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+      startTime: new Date(Date.now() - 3600000), // 1 hour ago
       endTime: null,
       breaks: [],
       totalDistanceMiles: 15.5,
@@ -318,31 +291,20 @@ describe('DriverTrackingPortal', () => {
     };
 
     beforeEach(() => {
-      useRealtimeLocationTracking.mockReturnValue({
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         currentLocation: {
           coordinates: { lat: 37.7749, lng: -122.4194 },
           accuracy: 25,
           speed: 5,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
         },
         isTracking: true,
         accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
         isRealtimeConnected: true,
-        isRealtimeEnabled: true,
-        connectionMode: 'realtime',
-      });
-      useDriverShift.mockReturnValue({
+        connectionMode: 'realtime' as const,
         currentShift: mockActiveShift,
         isShiftActive: true,
-        startShift: mockStartShift,
-        endShift: mockEndShift,
-        startBreak: mockStartBreak,
-        endBreak: mockEndBreak,
-        loading: false,
-        error: null,
       });
     });
 
@@ -374,13 +336,6 @@ describe('DriverTrackingPortal', () => {
       expect(screen.getByText('3')).toBeInTheDocument();
     });
 
-    it('should show break control buttons', () => {
-      render(<DriverTrackingPortal />);
-
-      expect(screen.getByText('Break')).toBeInTheDocument();
-      expect(screen.getByText('Meal')).toBeInTheDocument();
-    });
-
     it('should show End Shift button', () => {
       render(<DriverTrackingPortal />);
 
@@ -388,94 +343,37 @@ describe('DriverTrackingPortal', () => {
     });
   });
 
-  describe('Break Status', () => {
-    const mockShiftOnBreak = {
-      id: 'shift-123',
-      startTime: new Date(Date.now() - 3600000).toISOString(),
-      endTime: null,
-      breaks: [
-        {
-          id: 'break-1',
-          breakType: 'rest',
-          startTime: new Date(Date.now() - 600000).toISOString(), // 10 min ago
-          endTime: null,
-        },
-      ],
-      totalDistanceMiles: 10,
-      deliveryCount: 2,
-    };
-
-    beforeEach(() => {
-      useRealtimeLocationTracking.mockReturnValue({
-        currentLocation: {
-          coordinates: { lat: 37.7749, lng: -122.4194 },
-          accuracy: 25,
-          speed: 0,
-          timestamp: new Date().toISOString(),
-        },
-        isTracking: true,
-        accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
-        isRealtimeConnected: true,
-        isRealtimeEnabled: true,
-        connectionMode: 'realtime',
-      });
-      useDriverShift.mockReturnValue({
-        currentShift: mockShiftOnBreak,
-        isShiftActive: true,
-        startShift: mockStartShift,
-        endShift: mockEndShift,
-        startBreak: mockStartBreak,
-        endBreak: mockEndBreak,
-        loading: false,
-        error: null,
-      });
-    });
-
-    it('should display On Break badge when driver is on break', () => {
-      render(<DriverTrackingPortal />);
-
-      expect(screen.getByText('On Break')).toBeInTheDocument();
-    });
-
-    it('should show End Break button when on break', () => {
-      render(<DriverTrackingPortal />);
-
-      expect(screen.getByText('End Break')).toBeInTheDocument();
-    });
-
-    it('should display break type and start time', () => {
-      render(<DriverTrackingPortal />);
-
-      expect(screen.getByText(/On rest break since/)).toBeInTheDocument();
-    });
-  });
 
   describe('Live Map Section', () => {
-    it('should not show map when no location is available', () => {
+    it('should not show map when no shift is active', () => {
       render(<DriverTrackingPortal />);
 
       expect(screen.queryByTestId('driver-live-map')).not.toBeInTheDocument();
     });
 
-    it('should show map when location is available', () => {
-      useRealtimeLocationTracking.mockReturnValue({
+    it('should show map when shift is active and location is available', () => {
+      const mockShift = {
+        id: 'shift-123',
+        startTime: new Date(Date.now() - 3600000),
+        breaks: [],
+        totalDistanceMiles: 10,
+        deliveryCount: 2,
+      };
+
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         currentLocation: {
           coordinates: { lat: 37.7749, lng: -122.4194 },
           accuracy: 25,
           speed: 10,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
         },
         isTracking: true,
         accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
         isRealtimeConnected: true,
-        isRealtimeEnabled: true,
-        connectionMode: 'realtime',
+        connectionMode: 'realtime' as const,
+        currentShift: mockShift,
+        isShiftActive: true,
       });
 
       render(<DriverTrackingPortal />);
@@ -484,22 +382,29 @@ describe('DriverTrackingPortal', () => {
       expect(screen.getByText('Live Map')).toBeInTheDocument();
     });
 
-    it('should display current coordinates', () => {
-      useRealtimeLocationTracking.mockReturnValue({
+    it('should display current coordinates when shift is active', () => {
+      const mockShift = {
+        id: 'shift-123',
+        startTime: new Date(Date.now() - 3600000),
+        breaks: [],
+        totalDistanceMiles: 10,
+        deliveryCount: 2,
+      };
+
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         currentLocation: {
           coordinates: { lat: 37.774900, lng: -122.419400 },
           accuracy: 25,
           speed: 5,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
         },
         isTracking: true,
         accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
         isRealtimeConnected: true,
-        isRealtimeEnabled: true,
-        connectionMode: 'realtime',
+        connectionMode: 'realtime' as const,
+        currentShift: mockShift,
+        isShiftActive: true,
       });
 
       render(<DriverTrackingPortal />);
@@ -509,27 +414,35 @@ describe('DriverTrackingPortal', () => {
       expect(screen.getByText(/-122.419400/)).toBeInTheDocument();
     });
 
-    it('should display current speed', () => {
-      useRealtimeLocationTracking.mockReturnValue({
+    it('should display current speed when shift is active', () => {
+      const mockShift = {
+        id: 'shift-123',
+        startTime: new Date(Date.now() - 3600000),
+        breaks: [],
+        totalDistanceMiles: 10,
+        deliveryCount: 2,
+      };
+
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         currentLocation: {
           coordinates: { lat: 37.7749, lng: -122.4194 },
           accuracy: 25,
           speed: 20, // m/s
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
         },
         isTracking: true,
         accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
         isRealtimeConnected: true,
-        isRealtimeEnabled: true,
-        connectionMode: 'realtime',
+        connectionMode: 'realtime' as const,
+        currentShift: mockShift,
+        isShiftActive: true,
       });
 
       render(<DriverTrackingPortal />);
 
       expect(screen.getByText('Speed:')).toBeInTheDocument();
+      // 20 m/s converted to mph is approximately 45 mph
       expect(screen.getByText('45 mph')).toBeInTheDocument();
     });
   });
@@ -540,31 +453,27 @@ describe('DriverTrackingPortal', () => {
         id: 'delivery-1',
         status: 'assigned',
         deliveryLocation: { coordinates: [-122.4194, 37.7749] },
-        estimatedArrival: new Date(Date.now() + 1800000).toISOString(), // 30 min
+        estimatedArrival: new Date(Date.now() + 1800000), // 30 min
       },
       {
         id: 'delivery-2',
         status: 'en_route',
         deliveryLocation: { coordinates: [-122.4094, 37.7849] },
-        estimatedArrival: new Date(Date.now() + 3600000).toISOString(), // 1 hour
+        estimatedArrival: new Date(Date.now() + 3600000), // 1 hour
       },
     ];
 
     beforeEach(() => {
-      useDriverDeliveries.mockReturnValue({
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         activeDeliveries: mockDeliveries,
-        updateDeliveryStatus: mockUpdateDeliveryStatus,
-        loading: false,
-        error: null,
       });
     });
 
     it('should not show deliveries section when no deliveries exist', () => {
-      useDriverDeliveries.mockReturnValue({
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         activeDeliveries: [],
-        updateDeliveryStatus: mockUpdateDeliveryStatus,
-        loading: false,
-        error: null,
       });
 
       render(<DriverTrackingPortal />);
@@ -589,16 +498,12 @@ describe('DriverTrackingPortal', () => {
 
   describe('Error Handling', () => {
     it('should display location error', () => {
-      useRealtimeLocationTracking.mockReturnValue({
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         currentLocation: null,
-        isTracking: false,
-        accuracy: null,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: 'Location permission denied',
+        locationError: 'Location permission denied',
         isRealtimeConnected: false,
-        isRealtimeEnabled: true,
-        connectionMode: 'rest',
+        connectionMode: 'rest' as const,
       });
 
       render(<DriverTrackingPortal />);
@@ -607,15 +512,9 @@ describe('DriverTrackingPortal', () => {
     });
 
     it('should display shift error', () => {
-      useDriverShift.mockReturnValue({
-        currentShift: null,
-        isShiftActive: false,
-        startShift: mockStartShift,
-        endShift: mockEndShift,
-        startBreak: mockStartBreak,
-        endBreak: mockEndBreak,
-        loading: false,
-        error: 'Failed to start shift',
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
+        shiftError: 'Failed to start shift',
       });
 
       render(<DriverTrackingPortal />);
@@ -624,11 +523,9 @@ describe('DriverTrackingPortal', () => {
     });
 
     it('should display deliveries error', () => {
-      useDriverDeliveries.mockReturnValue({
-        activeDeliveries: [],
-        updateDeliveryStatus: mockUpdateDeliveryStatus,
-        loading: false,
-        error: 'Failed to load deliveries',
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
+        deliveriesError: 'Failed to load deliveries',
       });
 
       render(<DriverTrackingPortal />);
@@ -640,21 +537,15 @@ describe('DriverTrackingPortal', () => {
   describe('User Interactions', () => {
     it('should call startShift when Start Shift button is clicked', async () => {
       mockStartShift.mockResolvedValue(true);
-      useRealtimeLocationTracking.mockReturnValue({
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         currentLocation: {
           coordinates: { lat: 37.7749, lng: -122.4194 },
           accuracy: 25,
           speed: 0,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
         },
-        isTracking: false,
         accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
-        isRealtimeConnected: false,
-        isRealtimeEnabled: true,
-        connectionMode: 'rest',
       });
 
       render(<DriverTrackingPortal />);
@@ -671,37 +562,26 @@ describe('DriverTrackingPortal', () => {
       mockEndShift.mockResolvedValue(true);
       const mockShift = {
         id: 'shift-123',
-        startTime: new Date(Date.now() - 3600000).toISOString(),
+        startTime: new Date(Date.now() - 3600000),
         breaks: [],
         totalDistanceMiles: 10,
         deliveryCount: 2,
       };
 
-      useRealtimeLocationTracking.mockReturnValue({
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         currentLocation: {
           coordinates: { lat: 37.7749, lng: -122.4194 },
           accuracy: 25,
           speed: 0,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
         },
         isTracking: true,
         accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
         isRealtimeConnected: true,
-        isRealtimeEnabled: true,
-        connectionMode: 'realtime',
-      });
-      useDriverShift.mockReturnValue({
+        connectionMode: 'realtime' as const,
         currentShift: mockShift,
         isShiftActive: true,
-        startShift: mockStartShift,
-        endShift: mockEndShift,
-        startBreak: mockStartBreak,
-        endBreak: mockEndBreak,
-        loading: false,
-        error: null,
       });
 
       render(<DriverTrackingPortal />);
@@ -710,127 +590,26 @@ describe('DriverTrackingPortal', () => {
       fireEvent.click(endButton!);
 
       await waitFor(() => {
-        expect(mockEndShift).toHaveBeenCalledWith('shift-123', expect.any(Object));
+        expect(mockEndShift).toHaveBeenCalled();
       });
     });
 
-    it('should call startBreak when Break button is clicked', async () => {
-      const mockShift = {
-        id: 'shift-123',
-        startTime: new Date(Date.now() - 3600000).toISOString(),
-        breaks: [],
-        totalDistanceMiles: 10,
-        deliveryCount: 2,
-      };
-
-      useRealtimeLocationTracking.mockReturnValue({
-        currentLocation: {
-          coordinates: { lat: 37.7749, lng: -122.4194 },
-          accuracy: 25,
-          speed: 0,
-          timestamp: new Date().toISOString(),
-        },
-        isTracking: true,
-        accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
-        isRealtimeConnected: true,
-        isRealtimeEnabled: true,
-        connectionMode: 'realtime',
-      });
-      useDriverShift.mockReturnValue({
-        currentShift: mockShift,
-        isShiftActive: true,
-        startShift: mockStartShift,
-        endShift: mockEndShift,
-        startBreak: mockStartBreak,
-        endBreak: mockEndBreak,
-        loading: false,
-        error: null,
-      });
-
-      render(<DriverTrackingPortal />);
-
-      const breakButton = screen.getByText('Break').closest('button');
-      fireEvent.click(breakButton!);
-
-      await waitFor(() => {
-        expect(mockStartBreak).toHaveBeenCalledWith('shift-123', 'rest', expect.any(Object));
-      });
-    });
-
-    it('should call endBreak when End Break button is clicked', async () => {
-      const mockShiftOnBreak = {
-        id: 'shift-123',
-        startTime: new Date(Date.now() - 3600000).toISOString(),
-        breaks: [
-          {
-            id: 'break-1',
-            breakType: 'rest',
-            startTime: new Date(Date.now() - 600000).toISOString(),
-            endTime: null,
-          },
-        ],
-        totalDistanceMiles: 10,
-        deliveryCount: 2,
-      };
-
-      useRealtimeLocationTracking.mockReturnValue({
-        currentLocation: {
-          coordinates: { lat: 37.7749, lng: -122.4194 },
-          accuracy: 25,
-          speed: 0,
-          timestamp: new Date().toISOString(),
-        },
-        isTracking: true,
-        accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
-        isRealtimeConnected: true,
-        isRealtimeEnabled: true,
-        connectionMode: 'realtime',
-      });
-      useDriverShift.mockReturnValue({
-        currentShift: mockShiftOnBreak,
-        isShiftActive: true,
-        startShift: mockStartShift,
-        endShift: mockEndShift,
-        startBreak: mockStartBreak,
-        endBreak: mockEndBreak,
-        loading: false,
-        error: null,
-      });
-
-      render(<DriverTrackingPortal />);
-
-      const endBreakButton = screen.getByText('End Break').closest('button');
-      fireEvent.click(endBreakButton!);
-
-      await waitFor(() => {
-        expect(mockEndBreak).toHaveBeenCalledWith('break-1', expect.any(Object));
-      });
-    });
   });
 
   describe('Tracking Status', () => {
     it('should display "Location tracking active" when tracking', () => {
-      useRealtimeLocationTracking.mockReturnValue({
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         currentLocation: {
           coordinates: { lat: 37.7749, lng: -122.4194 },
           accuracy: 25,
           speed: 0,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
         },
         isTracking: true,
         accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
         isRealtimeConnected: true,
-        isRealtimeEnabled: true,
-        connectionMode: 'realtime',
+        connectionMode: 'realtime' as const,
       });
 
       render(<DriverTrackingPortal />);
@@ -848,16 +627,10 @@ describe('DriverTrackingPortal', () => {
 
   describe('Realtime Connection Status', () => {
     it('should show realtime connected message', () => {
-      useRealtimeLocationTracking.mockReturnValue({
-        currentLocation: null,
-        isTracking: false,
-        accuracy: null,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         isRealtimeConnected: true,
-        isRealtimeEnabled: true,
-        connectionMode: 'realtime',
+        connectionMode: 'realtime' as const,
       });
 
       render(<DriverTrackingPortal />);
@@ -866,16 +639,10 @@ describe('DriverTrackingPortal', () => {
     });
 
     it('should show connecting message for hybrid mode', () => {
-      useRealtimeLocationTracking.mockReturnValue({
-        currentLocation: null,
-        isTracking: false,
-        accuracy: null,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         isRealtimeConnected: false,
-        isRealtimeEnabled: true,
-        connectionMode: 'hybrid',
+        connectionMode: 'hybrid' as const,
       });
 
       render(<DriverTrackingPortal />);
@@ -894,37 +661,26 @@ describe('DriverTrackingPortal', () => {
     it('should have proper button labels', () => {
       const mockShift = {
         id: 'shift-123',
-        startTime: new Date(Date.now() - 3600000).toISOString(),
+        startTime: new Date(Date.now() - 3600000),
         breaks: [],
         totalDistanceMiles: 10,
         deliveryCount: 2,
       };
 
-      useRealtimeLocationTracking.mockReturnValue({
+      mockUseDriverTracking.mockReturnValue({
+        ...defaultMockContextValue,
         currentLocation: {
           coordinates: { lat: 37.7749, lng: -122.4194 },
           accuracy: 25,
           speed: 0,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(),
         },
         isTracking: true,
         accuracy: 25,
-        startTracking: mockStartTracking,
-        stopTracking: mockStopTracking,
-        error: null,
         isRealtimeConnected: true,
-        isRealtimeEnabled: true,
-        connectionMode: 'realtime',
-      });
-      useDriverShift.mockReturnValue({
+        connectionMode: 'realtime' as const,
         currentShift: mockShift,
         isShiftActive: true,
-        startShift: mockStartShift,
-        endShift: mockEndShift,
-        startBreak: mockStartBreak,
-        endBreak: mockEndBreak,
-        loading: false,
-        error: null,
       });
 
       render(<DriverTrackingPortal />);

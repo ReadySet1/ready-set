@@ -1,5 +1,12 @@
 // src/__tests__/api/tracking/tracking-deliveries.test.ts
 
+/**
+ * Tests for /api/tracking/deliveries API
+ *
+ * This route fetches from both `deliveries` (new tracking) and `dispatches` (legacy) tables
+ * and combines the results with pagination applied in JavaScript.
+ */
+
 import { GET, POST } from '@/app/api/tracking/deliveries/route';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
@@ -7,8 +14,6 @@ import {
   createGetRequest,
   createPostRequest,
   expectSuccessResponse,
-  expectUnauthorized,
-  expectForbidden,
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
 
@@ -22,12 +27,92 @@ jest.mock('@/utils/prismaDB', () => ({
 }));
 
 describe('/api/tracking/deliveries API', () => {
+  // Mock delivery from deliveries table
+  const mockDeliveryFromDeliveriesTable = {
+    id: 'delivery-1',
+    driver_id: 'driver-1',
+    status: 'ASSIGNED',
+    pickup_location_geojson: JSON.stringify({
+      coordinates: [-97.7431, 30.2672],
+    }),
+    delivery_location_geojson: JSON.stringify({
+      coordinates: [-97.7531, 30.2772],
+    }),
+    estimated_arrival: new Date('2024-12-01T10:00:00Z'),
+    actual_arrival: null,
+    proof_of_delivery: null,
+    order_number: 'ORD-001',
+    customer_name: 'John Doe',
+    pickup_address: '123 Pickup St, Austin, TX',
+    delivery_address: '456 Delivery Ave, Austin, TX',
+    assigned_at: new Date('2024-12-01T08:00:00Z'),
+    started_at: null,
+    arrived_at: null,
+    completed_at: null,
+    created_at: new Date('2024-12-01T08:00:00Z'),
+    updated_at: new Date('2024-12-01T08:00:00Z'),
+  };
+
+  // Mock dispatch from dispatches table (catering)
+  const mockCateringDispatch = {
+    id: 'dispatch-1',
+    catering_request_id: 'catering-1',
+    on_demand_id: null,
+    driver_id: 'driver-1',
+    assigned_at: new Date('2024-12-01T08:00:00Z'),
+    updated_at: new Date('2024-12-01T08:00:00Z'),
+    cr_order_number: 'CR-001',
+    cr_status: 'ACTIVE',
+    cr_driver_status: 'ASSIGNED',
+    cr_customer_name: 'Jane Doe',
+    cr_pickup_time: new Date('2024-12-01T09:00:00Z'),
+    cr_arrival_time: new Date('2024-12-01T10:00:00Z'),
+    cr_pickup_street: '100 Restaurant St',
+    cr_pickup_city: 'Austin',
+    cr_pickup_state: 'TX',
+    cr_pickup_zip: '78701',
+    cr_pickup_lat: 30.2672,
+    cr_pickup_lng: -97.7431,
+    cr_delivery_street: '200 Office Blvd',
+    cr_delivery_city: 'Austin',
+    cr_delivery_state: 'TX',
+    cr_delivery_zip: '78702',
+    cr_delivery_lat: 30.2772,
+    cr_delivery_lng: -97.7531,
+    od_order_number: null,
+    od_status: null,
+    od_driver_status: null,
+    od_customer_name: null,
+    od_pickup_time: null,
+    od_arrival_time: null,
+    od_pickup_street: null,
+    od_pickup_city: null,
+    od_pickup_state: null,
+    od_pickup_zip: null,
+    od_pickup_lat: null,
+    od_pickup_lng: null,
+    od_delivery_street: null,
+    od_delivery_city: null,
+    od_delivery_state: null,
+    od_delivery_zip: null,
+    od_delivery_lat: null,
+    od_delivery_lng: null,
+    driver_name: 'Test Driver',
+    driver_email: 'driver@test.com',
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'warn').mockImplementation();
+    jest.spyOn(console, 'error').mockImplementation();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('GET /api/tracking/deliveries - List Deliveries', () => {
-    describe('✅ Successful Retrieval', () => {
+    describe('Successful Retrieval', () => {
       it('should return deliveries for admin users', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: true,
@@ -36,37 +121,10 @@ describe('/api/tracking/deliveries API', () => {
           },
         });
 
-        const mockDeliveries = [
-          {
-            id: 'delivery-1',
-            catering_request_id: 'catering-1',
-            on_demand_id: null,
-            driver_id: 'driver-1',
-            status: 'ASSIGNED',
-            pickup_location_geojson: JSON.stringify({
-              coordinates: [-97.7431, 30.2672],
-            }),
-            delivery_location_geojson: JSON.stringify({
-              coordinates: [-97.7531, 30.2772],
-            }),
-            estimated_arrival: new Date('2024-12-01T10:00:00Z'),
-            actual_arrival: null,
-            proof_of_delivery: null,
-            actual_distance_km: 5.2,
-            route_polyline: null,
-            metadata: {},
-            assigned_at: new Date('2024-12-01T08:00:00Z'),
-            started_at: null,
-            arrived_at: null,
-            completed_at: null,
-            created_at: new Date('2024-12-01T08:00:00Z'),
-            updated_at: new Date('2024-12-01T08:00:00Z'),
-            employee_id: 'EMP-001',
-            vehicle_number: 'TX-1234',
-          },
-        ];
-
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(mockDeliveries);
+        // Mock deliveries table query
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([mockDeliveryFromDeliveriesTable])
+          .mockResolvedValueOnce([]); // dispatches query
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/deliveries'
@@ -79,11 +137,10 @@ describe('/api/tracking/deliveries API', () => {
         expect(data.data).toHaveLength(1);
         expect(data.data[0].id).toBe('delivery-1');
         expect(data.data[0].status).toBe('ASSIGNED');
-        expect(data.data[0].driverInfo).toBeDefined();
-        expect(data.data[0].driverInfo.employeeId).toBe('EMP-001');
+        expect(data.data[0].sourceType).toBe('delivery');
       });
 
-      it('should filter deliveries by driver_id for admin', async () => {
+      it('should return combined deliveries and dispatches', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: true,
           context: {
@@ -91,7 +148,37 @@ describe('/api/tracking/deliveries API', () => {
           },
         });
 
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([]);
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([mockDeliveryFromDeliveriesTable])
+          .mockResolvedValueOnce([mockCateringDispatch]);
+
+        const request = createGetRequest(
+          'http://localhost:3000/api/tracking/deliveries'
+        );
+
+        const response = await GET(request);
+        const data = await expectSuccessResponse(response, 200);
+
+        expect(data.success).toBe(true);
+        expect(data.data).toHaveLength(2);
+
+        // Results should include both source types
+        const sourceTypes = data.data.map((d: any) => d.sourceType);
+        expect(sourceTypes).toContain('delivery');
+        expect(sourceTypes).toContain('dispatch');
+      });
+
+      it('should filter by driver_id for admin', async () => {
+        (withAuth as jest.Mock).mockResolvedValue({
+          success: true,
+          context: {
+            user: { id: 'admin-123', type: 'ADMIN' },
+          },
+        });
+
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/deliveries?driver_id=driver-123'
@@ -99,15 +186,15 @@ describe('/api/tracking/deliveries API', () => {
 
         await GET(request);
 
-        expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
-          expect.stringContaining('d.driver_id = $'),
-          'driver-123',
-          50,
-          0
-        );
+        // Check that driver_id filter is in the query
+        const deliveryQuery = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
+        expect(deliveryQuery).toContain('d.driver_id = $');
+
+        const deliveryParams = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
+        expect(deliveryParams).toContain('driver-123');
       });
 
-      it('should filter deliveries by status', async () => {
+      it('should filter by status', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: true,
           context: {
@@ -115,7 +202,9 @@ describe('/api/tracking/deliveries API', () => {
           },
         });
 
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([]);
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/deliveries?status=COMPLETED'
@@ -123,15 +212,14 @@ describe('/api/tracking/deliveries API', () => {
 
         await GET(request);
 
-        expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
-          expect.stringContaining('d.status = $'),
-          'COMPLETED',
-          50,
-          0
-        );
+        const deliveryQuery = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
+        expect(deliveryQuery).toContain('d.status = $');
+
+        const deliveryParams = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
+        expect(deliveryParams).toContain('COMPLETED');
       });
 
-      it('should support custom pagination parameters', async () => {
+      it('should support pagination with limit and offset', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: true,
           context: {
@@ -139,19 +227,20 @@ describe('/api/tracking/deliveries API', () => {
           },
         });
 
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([]);
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([mockDeliveryFromDeliveriesTable])
+          .mockResolvedValueOnce([mockCateringDispatch]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/deliveries?limit=20&offset=40'
         );
 
-        await GET(request);
+        const response = await GET(request);
+        const data = await response.json();
 
-        expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
-          expect.stringContaining('LIMIT'),
-          20,
-          40
-        );
+        // Pagination is applied in JS after combining results
+        expect(data.pagination.limit).toBe(20);
+        expect(data.pagination.offset).toBe(40);
       });
 
       it('should only return driver own deliveries for DRIVER users', async () => {
@@ -162,37 +251,9 @@ describe('/api/tracking/deliveries API', () => {
           },
         });
 
-        const mockDeliveries = [
-          {
-            id: 'delivery-1',
-            catering_request_id: null,
-            on_demand_id: 'ondemand-1',
-            driver_id: 'driver-1',
-            status: 'STARTED',
-            pickup_location_geojson: JSON.stringify({
-              coordinates: [-97.7431, 30.2672],
-            }),
-            delivery_location_geojson: JSON.stringify({
-              coordinates: [-97.7531, 30.2772],
-            }),
-            estimated_arrival: new Date(),
-            actual_arrival: null,
-            proof_of_delivery: null,
-            actual_distance_km: null,
-            route_polyline: null,
-            metadata: {},
-            assigned_at: new Date(),
-            started_at: new Date(),
-            arrived_at: null,
-            completed_at: null,
-            created_at: new Date(),
-            updated_at: new Date(),
-            employee_id: null,
-            vehicle_number: null,
-          },
-        ];
-
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(mockDeliveries);
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([mockDeliveryFromDeliveriesTable])
+          .mockResolvedValueOnce([]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/deliveries'
@@ -202,13 +263,13 @@ describe('/api/tracking/deliveries API', () => {
         const data = await expectSuccessResponse(response, 200);
 
         expect(data.data).toHaveLength(1);
-        expect(data.data[0].driverInfo).toBeUndefined(); // Driver shouldn't see driver info
-        expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
-          expect.stringContaining('d.driver_id = (SELECT id FROM drivers WHERE user_id = $'),
-          'driver-user-123',
-          50,
-          0
-        );
+
+        // Verify driver filtering was applied
+        const deliveryQuery = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
+        expect(deliveryQuery).toContain('d.driver_id = $');
+
+        const deliveryParams = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
+        expect(deliveryParams).toContain('driver-user-123');
       });
 
       it('should parse GeoJSON coordinates correctly', async () => {
@@ -219,37 +280,9 @@ describe('/api/tracking/deliveries API', () => {
           },
         });
 
-        const mockDeliveries = [
-          {
-            id: 'delivery-1',
-            catering_request_id: 'catering-1',
-            on_demand_id: null,
-            driver_id: 'driver-1',
-            status: 'ASSIGNED',
-            pickup_location_geojson: JSON.stringify({
-              coordinates: [-97.7431, 30.2672],
-            }),
-            delivery_location_geojson: JSON.stringify({
-              coordinates: [-97.7531, 30.2772],
-            }),
-            estimated_arrival: new Date(),
-            actual_arrival: null,
-            proof_of_delivery: null,
-            actual_distance_km: null,
-            route_polyline: null,
-            metadata: {},
-            assigned_at: new Date(),
-            started_at: null,
-            arrived_at: null,
-            completed_at: null,
-            created_at: new Date(),
-            updated_at: new Date(),
-            employee_id: 'EMP-001',
-            vehicle_number: 'TX-1234',
-          },
-        ];
-
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(mockDeliveries);
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([mockDeliveryFromDeliveriesTable])
+          .mockResolvedValueOnce([]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/deliveries'
@@ -262,9 +295,56 @@ describe('/api/tracking/deliveries API', () => {
         expect(data.data[0].pickupLocation).toEqual([30.2672, -97.7431]);
         expect(data.data[0].deliveryLocation).toEqual([30.2772, -97.7531]);
       });
+
+      it('should parse dispatch lat/lng coordinates correctly', async () => {
+        (withAuth as jest.Mock).mockResolvedValue({
+          success: true,
+          context: {
+            user: { id: 'admin-123', type: 'ADMIN' },
+          },
+        });
+
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([mockCateringDispatch]);
+
+        const request = createGetRequest(
+          'http://localhost:3000/api/tracking/deliveries'
+        );
+
+        const response = await GET(request);
+        const data = await expectSuccessResponse(response, 200);
+
+        // Dispatch coordinates come from lat/lng fields directly
+        expect(data.data[0].pickupLocation).toEqual([30.2672, -97.7431]);
+        expect(data.data[0].deliveryLocation).toEqual([30.2772, -97.7531]);
+      });
+
+      it('should include orderType for dispatch records', async () => {
+        (withAuth as jest.Mock).mockResolvedValue({
+          success: true,
+          context: {
+            user: { id: 'admin-123', type: 'ADMIN' },
+          },
+        });
+
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([mockCateringDispatch]);
+
+        const request = createGetRequest(
+          'http://localhost:3000/api/tracking/deliveries'
+        );
+
+        const response = await GET(request);
+        const data = await expectSuccessResponse(response, 200);
+
+        expect(data.data[0].orderType).toBe('catering');
+        expect(data.data[0].sourceType).toBe('dispatch');
+      });
     });
 
-    describe('🔐 Authentication Tests', () => {
+    describe('Authentication Tests', () => {
       it('should return 401 for unauthenticated requests', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: false,
@@ -283,7 +363,7 @@ describe('/api/tracking/deliveries API', () => {
       });
     });
 
-    describe('🔒 Authorization Tests', () => {
+    describe('Authorization Tests', () => {
       it('should return 403 for CLIENT users', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: false,
@@ -309,7 +389,9 @@ describe('/api/tracking/deliveries API', () => {
           },
         });
 
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([]);
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/deliveries'
@@ -327,7 +409,9 @@ describe('/api/tracking/deliveries API', () => {
           },
         });
 
-        (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([]);
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/deliveries'
@@ -338,8 +422,8 @@ describe('/api/tracking/deliveries API', () => {
       });
     });
 
-    describe('❌ Error Handling', () => {
-      it('should handle database errors', async () => {
+    describe('Error Handling', () => {
+      it('should gracefully handle deliveries table failure and continue to dispatches', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: true,
           context: {
@@ -347,26 +431,76 @@ describe('/api/tracking/deliveries API', () => {
           },
         });
 
-        (prisma.$queryRawUnsafe as jest.Mock).mockRejectedValue(
-          new Error('Database connection failed')
-        );
+        // Deliveries query fails, but dispatches succeeds
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockRejectedValueOnce(new Error('Database connection failed'))
+          .mockResolvedValueOnce([mockCateringDispatch]);
 
         const request = createGetRequest(
           'http://localhost:3000/api/tracking/deliveries'
         );
 
         const response = await GET(request);
-        await expectErrorResponse(
-          response,
-          500,
-          /Failed to fetch deliveries/i
+        // Should return 200 with dispatch data due to graceful degradation
+        const data = await expectSuccessResponse(response, 200);
+        expect(data.data).toHaveLength(1);
+        expect(data.data[0].sourceType).toBe('dispatch');
+      });
+
+      it('should return empty results when both queries fail', async () => {
+        (withAuth as jest.Mock).mockResolvedValue({
+          success: true,
+          context: {
+            user: { id: 'admin-123', type: 'ADMIN' },
+          },
+        });
+
+        // Both queries fail - graceful degradation returns empty results
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockRejectedValueOnce(new Error('Deliveries table error'))
+          .mockRejectedValueOnce(new Error('Dispatches query error'));
+
+        const request = createGetRequest(
+          'http://localhost:3000/api/tracking/deliveries'
         );
+
+        const response = await GET(request);
+        // Should still return 200 with empty results due to graceful degradation
+        const data = await response.json();
+        expect(response.status).toBe(200);
+        expect(data.success).toBe(true);
+        expect(data.data).toHaveLength(0);
+      });
+
+      it('should continue if deliveries table fails but dispatches succeeds', async () => {
+        (withAuth as jest.Mock).mockResolvedValue({
+          success: true,
+          context: {
+            user: { id: 'admin-123', type: 'ADMIN' },
+          },
+        });
+
+        // Deliveries query fails (table might not exist)
+        (prisma.$queryRawUnsafe as jest.Mock)
+          .mockRejectedValueOnce(new Error('relation "deliveries" does not exist'))
+          .mockResolvedValueOnce([mockCateringDispatch]);
+
+        const request = createGetRequest(
+          'http://localhost:3000/api/tracking/deliveries'
+        );
+
+        const response = await GET(request);
+        const data = await expectSuccessResponse(response, 200);
+
+        // Should still return dispatch data
+        expect(data.data).toHaveLength(1);
+        expect(data.data[0].sourceType).toBe('dispatch');
       });
     });
   });
 
   describe('POST /api/tracking/deliveries - Create Delivery', () => {
-    describe('✅ Successful Creation', () => {
+    describe('Successful Creation', () => {
       it('should create delivery with valid data', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: true,
@@ -440,7 +574,7 @@ describe('/api/tracking/deliveries API', () => {
       });
     });
 
-    describe('🔐 Authentication Tests', () => {
+    describe('Authentication Tests', () => {
       it('should return 401 for unauthenticated requests', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: false,
@@ -460,7 +594,7 @@ describe('/api/tracking/deliveries API', () => {
       });
     });
 
-    describe('🔒 Authorization Tests', () => {
+    describe('Authorization Tests', () => {
       it('should return 403 for DRIVER users', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: false,
@@ -505,7 +639,7 @@ describe('/api/tracking/deliveries API', () => {
       });
     });
 
-    describe('✏️ Validation Tests', () => {
+    describe('Validation Tests', () => {
       it('should return 400 for missing driverId', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: true,
@@ -599,7 +733,7 @@ describe('/api/tracking/deliveries API', () => {
       });
     });
 
-    describe('❌ Error Handling', () => {
+    describe('Error Handling', () => {
       it('should handle database errors during creation', async () => {
         (withAuth as jest.Mock).mockResolvedValue({
           success: true,

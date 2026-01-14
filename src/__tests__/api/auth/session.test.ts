@@ -1,31 +1,64 @@
 // src/__tests__/api/auth/session.test.ts
 
 import { GET } from '@/app/api/auth/session/route';
+import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/utils/prismaDB';
 import { createGetRequest } from '@/__tests__/helpers/api-test-helpers';
 
 // Mock dependencies
+jest.mock('@/utils/supabase/server', () => ({
+  createClient: jest.fn(),
+}));
+
 jest.mock('@/utils/prismaDB', () => ({
   prisma: {
     $queryRawUnsafe: jest.fn(),
   },
 }));
 
+const mockCreateClient = createClient as jest.MockedFunction<typeof createClient>;
+
 describe('/api/auth/session GET API', () => {
+  const mockUser = {
+    id: 'user-uuid-123',
+    email: 'driver@readyset.com',
+  };
+
+  const mockProfile = {
+    id: 'user-uuid-123',
+    email: 'driver@readyset.com',
+    name: 'John Driver',
+    type: 'DRIVER',
+  };
+
+  const mockDriver = {
+    id: 'driver-uuid-123',
+    employee_id: 'EMP001',
+  };
+
+  const mockSupabase = {
+    auth: {
+      getUser: jest.fn(),
+    },
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCreateClient.mockResolvedValue(mockSupabase as any);
   });
 
   describe('✅ Successful Session Retrieval', () => {
-    it('should return a valid session with driver data', async () => {
-      const mockDriver = [
-        {
-          id: 'driver-uuid-123',
-          employee_id: 'EMP001',
-        },
-      ];
+    beforeEach(() => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: mockUser },
+        error: null,
+      });
+    });
 
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(mockDriver);
+    it('should return a valid session with driver data', async () => {
+      (prisma.$queryRawUnsafe as jest.Mock)
+        .mockResolvedValueOnce([mockProfile])
+        .mockResolvedValueOnce([mockDriver]);
 
       const request = createGetRequest('http://localhost:3000/api/auth/session');
       const response = await GET(request);
@@ -36,8 +69,8 @@ describe('/api/auth/session GET API', () => {
       expect(data).toHaveProperty('expires');
 
       expect(data.user).toEqual({
-        id: 'user-123',
-        email: 'driver@readyset.com',
+        id: mockUser.id,
+        email: mockUser.email,
         type: 'DRIVER',
         driverId: 'driver-uuid-123',
         name: 'John Driver',
@@ -47,8 +80,10 @@ describe('/api/auth/session GET API', () => {
       expect(new Date(data.expires).getTime()).toBeGreaterThan(Date.now());
     });
 
-    it('should return session with null driverId when no drivers exist', async () => {
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([]);
+    it('should return session with null driverId when no driver record exists', async () => {
+      (prisma.$queryRawUnsafe as jest.Mock)
+        .mockResolvedValueOnce([mockProfile])
+        .mockResolvedValueOnce([]);
 
       const request = createGetRequest('http://localhost:3000/api/auth/session');
       const response = await GET(request);
@@ -59,14 +94,9 @@ describe('/api/auth/session GET API', () => {
     });
 
     it('should set expiration to 24 hours from now', async () => {
-      const mockDriver = [
-        {
-          id: 'driver-uuid-123',
-          employee_id: 'EMP001',
-        },
-      ];
-
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(mockDriver);
+      (prisma.$queryRawUnsafe as jest.Mock)
+        .mockResolvedValueOnce([mockProfile])
+        .mockResolvedValueOnce([mockDriver]);
 
       const beforeRequest = Date.now();
       const request = createGetRequest('http://localhost:3000/api/auth/session');
@@ -83,11 +113,50 @@ describe('/api/auth/session GET API', () => {
     });
   });
 
+  describe('🔒 Unauthenticated Requests', () => {
+    it('should return null session when not authenticated', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: null },
+        error: null,
+      });
+
+      const request = createGetRequest('http://localhost:3000/api/auth/session');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ user: null, expires: null });
+    });
+
+    it('should return null session on auth error', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: null },
+        error: new Error('Auth error'),
+      });
+
+      const request = createGetRequest('http://localhost:3000/api/auth/session');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ user: null, expires: null });
+    });
+  });
+
   describe('❌ Error Handling Tests', () => {
+    beforeEach(() => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: mockUser },
+        error: null,
+      });
+    });
+
     it('should return 500 when database query fails', async () => {
       (prisma.$queryRawUnsafe as jest.Mock).mockRejectedValue(
         new Error('Database connection failed')
       );
+
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const request = createGetRequest('http://localhost:3000/api/auth/session');
       const response = await GET(request);
@@ -95,6 +164,8 @@ describe('/api/auth/session GET API', () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Failed to get session');
+
+      consoleSpy.mockRestore();
     });
 
     it('should handle database timeout errors', async () => {
@@ -102,49 +173,31 @@ describe('/api/auth/session GET API', () => {
         new Error('Query timeout')
       );
 
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
       const request = createGetRequest('http://localhost:3000/api/auth/session');
       const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(500);
       expect(data.error).toBe('Failed to get session');
-    });
 
-    it('should handle null database response with error', async () => {
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(null);
-
-      const request = createGetRequest('http://localhost:3000/api/auth/session');
-      const response = await GET(request);
-      const data = await response.json();
-
-      // When database returns null, accessing properties throws error
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Failed to get session');
-    });
-
-    it('should handle undefined database response with error', async () => {
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(undefined);
-
-      const request = createGetRequest('http://localhost:3000/api/auth/session');
-      const response = await GET(request);
-      const data = await response.json();
-
-      // When database returns undefined, accessing properties throws error
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Failed to get session');
+      consoleSpy.mockRestore();
     });
   });
 
   describe('📊 Response Structure Tests', () => {
-    it('should return session with all required user fields', async () => {
-      const mockDriver = [
-        {
-          id: 'driver-uuid-123',
-          employee_id: 'EMP001',
-        },
-      ];
+    beforeEach(() => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: mockUser },
+        error: null,
+      });
+    });
 
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(mockDriver);
+    it('should return session with all required user fields', async () => {
+      (prisma.$queryRawUnsafe as jest.Mock)
+        .mockResolvedValueOnce([mockProfile])
+        .mockResolvedValueOnce([mockDriver]);
 
       const request = createGetRequest('http://localhost:3000/api/auth/session');
       const response = await GET(request);
@@ -158,14 +211,9 @@ describe('/api/auth/session GET API', () => {
     });
 
     it('should return ISO 8601 formatted expiration date', async () => {
-      const mockDriver = [
-        {
-          id: 'driver-uuid-123',
-          employee_id: 'EMP001',
-        },
-      ];
-
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(mockDriver);
+      (prisma.$queryRawUnsafe as jest.Mock)
+        .mockResolvedValueOnce([mockProfile])
+        .mockResolvedValueOnce([mockDriver]);
 
       const request = createGetRequest('http://localhost:3000/api/auth/session');
       const response = await GET(request);
@@ -177,16 +225,15 @@ describe('/api/auth/session GET API', () => {
     });
 
     it('should not include sensitive driver information', async () => {
-      const mockDriver = [
-        {
-          id: 'driver-uuid-123',
-          employee_id: 'EMP001',
-          password: 'should-not-be-returned',
-          ssn: 'should-not-be-returned',
-        },
-      ];
+      const driverWithSensitive = {
+        ...mockDriver,
+        password: 'should-not-be-returned',
+        ssn: 'should-not-be-returned',
+      };
 
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(mockDriver);
+      (prisma.$queryRawUnsafe as jest.Mock)
+        .mockResolvedValueOnce([mockProfile])
+        .mockResolvedValueOnce([driverWithSensitive]);
 
       const request = createGetRequest('http://localhost:3000/api/auth/session');
       const response = await GET(request);
@@ -199,48 +246,65 @@ describe('/api/auth/session GET API', () => {
   });
 
   describe('🗄️ Database Query Tests', () => {
-    it('should query for most recent driver', async () => {
-      const mockDriver = [
-        {
-          id: 'driver-uuid-123',
-          employee_id: 'EMP001',
-        },
-      ];
+    beforeEach(() => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: mockUser },
+        error: null,
+      });
+    });
 
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(mockDriver);
+    it('should query profile and driver tables with user ID', async () => {
+      (prisma.$queryRawUnsafe as jest.Mock)
+        .mockResolvedValueOnce([mockProfile])
+        .mockResolvedValueOnce([mockDriver]);
 
       const request = createGetRequest('http://localhost:3000/api/auth/session');
       await GET(request);
 
-      expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
-        'SELECT id, employee_id FROM drivers ORDER BY created_at DESC LIMIT 1'
+      // First call: profile query
+      expect(prisma.$queryRawUnsafe).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('SELECT id, email, name, type'),
+        mockUser.id
       );
-      expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
+
+      // Second call: driver query (only for DRIVER type)
+      expect(prisma.$queryRawUnsafe).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('SELECT d.id, d.employee_id'),
+        mockUser.id
+      );
     });
 
-    it('should handle multiple drivers and select the most recent', async () => {
-      const mockDrivers = [
-        {
-          id: 'most-recent-driver-uuid',
-          employee_id: 'EMP999',
-        },
-      ];
-
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(mockDrivers);
+    it('should not query driver table for non-DRIVER users', async () => {
+      const vendorProfile = { ...mockProfile, type: 'VENDOR' };
+      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([vendorProfile]);
 
       const request = createGetRequest('http://localhost:3000/api/auth/session');
       const response = await GET(request);
       const data = await response.json();
 
-      expect(data.user.driverId).toBe('most-recent-driver-uuid');
+      expect(data.user.type).toBe('VENDOR');
+      expect(data.user.driverId).toBeNull();
+      // Should only call once for profile, not for driver
+      expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('🔒 Security Tests', () => {
+    beforeEach(() => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: mockUser },
+        error: null,
+      });
+    });
+
     it('should not expose database errors to client', async () => {
       (prisma.$queryRawUnsafe as jest.Mock).mockRejectedValue(
         new Error('Internal database error: Connection string postgres://user:pass@host')
       );
+
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const request = createGetRequest('http://localhost:3000/api/auth/session');
       const response = await GET(request);
@@ -250,6 +314,8 @@ describe('/api/auth/session GET API', () => {
       expect(data.error).toBe('Failed to get session');
       expect(data.error).not.toContain('postgres');
       expect(data.error).not.toContain('Connection string');
+
+      consoleSpy.mockRestore();
     });
 
     it('should return consistent session structure on errors', async () => {
@@ -257,36 +323,50 @@ describe('/api/auth/session GET API', () => {
         new Error('Database error')
       );
 
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
       const request = createGetRequest('http://localhost:3000/api/auth/session');
       const response = await GET(request);
       const data = await response.json();
 
       expect(data).toHaveProperty('error');
       expect(data).not.toHaveProperty('user');
+
+      consoleSpy.mockRestore();
     });
   });
 
-  describe('⚠️ Temporary Implementation Tests', () => {
-    it('should use hardcoded user data (temporary dev implementation)', async () => {
-      const mockDriver = [
-        {
-          id: 'any-driver-id',
-          employee_id: 'EMP001',
-        },
-      ];
+  describe('📱 User Type Handling', () => {
+    beforeEach(() => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: mockUser },
+        error: null,
+      });
+    });
 
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(mockDriver);
+    it('should default to VENDOR type when profile has no type', async () => {
+      const profileWithoutType = { ...mockProfile, type: undefined };
+      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce([profileWithoutType]);
 
       const request = createGetRequest('http://localhost:3000/api/auth/session');
       const response = await GET(request);
       const data = await response.json();
 
-      // This test documents that the endpoint currently uses hardcoded values
-      // and should be updated when proper session management is implemented
-      expect(data.user.id).toBe('user-123');
-      expect(data.user.email).toBe('driver@readyset.com');
-      expect(data.user.type).toBe('DRIVER');
-      expect(data.user.name).toBe('John Driver');
+      expect(response.status).toBe(200);
+      expect(data.user.type).toBe('VENDOR');
+    });
+
+    it('should use email prefix as name when profile has no name', async () => {
+      const profileWithoutName = { ...mockProfile, name: undefined };
+      (prisma.$queryRawUnsafe as jest.Mock)
+        .mockResolvedValueOnce([profileWithoutName])
+        .mockResolvedValueOnce([mockDriver]);
+
+      const request = createGetRequest('http://localhost:3000/api/auth/session');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.user.name).toBe('driver'); // From driver@readyset.com
     });
   });
 });

@@ -13,13 +13,13 @@ import {
   ClockIcon,
   UsersIcon,
   ActivityIcon,
-  BatteryIcon,
   SignalIcon,
   AlertTriangleIcon,
   DownloadIcon,
   RefreshCwIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import DriverStatusList from './DriverStatusList';
 import DeliveryAssignmentPanel from './DeliveryAssignmentPanel';
 import { useAdminRealtimeTracking } from '@/hooks/tracking/useAdminRealtimeTracking';
@@ -53,6 +53,7 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
     recentLocations,
     activeDeliveries,
     isConnected,
+    isLoading,
     isRealtimeConnected,
     isRealtimeEnabled,
     connectionMode,
@@ -222,9 +223,19 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
                 <UsersIcon className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{stats.driversOnDuty}</p>
-                <p className="text-sm text-muted-foreground">On Duty</p>
-                <p className="text-xs text-muted-foreground">of {stats.totalDrivers} total</p>
+                {isLoading ? (
+                  <>
+                    <Skeleton className="h-8 w-12 mb-1" />
+                    <Skeleton className="h-4 w-16 mb-1" />
+                    <Skeleton className="h-3 w-20" />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold">{stats.driversOnDuty}</p>
+                    <p className="text-sm text-muted-foreground">On Duty</p>
+                    <p className="text-xs text-muted-foreground">of {stats.totalDrivers} total</p>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -237,8 +248,17 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
                 <TruckIcon className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{stats.activeDeliveries}</p>
-                <p className="text-sm text-muted-foreground">Active Deliveries</p>
+                {isLoading ? (
+                  <>
+                    <Skeleton className="h-8 w-12 mb-1" />
+                    <Skeleton className="h-4 w-28" />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold">{stats.activeDeliveries}</p>
+                    <p className="text-sm text-muted-foreground">Active Deliveries</p>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -251,8 +271,17 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
                 <ActivityIcon className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{stats.averageSpeed}</p>
-                <p className="text-sm text-muted-foreground">Avg Speed (mph)</p>
+                {isLoading ? (
+                  <>
+                    <Skeleton className="h-8 w-12 mb-1" />
+                    <Skeleton className="h-4 w-28" />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold">{stats.averageSpeed}</p>
+                    <p className="text-sm text-muted-foreground">Avg Speed (mph)</p>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -265,9 +294,19 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
                 <NavigationIcon className="w-5 h-5 text-orange-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{Math.round(stats.totalDistance)}</p>
-                <p className="text-sm text-muted-foreground">Total KM</p>
-                <p className="text-xs text-muted-foreground">today</p>
+                {isLoading ? (
+                  <>
+                    <Skeleton className="h-8 w-12 mb-1" />
+                    <Skeleton className="h-4 w-20 mb-1" />
+                    <Skeleton className="h-3 w-12" />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold">{Math.round(stats.totalDistance)}</p>
+                    <p className="text-sm text-muted-foreground">Total KM</p>
+                    <p className="text-xs text-muted-foreground">today</p>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -280,9 +319,19 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
                 <ClockIcon className="w-5 h-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{recentLocations.length}</p>
-                <p className="text-sm text-muted-foreground">GPS Updates</p>
-                <p className="text-xs text-muted-foreground">last 5 min</p>
+                {isLoading ? (
+                  <>
+                    <Skeleton className="h-8 w-12 mb-1" />
+                    <Skeleton className="h-4 w-24 mb-1" />
+                    <Skeleton className="h-3 w-16" />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold">{recentLocations.length}</p>
+                    <p className="text-sm text-muted-foreground">GPS Updates</p>
+                    <p className="text-xs text-muted-foreground">last 5 min</p>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -387,6 +436,7 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
               <DeliveryAssignmentPanel
                 drivers={activeDrivers}
                 deliveries={activeDeliveries}
+                isLoading={isLoading}
               />
             </CardContent>
           </Card>

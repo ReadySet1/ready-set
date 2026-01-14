@@ -393,7 +393,8 @@ export class RealtimeClient {
             // Track error in metrics
             this.recordError(channelName, timeoutError);
 
-            realtimeLogger.error('Channel subscription timed out', {
+            // Log as warning since timeout often triggers graceful SSE fallback
+            realtimeLogger.warn('Channel subscription timed out - may fallback to SSE', {
               channelName,
             });
 

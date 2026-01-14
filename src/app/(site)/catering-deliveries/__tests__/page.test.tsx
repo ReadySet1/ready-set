@@ -27,6 +27,12 @@ jest.mock("@/components/FoodDelivery/DeliveryPartners", () => {
   };
 });
 
+jest.mock("@/components/FoodDelivery/ServedPartners", () => {
+  return function ServedPartners() {
+    return <div data-testid="served-partners">ServedPartners Component</div>;
+  };
+});
+
 jest.mock("@/components/FoodDelivery/FoodSetupCarousel", () => {
   return function FoodSetupCarousel() {
     return <div data-testid="food-setup-carousel">FoodSetupCarousel Component</div>;
@@ -76,6 +82,7 @@ describe("FoodPage (Catering Deliveries)", () => {
       expect(screen.getByTestId("catering-features")).toBeInTheDocument();
       expect(screen.getByTestId("catering-about")).toBeInTheDocument();
       expect(screen.getByTestId("delivery-partners")).toBeInTheDocument();
+      expect(screen.getByTestId("served-partners")).toBeInTheDocument();
       expect(screen.getByTestId("food-setup-carousel")).toBeInTheDocument();
       expect(screen.getByTestId("catering-contact")).toBeInTheDocument();
     });
@@ -128,18 +135,19 @@ describe("FoodPage (Catering Deliveries)", () => {
       expect(children[1]).toHaveAttribute("data-testid", "catering-features");
       expect(children[2]).toHaveAttribute("data-testid", "catering-about");
       expect(children[3]).toHaveAttribute("data-testid", "delivery-partners");
-      expect(children[4]).toHaveAttribute("data-testid", "food-setup-carousel");
-      expect(children[5]).toHaveAttribute("data-testid", "catering-contact");
+      expect(children[4]).toHaveAttribute("data-testid", "served-partners");
+      expect(children[5]).toHaveAttribute("data-testid", "food-setup-carousel");
+      expect(children[6]).toHaveAttribute("data-testid", "catering-contact");
     });
 
-    it("renders exactly 6 components", () => {
+    it("renders exactly 7 components", () => {
       const { container } = render(<FoodPage />);
 
       const wrapperDiv = container.firstChild as HTMLElement;
       const childComponents = wrapperDiv.querySelectorAll('[data-testid]');
 
-      // Should have exactly 6 components (no promotional banners, commented out components removed)
-      expect(childComponents).toHaveLength(6);
+      // Should have exactly 7 components (no promotional banners, commented out components removed)
+      expect(childComponents).toHaveLength(7);
     });
 
     it("uses div wrapper with correct styling", () => {
@@ -158,13 +166,14 @@ describe("FoodPage (Catering Deliveries)", () => {
       const wrapperDiv = container.firstChild as HTMLElement;
       const components = Array.from(wrapperDiv.children);
 
-      // Verify logical flow: Header -> Features -> About -> Partners -> Carousel -> Contact
+      // Verify logical flow: Header -> Features -> About -> Partners -> Served -> Carousel -> Contact
       expect(components[0]).toHaveAttribute("data-testid", "food-header"); // Hero/Header
       expect(components[1]).toHaveAttribute("data-testid", "catering-features"); // Service features
       expect(components[2]).toHaveAttribute("data-testid", "catering-about"); // About section
       expect(components[3]).toHaveAttribute("data-testid", "delivery-partners"); // Trust signals
-      expect(components[4]).toHaveAttribute("data-testid", "food-setup-carousel"); // Visual showcase
-      expect(components[5]).toHaveAttribute("data-testid", "catering-contact"); // CTA
+      expect(components[4]).toHaveAttribute("data-testid", "served-partners"); // Served logos
+      expect(components[5]).toHaveAttribute("data-testid", "food-setup-carousel"); // Visual showcase
+      expect(components[6]).toHaveAttribute("data-testid", "catering-contact"); // CTA
     });
 
     it("provides clean user experience without popup interruptions", () => {
@@ -185,6 +194,7 @@ describe("FoodPage (Catering Deliveries)", () => {
         screen.getByTestId("catering-features"),
         screen.getByTestId("catering-about"),
         screen.getByTestId("delivery-partners"),
+        screen.getByTestId("served-partners"),
         screen.getByTestId("food-setup-carousel"),
         screen.getByTestId("catering-contact"),
       ];
@@ -252,7 +262,7 @@ describe("FoodPage (Catering Deliveries)", () => {
       const wrapperDiv = container.firstChild as HTMLElement;
 
       // Verify all expected components are integrated
-      expect(wrapperDiv.children).toHaveLength(6);
+      expect(wrapperDiv.children).toHaveLength(7);
       expect(wrapperDiv).toContainElement(screen.getByTestId("food-header"));
       expect(wrapperDiv).toContainElement(screen.getByTestId("catering-features"));
       expect(wrapperDiv).toContainElement(screen.getByTestId("catering-contact"));
@@ -267,6 +277,7 @@ describe("FoodPage (Catering Deliveries)", () => {
         "catering-features",
         "catering-about",
         "delivery-partners",
+        "served-partners",
         "food-setup-carousel",
         "catering-contact"
       ];
@@ -318,8 +329,8 @@ describe("FoodPage (Catering Deliveries)", () => {
       const wrapperDiv = container.firstChild as HTMLElement;
       const childComponents = wrapperDiv.querySelectorAll('[data-testid]');
 
-      // Should have exactly 6 components (no promotional banners)
-      expect(childComponents).toHaveLength(6);
+      // Should have exactly 7 components (no promotional banners)
+      expect(childComponents).toHaveLength(7);
     });
   });
 
@@ -360,6 +371,7 @@ describe("FoodPage (Catering Deliveries)", () => {
         "catering-features",
         "catering-about",
         "delivery-partners",
+        "served-partners",
         "food-setup-carousel",
         "catering-contact"
       ];

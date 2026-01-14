@@ -55,6 +55,7 @@ export interface DeliveryTracking {
   cateringRequestId?: string;  // Link to existing CateringRequest
   onDemandId?: string;         // Link to OnDemand orders
   driverId: string;
+  dispatchDriverId?: string;   // Profile ID from dispatch assignment (for legacy dispatches)
   status: DriverStatus;        // Use existing enum
   pickupLocation: {
     coordinates: [number, number]; // [lng, lat]
@@ -93,6 +94,7 @@ export interface TrackedDriver {
   id: string;
   userId?: string;
   employeeId: string;
+  name?: string;
   vehicleNumber?: string;
   licenseNumber?: string;
   phoneNumber: string;
