@@ -74,13 +74,13 @@ describe('/api/calculator/configurations', () => {
     mileageRate: 3.00,
     distanceThreshold: 10.00,
     dailyDriveDiscounts: { twoDrivers: 5, threeDrivers: 10, fourPlusDrivers: 15 },
-    driverPaySettings: { maxPayPerDrop: 40, basePayPerDrop: 23, bonusPay: 10, readySetFee: 70 },
+    driverPaySettings: { maxPayPerDrop: null, basePayPerDrop: 18, driverMileageRate: 0.70, bonusPay: 10, readySetFee: 70 },
     bridgeTollSettings: { defaultTollAmount: 8.00, autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County'] },
     customSettings: { tollPaidByReadySet: true },
     createdAt: new Date('2025-11-10'),
     updatedAt: new Date('2025-11-10'),
     createdBy: null,
-    notes: 'CaterValley pricing with $42.50 minimum delivery fee as per agreement'
+    notes: 'CaterValley pricing with $42.50 minimum delivery fee. Driver pay: $18 base + $10 bonus + ($0.70/mile).'
   };
 
   const mockReadySetConfig = {
@@ -188,8 +188,9 @@ describe('/api/calculator/configurations', () => {
 
         const caterValley = data.data.find((c: any) => c.id === 'cater-valley');
         expect(caterValley.driverPaySettings).toEqual({
-          maxPayPerDrop: 40,
-          basePayPerDrop: 23,
+          maxPayPerDrop: null, // CaterValley: no cap, uses sum of components
+          basePayPerDrop: 18, // $18 flat rate
+          driverMileageRate: 0.70, // $0.70/mile for ALL miles
           bonusPay: 10,
           readySetFee: 70
         });

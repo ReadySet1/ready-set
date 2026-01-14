@@ -5,7 +5,9 @@
  * - Minimum delivery fee: $42.50
  * - Bridge toll: Driver compensation paid by Ready Set (NOT charged to customer)
  * - Percentage-based pricing for 100+ headcount (10% of food cost)
- * - Mileage rate: $3.00/mile after 10 miles
+ * - Customer mileage rate: $3.00/mile after 10 miles
+ * - Driver mileage rate: $0.70/mile for ALL miles
+ * - Driver base pay: $18.00 flat
  */
 
 import {
@@ -233,13 +235,13 @@ describe('CaterValley Calculator - Driver Compensation', () => {
       };
 
       const result = calculateDriverPay(input);
-      // CaterValley driver base pay: $23
-      expect(result.driverTotalBasePay).toBe(23);
+      // CaterValley driver base pay: $18 flat
+      expect(result.driverTotalBasePay).toBe(18);
     });
   });
 
   describe('Mileage pay calculation', () => {
-    it('should calculate mileage at $0.35/mile for all miles', () => {
+    it('should calculate mileage at $0.70/mile for all miles', () => {
       const input: DriverPayInput = {
         headcount: 30,
         foodCost: 400,
@@ -252,8 +254,8 @@ describe('CaterValley Calculator - Driver Compensation', () => {
       };
 
       const result = calculateDriverPay(input);
-      // 10 miles × $0.35 = $3.50
-      expect(result.totalMileagePay).toBe(3.50);
+      // 10 miles × $0.70 = $7.00
+      expect(result.totalMileagePay).toBe(7.00);
     });
   });
 
@@ -311,9 +313,9 @@ describe('CaterValley Calculator - Driver Compensation', () => {
       const result = calculateDriverPay(input);
       // Bridge toll tracked separately for CaterValley (paid by Ready Set)
       expect(result.bridgeToll).toBe(8);
-      // Base $23 + Mileage (12 × $0.35 = $4.20) + Bonus $10 = $37.20
+      // Base $18 + Mileage (12 × $0.70 = $8.40) + Bonus $10 = $36.40
       // Bridge toll is separate reimbursement, not in totalDriverPay
-      expect(result.totalDriverPay).toBeCloseTo(37.20, 2);
+      expect(result.totalDriverPay).toBeCloseTo(36.40, 2);
     });
   });
 
@@ -331,8 +333,8 @@ describe('CaterValley Calculator - Driver Compensation', () => {
       };
 
       const result = calculateDriverPay(input);
-      // Base $23 + Mileage (15 × $0.35 = $5.25) + Bonus $10 = $38.25
-      const expectedTotal = 23 + 5.25 + 10;
+      // Base $18 + Mileage (15 × $0.70 = $10.50) + Bonus $10 = $38.50
+      const expectedTotal = 18 + 10.50 + 10;
       expect(result.totalDriverPay).toBeCloseTo(expectedTotal, 2);
     });
   });

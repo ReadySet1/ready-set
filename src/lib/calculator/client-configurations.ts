@@ -30,10 +30,12 @@ export interface ClientDeliveryConfiguration {
 
   // Driver Pay Settings
   driverPaySettings: {
-    maxPayPerDrop: number;
+    maxPayPerDrop: number | null; // null = no cap (CaterValley uses sum of components)
     basePayPerDrop: number; // Flat rate for clients like HY Food Company
     bonusPay: number;
     readySetFee: number;
+    // Optional: Client-specific driver mileage rate (defaults to $0.35/mi if not set)
+    driverMileageRate?: number;
     // Optional: Tiered driver base pay based on headcount (for Destino, Try Hungry)
     driverBasePayTiers?: Array<{
       headcountMin: number;
@@ -266,10 +268,11 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
   },
 
   driverPaySettings: {
-    maxPayPerDrop: 40,
-    basePayPerDrop: 23,
+    maxPayPerDrop: null, // CaterValley: No cap, driver pay is sum of components
+    basePayPerDrop: 18, // $18 flat rate (confirmed from spreadsheet)
     bonusPay: 10,
-    readySetFee: 70
+    readySetFee: 70,
+    driverMileageRate: 0.70 // $0.70/mile for ALL miles (CaterValley-specific)
   },
 
   bridgeTollSettings: {
@@ -278,8 +281,8 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
   },
 
   createdAt: new Date('2025-11-10'),
-  updatedAt: new Date('2025-11-10'),
-  notes: 'CaterValley pricing with $42.50 minimum delivery fee as per agreement'
+  updatedAt: new Date('2026-01-14'),
+  notes: 'CaterValley pricing: $42.50 minimum fee, $18 driver base, $0.70/mi driver mileage'
 };
 
 /**
@@ -549,7 +552,9 @@ export function validateConfiguration(config: ClientDeliveryConfiguration): {
 
   // Validate driver pay settings
   if (config.driverPaySettings) {
-    if (config.driverPaySettings.maxPayPerDrop < config.driverPaySettings.basePayPerDrop) {
+    // Only validate maxPayPerDrop if it's set (not null means there's a cap)
+    if (config.driverPaySettings.maxPayPerDrop !== null &&
+        config.driverPaySettings.maxPayPerDrop < config.driverPaySettings.basePayPerDrop) {
       errors.push('Max pay per drop must be greater than or equal to base pay per drop');
     }
     if (config.driverPaySettings.bonusPay < 0) {

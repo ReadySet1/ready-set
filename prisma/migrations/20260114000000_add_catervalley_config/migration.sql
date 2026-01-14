@@ -35,12 +35,12 @@ INSERT INTO "delivery_configurations" (
     3.00,
     10.00,
     '{"twoDrivers": 5, "threeDrivers": 10, "fourPlusDrivers": 15}'::jsonb,
-    '{"maxPayPerDrop": 40, "basePayPerDrop": 23, "bonusPay": 10, "readySetFee": 70}'::jsonb,
+    '{"maxPayPerDrop": null, "basePayPerDrop": 18, "driverMileageRate": 0.70, "bonusPay": 10, "readySetFee": 70}'::jsonb,
     '{"defaultTollAmount": 8.00, "autoApplyForAreas": ["San Francisco", "Oakland", "Marin County"]}'::jsonb,
     '{"tollPaidByReadySet": true}'::jsonb,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP,
-    'CaterValley pricing with $42.50 minimum delivery fee as per agreement. Bridge toll ($8) is driver compensation paid by Ready Set, NOT charged to customer.'
+    'CaterValley pricing with $42.50 minimum delivery fee. Driver pay: $18 base + $10 bonus + ($0.70/mile). Bridge toll ($8) is driver compensation paid by Ready Set, NOT charged to customer.'
 )
 ON CONFLICT ("config_id") DO UPDATE SET
     "client_name" = EXCLUDED."client_name",
