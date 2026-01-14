@@ -16,7 +16,6 @@ jest.mock('@/utils/prismaDB', () => ({
   prisma: {
     cateringRequest: {
       findFirst: jest.fn(),
-      findUnique: jest.fn(),
       update: jest.fn(),
     },
     onDemand: {
@@ -249,12 +248,7 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         const mockExistingOrder = {
           id: 'order-1',
           orderNumber: 'CATER-001',
-        };
-
-        const mockUpdatedOrder = {
-          id: 'order-1',
-          orderNumber: 'CATER-001',
-          status: 'IN_PROGRESS',
+          status: 'PENDING',
           user: { name: 'John Doe', email: 'john@example.com' },
           pickupAddress: {},
           deliveryAddress: { state: 'CA' },
@@ -264,7 +258,13 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
           updatedAt: new Date(),
         };
 
-        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(mockExistingOrder);
+        const mockUpdatedOrder = {
+          ...mockExistingOrder,
+          status: 'IN_PROGRESS',
+        };
+
+        // Route uses findFirst to find the order
+        (prisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue(mockExistingOrder);
         (prisma.cateringRequest.update as jest.Mock).mockResolvedValue(mockUpdatedOrder);
 
         const request = createPatchRequest(
@@ -289,12 +289,14 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
           data: { user: { id: 'user-123' } },
         });
 
-        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
+        // No catering order found
+        (prisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue(null);
 
-        const mockUpdatedOrder = {
+        const mockExistingOrder = {
           id: 'order-2',
           orderNumber: 'OD-002',
-          driverStatus: 'EN_ROUTE',
+          status: 'PENDING',
+          driverStatus: null,
           user: { name: 'Jane Smith', email: 'jane@example.com' },
           pickupAddress: {},
           deliveryAddress: { state: 'TX' },
@@ -304,6 +306,13 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
           updatedAt: new Date(),
         };
 
+        const mockUpdatedOrder = {
+          ...mockExistingOrder,
+          driverStatus: 'EN_ROUTE',
+          status: 'IN_PROGRESS', // Auto-synced from driver status
+        };
+
+        (prisma.onDemand.findFirst as jest.Mock).mockResolvedValue(mockExistingOrder);
         (prisma.onDemand.update as jest.Mock).mockResolvedValue(mockUpdatedOrder);
 
         const request = createPatchRequest(
@@ -326,13 +335,7 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         const mockExistingOrder = {
           id: 'order-1',
           orderNumber: 'CATER-001',
-        };
-
-        const mockUpdatedOrder = {
-          id: 'order-1',
-          orderNumber: 'CATER-001',
-          status: 'IN_PROGRESS',
-          driverStatus: 'ASSIGNED',
+          status: 'PENDING',
           user: { name: 'John Doe', email: 'john@example.com' },
           pickupAddress: {},
           deliveryAddress: { state: 'CA' },
@@ -342,7 +345,13 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
           updatedAt: new Date(),
         };
 
-        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(mockExistingOrder);
+        const mockUpdatedOrder = {
+          ...mockExistingOrder,
+          status: 'IN_PROGRESS',
+          driverStatus: 'ASSIGNED',
+        };
+
+        (prisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue(mockExistingOrder);
         (prisma.cateringRequest.update as jest.Mock).mockResolvedValue(mockUpdatedOrder);
 
         const request = createPatchRequest(
@@ -372,7 +381,7 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         const response = await PATCH(request, { params: Promise.resolve(params) });
 
         await expectUnauthorized(response);
-        expect(prisma.cateringRequest.findUnique).not.toHaveBeenCalled();
+        expect(prisma.cateringRequest.findFirst).not.toHaveBeenCalled();
       });
     });
 
@@ -403,10 +412,9 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
       });
 
       it('should return 404 when order is not found for update', async () => {
-        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(null);
-        (prisma.onDemand.update as jest.Mock).mockRejectedValue(
-          new Error('Record to update not found')
-        );
+        // Neither catering nor on-demand order found
+        (prisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue(null);
+        (prisma.onDemand.findFirst as jest.Mock).mockResolvedValue(null);
 
         const request = createPatchRequest(
           'http://localhost:3000/api/orders/NONEXISTENT',
@@ -415,12 +423,23 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         const params = { order_number: 'NONEXISTENT' };
         const response = await PATCH(request, { params: Promise.resolve(params) });
 
-        await expectErrorResponse(response, 500);
+        await expectErrorResponse(response, 404, /Order not found/i);
       });
 
       it('should handle database errors during update', async () => {
-        const mockExistingOrder = { id: 'order-1', orderNumber: 'CATER-001' };
-        (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue(mockExistingOrder);
+        const mockExistingOrder = {
+          id: 'order-1',
+          orderNumber: 'CATER-001',
+          status: 'PENDING',
+          user: { name: 'John Doe', email: 'john@example.com' },
+          pickupAddress: {},
+          deliveryAddress: { state: 'CA' },
+          dispatches: [],
+          fileUploads: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        (prisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue(mockExistingOrder);
         (prisma.cateringRequest.update as jest.Mock).mockRejectedValue(
           new Error('Database connection failed')
         );

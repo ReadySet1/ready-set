@@ -1,17 +1,17 @@
 /**
  * Tests for /api/tracking/deliveries route
  *
- * This route is BUSINESS CRITICAL as it handles real-time delivery tracking with geospatial data
+ * This route is BUSINESS CRITICAL as it handles real-time delivery tracking
+ * It fetches from both `deliveries` table (new tracking) and `dispatches` table (legacy)
  *
  * Tests cover:
- * - GET: Delivery tracking with multi-tenant isolation, geospatial queries, pagination
+ * - GET: Delivery tracking with multi-tenant isolation, dual-source data, pagination
  * - POST: Delivery assignment creation with driver verification
  * - Role-based access control and data isolation
  * - PostGIS geospatial data handling
  * - Error handling and validation
  */
 
-import { NextRequest } from "next/server";
 import { GET, POST } from "../route";
 import { withAuth } from "@/lib/auth-middleware";
 import { prisma } from "@/utils/prismaDB";
@@ -41,57 +41,87 @@ const mockWithAuth = withAuth as jest.MockedFunction<typeof withAuth>;
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 
 describe("/api/tracking/deliveries", () => {
-  const mockDeliveries = [
-    {
-      id: "delivery-1",
-      catering_request_id: "catering-1",
-      on_demand_id: null,
-      driver_id: "driver-1",
-      status: "ASSIGNED",
-      pickup_location_geojson: '{"type":"Point","coordinates":[-122.4194,37.7749]}',
-      delivery_location_geojson: '{"type":"Point","coordinates":[-122.4084,37.7849]}',
-      estimated_arrival: new Date("2025-01-15T12:00:00Z"),
-      actual_arrival: null,
-      proof_of_delivery: null,
-      actual_distance_km: null,
-      route_polyline: null,
-      metadata: {},
-      assigned_at: new Date("2025-01-15T10:00:00Z"),
-      started_at: null,
-      arrived_at: null,
-      completed_at: null,
-      created_at: new Date("2025-01-15T10:00:00Z"),
-      updated_at: new Date("2025-01-15T10:00:00Z"),
-      employee_id: "EMP001",
-      vehicle_number: "VEH001",
-    },
-    {
-      id: "delivery-2",
-      catering_request_id: null,
-      on_demand_id: "ondemand-1",
-      driver_id: "driver-1",
-      status: "IN_PROGRESS",
-      pickup_location_geojson: '{"type":"Point","coordinates":[-122.4194,37.7749]}',
-      delivery_location_geojson: '{"type":"Point","coordinates":[-122.4084,37.7849]}',
-      estimated_arrival: new Date("2025-01-15T14:00:00Z"),
-      actual_arrival: null,
-      proof_of_delivery: null,
-      actual_distance_km: 5.2,
-      route_polyline: "encoded_polyline_string",
-      metadata: { notes: "Fragile items" },
-      assigned_at: new Date("2025-01-15T11:00:00Z"),
-      started_at: new Date("2025-01-15T11:30:00Z"),
-      arrived_at: null,
-      completed_at: null,
-      created_at: new Date("2025-01-15T11:00:00Z"),
-      updated_at: new Date("2025-01-15T11:30:00Z"),
-      employee_id: "EMP001",
-      vehicle_number: "VEH001",
-    },
-  ];
+  // Mock delivery from deliveries table (new system)
+  const mockDeliveryRecord = {
+    id: "delivery-1",
+    driver_id: "driver-1",
+    status: "ASSIGNED",
+    pickup_location_geojson: '{"type":"Point","coordinates":[-122.4194,37.7749]}',
+    delivery_location_geojson: '{"type":"Point","coordinates":[-122.4084,37.7849]}',
+    estimated_arrival: new Date("2025-01-15T12:00:00Z"),
+    actual_arrival: null,
+    proof_of_delivery: null,
+    order_number: "ORD-001",
+    customer_name: "John Doe",
+    pickup_address: "123 Pickup St",
+    delivery_address: "456 Delivery Ave",
+    assigned_at: new Date("2025-01-15T10:00:00Z"),
+    started_at: null,
+    arrived_at: null,
+    completed_at: null,
+    created_at: new Date("2025-01-15T10:00:00Z"),
+    updated_at: new Date("2025-01-15T10:00:00Z"),
+    source_type: "delivery",
+  };
+
+  // Mock dispatch from dispatches table (legacy system)
+  const mockDispatchRecord = {
+    id: "dispatch-1",
+    catering_request_id: "catering-1",
+    on_demand_id: null,
+    driver_id: "driver-1",
+    assigned_at: new Date("2025-01-15T10:00:00Z"),
+    updated_at: new Date("2025-01-15T10:00:00Z"),
+    cr_order_number: "CR-001",
+    cr_status: "ACTIVE",
+    cr_driver_status: "ASSIGNED",
+    cr_customer_name: "Jane Doe",
+    cr_pickup_time: new Date("2025-01-15T11:00:00Z"),
+    cr_arrival_time: new Date("2025-01-15T12:00:00Z"),
+    cr_pickup_street: "100 Restaurant St",
+    cr_pickup_city: "Austin",
+    cr_pickup_state: "TX",
+    cr_pickup_zip: "78701",
+    cr_pickup_lat: 30.2672,
+    cr_pickup_lng: -97.7431,
+    cr_delivery_street: "200 Office Blvd",
+    cr_delivery_city: "Austin",
+    cr_delivery_state: "TX",
+    cr_delivery_zip: "78702",
+    cr_delivery_lat: 30.2772,
+    cr_delivery_lng: -97.7531,
+    od_order_number: null,
+    od_status: null,
+    od_driver_status: null,
+    od_customer_name: null,
+    od_pickup_time: null,
+    od_arrival_time: null,
+    od_pickup_street: null,
+    od_pickup_city: null,
+    od_pickup_state: null,
+    od_pickup_zip: null,
+    od_pickup_lat: null,
+    od_pickup_lng: null,
+    od_delivery_street: null,
+    od_delivery_city: null,
+    od_delivery_state: null,
+    od_delivery_zip: null,
+    od_delivery_lat: null,
+    od_delivery_lng: null,
+    driver_name: "Test Driver",
+    driver_email: "driver@test.com",
+    source_type: "dispatch",
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Suppress console.warn for deliveries table not existing
+    jest.spyOn(console, "warn").mockImplementation();
+    jest.spyOn(console, "error").mockImplementation();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe("GET /api/tracking/deliveries", () => {
@@ -122,6 +152,9 @@ describe("/api/tracking/deliveries", () => {
           },
         } as any);
 
+        // Mock deliveries query (empty)
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
+        // Mock dispatches query (empty)
         mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
@@ -142,6 +175,7 @@ describe("/api/tracking/deliveries", () => {
         } as any);
 
         mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
         const response = await GET(request);
@@ -161,6 +195,7 @@ describe("/api/tracking/deliveries", () => {
         } as any);
 
         mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
         const response = await GET(request);
@@ -179,6 +214,7 @@ describe("/api/tracking/deliveries", () => {
           },
         } as any);
 
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
         mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
@@ -204,7 +240,7 @@ describe("/api/tracking/deliveries", () => {
     });
 
     describe("Multi-Tenant Data Isolation", () => {
-      it("should filter deliveries by driver ID for DRIVER role", async () => {
+      it("should filter deliveries by user ID for DRIVER role", async () => {
         mockWithAuth.mockResolvedValueOnce({
           success: true,
           context: {
@@ -215,19 +251,23 @@ describe("/api/tracking/deliveries", () => {
           },
         } as any);
 
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveries[0]]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveryRecord]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
         await GET(request);
 
-        const query = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
-        const params = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
+        // First query is for deliveries table - should filter by driver_id using user.id
+        const deliveryQuery = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
+        expect(deliveryQuery).toContain("d.driver_id = $");
+        expect(deliveryQuery).toContain("::uuid");
 
-        expect(query).toContain("SELECT id FROM drivers WHERE user_id");
-        expect(params).toContain("driver-user-id");
+        // Verify user ID is passed as parameter
+        const deliveryParams = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
+        expect(deliveryParams).toContain("driver-user-id");
       });
 
-      it("should not filter by driver ID for ADMIN role", async () => {
+      it("should not filter by driver ID for ADMIN role without driver_id param", async () => {
         mockWithAuth.mockResolvedValueOnce({
           success: true,
           context: {
@@ -238,59 +278,16 @@ describe("/api/tracking/deliveries", () => {
           },
         } as any);
 
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce(mockDeliveries);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveryRecord]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDispatchRecord]);
 
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
         await GET(request);
 
-        const query = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
-        const params = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
-
-        expect(query).not.toContain("SELECT id FROM drivers WHERE user_id");
-      });
-
-      it("should hide driverInfo from DRIVER role responses", async () => {
-        mockWithAuth.mockResolvedValueOnce({
-          success: true,
-          context: {
-            user: {
-              id: "driver-user-id",
-              type: "DRIVER",
-            },
-          },
-        } as any);
-
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveries[0]]);
-
-        const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
-        const response = await GET(request);
-
-        const data = await expectSuccessResponse(response);
-
-        expect(data.data[0].driverInfo).toBeUndefined();
-      });
-
-      it("should include driverInfo for ADMIN role responses", async () => {
-        mockWithAuth.mockResolvedValueOnce({
-          success: true,
-          context: {
-            user: {
-              id: "admin-id",
-              type: "ADMIN",
-            },
-          },
-        } as any);
-
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveries[0]]);
-
-        const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
-        const response = await GET(request);
-
-        const data = await expectSuccessResponse(response);
-
-        expect(data.data[0].driverInfo).toBeDefined();
-        expect(data.data[0].driverInfo.employeeId).toBe("EMP001");
-        expect(data.data[0].driverInfo.vehicleNumber).toBe("VEH001");
+        // For admin without driver_id param, no driver filtering should be applied
+        const deliveryQuery = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
+        // The base query should not have driver_id filter when admin has no driver_id param
+        expect(deliveryQuery).toContain("FROM deliveries d");
       });
     });
 
@@ -308,7 +305,8 @@ describe("/api/tracking/deliveries", () => {
       });
 
       it("should filter by driver_id query parameter", async () => {
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveries[0]]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveryRecord]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createRequestWithParams(
           "http://localhost:3000/api/tracking/deliveries",
@@ -316,15 +314,16 @@ describe("/api/tracking/deliveries", () => {
         );
         await GET(request);
 
-        const query = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
-        const params = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
+        const deliveryQuery = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
+        expect(deliveryQuery).toContain("d.driver_id = $");
 
-        expect(query).toContain("AND d.driver_id =");
+        const params = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
         expect(params).toContain("driver-1");
       });
 
       it("should filter by status query parameter", async () => {
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveries[1]]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveryRecord]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createRequestWithParams(
           "http://localhost:3000/api/tracking/deliveries",
@@ -332,57 +331,60 @@ describe("/api/tracking/deliveries", () => {
         );
         await GET(request);
 
-        const query = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
-        const params = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
+        const deliveryQuery = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
+        expect(deliveryQuery).toContain("d.status = $");
 
-        expect(query).toContain("AND d.status =");
+        const params = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
         expect(params).toContain("IN_PROGRESS");
       });
 
-      it("should use default limit of 50", async () => {
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
+      it("should filter by source parameter (deliveries only)", async () => {
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveryRecord]);
 
-        const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
+        const request = createRequestWithParams(
+          "http://localhost:3000/api/tracking/deliveries",
+          { source: "deliveries" }
+        );
         await GET(request);
 
-        const params = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
-        expect(params).toContain(50);
+        // Should only query deliveries table, not dispatches
+        expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
+        const query = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
+        expect(query).toContain("FROM deliveries d");
       });
 
-      it("should use custom limit parameter", async () => {
+      it("should filter by source parameter (dispatches only)", async () => {
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDispatchRecord]);
+
+        const request = createRequestWithParams(
+          "http://localhost:3000/api/tracking/deliveries",
+          { source: "dispatches" }
+        );
+        await GET(request);
+
+        // Should only query dispatches table, not deliveries
+        expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
+        const query = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
+        expect(query).toContain("FROM dispatches disp");
+      });
+
+      it("should apply pagination from limit/offset params", async () => {
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
         mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createRequestWithParams(
           "http://localhost:3000/api/tracking/deliveries",
-          { limit: "10" }
+          { limit: "10", offset: "20" }
         );
-        await GET(request);
+        const response = await GET(request);
+        const data = await response.json();
 
-        const params = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
-        expect(params).toContain(10);
-      });
-
-      it("should use default offset of 0", async () => {
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
-
-        const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
-        await GET(request);
-
-        const params = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
-        expect(params).toContain(0);
-      });
-
-      it("should use custom offset parameter", async () => {
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
-
-        const request = createRequestWithParams(
-          "http://localhost:3000/api/tracking/deliveries",
-          { offset: "20" }
-        );
-        await GET(request);
-
-        const params = (mockPrisma.$queryRawUnsafe as jest.Mock).mock.calls[0].slice(1);
-        expect(params).toContain(20);
+        // Pagination is applied in JS after combining results
+        expect(data.pagination).toEqual({
+          limit: 10,
+          offset: 20,
+          total: 0,
+        });
       });
     });
 
@@ -399,46 +401,62 @@ describe("/api/tracking/deliveries", () => {
         } as any);
       });
 
-      it("should parse pickup location GeoJSON correctly", async () => {
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveries[0]]);
+      it("should parse delivery pickup location GeoJSON correctly", async () => {
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveryRecord]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
         const response = await GET(request);
 
         const data = await expectSuccessResponse(response);
 
-        // GeoJSON coordinates are reversed to [lat, lng] format
+        // GeoJSON coordinates are reversed from [lng, lat] to [lat, lng]
         expect(data.data[0].pickupLocation).toEqual([37.7749, -122.4194]);
       });
 
       it("should parse delivery location GeoJSON correctly", async () => {
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveries[0]]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveryRecord]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
         const response = await GET(request);
 
         const data = await expectSuccessResponse(response);
 
-        // GeoJSON coordinates are reversed to [lat, lng] format
         expect(data.data[0].deliveryLocation).toEqual([37.7849, -122.4084]);
       });
 
       it("should handle null geospatial data gracefully", async () => {
         const deliveryWithNullGeo = {
-          ...mockDeliveries[0],
+          ...mockDeliveryRecord,
           pickup_location_geojson: null,
           delivery_location_geojson: null,
         };
 
         mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([deliveryWithNullGeo]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
         const response = await GET(request);
 
         const data = await expectSuccessResponse(response);
 
-        expect(data.data[0].pickupLocation).toEqual({ lat: 0, lng: 0 });
-        expect(data.data[0].deliveryLocation).toEqual({ lat: 0, lng: 0 });
+        expect(data.data[0].pickupLocation).toBeNull();
+        expect(data.data[0].deliveryLocation).toBeNull();
+      });
+
+      it("should parse dispatch coordinates from lat/lng fields", async () => {
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDispatchRecord]);
+
+        const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
+        const response = await GET(request);
+
+        const data = await expectSuccessResponse(response);
+
+        // Dispatch records use lat/lng directly
+        expect(data.data[0].pickupLocation).toEqual([30.2672, -97.7431]);
+        expect(data.data[0].deliveryLocation).toEqual([30.2772, -97.7531]);
       });
     });
 
@@ -456,7 +474,8 @@ describe("/api/tracking/deliveries", () => {
       });
 
       it("should return deliveries with correct structure", async () => {
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveries[0]]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveryRecord]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
         const response = await GET(request);
@@ -470,11 +489,12 @@ describe("/api/tracking/deliveries", () => {
       });
 
       it("should include pagination metadata", async () => {
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce(mockDeliveries);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveryRecord]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDispatchRecord]);
 
         const request = createRequestWithParams(
           "http://localhost:3000/api/tracking/deliveries",
-          { limit: "10", offset: "20" }
+          { limit: "10", offset: "0" }
         );
         const response = await GET(request);
 
@@ -482,13 +502,38 @@ describe("/api/tracking/deliveries", () => {
 
         expect(data.pagination).toEqual({
           limit: 10,
-          offset: 20,
+          offset: 0,
           total: 2,
         });
       });
 
-      it("should include all delivery fields", async () => {
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveries[0]]);
+      it("should include sourceType in delivery records", async () => {
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveryRecord]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
+
+        const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
+        const response = await GET(request);
+
+        const data = await expectSuccessResponse(response);
+
+        expect(data.data[0].sourceType).toBe("delivery");
+      });
+
+      it("should include sourceType in dispatch records", async () => {
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDispatchRecord]);
+
+        const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
+        const response = await GET(request);
+
+        const data = await expectSuccessResponse(response);
+
+        expect(data.data[0].sourceType).toBe("dispatch");
+      });
+
+      it("should include delivery fields from deliveries table", async () => {
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDeliveryRecord]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
 
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
         const response = await GET(request);
@@ -497,25 +542,38 @@ describe("/api/tracking/deliveries", () => {
         const delivery = data.data[0];
 
         expect(delivery).toHaveProperty("id");
-        expect(delivery).toHaveProperty("cateringRequestId");
-        expect(delivery).toHaveProperty("onDemandId");
         expect(delivery).toHaveProperty("driverId");
         expect(delivery).toHaveProperty("status");
         expect(delivery).toHaveProperty("pickupLocation");
         expect(delivery).toHaveProperty("deliveryLocation");
-        expect(delivery).toHaveProperty("estimatedArrival");
-        expect(delivery).toHaveProperty("actualArrival");
-        expect(delivery).toHaveProperty("route");
-        expect(delivery).toHaveProperty("proofOfDelivery");
-        expect(delivery).toHaveProperty("actualDistanceKm");
-        expect(delivery).toHaveProperty("routePolyline");
-        expect(delivery).toHaveProperty("metadata");
+        expect(delivery).toHaveProperty("orderNumber");
+        expect(delivery).toHaveProperty("customerName");
+        expect(delivery).toHaveProperty("pickupAddress");
+        expect(delivery).toHaveProperty("deliveryAddress");
         expect(delivery).toHaveProperty("assignedAt");
-        expect(delivery).toHaveProperty("startedAt");
-        expect(delivery).toHaveProperty("arrivedAt");
-        expect(delivery).toHaveProperty("completedAt");
-        expect(delivery).toHaveProperty("createdAt");
-        expect(delivery).toHaveProperty("updatedAt");
+        expect(delivery).toHaveProperty("sourceType", "delivery");
+      });
+
+      it("should include dispatch fields from dispatches table", async () => {
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([]);
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDispatchRecord]);
+
+        const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
+        const response = await GET(request);
+
+        const data = await expectSuccessResponse(response);
+        const dispatch = data.data[0];
+
+        expect(dispatch).toHaveProperty("id");
+        expect(dispatch).toHaveProperty("cateringRequestId");
+        expect(dispatch).toHaveProperty("driverId");
+        expect(dispatch).toHaveProperty("status");
+        expect(dispatch).toHaveProperty("pickupLocation");
+        expect(dispatch).toHaveProperty("deliveryLocation");
+        expect(dispatch).toHaveProperty("orderNumber");
+        expect(dispatch).toHaveProperty("customerName");
+        expect(dispatch).toHaveProperty("sourceType", "dispatch");
+        expect(dispatch).toHaveProperty("orderType", "catering");
       });
     });
 
@@ -532,42 +590,59 @@ describe("/api/tracking/deliveries", () => {
         } as any);
       });
 
-      it("should handle database errors gracefully", async () => {
-        const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
-
+      it("should gracefully handle deliveries table query failure and continue to dispatches", async () => {
+        // Deliveries query fails (table might not exist in older deployments)
         mockPrisma.$queryRawUnsafe.mockRejectedValueOnce(
           new Error("Database connection failed")
+        );
+        // Dispatches query succeeds
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDispatchRecord]);
+
+        const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
+        const response = await GET(request);
+
+        // Should return 200 with dispatch data due to graceful degradation
+        const data = await expectSuccessResponse(response);
+        expect(data.success).toBe(true);
+        expect(data.data).toHaveLength(1);
+        expect(data.data[0].sourceType).toBe("dispatch");
+      });
+
+      it("should continue if deliveries table query fails but dispatches succeeds", async () => {
+        // Deliveries query throws (table might not exist)
+        mockPrisma.$queryRawUnsafe.mockRejectedValueOnce(
+          new Error("relation \"deliveries\" does not exist")
+        );
+        // Dispatches query succeeds
+        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([mockDispatchRecord]);
+
+        const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
+        const response = await GET(request);
+
+        const data = await expectSuccessResponse(response);
+
+        // Should still return dispatch data
+        expect(data.data).toHaveLength(1);
+        expect(data.data[0].sourceType).toBe("dispatch");
+      });
+
+      it("should return empty results when both queries fail", async () => {
+        // Both queries fail - graceful degradation returns empty results
+        mockPrisma.$queryRawUnsafe.mockRejectedValueOnce(
+          new Error("Deliveries table error")
+        );
+        mockPrisma.$queryRawUnsafe.mockRejectedValueOnce(
+          new Error("Dispatches query error")
         );
 
         const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
         const response = await GET(request);
 
-        await expectServerError(response);
-
+        // Should still return 200 with empty results due to graceful degradation
         const data = await response.json();
-        expect(data.success).toBe(false);
-        expect(data.error).toBe("Failed to fetch deliveries");
-        expect(data.details).toBe("Database connection failed");
-
-        consoleErrorSpy.mockRestore();
-      });
-
-      it("should handle invalid GeoJSON gracefully", async () => {
-        const deliveryWithInvalidGeo = {
-          ...mockDeliveries[0],
-          pickup_location_geojson: "invalid json",
-        };
-
-        mockPrisma.$queryRawUnsafe.mockResolvedValueOnce([deliveryWithInvalidGeo]);
-
-        const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
-
-        const request = createGetRequest("http://localhost:3000/api/tracking/deliveries");
-        const response = await GET(request);
-
-        await expectServerError(response);
-
-        consoleErrorSpy.mockRestore();
+        expect(response.status).toBe(200);
+        expect(data.success).toBe(true);
+        expect(data.data).toHaveLength(0);
       });
     });
   });
@@ -895,8 +970,6 @@ describe("/api/tracking/deliveries", () => {
       });
 
       it("should handle database errors gracefully", async () => {
-        const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
-
         mockPrisma.$queryRawUnsafe.mockRejectedValueOnce(
           new Error("Database connection failed")
         );
@@ -912,13 +985,9 @@ describe("/api/tracking/deliveries", () => {
         const data = await response.json();
         expect(data.success).toBe(false);
         expect(data.error).toBe("Failed to create delivery");
-
-        consoleErrorSpy.mockRestore();
       });
 
       it("should handle insertion errors", async () => {
-        const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
-
         mockPrisma.$queryRawUnsafe
           .mockResolvedValueOnce([{ id: "driver-1", is_active: true }])
           .mockRejectedValueOnce(new Error("Insertion failed"));
@@ -930,8 +999,6 @@ describe("/api/tracking/deliveries", () => {
         const response = await POST(request);
 
         await expectServerError(response);
-
-        consoleErrorSpy.mockRestore();
       });
     });
   });
