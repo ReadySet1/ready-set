@@ -232,7 +232,7 @@ describe('Calculator Fix Verification', () => {
       expect(result.totalMileagePay).toBe(0);
     });
 
-    it('should handle zero mileage with driver minimum', () => {
+    it('should handle zero mileage correctly', () => {
       const input: DriverPayInput = {
         headcount: 30,
         foodCost: 400,
@@ -243,8 +243,9 @@ describe('Calculator Fix Verification', () => {
 
       const result = calculateDriverPay(input);
 
-      // Zero mileage should still get $7 minimum
-      expect(result.totalMileagePay).toBe(7.0);
+      // Zero mileage = $0 mileage pay (no minimum in current implementation)
+      // Default config uses $0.35/mile, 0 × $0.35 = $0
+      expect(result.totalMileagePay).toBe(0);
     });
 
     it('should handle boundary value - 24 vs 25 headcount', () => {
@@ -350,7 +351,7 @@ describe('Calculator Fix Verification', () => {
   });
 
   describe('Mileage Rate Separation', () => {
-    it('should use different mileage rates for vendor vs driver', () => {
+    it('should use different mileage rates for vendor vs driver (default config)', () => {
       const input: DriverPayInput = {
         headcount: 50,
         foodCost: 800,
@@ -365,7 +366,28 @@ describe('Calculator Fix Verification', () => {
       // Vendor mileage: (20 - 10) × $3.00 = $30.00
       expect(vendorResult.totalMileagePay).toBe(30);
 
-      // Driver mileage: 20 × $0.70 = $14.00
+      // Driver mileage (default config): 20 × $0.35 = $7.00
+      expect(driverResult.totalMileagePay).toBe(7);
+      expect(driverResult.mileageRate).toBe(0.35);
+    });
+
+    it('should use CaterValley-specific mileage rate for driver', () => {
+      const input: DriverPayInput = {
+        headcount: 50,
+        foodCost: 800,
+        totalMileage: 20,
+        numberOfDrives: 1,
+        bonusQualified: true,
+        clientConfigId: 'cater-valley'
+      };
+
+      const vendorResult = calculateDeliveryCost(input);
+      const driverResult = calculateDriverPay(input);
+
+      // Vendor mileage: (20 - 10) × $3.00 = $30.00
+      expect(vendorResult.totalMileagePay).toBe(30);
+
+      // Driver mileage (CaterValley config): 20 × $0.70 = $14.00
       expect(driverResult.totalMileagePay).toBe(14);
       expect(driverResult.mileageRate).toBe(0.70);
     });

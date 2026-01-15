@@ -797,16 +797,17 @@ export function ClientConfigurationManager({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="max-pay">Max Pay Per Drop ($) *</Label>
+                    <Label htmlFor="max-pay">Max Pay Per Drop ($)</Label>
                     <Input
                       id="max-pay"
                       type="number"
                       step="0.01"
-                      value={editingConfig.driverPaySettings.maxPayPerDrop}
-                      onChange={(e) => handleNestedFieldChange('driverPaySettings', 'maxPayPerDrop', parseFloat(e.target.value) || 0)}
+                      value={editingConfig.driverPaySettings.maxPayPerDrop ?? ''}
+                      placeholder="No cap"
+                      onChange={(e) => handleNestedFieldChange('driverPaySettings', 'maxPayPerDrop', e.target.value === '' ? null : parseFloat(e.target.value) || 0)}
                     />
                     <p className="text-xs text-slate-500">
-                      Maximum driver earnings per delivery (cap)
+                      Maximum driver earnings per delivery (leave empty for no cap)
                     </p>
                   </div>
 
@@ -876,15 +877,23 @@ export function ClientConfigurationManager({
                       ${(editingConfig.driverPaySettings.basePayPerDrop + editingConfig.driverPaySettings.bonusPay).toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between text-blue-600">
-                    <span>Capped at Max:</span>
-                    <span className="font-semibold">
-                      ${Math.min(
-                        editingConfig.driverPaySettings.basePayPerDrop + editingConfig.driverPaySettings.bonusPay,
-                        editingConfig.driverPaySettings.maxPayPerDrop
-                      ).toFixed(2)}
-                    </span>
-                  </div>
+                  {editingConfig.driverPaySettings.maxPayPerDrop !== null && (
+                    <div className="flex justify-between text-blue-600">
+                      <span>Capped at Max:</span>
+                      <span className="font-semibold">
+                        ${Math.min(
+                          editingConfig.driverPaySettings.basePayPerDrop + editingConfig.driverPaySettings.bonusPay,
+                          editingConfig.driverPaySettings.maxPayPerDrop
+                        ).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  {editingConfig.driverPaySettings.maxPayPerDrop === null && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Pay Cap:</span>
+                      <span className="font-semibold">No cap (sum of components)</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>

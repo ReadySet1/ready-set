@@ -218,31 +218,32 @@ describe('Delivery Cost Calculator', () => {
         numberOfDrives: 1,
         bonusQualified: true,
         readySetFee: 70,
-        readySetAddonFee: 0
+        readySetAddonFee: 0,
+        clientConfigId: 'ready-set-food-standard' // Use specific client config
       };
 
       const result = calculateDriverPay(input);
 
-      // Expected with tiered driver base pay (REA-41):
+      // Expected with tiered driver base pay (ready-set-food-standard config):
       // Headcount 28 is in 25-49 tier → Driver Base Pay: $23.00
-      // Mileage: 3.1 miles × $0.70 = $2.17 < $7 minimum → $7.00
-      // Driver Total Base Pay: $23.00 + $7.00 = $30.00
+      // Mileage: 3.1 miles × $0.35 = $1.09 (Destino rate, no minimum)
+      // Driver Total Base Pay: $23.00
       // Driver Bonus Pay: $10.00
-      // Total Driver Pay: $30.00 + $10.00 = $40.00
+      // Total Driver Pay: $23.00 + $1.09 + $10.00 = $34.09
       // Ready Set Fee: $70.00
       // Ready Set Total Fee: $70.00
 
       expect(result.driverMaxPayPerDrop).toBe(40);
       expect(result.driverBasePayPerDrop).toBe(23); // Tiered rate for 25-49 headcount
-      expect(result.driverTotalBasePay).toBe(30); // $23 base + $7 mileage
+      expect(result.driverTotalBasePay).toBe(23); // Base pay from tier
       expect(result.readySetFee).toBe(70);
       expect(result.readySetAddonFee).toBe(0);
       expect(result.readySetTotalFee).toBe(70);
       expect(result.driverBonusPay).toBe(10);
-      expect(result.totalDriverPay).toBe(40); // $30 base + $10 bonus
+      expect(result.totalDriverPay).toBeCloseTo(34.09, 2); // $23 base + $1.09 mileage + $10 bonus
       expect(result.bonusQualifiedPercent).toBe(100);
       expect(result.bonusQualified).toBe(true);
-      expect(result.totalMileagePay).toBe(7.0); // 3.1 miles × $0.70 = $2.17 < $7 minimum
+      expect(result.totalMileagePay).toBeCloseTo(1.09, 2); // 3.1 miles × $0.35
     });
 
     test('driver pay with tiered base pay (50-74 headcount)', () => {
@@ -252,21 +253,23 @@ describe('Delivery Cost Calculator', () => {
         totalMileage: 12,
         numberOfDrives: 1,
         bonusQualified: true,
-        readySetFee: 70
+        readySetFee: 70,
+        clientConfigId: 'ready-set-food-standard' // Use specific client config
       };
 
       const result = calculateDriverPay(input);
 
-      // With tiered driver base pay (REA-41):
+      // With tiered driver base pay (ready-set-food-standard config):
       // Headcount 50 is in 50-74 tier → Driver Base Pay: $33.00
-      // Mileage: 12 miles × $0.70 = $8.40 (> $7 minimum)
-      // Driver Total Base Pay: $33.00 + $8.40 = $41.40, CAPPED at maxPayPerDrop $40
+      // Mileage: 12 miles × $0.35 = $4.20 (Destino rate, no minimum)
+      // Driver Total Base Pay: $33.00
       // Driver Bonus Pay: $10.00
-      // Total Driver Pay: $40.00 + $10.00 = $50.00
+      // Total Driver Pay: $33.00 + $4.20 + $10.00 = $47.20
       expect(result.driverBasePayPerDrop).toBe(33); // Tiered rate for 50-74 headcount
-      expect(result.driverTotalBasePay).toBe(40); // $33 + $8.40 = $41.40, capped at $40
+      expect(result.driverTotalBasePay).toBe(33); // Base pay from tier
+      expect(result.totalMileagePay).toBeCloseTo(4.20, 2); // 12 × $0.35
       expect(result.driverBonusPay).toBe(10);
-      expect(result.totalDriverPay).toBe(50); // $40 capped base + $10 bonus
+      expect(result.totalDriverPay).toBeCloseTo(47.20, 2); // $33 base + $4.20 mileage + $10 bonus
     });
 
     test('no bonus when not qualified', () => {
@@ -276,7 +279,8 @@ describe('Delivery Cost Calculator', () => {
         totalMileage: 12,
         numberOfDrives: 1,
         bonusQualified: false,
-        readySetFee: 70
+        readySetFee: 70,
+        clientConfigId: 'ready-set-food-standard' // Use specific client config
       };
 
       const result = calculateDriverPay(input);
@@ -284,14 +288,16 @@ describe('Delivery Cost Calculator', () => {
       expect(result.driverBonusPay).toBe(0);
       expect(result.bonusQualifiedPercent).toBe(0);
       expect(result.bonusQualified).toBe(false);
-      // With tiered driver base pay (REA-41):
+      // With tiered driver base pay (ready-set-food-standard config):
       // Headcount 30 is in 25-49 tier → Driver Base Pay: $23.00
-      // Mileage: 12 miles × $0.70 = $8.40 (> $7 minimum)
-      // Driver Total Base Pay: $23.00 + $8.40 = $31.40
+      // Mileage: 12 miles × $0.35 = $4.20 (Destino rate)
+      // Driver Total Base Pay: $23.00
       // No bonus since not qualified
+      // Total: $23.00 + $4.20 = $27.20
       expect(result.driverBasePayPerDrop).toBe(23); // Tiered rate for 25-49 headcount
-      expect(result.driverTotalBasePay).toBeCloseTo(31.4, 1); // $23 base + $8.40 mileage
-      expect(result.totalDriverPay).toBeCloseTo(31.4, 1); // No bonus
+      expect(result.driverTotalBasePay).toBe(23); // Base pay from tier
+      expect(result.totalMileagePay).toBeCloseTo(4.20, 2); // 12 × $0.35
+      expect(result.totalDriverPay).toBeCloseTo(27.20, 2); // No bonus
     });
   });
 
@@ -956,9 +962,11 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
+        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
         expect(result.driverBasePayPerDrop).toBe(18); // Tier 0-24
-        expect(result.driverTotalBasePay).toBe(25); // $18 + $7 mileage minimum
-        expect(result.totalDriverPay).toBe(25); // No bonus
+        expect(result.driverTotalBasePay).toBe(18); // Just base pay
+        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
+        expect(result.totalDriverPay).toBeCloseTo(19.75, 2); // $18 + $1.75 mileage, no bonus
       });
 
       test('uses correct driver base pay for 25-49 headcount tier', () => {
@@ -972,9 +980,11 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
+        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
         expect(result.driverBasePayPerDrop).toBe(23); // Tier 25-49
-        expect(result.driverTotalBasePay).toBe(30); // $23 + $7 mileage minimum
-        expect(result.totalDriverPay).toBe(40); // $30 + $10 bonus (capped at maxPayPerDrop)
+        expect(result.driverTotalBasePay).toBe(23); // Just base pay
+        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
+        expect(result.totalDriverPay).toBeCloseTo(34.75, 2); // $23 + $1.75 + $10 bonus
       });
 
       test('uses correct driver base pay for 50-74 headcount tier', () => {
@@ -988,9 +998,11 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
+        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
         expect(result.driverBasePayPerDrop).toBe(33); // Tier 50-74
-        expect(result.driverTotalBasePay).toBe(40); // $33 + $7 = $40 (capped at maxPayPerDrop)
-        expect(result.totalDriverPay).toBe(40); // Capped, no bonus
+        expect(result.driverTotalBasePay).toBe(33); // Just base pay
+        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
+        expect(result.totalDriverPay).toBeCloseTo(34.75, 2); // $33 + $1.75, no bonus
       });
 
       test('uses correct driver base pay for 75-99 headcount tier', () => {
@@ -1004,10 +1016,11 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
+        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
         expect(result.driverBasePayPerDrop).toBe(43); // Tier 75-99
-        // $43 + $7 = $50, but capped at $40
-        expect(result.driverTotalBasePay).toBe(40); // Capped at maxPayPerDrop
-        expect(result.totalDriverPay).toBe(40);
+        expect(result.driverTotalBasePay).toBe(43); // Just base pay
+        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
+        expect(result.totalDriverPay).toBeCloseTo(44.75, 2); // $43 + $1.75, no bonus
       });
 
       test('tier boundary: 24 headcount uses 0-24 tier', () => {
@@ -1148,8 +1161,11 @@ describe('Delivery Cost Calculator', () => {
         const result = calculateDriverPay(input);
 
         // Should use 0-24 tier
+        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
         expect(result.driverBasePayPerDrop).toBe(18);
-        expect(result.driverTotalBasePay).toBe(25); // $18 + $7 minimum
+        expect(result.driverTotalBasePay).toBe(18); // Just base pay
+        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
+        expect(result.totalDriverPay).toBeCloseTo(19.75, 2); // $18 + $1.75
       });
 
       test('concurrent conditions: 100 headcount with multiple edge cases', () => {
@@ -1205,10 +1221,11 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
+        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
         expect(result.driverBasePayPerDrop).toBe(50); // Flat $50
-        // $50 + $7 = $57, but capped at $50 maxPayPerDrop
-        expect(result.driverTotalBasePay).toBe(50); // Capped at maxPayPerDrop
-        expect(result.totalDriverPay).toBe(50);
+        expect(result.driverTotalBasePay).toBe(50); // Base pay
+        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
+        expect(result.totalDriverPay).toBeCloseTo(51.75, 2); // $50 + $1.75
       });
 
       test('uses flat $50 driver base pay regardless of headcount (50 people)', () => {
@@ -1222,9 +1239,11 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
+        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
         expect(result.driverBasePayPerDrop).toBe(50); // Flat $50
-        expect(result.driverTotalBasePay).toBe(50); // Capped at maxPayPerDrop
-        expect(result.totalDriverPay).toBe(50);
+        expect(result.driverTotalBasePay).toBe(50); // Base pay
+        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
+        expect(result.totalDriverPay).toBeCloseTo(51.75, 2); // $50 + $1.75
       });
 
       test('uses flat $50 driver base pay regardless of headcount (100 people)', () => {
@@ -1238,16 +1257,18 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
+        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
         expect(result.driverBasePayPerDrop).toBe(50); // Flat $50
-        expect(result.driverTotalBasePay).toBe(50); // Capped at maxPayPerDrop
-        expect(result.totalDriverPay).toBe(50);
+        expect(result.driverTotalBasePay).toBe(50); // Base pay
+        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
+        expect(result.totalDriverPay).toBeCloseTo(51.75, 2); // $50 + $1.75
       });
 
-      test('maxPayPerDrop cap is enforced with mileage (12 miles scenario)', () => {
+      test('mileage is calculated at Destino rate (12 miles scenario)', () => {
         const input: DriverPayInput = {
           headcount: 30,
           foodCost: 400,
-          totalMileage: 12, // 12 miles × $0.70 = $8.40
+          totalMileage: 12, // 12 miles × $0.35 = $4.20
           bonusQualified: false,
           clientConfigId: 'hy-food-company-direct'
         };
@@ -1255,13 +1276,12 @@ describe('Delivery Cost Calculator', () => {
         const result = calculateDriverPay(input);
 
         expect(result.driverBasePayPerDrop).toBe(50); // Flat $50
-        expect(result.totalMileagePay).toBeCloseTo(8.40, 2); // 12 × $0.70
-        // $50 + $8.40 = $58.40, but should be capped at $50
-        expect(result.driverTotalBasePay).toBe(50); // Capped at maxPayPerDrop
-        expect(result.totalDriverPay).toBe(50);
+        expect(result.totalMileagePay).toBeCloseTo(4.20, 2); // 12 × $0.35
+        expect(result.driverTotalBasePay).toBe(50); // Base pay
+        expect(result.totalDriverPay).toBeCloseTo(54.20, 2); // $50 + $4.20
       });
 
-      test('maxPayPerDrop cap is enforced with mileage and bonus', () => {
+      test('mileage and bonus calculation', () => {
         const input: DriverPayInput = {
           headcount: 30,
           foodCost: 400,
@@ -1273,14 +1293,13 @@ describe('Delivery Cost Calculator', () => {
         const result = calculateDriverPay(input);
 
         expect(result.driverBasePayPerDrop).toBe(50);
-        expect(result.totalMileagePay).toBeCloseTo(8.40, 2);
+        expect(result.totalMileagePay).toBeCloseTo(4.20, 2); // 12 × $0.35
         expect(result.driverBonusPay).toBe(10);
-        // Base + mileage = $50 (capped), then add bonus
-        expect(result.driverTotalBasePay).toBe(50); // Capped
-        expect(result.totalDriverPay).toBe(60); // $50 capped base + $10 bonus
+        expect(result.driverTotalBasePay).toBe(50); // Base pay
+        expect(result.totalDriverPay).toBeCloseTo(64.20, 2); // $50 + $4.20 + $10 bonus
       });
 
-      test('maxPayPerDrop cap with bridge toll', () => {
+      test('bridge toll calculation', () => {
         const input: DriverPayInput = {
           headcount: 30,
           foodCost: 400,
@@ -1292,10 +1311,11 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
-        expect(result.driverTotalBasePay).toBe(50); // Capped
+        expect(result.driverTotalBasePay).toBe(50); // Base pay
         expect(result.bridgeToll).toBe(8.00);
-        // Capped base + bridge toll
-        expect(result.totalDriverPay).toBe(58); // $50 + $8 bridge toll
+        expect(result.totalMileagePay).toBeCloseTo(4.20, 2); // 12 × $0.35
+        // Total: base + mileage + bridge toll
+        expect(result.totalDriverPay).toBeCloseTo(54.20, 2); // $50 + $4.20 (bridge toll not in totalDriverPay, it's in readySetTotalFee)
       });
 
       test('handles edge case: zero headcount with flat rate', () => {
@@ -1309,23 +1329,26 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
+        // Mileage: 5 × $0.35 = $1.75
         expect(result.driverBasePayPerDrop).toBe(50); // Flat $50 for any headcount
-        expect(result.driverTotalBasePay).toBe(50); // Capped
+        expect(result.driverTotalBasePay).toBe(50); // Base pay
+        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
+        expect(result.totalDriverPay).toBeCloseTo(51.75, 2);
       });
 
-      test('standard mileage pay ($7 minimum) is used for HY Food Company', () => {
+      test('mileage pay uses Destino rate for HY Food Company', () => {
         const input: DriverPayInput = {
           headcount: 30,
           foodCost: 400,
-          totalMileage: 3, // 3 miles × $0.70 = $2.10 < $7 minimum
+          totalMileage: 3, // 3 miles × $0.35 = $1.05
           bonusQualified: false,
           clientConfigId: 'hy-food-company-direct'
         };
 
         const result = calculateDriverPay(input);
 
-        expect(result.totalMileagePay).toBe(7.0); // $7 minimum
-        // $50 + $7 = $57, capped at $50
+        expect(result.totalMileagePay).toBeCloseTo(1.05, 2); // 3 × $0.35
+        // $50 + $1.05 = $51.05
         expect(result.driverTotalBasePay).toBe(50); // Capped at maxPayPerDrop
       });
     });

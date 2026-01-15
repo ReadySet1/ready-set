@@ -5,10 +5,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  NavigationIcon, 
-  MapPinIcon, 
-  ClockIcon, 
+import {
+  NavigationIcon,
+  MapPinIcon,
+  ClockIcon,
   TruckIcon,
   PlayIcon,
   PauseIcon,
@@ -18,6 +18,8 @@ import {
   UserIcon
 } from "lucide-react";
 import DriverDeliveries from "@/components/Driver/DriverDeliveries";
+import { DriverStatsCard } from "@/components/Driver/DriverStatsCard";
+import { useDriverStats } from "@/hooks/tracking/useDriverStats";
 
 interface ShiftStatus {
   isActive: boolean;
@@ -30,6 +32,14 @@ const DriverPage = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [shiftStatus, setShiftStatus] = useState<ShiftStatus>({ isActive: false });
   const [driverName, setDriverName] = useState("Driver");
+  const [driverId, setDriverId] = useState<string | null>(null);
+
+  // Fetch driver stats for the quick summary
+  const { data: stats } = useDriverStats({
+    driverId: driverId || '',
+    period: 'today',
+    enabled: !!driverId,
+  });
 
   // Ensure time-based UI only renders on the client to avoid SSR hydration mismatches
   useEffect(() => {
@@ -48,10 +58,32 @@ const DriverPage = () => {
     return 'evening';
   }, [currentTime]);
 
-  // Mock shift data - in real implementation, this would come from API
+  // Fetch driver profile and ID
   useEffect(() => {
-    // This would be replaced with actual API call to get driver info and shift status
-    setDriverName("Test"); // This would come from user context/session
+    const fetchDriverInfo = async () => {
+      try {
+        // Fetch user profile to get driver info
+        const profileResponse = await fetch('/api/profile');
+        if (profileResponse.ok) {
+          const profile = await profileResponse.json();
+          setDriverName(profile.name || profile.firstName || 'Driver');
+
+          // Fetch driver ID using the profile
+          const driverResponse = await fetch('/api/tracking/drivers?limit=1');
+          if (driverResponse.ok) {
+            const driverData = await driverResponse.json();
+            if (driverData.success && driverData.data?.length > 0) {
+              // For drivers, the API returns their own driver record
+              setDriverId(driverData.data[0].id);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching driver info:', error);
+      }
+    };
+
+    fetchDriverInfo();
   }, []);
 
   const formatTime = (date: Date) => {
@@ -170,11 +202,15 @@ const DriverPage = () => {
                   <div className="flex items-center space-x-4 text-green-100">
                     <div className="flex items-center space-x-1">
                       <PackageIcon className="w-4 h-4" />
-                      <span className="text-xs">0 Pending</span>
+                      <span className="text-xs">
+                        {stats?.deliveryStats.inProgress ?? 0} Pending
+                      </span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <CheckCircleIcon className="w-4 h-4" />
-                      <span className="text-xs">1 Complete</span>
+                      <span className="text-xs">
+                        {stats?.deliveryStats.completed ?? 0} Complete
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -184,7 +220,14 @@ const DriverPage = () => {
           </Card>
         </div>
 
-
+        {/* Performance Stats Card */}
+        {driverId && (
+          <DriverStatsCard
+            driverId={driverId}
+            defaultPeriod="today"
+            showTrends={true}
+          />
+        )}
 
         {/* Delivery Details */}
         <DriverDeliveries />
