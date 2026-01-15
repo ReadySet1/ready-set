@@ -27,6 +27,7 @@ import { HostSection } from "./HostSection";
 import { useUser } from "@/contexts/UserContext";
 import { getOrderCreationRedirectRoute } from "@/utils/routing";
 import OrderConfirmationModal from "./OrderConfirmationModal";
+import { CostEstimatorCard } from "./CostEstimatorCard";
 
 // Extended form data type
 interface ExtendedCateringFormData extends CateringFormData {
@@ -737,6 +738,16 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           addressTypeFilter="private"
           defaultCollapsed={true}
           showAllAddressesSection={false}
+        />
+      </div>
+
+      {/* Delivery Cost Estimator */}
+      <div className="mb-8">
+        <CostEstimatorCard
+          headcount={parseInt(watch("headcount") || "0", 10)}
+          onEstimatedCostChange={(cost) => {
+            setValue("orderTotal", cost.toFixed(2));
+          }}
         />
       </div>
 
