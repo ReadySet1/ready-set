@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 import { getOrderCreationRedirectRoute } from "@/utils/routing";
+import { CostEstimatorCard } from "./CostEstimatorCard";
 
 // Form field components
 const InputField: React.FC<{
@@ -538,6 +539,16 @@ const OnDemandOrderForm: React.FC = () => {
             ]}
           />
         </div>
+      </div>
+
+      {/* Delivery Cost Estimator - uses headcount=1 for on-demand orders (smallest tier) */}
+      <div className="mb-8">
+        <CostEstimatorCard
+          headcount={1}
+          onEstimatedCostChange={(cost) => {
+            setValue("order_total", cost.toFixed(2));
+          }}
+        />
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
