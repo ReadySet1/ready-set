@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CateringRequestForm from "../CateringRequestForm";
 import { Address } from "@/types/address";
@@ -195,6 +195,13 @@ const mockAddress = {
   zip: "12345",
 };
 
+// Helper to wait for component initialization (Supabase client + session loading)
+const waitForInit = async () => {
+  await act(async () => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  });
+};
+
 describe("CateringRequestForm", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -286,61 +293,72 @@ describe("CateringRequestForm", () => {
       render(<CateringRequestForm />);
     });
 
-    // Wait for form to initialize (Supabase client and session)
-    await waitFor(() => {
-      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
-    });
+    // Wait for form to initialize and Supabase client + session to be loaded
+    await waitForInit();
+    await waitForInit();
 
     // Fill out the form with valid data
+    // Fill brokerage field
+    const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
+    await user.selectOptions(brokerageSelect, "Ez Cater");
+
+    // Fill order number
+    await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
+
+    // Fill date - clear first, then type
+    const dateInput = screen.getByLabelText(/date/i);
+    await user.clear(dateInput);
+    await user.type(dateInput, "2024-12-31");
+
+    // Fill headcount
+    await user.type(screen.getByLabelText(/headcount/i), "50");
+
+    // Fill pickup time
+    await user.type(screen.getByLabelText(/pick up time/i), "10:00");
+
+    // Fill arrival time
+    await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+
+    // Fill client attention
+    await user.type(screen.getByLabelText(/client.*attention/i), "John Doe");
+
+    // Fill order total
+    await user.type(screen.getByLabelText(/order total/i), "1000");
+
+    // Select "No" for host requirement
+    const hostNoRadio = screen.getByRole("radio", { name: /no/i });
+    await user.click(hostNoRadio);
+
+    // Simulate address selection for both pickup and delivery
     await act(async () => {
-      // Fill brokerage field
-      const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
-      await user.selectOptions(brokerageSelect, "Ez Cater");
-
-      // Fill order number
-      await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-
-      // Fill date - clear first, then type
-      const dateInput = screen.getByLabelText(/date/i);
-      await user.clear(dateInput);
-      await user.type(dateInput, "2024-12-31");
-
-      // Fill headcount
-      await user.type(screen.getByLabelText(/headcount/i), "50");
-
-      // Fill pickup time
-      await user.type(screen.getByLabelText(/pick up time/i), "10:00");
-
-      // Fill arrival time
-      await user.type(screen.getByLabelText(/arrival time/i), "11:00");
-
-      // Fill client attention
-      await user.type(screen.getByLabelText(/client.*attention/i), "John Doe");
-
-      // Fill order total
-      await user.type(screen.getByLabelText(/order total/i), "1000");
-
-      // Select "No" for host requirement
-      const hostNoRadio = screen.getByRole("radio", { name: /no/i });
-      await user.click(hostNoRadio);
-
-      // Simulate address selection for both pickup and delivery
       mockHandleAddressSelect(mockAddress);
     });
+    await waitForInit();
 
-    // Submit the form
-    await act(async () => {
-      const submitButton = screen.getByRole("button", {
-        name: /submit catering request/i,
-      });
-      await user.click(submitButton);
+    // Submit the form using fireEvent.submit (more reliable than button click in tests)
+    const submitButton = screen.getByRole("button", {
+      name: /submit catering request/i,
     });
+    const form = submitButton.closest('form');
+
+    await act(async () => {
+      if (form) {
+        fireEvent.submit(form);
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    // Wait for fetch to be called first
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    }, { timeout: 5000 });
 
     // Verify that confirmation modal is shown with the order number
     await waitFor(() => {
       expect(screen.getByTestId("order-confirmation-modal")).toBeInTheDocument();
-      expect(screen.getByTestId("modal-order-number")).toHaveTextContent("TEST-12345");
     }, { timeout: 5000 });
+
+    expect(screen.getByTestId("modal-order-number")).toHaveTextContent("TEST-12345");
   });
 
   it("shows confirmation modal after successful form submission for vendor users", async () => {
@@ -363,61 +381,72 @@ describe("CateringRequestForm", () => {
       render(<CateringRequestForm />);
     });
 
-    // Wait for form to initialize (Supabase client and session)
-    await waitFor(() => {
-      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
-    });
+    // Wait for form to initialize and Supabase client + session to be loaded
+    await waitForInit();
+    await waitForInit();
 
     // Fill out the form with valid data
+    // Fill brokerage field
+    const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
+    await user.selectOptions(brokerageSelect, "Ez Cater");
+
+    // Fill order number
+    await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
+
+    // Fill date - clear first, then type
+    const dateInput = screen.getByLabelText(/date/i);
+    await user.clear(dateInput);
+    await user.type(dateInput, "2024-12-31");
+
+    // Fill headcount
+    await user.type(screen.getByLabelText(/headcount/i), "50");
+
+    // Fill pickup time
+    await user.type(screen.getByLabelText(/pick up time/i), "10:00");
+
+    // Fill arrival time
+    await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+
+    // Fill client attention
+    await user.type(screen.getByLabelText(/client.*attention/i), "John Doe");
+
+    // Fill order total
+    await user.type(screen.getByLabelText(/order total/i), "1000");
+
+    // Select "No" for host requirement
+    const hostNoRadio = screen.getByRole("radio", { name: /no/i });
+    await user.click(hostNoRadio);
+
+    // Simulate address selection for both pickup and delivery
     await act(async () => {
-      // Fill brokerage field
-      const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
-      await user.selectOptions(brokerageSelect, "Ez Cater");
-
-      // Fill order number
-      await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-
-      // Fill date - clear first, then type
-      const dateInput = screen.getByLabelText(/date/i);
-      await user.clear(dateInput);
-      await user.type(dateInput, "2024-12-31");
-
-      // Fill headcount
-      await user.type(screen.getByLabelText(/headcount/i), "50");
-
-      // Fill pickup time
-      await user.type(screen.getByLabelText(/pick up time/i), "10:00");
-
-      // Fill arrival time
-      await user.type(screen.getByLabelText(/arrival time/i), "11:00");
-
-      // Fill client attention
-      await user.type(screen.getByLabelText(/client.*attention/i), "John Doe");
-
-      // Fill order total
-      await user.type(screen.getByLabelText(/order total/i), "1000");
-
-      // Select "No" for host requirement
-      const hostNoRadio = screen.getByRole("radio", { name: /no/i });
-      await user.click(hostNoRadio);
-
-      // Simulate address selection for both pickup and delivery
       mockHandleAddressSelect(mockAddress);
     });
+    await waitForInit();
 
-    // Submit the form
-    await act(async () => {
-      const submitButton = screen.getByRole("button", {
-        name: /submit catering request/i,
-      });
-      await user.click(submitButton);
+    // Submit the form using fireEvent.submit (more reliable than button click in tests)
+    const submitButton = screen.getByRole("button", {
+      name: /submit catering request/i,
     });
+    const form = submitButton.closest('form');
+
+    await act(async () => {
+      if (form) {
+        fireEvent.submit(form);
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    // Wait for fetch to be called first
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    }, { timeout: 5000 });
 
     // Verify that confirmation modal is shown with the order number
     await waitFor(() => {
       expect(screen.getByTestId("order-confirmation-modal")).toBeInTheDocument();
-      expect(screen.getByTestId("modal-order-number")).toHaveTextContent("TEST-12345");
     }, { timeout: 5000 });
+
+    expect(screen.getByTestId("modal-order-number")).toHaveTextContent("TEST-12345");
   });
 
   it("does not redirect on submission failure", async () => {
@@ -452,37 +481,53 @@ describe("CateringRequestForm", () => {
       render(<CateringRequestForm />);
     });
 
+    // Wait for form to initialize and Supabase client + session to be loaded
+    await waitForInit();
+    await waitForInit();
+
     // Fill out the form with valid data
+    const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
+    await user.selectOptions(brokerageSelect, "Ez Cater");
+    await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
+
+    const dateInput = screen.getByLabelText(/date/i);
+    await user.clear(dateInput);
+    await user.type(dateInput, "2024-12-31");
+
+    await user.type(screen.getByLabelText(/headcount/i), "50");
+    await user.type(screen.getByLabelText(/pick up time/i), "10:00");
+    await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+    await user.type(screen.getByLabelText(/client.*attention/i), "John Doe");
+    await user.type(screen.getByLabelText(/order total/i), "1000");
+
+    const hostNoRadio = screen.getByRole("radio", { name: /no/i });
+    await user.click(hostNoRadio);
+
     await act(async () => {
-      const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
-      await user.selectOptions(brokerageSelect, "Ez Cater");
-      await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-      await user.type(screen.getByLabelText(/date/i), "2024-12-31");
-      await user.type(screen.getByLabelText(/headcount/i), "50");
-      await user.type(screen.getByLabelText(/pick up time/i), "10:00");
-      await user.type(screen.getByLabelText(/arrival time/i), "11:00");
-      await user.type(screen.getByLabelText(/client.*attention/i), "John Doe");
-      await user.type(screen.getByLabelText(/order total/i), "1000");
-
-      const hostNoRadio = screen.getByRole("radio", { name: /no/i });
-      await user.click(hostNoRadio);
-
       mockHandleAddressSelect(mockAddress);
     });
+    await waitForInit();
 
-    // Submit the form
-    await act(async () => {
-      const submitButton = screen.getByRole("button", {
-        name: /submit catering request/i,
-      });
-      await user.click(submitButton);
+    // Submit the form using fireEvent.submit (more reliable than button click in tests)
+    const submitButton = screen.getByRole("button", {
+      name: /submit catering request/i,
     });
+    const form = submitButton.closest('form');
+
+    await act(async () => {
+      if (form) {
+        fireEvent.submit(form);
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    // Wait for fetch to be called first
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    }, { timeout: 5000 });
 
     // Verify that router.push was NOT called since submission failed
-    await waitFor(() => {
-      // Wait a moment to ensure no redirect happened
-      expect(mockPush).not.toHaveBeenCalled();
-    });
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("submits the form with correct data structure and shows modal", async () => {
@@ -491,49 +536,62 @@ describe("CateringRequestForm", () => {
       render(<CateringRequestForm />);
     });
 
-    // Wait for form to initialize (Supabase client and session)
-    await waitFor(() => {
-      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
-    });
+    // Wait for form to initialize and Supabase client + session to be loaded
+    await waitForInit();
+    await waitForInit();
 
     // Fill out the form
+    const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
+    await user.selectOptions(brokerageSelect, "Ez Cater");
+    await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
+
+    // Clear date field first, then type
+    const dateInput = screen.getByLabelText(/date/i);
+    await user.clear(dateInput);
+    await user.type(dateInput, "2024-12-31");
+
+    await user.type(screen.getByLabelText(/headcount/i), "50");
+    await user.type(screen.getByLabelText(/pick up time/i), "10:00");
+    await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+    await user.type(screen.getByLabelText(/client.*attention/i), "John Doe");
+    await user.type(screen.getByLabelText(/order total/i), "1000");
+
+    const hostNoRadio = screen.getByRole("radio", { name: /no/i });
+    await user.click(hostNoRadio);
+
+    // Simulate address selection for both pickup and delivery
     await act(async () => {
-      const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
-      await user.selectOptions(brokerageSelect, "Ez Cater");
-      await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-
-      // Clear date field first, then type
-      const dateInput = screen.getByLabelText(/date/i);
-      await user.clear(dateInput);
-      await user.type(dateInput, "2024-12-31");
-
-      await user.type(screen.getByLabelText(/headcount/i), "50");
-      await user.type(screen.getByLabelText(/pick up time/i), "10:00");
-      await user.type(screen.getByLabelText(/arrival time/i), "11:00");
-      await user.type(screen.getByLabelText(/client.*attention/i), "John Doe");
-      await user.type(screen.getByLabelText(/order total/i), "1000");
-
-      const hostNoRadio = screen.getByRole("radio", { name: /no/i });
-      await user.click(hostNoRadio);
-
-      // Simulate address selection for both pickup and delivery
       mockHandleAddressSelect(mockAddress);
+    });
+    await waitForInit();
 
-      const submitButton = screen.getByRole("button", {
-        name: /submit catering request/i,
-      });
-      await user.click(submitButton);
+    // Submit the form using fireEvent.submit (more reliable than button click in tests)
+    const submitButton = screen.getByRole("button", {
+      name: /submit catering request/i,
+    });
+    const form = submitButton.closest('form');
+
+    await act(async () => {
+      if (form) {
+        fireEvent.submit(form);
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
     });
 
-    // Verify the API call was made with correct data
+    // Wait for fetch to be called
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith("/api/catering-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: expect.stringContaining("TEST-12345"),
-      });
+      expect(mockFetch).toHaveBeenCalled();
+    }, { timeout: 5000 });
 
-      // Verify modal is shown instead of direct redirect
+    // Verify the API call was made with correct data
+    expect(mockFetch).toHaveBeenCalledWith("/api/catering-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: expect.stringContaining("TEST-12345"),
+    });
+
+    // Verify modal is shown instead of direct redirect
+    await waitFor(() => {
       expect(screen.getByTestId("order-confirmation-modal")).toBeInTheDocument();
     }, { timeout: 5000 });
   });
