@@ -94,6 +94,33 @@ jest.mock("@/hooks/use-job-application-upload", () => ({
   }),
 }));
 
+// Mock CostEstimatorCard component
+jest.mock("../CostEstimatorCard", () => ({
+  __esModule: true,
+  CostEstimatorCard: ({ headcount, onEstimatedCostChange }: { headcount: number; onEstimatedCostChange?: (cost: number) => void }) => (
+    <div data-testid="mock-cost-estimator" data-headcount={headcount}>
+      Mock Cost Estimator
+      <button
+        data-testid="apply-estimate-button"
+        onClick={() => onEstimatedCostChange?.(100)}
+      >
+        Apply Estimate
+      </button>
+    </div>
+  ),
+  default: ({ headcount, onEstimatedCostChange }: { headcount: number; onEstimatedCostChange?: (cost: number) => void }) => (
+    <div data-testid="mock-cost-estimator" data-headcount={headcount}>
+      Mock Cost Estimator
+      <button
+        data-testid="apply-estimate-button"
+        onClick={() => onEstimatedCostChange?.(100)}
+      >
+        Apply Estimate
+      </button>
+    </div>
+  ),
+}));
+
 // Mock Supabase client - must return a Promise since createClient is async
 jest.mock("@/utils/supabase/client", () => ({
   createClient: jest.fn(() =>
