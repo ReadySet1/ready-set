@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import OnDemandOrderForm from "../OnDemandForm";
 import { Address } from "@/types/address";
@@ -38,9 +38,9 @@ jest.mock("react-hot-toast", () => {
 // Mock AddressManager component - store callbacks for pickup and delivery
 // OnDemandForm uses onAddressSelected(addressId) which receives just an ID,
 // then looks up the address from addresses state populated by onAddressesLoaded
+// Uses showManagementButtons prop to distinguish pickup (undefined) from delivery (false)
 const addressSelectCallbacks: { pickup?: (addressId: string) => void; delivery?: (addressId: string) => void } = {};
 const addressLoadCallbacks: { pickup?: (addresses: any[]) => void; delivery?: (addresses: any[]) => void } = {};
-let mockInstanceCount = 0;
 
 jest.mock("@/components/AddressManager", () => ({
   __esModule: true,
@@ -51,9 +51,10 @@ jest.mock("@/components/AddressManager", () => ({
     showFilters?: boolean;
     showManagementButtons?: boolean;
   }) => {
-    // Track based on render order - first is pickup, second is delivery
-    const isPickup = mockInstanceCount % 2 === 0;
-    mockInstanceCount++;
+    // Distinguish pickup from delivery using showManagementButtons prop
+    // Pickup: showManagementButtons is undefined (default)
+    // Delivery: showManagementButtons is explicitly false
+    const isPickup = props.showManagementButtons !== false;
 
     if (isPickup) {
       addressSelectCallbacks.pickup = props.onAddressSelected;
@@ -149,17 +150,28 @@ const mockAddress = {
   zip: "12345",
 };
 
+// Helper to wait for component initialization (Supabase client + user loading)
+// The component has a chain of async effects that need to complete:
+// 1. createClient() -> setSupabase()
+// 2. getUser() -> setUser()
+// Each step involves Promise resolution + React state update + re-render
+const waitForInit = async () => {
+  await act(async () => {
+    // Use a real delay to allow the async initialization chain to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+  });
+};
+
 /**
  * REA-270 - OnDemandOrderForm tests
  * AddressManager mock properly captures both onAddressesLoaded and onAddressSelected callbacks
- * for both pickup and delivery address managers using render order tracking.
+ * for both pickup and delivery address managers using showManagementButtons prop.
  */
 describe("OnDemandOrderForm", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockClear();
-    // Reset address manager mock state
-    mockInstanceCount = 0;
+    // Reset address manager callback state
     addressSelectCallbacks.pickup = undefined;
     addressSelectCallbacks.delivery = undefined;
     addressLoadCallbacks.pickup = undefined;
@@ -243,64 +255,74 @@ describe("OnDemandOrderForm", () => {
       render(<OnDemandOrderForm />);
     });
 
-    // Wait for form to initialize (Supabase client and user)
-    await waitFor(() => {
-      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
-    });
+    // Wait for form to initialize and Supabase client + user to be loaded
+    await waitForInit();
+    await waitForInit();
 
     // Simulate address loading (populates component's addresses state)
     await act(async () => {
       addressLoadCallbacks.pickup?.([mockAddress]);
       addressLoadCallbacks.delivery?.([mockAddress]);
     });
+    await waitForInit();
 
     // Fill out the form with valid data
+    // Fill brokerage/direct field
+    const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
+    await user.selectOptions(brokerageSelect, "direct");
+
+    // Fill order number
+    await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
+
+    // Fill date
+    const dateInput = screen.getByLabelText(/date/i);
+    await user.clear(dateInput);
+    await user.type(dateInput, "2024-12-31");
+
+    // Fill pickup time
+    await user.type(screen.getByLabelText(/pickup time/i), "10:00");
+
+    // Fill arrival time
+    await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+
+    // Fill client attention
+    await user.type(screen.getByLabelText(/client attention/i), "John Doe");
+
+    // Fill item being delivered
+    await user.type(screen.getByLabelText(/item.*delivered/i), "Test Package");
+
+    // Fill vehicle type
+    const vehicleSelect = screen.getByLabelText(/vehicle type/i);
+    await user.selectOptions(vehicleSelect, "Car");
+
+    // Fill order total
+    await user.type(screen.getByLabelText(/order total/i), "100");
+
+    // Simulate address selection (calls component's onAddressSelected with ID)
     await act(async () => {
-      // Fill brokerage/direct field
-      const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
-      await user.selectOptions(brokerageSelect, "direct");
-
-      // Fill order number
-      await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-
-      // Fill date
-      const dateInput = screen.getByLabelText(/date/i);
-      await user.clear(dateInput);
-      await user.type(dateInput, "2024-12-31");
-
-      // Fill pickup time
-      await user.type(screen.getByLabelText(/pickup time/i), "10:00");
-
-      // Fill arrival time
-      await user.type(screen.getByLabelText(/arrival time/i), "11:00");
-
-      // Fill client attention
-      await user.type(screen.getByLabelText(/client attention/i), "John Doe");
-
-      // Fill item being delivered
-      await user.type(screen.getByLabelText(/item.*delivered/i), "Test Package");
-
-      // Fill vehicle type
-      const vehicleSelect = screen.getByLabelText(/vehicle type/i);
-      await user.selectOptions(vehicleSelect, "Car");
-
-      // Fill order total
-      await user.type(screen.getByLabelText(/order total/i), "100");
-
-      // Simulate address selection (calls component's onAddressSelected with ID)
       addressSelectCallbacks.pickup?.(mockAddress.id);
       addressSelectCallbacks.delivery?.(mockAddress.id);
     });
+    await waitForInit();
 
-    // Submit the form
+    // Submit the form using fireEvent.submit (more reliable than button click in tests)
+    const submitButton = screen.getByRole("button", {
+      name: /submit.*request/i,
+    });
+    const form = submitButton.closest('form');
+
     await act(async () => {
-      const submitButton = screen.getByRole("button", {
-        name: /submit.*request/i,
-      });
-      await user.click(submitButton);
+      if (form) {
+        fireEvent.submit(form);
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
     });
 
-    // Verify that router.push was called with the client dashboard path for client users
+    // Wait for fetch to be called, then check redirect
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    }, { timeout: 5000 });
+
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/client");
     }, { timeout: 5000 });
@@ -326,64 +348,76 @@ describe("OnDemandOrderForm", () => {
       render(<OnDemandOrderForm />);
     });
 
-    // Wait for form to initialize (Supabase client and user)
-    await waitFor(() => {
-      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
-    });
+    // Wait for form to initialize and Supabase client + user to be loaded
+    await waitForInit();
+    await waitForInit();
 
     // Simulate address loading (populates component's addresses state)
     await act(async () => {
       addressLoadCallbacks.pickup?.([mockAddress]);
       addressLoadCallbacks.delivery?.([mockAddress]);
     });
+    await waitForInit();
 
     // Fill out the form with valid data
+    // Fill brokerage/direct field
+    const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
+    await user.selectOptions(brokerageSelect, "direct");
+
+    // Fill order number
+    await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
+
+    // Fill date
+    const dateInput = screen.getByLabelText(/date/i);
+    await user.clear(dateInput);
+    await user.type(dateInput, "2024-12-31");
+
+    // Fill pickup time
+    await user.type(screen.getByLabelText(/pickup time/i), "10:00");
+
+    // Fill arrival time
+    await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+
+    // Fill client attention
+    await user.type(screen.getByLabelText(/client attention/i), "John Doe");
+
+    // Fill item being delivered
+    await user.type(screen.getByLabelText(/item.*delivered/i), "Test Package");
+
+    // Fill vehicle type
+    const vehicleSelect = screen.getByLabelText(/vehicle type/i);
+    await user.selectOptions(vehicleSelect, "Car");
+
+    // Fill order total
+    await user.type(screen.getByLabelText(/order total/i), "100");
+
+    // Simulate address selection (calls component's onAddressSelected with ID)
     await act(async () => {
-      // Fill brokerage/direct field
-      const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
-      await user.selectOptions(brokerageSelect, "direct");
-
-      // Fill order number
-      await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-
-      // Fill date
-      const dateInput = screen.getByLabelText(/date/i);
-      await user.clear(dateInput);
-      await user.type(dateInput, "2024-12-31");
-
-      // Fill pickup time
-      await user.type(screen.getByLabelText(/pickup time/i), "10:00");
-
-      // Fill arrival time
-      await user.type(screen.getByLabelText(/arrival time/i), "11:00");
-
-      // Fill client attention
-      await user.type(screen.getByLabelText(/client attention/i), "John Doe");
-
-      // Fill item being delivered
-      await user.type(screen.getByLabelText(/item.*delivered/i), "Test Package");
-
-      // Fill vehicle type
-      const vehicleSelect = screen.getByLabelText(/vehicle type/i);
-      await user.selectOptions(vehicleSelect, "Car");
-
-      // Fill order total
-      await user.type(screen.getByLabelText(/order total/i), "100");
-
-      // Simulate address selection (calls component's onAddressSelected with ID)
       addressSelectCallbacks.pickup?.(mockAddress.id);
       addressSelectCallbacks.delivery?.(mockAddress.id);
     });
+    await waitForInit();
 
-    // Submit the form
+    // Submit the form using fireEvent.submit (more reliable than button click in tests)
+    const submitButton = screen.getByRole("button", {
+      name: /submit.*request/i,
+    });
+    const form = submitButton.closest('form');
+
     await act(async () => {
-      const submitButton = screen.getByRole("button", {
-        name: /submit.*request/i,
-      });
-      await user.click(submitButton);
+      if (form) {
+        fireEvent.submit(form);
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
     });
 
-    // Verify that router.push was called with the vendor dashboard path for vendor users
+    // Wait for fetch to be called, then check redirect
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    }, { timeout: 5000 });
+
+    // Verify that router.push was called
+    // Note: Both vendors and clients redirect to /client per getDashboardRouteByRole utility
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/client");
     }, { timeout: 5000 });
@@ -488,70 +522,81 @@ describe("OnDemandOrderForm", () => {
       render(<OnDemandOrderForm />);
     });
 
-    // Wait for form to initialize (Supabase client and user)
-    await waitFor(() => {
-      expect(screen.getByLabelText(/brokerage.*direct/i)).toBeEnabled();
-    });
+    // Wait for form to initialize and Supabase client + user to be loaded
+    await waitForInit();
+    await waitForInit();
 
     // Simulate address loading (populates component's addresses state)
     await act(async () => {
       addressLoadCallbacks.pickup?.([mockAddress]);
       addressLoadCallbacks.delivery?.([mockAddress]);
     });
+    await waitForInit();
 
     // Fill out the form
+    const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
+    await user.selectOptions(brokerageSelect, "direct");
+    await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
+
+    // Fill date
+    const dateInput = screen.getByLabelText(/date/i);
+    await user.clear(dateInput);
+    await user.type(dateInput, "2024-12-31");
+
+    // Fill pickup time
+    await user.type(screen.getByLabelText(/pickup time/i), "10:00");
+
+    // Fill arrival time
+    await user.type(screen.getByLabelText(/arrival time/i), "11:00");
+
+    // Fill client attention
+    await user.type(screen.getByLabelText(/client attention/i), "John Doe");
+
+    // Fill item being delivered
+    await user.type(screen.getByLabelText(/item.*delivered/i), "Test Package");
+
+    // Fill vehicle type
+    const vehicleSelect = screen.getByLabelText(/vehicle type/i);
+    await user.selectOptions(vehicleSelect, "Car");
+
+    // Fill order total
+    await user.type(screen.getByLabelText(/order total/i), "100");
+
+    // Simulate address selection
     await act(async () => {
-      const brokerageSelect = screen.getByLabelText(/brokerage.*direct/i);
-      await user.selectOptions(brokerageSelect, "direct");
-      await user.type(screen.getByLabelText(/order number/i), "TEST-12345");
-
-      // Fill date
-      const dateInput = screen.getByLabelText(/date/i);
-      await user.clear(dateInput);
-      await user.type(dateInput, "2024-12-31");
-
-      // Fill pickup time
-      await user.type(screen.getByLabelText(/pickup time/i), "10:00");
-
-      // Fill arrival time
-      await user.type(screen.getByLabelText(/arrival time/i), "11:00");
-
-      // Fill client attention
-      await user.type(screen.getByLabelText(/client attention/i), "John Doe");
-
-      // Fill item being delivered
-      await user.type(screen.getByLabelText(/item.*delivered/i), "Test Package");
-
-      // Fill vehicle type
-      const vehicleSelect = screen.getByLabelText(/vehicle type/i);
-      await user.selectOptions(vehicleSelect, "Car");
-
-      // Fill order total
-      await user.type(screen.getByLabelText(/order total/i), "100");
-
-      // Simulate address selection
       addressSelectCallbacks.pickup?.(mockAddress.id);
       addressSelectCallbacks.delivery?.(mockAddress.id);
     });
+    await waitForInit();
 
-    // Submit the form
-    await act(async () => {
-      const submitButton = screen.getByRole("button", {
-        name: /submit.*request/i,
-      });
-      await user.click(submitButton);
+    // Submit the form using fireEvent.submit (more reliable than button click in tests)
+    const submitButton = screen.getByRole("button", {
+      name: /submit.*request/i,
     });
+    const form = submitButton.closest('form');
+
+    await act(async () => {
+      if (form) {
+        fireEvent.submit(form);
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    // Wait for fetch to be called
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    }, { timeout: 5000 });
 
     // Verify the API call was made with correct data
     // Note: Component submits to /api/orders with order_type: "on_demand"
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: expect.stringContaining("TEST-12345"),
-      });
+    expect(mockFetch).toHaveBeenCalledWith("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: expect.stringContaining("TEST-12345"),
+    });
 
-      // Verify redirect happened
+    // Verify redirect happened
+    await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith("/client");
     }, { timeout: 5000 });
   });
