@@ -59,12 +59,13 @@ const customJestConfig = {
   ],
   coverageThreshold: {
     global: {
-      // Temporarily lowered from 70% to match current state
-      // TODO: Improve coverage - see Plane issue for tracking
-      branches: 24,
-      functions: 24,
-      lines: 24,
-      statements: 24,
+      // Updated to 36% based on realistic assessment of codebase structure
+      // Most uncovered code is in src/app (React pages) requiring complex test setup
+      // See Plane sub-issues for phased coverage improvement plan
+      branches: 30,
+      functions: 30,
+      lines: 36,
+      statements: 36,
     },
   },
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
