@@ -95,7 +95,7 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # REA-181: Threshold-based enforcement (currently 80%, will increase to 95%)
+    # REA-285: Threshold-based enforcement at 95%
 
     steps:
       - name: Checkout code
@@ -148,8 +148,8 @@ jobs:
               echo "📊 Pass rate: $PASS_RATE% ($PASSED/$RUN_TESTS executed tests)"
               echo "📋 Total: $TOTAL | Passed: $PASSED | Failed: $FAILED | Skipped: $PENDING"
 
-              # Threshold check: Start at 80%, increase to 95% as tests improve
-              THRESHOLD=80
+              # REA-285: Threshold enforced at 95%
+              THRESHOLD=95
               if (( $(echo "$PASS_RATE < $THRESHOLD" | bc -l) )); then
                 echo "❌ Pass rate ${PASS_RATE}% is below ${THRESHOLD}% threshold"
                 echo "PASS_RATE=$PASS_RATE" >> $GITHUB_ENV
@@ -207,7 +207,7 @@ jobs:
             echo "| ✅ Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
             echo "| ❌ Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
             echo "| 📊 Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
-            echo "| 🎯 Threshold | 80% |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🎯 Threshold | 95% |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
 
@@ -408,12 +408,12 @@ jobs:
             echo "✅ Lint and type check passed"
           fi
 
-          # REA-181: Unit tests now blocking at 80% threshold
+          # REA-285: Unit tests now blocking at 95% threshold
           if [[ "${{ needs.unit-tests.result }}" != "success" ]]; then
-            echo "❌ Unit tests failed (below 80% threshold)"
+            echo "❌ Unit tests failed (below 95% threshold)"
             FAILED=true
           else
-            echo "✅ Unit tests passed (≥80% threshold)"
+            echo "✅ Unit tests passed (≥95% threshold)"
           fi
 
           # Build check is non-blocking (works with SKIP_ENV_VALIDATION)
@@ -431,7 +431,7 @@ jobs:
 
           echo "✅ All required checks passed!"
           echo ""
-          echo "📊 Test Status (REA-181):"
+          echo "📊 Test Status (REA-285):"
           echo "  - TypeScript: ✅ Type checking enabled"
-          echo "  - Unit Tests: ✅ Passing (80% threshold)"
+          echo "  - Unit Tests: ✅ Passing (95% threshold)"
           echo "  - E2E Tests: ⏸️  Requires secrets configuration"
