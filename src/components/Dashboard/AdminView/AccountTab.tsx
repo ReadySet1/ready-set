@@ -52,7 +52,7 @@ export const AccountTab: React.FC<AccountTabProps> = ({ userId }) => {
     try {
       const supabase = await createClient();
       const { data, error } = await supabase
-        .from("users")
+        .from("profiles")
         .select("*")
         .eq("id", userId)
         .single();
@@ -63,7 +63,7 @@ export const AccountTab: React.FC<AccountTabProps> = ({ userId }) => {
         const userData: AccountFormData = {
           name: data.name || "",
           email: data.email || "",
-          contactNumber: data.contact_number || "",
+          contactNumber: data.contactNumber || "",
           street1: data.street1 || "",
           street2: data.street2 || "",
           city: data.city || "",
