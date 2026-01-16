@@ -49,6 +49,13 @@ const customJestConfig = {
     '!src/app/**/icon.*',
     '!src/app/**/apple-icon.*',
     '!src/sanity/**',
+    // Exclude type definition files (pure TypeScript types, no runtime code)
+    '!src/types/supabase.ts',
+    '!src/types/**/*.types.ts',
+    // Exclude dev-only utilities (not used in production)
+    '!src/lib/dev/**',
+    '!src/hooks/dev/**',
+    '!src/lib/error-testing.tsx',
   ],
   coverageThreshold: {
     global: {
