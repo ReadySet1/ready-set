@@ -235,6 +235,7 @@ const CateringOrderForm: React.FC = () => {
           <Input
             id="eventDate"
             type="date"
+            min={new Date().toISOString().split("T")[0]}
             {...register("eventDate", {
               required: "Event date is required",
               validate: {

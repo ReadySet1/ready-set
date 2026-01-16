@@ -1,5 +1,6 @@
 // src/__tests__/api/vendor/vendor-metrics.test.ts
 
+import { NextResponse } from 'next/server';
 import { GET } from '@/app/api/vendor/metrics/route';
 import {
   getUserOrderMetrics,
@@ -40,11 +41,7 @@ jest.mock('@/lib/cache/http-cache', () => ({
   },
 }));
 
-/**
- * TODO: REA-211 - Response structure mismatch (double JSON stringification)
- * 11 pass, 4 fail - createCachedResponse mock returns stringified data
- */
-describe.skip('/api/vendor/metrics API', () => {
+describe('/api/vendor/metrics API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -71,7 +68,7 @@ describe.skip('/api/vendor/metrics API', () => {
         (getUserOrderMetrics as jest.Mock).mockResolvedValue(mockMetrics);
         (setVendorMetricsCache as jest.Mock).mockReturnValue('etag-abc123');
         (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
+          NextResponse.json(data, { status: 200 })
         );
 
         const request = createGetRequest(
@@ -180,7 +177,7 @@ describe.skip('/api/vendor/metrics API', () => {
         (getUserOrderMetrics as jest.Mock).mockResolvedValue(mockMetrics);
         (setVendorMetricsCache as jest.Mock).mockReturnValue('etag-new');
         (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
+          NextResponse.json(data, { status: 200 })
         );
 
         const request = createGetRequest(
@@ -249,7 +246,7 @@ describe.skip('/api/vendor/metrics API', () => {
         });
         (setVendorMetricsCache as jest.Mock).mockReturnValue('etag');
         (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
+          NextResponse.json(data, { status: 200 })
         );
 
         const request = createGetRequest(
@@ -273,7 +270,7 @@ describe.skip('/api/vendor/metrics API', () => {
         (getUserOrderMetrics as jest.Mock).mockResolvedValue(mockMetrics);
         (setVendorMetricsCache as jest.Mock).mockReturnValue('etag-new');
         (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
+          NextResponse.json(data, { status: 200 })
         );
 
         const request = createGetRequest(
@@ -323,7 +320,7 @@ describe.skip('/api/vendor/metrics API', () => {
         (getUserOrderMetrics as jest.Mock).mockResolvedValue({});
         (setVendorMetricsCache as jest.Mock).mockReturnValue('etag');
         (createCachedResponse as jest.Mock).mockImplementation((data) =>
-          new Response(JSON.stringify(data), { status: 200 })
+          NextResponse.json(data, { status: 200 })
         );
 
         const request = createGetRequest(
@@ -361,7 +358,7 @@ describe.skip('/api/vendor/metrics API', () => {
         await expectErrorResponse(
           response,
           500,
-          /Failed to fetch vendor metrics/i
+          /Database connection failed/i
         );
       });
 

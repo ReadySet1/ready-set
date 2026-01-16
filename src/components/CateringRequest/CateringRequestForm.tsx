@@ -27,6 +27,7 @@ import { HostSection } from "./HostSection";
 import { useUser } from "@/contexts/UserContext";
 import { getOrderCreationRedirectRoute } from "@/utils/routing";
 import OrderConfirmationModal from "./OrderConfirmationModal";
+import { CostEstimatorCard } from "./CostEstimatorCard";
 
 // Extended form data type
 interface ExtendedCateringFormData extends CateringFormData {
@@ -62,6 +63,7 @@ const InputField: React.FC<{
   rows?: number;
   placeholder?: string;
   icon?: React.ReactNode;
+  min?: string;
 }> = ({
   control,
   name,
@@ -73,6 +75,7 @@ const InputField: React.FC<{
   rows,
   placeholder,
   icon,
+  min,
 }) => (
   <div className="relative mb-4">
     <label
@@ -113,6 +116,7 @@ const InputField: React.FC<{
                 {...field}
                 id={name}
                 type={type}
+                min={min}
                 className={`w-full rounded-md border ${
                   error ? "border-red-500" : "border-gray-300"
                 } ${icon ? "pl-10" : "pl-3"} py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500`}
@@ -628,6 +632,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           label="Date"
           type="date"
           required
+          min={new Date().toISOString().split("T")[0]}
           icon={<Calendar size={16} />}
         />
         <InputField
@@ -733,6 +738,16 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
           addressTypeFilter="private"
           defaultCollapsed={true}
           showAllAddressesSection={false}
+        />
+      </div>
+
+      {/* Delivery Cost Estimator */}
+      <div className="mb-8">
+        <CostEstimatorCard
+          headcount={parseInt(watch("headcount") || "0", 10)}
+          onEstimatedCostChange={(cost) => {
+            setValue("orderTotal", cost.toFixed(2));
+          }}
         />
       </div>
 

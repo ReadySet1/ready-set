@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 import { getOrderCreationRedirectRoute } from "@/utils/routing";
+import { CostEstimatorCard } from "./CostEstimatorCard";
 
 // Form field components
 const InputField: React.FC<{
@@ -33,6 +34,7 @@ const InputField: React.FC<{
   rows?: number;
   placeholder?: string;
   icon?: React.ReactNode;
+  min?: string;
 }> = ({
   control,
   name,
@@ -44,6 +46,7 @@ const InputField: React.FC<{
   rows,
   placeholder,
   icon,
+  min,
 }) => (
   <div className="relative mb-4">
     <label
@@ -84,6 +87,7 @@ const InputField: React.FC<{
                 {...field}
                 id={name}
                 type={type}
+                min={min}
                 className={`w-full rounded-md border ${
                   error ? "border-red-500" : "border-gray-300"
                 } ${icon ? "pl-10" : "pl-3"} py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500`}
@@ -475,6 +479,7 @@ const OnDemandOrderForm: React.FC = () => {
           label="Date"
           type="date"
           required
+          min={new Date().toISOString().split("T")[0]}
           icon={<Calendar size={16} />}
         />
 
@@ -534,6 +539,16 @@ const OnDemandOrderForm: React.FC = () => {
             ]}
           />
         </div>
+      </div>
+
+      {/* Delivery Cost Estimator - uses headcount=1 for on-demand orders (smallest tier) */}
+      <div className="mb-8">
+        <CostEstimatorCard
+          headcount={1}
+          onEstimatedCostChange={(cost) => {
+            setValue("order_total", cost.toFixed(2));
+          }}
+        />
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
