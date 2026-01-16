@@ -1001,25 +1001,111 @@ jest.mock('@radix-ui/react-select', () => {
   };
 });
 
-// Mock Radix UI Tabs
+// Mock Radix UI Tabs with interactive behavior for testing
 jest.mock('@radix-ui/react-tabs', () => {
   const React = require('react');
 
-  const createMockComponent = (name: string) => {
-    const Component = React.forwardRef(({ children, ...props }: any, ref: any) => {
-      // Filter out Radix-specific props
-      const { asChild, onValueChange, value, defaultValue, ...domProps } = props;
-      return React.createElement('div', { ref, 'data-testid': `tabs-${name.toLowerCase()}`, ...domProps }, children);
-    });
-    Component.displayName = name;
-    return Component;
+  // Create context to share state between components
+  const TabsContext = React.createContext({ value: '', onValueChange: undefined });
+
+  // Root component manages state
+  const Root = ({ children, value, defaultValue, onValueChange, orientation, ...props }: any) => {
+    const [internalValue, setInternalValue] = React.useState(defaultValue || '');
+
+    const actualValue = value !== undefined ? value : internalValue;
+
+    const handleValueChange = (newValue: string) => {
+      if (value === undefined) {
+        setInternalValue(newValue);
+      }
+      onValueChange?.(newValue);
+    };
+
+    return React.createElement(
+      TabsContext.Provider,
+      { value: { value: actualValue, onValueChange: handleValueChange } },
+      React.createElement('div', { 'data-testid': 'tabs-root', 'data-orientation': orientation, ...props }, children)
+    );
   };
+  Root.displayName = 'TabsRoot';
+
+  // List wraps the tab triggers
+  const List = React.forwardRef(({ children, className, ...props }: any, ref: any) => {
+    return React.createElement(
+      'div',
+      {
+        ref,
+        role: 'tablist',
+        'data-testid': 'tabs-list',
+        className,
+        ...props,
+      },
+      children
+    );
+  });
+  List.displayName = 'TabsList';
+
+  // Trigger is a tab button
+  const Trigger = React.forwardRef(({ children, value: triggerValue, className, disabled, ...props }: any, ref: any) => {
+    const { value, onValueChange } = React.useContext(TabsContext);
+    const isSelected = value === triggerValue;
+
+    const handleClick = () => {
+      if (!disabled) {
+        onValueChange?.(triggerValue);
+      }
+    };
+
+    return React.createElement(
+      'button',
+      {
+        ref,
+        type: 'button',
+        role: 'tab',
+        'aria-selected': isSelected,
+        'data-state': isSelected ? 'active' : 'inactive',
+        'data-disabled': disabled ? '' : undefined,
+        'data-testid': 'tabs-trigger',
+        className,
+        onClick: handleClick,
+        disabled,
+        ...props,
+      },
+      children
+    );
+  });
+  Trigger.displayName = 'TabsTrigger';
+
+  // Content is shown when its value matches the current tab
+  const Content = React.forwardRef(({ children, value: contentValue, className, forceMount, ...props }: any, ref: any) => {
+    const { value } = React.useContext(TabsContext);
+    const isSelected = value === contentValue;
+
+    if (!isSelected && !forceMount) {
+      return null;
+    }
+
+    return React.createElement(
+      'div',
+      {
+        ref,
+        role: 'tabpanel',
+        'data-state': isSelected ? 'active' : 'inactive',
+        'data-testid': 'tabs-content',
+        className,
+        hidden: !isSelected,
+        ...props,
+      },
+      children
+    );
+  });
+  Content.displayName = 'TabsContent';
 
   return {
-    Root: createMockComponent('Root'),
-    List: createMockComponent('List'),
-    Trigger: createMockComponent('Trigger'),
-    Content: createMockComponent('Content'),
+    Root,
+    List,
+    Trigger,
+    Content,
   };
 });
 
