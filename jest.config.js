@@ -49,15 +49,23 @@ const customJestConfig = {
     '!src/app/**/icon.*',
     '!src/app/**/apple-icon.*',
     '!src/sanity/**',
+    // Exclude type definition files (pure TypeScript types, no runtime code)
+    '!src/types/supabase.ts',
+    '!src/types/**/*.types.ts',
+    // Exclude dev-only utilities (not used in production)
+    '!src/lib/dev/**',
+    '!src/hooks/dev/**',
+    '!src/lib/error-testing.tsx',
   ],
   coverageThreshold: {
     global: {
-      // Temporarily lowered from 70% to match current state
-      // TODO: Improve coverage - see Plane issue for tracking
-      branches: 24,
-      functions: 24,
-      lines: 24,
-      statements: 24,
+      // Updated to 36% based on realistic assessment of codebase structure
+      // Most uncovered code is in src/app (React pages) requiring complex test setup
+      // See Plane sub-issues for phased coverage improvement plan
+      branches: 30,
+      functions: 30,
+      lines: 36,
+      statements: 36,
     },
   },
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
