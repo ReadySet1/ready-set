@@ -31,6 +31,7 @@ import CustomerInfo from "./ui/CustomerInfo";
 import AdditionalInfo from "./ui/AdditionalInfo";
 import DriverAssignmentDialog from "./ui/DriverAssignmentDialog";
 import EditOrderDialog from "./ui/EditOrderDialog";
+import OrderLocationMap from "./ui/OrderLocationMap";
 import { TERMINAL_STATUSES } from "@/app/api/orders/[order_number]/schemas";
 import OrderStatusCard from "./OrderStatus";
 import { usePathname, useRouter, useParams } from "next/navigation";
@@ -1004,6 +1005,15 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                       </div>
                     </div>
                   )}
+                </div>
+                {/* Mini Map for order locations */}
+                <div className="mt-6">
+                  <OrderLocationMap
+                    pickupAddress={order.pickupAddress}
+                    deliveryAddress={order.deliveryAddress}
+                    height="250px"
+                    className="rounded-lg border border-slate-200"
+                  />
                 </div>
               </div>
             </div>
