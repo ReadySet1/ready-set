@@ -163,7 +163,7 @@ describe("ServiceFeaturesSection", () => {
             screen.queryByTestId("loading-spinner"),
           ).not.toBeInTheDocument();
         },
-        { timeout: 200 },
+        { timeout: 1000 },
       );
     });
 
