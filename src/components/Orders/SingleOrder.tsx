@@ -539,12 +539,15 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
     fetchDriverLocation();
 
-    // Optionally refresh driver location every 30 seconds if order is active
+    // Poll driver location every 10 seconds when a driver is assigned and order is not completed/cancelled
+    const isActiveOrder = order?.status && !['COMPLETED', 'CANCELLED', 'DELIVERED'].includes(order.status);
+
     const intervalId = setInterval(() => {
-      if (order?.status === "ACTIVE" || order?.status === "ASSIGNED" || order?.status === "IN_PROGRESS") {
+      if (driverInfo?.id && isActiveOrder) {
+        console.log('[SingleOrder] Polling driver location...');
         fetchDriverLocation();
       }
-    }, 30000);
+    }, 10000); // Poll every 10 seconds
 
     return () => clearInterval(intervalId);
   }, [driverInfo?.id, orderNumber, order?.status, supabase.auth]);
