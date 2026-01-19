@@ -157,6 +157,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   const [isDriverAssigned, setIsDriverAssigned] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
+  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [files, setFiles] = useState<FileUpload[]>([]);
   const [forceCloseDialog, setForceCloseDialog] = useState(false);
 
@@ -483,6 +484,71 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
     fetchDrivers();
   }, [setDrivers, supabase.auth, router, rolesLoaded, userRoles.isVendor]);
+
+  // Fetch driver's current location when driver is assigned
+  useEffect(() => {
+    const fetchDriverLocation = async () => {
+      if (!driverInfo?.id) {
+        setDriverLocation(null);
+        return;
+      }
+
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session) return;
+
+        // Fetch live tracking data to find driver's location
+        const response = await fetch("/api/tracking/live", {
+          credentials: "include",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          // Silently fail - driver location is optional
+          return;
+        }
+
+        const data = await response.json();
+
+        // Find the driver in the active drivers list by matching profile ID
+        // The tracking system uses driver.user_id which corresponds to the profile ID
+        const activeDriver = data.drivers?.find(
+          (d: { user_id?: string; id?: string }) =>
+            d.user_id === driverInfo.id || d.id === driverInfo.id
+        );
+
+        if (activeDriver?.location?.lat && activeDriver?.location?.lng) {
+          setDriverLocation({
+            lat: activeDriver.location.lat,
+            lng: activeDriver.location.lng,
+          });
+        } else {
+          setDriverLocation(null);
+        }
+      } catch (error) {
+        // Silently fail - driver location is optional enhancement
+        console.debug("Could not fetch driver location:", error);
+        setDriverLocation(null);
+      }
+    };
+
+    fetchDriverLocation();
+
+    // Optionally refresh driver location every 30 seconds if order is active
+    const intervalId = setInterval(() => {
+      if (order?.status === "ACTIVE" || order?.status === "ASSIGNED" || order?.status === "IN_PROGRESS") {
+        fetchDriverLocation();
+      }
+    }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, [driverInfo?.id, order?.status, supabase.auth]);
 
   const handleOpenDriverDialog = () => {
     setIsDriverDialogOpen(true);
@@ -1011,6 +1077,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                   <OrderLocationMap
                     pickupAddress={order.pickupAddress}
                     deliveryAddress={order.deliveryAddress}
+                    driverLocation={driverLocation}
                     height="250px"
                     className="rounded-lg border border-slate-200"
                   />
