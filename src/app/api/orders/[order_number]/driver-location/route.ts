@@ -117,7 +117,7 @@ export async function GET(
         d.is_on_duty,
         d.last_location_update
       FROM drivers d
-      WHERE d.profile_id = $1
+      WHERE d.profile_id = $1::uuid
         AND d.is_active = true
         AND d.deleted_at IS NULL
         AND d.last_known_location IS NOT NULL
@@ -150,7 +150,7 @@ export async function GET(
           d.is_on_duty,
           d.last_location_update
         FROM drivers d
-        WHERE d.user_id = $1
+        WHERE d.user_id = $1::uuid
           AND d.is_active = true
           AND d.deleted_at IS NULL
           AND d.last_known_location IS NOT NULL
