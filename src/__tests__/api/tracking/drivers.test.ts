@@ -34,29 +34,41 @@ describe('/api/tracking/drivers', () => {
       const mockDrivers = [
         {
           id: 'driver-1',
+          user_id: 'user-1',
+          profile_id: 'profile-1',
           employee_id: 'EMP001',
           vehicle_number: 'VEH001',
-          license_number: 'LIC001',
           phone_number: '+1234567890',
           is_active: true,
           is_on_duty: true,
+          shift_start_time: null,
+          shift_end_time: null,
+          current_shift_id: null,
           last_known_location: null,
           last_location_update: null,
-          metadata: {},
+          last_known_accuracy: null,
+          last_known_speed: null,
+          last_known_heading: null,
           created_at: '2024-01-01T00:00:00Z',
           updated_at: '2024-01-01T00:00:00Z',
         },
         {
           id: 'driver-2',
+          user_id: 'user-2',
+          profile_id: 'profile-2',
           employee_id: 'EMP002',
           vehicle_number: 'VEH002',
-          license_number: 'LIC002',
           phone_number: '+1234567891',
           is_active: false,
           is_on_duty: false,
+          shift_start_time: null,
+          shift_end_time: null,
+          current_shift_id: null,
           last_known_location: null,
           last_location_update: null,
-          metadata: {},
+          last_known_accuracy: null,
+          last_known_speed: null,
+          last_known_heading: null,
           created_at: '2024-01-02T00:00:00Z',
           updated_at: '2024-01-02T00:00:00Z',
         },
@@ -175,22 +187,22 @@ describe('/api/tracking/drivers', () => {
   describe('POST /api/tracking/drivers', () => {
     it('creates a new driver successfully', async () => {
       const newDriver = {
+        user_id: 'user-3',
+        profile_id: 'profile-3',
         employee_id: 'EMP003',
         vehicle_number: 'V003',
-        license_number: 'L003',
         phone_number: '+1234567890',
-        metadata: { shift: 'morning' },
       };
 
       const createdDriver = {
         id: 'driver-3',
+        user_id: 'user-3',
+        profile_id: 'profile-3',
         employee_id: 'EMP003',
         vehicle_number: 'V003',
-        license_number: 'L003',
         phone_number: '+1234567890',
         is_active: true,
         is_on_duty: false,
-        metadata: { shift: 'morning' },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -213,10 +225,11 @@ describe('/api/tracking/drivers', () => {
       expect(data.data.employee_id).toBe('EMP003');
     });
 
-    it('returns 400 for invalid driver data', async () => {
+    it('returns 400 when no identifier is provided', async () => {
       const invalidDriver = {
-        employee_id: 'EMP001',
-        // Missing required phone_number field
+        vehicle_number: 'V003',
+        phone_number: '+1234567890',
+        // Missing employee_id, profile_id, and user_id
       };
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
@@ -235,7 +248,6 @@ describe('/api/tracking/drivers', () => {
     it('handles database insertion errors', async () => {
       const newDriver = {
         employee_id: 'EMP003',
-        phone_number: '+1234567890',
       };
 
       // Mock duplicate employee_id error (PostgreSQL unique constraint violation)
@@ -256,23 +268,74 @@ describe('/api/tracking/drivers', () => {
       expect(data.error).toContain('already exists');
     });
 
-    it('validates required fields', async () => {
-      const incompleteDriver = {
-        vehicle_number: 'V003',
-        // Missing required employee_id and phone_number fields
+    it('accepts driver with only profile_id', async () => {
+      const newDriver = {
+        profile_id: 'profile-4',
       };
+
+      const createdDriver = {
+        id: 'driver-4',
+        user_id: null,
+        profile_id: 'profile-4',
+        employee_id: null,
+        vehicle_number: null,
+        phone_number: null,
+        is_active: true,
+        is_on_duty: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      mockQuery.mockResolvedValue({
+        rows: [createdDriver],
+      });
 
       const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
         method: 'POST',
-        body: JSON.stringify(incompleteDriver),
+        body: JSON.stringify(newDriver),
       });
 
       const response = await POST(request);
       const data = await response.json();
 
-      expect(response.status).toBe(400);
-      expect(data.success).toBe(false);
-      expect(data.error).toContain('Missing required fields');
+      expect(response.status).toBe(201);
+      expect(data.success).toBe(true);
+      expect(data.data.profile_id).toBe('profile-4');
+    });
+
+    it('accepts driver with only user_id', async () => {
+      const newDriver = {
+        user_id: 'user-5',
+      };
+
+      const createdDriver = {
+        id: 'driver-5',
+        user_id: 'user-5',
+        profile_id: null,
+        employee_id: null,
+        vehicle_number: null,
+        phone_number: null,
+        is_active: true,
+        is_on_duty: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      mockQuery.mockResolvedValue({
+        rows: [createdDriver],
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/tracking/drivers', {
+        method: 'POST',
+        body: JSON.stringify(newDriver),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(data.success).toBe(true);
+      expect(data.data.user_id).toBe('user-5');
     });
   });
 

@@ -32,10 +32,13 @@ const mockBroadcastLocationUpdate = jest.fn().mockResolvedValue(undefined);
 const mockSubscribe = jest.fn();
 const mockUnsubscribe = jest.fn().mockResolvedValue(undefined);
 
+const mockIsConnected = jest.fn().mockReturnValue(true);
+
 const mockChannel = {
   subscribe: mockSubscribe,
   unsubscribe: mockUnsubscribe,
   broadcastLocationUpdate: mockBroadcastLocationUpdate,
+  isConnected: mockIsConnected,
 };
 
 jest.mock('@/lib/realtime', () => ({
@@ -464,6 +467,122 @@ describe('useRealtimeLocationTracking', () => {
       await waitFor(() => {
         expect(realtimeLogger.error).toHaveBeenCalled();
       });
+    });
+
+    it('should skip broadcast when channel.isConnected() returns false', async () => {
+      // Simulate channel reporting disconnected even though state thinks connected
+      mockIsConnected.mockReturnValue(false);
+
+      mockUseLocationTracking.mockReturnValue({
+        currentLocation: mockLocation,
+        isTracking: true,
+        accuracy: 10,
+        error: null,
+        unsyncedCount: 0,
+        isOnline: true,
+        startTracking: mockStartTracking,
+        stopTracking: mockStopTracking,
+        updateLocationManually: mockUpdateLocationManually,
+        syncOfflineLocations: mockSyncOfflineLocations,
+      });
+
+      renderHook(() => useRealtimeLocationTracking());
+
+      await act(async () => {
+        jest.advanceTimersByTime(10);
+      });
+
+      // Should log debug message and not attempt broadcast
+      expect(realtimeLogger.debug).toHaveBeenCalledWith(
+        'Skipping broadcast - channel not connected',
+        expect.any(Object)
+      );
+      expect(mockBroadcastLocationUpdate).not.toHaveBeenCalled();
+
+      // Reset mock for other tests
+      mockIsConnected.mockReturnValue(true);
+    });
+
+    it('should downgrade CONNECTION_ERROR to debug level during shift ending', async () => {
+      // Simulate CONNECTION_ERROR that occurs when shift is ending
+      const connectionError = new Error('Connection closed') as any;
+      connectionError.code = 'CONNECTION_ERROR';
+      connectionError.name = 'RealtimeConnectionError';
+      mockBroadcastLocationUpdate.mockRejectedValue(connectionError);
+
+      mockUseLocationTracking.mockReturnValue({
+        currentLocation: mockLocation,
+        isTracking: true,
+        accuracy: 10,
+        error: null,
+        unsyncedCount: 0,
+        isOnline: true,
+        startTracking: mockStartTracking,
+        stopTracking: mockStopTracking,
+        updateLocationManually: mockUpdateLocationManually,
+        syncOfflineLocations: mockSyncOfflineLocations,
+      });
+
+      const onRealtimeError = jest.fn();
+      renderHook(() => useRealtimeLocationTracking({ onRealtimeError }));
+
+      await act(async () => {
+        jest.advanceTimersByTime(10);
+      });
+
+      await waitFor(() => {
+        // Should log as debug, not error
+        expect(realtimeLogger.debug).toHaveBeenCalledWith(
+          'Broadcast skipped - connection closing',
+          expect.any(Object)
+        );
+      });
+
+      // Should NOT call onRealtimeError for expected connection errors
+      expect(onRealtimeError).not.toHaveBeenCalled();
+
+      // Reset mock for other tests
+      mockBroadcastLocationUpdate.mockResolvedValue(undefined);
+    });
+
+    it('should still log error for non-connection broadcast failures', async () => {
+      // Simulate a different type of error (not connection related)
+      const otherError = new Error('Permission denied');
+      mockBroadcastLocationUpdate.mockRejectedValue(otherError);
+
+      mockUseLocationTracking.mockReturnValue({
+        currentLocation: mockLocation,
+        isTracking: true,
+        accuracy: 10,
+        error: null,
+        unsyncedCount: 0,
+        isOnline: true,
+        startTracking: mockStartTracking,
+        stopTracking: mockStopTracking,
+        updateLocationManually: mockUpdateLocationManually,
+        syncOfflineLocations: mockSyncOfflineLocations,
+      });
+
+      const onRealtimeError = jest.fn();
+      renderHook(() => useRealtimeLocationTracking({ onRealtimeError }));
+
+      await act(async () => {
+        jest.advanceTimersByTime(10);
+      });
+
+      await waitFor(() => {
+        // Should log as error for non-connection errors
+        expect(realtimeLogger.error).toHaveBeenCalledWith(
+          'Failed to broadcast location',
+          expect.any(Object)
+        );
+      });
+
+      // Should call onRealtimeError for unexpected errors
+      expect(onRealtimeError).toHaveBeenCalledWith(otherError);
+
+      // Reset mock for other tests
+      mockBroadcastLocationUpdate.mockResolvedValue(undefined);
     });
   });
 

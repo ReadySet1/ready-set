@@ -73,19 +73,28 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
   const [isAssigning, setIsAssigning] = useState(false);
   const itemsPerPage = 4; // Reduced for better mobile experience
 
-  // Filter drivers when search term or drivers array changes
+  // Filter and sort drivers when search term or drivers array changes
   useEffect(() => {
-    if (searchTerm.trim() === "") {
-      setFilteredDrivers(drivers);
-    } else {
+    let result = drivers;
+
+    // Filter by search term
+    if (searchTerm.trim() !== "") {
       const lowercaseSearch = searchTerm.toLowerCase();
-      const filtered = drivers.filter(
+      result = result.filter(
         (driver) =>
           (driver.name?.toLowerCase().includes(lowercaseSearch) ?? false) ||
           (driver.contactNumber && driver.contactNumber.includes(searchTerm)),
       );
-      setFilteredDrivers(filtered);
     }
+
+    // Sort alphabetically by name (A-Z)
+    result = [...result].sort((a, b) => {
+      const nameA = (a.name ?? "").toLowerCase();
+      const nameB = (b.name ?? "").toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    setFilteredDrivers(result);
     // Reset to first page when filters change
     setCurrentPage(1);
   }, [searchTerm, drivers]);
@@ -268,11 +277,8 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-gradient-to-r from-slate-50 to-white">
                       <TableRow>
-                        <TableHead className="w-[300px] font-semibold text-slate-700">
-                          Driver
-                        </TableHead>
                         <TableHead className="font-semibold text-slate-700">
-                          Status
+                          Driver
                         </TableHead>
                         <TableHead className="text-right font-semibold text-slate-700">
                           Action
@@ -320,15 +326,6 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
                                   </div>
                                 </div>
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className="border-green-200 bg-green-50 text-green-700 shadow-sm"
-                              >
-                                <RadioTower className="mr-1 h-3 w-3" />
-                                Active
-                              </Badge>
                             </TableCell>
                             <TableCell className="text-right">
                               <Button
@@ -399,19 +396,12 @@ const DriverAssignmentDialog: React.FC<DriverAssignmentDialogProps> = ({
                               <div className="truncate font-medium text-slate-800">
                                 {driver.name}
                               </div>
-                              <div className="mb-1 flex items-center gap-1 text-sm text-slate-500">
+                              <div className="flex items-center gap-1 text-sm text-slate-500">
                                 <Phone className="h-3 w-3 flex-shrink-0" />
                                 <span className="truncate">
                                   {driver.contactNumber || "No phone"}
                                 </span>
                               </div>
-                              <Badge
-                                variant="outline"
-                                className="border-green-200 bg-green-50 text-xs text-green-700"
-                              >
-                                <RadioTower className="mr-1 h-2.5 w-2.5" />
-                                Active
-                              </Badge>
                             </div>
                             <Button
                               onClick={() => handleDriverSelection(driver.id)}
