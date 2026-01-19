@@ -488,7 +488,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   // Fetch driver's current location when driver is assigned
   useEffect(() => {
     const fetchDriverLocation = async () => {
-      if (!driverInfo?.id) {
+      if (!driverInfo?.id || !orderNumber) {
         setDriverLocation(null);
         return;
       }
@@ -500,14 +500,17 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
         if (!session) return;
 
-        // Fetch live tracking data to find driver's location
-        const response = await fetch("/api/tracking/live", {
-          credentials: "include",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
-        });
+        // Fetch driver location for this specific order
+        const response = await fetch(
+          `/api/orders/${encodeURIComponent(orderNumber)}/driver-location`,
+          {
+            credentials: "include",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
         if (!response.ok) {
           // Silently fail - driver location is optional
@@ -516,19 +519,15 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
         const data = await response.json();
 
-        // Find the driver in the active drivers list by matching profile ID
-        // The tracking system uses driver.user_id which corresponds to the profile ID
-        const activeDriver = data.drivers?.find(
-          (d: { user_id?: string; id?: string }) =>
-            d.user_id === driverInfo.id || d.id === driverInfo.id
-        );
-
-        if (activeDriver?.location?.lat && activeDriver?.location?.lng) {
+        console.log('[SingleOrder] Driver location response:', data);
+        if (data.success && data.driverLocation?.lat && data.driverLocation?.lng) {
+          console.log('[SingleOrder] Setting driver location:', data.driverLocation.lat, data.driverLocation.lng);
           setDriverLocation({
-            lat: activeDriver.location.lat,
-            lng: activeDriver.location.lng,
+            lat: data.driverLocation.lat,
+            lng: data.driverLocation.lng,
           });
         } else {
+          console.log('[SingleOrder] No driver location available:', data.message);
           setDriverLocation(null);
         }
       } catch (error) {
@@ -548,7 +547,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     }, 30000);
 
     return () => clearInterval(intervalId);
-  }, [driverInfo?.id, order?.status, supabase.auth]);
+  }, [driverInfo?.id, orderNumber, order?.status, supabase.auth]);
 
   const handleOpenDriverDialog = () => {
     setIsDriverDialogOpen(true);
