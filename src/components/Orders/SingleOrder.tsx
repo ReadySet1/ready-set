@@ -50,6 +50,7 @@ import { createClient } from "@/utils/supabase/client";
 import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
 import { UserType } from "@/types/client-enums";
 import { decodeOrderNumber } from "@/utils/order";
+import { useDriverRealtimeLocation } from "@/hooks/tracking/useDriverRealtimeLocation";
 
 // Make sure the bucket name is user-assets
 const STORAGE_BUCKET = "user-assets";
@@ -157,7 +158,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   const [isDriverAssigned, setIsDriverAssigned] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
-  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [files, setFiles] = useState<FileUpload[]>([]);
   const [forceCloseDialog, setForceCloseDialog] = useState(false);
 
@@ -197,6 +197,23 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     isDriver: false,
   });
   const [rolesLoaded, setRolesLoaded] = useState(false);
+
+  // Real-time driver location tracking using Supabase Realtime (WebSocket)
+  // This provides instant updates like the admin tracking dashboard
+  const isActiveOrder = order?.status && !['COMPLETED', 'CANCELLED', 'DELIVERED'].includes(order.status);
+  const { location: realtimeLocation, isConnected: isRealtimeConnected } = useDriverRealtimeLocation({
+    driverProfileId: driverInfo?.id,
+    enabled: !!driverInfo?.id && !!isActiveOrder,
+    onLocationUpdate: (loc) => {
+      console.log('[SingleOrder] Realtime location update:', loc.lat, loc.lng);
+    },
+  });
+
+  // Combine realtime location with format expected by map component
+  const driverLocation = realtimeLocation ? {
+    lat: realtimeLocation.lat,
+    lng: realtimeLocation.lng,
+  } : null;
 
   // Check for bucket existence but don't try to create it (requires admin privileges)
   const ensureStorageBucketExists = useCallback(async () => {
@@ -484,73 +501,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
     fetchDrivers();
   }, [setDrivers, supabase.auth, router, rolesLoaded, userRoles.isVendor]);
-
-  // Fetch driver's current location when driver is assigned
-  useEffect(() => {
-    const fetchDriverLocation = async () => {
-      if (!driverInfo?.id || !orderNumber) {
-        setDriverLocation(null);
-        return;
-      }
-
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) return;
-
-        // Fetch driver location for this specific order
-        const response = await fetch(
-          `/api/orders/${encodeURIComponent(orderNumber)}/driver-location`,
-          {
-            credentials: "include",
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (!response.ok) {
-          // Silently fail - driver location is optional
-          return;
-        }
-
-        const data = await response.json();
-
-        console.log('[SingleOrder] Driver location response:', data);
-        if (data.success && data.driverLocation?.lat && data.driverLocation?.lng) {
-          console.log('[SingleOrder] Setting driver location:', data.driverLocation.lat, data.driverLocation.lng);
-          setDriverLocation({
-            lat: data.driverLocation.lat,
-            lng: data.driverLocation.lng,
-          });
-        } else {
-          console.log('[SingleOrder] No driver location available:', data.message);
-          setDriverLocation(null);
-        }
-      } catch (error) {
-        // Silently fail - driver location is optional enhancement
-        console.debug("Could not fetch driver location:", error);
-        setDriverLocation(null);
-      }
-    };
-
-    fetchDriverLocation();
-
-    // Poll driver location every 10 seconds when a driver is assigned and order is not completed/cancelled
-    const isActiveOrder = order?.status && !['COMPLETED', 'CANCELLED', 'DELIVERED'].includes(order.status);
-
-    const intervalId = setInterval(() => {
-      if (driverInfo?.id && isActiveOrder) {
-        console.log('[SingleOrder] Polling driver location...');
-        fetchDriverLocation();
-      }
-    }, 10000); // Poll every 10 seconds
-
-    return () => clearInterval(intervalId);
-  }, [driverInfo?.id, orderNumber, order?.status, supabase.auth]);
 
   const handleOpenDriverDialog = () => {
     setIsDriverDialogOpen(true);
