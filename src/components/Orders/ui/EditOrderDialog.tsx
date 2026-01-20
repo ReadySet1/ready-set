@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { formatDateTimeForDisplay } from "@/lib/utils/date-display";
 import {
   Edit3,
   Calendar as CalendarIcon,
@@ -357,7 +358,7 @@ const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
               )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {value ? format(value, "PPPp") : "Select date and time"}
+              {value ? formatDateTimeForDisplay(value, "PPPp") : "Select date and time"}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="z-[1100] w-auto p-0" align="start" sideOffset={4}>

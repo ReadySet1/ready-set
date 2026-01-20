@@ -207,7 +207,17 @@ export function useRealtimeLocationTracking(
    */
   const broadcastLocation = useCallback(
     async (location: LocationUpdate) => {
+      // Early exit if no channel or not connected
       if (!channelRef.current || !isRealtimeConnected) {
+        return false;
+      }
+
+      // Double-check channel is actually connected before attempting broadcast
+      // This prevents errors during shift ending when channel is closing
+      if (!channelRef.current.isConnected()) {
+        realtimeLogger.debug('Skipping broadcast - channel not connected', {
+          driverId: location.driverId,
+        });
         return false;
       }
 
@@ -250,11 +260,27 @@ export function useRealtimeLocationTracking(
         });
         return true;
       } catch (error) {
-        realtimeLogger.error('Failed to broadcast location', {
-          driverId: location.driverId,
-          error
-        });
-        onRealtimeError?.(error as Error);
+        // Check if this is an expected connection error (e.g., during shift ending)
+        const errorObj = error as { code?: string; name?: string; message?: string };
+        const isConnectionError =
+          errorObj.code === 'CONNECTION_ERROR' ||
+          errorObj.name === 'RealtimeConnectionError' ||
+          errorObj.message?.includes('connection') ||
+          errorObj.message?.includes('closed');
+
+        if (isConnectionError) {
+          // Downgrade to debug level for expected disconnection scenarios
+          realtimeLogger.debug('Broadcast skipped - connection closing', {
+            driverId: location.driverId,
+          });
+        } else {
+          // Log unexpected errors at error level
+          realtimeLogger.error('Failed to broadcast location', {
+            driverId: location.driverId,
+            error
+          });
+          onRealtimeError?.(error as Error);
+        }
         return false;
       }
     },

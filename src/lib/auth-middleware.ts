@@ -140,8 +140,8 @@ export async function withAuth(
     const normalizedAllowedRoles = allowedRoles.map(role => role.toUpperCase());
 
     if (allowedRoles.length > 0 && normalizedUserType && !normalizedAllowedRoles.includes(normalizedUserType)) {
-      // Note: Using console.error to avoid circular dependencies with authLogger
-      console.error('❌ [Auth Middleware] Insufficient permissions for user type:', userType, 'Allowed roles:', allowedRoles);
+      // Note: Using console.warn (not error) since this is expected behavior for role-based access control
+      console.warn('[Auth Middleware] Access denied for user type:', userType, '- Route requires:', allowedRoles);
       return {
         success: false,
         response: NextResponse.json(
