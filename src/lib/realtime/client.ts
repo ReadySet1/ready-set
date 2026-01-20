@@ -35,7 +35,7 @@ import { createClient as createBrowserClient } from '@/utils/supabase/client';
 
 export interface UserContext {
   userId: string;
-  userType: 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT';
+  userType: 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT' | 'VENDOR';
   driverId?: string;
 }
 
@@ -50,7 +50,7 @@ export class UnauthorizedError extends Error {
  * Channel access rules based on user type
  */
 const CHANNEL_ACCESS_RULES: Record<string, string[]> = {
-  [REALTIME_CHANNELS.DRIVER_LOCATIONS]: ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
+  [REALTIME_CHANNELS.DRIVER_LOCATIONS]: ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK', 'VENDOR', 'CLIENT'],
   [REALTIME_CHANNELS.DRIVER_STATUS]: ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
   [REALTIME_CHANNELS.ADMIN_COMMANDS]: ['ADMIN', 'SUPER_ADMIN'],
   [REALTIME_CHANNELS.DELIVERIES]: ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
@@ -114,7 +114,7 @@ async function fetchUserContext(
     );
   }
 
-  const userType = profile.type as 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT';
+  const userType = profile.type as 'DRIVER' | 'ADMIN' | 'SUPER_ADMIN' | 'HELPDESK' | 'CLIENT' | 'VENDOR';
 
   // If user is a driver, fetch driver ID
   let driverId: string | undefined;
