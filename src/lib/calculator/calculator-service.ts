@@ -213,6 +213,7 @@ export class CalculatorService {
         foodCost: input.foodCost || 0,
         totalMileage: input.mileage || 0,
         numberOfDrives: input.numberOfDrives || 1,
+        numberOfStops: input.numberOfStops || 1,
         requiresBridge: input.requiresBridge || false,
         bridgeToll: input.bridgeToll,
         clientConfigId: clientConfigId || 'ready-set-food-standard'
@@ -235,10 +236,12 @@ export class CalculatorService {
         mileageCharges: deliveryCostBreakdown.totalMileagePay,
         bridgeToll: deliveryCostBreakdown.bridgeToll,
         dailyDriveDiscount: -deliveryCostBreakdown.dailyDriveDiscount,
+        extraStopsCharge: deliveryCostBreakdown.extraStopsCharge,
         total: deliveryCostBreakdown.deliveryFee,
         breakdown: [
           { label: 'Base Delivery Fee', amount: deliveryCostBreakdown.deliveryCost },
           { label: 'Mileage Charges', amount: deliveryCostBreakdown.totalMileagePay },
+          { label: 'Extra Stops Charge', amount: deliveryCostBreakdown.extraStopsCharge },
           { label: 'Bridge Toll', amount: deliveryCostBreakdown.bridgeToll },
           { label: 'Daily Drive Discount', amount: -deliveryCostBreakdown.dailyDriveDiscount }
         ]
@@ -249,11 +252,13 @@ export class CalculatorService {
         mileagePay: driverPayBreakdown.totalMileagePay,
         bonus: driverPayBreakdown.driverBonusPay,
         bridgeToll: driverPayBreakdown.bridgeToll,
+        extraStopsBonus: driverPayBreakdown.extraStopsBonus,
         total: driverPayBreakdown.totalDriverPay,
         breakdown: [
           { label: 'Base Pay', amount: driverPayBreakdown.driverBasePayPerDrop },
           { label: `Mileage (${driverPayBreakdown.totalMileage} mi × $${driverPayBreakdown.mileageRate}/mi)`, amount: driverPayBreakdown.totalMileagePay },
           { label: 'Bonus', amount: driverPayBreakdown.driverBonusPay },
+          { label: 'Extra Stops Bonus', amount: driverPayBreakdown.extraStopsBonus },
           { label: 'Bridge Toll', amount: driverPayBreakdown.bridgeToll }
         ]
       };
@@ -269,6 +274,7 @@ export class CalculatorService {
           foodCost: input.foodCost,
           mileage: input.mileage,
           numberOfDrives: input.numberOfDrives || 1,
+          numberOfStops: input.numberOfStops || 1,
           bonusQualified: driverPayBreakdown.bonusQualified,
           vendorMileageRate: 3.0,
           readySetMileageRate: 3.0,
