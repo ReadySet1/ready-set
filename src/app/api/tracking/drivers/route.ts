@@ -10,20 +10,27 @@ const pool = new Pool({
 
 interface Driver {
   id: string;
-  employee_id: string;
-  vehicle_number: string;
-  license_number: string;
-  phone_number: string;
+  user_id?: string;
+  profile_id?: string;
+  employee_id?: string;
+  vehicle_number?: string;
+  phone_number?: string;
   is_active: boolean;
   is_on_duty: boolean;
+  shift_start_time?: string;
+  shift_end_time?: string;
+  current_shift_id?: string;
   last_known_location?: {
     type: string;
     coordinates: [number, number];
   };
   last_location_update?: string;
-  metadata?: Record<string, any>;
+  last_known_accuracy?: number;
+  last_known_speed?: number;
+  last_known_heading?: number;
   created_at: string;
   updated_at: string;
+  deleted_at?: string;
 }
 
 interface DriverLocation {
@@ -41,24 +48,30 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0');
 
     let query = `
-      SELECT 
+      SELECT
         id,
+        user_id,
+        profile_id,
         employee_id,
         vehicle_number,
-        license_number,
         phone_number,
         is_active,
         is_on_duty,
+        shift_start_time,
+        shift_end_time,
+        current_shift_id,
         ST_AsGeoJSON(last_known_location) as location_geojson,
         last_location_update,
-        metadata,
+        last_known_accuracy,
+        last_known_speed,
+        last_known_heading,
         created_at,
         updated_at
       FROM drivers
-      WHERE 1=1
+      WHERE deleted_at IS NULL
     `;
     
-    const params: any[] = [];
+    const params: (string | number | boolean)[] = [];
     let paramCounter = 1;
 
     if (isActive !== null) {
@@ -111,19 +124,19 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
+      user_id,
+      profile_id,
       employee_id,
       vehicle_number,
-      license_number,
       phone_number,
-      metadata = {}
     } = body;
 
-    // Validate required fields
-    if (!employee_id || !phone_number) {
+    // Validate - at least one identifier is needed
+    if (!employee_id && !profile_id && !user_id) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Missing required fields: employee_id, phone_number' 
+        {
+          success: false,
+          error: 'Missing required fields: at least one of employee_id, profile_id, or user_id is required'
         },
         { status: 400 }
       );
@@ -131,32 +144,32 @@ export async function POST(request: NextRequest) {
 
     const query = `
       INSERT INTO drivers (
-        employee_id, 
-        vehicle_number, 
-        license_number, 
-        phone_number, 
-        metadata
-      )
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING 
-        id,
+        user_id,
+        profile_id,
         employee_id,
         vehicle_number,
-        license_number,
+        phone_number
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING
+        id,
+        user_id,
+        profile_id,
+        employee_id,
+        vehicle_number,
         phone_number,
         is_active,
         is_on_duty,
-        metadata,
         created_at,
         updated_at
     `;
 
     const result = await pool.query(query, [
-      employee_id,
-      vehicle_number,
-      license_number,
-      phone_number,
-      JSON.stringify(metadata)
+      user_id || null,
+      profile_id || null,
+      employee_id || null,
+      vehicle_number || null,
+      phone_number || null,
     ]);
 
     return NextResponse.json({
@@ -203,7 +216,7 @@ export async function PUT(request: NextRequest) {
     }
 
     let query = 'UPDATE drivers SET last_location_update = NOW()';
-    const params: any[] = [];
+    const params: (string | number | boolean)[] = [];
     let paramCounter = 1;
 
     if (location && location.latitude && location.longitude) {

@@ -85,18 +85,25 @@ jest.mock("@/lib/utils", () => ({
 }));
 
 describe("Driver Assignment Dialog", () => {
+  // Drivers in non-alphabetical order to test sorting
   const mockDrivers = [
     {
       id: "driver-1",
+      name: "Maria Rodriguez",
+      email: "maria@example.com",
+      contactNumber: "5559876543",
+    },
+    {
+      id: "driver-2",
       name: "David Sanchez",
       email: "david@example.com",
       contactNumber: "5551234567",
     },
     {
-      id: "driver-2",
-      name: "Maria Rodriguez",
-      email: "maria@example.com",
-      contactNumber: "5559876543",
+      id: "driver-3",
+      name: "Ana Garcia",
+      email: "ana@example.com",
+      contactNumber: "5551112222",
     },
   ];
 
@@ -148,6 +155,30 @@ describe("Driver Assignment Dialog", () => {
     // Driver names appear in both desktop table and mobile cards
     expect(screen.getAllByText("David Sanchez").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Maria Rodriguez").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Ana Garcia").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("should sort drivers alphabetically by name (A-Z)", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(<DriverAssignmentDialog {...defaultProps} />);
+
+    // Get all driver name elements - they appear in desktop table
+    const driverNames = screen
+      .getAllByText(/Ana Garcia|David Sanchez|Maria Rodriguez/)
+      .filter((el) => el.closest("td")); // Filter to table cells only
+
+    // Should be sorted alphabetically: Ana, David, Maria
+    expect(driverNames.length).toBeGreaterThanOrEqual(3);
+
+    // Check that names appear in alphabetical order by getting text content
+    const names = driverNames.map((el) => el.textContent);
+    const sortedNames = [...names].sort((a, b) =>
+      (a || "").localeCompare(b || ""),
+    );
+    expect(names).toEqual(sortedNames);
   });
 
   it("should call onDriverSelection when driver is selected", async () => {
@@ -165,11 +196,12 @@ describe("Driver Assignment Dialog", () => {
       />,
     );
 
-    // Click the Select button for the first driver
+    // Click the Select button for the first driver (Ana Garcia after sorting)
     const selectButtons = screen.getAllByText("Select");
     await user.click(selectButtons[0]);
 
-    expect(mockOnDriverSelection).toHaveBeenCalledWith("driver-1");
+    // First driver alphabetically is Ana Garcia (driver-3)
+    expect(mockOnDriverSelection).toHaveBeenCalledWith("driver-3");
   });
 
   it("should show selected state when driver is selected", async () => {
@@ -246,9 +278,10 @@ describe("Driver Assignment Dialog", () => {
 
     render(<DriverAssignmentDialog {...defaultProps} />);
 
-    // Both drivers should be visible initially (appear in both desktop and mobile views)
+    // All drivers should be visible initially (appear in both desktop and mobile views)
     expect(screen.getAllByText("David Sanchez").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Maria Rodriguez").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Ana Garcia").length).toBeGreaterThanOrEqual(1);
 
     // Type in search
     const searchInput = screen.getByPlaceholderText(
@@ -260,7 +293,24 @@ describe("Driver Assignment Dialog", () => {
     await waitFor(() => {
       expect(screen.getAllByText("David Sanchez").length).toBeGreaterThanOrEqual(1);
       expect(screen.queryByText("Maria Rodriguez")).not.toBeInTheDocument();
+      expect(screen.queryByText("Ana Garcia")).not.toBeInTheDocument();
     });
+  });
+
+  it("should not display Status column", async () => {
+    const { default: DriverAssignmentDialog } = await import(
+      "@/components/Orders/ui/DriverAssignmentDialog"
+    );
+
+    render(<DriverAssignmentDialog {...defaultProps} />);
+
+    // Status column should not be present - only Driver and Action columns
+    const headers = screen.getAllByRole("columnheader");
+    const headerTexts = headers.map((h) => h.textContent);
+
+    expect(headerTexts).toContain("Driver");
+    expect(headerTexts).toContain("Action");
+    expect(headerTexts).not.toContain("Status");
   });
 
   it("should call onOpenChange when cancel is clicked", async () => {

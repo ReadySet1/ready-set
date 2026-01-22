@@ -682,6 +682,62 @@ export function DeliveryCalculator({
 
           {result && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Customer Charges */}
+              <Card className="border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                    <div className="p-1.5 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg shadow-sm">
+                      <DollarSign className="h-4 w-4 text-white" />
+                    </div>
+                    <span className="text-purple-700">Customer Charges</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {(result.customerCharges.baseDeliveryFee ?? 0) > 0 && (
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-slate-600 font-medium">Base Delivery Fee:</span>
+                        <span className="font-semibold text-slate-900">${formatCurrency(result.customerCharges.baseDeliveryFee)}</span>
+                      </div>
+                    )}
+
+                    {(result.customerCharges.mileageCharges ?? 0) > 0 && (
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-slate-600 font-medium">Mileage Charges:</span>
+                        <span className="font-semibold text-slate-900">${formatCurrency(result.customerCharges.mileageCharges)}</span>
+                      </div>
+                    )}
+
+                    {(result.customerCharges.extraStopsCharge ?? 0) > 0 && (
+                      <div className="flex justify-between items-center py-2 bg-emerald-50 -mx-4 px-4 rounded-lg border border-emerald-100">
+                        <span className="text-emerald-700 font-medium">Extra Stops Charge:</span>
+                        <span className="font-semibold text-emerald-700">${formatCurrency(result.customerCharges.extraStopsCharge)}</span>
+                      </div>
+                    )}
+
+                    {(result.customerCharges.bridgeToll ?? 0) > 0 && (
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-slate-600 font-medium">Bridge Toll:</span>
+                        <span className="font-semibold text-slate-900">${formatCurrency(result.customerCharges.bridgeToll)}</span>
+                      </div>
+                    )}
+
+                    {(result.customerCharges.dailyDriveDiscount ?? 0) < 0 && (
+                      <div className="flex justify-between items-center py-2 text-green-600">
+                        <span className="font-medium">Daily Drive Discount:</span>
+                        <span className="font-semibold">${formatCurrency(result.customerCharges.dailyDriveDiscount)}</span>
+                      </div>
+                    )}
+
+                    <Separator className="my-4" />
+                    <div className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl border border-purple-200">
+                      <span className="text-lg font-bold text-purple-800">Total Customer Fee:</span>
+                      <span className="text-2xl font-bold text-purple-900">${formatCurrency(result.customerCharges.total)}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Ready Set Earnings */}
               {readySetEarnings && (
                 <Card className="border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm">

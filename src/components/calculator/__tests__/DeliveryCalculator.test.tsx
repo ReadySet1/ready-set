@@ -122,7 +122,14 @@ const mockConfig = {
 };
 
 const mockResult = {
-  customerTotal: 125.50,
+  customerCharges: {
+    baseDeliveryFee: 55.50,
+    mileageCharges: 15,
+    bridgeToll: 0,
+    dailyDriveDiscount: 0,
+    extraStopsCharge: 0,
+    total: 125.50,
+  },
   driverPayments: {
     basePay: 25,
     mileagePay: 35,
@@ -132,6 +139,9 @@ const mockResult = {
     adjustments: 0,
     total: 70,
   },
+  profit: 55.50,
+  calculatedAt: new Date().toISOString(),
+  templateUsed: 'template-123',
   metadata: {
     readySetFee: 45,
     readySetMileageRate: 3.0,

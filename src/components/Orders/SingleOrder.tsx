@@ -50,6 +50,7 @@ import { createClient } from "@/utils/supabase/client";
 import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
 import { UserType } from "@/types/client-enums";
 import { decodeOrderNumber } from "@/utils/order";
+import { useDriverRealtimeLocation } from "@/hooks/tracking/useDriverRealtimeLocation";
 
 // Make sure the bucket name is user-assets
 const STORAGE_BUCKET = "user-assets";
@@ -196,6 +197,23 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     isDriver: false,
   });
   const [rolesLoaded, setRolesLoaded] = useState(false);
+
+  // Real-time driver location tracking using Supabase Realtime (WebSocket)
+  // This provides instant updates like the admin tracking dashboard
+  const isActiveOrder = order?.status && !['COMPLETED', 'CANCELLED', 'DELIVERED'].includes(order.status);
+  const { location: realtimeLocation, isConnected: isRealtimeConnected } = useDriverRealtimeLocation({
+    driverProfileId: driverInfo?.id,
+    enabled: !!driverInfo?.id && !!isActiveOrder,
+    onLocationUpdate: (loc) => {
+      console.log('[SingleOrder] Realtime location update:', loc.lat, loc.lng);
+    },
+  });
+
+  // Combine realtime location with format expected by map component
+  const driverLocation = realtimeLocation ? {
+    lat: realtimeLocation.lat,
+    lng: realtimeLocation.lng,
+  } : null;
 
   // Check for bucket existence but don't try to create it (requires admin privileges)
   const ensureStorageBucketExists = useCallback(async () => {
@@ -1011,6 +1029,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                   <OrderLocationMap
                     pickupAddress={order.pickupAddress}
                     deliveryAddress={order.deliveryAddress}
+                    driverLocation={driverLocation}
                     height="250px"
                     className="rounded-lg border border-slate-200"
                   />
