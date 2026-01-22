@@ -62,7 +62,14 @@ interface DemoInput {
   requiresBridge: boolean;
 }
 
-export default function MultiStopCalculatorDemo() {
+interface MultiStopCalculatorDemoProps {
+  /** Whether to show driver earnings section (hidden from vendors/clients, shown to admins) */
+  showDriverEarnings?: boolean;
+}
+
+export default function MultiStopCalculatorDemo({
+  showDriverEarnings = false
+}: MultiStopCalculatorDemoProps) {
   const [input, setInput] = useState<DemoInput>({
     headcount: 50,
     foodCost: 500,
@@ -396,7 +403,9 @@ export default function MultiStopCalculatorDemo() {
                     </div>
                     <div className="text-sm text-emerald-700 space-y-1">
                       <p>Customer charge: +${formatCurrency(extraStopsInfo.customerCharge)}</p>
-                      <p>Driver bonus: +${formatCurrency(extraStopsInfo.driverBonus)}</p>
+                      {showDriverEarnings && (
+                        <p>Driver bonus: +${formatCurrency(extraStopsInfo.driverBonus)}</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -466,8 +475,8 @@ export default function MultiStopCalculatorDemo() {
                   </CardContent>
                 </Card>
 
-                {/* Driver Payments */}
-                {driverResult && (
+                {/* Driver Payments - Only shown to admins */}
+                {showDriverEarnings && driverResult && (
                   <Card className="border-0 shadow-lg">
                     <CardHeader className="pb-4">
                       <CardTitle className="flex items-center gap-3 text-xl">
@@ -558,7 +567,7 @@ export default function MultiStopCalculatorDemo() {
             <Calculator className="h-5 w-5 text-slate-600" />
             How Multi-Stop Pricing Works
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-600">
+          <div className={`grid grid-cols-1 ${showDriverEarnings ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 text-sm text-slate-600`}>
             <div className="p-4 bg-white rounded-lg">
               <div className="font-semibold text-slate-800 mb-1">First Stop</div>
               <p>Included in the base delivery fee based on your headcount and food cost tier.</p>
@@ -567,10 +576,12 @@ export default function MultiStopCalculatorDemo() {
               <div className="font-semibold text-slate-800 mb-1">Additional Stops</div>
               <p>$5.00 per extra stop is added to the customer charge for handling multiple locations.</p>
             </div>
-            <div className="p-4 bg-white rounded-lg">
-              <div className="font-semibold text-slate-800 mb-1">Driver Bonus</div>
-              <p>Drivers receive a $2.50 bonus per additional stop to compensate for extra time and effort.</p>
-            </div>
+            {showDriverEarnings && (
+              <div className="p-4 bg-white rounded-lg">
+                <div className="font-semibold text-slate-800 mb-1">Driver Bonus</div>
+                <p>Drivers receive a $2.50 bonus per additional stop to compensate for extra time and effort.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
