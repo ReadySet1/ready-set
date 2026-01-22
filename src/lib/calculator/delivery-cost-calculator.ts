@@ -21,6 +21,7 @@ export interface DeliveryCostInput {
   foodCost: number;
   totalMileage: number;
   numberOfDrives?: number; // For daily drive discount (1-4+)
+  numberOfStops?: number; // For multi-stop deliveries (default 1)
   requiresBridge?: boolean;
   bridgeToll?: number;
   clientConfigId?: string; // Optional: use specific client configuration
@@ -30,8 +31,9 @@ export interface DeliveryCostBreakdown {
   deliveryCost: number; // Base delivery cost from tier
   totalMileagePay: number; // Mileage × $3.00
   dailyDriveDiscount: number; // Discount based on number of drives
+  extraStopsCharge: number; // Charge for stops beyond the first
   bridgeToll: number;
-  deliveryFee: number; // Total: deliveryCost + mileagePay - discount + bridge
+  deliveryFee: number; // Total: deliveryCost + mileagePay - discount + extraStops + bridge
 }
 
 export interface DriverPayInput extends DeliveryCostInput {
@@ -50,12 +52,13 @@ export interface DriverPayBreakdown {
   mileageRate: number; // Driver mileage rate (CaterValley: $0.70, Destino: $0.35)
   totalMileagePay: number; // Driver mileage pay (all miles × rate)
   bridgeToll: number; // Bridge toll amount
+  extraStopsBonus: number; // Driver bonus for extra stops
   readySetFee: number; // Ready Set platform fee
   readySetAddonFee: number; // Additional Ready Set fees
   readySetTotalFee: number; // Total Ready Set fees
   driverBonusPay: number; // Bonus if qualified (0 if direct tip received)
   directTip: number; // Direct tip amount (100% to driver)
-  totalDriverPay: number; // Final driver payment (base + mileage + bonus + tip)
+  totalDriverPay: number; // Final driver payment (base + mileage + bonus + extraStops + tip)
   bonusQualifiedPercent: number; // 0-100%
   bonusQualified: boolean; // Whether driver qualifies for bonus
 }
@@ -133,6 +136,10 @@ const DEFAULT_READY_SET_FEE = 70;
 const DRIVER_MAX_PAY_PER_DROP = 40;
 const DRIVER_BASE_PAY_PER_DROP = 23;
 const DRIVER_BONUS_PAY = 10;
+
+// Multi-stop pricing constants
+const CUSTOMER_EXTRA_STOP_RATE = 5.00; // $5.00 per additional stop (charged to customer)
+const DRIVER_EXTRA_STOP_BONUS = 2.50;  // $2.50 per additional stop (paid to driver)
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -218,6 +225,19 @@ function determinePricingTier(
  */
 function isInTier(value: number, min: number, max: number | null): boolean {
   return max === null ? value >= min : value >= min && value <= max;
+}
+
+/**
+ * Calculates extra stops charge for multi-stop deliveries
+ * First stop is included in base delivery cost, additional stops are charged extra
+ *
+ * @param numberOfStops - Total number of delivery stops
+ * @param ratePerStop - Rate charged per additional stop
+ * @returns Charge for extra stops (0 if only 1 stop)
+ */
+function calculateExtraStopsCharge(numberOfStops: number, ratePerStop: number): number {
+  if (numberOfStops <= 1) return 0;
+  return (numberOfStops - 1) * ratePerStop;
 }
 
 /**
@@ -438,6 +458,7 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
     foodCost,
     totalMileage,
     numberOfDrives = 1,
+    numberOfStops = 1,
     requiresBridge = false,
     bridgeToll,
     clientConfigId
@@ -480,7 +501,10 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   // 4. Calculate daily drive discount using config
   const dailyDriveDiscount = calculateDailyDriveDiscount(numberOfDrives, config);
 
-  // 5. Calculate total delivery fee
+  // 5. Calculate extra stops charge for multi-stop deliveries
+  const extraStopsCharge = calculateExtraStopsCharge(numberOfStops, CUSTOMER_EXTRA_STOP_RATE);
+
+  // 6. Calculate total delivery fee
   const effectiveMileagePay = totalMileagePay;
   const effectiveBridgeToll = requiresBridge ? (bridgeToll || config.bridgeTollSettings.defaultTollAmount) : 0;
 
@@ -490,7 +514,7 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   // Other clients may include bridge toll in their delivery fee
   const bridgeTollForCustomer = config.clientName === 'CaterValley' ? 0 : effectiveBridgeToll;
 
-  const deliveryFee = deliveryCost + effectiveMileagePay - dailyDriveDiscount + bridgeTollForCustomer;
+  const deliveryFee = deliveryCost + effectiveMileagePay - dailyDriveDiscount + extraStopsCharge + bridgeTollForCustomer;
 
   // CRITICAL: Validate that delivery cost is not zero for non-zero orders
   // This prevents revenue loss from configuration errors
@@ -509,6 +533,7 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
     deliveryCost,
     totalMileagePay: effectiveMileagePay,
     dailyDriveDiscount,
+    extraStopsCharge,
     bridgeToll: effectiveBridgeToll,
     deliveryFee
   };
@@ -571,6 +596,7 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
     directTip = 0,
     readySetAddonFee = 0,
     totalMileage,
+    numberOfStops = 1,
     requiresBridge = false,
     bridgeToll,
     clientConfigId
@@ -627,16 +653,19 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
   // Step 4: Calculate bridge toll
   const effectiveBridgeToll = requiresBridge ? (bridgeToll || config.bridgeTollSettings.defaultTollAmount) : 0;
 
-  // Step 5: Calculate Driver Total Base Pay
+  // Step 5: Calculate extra stops bonus for multi-stop deliveries
+  const extraStopsBonus = calculateExtraStopsCharge(numberOfStops, DRIVER_EXTRA_STOP_BONUS);
+
+  // Step 6: Calculate Driver Total Base Pay
   // This is just the base pay tier amount (not capped when using Destino rules)
   const driverTotalBasePay = driverBasePay;
 
-  // Step 6: Calculate Driver Total Pay
-  // Formula: Base Pay + Mileage + Bonus + Direct Tip
-  // When tip received: 0 + Mileage + 0 + Tip
-  const totalDriverPay = driverTotalBasePay + totalMileagePay + driverBonusPay + directTip;
+  // Step 7: Calculate Driver Total Pay
+  // Formula: Base Pay + Mileage + Bonus + Extra Stops + Direct Tip
+  // When tip received: 0 + Mileage + 0 + Extra Stops + Tip
+  const totalDriverPay = driverTotalBasePay + totalMileagePay + driverBonusPay + extraStopsBonus + directTip;
 
-  // Step 7: Ready Set fees - from config
+  // Step 8: Ready Set fees - from config
   const readySetFee = input.readySetFee || config.driverPaySettings.readySetFee;
   const readySetTotalFee = readySetFee + readySetAddonFee + effectiveBridgeToll;
 
@@ -648,6 +677,7 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
     mileageRate: driverMileageRate, // Use actual rate (client-specific or default)
     totalMileagePay,
     bridgeToll: effectiveBridgeToll,
+    extraStopsBonus,
     readySetFee,
     readySetAddonFee,
     readySetTotalFee,
@@ -722,7 +752,9 @@ const deliveryCostCalculator = {
   VENDOR_MILEAGE_RATE,
   DRIVER_MILEAGE_RATE,
   DISTANCE_THRESHOLD,
-  DAILY_DRIVE_DISCOUNTS
+  DAILY_DRIVE_DISCOUNTS,
+  CUSTOMER_EXTRA_STOP_RATE,
+  DRIVER_EXTRA_STOP_BONUS
 };
 
 export default deliveryCostCalculator;
