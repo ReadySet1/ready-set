@@ -120,31 +120,25 @@ export function useDriverRealtimeLocation({
       lastUpdate: new Date(payload.timestamp),
     };
 
-    console.log('[useDriverRealtimeLocation] Received location update:', {
-      driverId: updateDriverId,
-      targetDriverId: driverIdRef.current,
-      location: newLocation,
-    });
-
     setLocation(newLocation);
     onLocationUpdate?.(newLocation);
   }, [onLocationUpdate]);
 
+  // Database record type for location inserts
+  interface LocationRecord {
+    driver_id: string;
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    speed?: number;
+    heading?: number;
+    is_moving?: boolean;
+    recorded_at?: string;
+  }
+
   // Handle database INSERT event (captures all location updates)
-  const handleDatabaseInsert = useCallback((record: any) => {
+  const handleDatabaseInsert = useCallback((record: LocationRecord) => {
     if (!record || !driverIdRef.current) return;
-
-    // Check if this update is for our driver
-    // record.driver_id is the drivers table ID
-    // We need to match against profile_id, which requires a lookup
-    // For simplicity, we'll accept all updates for now
-    // The admin tracking also uses enrichment logic
-
-    console.log('[useDriverRealtimeLocation] Database INSERT:', {
-      driverId: record.driver_id,
-      lat: record.latitude,
-      lng: record.longitude,
-    });
 
     const newLocation: DriverLocation = {
       lat: record.latitude,
@@ -187,19 +181,16 @@ export function useDriverRealtimeLocation({
         onLocationUpdate: handleLocationUpdate,
         onDatabaseInsert: handleDatabaseInsert,
         onConnect: () => {
-          console.log('[useDriverRealtimeLocation] Connected to realtime channel');
           setIsConnected(true);
           setIsConnecting(false);
           setError(null);
           onConnectionChange?.(true);
         },
         onDisconnect: () => {
-          console.log('[useDriverRealtimeLocation] Disconnected from realtime channel');
           setIsConnected(false);
           onConnectionChange?.(false);
         },
         onError: (err) => {
-          console.error('[useDriverRealtimeLocation] Channel error:', err);
           setError(err.message);
           setIsConnected(false);
           setIsConnecting(false);
@@ -207,7 +198,6 @@ export function useDriverRealtimeLocation({
         },
       });
     } catch (err) {
-      console.error('[useDriverRealtimeLocation] Failed to connect:', err);
       setError(err instanceof Error ? err.message : 'Failed to connect');
       setIsConnected(false);
       setIsConnecting(false);

@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Multi-Stop Calculator Demo (REA-318)**: Auto-distance calculation feature
+  - Geocode API endpoint for address-to-coordinates conversion
+  - Auto-distance calculation between stops using Haversine formula
+  - Removed unused xlsx package with security vulnerabilities
+
+- **Order Tracking Driver/Vendor Flows (REA-xxx)**: Real-time driver location tracking
+  - New `/api/orders/[order_number]/driver-location` endpoint for vendor/client order views
+  - `useDriverRealtimeLocation` hook for single-driver location tracking
+  - Vendor access to realtime driver locations channel
+  - RLS policy implementations for user-scoped and admin-managed tables
+  - Driver shift mileage columns migration
+
 - **On-Demand Order Creation (REA-155)**: Admin and client-side on-demand order creation
   - New admin order creation page at `/admin/on-demand-orders/new`
   - New client order creation page at `/client/orders/new`

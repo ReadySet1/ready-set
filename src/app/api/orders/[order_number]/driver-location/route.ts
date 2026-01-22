@@ -82,18 +82,14 @@ export async function GET(
 
     // Get the assigned driver's profile ID from dispatch
     const dispatch = order.dispatches?.[0];
-    console.log(`[driver-location] Order ${orderNumber}: dispatch =`, JSON.stringify(dispatch));
 
     if (!dispatch?.driverId) {
-      console.log(`[driver-location] Order ${orderNumber}: No driver assigned`);
       return NextResponse.json({
         success: true,
         driverLocation: null,
         message: "No driver assigned to this order",
       });
     }
-
-    console.log(`[driver-location] Order ${orderNumber}: Looking up driver with profile_id = ${dispatch.driverId}`);
 
     // Find the driver's current location
     // The dispatch.driverId is a profile ID, so we need to find the driver
@@ -126,10 +122,7 @@ export async function GET(
       dispatch.driverId
     );
 
-    console.log(`[driver-location] Order ${orderNumber}: profile_id query returned ${driverLocation?.length ?? 0} rows`);
-
     if (!driverLocation || driverLocation.length === 0 || !driverLocation[0]) {
-      console.log(`[driver-location] Order ${orderNumber}: Trying user_id lookup...`);
       // Try alternative: maybe the dispatch.driverId is actually a user_id
       const altLocation = await prisma.$queryRawUnsafe<Array<{
         lat: number;
@@ -159,10 +152,7 @@ export async function GET(
         dispatch.driverId
       );
 
-      console.log(`[driver-location] Order ${orderNumber}: user_id query returned ${altLocation?.length ?? 0} rows`);
-
       if (!altLocation || altLocation.length === 0 || !altLocation[0]) {
-        console.log(`[driver-location] Order ${orderNumber}: No location found in either query`);
         return NextResponse.json({
           success: true,
           driverLocation: null,
@@ -171,7 +161,6 @@ export async function GET(
       }
 
       const loc = altLocation[0];
-      console.log(`[driver-location] Order ${orderNumber}: Found location via user_id: ${loc.lat}, ${loc.lng}`);
       return NextResponse.json({
         success: true,
         driverLocation: {
@@ -187,7 +176,6 @@ export async function GET(
     }
 
     const loc = driverLocation[0];
-    console.log(`[driver-location] Order ${orderNumber}: Found location via profile_id: ${loc.lat}, ${loc.lng}`);
     return NextResponse.json({
       success: true,
       driverLocation: {

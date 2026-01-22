@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
       WHERE deleted_at IS NULL
     `;
     
-    const params: any[] = [];
+    const params: (string | number | boolean)[] = [];
     let paramCounter = 1;
 
     if (isActive !== null) {
@@ -216,7 +216,7 @@ export async function PUT(request: NextRequest) {
     }
 
     let query = 'UPDATE drivers SET last_location_update = NOW()';
-    const params: any[] = [];
+    const params: (string | number | boolean)[] = [];
     let paramCounter = 1;
 
     if (location && location.latitude && location.longitude) {
