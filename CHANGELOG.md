@@ -154,6 +154,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Promotional Banners (REA-193)**: Permanently removed promotional banner components and tests from all pages
 
 ### Security
+- Fixed high-severity `qs` vulnerability (CVE-2025-15284) via pnpm override
+  - `qs@<6.14.1` → `>=6.14.1` (prototype pollution in googleapis)
+- Fixed high-severity `tar` vulnerabilities via pnpm override
+  - `tar@<=7.5.3` → `>=7.5.4` (GHSA-8qq5-rm4j-mr97, GHSA-r6q2-hw4h-h46w in sanity)
 - Fixed 5 high-severity npm vulnerabilities via pnpm overrides
   - `node-forge@<1.3.2` → `>=1.3.2` (ASN.1 vulnerabilities in firebase-admin)
   - `valibot@>=0.31.0 <1.2.0` → `>=1.2.0` (ReDoS in next-sanity)
