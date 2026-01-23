@@ -1,186 +1,565 @@
 /**
- * Unit Tests for UserSoftDeleteService
- * 
- * This file provides a foundation for testing the soft delete operations.
- * The tests demonstrate the testing approach and can be expanded as needed.
+ * Comprehensive Unit Tests for UserSoftDeleteService
+ *
+ * Tests soft delete, restore, permanent delete, and query operations
+ * with properly mocked Prisma client.
+ *
+ * Part of REA-315: Service Layer Unit Tests
  */
 
 import { UserSoftDeleteService } from '@/services/userSoftDeleteService';
 import { UserType, UserStatus } from '@/types/prisma';
+import {
+  createMockProfile,
+  createMockDeletedProfile,
+  createMockSuperAdmin,
+  createMockAddress,
+  createMockDispatch,
+  createMockFileUpload,
+  resetIdCounter,
+} from '../helpers/mock-data-factories';
+import {
+  configureUserExists,
+  configureUserNotFound,
+  configureUserAlreadyDeleted,
+  configureUserWithActiveOrders,
+  configureUserWithoutActiveOrders,
+  configureSuccessfulTransaction,
+  configureTransactionFailure,
+  configureProfileUpdateSuccess,
+  configureAuditLogSuccess,
+  configureFindManyUsers,
+  expectTransactionCalled,
+  expectAuditLogCreated,
+  expectSoftDeleteApplied,
+  expectRestoreApplied,
+  resetAllMocks,
+} from '../helpers/service-test-utils';
+import { MockPrismaClient, createMockPrismaClient, resetPrismaMocks } from '../helpers/prisma-mock-helpers';
 
-// Mock the database
-jest.mock('@/utils/prismaDB', () => ({
-  prisma: {
-    profile: {
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      count: jest.fn(),
-    },
-    userAudit: {
-      create: jest.fn(),
-    },
-    cateringRequest: {
-      count: jest.fn(),
-    },
-    onDemandRequest: {
-      count: jest.fn(),
-    },
-    $transaction: jest.fn(),
-  },
-}));
+// Mock the prisma module - use a factory function
+jest.mock('@/utils/prismaDB', () => {
+  const { createMockPrismaClient } = jest.requireActual('../helpers/prisma-mock-helpers');
+  return {
+    prisma: createMockPrismaClient(),
+  };
+});
 
-// Mock logger
-jest.mock('@/utils/logger', () => ({
-  loggers: {
-    prisma: {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-    },
-  },
-}));
+// Import mocked prisma client after mocking
+import { prisma } from '@/utils/prismaDB';
+
+// Type the mock prisma client for easier usage
+const mockPrisma = prisma as unknown as MockPrismaClient;
 
 describe('UserSoftDeleteService', () => {
-  let userSoftDeleteService: UserSoftDeleteService;
+  let service: UserSoftDeleteService;
 
   beforeEach(() => {
-    userSoftDeleteService = new UserSoftDeleteService();
+    service = new UserSoftDeleteService();
+    resetPrismaMocks(mockPrisma);
+    resetIdCounter();
     jest.clearAllMocks();
   });
 
   describe('Service Initialization', () => {
     it('should create an instance of UserSoftDeleteService', () => {
-      expect(userSoftDeleteService).toBeInstanceOf(UserSoftDeleteService);
+      expect(service).toBeInstanceOf(UserSoftDeleteService);
     });
 
     it('should have all required methods', () => {
-      expect(typeof userSoftDeleteService.softDeleteUser).toBe('function');
-      expect(typeof userSoftDeleteService.restoreUser).toBe('function');
-      expect(typeof userSoftDeleteService.getDeletedUsers).toBe('function');
-      expect(typeof userSoftDeleteService.permanentlyDeleteUser).toBe('function');
+      expect(typeof service.softDeleteUser).toBe('function');
+      expect(typeof service.restoreUser).toBe('function');
+      expect(typeof service.permanentlyDeleteUser).toBe('function');
+      expect(typeof service.getDeletedUsers).toBe('function');
     });
   });
 
-  describe('Basic Functionality Tests', () => {
-    it('should handle soft delete operation structure', async () => {
-      // This test demonstrates the expected structure of soft delete operations
-      // In a real implementation, you would mock Prisma and test the actual logic
-      
-      const userId = 'test-user-123';
-      const deletedBy = 'admin-456';
-      const reason = 'Test deletion';
+  describe('softDeleteUser', () => {
+    describe('Validation', () => {
+      it('should throw error when user not found', async () => {
+        configureUserNotFound(mockPrisma);
 
-      // For now, we'll test that the method exists and has the right signature
-      expect(async () => {
-        await userSoftDeleteService.softDeleteUser(userId, deletedBy, reason);
-      }).toBeDefined();
-    });
+        await expect(
+          service.softDeleteUser('nonexistent-user', 'admin-123', 'Test reason')
+        ).rejects.toThrow('User not found');
+      });
 
-    it('should handle restore operation structure', async () => {
-      const userId = 'test-user-123';
-      const restoredBy = 'admin-456';
+      it('should throw error when user is already soft deleted', async () => {
+        configureUserAlreadyDeleted(mockPrisma);
 
-      expect(async () => {
-        await userSoftDeleteService.restoreUser(userId, restoredBy);
-      }).toBeDefined();
-    });
+        await expect(
+          service.softDeleteUser('user-123', 'admin-123', 'Test reason')
+        ).rejects.toThrow('User is already soft deleted');
+      });
 
-    it('should handle permanent delete operation structure', async () => {
-      const userId = 'test-user-123';
+      it('should throw error when user has active orders', async () => {
+        const user = configureUserExists(mockPrisma, { id: 'user-123' });
+        configureUserWithActiveOrders(mockPrisma, 2, 1);
 
-      expect(async () => {
-        await userSoftDeleteService.permanentlyDeleteUser(userId);
-      }).toBeDefined();
-    });
-
-    it('should handle getDeletedUsers operation structure', async () => {
-      const filters = {
-        page: 1,
-        limit: 10,
-        type: UserType.CLIENT,
-      };
-
-      expect(async () => {
-        await userSoftDeleteService.getDeletedUsers(filters);
-      }).toBeDefined();
-    });
-  });
-
-  describe('Input Validation', () => {
-    it('should handle different user types', () => {
-      const validUserTypes = Object.values(UserType);
-      expect(validUserTypes).toContain(UserType.CLIENT);
-      expect(validUserTypes).toContain(UserType.ADMIN);
-      expect(validUserTypes).toContain(UserType.SUPER_ADMIN);
-      expect(validUserTypes).toContain(UserType.VENDOR);
-      expect(validUserTypes).toContain(UserType.DRIVER);
-      expect(validUserTypes).toContain(UserType.HELPDESK);
-    });
-
-    it('should handle different user statuses', () => {
-      const validUserStatuses = Object.values(UserStatus);
-      expect(validUserStatuses).toContain(UserStatus.ACTIVE);
-      expect(validUserStatuses).toContain(UserStatus.PENDING);
-      expect(validUserStatuses).toContain(UserStatus.DELETED);
-    });
-  });
-
-  describe('Error Handling Patterns', () => {
-    it('should define expected error patterns for soft delete', async () => {
-      // These tests would be expanded with proper mocking to test actual error scenarios
-      const expectedErrors = [
-        'User not found',
-        'User is already soft deleted',
-        'Cannot delete user with active orders',
-      ];
-
-      expectedErrors.forEach(errorMessage => {
-        expect(typeof errorMessage).toBe('string');
-        expect(errorMessage.length).toBeGreaterThan(0);
+        await expect(
+          service.softDeleteUser('user-123', 'admin-123', 'Test reason')
+        ).rejects.toThrow('Cannot delete user with active orders');
       });
     });
 
-    it('should define expected error patterns for restore', async () => {
-      const expectedErrors = [
-        'User not found',
-        'User is not soft deleted',
-      ];
+    describe('Success Scenarios', () => {
+      it('should successfully soft delete user without active orders', async () => {
+        const userId = 'user-123';
+        const deletedBy = 'admin-456';
+        const reason = 'User requested deletion';
 
-      expectedErrors.forEach(errorMessage => {
-        expect(typeof errorMessage).toBe('string');
-        expect(errorMessage.length).toBeGreaterThan(0);
+        const user = configureUserExists(mockPrisma, { id: userId });
+        configureUserWithoutActiveOrders(mockPrisma);
+        configureSuccessfulTransaction(mockPrisma);
+
+        const now = new Date();
+        mockPrisma.profile.update.mockResolvedValue({
+          ...user,
+          deletedAt: now,
+          deletedBy,
+          deletionReason: reason,
+        });
+        configureAuditLogSuccess(mockPrisma);
+
+        const result = await service.softDeleteUser(userId, deletedBy, reason);
+
+        expect(result.success).toBe(true);
+        expect(result.userId).toBe(userId);
+        expect(result.deletedBy).toBe(deletedBy);
+        expect(result.deletionReason).toBe(reason);
+        expect(result.deletedAt).toBeDefined();
+        expect(result.message).toBe('User soft deleted successfully');
+      });
+
+      it('should soft delete user without reason', async () => {
+        const userId = 'user-123';
+        const deletedBy = 'admin-456';
+
+        configureUserExists(mockPrisma, { id: userId });
+        configureUserWithoutActiveOrders(mockPrisma);
+        configureSuccessfulTransaction(mockPrisma);
+
+        mockPrisma.profile.update.mockResolvedValue({
+          id: userId,
+          deletedAt: new Date(),
+          deletedBy,
+          deletionReason: null,
+        });
+        configureAuditLogSuccess(mockPrisma);
+
+        const result = await service.softDeleteUser(userId, deletedBy);
+
+        expect(result.success).toBe(true);
+        expect(result.deletionReason).toBeUndefined();
+      });
+    });
+
+    describe('Transaction Behavior', () => {
+      it('should use transaction for soft delete operation', async () => {
+        const userId = 'user-123';
+
+        configureUserExists(mockPrisma, { id: userId });
+        configureUserWithoutActiveOrders(mockPrisma);
+        configureSuccessfulTransaction(mockPrisma);
+
+        mockPrisma.profile.update.mockResolvedValue({
+          id: userId,
+          deletedAt: new Date(),
+          deletedBy: 'admin-123',
+          deletionReason: null,
+        });
+        configureAuditLogSuccess(mockPrisma);
+
+        await service.softDeleteUser(userId, 'admin-123');
+
+        expectTransactionCalled(mockPrisma);
+      });
+
+      it('should create audit log entry during soft delete', async () => {
+        const userId = 'user-123';
+
+        configureUserExists(mockPrisma, { id: userId });
+        configureUserWithoutActiveOrders(mockPrisma);
+        configureSuccessfulTransaction(mockPrisma);
+
+        mockPrisma.profile.update.mockResolvedValue({
+          id: userId,
+          deletedAt: new Date(),
+          deletedBy: 'admin-123',
+          deletionReason: 'Test',
+        });
+        configureAuditLogSuccess(mockPrisma);
+
+        await service.softDeleteUser(userId, 'admin-123', 'Test');
+
+        expect(mockPrisma.userAudit.create).toHaveBeenCalled();
+        const auditCall = mockPrisma.userAudit.create.mock.calls[0][0];
+        expect(auditCall.data.action).toBe('SOFT_DELETE');
+        expect(auditCall.data.userId).toBe(userId);
+      });
+
+      it('should rollback on transaction failure', async () => {
+        const userId = 'user-123';
+
+        configureUserExists(mockPrisma, { id: userId });
+        configureUserWithoutActiveOrders(mockPrisma);
+        configureTransactionFailure(mockPrisma, new Error('Transaction failed'));
+
+        await expect(
+          service.softDeleteUser(userId, 'admin-123')
+        ).rejects.toThrow('Transaction failed');
+      });
+    });
+  });
+
+  describe('restoreUser', () => {
+    describe('Validation', () => {
+      it('should throw error when user not found', async () => {
+        configureUserNotFound(mockPrisma);
+
+        await expect(
+          service.restoreUser('nonexistent-user', 'admin-123')
+        ).rejects.toThrow('User not found');
+      });
+
+      it('should throw error when user is not soft deleted', async () => {
+        configureUserExists(mockPrisma, { id: 'user-123', deletedAt: null });
+
+        await expect(
+          service.restoreUser('user-123', 'admin-123')
+        ).rejects.toThrow('User is not soft deleted');
+      });
+    });
+
+    describe('Success Scenarios', () => {
+      it('should successfully restore a soft-deleted user', async () => {
+        const userId = 'user-123';
+        const restoredBy = 'admin-456';
+
+        const deletedUser = configureUserAlreadyDeleted(mockPrisma, { id: userId });
+        configureSuccessfulTransaction(mockPrisma);
+
+        mockPrisma.profile.update.mockResolvedValue({
+          ...deletedUser,
+          deletedAt: null,
+          deletedBy: null,
+          deletionReason: null,
+        });
+        configureAuditLogSuccess(mockPrisma);
+
+        const result = await service.restoreUser(userId, restoredBy);
+
+        expect(result.success).toBe(true);
+        expect(result.userId).toBe(userId);
+        expect(result.restoredBy).toBe(restoredBy);
+        expect(result.restoredAt).toBeDefined();
+        expect(result.message).toBe('User restored successfully');
+      });
+    });
+
+    describe('Transaction Behavior', () => {
+      it('should use transaction for restore operation', async () => {
+        const userId = 'user-123';
+
+        configureUserAlreadyDeleted(mockPrisma, { id: userId });
+        configureSuccessfulTransaction(mockPrisma);
+
+        mockPrisma.profile.update.mockResolvedValue({
+          id: userId,
+          deletedAt: null,
+          deletedBy: null,
+          deletionReason: null,
+        });
+        configureAuditLogSuccess(mockPrisma);
+
+        await service.restoreUser(userId, 'admin-123');
+
+        expectTransactionCalled(mockPrisma);
+      });
+
+      it('should create RESTORE audit log entry', async () => {
+        const userId = 'user-123';
+
+        configureUserAlreadyDeleted(mockPrisma, { id: userId });
+        configureSuccessfulTransaction(mockPrisma);
+
+        mockPrisma.profile.update.mockResolvedValue({
+          id: userId,
+          deletedAt: null,
+          deletedBy: null,
+          deletionReason: null,
+        });
+        configureAuditLogSuccess(mockPrisma);
+
+        await service.restoreUser(userId, 'admin-123');
+
+        expect(mockPrisma.userAudit.create).toHaveBeenCalled();
+        const auditCall = mockPrisma.userAudit.create.mock.calls[0][0];
+        expect(auditCall.data.action).toBe('RESTORE');
+      });
+    });
+  });
+
+  describe('permanentlyDeleteUser', () => {
+    describe('Validation', () => {
+      it('should throw error when user not found', async () => {
+        configureUserNotFound(mockPrisma);
+
+        await expect(
+          service.permanentlyDeleteUser('nonexistent-user')
+        ).rejects.toThrow('User not found');
+      });
+
+      it('should throw error when user is not soft deleted', async () => {
+        configureUserExists(mockPrisma, { id: 'user-123', deletedAt: null });
+
+        await expect(
+          service.permanentlyDeleteUser('user-123')
+        ).rejects.toThrow('User must be soft deleted before permanent deletion');
+      });
+
+      it('should throw error when trying to delete SUPER_ADMIN', async () => {
+        const superAdmin = createMockDeletedProfile({
+          id: 'admin-123',
+          type: UserType.SUPER_ADMIN,
+        });
+        mockPrisma.profile.findUnique.mockResolvedValue(superAdmin);
+
+        await expect(
+          service.permanentlyDeleteUser('admin-123')
+        ).rejects.toThrow('Super Admin users cannot be permanently deleted');
+      });
+    });
+
+    describe('Cascade Deletion', () => {
+      it('should delete dispatches for the user', async () => {
+        const userId = 'user-123';
+
+        configureUserAlreadyDeleted(mockPrisma, { id: userId, type: UserType.CLIENT });
+        configureSuccessfulTransaction(mockPrisma);
+
+        mockPrisma.dispatch.deleteMany.mockResolvedValue({ count: 3 });
+        mockPrisma.fileUpload.updateMany.mockResolvedValue({ count: 2 });
+        mockPrisma.address.findMany.mockResolvedValue([]);
+        mockPrisma.profile.delete.mockResolvedValue({ id: userId });
+        configureAuditLogSuccess(mockPrisma);
+
+        const result = await service.permanentlyDeleteUser(userId);
+
+        expect(result.success).toBe(true);
+        expect(result.affectedRecords.dispatchesDeleted).toBe(3);
+      });
+
+      it('should update file uploads to null userId', async () => {
+        const userId = 'user-123';
+
+        configureUserAlreadyDeleted(mockPrisma, { id: userId, type: UserType.CLIENT });
+        configureSuccessfulTransaction(mockPrisma);
+
+        mockPrisma.dispatch.deleteMany.mockResolvedValue({ count: 0 });
+        mockPrisma.fileUpload.updateMany.mockResolvedValue({ count: 5 });
+        mockPrisma.address.findMany.mockResolvedValue([]);
+        mockPrisma.profile.delete.mockResolvedValue({ id: userId });
+        configureAuditLogSuccess(mockPrisma);
+
+        const result = await service.permanentlyDeleteUser(userId);
+
+        expect(result.affectedRecords.fileUploadsUpdated).toBe(5);
+      });
+
+      it('should handle addresses correctly', async () => {
+        const userId = 'user-123';
+
+        configureUserAlreadyDeleted(mockPrisma, { id: userId, type: UserType.VENDOR });
+        configureSuccessfulTransaction(mockPrisma);
+
+        // Simulate two addresses: one can be deleted, one needs update
+        const addressToDelete = createMockAddress({
+          id: 'addr-1',
+          createdBy: userId,
+        });
+        const addressToUpdate = createMockAddress({
+          id: 'addr-2',
+          createdBy: userId,
+        });
+
+        mockPrisma.dispatch.deleteMany.mockResolvedValue({ count: 0 });
+        mockPrisma.fileUpload.updateMany.mockResolvedValue({ count: 0 });
+        mockPrisma.address.findMany.mockResolvedValue([
+          {
+            ...addressToDelete,
+            userAddresses: [],
+            cateringPickupRequests: [],
+            cateringDeliveryRequests: [],
+            onDemandPickupRequests: [],
+            onDemandDeliveryRequests: [],
+          },
+          {
+            ...addressToUpdate,
+            userAddresses: [{ userId: 'other-user' }],
+            cateringPickupRequests: [],
+            cateringDeliveryRequests: [],
+            onDemandPickupRequests: [],
+            onDemandDeliveryRequests: [],
+          },
+        ]);
+        mockPrisma.address.delete.mockResolvedValue(addressToDelete);
+        mockPrisma.address.update.mockResolvedValue(addressToUpdate);
+        mockPrisma.profile.delete.mockResolvedValue({ id: userId });
+        configureAuditLogSuccess(mockPrisma);
+
+        const result = await service.permanentlyDeleteUser(userId);
+
+        expect(result.success).toBe(true);
+        expect(result.affectedRecords.addressesDeleted).toBe(1);
+        expect(result.affectedRecords.addressesUpdated).toBe(1);
+      });
+    });
+
+    describe('Transaction Behavior', () => {
+      it('should create PERMANENT_DELETE audit log entry', async () => {
+        const userId = 'user-123';
+
+        configureUserAlreadyDeleted(mockPrisma, { id: userId, type: UserType.DRIVER });
+        configureSuccessfulTransaction(mockPrisma);
+
+        mockPrisma.dispatch.deleteMany.mockResolvedValue({ count: 0 });
+        mockPrisma.fileUpload.updateMany.mockResolvedValue({ count: 0 });
+        mockPrisma.address.findMany.mockResolvedValue([]);
+        mockPrisma.profile.delete.mockResolvedValue({ id: userId });
+        configureAuditLogSuccess(mockPrisma);
+
+        await service.permanentlyDeleteUser(userId);
+
+        expect(mockPrisma.userAudit.create).toHaveBeenCalled();
+        const auditCall = mockPrisma.userAudit.create.mock.calls[0][0];
+        expect(auditCall.data.action).toBe('PERMANENT_DELETE');
+      });
+    });
+  });
+
+  describe('getDeletedUsers', () => {
+    describe('Filtering', () => {
+      it('should return only soft-deleted users', async () => {
+        const deletedUsers = [
+          createMockDeletedProfile({ id: 'user-1' }),
+          createMockDeletedProfile({ id: 'user-2' }),
+        ];
+
+        configureFindManyUsers(mockPrisma, deletedUsers, 2);
+
+        const result = await service.getDeletedUsers();
+
+        expect(result.users).toHaveLength(2);
+        expect(mockPrisma.profile.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              deletedAt: { not: null },
+            }),
+          })
+        );
+      });
+
+      it('should filter by user type', async () => {
+        const deletedDrivers = [
+          createMockDeletedProfile({ id: 'driver-1', type: UserType.DRIVER }),
+        ];
+
+        configureFindManyUsers(mockPrisma, deletedDrivers, 1);
+
+        const result = await service.getDeletedUsers({ type: UserType.DRIVER });
+
+        expect(mockPrisma.profile.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              type: UserType.DRIVER,
+            }),
+          })
+        );
+      });
+
+      it('should filter by deletedBy', async () => {
+        configureFindManyUsers(mockPrisma, [], 0);
+
+        await service.getDeletedUsers({ deletedBy: 'admin-123' });
+
+        expect(mockPrisma.profile.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              deletedBy: 'admin-123',
+            }),
+          })
+        );
+      });
+
+      it('should filter by date range', async () => {
+        const deletedAfter = new Date('2024-01-01');
+        const deletedBefore = new Date('2024-12-31');
+
+        configureFindManyUsers(mockPrisma, [], 0);
+
+        await service.getDeletedUsers({ deletedAfter, deletedBefore });
+
+        expect(mockPrisma.profile.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              deletedAt: expect.objectContaining({
+                gte: deletedAfter,
+                lte: deletedBefore,
+              }),
+            }),
+          })
+        );
+      });
+    });
+
+    describe('Pagination', () => {
+      it('should return paginated results', async () => {
+        const users = Array.from({ length: 10 }, (_, i) =>
+          createMockDeletedProfile({ id: `user-${i}` })
+        );
+
+        configureFindManyUsers(mockPrisma, users.slice(0, 5), 25);
+
+        const result = await service.getDeletedUsers({ page: 1, limit: 5 });
+
+        expect(result.pagination.page).toBe(1);
+        expect(result.pagination.limit).toBe(5);
+        expect(result.pagination.totalCount).toBe(25);
+        expect(result.pagination.totalPages).toBe(5);
+        expect(result.pagination.hasNextPage).toBe(true);
+        expect(result.pagination.hasPrevPage).toBe(false);
+      });
+
+      it('should calculate hasNextPage correctly', async () => {
+        configureFindManyUsers(mockPrisma, [], 20);
+
+        const result = await service.getDeletedUsers({ page: 2, limit: 10 });
+
+        expect(result.pagination.hasNextPage).toBe(false);
+        expect(result.pagination.hasPrevPage).toBe(true);
+      });
+    });
+
+    describe('Search', () => {
+      it('should search by name, email, contactName, and companyName', async () => {
+        configureFindManyUsers(mockPrisma, [], 0);
+
+        await service.getDeletedUsers({ search: 'john' });
+
+        expect(mockPrisma.profile.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              OR: expect.arrayContaining([
+                { name: { contains: 'john', mode: 'insensitive' } },
+                { email: { contains: 'john', mode: 'insensitive' } },
+                { contactName: { contains: 'john', mode: 'insensitive' } },
+                { companyName: { contains: 'john', mode: 'insensitive' } },
+              ]),
+            }),
+          })
+        );
       });
     });
   });
 });
-
-/*
- * TODO: Expand these tests with proper mocking
- * 
- * To create comprehensive tests, you would:
- * 1. Mock Prisma client methods properly
- * 2. Test actual service logic with mocked database responses
- * 3. Test error scenarios with appropriate mocks
- * 4. Test transaction behavior
- * 5. Test audit logging functionality
- * 
- * Example for future implementation:
- * 
- * it('should successfully soft delete a user', async () => {
- *   const mockUser = { id: 'user-123', email: 'test@example.com', deletedAt: null };
- *   
- *   // Mock database responses
- *   prisma.profile.findUnique.mockResolvedValue(mockUser);
- *   prisma.cateringRequest.count.mockResolvedValue(0);
- *   prisma.$transaction.mockImplementation(async (callback) => {
- *     return await callback(mockPrisma);
- *   });
- *   
- *   const result = await userSoftDeleteService.softDeleteUser('user-123', 'admin-456', 'Test reason');
- *   
- *   expect(result.success).toBe(true);
- *   expect(result.userId).toBe('user-123');
- * });
- */
