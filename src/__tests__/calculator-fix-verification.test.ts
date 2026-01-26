@@ -25,20 +25,18 @@ describe('Calculator Fix Verification', () => {
 
       const result = calculateDeliveryCost(input);
 
-      // Expected:
-      // - Ready Set Fee: $70.00 (25-49 headcount tier, within 10 miles = $40, but food cost 300-599.99 = $40, LESSER is $40)
-      // Actually based on tier logic: 40 headcount falls in 25-49 tier
-      // 25-49 headcount: within 10 miles = $40, regular = $70
-      // $500 food cost: 300-599.99 tier: within 10 miles = $40, regular = $70
-      // Within 10 miles (6.4 < 10), both give $40
-      // LESSER of $40 and $40 = $40
-      expect(result.deliveryCost).toBe(40);
+      // Expected (Flat Fee Pricing - same rate regardless of distance within 10 miles):
+      // 40 headcount falls in 25-49 tier: flat rate = $70
+      // $500 food cost falls in 300-599.99 tier: flat rate = $70
+      // Within 10 miles (6.4 < 10), mileage charges don't apply
+      // LESSER of $70 and $70 = $70
+      expect(result.deliveryCost).toBe(70);
 
       // - Mileage Charges: $0.00 (< 10 miles)
       expect(result.totalMileagePay).toBe(0);
 
-      // - Ready Set Total Fee: $40.00
-      expect(result.deliveryFee).toBe(40);
+      // - Ready Set Total Fee: $70.00
+      expect(result.deliveryFee).toBe(70);
     });
 
     // TODO: REA-211 - Driver pay calculation differs from test expectations
@@ -141,18 +139,18 @@ describe('Calculator Fix Verification', () => {
 
       const result = calculateDeliveryCost(input);
 
-      // Expected:
-      // - Ready Set Fee: $80.00 (within 10 miles, 100-124 tier)
-      // 100-124 headcount: within 10 miles = $80
-      // 1200-1499.99 food cost: within 10 miles = $80
-      // LESSER of $80 and $80 = $80
-      expect(result.deliveryCost).toBe(80);
+      // Expected (Flat Fee Pricing):
+      // 100-124 headcount: flat rate = $120
+      // 1200-1499.99 food cost: flat rate = $120
+      // Within 10 miles (9 < 10), mileage charges don't apply
+      // LESSER of $120 and $120 = $120
+      expect(result.deliveryCost).toBe(120);
 
       // - Mileage Charges: $0.00 (< 10 miles)
       expect(result.totalMileagePay).toBe(0);
 
-      // - Ready Set Total Fee: $80.00
-      expect(result.deliveryFee).toBe(80);
+      // - Ready Set Total Fee: $120.00
+      expect(result.deliveryFee).toBe(120);
     });
 
     // TODO: REA-211 - Driver pay calculation differs from test expectations
@@ -224,9 +222,10 @@ describe('Calculator Fix Verification', () => {
 
       const result = calculateDeliveryCost(input);
 
-      // At exactly 10 miles, should use "within 10 miles" rate
-      // 50-74 headcount: within 10 miles = $60
-      expect(result.deliveryCost).toBe(60);
+      // At exactly 10 miles, mileage charges don't apply (Flat Fee Pricing)
+      // 50-74 headcount: flat rate = $90
+      // 600-899.99 food cost: flat rate = $90
+      expect(result.deliveryCost).toBe(90);
 
       // No mileage charges at exactly 10 miles
       expect(result.totalMileagePay).toBe(0);
@@ -266,14 +265,15 @@ describe('Calculator Fix Verification', () => {
       const result24 = calculateDeliveryCost(input24);
       const result25 = calculateDeliveryCost(input25);
 
-      // 24 headcount: 0-24 tier, within 10 miles = $30
-      // 0-299.99 food cost: within 10 miles = $30
-      expect(result24.deliveryCost).toBe(30);
+      // Flat Fee Pricing: within10Miles = regularRate
+      // 24 headcount: 0-24 tier, flat rate = $60
+      // 0-299.99 food cost: flat rate = $60
+      expect(result24.deliveryCost).toBe(60);
 
-      // 25 headcount: 25-49 tier, within 10 miles = $40
-      // 0-299.99 food cost: within 10 miles = $30
-      // LESSER of $40 and $30 = $30
-      expect(result25.deliveryCost).toBe(30);
+      // 25 headcount: 25-49 tier, flat rate = $70
+      // 0-299.99 food cost: flat rate = $60
+      // LESSER of $70 and $60 = $60
+      expect(result25.deliveryCost).toBe(60);
     });
 
     it('should handle boundary value - $299.99 vs $300 food cost', () => {
@@ -294,14 +294,15 @@ describe('Calculator Fix Verification', () => {
       const result299 = calculateDeliveryCost(input299);
       const result300 = calculateDeliveryCost(input300);
 
-      // $299.99: 0-299.99 tier, within 10 miles = $30
-      // 10 headcount: 0-24 tier, within 10 miles = $30
-      expect(result299.deliveryCost).toBe(30);
+      // Flat Fee Pricing: within10Miles = regularRate
+      // $299.99: 0-299.99 tier, flat rate = $60
+      // 10 headcount: 0-24 tier, flat rate = $60
+      expect(result299.deliveryCost).toBe(60);
 
-      // $300: 300-599.99 tier, within 10 miles = $40
-      // 10 headcount: 0-24 tier, within 10 miles = $30
-      // LESSER of $30 and $40 = $30
-      expect(result300.deliveryCost).toBe(30);
+      // $300: 300-599.99 tier, flat rate = $70
+      // 10 headcount: 0-24 tier, flat rate = $60
+      // LESSER of $60 and $70 = $60
+      expect(result300.deliveryCost).toBe(60);
     });
   });
 

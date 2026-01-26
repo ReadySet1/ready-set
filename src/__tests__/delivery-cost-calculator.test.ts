@@ -135,15 +135,15 @@ describe('Delivery Cost Calculator', () => {
 
       const result = calculateDeliveryCost(input);
 
-      // Expected from image:
-      // Delivery Cost: $80.00 (Within 10 miles rate for Tier 5)
+      // Flat Fee Pricing: within10Miles = regularRate
+      // Tier 5 ($1200-$1499.99): flat rate = $120
       // Total Mileage Pay: $0.00 (within 10 miles)
-      // Delivery Fee: $80.00
+      // Delivery Fee: $120.00
 
-      expect(result.deliveryCost).toBe(80); // Tier 5 within 10 miles
+      expect(result.deliveryCost).toBe(120); // Tier 5 flat rate
       expect(result.totalMileagePay).toBe(0); // No mileage charge within 10 miles
       expect(result.dailyDriveDiscount).toBe(0);
-      expect(result.deliveryFee).toBe(80);
+      expect(result.deliveryFee).toBe(120);
     });
 
     /**
@@ -440,8 +440,8 @@ describe('Delivery Cost Calculator', () => {
 
       const result = calculateDeliveryCost(input);
 
-      // Should default to Tier 1 within 10 miles
-      expect(result.deliveryCost).toBe(30);
+      // Should default to Tier 1 (Flat Fee Pricing: flat rate = $60)
+      expect(result.deliveryCost).toBe(60);
       expect(result.totalMileagePay).toBe(0);
       expect(result.dailyDriveDiscount).toBe(0);
     });
@@ -456,8 +456,9 @@ describe('Delivery Cost Calculator', () => {
 
       const result = calculateDeliveryCost(input);
 
-      // Exactly 10 miles should use within 10 miles rate
-      expect(result.deliveryCost).toBe(60); // Tier 3 within 10 miles
+      // Exactly 10 miles - no mileage charge (Flat Fee Pricing)
+      // Tier 3 (50-74 headcount / 600-899.99 food cost): flat rate = $90
+      expect(result.deliveryCost).toBe(90); // Tier 3 flat rate
       expect(result.totalMileagePay).toBe(0); // No mileage charge at exactly 10
     });
 
@@ -621,8 +622,8 @@ describe('Delivery Cost Calculator', () => {
 
       const result = calculateDeliveryCost(input);
 
-      // Should fallback to Ready Set Food Standard (within10Miles: 30)
-      expect(result.deliveryCost).toBe(30);
+      // Should fallback to Ready Set Food Standard (Flat Fee Pricing: $60)
+      expect(result.deliveryCost).toBe(60);
     });
 
     test('CaterValley: Edge case - Exactly 10.0 miles uses within10Miles rate', () => {
