@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,7 +39,14 @@ import {
   EyeOff,
   History,
   ShieldAlert,
+  Minus,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useBulkSelection, getSelectedIdsArray } from "@/hooks/useBulkSelection";
+import { useBulkUserOperations } from "@/hooks/useBulkUserOperations";
+import { BulkActionBar } from "@/components/Admin/users/BulkActionBar";
+import { BulkConfirmDialog } from "@/components/Admin/users/BulkConfirmDialog";
+import type { BulkOperationType } from "@/types/bulk-operations";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -251,6 +258,168 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
   const canDeleteUsers =
     normalizedUserType === "ADMIN" || normalizedUserType === "SUPER_ADMIN";
   const canPermanentlyDelete = normalizedUserType === "SUPER_ADMIN";
+
+  // Bulk selection state - memoize page IDs based on current tab
+  const pageUserIds = useMemo(() => {
+    if (activeTab === "active") {
+      return users.filter(u => u.type !== "SUPER_ADMIN").map(u => u.id);
+    }
+    return deletedUsers.map(u => u.id);
+  }, [activeTab, users, deletedUsers]);
+
+  const {
+    selectedIds,
+    selectedCount,
+    isAllOnPageSelected,
+    toggle: toggleSelection,
+    selectAll,
+    deselectAll,
+    clearAll: clearSelection,
+    isSelected,
+  } = useBulkSelection(pageUserIds);
+
+  // Bulk operations dialog state
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkOperationType, setBulkOperationType] = useState<BulkOperationType>("soft_delete");
+  const [bulkTargetStatus, setBulkTargetStatus] = useState<UserStatus | undefined>();
+
+  // Bulk operations mutations
+  const {
+    bulkStatusChangeMutation,
+    bulkDeleteMutation,
+    bulkRestoreMutation,
+    bulkExportMutation,
+    isAnyLoading: isBulkLoading,
+  } = useBulkUserOperations({
+    onStatusChangeSuccess: (data) => {
+      toast({
+        title: "Status changed",
+        description: `${data.results.totalSuccess} users updated successfully.`,
+        duration: 3000,
+      });
+      clearSelection();
+    },
+    onStatusChangeError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+        duration: 3000,
+      });
+    },
+    onDeleteSuccess: (data) => {
+      toast({
+        title: "Users deleted",
+        description: `${data.results.totalSuccess} users moved to trash.`,
+        duration: 3000,
+      });
+      clearSelection();
+      // Refresh data - trigger re-fetch
+      setSearchTerm(prev => prev);
+    },
+    onDeleteError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+        duration: 3000,
+      });
+    },
+    onRestoreSuccess: (data) => {
+      toast({
+        title: "Users restored",
+        description: `${data.results.totalSuccess} users restored successfully.`,
+        duration: 3000,
+      });
+      clearSelection();
+      // Refresh data - trigger re-fetch
+      setSearchTerm(prev => prev);
+    },
+    onRestoreError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+        duration: 3000,
+      });
+    },
+    onExportSuccess: () => {
+      toast({
+        title: "Export complete",
+        description: "Users exported to CSV file.",
+        duration: 3000,
+      });
+    },
+    onExportError: (error) => {
+      toast({
+        title: "Export failed",
+        description: error.message,
+        variant: "destructive",
+        duration: 3000,
+      });
+    },
+  });
+
+  // Bulk action handlers
+  const handleBulkStatusChange = (status: UserStatus) => {
+    setBulkOperationType("status_change");
+    setBulkTargetStatus(status);
+    setBulkDialogOpen(true);
+  };
+
+  const handleBulkDelete = () => {
+    setBulkOperationType("soft_delete");
+    setBulkTargetStatus(undefined);
+    setBulkDialogOpen(true);
+  };
+
+  const handleBulkRestore = () => {
+    setBulkOperationType("restore");
+    setBulkTargetStatus(undefined);
+    setBulkDialogOpen(true);
+  };
+
+  const handleBulkExport = () => {
+    const selectedIdsArray = getSelectedIdsArray(selectedIds);
+    bulkExportMutation.mutate({
+      userIds: selectedIdsArray,
+      includeDeleted: activeTab === "deleted",
+    });
+  };
+
+  const handleBulkConfirm = (reason?: string) => {
+    const selectedIdsArray = getSelectedIdsArray(selectedIds);
+
+    switch (bulkOperationType) {
+      case "status_change":
+        if (bulkTargetStatus) {
+          bulkStatusChangeMutation.mutate({
+            userIds: selectedIdsArray,
+            status: bulkTargetStatus,
+            reason,
+          });
+        }
+        break;
+      case "soft_delete":
+        bulkDeleteMutation.mutate({
+          userIds: selectedIdsArray,
+          reason,
+        });
+        break;
+      case "restore":
+        bulkRestoreMutation.mutate({
+          userIds: selectedIdsArray,
+        });
+        break;
+    }
+
+    setBulkDialogOpen(false);
+  };
+
+  // Clear selection when switching tabs
+  useEffect(() => {
+    clearSelection();
+  }, [activeTab, clearSelection]);
 
   // --- Data Fetching Effect ---
   useEffect(() => {
@@ -823,6 +992,22 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                     <Table className="min-w-[800px]">
                       <TableHeader className="bg-slate-50">
                         <TableRow>
+                          {/* Checkbox column */}
+                          {canDeleteUsers && (
+                            <TableHead className="w-[50px]">
+                              <Checkbox
+                                checked={isAllOnPageSelected && pageUserIds.length > 0}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    selectAll(pageUserIds);
+                                  } else {
+                                    deselectAll(pageUserIds);
+                                  }
+                                }}
+                                aria-label="Select all users on this page"
+                              />
+                            </TableHead>
+                          )}
                           <TableHead
                             className="min-w-[200px] cursor-pointer"
                             onClick={() => handleSort("name")}
@@ -885,6 +1070,8 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                             const createdAtDate = new Date(user.createdAt);
                             const isValidDate = !isNaN(createdAtDate.getTime());
 
+                            const canSelectUser = user.type !== "SUPER_ADMIN";
+
                             return (
                               <motion.tr
                                 key={user.id}
@@ -892,8 +1079,26 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.2 }}
-                                className="group hover:bg-slate-50"
+                                className={`group hover:bg-slate-50 ${isSelected(user.id) ? "bg-amber-50" : ""}`}
                               >
+                                {/* Checkbox cell */}
+                                {canDeleteUsers && (
+                                  <TableCell>
+                                    {canSelectUser ? (
+                                      <Checkbox
+                                        checked={isSelected(user.id)}
+                                        onCheckedChange={() => toggleSelection(user.id)}
+                                        aria-label={`Select ${user.name || user.email}`}
+                                      />
+                                    ) : (
+                                      <Checkbox
+                                        disabled
+                                        aria-label="Cannot select Super Admin"
+                                        title="Super Admin users cannot be modified"
+                                      />
+                                    )}
+                                  </TableCell>
+                                )}
                                 <TableCell>
                                   <Link
                                     href={`/admin/users/${user.id}`}
@@ -1017,6 +1222,22 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                     <Table className="min-w-[900px]">
                       <TableHeader className="bg-slate-50">
                         <TableRow>
+                          {/* Checkbox column for deleted users */}
+                          {canDeleteUsers && (
+                            <TableHead className="w-[50px]">
+                              <Checkbox
+                                checked={isAllOnPageSelected && pageUserIds.length > 0}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    selectAll(pageUserIds);
+                                  } else {
+                                    deselectAll(pageUserIds);
+                                  }
+                                }}
+                                aria-label="Select all deleted users on this page"
+                              />
+                            </TableHead>
+                          )}
                           <TableHead
                             className="min-w-[200px] cursor-pointer"
                             onClick={() => handleSort("name")}
@@ -1075,8 +1296,18 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.2 }}
-                                className="group bg-red-50/30 hover:bg-red-50/60"
+                                className={`group bg-red-50/30 hover:bg-red-50/60 ${isSelected(user.id) ? "bg-amber-50" : ""}`}
                               >
+                                {/* Checkbox cell for deleted users */}
+                                {canDeleteUsers && (
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={isSelected(user.id)}
+                                      onCheckedChange={() => toggleSelection(user.id)}
+                                      aria-label={`Select ${user.name || user.email}`}
+                                    />
+                                  </TableCell>
+                                )}
                                 <TableCell>
                                   <div className="flex items-center gap-2">
                                     <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-500" />
@@ -1422,6 +1653,31 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Action Bar */}
+      {canDeleteUsers && (
+        <BulkActionBar
+          selectedCount={selectedCount}
+          onClearSelection={clearSelection}
+          onStatusChange={handleBulkStatusChange}
+          onDelete={handleBulkDelete}
+          onRestore={activeTab === "deleted" ? handleBulkRestore : undefined}
+          onExport={handleBulkExport}
+          isLoading={isBulkLoading}
+          mode={activeTab}
+        />
+      )}
+
+      {/* Bulk Confirm Dialog */}
+      <BulkConfirmDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        operationType={bulkOperationType}
+        selectedCount={selectedCount}
+        onConfirm={handleBulkConfirm}
+        isLoading={isBulkLoading}
+        targetStatus={bulkTargetStatus}
+      />
     </div>
   );
 };
