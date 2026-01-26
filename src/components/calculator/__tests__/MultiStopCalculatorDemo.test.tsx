@@ -11,12 +11,15 @@
  * - Extra stops highlighting
  * - CTA buttons
  * - Responsive behavior
+ * - showDriverEarnings prop behavior
+ * - Flat fee pricing verification
  */
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MultiStopCalculatorDemo from '../MultiStopCalculatorDemo';
+import { calculateDeliveryCost } from '@/lib/calculator/delivery-cost-calculator';
 
 // Mock Next.js Link component
 jest.mock('next/link', () => {
@@ -77,6 +80,16 @@ describe('MultiStopCalculatorDemo Component', () => {
 
     it('should render the pricing explanation section', () => {
       render(<MultiStopCalculatorDemo />);
+
+      expect(screen.getByText('How Multi-Stop Pricing Works')).toBeInTheDocument();
+      expect(screen.getByText('First Stop')).toBeInTheDocument();
+      expect(screen.getByText('Additional Stops')).toBeInTheDocument();
+      // Driver Bonus is only shown when showDriverEarnings is true
+      expect(screen.queryByText('Driver Bonus')).not.toBeInTheDocument();
+    });
+
+    it('should render pricing explanation with driver bonus when showDriverEarnings is true', () => {
+      render(<MultiStopCalculatorDemo showDriverEarnings={true} />);
 
       expect(screen.getByText('How Multi-Stop Pricing Works')).toBeInTheDocument();
       expect(screen.getByText('First Stop')).toBeInTheDocument();
@@ -205,8 +218,22 @@ describe('MultiStopCalculatorDemo Component', () => {
   });
 
   describe('Real-time Calculation Display', () => {
-    it('should display calculation results on initial render', () => {
+    it('should display calculation results on initial render (without driver earnings by default)', () => {
       render(<MultiStopCalculatorDemo />);
+
+      // Should show Customer Charges section
+      expect(screen.getByText('Customer Charges')).toBeInTheDocument();
+
+      // Should NOT show Driver Earnings section by default
+      expect(screen.queryByText('Driver Earnings')).not.toBeInTheDocument();
+
+      // Should show customer totals only
+      expect(screen.getByText('Total Delivery Fee:')).toBeInTheDocument();
+      expect(screen.queryByText('Total Driver Pay:')).not.toBeInTheDocument();
+    });
+
+    it('should display calculation results with driver earnings when showDriverEarnings is true', () => {
+      render(<MultiStopCalculatorDemo showDriverEarnings={true} />);
 
       // Should show Customer Charges section
       expect(screen.getByText('Customer Charges')).toBeInTheDocument();
@@ -214,7 +241,7 @@ describe('MultiStopCalculatorDemo Component', () => {
       // Should show Driver Earnings section
       expect(screen.getByText('Driver Earnings')).toBeInTheDocument();
 
-      // Should show totals
+      // Should show both totals
       expect(screen.getByText('Total Delivery Fee:')).toBeInTheDocument();
       expect(screen.getByText('Total Driver Pay:')).toBeInTheDocument();
     });
@@ -224,9 +251,14 @@ describe('MultiStopCalculatorDemo Component', () => {
       expect(screen.getByText('Base Delivery Fee:')).toBeInTheDocument();
     });
 
-    it('should display driver base pay', () => {
-      render(<MultiStopCalculatorDemo />);
+    it('should display driver base pay when showDriverEarnings is true', () => {
+      render(<MultiStopCalculatorDemo showDriverEarnings={true} />);
       expect(screen.getByText('Base Pay:')).toBeInTheDocument();
+    });
+
+    it('should NOT display driver base pay when showDriverEarnings is false', () => {
+      render(<MultiStopCalculatorDemo />);
+      expect(screen.queryByText('Base Pay:')).not.toBeInTheDocument();
     });
 
     it('should have calculation input fields that are editable', async () => {
@@ -290,8 +322,15 @@ describe('MultiStopCalculatorDemo Component', () => {
       expect(screen.getByText(/\$5\.00 per extra stop/i)).toBeInTheDocument();
     });
 
-    it('should have pricing explanation that mentions driver bonus', () => {
+    it('should NOT show driver bonus pricing explanation by default', () => {
       render(<MultiStopCalculatorDemo />);
+
+      // Driver bonus should NOT be visible by default
+      expect(screen.queryByText(/\$2\.50 bonus per additional stop/i)).not.toBeInTheDocument();
+    });
+
+    it('should show driver bonus pricing explanation when showDriverEarnings is true', () => {
+      render(<MultiStopCalculatorDemo showDriverEarnings={true} />);
 
       // Check the pricing info section mentions driver bonus
       expect(screen.getByText(/\$2\.50 bonus per additional stop/i)).toBeInTheDocument();
@@ -492,6 +531,213 @@ describe('MultiStopCalculatorDemo Component', () => {
       expect(
         screen.getByText(/Enter both addresses and click "Check" to auto-calculate distance/i)
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('showDriverEarnings Prop Behavior', () => {
+    it('should hide driver earnings section when showDriverEarnings is false (default)', () => {
+      render(<MultiStopCalculatorDemo />);
+
+      expect(screen.queryByText('Driver Earnings')).not.toBeInTheDocument();
+      expect(screen.queryByText('Total Driver Pay:')).not.toBeInTheDocument();
+      expect(screen.queryByText('Base Pay:')).not.toBeInTheDocument();
+    });
+
+    it('should show driver earnings section when showDriverEarnings is true', () => {
+      render(<MultiStopCalculatorDemo showDriverEarnings={true} />);
+
+      expect(screen.getByText('Driver Earnings')).toBeInTheDocument();
+      expect(screen.getByText('Total Driver Pay:')).toBeInTheDocument();
+      expect(screen.getByText('Base Pay:')).toBeInTheDocument();
+    });
+
+    it('should hide driver bonus in extra stops info when showDriverEarnings is false', async () => {
+      const user = userEvent.setup();
+      render(<MultiStopCalculatorDemo />);
+
+      // Add extra stops
+      const incrementButton = screen.getAllByRole('button').find(
+        (btn) => btn.textContent === '+'
+      );
+      await user.click(incrementButton!);
+
+      // Extra stops section should appear with customer charge but NOT driver bonus
+      // Use getAllByText since "Extra Stop" appears multiple times
+      const extraStopElements = screen.getAllByText(/Extra Stop/i);
+      expect(extraStopElements.length).toBeGreaterThan(0);
+      expect(screen.getByText(/Customer charge:/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Driver bonus:/i)).not.toBeInTheDocument();
+    });
+
+    it('should show driver bonus in extra stops info when showDriverEarnings is true', async () => {
+      const user = userEvent.setup();
+      render(<MultiStopCalculatorDemo showDriverEarnings={true} />);
+
+      // Add extra stops
+      const incrementButton = screen.getAllByRole('button').find(
+        (btn) => btn.textContent === '+'
+      );
+      await user.click(incrementButton!);
+
+      // Extra stops section should show both customer charge and driver bonus
+      // Use getAllByText since "Extra Stop" appears multiple times
+      const extraStopElements = screen.getAllByText(/Extra Stop/i);
+      expect(extraStopElements.length).toBeGreaterThan(0);
+      expect(screen.getByText(/Customer charge:/i)).toBeInTheDocument();
+      expect(screen.getByText(/Driver bonus:/i)).toBeInTheDocument();
+    });
+
+    it('should show 3-column pricing explanation when showDriverEarnings is true', () => {
+      render(<MultiStopCalculatorDemo showDriverEarnings={true} />);
+
+      // Should have three columns: First Stop, Additional Stops, and Driver Bonus
+      expect(screen.getByText('First Stop')).toBeInTheDocument();
+      expect(screen.getByText('Additional Stops')).toBeInTheDocument();
+      expect(screen.getByText('Driver Bonus')).toBeInTheDocument();
+    });
+
+    it('should show 2-column pricing explanation when showDriverEarnings is false', () => {
+      render(<MultiStopCalculatorDemo />);
+
+      // Should have two columns: First Stop and Additional Stops (no Driver Bonus)
+      expect(screen.getByText('First Stop')).toBeInTheDocument();
+      expect(screen.getByText('Additional Stops')).toBeInTheDocument();
+      expect(screen.queryByText('Driver Bonus')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Flat Fee Pricing Verification', () => {
+    /**
+     * Tests that verify the flat fee pricing model from the PDF "Direct Client Pricing"
+     * Flat fee = same rate regardless of distance (within10Miles = regularRate)
+     * Mileage charges only apply for miles BEYOND 10
+     */
+
+    it('should calculate flat fee for tier 1 (headcount 0-24, food <$300)', () => {
+      const result = calculateDeliveryCost({
+        headcount: 20,
+        foodCost: 250,
+        totalMileage: 8,
+        clientConfigId: 'ready-set-food-standard',
+      });
+
+      // Tier 1 flat fee should be $60
+      expect(result.deliveryCost).toBe(60);
+      expect(result.totalMileagePay).toBe(0); // No mileage for within 10 miles
+      expect(result.deliveryFee).toBe(60);
+    });
+
+    it('should calculate flat fee for tier 2 (headcount 25-49, food $300-$599)', () => {
+      const result = calculateDeliveryCost({
+        headcount: 35,
+        foodCost: 450,
+        totalMileage: 5,
+        clientConfigId: 'ready-set-food-standard',
+      });
+
+      // Tier 2 flat fee should be $70
+      expect(result.deliveryCost).toBe(70);
+      expect(result.totalMileagePay).toBe(0);
+      expect(result.deliveryFee).toBe(70);
+    });
+
+    it('should calculate flat fee for tier 3 (headcount 50-74, food $600-$899)', () => {
+      const result = calculateDeliveryCost({
+        headcount: 60,
+        foodCost: 750,
+        totalMileage: 10,
+        clientConfigId: 'ready-set-food-standard',
+      });
+
+      // Tier 3 flat fee should be $90
+      expect(result.deliveryCost).toBe(90);
+      expect(result.totalMileagePay).toBe(0); // Exactly 10 miles = no extra charge
+      expect(result.deliveryFee).toBe(90);
+    });
+
+    it('should add mileage charge only for miles beyond 10', () => {
+      const result = calculateDeliveryCost({
+        headcount: 50,
+        foodCost: 700,
+        totalMileage: 15,
+        clientConfigId: 'ready-set-food-standard',
+      });
+
+      // Tier 3 flat fee should be $90
+      expect(result.deliveryCost).toBe(90);
+      // 5 miles beyond 10 × $3/mile = $15
+      expect(result.totalMileagePay).toBe(15);
+      expect(result.deliveryFee).toBe(105);
+    });
+
+    it('should use LESSER rule when headcount and food cost are in different tiers', () => {
+      // Headcount 25 = tier 25-49 ($70)
+      // Food cost $200 = tier 0-24 ($60)
+      // LESSER = $60
+      const result = calculateDeliveryCost({
+        headcount: 25,
+        foodCost: 200,
+        totalMileage: 8,
+        clientConfigId: 'ready-set-food-standard',
+      });
+
+      expect(result.deliveryCost).toBe(60); // Uses lesser fee
+    });
+
+    it('should apply flat fee pricing (within10Miles equals regularRate)', () => {
+      // Test that 8 miles and 10 miles produce the same base fee
+      const result8Miles = calculateDeliveryCost({
+        headcount: 50,
+        foodCost: 700,
+        totalMileage: 8,
+        clientConfigId: 'ready-set-food-standard',
+      });
+
+      const result10Miles = calculateDeliveryCost({
+        headcount: 50,
+        foodCost: 700,
+        totalMileage: 10,
+        clientConfigId: 'ready-set-food-standard',
+      });
+
+      // Both should have the same base delivery cost (flat fee)
+      expect(result8Miles.deliveryCost).toBe(result10Miles.deliveryCost);
+      expect(result8Miles.deliveryCost).toBe(90); // Tier 3 flat fee
+    });
+
+    it('should correctly calculate for high-value tiers', () => {
+      // Test tier 9: 200-249 headcount, $2100-$2299 food cost = $280
+      const result = calculateDeliveryCost({
+        headcount: 220,
+        foodCost: 2200,
+        totalMileage: 8,
+        clientConfigId: 'ready-set-food-standard',
+      });
+
+      expect(result.deliveryCost).toBe(280);
+      expect(result.totalMileagePay).toBe(0);
+      expect(result.deliveryFee).toBe(280);
+    });
+
+    it('should calculate mileage correctly for various distances beyond 10', () => {
+      const testCases = [
+        { miles: 11, expectedMileage: 3 },  // 1 mile beyond × $3
+        { miles: 12, expectedMileage: 6 },  // 2 miles beyond × $3
+        { miles: 15, expectedMileage: 15 }, // 5 miles beyond × $3
+        { miles: 20, expectedMileage: 30 }, // 10 miles beyond × $3
+      ];
+
+      testCases.forEach(({ miles, expectedMileage }) => {
+        const result = calculateDeliveryCost({
+          headcount: 50,
+          foodCost: 700,
+          totalMileage: miles,
+          clientConfigId: 'ready-set-food-standard',
+        });
+
+        expect(result.totalMileagePay).toBe(expectedMileage);
+        expect(result.deliveryFee).toBe(90 + expectedMileage); // $90 flat fee + mileage
+      });
     });
   });
 });

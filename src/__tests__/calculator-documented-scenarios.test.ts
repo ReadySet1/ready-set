@@ -28,15 +28,15 @@ describe('KASA Calculator - Client Pricing (Documented Scenarios)', () => {
       expect(result.totalMileagePay).toBe(0); // No mileage charge within 10 miles
     });
 
-    it('should calculate delivery cost as $30.00', () => {
+    it('should calculate delivery cost as $60.00', () => {
       const result = calculateDeliveryCost(input);
-      // Tier: <$300 food cost, <25 headcount = $30
-      expect(result.deliveryCost).toBe(30);
+      // Tier: <$300 food cost, <25 headcount (Flat Fee Pricing: $60)
+      expect(result.deliveryCost).toBe(60);
     });
 
-    it('should calculate total client charge as $30.00', () => {
+    it('should calculate total client charge as $60.00', () => {
       const result = calculateDeliveryCost(input);
-      expect(result.deliveryFee).toBe(30);
+      expect(result.deliveryFee).toBe(60);
     });
   });
 
@@ -118,16 +118,16 @@ describe('KASA Calculator - Client Pricing (Documented Scenarios)', () => {
       expect(result.totalMileagePay).toBe(0);
     });
 
-    it('should calculate delivery cost as $120.00', () => {
+    it('should calculate delivery cost as $280.00', () => {
       const result = calculateDeliveryCost(input);
       // Tier: $2100-2299 food cost, 200-249 headcount
-      // Within 10 miles: $120
-      expect(result.deliveryCost).toBe(120);
+      // Flat Fee Pricing: $280
+      expect(result.deliveryCost).toBe(280);
     });
 
-    it('should calculate total client charge as $120.00', () => {
+    it('should calculate total client charge as $280.00', () => {
       const result = calculateDeliveryCost(input);
-      expect(result.deliveryFee).toBe(120);
+      expect(result.deliveryFee).toBe(280);
     });
   });
 });
