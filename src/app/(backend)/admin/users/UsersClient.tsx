@@ -40,12 +40,15 @@ import {
   History,
   ShieldAlert,
   Minus,
+  Upload,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useBulkSelection, getSelectedIdsArray } from "@/hooks/useBulkSelection";
 import { useBulkUserOperations } from "@/hooks/useBulkUserOperations";
 import { BulkActionBar } from "@/components/Admin/users/BulkActionBar";
 import { BulkConfirmDialog } from "@/components/Admin/users/BulkConfirmDialog";
+import { BulkImportDialog } from "@/components/Admin/users/BulkImportDialog";
+import { BulkEmailDialog } from "@/components/Admin/users/BulkEmailDialog";
 import type { BulkOperationType } from "@/types/bulk-operations";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -276,16 +279,36 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
     deselectAll,
     clearAll: clearSelection,
     isSelected,
+    selectAllMatching,
+    isSelectAllMatchingMode,
+    matchingCount,
+    exitSelectAllMatchingMode,
   } = useBulkSelection(pageUserIds);
+
+  // State for fetching all matching IDs
+  const [isLoadingMatchingIds, setIsLoadingMatchingIds] = useState(false);
+  const [matchingIdsCount, setMatchingIdsCount] = useState<number | null>(null);
 
   // Bulk operations dialog state
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [bulkOperationType, setBulkOperationType] = useState<BulkOperationType>("soft_delete");
   const [bulkTargetStatus, setBulkTargetStatus] = useState<UserStatus | undefined>();
+  const [bulkTargetRole, setBulkTargetRole] = useState<UserType | undefined>();
+
+  // Import dialog state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  // Email dialog state
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [isEmailSending, setIsEmailSending] = useState(false);
+
+  // Check if current user is SUPER_ADMIN
+  const isSuperAdmin = normalizedUserType === "SUPER_ADMIN";
 
   // Bulk operations mutations
   const {
     bulkStatusChangeMutation,
+    bulkRoleChangeMutation,
     bulkDeleteMutation,
     bulkRestoreMutation,
     bulkExportMutation,
@@ -300,6 +323,24 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
       clearSelection();
     },
     onStatusChangeError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+        duration: 3000,
+      });
+    },
+    onRoleChangeSuccess: (data) => {
+      toast({
+        title: "Role changed",
+        description: `${data.results.totalSuccess} users updated successfully.`,
+        duration: 3000,
+      });
+      clearSelection();
+      // Refresh data
+      setSearchTerm(prev => prev);
+    },
+    onRoleChangeError: (error) => {
       toast({
         title: "Error",
         description: error.message,
@@ -364,6 +405,14 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
   const handleBulkStatusChange = (status: UserStatus) => {
     setBulkOperationType("status_change");
     setBulkTargetStatus(status);
+    setBulkTargetRole(undefined);
+    setBulkDialogOpen(true);
+  };
+
+  const handleBulkRoleChange = (role: UserType) => {
+    setBulkOperationType("role_change");
+    setBulkTargetRole(role);
+    setBulkTargetStatus(undefined);
     setBulkDialogOpen(true);
   };
 
@@ -387,6 +436,116 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
     });
   };
 
+  const handleBulkEmail = () => {
+    setEmailDialogOpen(true);
+  };
+
+  const handleSendEmail = async (request: { template: string; subject: string; body: string }) => {
+    const selectedIdsArray = getSelectedIdsArray(selectedIds);
+    setIsEmailSending(true);
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("No active session - please log in again");
+      }
+
+      const response = await fetch("/api/users/bulk/email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          userIds: selectedIdsArray,
+          ...request,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send email");
+      }
+
+      toast({
+        title: "Email sent",
+        description: `Email sent to ${data.results.totalSuccess} users.`,
+        duration: 3000,
+      });
+
+      clearSelection();
+      setEmailDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send email",
+        variant: "destructive",
+        duration: 3000,
+      });
+      throw error; // Re-throw to let the dialog handle the error state
+    } finally {
+      setIsEmailSending(false);
+    }
+  };
+
+  // Fetch all matching IDs for "Select all matching" functionality
+  const fetchAllMatchingIds = async () => {
+    setIsLoadingMatchingIds(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("No active session - please log in again");
+      }
+
+      const params = new URLSearchParams();
+      if (statusFilter !== "all") params.append("status", statusFilter);
+      if (typeFilter !== "all") params.append("type", typeFilter);
+      if (searchTerm) params.append("search", searchTerm);
+      if (activeTab === "deleted") params.append("includeDeleted", "true");
+
+      const response = await fetch(`/api/users/bulk/ids?${params.toString()}`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch matching user IDs");
+      }
+
+      const data = await response.json();
+      selectAllMatching(data.ids);
+      setMatchingIdsCount(data.totalCount);
+
+      if (data.hasMore) {
+        toast({
+          title: "Selection limit reached",
+          description: `Selected ${data.count} of ${data.totalCount} matching users. Maximum 1000 users can be selected at once.`,
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to fetch matching users",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setIsLoadingMatchingIds(false);
+    }
+  };
+
   const handleBulkConfirm = (reason?: string) => {
     const selectedIdsArray = getSelectedIdsArray(selectedIds);
 
@@ -396,6 +555,15 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
           bulkStatusChangeMutation.mutate({
             userIds: selectedIdsArray,
             status: bulkTargetStatus,
+            reason,
+          });
+        }
+        break;
+      case "role_change":
+        if (bulkTargetRole) {
+          bulkRoleChangeMutation.mutate({
+            userIds: selectedIdsArray,
+            newRole: bulkTargetRole,
             reason,
           });
         }
@@ -880,8 +1048,27 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                   />
                 </div>
 
-                {/* --- Add User Button (only show on active tab) --- */}
-                {activeTab === "active" && (
+                {/* --- Import and Add User Buttons (only show on active tab) --- */}
+                {activeTab === "active" && canDeleteUsers && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setImportDialogOpen(true)}
+                      className="whitespace-nowrap"
+                    >
+                      <Upload className="mr-1 h-4 w-4" />
+                      Import
+                    </Button>
+                    <Link href="/admin/users/new-user">
+                      <Button size="sm" className="whitespace-nowrap">
+                        <PlusCircle className="mr-1 h-4 w-4" />
+                        Add User
+                      </Button>
+                    </Link>
+                  </>
+                )}
+                {activeTab === "active" && !canDeleteUsers && (
                   <Link href="/admin/users/new-user">
                     <Button size="sm" className="whitespace-nowrap">
                       <PlusCircle className="mr-1 h-4 w-4" />
@@ -985,6 +1172,30 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
             {/* --- Content Section with Tabs --- */}
             <Tabs value={activeTab} onValueChange={handleTabChange}>
               <TabsContent value="active" className="m-0">
+                {/* Select All Matching Banner */}
+                {isSelectAllMatchingMode && canDeleteUsers && (
+                  <div className="flex items-center justify-between bg-amber-50 px-4 py-3 border-b border-amber-200">
+                    <div className="flex items-center gap-2">
+                      <Users2 className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-medium text-amber-800">
+                        All {matchingCount} users matching your filters are selected
+                        {matchingIdsCount && matchingIdsCount > matchingCount && (
+                          <span className="text-amber-600"> (max 1000)</span>
+                        )}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        clearSelection();
+                      }}
+                      className="text-amber-700 hover:text-amber-800 hover:bg-amber-100"
+                    >
+                      Clear selection
+                    </Button>
+                  </div>
+                )}
                 {isLoading ? (
                   <LoadingSkeleton />
                 ) : users.length > 0 ? (
@@ -995,17 +1206,20 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                           {/* Checkbox column */}
                           {canDeleteUsers && (
                             <TableHead className="w-[50px]">
-                              <Checkbox
-                                checked={isAllOnPageSelected && pageUserIds.length > 0}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    selectAll(pageUserIds);
-                                  } else {
-                                    deselectAll(pageUserIds);
-                                  }
-                                }}
-                                aria-label="Select all users on this page"
-                              />
+                              <div className="flex flex-col gap-1">
+                                <Checkbox
+                                  checked={isAllOnPageSelected && pageUserIds.length > 0}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      selectAll(pageUserIds);
+                                    } else {
+                                      deselectAll(pageUserIds);
+                                      exitSelectAllMatchingMode();
+                                    }
+                                  }}
+                                  aria-label="Select all users on this page"
+                                />
+                              </div>
                             </TableHead>
                           )}
                           <TableHead
@@ -1056,6 +1270,23 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
+                        {/* Select all matching row */}
+                        {isAllOnPageSelected && !isSelectAllMatchingMode && canDeleteUsers && pageUserIds.length > 0 && (
+                          <TableRow className="bg-slate-50 hover:bg-slate-50">
+                            <TableCell colSpan={7} className="py-2 text-center">
+                              <span className="text-sm text-slate-600">
+                                All {pageUserIds.length} users on this page are selected.{" "}
+                                <button
+                                  onClick={fetchAllMatchingIds}
+                                  disabled={isLoadingMatchingIds}
+                                  className="text-amber-600 hover:text-amber-700 font-medium underline disabled:opacity-50"
+                                >
+                                  {isLoadingMatchingIds ? "Loading..." : "Select all users matching filters"}
+                                </button>
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        )}
                         <AnimatePresence>
                           {users.map((user) => {
                             const typeInfo = userTypeConfig[user.type] || {
@@ -1215,6 +1446,30 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
               </TabsContent>
 
               <TabsContent value="deleted" className="m-0">
+                {/* Select All Matching Banner for deleted users */}
+                {isSelectAllMatchingMode && canDeleteUsers && activeTab === "deleted" && (
+                  <div className="flex items-center justify-between bg-amber-50 px-4 py-3 border-b border-amber-200">
+                    <div className="flex items-center gap-2">
+                      <Users2 className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-medium text-amber-800">
+                        All {matchingCount} deleted users matching your filters are selected
+                        {matchingIdsCount && matchingIdsCount > matchingCount && (
+                          <span className="text-amber-600"> (max 1000)</span>
+                        )}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        clearSelection();
+                      }}
+                      className="text-amber-700 hover:text-amber-800 hover:bg-amber-100"
+                    >
+                      Clear selection
+                    </Button>
+                  </div>
+                )}
                 {isLoading ? (
                   <LoadingSkeleton />
                 ) : deletedUsers.length > 0 ? (
@@ -1232,6 +1487,7 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                                     selectAll(pageUserIds);
                                   } else {
                                     deselectAll(pageUserIds);
+                                    exitSelectAllMatchingMode();
                                   }
                                 }}
                                 aria-label="Select all deleted users on this page"
@@ -1277,6 +1533,23 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
+                        {/* Select all matching row for deleted users */}
+                        {isAllOnPageSelected && !isSelectAllMatchingMode && canDeleteUsers && pageUserIds.length > 0 && (
+                          <TableRow className="bg-slate-50 hover:bg-slate-50">
+                            <TableCell colSpan={8} className="py-2 text-center">
+                              <span className="text-sm text-slate-600">
+                                All {pageUserIds.length} deleted users on this page are selected.{" "}
+                                <button
+                                  onClick={fetchAllMatchingIds}
+                                  disabled={isLoadingMatchingIds}
+                                  className="text-amber-600 hover:text-amber-700 font-medium underline disabled:opacity-50"
+                                >
+                                  {isLoadingMatchingIds ? "Loading..." : "Select all deleted users matching filters"}
+                                </button>
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        )}
                         <AnimatePresence>
                           {deletedUsers.map((user) => {
                             const typeInfo = userTypeConfig[user.type] || {
@@ -1660,11 +1933,14 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
           selectedCount={selectedCount}
           onClearSelection={clearSelection}
           onStatusChange={handleBulkStatusChange}
+          onRoleChange={isSuperAdmin ? handleBulkRoleChange : undefined}
           onDelete={handleBulkDelete}
           onRestore={activeTab === "deleted" ? handleBulkRestore : undefined}
           onExport={handleBulkExport}
-          isLoading={isBulkLoading}
+          onEmail={handleBulkEmail}
+          isLoading={isBulkLoading || isEmailSending}
           mode={activeTab}
+          isSuperAdmin={isSuperAdmin}
         />
       )}
 
@@ -1677,6 +1953,33 @@ const UsersClient: React.FC<UsersClientProps> = ({ userType }) => {
         onConfirm={handleBulkConfirm}
         isLoading={isBulkLoading}
         targetStatus={bulkTargetStatus}
+        targetRole={bulkTargetRole}
+      />
+
+      {/* Bulk Import Dialog */}
+      <BulkImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImportComplete={(result) => {
+          if (result.success.length > 0) {
+            toast({
+              title: "Import completed",
+              description: `${result.success.length} users imported successfully.`,
+              duration: 3000,
+            });
+            // Refresh the user list
+            setSearchTerm((prev) => prev);
+          }
+        }}
+      />
+
+      {/* Bulk Email Dialog */}
+      <BulkEmailDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+        selectedCount={selectedCount}
+        onSend={handleSendEmail}
+        isLoading={isEmailSending}
       />
     </div>
   );

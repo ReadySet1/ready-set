@@ -2,6 +2,16 @@ import { useCallback, useMemo, useState } from "react";
 import type { UseBulkSelectionReturn } from "@/types/bulk-operations";
 
 /**
+ * Extended return type for bulk selection with "select all matching" support
+ */
+export interface UseBulkSelectionExtendedReturn extends UseBulkSelectionReturn {
+  selectAllMatching: (ids: string[]) => void;
+  isSelectAllMatchingMode: boolean;
+  matchingCount: number;
+  exitSelectAllMatchingMode: () => void;
+}
+
+/**
  * Hook for managing bulk selection state
  *
  * Provides O(1) lookups for selection state using a Set,
@@ -37,8 +47,10 @@ import type { UseBulkSelectionReturn } from "@/types/bulk-operations";
  */
 export function useBulkSelection(
   pageIds: string[] = []
-): UseBulkSelectionReturn {
+): UseBulkSelectionExtendedReturn {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isSelectAllMatchingMode, setIsSelectAllMatchingMode] = useState(false);
+  const [matchingCount, setMatchingCount] = useState(0);
 
   /**
    * Toggle a single item's selection state
@@ -86,6 +98,26 @@ export function useBulkSelection(
    */
   const clearAll = useCallback(() => {
     setSelectedIds(new Set());
+    setIsSelectAllMatchingMode(false);
+    setMatchingCount(0);
+  }, []);
+
+  /**
+   * Select all users matching current filters
+   * Sets the hook into "select all matching" mode
+   */
+  const selectAllMatching = useCallback((ids: string[]) => {
+    setSelectedIds(new Set(ids));
+    setIsSelectAllMatchingMode(true);
+    setMatchingCount(ids.length);
+  }, []);
+
+  /**
+   * Exit "select all matching" mode without clearing selection
+   */
+  const exitSelectAllMatchingMode = useCallback(() => {
+    setIsSelectAllMatchingMode(false);
+    setMatchingCount(0);
   }, []);
 
   /**
@@ -130,6 +162,10 @@ export function useBulkSelection(
     deselectAll,
     clearAll,
     isSelected,
+    selectAllMatching,
+    isSelectAllMatchingMode,
+    matchingCount,
+    exitSelectAllMatchingMode,
   };
 }
 

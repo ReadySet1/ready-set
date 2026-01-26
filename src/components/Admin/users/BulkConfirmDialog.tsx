@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,16 +13,21 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import {
   Trash2,
   RotateCcw,
   CheckCircle,
   AlertTriangle,
   Users,
+  Shield,
+  Mail,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import type { BulkOperationType, BulkOperationConfig } from "@/types/bulk-operations";
 import { BULK_OPERATION_CONFIGS } from "@/types/bulk-operations";
-import { UserStatus } from "@/types/prisma";
+import { UserStatus, UserType } from "@/types/prisma";
 
 interface BulkConfirmDialogProps {
   open: boolean;
@@ -33,6 +38,8 @@ interface BulkConfirmDialogProps {
   isLoading?: boolean;
   /** For status change operations */
   targetStatus?: UserStatus;
+  /** For role change operations */
+  targetRole?: UserType;
 }
 
 /**
@@ -43,6 +50,9 @@ const operationIcons: Record<BulkOperationType, React.ReactNode> = {
   soft_delete: <Trash2 className="h-5 w-5 text-orange-500" />,
   restore: <RotateCcw className="h-5 w-5 text-green-500" />,
   export: <Users className="h-5 w-5 text-slate-500" />,
+  role_change: <Shield className="h-5 w-5 text-purple-500" />,
+  email: <Mail className="h-5 w-5 text-blue-500" />,
+  import: <Upload className="h-5 w-5 text-green-500" />,
 };
 
 /**
@@ -66,20 +76,69 @@ export function BulkConfirmDialog({
   onConfirm,
   isLoading = false,
   targetStatus,
+  targetRole,
 }: BulkConfirmDialogProps) {
   const [reason, setReason] = useState("");
+  const [progress, setProgress] = useState(0);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Track if we were loading to detect completion
+  const wasLoadingRef = useRef(false);
+
+  // Simulate progress when loading
+  useEffect(() => {
+    if (isLoading) {
+      wasLoadingRef.current = true;
+      setProgress(0);
+      // Calculate estimated duration based on user count (approx 100ms per user, min 1s, max 10s)
+      const estimatedDuration = Math.min(Math.max(selectedCount * 100, 1000), 10000);
+      const incrementInterval = estimatedDuration / 100; // Update every 1%
+
+      progressIntervalRef.current = setInterval(() => {
+        setProgress((prev) => {
+          // Slow down as we approach 90% to wait for actual completion
+          if (prev >= 90) {
+            return Math.min(prev + 0.5, 95);
+          }
+          return Math.min(prev + 1, 90);
+        });
+      }, incrementInterval);
+    } else {
+      // Complete the progress when loading finishes
+      if (wasLoadingRef.current) {
+        setProgress(100);
+        setTimeout(() => setProgress(0), 500);
+        wasLoadingRef.current = false;
+      }
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    };
+  }, [isLoading, selectedCount]);
 
   const config = BULK_OPERATION_CONFIGS[operationType];
   const Icon = operationIcons[operationType];
 
   // Build description with count
-  const description =
-    operationType === "status_change" && targetStatus
-      ? `Change the status of ${selectedCount} ${selectedCount === 1 ? "user" : "users"} to "${targetStatus}".`
-      : config.description.replace(
-          "selected users",
-          `${selectedCount} ${selectedCount === 1 ? "user" : "users"}`
-        );
+  let description: string;
+  if (operationType === "status_change" && targetStatus) {
+    description = `Change the status of ${selectedCount} ${selectedCount === 1 ? "user" : "users"} to "${targetStatus}".`;
+  } else if (operationType === "role_change" && targetRole) {
+    description = `Change the role of ${selectedCount} ${selectedCount === 1 ? "user" : "users"} to "${targetRole}".`;
+  } else {
+    description = config.description.replace(
+      "selected users",
+      `${selectedCount} ${selectedCount === 1 ? "user" : "users"}`
+    );
+  }
 
   const handleConfirm = () => {
     onConfirm(config.requiresReason ? reason : undefined);
@@ -132,7 +191,7 @@ export function BulkConfirmDialog({
           </div>
 
           {/* Reason input */}
-          {config.requiresReason && (
+          {config.requiresReason && !isLoading && (
             <div className="space-y-2">
               <Label htmlFor="bulk-reason">{config.reasonLabel}</Label>
               <Textarea
@@ -147,6 +206,26 @@ export function BulkConfirmDialog({
                   {reason.length}/{config.minReasonLength} characters minimum
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Progress indicator */}
+          {isLoading && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
+                <span className="text-sm font-medium text-slate-700">
+                  Processing {selectedCount} {selectedCount === 1 ? "user" : "users"}...
+                </span>
+              </div>
+              <Progress
+                value={progress}
+                className="h-2"
+                indicatorClassName="bg-amber-500"
+              />
+              <p className="text-xs text-slate-500 text-center">
+                {Math.round(progress)}% complete
+              </p>
             </div>
           )}
         </div>
@@ -166,7 +245,7 @@ export function BulkConfirmDialog({
           >
             {isLoading ? (
               <>
-                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Processing...
               </>
             ) : (

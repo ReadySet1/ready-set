@@ -7,8 +7,10 @@ import type {
   BulkDeleteRequest,
   BulkRestoreRequest,
   BulkExportParams,
+  BulkRoleChangeRequest,
+  BulkEmailRequest,
 } from "@/types/bulk-operations";
-import { UserStatus } from "@/types/prisma";
+import { UserStatus, UserType } from "@/types/prisma";
 
 // Query keys for cache invalidation
 export const USERS_QUERY_KEY = "users";
@@ -93,6 +95,60 @@ async function bulkDelete(
   if (!response.ok) {
     throw new BulkOperationError(
       data.error || "Failed to delete users",
+      data.results
+    );
+  }
+
+  return data;
+}
+
+/**
+ * Bulk role change mutation function
+ */
+async function bulkRoleChange(
+  request: BulkRoleChangeRequest
+): Promise<BulkOperationApiResponse> {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch("/api/users/bulk/role", {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: JSON.stringify(request),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new BulkOperationError(
+      data.error || "Failed to change role",
+      data.results
+    );
+  }
+
+  return data;
+}
+
+/**
+ * Bulk email mutation function
+ */
+async function bulkEmail(
+  request: BulkEmailRequest
+): Promise<BulkOperationApiResponse> {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch("/api/users/bulk/email", {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: JSON.stringify(request),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new BulkOperationError(
+      data.error || "Failed to send email",
       data.results
     );
   }
@@ -197,12 +253,16 @@ function downloadBlob(blob: Blob, filename: string) {
 interface UseBulkUserOperationsOptions {
   onStatusChangeSuccess?: (data: BulkOperationApiResponse) => void;
   onStatusChangeError?: (error: BulkOperationError) => void;
+  onRoleChangeSuccess?: (data: BulkOperationApiResponse) => void;
+  onRoleChangeError?: (error: BulkOperationError) => void;
   onDeleteSuccess?: (data: BulkOperationApiResponse) => void;
   onDeleteError?: (error: BulkOperationError) => void;
   onRestoreSuccess?: (data: BulkOperationApiResponse) => void;
   onRestoreError?: (error: BulkOperationError) => void;
   onExportSuccess?: () => void;
   onExportError?: (error: Error) => void;
+  onEmailSuccess?: (data: BulkOperationApiResponse) => void;
+  onEmailError?: (error: BulkOperationError) => void;
 }
 
 /**
@@ -251,6 +311,19 @@ export function useBulkUserOperations(options: UseBulkUserOperationsOptions = {}
     },
   });
 
+  // Bulk role change mutation
+  const bulkRoleChangeMutation = useMutation({
+    mutationFn: bulkRoleChange,
+    onSuccess: (data) => {
+      // Invalidate user queries to refresh the list
+      queryClient.invalidateQueries({ queryKey: [USERS_QUERY_KEY] });
+      options.onRoleChangeSuccess?.(data);
+    },
+    onError: (error: BulkOperationError) => {
+      options.onRoleChangeError?.(error);
+    },
+  });
+
   // Bulk delete mutation
   const bulkDeleteMutation = useMutation({
     mutationFn: bulkDelete,
@@ -295,15 +368,30 @@ export function useBulkUserOperations(options: UseBulkUserOperationsOptions = {}
     },
   });
 
+  // Bulk email mutation
+  const bulkEmailMutation = useMutation({
+    mutationFn: bulkEmail,
+    onSuccess: (data) => {
+      options.onEmailSuccess?.(data);
+    },
+    onError: (error: BulkOperationError) => {
+      options.onEmailError?.(error);
+    },
+  });
+
   return {
     bulkStatusChangeMutation,
+    bulkRoleChangeMutation,
     bulkDeleteMutation,
     bulkRestoreMutation,
     bulkExportMutation,
+    bulkEmailMutation,
     isAnyLoading:
       bulkStatusChangeMutation.isPending ||
+      bulkRoleChangeMutation.isPending ||
       bulkDeleteMutation.isPending ||
       bulkRestoreMutation.isPending ||
-      bulkExportMutation.isPending,
+      bulkExportMutation.isPending ||
+      bulkEmailMutation.isPending,
   };
 }

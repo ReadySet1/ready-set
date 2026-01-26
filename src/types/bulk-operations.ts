@@ -60,6 +60,60 @@ export interface BulkRestoreRequest {
 }
 
 /**
+ * Request payload for bulk role change
+ */
+export interface BulkRoleChangeRequest {
+  userIds: string[];
+  newRole: UserType;
+  reason?: string;
+}
+
+/**
+ * Request payload for bulk email
+ */
+export interface BulkEmailRequest {
+  userIds: string[];
+  template: "announcement" | "promotion" | "survey" | "custom";
+  subject: string;
+  body: string;
+  reason?: string;
+}
+
+/**
+ * Result of bulk import operation
+ */
+export interface BulkImportResult {
+  success: string[];
+  failed: Array<{
+    row: number;
+    email: string;
+    reason: string;
+  }>;
+  totalProcessed: number;
+  totalSuccess: number;
+  totalFailed: number;
+}
+
+/**
+ * Parsed row from CSV import
+ */
+export interface ParsedUserRow {
+  email: string;
+  name?: string;
+  type: string;
+  status: string;
+  contactName?: string;
+  contactNumber?: string;
+  companyName?: string;
+  website?: string;
+  street1?: string;
+  street2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+}
+
+/**
  * Query parameters for bulk export
  */
 export interface BulkExportParams {
@@ -80,7 +134,10 @@ export type BulkOperationType =
   | "status_change"
   | "soft_delete"
   | "restore"
-  | "export";
+  | "export"
+  | "role_change"
+  | "email"
+  | "import";
 
 /**
  * Configuration for a bulk operation confirmation dialog
@@ -140,6 +197,30 @@ export const BULK_OPERATION_CONFIGS: Record<
     title: "Export Users",
     description: "Export the selected users to a CSV file.",
     confirmLabel: "Export",
+    variant: "default",
+    requiresReason: false,
+  },
+  role_change: {
+    type: "role_change",
+    title: "Change User Role",
+    description: "Change the role of the selected users.",
+    confirmLabel: "Change Role",
+    variant: "warning",
+    requiresReason: false,
+  },
+  email: {
+    type: "email",
+    title: "Send Email",
+    description: "Send an email to the selected users.",
+    confirmLabel: "Send Email",
+    variant: "default",
+    requiresReason: false,
+  },
+  import: {
+    type: "import",
+    title: "Import Users",
+    description: "Import users from a CSV file.",
+    confirmLabel: "Import",
     variant: "default",
     requiresReason: false,
   },

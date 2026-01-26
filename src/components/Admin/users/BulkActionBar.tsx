@@ -19,19 +19,62 @@ import {
   X,
   Download,
   Users,
+  Shield,
+  User,
+  Truck,
+  Building2,
+  Headphones,
+  Mail,
 } from "lucide-react";
-import { UserStatus } from "@/types/prisma";
+import { UserStatus, UserType } from "@/types/prisma";
 
 interface BulkActionBarProps {
   selectedCount: number;
   onClearSelection: () => void;
   onStatusChange: (status: UserStatus) => void;
+  onRoleChange?: (role: UserType) => void;
   onDelete: () => void;
   onRestore?: () => void;
   onExport: () => void;
+  onEmail?: () => void;
   isLoading?: boolean;
   mode: "active" | "deleted";
+  isSuperAdmin?: boolean;
 }
+
+/**
+ * Role configuration for dropdown display
+ */
+const roleConfig: Record<
+  Exclude<UserType, "SUPER_ADMIN">,
+  { label: string; icon: React.ReactNode; className: string }
+> = {
+  VENDOR: {
+    label: "Vendor",
+    icon: <Building2 className="h-4 w-4" />,
+    className: "text-purple-600",
+  },
+  CLIENT: {
+    label: "Client",
+    icon: <User className="h-4 w-4" />,
+    className: "text-blue-600",
+  },
+  DRIVER: {
+    label: "Driver",
+    icon: <Truck className="h-4 w-4" />,
+    className: "text-green-600",
+  },
+  ADMIN: {
+    label: "Admin",
+    icon: <Shield className="h-4 w-4" />,
+    className: "text-yellow-600",
+  },
+  HELPDESK: {
+    label: "Helpdesk",
+    icon: <Headphones className="h-4 w-4" />,
+    className: "text-orange-600",
+  },
+};
 
 /**
  * Floating action bar that appears when users are selected
@@ -41,11 +84,14 @@ export function BulkActionBar({
   selectedCount,
   onClearSelection,
   onStatusChange,
+  onRoleChange,
   onDelete,
   onRestore,
   onExport,
+  onEmail,
   isLoading = false,
   mode,
+  isSuperAdmin = false,
 }: BulkActionBarProps) {
   if (selectedCount === 0) return null;
 
@@ -103,6 +149,41 @@ export function BulkActionBar({
                   </DropdownMenuContent>
                 </DropdownMenu>
 
+                {/* Role dropdown - SUPER_ADMIN only */}
+                {isSuperAdmin && onRoleChange && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isLoading}
+                        className="flex items-center gap-1"
+                      >
+                        <Shield className="h-4 w-4" />
+                        Role
+                        <ChevronDown className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      {(Object.keys(roleConfig) as Array<Exclude<UserType, "SUPER_ADMIN">>).map(
+                        (role) => {
+                          const config = roleConfig[role];
+                          return (
+                            <DropdownMenuItem
+                              key={role}
+                              onClick={() => onRoleChange(role)}
+                              className={config.className}
+                            >
+                              <span className="mr-2">{config.icon}</span>
+                              Set as {config.label}
+                            </DropdownMenuItem>
+                          );
+                        }
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+
                 {/* Delete button */}
                 <Button
                   variant="outline"
@@ -129,6 +210,20 @@ export function BulkActionBar({
                   Restore
                 </Button>
               )
+            )}
+
+            {/* Email button */}
+            {mode === "active" && onEmail && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                onClick={onEmail}
+                className="flex items-center gap-1 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+              >
+                <Mail className="h-4 w-4" />
+                Email
+              </Button>
             )}
 
             {/* Export button */}
