@@ -41,6 +41,10 @@ export const REALTIME_EVENTS = {
   ADMIN_MESSAGE: 'admin:message',
   ADMIN_MESSAGE_RECEIVED: 'admin:message:received',
 
+  // Delivery Status Updates (for order tracking)
+  DELIVERY_STATUS_UPDATE: 'delivery:status',
+  DELIVERY_STATUS_UPDATED: 'delivery:status:updated',
+
   // Bidirectional heartbeat
   PING: 'ping',
   PONG: 'pong',
@@ -134,6 +138,46 @@ export interface DeliveryAssignedPayload extends DeliveryAssignmentPayload {
   assignedBy: string;
   assignedByName: string;
   assignedAt: string;
+}
+
+// ============================================================================
+// Delivery Status Events (for order tracking by helpdesk/vendor/client)
+// ============================================================================
+
+/**
+ * Delivery status values for order tracking
+ * These are different from DriverStatus (shift status) - these track delivery progress
+ */
+export type DeliveryTrackingStatus =
+  | 'ASSIGNED'
+  | 'ARRIVED_AT_VENDOR'
+  | 'PICKED_UP'
+  | 'EN_ROUTE_TO_CLIENT'
+  | 'ARRIVED_TO_CLIENT'
+  | 'COMPLETED';
+
+/**
+ * Payload for delivery status update events
+ * Sent when a driver changes the status of a delivery (pickup, en route, arrived, etc.)
+ */
+export interface DeliveryStatusPayload {
+  deliveryId?: string;
+  orderId: string;
+  orderNumber: string;
+  orderType: 'catering' | 'on_demand';
+  driverId: string;
+  status: DeliveryTrackingStatus;
+  previousStatus?: DeliveryTrackingStatus;
+  timestamp: string; // ISO 8601
+}
+
+/**
+ * Enriched delivery status payload broadcast to subscribers
+ * Includes additional context like driver name for display
+ */
+export interface DeliveryStatusUpdatedPayload extends DeliveryStatusPayload {
+  driverName?: string;
+  estimatedArrival?: string; // ISO 8601
 }
 
 // ============================================================================
@@ -259,6 +303,8 @@ export interface RealtimeEventHandlers {
   [REALTIME_EVENTS.DELIVERY_ASSIGNED]?: RealtimeEventHandler<DeliveryAssignedPayload>;
   [REALTIME_EVENTS.ADMIN_MESSAGE]?: RealtimeEventHandler<AdminMessagePayload>;
   [REALTIME_EVENTS.ADMIN_MESSAGE_RECEIVED]?: RealtimeEventHandler<AdminMessageReceivedPayload>;
+  [REALTIME_EVENTS.DELIVERY_STATUS_UPDATE]?: RealtimeEventHandler<DeliveryStatusPayload>;
+  [REALTIME_EVENTS.DELIVERY_STATUS_UPDATED]?: RealtimeEventHandler<DeliveryStatusUpdatedPayload>;
   [REALTIME_EVENTS.PING]?: RealtimeEventHandler<HeartbeatPayload>;
   [REALTIME_EVENTS.PONG]?: RealtimeEventHandler<HeartbeatPayload>;
 }
@@ -422,6 +468,38 @@ function isHeartbeatPayload(payload: unknown): payload is HeartbeatPayload {
 }
 
 /**
+ * Type guard for DeliveryStatusPayload
+ */
+function isDeliveryStatusPayload(payload: unknown): payload is DeliveryStatusPayload {
+  if (!payload || typeof payload !== 'object') return false;
+  const p = payload as Partial<DeliveryStatusPayload>;
+  const validStatuses: DeliveryTrackingStatus[] = [
+    'ASSIGNED',
+    'ARRIVED_AT_VENDOR',
+    'PICKED_UP',
+    'EN_ROUTE_TO_CLIENT',
+    'ARRIVED_TO_CLIENT',
+    'COMPLETED',
+  ];
+  return (
+    typeof p.orderId === 'string' &&
+    typeof p.orderNumber === 'string' &&
+    (p.orderType === 'catering' || p.orderType === 'on_demand') &&
+    typeof p.driverId === 'string' &&
+    typeof p.status === 'string' &&
+    validStatuses.includes(p.status as DeliveryTrackingStatus) &&
+    typeof p.timestamp === 'string'
+  );
+}
+
+/**
+ * Type guard for DeliveryStatusUpdatedPayload
+ */
+function isDeliveryStatusUpdatedPayload(payload: unknown): payload is DeliveryStatusUpdatedPayload {
+  return isDeliveryStatusPayload(payload);
+}
+
+/**
  * Validate broadcast payload matches event type
  * Returns validation result with success flag and error message
  */
@@ -475,6 +553,16 @@ export function validateBroadcastPayload(
       return isHeartbeatPayload(payload)
         ? { success: true }
         : { success: false, error: 'Payload must be a valid HeartbeatPayload' };
+
+    case REALTIME_EVENTS.DELIVERY_STATUS_UPDATE:
+      return isDeliveryStatusPayload(payload)
+        ? { success: true }
+        : { success: false, error: 'Payload must be a valid DeliveryStatusPayload' };
+
+    case REALTIME_EVENTS.DELIVERY_STATUS_UPDATED:
+      return isDeliveryStatusUpdatedPayload(payload)
+        ? { success: true }
+        : { success: false, error: 'Payload must be a valid DeliveryStatusUpdatedPayload' };
 
     default:
       // For unknown events, allow any payload (backwards compatibility)

@@ -51,6 +51,8 @@ import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
 import { UserType } from "@/types/client-enums";
 import { decodeOrderNumber } from "@/utils/order";
 import { useDriverRealtimeLocation } from "@/hooks/tracking/useDriverRealtimeLocation";
+import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
+import { RealtimeStatusIndicator } from "./ui/RealtimeStatusIndicator";
 
 // Make sure the bucket name is user-assets
 const STORAGE_BUCKET = "user-assets";
@@ -214,6 +216,30 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     lat: realtimeLocation.lat,
     lng: realtimeLocation.lng,
   } : null;
+
+  // Real-time delivery status tracking using Supabase Realtime (WebSocket)
+  // This allows helpdesk, vendor, and client users to see status changes instantly
+  const {
+    latestStatus: realtimeDeliveryStatus,
+    isConnected: isStatusConnected,
+    isConnecting: isStatusConnecting,
+    error: statusError,
+    reconnect: reconnectStatus,
+  } = useDeliveryStatusRealtime({
+    orderId: order?.id,
+    enabled: !!order?.id && !!isActiveOrder,
+    showNotifications: true,
+    onStatusUpdate: (payload) => {
+      console.log('[SingleOrder] Realtime delivery status update:', payload.status);
+      // Update the order's driver status when we receive a real-time update
+      if (order && payload.orderId === order.id) {
+        setOrder({
+          ...order,
+          driverStatus: payload.status as DriverStatus,
+        });
+      }
+    },
+  });
 
   // Check for bucket existence but don't try to create it (requires admin privileges)
   const ensureStorageBucketExists = useCallback(async () => {
@@ -943,10 +969,21 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
             {/* Driver & Status Section */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 p-6">
-                <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-800">
-                  <Truck className="h-5 w-5 text-blue-600" />
-                  Driver & Status
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-800">
+                    <Truck className="h-5 w-5 text-blue-600" />
+                    Driver & Status
+                  </h2>
+                  {isActiveOrder && (
+                    <RealtimeStatusIndicator
+                      isConnected={isStatusConnected || isRealtimeConnected}
+                      isConnecting={isStatusConnecting}
+                      error={statusError}
+                      onReconnect={reconnectStatus}
+                      size="sm"
+                    />
+                  )}
+                </div>
               </div>
               <div className="space-y-6 p-6">
                 <DriverStatusCard
