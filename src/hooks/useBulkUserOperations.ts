@@ -10,7 +10,7 @@ import type {
   BulkRoleChangeRequest,
   BulkEmailRequest,
 } from "@/types/bulk-operations";
-import { UserStatus, UserType } from "@/types/prisma";
+import { UserStatus, UserType } from "@/types/prisma-enums";
 
 // Query keys for cache invalidation
 export const USERS_QUERY_KEY = "users";

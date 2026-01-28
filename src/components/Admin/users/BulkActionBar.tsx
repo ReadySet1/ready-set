@@ -26,7 +26,7 @@ import {
   Headphones,
   Mail,
 } from "lucide-react";
-import { UserStatus, UserType } from "@/types/prisma";
+import { UserStatus, UserType } from "@/types/prisma-enums";
 
 interface BulkActionBarProps {
   selectedCount: number;

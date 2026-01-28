@@ -92,7 +92,7 @@ import { useToast } from "@/components/ui/use-toast";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { UserType, UserStatus } from "@/types/prisma";
+import { UserType, UserStatus } from "@/types/prisma-enums";
 import { logger } from "@/utils/logger";
 import {
   ApiTypeUtils,

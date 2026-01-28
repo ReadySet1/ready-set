@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import type { BulkOperationType, BulkOperationConfig } from "@/types/bulk-operations";
 import { BULK_OPERATION_CONFIGS } from "@/types/bulk-operations";
-import { UserStatus, UserType } from "@/types/prisma";
+import { UserStatus, UserType } from "@/types/prisma-enums";
 
 interface BulkConfirmDialogProps {
   open: boolean;
