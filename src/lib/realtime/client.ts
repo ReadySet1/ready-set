@@ -51,7 +51,7 @@ export class UnauthorizedError extends Error {
  */
 const CHANNEL_ACCESS_RULES: Record<string, string[]> = {
   [REALTIME_CHANNELS.DRIVER_LOCATIONS]: ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK', 'VENDOR', 'CLIENT'],
-  [REALTIME_CHANNELS.DRIVER_STATUS]: ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
+  [REALTIME_CHANNELS.DRIVER_STATUS]: ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK', 'VENDOR', 'CLIENT'],
   [REALTIME_CHANNELS.ADMIN_COMMANDS]: ['ADMIN', 'SUPER_ADMIN'],
   [REALTIME_CHANNELS.DELIVERIES]: ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
 };
@@ -64,6 +64,10 @@ const BROADCAST_ACCESS_RULES: Record<string, string[]> = {
   'driver:status': ['DRIVER'],
   'admin:assign-delivery': ['ADMIN', 'SUPER_ADMIN'],
   'admin:message': ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
+  // Delivery status can be broadcast by drivers (updating their delivery status)
+  // and by admins/helpdesk (via API routes)
+  'delivery:status': ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
+  'delivery:status:updated': ['DRIVER', 'ADMIN', 'SUPER_ADMIN', 'HELPDESK'],
 };
 
 /**
