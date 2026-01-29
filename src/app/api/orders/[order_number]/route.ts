@@ -1,10 +1,12 @@
 // src/app/api/orders/[order_number]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { createClient, createAdminClient } from "@/utils/supabase/server";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from "@prisma/client";
 import { sendDispatchStatusNotification } from "@/services/notifications/delivery-status";
 import { DriverStatus } from "@/types/user";
+import { REALTIME_CHANNELS, REALTIME_EVENTS } from "@/lib/realtime/types";
+import type { DeliveryStatusUpdatedPayload } from "@/lib/realtime/schemas";
 
 import { CateringRequestGetPayload, OnDemandGetPayload } from '@/types/prisma';
 import {
@@ -535,6 +537,65 @@ export async function PATCH(
             });
           }
         }
+
+        // Broadcast real-time delivery status update (non-blocking)
+        // This allows helpdesk, vendor, and client users to see status changes instantly
+        const broadcastDeliveryStatus = async () => {
+          try {
+            const adminSupabase = await createAdminClient();
+            const dispatch = (updatedOrder as any).dispatches?.[0];
+            const driverId = dispatch?.driver?.id;
+            const driverName = dispatch?.driver?.name;
+
+            if (!driverId) {
+              console.warn('No driver assigned, skipping delivery status broadcast');
+              return;
+            }
+
+            const payload: DeliveryStatusUpdatedPayload = {
+              orderId: (updatedOrder as any).id,
+              orderNumber: (updatedOrder as any).orderNumber,
+              orderType: orderType,
+              driverId: driverId,
+              status: driverStatus as 'ASSIGNED' | 'ARRIVED_AT_VENDOR' | 'PICKED_UP' | 'EN_ROUTE_TO_CLIENT' | 'ARRIVED_TO_CLIENT' | 'COMPLETED',
+              previousStatus: (existingOrder as any)?.driverStatus || undefined,
+              driverName: driverName || undefined,
+              timestamp: new Date().toISOString(),
+            };
+
+            const channel = adminSupabase.channel(REALTIME_CHANNELS.DRIVER_STATUS);
+
+            // Subscribe first (required to send)
+            await new Promise<void>((resolve, reject) => {
+              channel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                  resolve();
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                  reject(new Error(`Channel subscription failed: ${status}`));
+                }
+              });
+            });
+
+            // Send the broadcast
+            const result = await channel.send({
+              type: 'broadcast',
+              event: REALTIME_EVENTS.DELIVERY_STATUS_UPDATED,
+              payload,
+            });
+
+            if (result !== 'ok') {
+              console.warn('Delivery status broadcast returned non-ok result:', result);
+            }
+
+            // Cleanup: unsubscribe from channel
+            await adminSupabase.removeChannel(channel);
+          } catch (err) {
+            console.error('Failed to broadcast delivery status update:', err);
+          }
+        };
+
+        // Fire and forget - don't block the response
+        broadcastDeliveryStatus();
       }
 
       // Send customer notification for significant field changes (non-blocking)

@@ -171,6 +171,37 @@ export const DeliveryAssignedPayloadSchema = DeliveryAssignmentPayloadSchema.ext
 });
 
 // ============================================================================
+// Delivery Status Schemas (for order tracking)
+// ============================================================================
+
+export const DeliveryTrackingStatusSchema = z.enum([
+  'ASSIGNED',
+  'ARRIVED_AT_VENDOR',
+  'PICKED_UP',
+  'EN_ROUTE_TO_CLIENT',
+  'ARRIVED_TO_CLIENT',
+  'COMPLETED',
+]);
+
+export const OrderTypeSchema = z.enum(['catering', 'on_demand']);
+
+export const DeliveryStatusPayloadSchema = z.object({
+  deliveryId: UUIDSchema.optional(),
+  orderId: UUIDSchema,
+  orderNumber: SanitizedStringSchema(PAYLOAD_CONFIG.MAX_STRING_LENGTH),
+  orderType: OrderTypeSchema,
+  driverId: UUIDSchema,
+  status: DeliveryTrackingStatusSchema,
+  previousStatus: DeliveryTrackingStatusSchema.optional(),
+  timestamp: TimestampSchema,
+});
+
+export const DeliveryStatusUpdatedPayloadSchema = DeliveryStatusPayloadSchema.extend({
+  driverName: SanitizedStringSchema(PAYLOAD_CONFIG.MAX_STRING_LENGTH).optional(),
+  estimatedArrival: TimestampSchema.optional(),
+});
+
+// ============================================================================
 // Admin Message Schemas
 // ============================================================================
 
@@ -228,6 +259,8 @@ export const PAYLOAD_SCHEMAS = {
   [REALTIME_EVENTS.DELIVERY_ASSIGNED]: DeliveryAssignedPayloadSchema,
   [REALTIME_EVENTS.ADMIN_MESSAGE]: AdminMessagePayloadSchema,
   [REALTIME_EVENTS.ADMIN_MESSAGE_RECEIVED]: AdminMessageReceivedPayloadSchema,
+  [REALTIME_EVENTS.DELIVERY_STATUS_UPDATE]: DeliveryStatusPayloadSchema,
+  [REALTIME_EVENTS.DELIVERY_STATUS_UPDATED]: DeliveryStatusUpdatedPayloadSchema,
   [REALTIME_EVENTS.PING]: HeartbeatPayloadSchema,
   [REALTIME_EVENTS.PONG]: HeartbeatPayloadSchema,
 } as const;
@@ -330,3 +363,6 @@ export type AdminMessageReceivedPayload = z.infer<typeof AdminMessageReceivedPay
 export type HeartbeatPayload = z.infer<typeof HeartbeatPayloadSchema>;
 export type PresenceState = z.infer<typeof PresenceStateSchema>;
 export type PresencePayload = z.infer<typeof PresencePayloadSchema>;
+export type DeliveryTrackingStatus = z.infer<typeof DeliveryTrackingStatusSchema>;
+export type DeliveryStatusPayload = z.infer<typeof DeliveryStatusPayloadSchema>;
+export type DeliveryStatusUpdatedPayload = z.infer<typeof DeliveryStatusUpdatedPayloadSchema>;
