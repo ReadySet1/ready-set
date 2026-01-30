@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Prerequisites
+
+- Node.js >=20.0.0 <23.0.0
+- pnpm >=10.0.0 (enforced via `preinstall` hook)
+
+## Environment Setup
+
+- Copy `.env.example` to `.env.local` for local development
+- Database commands use `dotenv -e .env.local` prefix
+- Required: `DATABASE_URL`, `DIRECT_URL`, Supabase keys
+
 ## Build & Development Commands
 
 ```bash
@@ -13,10 +24,16 @@ pnpm typecheck              # TypeScript validation
 
 # Testing
 pnpm test                   # Jest unit tests
+pnpm test -- path/to/test   # Run a single test file
 pnpm test:unit:watch        # Jest in watch mode
+pnpm test:coverage          # Jest with coverage report
 pnpm test:e2e               # Playwright E2E tests
 pnpm test:e2e:ui            # Playwright with UI
 pnpm test:all               # Run all tests (unit, integration, e2e)
+
+# Pre-push validation (run before PRs)
+pnpm pre-push-check         # typecheck + lint + prisma validate
+pnpm test:ci                # run tests with coverage
 
 # Database
 pnpm db:generate            # Generate Prisma client
@@ -65,7 +82,15 @@ src/
 **Database**: PostgreSQL with Prisma
 - Schema: `prisma/schema.prisma`
 - Soft-delete pattern: All models use `deletedAt`, `deletedBy`, `deletionReason`
-- Always filter with `where: { deletedAt: null }` in queries
+
+**IMPORTANT - Soft Delete**: All queries MUST filter deleted records:
+```typescript
+// ✅ ALWAYS include soft-delete filter
+prisma.profile.findMany({ where: { deletedAt: null } })
+
+// ❌ NEVER query without filter (will include deleted records)
+prisma.profile.findMany()
+```
 
 **Service Layer Hierarchy**:
 ```
@@ -85,13 +110,19 @@ API Route → Server Action → Service Layer → Utils → Prisma
 
 **Jest** (`jest.config.js`):
 - Environment: jsdom
-- Coverage threshold: 70%
+- Coverage threshold: 36% lines/statements, 30% branches/functions
 - Tests in `src/**/__tests__/` or `*.test.ts`
 
 **Playwright** (`playwright.config.ts`):
 - E2E tests in `e2e/`
 - Auth state cached in `.auth/` via global setup
 - Base URL: `http://localhost:3000`
+
+### TypeScript Configuration
+
+- Strict mode enabled with `noUncheckedIndexedAccess`
+- Tests excluded from build (`tsconfig.json` excludes `**/*.test.ts`)
+- Run `pnpm typecheck` before commits
 
 ### Git Workflow
 
@@ -100,11 +131,7 @@ API Route → Server Action → Service Layer → Utils → Prisma
 - Never merge directly into `main` - always create a PR first
 - PRs require passing CI checks before merge
 - Use feature branches: `feature/REA-XXX-description`
-- Run quality gates before creating PR:
-  ```bash
-  pnpm pre-push-check    # typecheck + lint + prisma validate
-  pnpm test:ci           # run all unit tests
-  ```
+- Run `pnpm pre-push-check` and `pnpm test:ci` before creating PRs
 
 ### External Integrations
 
@@ -116,46 +143,26 @@ API Route → Server Action → Service Layer → Utils → Prisma
 - **Mapbox**: Maps and geocoding
 - **Supabase Realtime**: WebSocket-based live tracking
 
+### Real-Time Features (Supabase Realtime)
+
+- `driver-locations` channel for live GPS updates
+- Feature flags: `NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES`, `NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD`
+- Admin dashboard: `/admin/tracking`
+- Test driver simulator: `/admin/tracking/test-driver`
+
 ### Cloudinary Image CDN
 
-Static images are served from Cloudinary CDN for optimized delivery. See [docs/cloudinary-integration.md](docs/cloudinary-integration.md) for complete documentation.
+See [docs/cloudinary-integration.md](docs/cloudinary-integration.md) for complete documentation.
 
-**Configuration**:
-- Cloud name: `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`
-- Images stored under `ready-set/` folder in Cloudinary
 - Module: `src/lib/cloudinary/`
-
-**Usage**:
-```typescript
-import { getCloudinaryUrl } from '@/lib/cloudinary';
-
-// Basic usage - auto optimization (WebP/AVIF, quality)
-<Image src={getCloudinaryUrl('logo/logo-dark')} alt="Logo" width={140} height={30} />
-
-// With transformations
-<Image
-  src={getCloudinaryUrl('hero/hero-bg', {
-    width: 1920,
-    height: 1080,
-    crop: 'fill',
-    quality: 80
-  })}
-  alt="Hero"
-  fill
-/>
-```
-
-**Path Mapping**:
-- Local: `/images/logo/logo-dark.png`
-- Cloudinary public ID: `logo/logo-dark`
-- Full URL: `https://res.cloudinary.com/{cloud}/image/upload/f_auto,q_auto/ready-set/logo/logo-dark`
-
-**Migration Script**: `scripts/migrate-images-to-cloudinary.ts`
+- Use `getCloudinaryUrl('path/to/image')` for all static images
+- Path mapping: `/images/logo/logo-dark.png` → `getCloudinaryUrl('logo/logo-dark')`
 
 ### TypeScript Paths
 
 ```typescript
-import { something } from '@/lib/something'     // src/lib/
-import { Component } from '@components/...'     // src/components/
-import { util } from '@lib/...'                 // src/lib/
+import { something } from '@/lib/something'     // src/*
+import { Component } from '@components/...'     // src/components/*
+import { util } from '@lib/...'                 // src/lib/*
+import styles from '@styles/...'                // src/styles/*
 ```

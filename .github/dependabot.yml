@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    ignore:
+      # Ignore major version updates for Next.js - requires manual migration
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
