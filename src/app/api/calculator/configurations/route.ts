@@ -14,7 +14,11 @@ import {
 } from '@/lib/calculator/client-configurations';
 
 // Helper function to convert DB record to ClientDeliveryConfiguration
+// Merges with in-memory configuration for fields not stored in database (e.g., zeroOrderSettings)
 function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
+  // Get the in-memory configuration to merge any fields not in the database
+  const inMemoryConfig = getConfiguration(dbConfig.configId);
+  
   return {
     id: dbConfig.configId,
     clientName: dbConfig.clientName,
@@ -27,6 +31,8 @@ function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
     dailyDriveDiscounts: dbConfig.dailyDriveDiscounts as any,
     driverPaySettings: dbConfig.driverPaySettings as any,
     bridgeTollSettings: dbConfig.bridgeTollSettings as any,
+    // Merge zeroOrderSettings from in-memory config (not stored in database yet)
+    zeroOrderSettings: dbConfig.zeroOrderSettings || inMemoryConfig?.zeroOrderSettings,
     customSettings: dbConfig.customSettings as any,
     createdAt: dbConfig.createdAt,
     updatedAt: dbConfig.updatedAt,

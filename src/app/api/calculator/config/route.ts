@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ConfigurationError } from '@/types/calculator';
 import { createClient } from '@/utils/supabase/server';
+import { getConfiguration } from '@/lib/calculator/client-configurations';
 
 export async function GET(request: NextRequest) {
   try {
@@ -81,26 +82,55 @@ export async function GET(request: NextRequest) {
     };
 
     // Get client configuration if specified
+    // First try in-memory configurations (which have the full pricing details)
+    // Then fall back to database if not found
     let clientConfig = null;
     if (clientConfigId) {
-      const { data: configs, error: configError } = await supabase
-        .from('client_configurations')
-        .select('*')
-        .eq('id', clientConfigId)
-        .single();
-
-      if (!configError && configs) {
+      // Try in-memory config first (has complete pricing data including zeroOrderSettings)
+      const inMemoryConfig = getConfiguration(clientConfigId);
+      
+      if (inMemoryConfig) {
         clientConfig = {
-          id: configs.id,
-          clientId: configs.client_id,
-          templateId: configs.template_id || template.id,
-          clientName: configs.client_name,
-          ruleOverrides: configs.rule_overrides || {},
-          areaRules: configs.area_rules || [],
-          isActive: configs.is_active,
-          createdAt: configs.created_at,
-          updatedAt: configs.updated_at
+          id: inMemoryConfig.id,
+          clientId: inMemoryConfig.id,
+          templateId: template.id,
+          clientName: inMemoryConfig.clientName,
+          vendorName: inMemoryConfig.vendorName,
+          ruleOverrides: {},
+          areaRules: [],
+          isActive: inMemoryConfig.isActive,
+          // Include the full configuration for use in calculations
+          pricingTiers: inMemoryConfig.pricingTiers,
+          mileageRate: inMemoryConfig.mileageRate,
+          distanceThreshold: inMemoryConfig.distanceThreshold,
+          dailyDriveDiscounts: inMemoryConfig.dailyDriveDiscounts,
+          driverPaySettings: inMemoryConfig.driverPaySettings,
+          bridgeTollSettings: inMemoryConfig.bridgeTollSettings,
+          zeroOrderSettings: inMemoryConfig.zeroOrderSettings,
+          createdAt: inMemoryConfig.createdAt,
+          updatedAt: inMemoryConfig.updatedAt
         };
+      } else {
+        // Fall back to database lookup
+        const { data: configs, error: configError } = await supabase
+          .from('client_configurations')
+          .select('*')
+          .eq('id', clientConfigId)
+          .single();
+
+        if (!configError && configs) {
+          clientConfig = {
+            id: configs.id,
+            clientId: configs.client_id,
+            templateId: configs.template_id || template.id,
+            clientName: configs.client_name,
+            ruleOverrides: configs.rule_overrides || {},
+            areaRules: configs.area_rules || [],
+            isActive: configs.is_active,
+            createdAt: configs.created_at,
+            updatedAt: configs.updated_at
+          };
+        }
       }
     }
 

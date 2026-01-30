@@ -42,7 +42,36 @@ export interface ClientDeliveryConfiguration {
       headcountMax: number | null;
       basePay: number;
     }>;
+    // Optional: Tiered driver base pay based on food cost (used when headcount is 0 but food cost > 0)
+    // For HY Food Company: mirrors headcount tiers but based on food cost ranges
+    driverFoodCostPayTiers?: Array<{
+      foodCostMin: number;
+      foodCostMax: number | null;
+      basePay: number;
+    }>;
     requiresManualReview?: boolean; // Flag for "case by case" scenarios
+    // Optional: Special mileage calculation settings
+    // For clients like HY Food Company: flat $7 within threshold, then total miles × rate
+    driverMileageSettings?: {
+      flatAmountWithinThreshold: number; // e.g., $7 for drives within 10 miles
+      perMileRateOverThreshold: number;  // e.g., $0.70/mile for ALL miles when over threshold
+      threshold?: number; // Defaults to distanceThreshold if not specified
+    };
+    // Optional: Ready Set fee matches customer delivery fee (for HY Food Company)
+    // When true, Ready Set fee = customer tier-based delivery fee (not fixed amount)
+    readySetFeeMatchesDeliveryFee?: boolean;
+  };
+
+  // Zero Order Settings - Special pricing when headcount = 0 AND foodCost = 0
+  // Used for standard/default drives without specific order details (e.g., HY Food Company)
+  zeroOrderSettings?: {
+    enabled: boolean;
+    readySetFee: number; // Ready Set fee for zero-order drives
+    customerDeliveryFee: number; // What customer pays (may equal readySetFee)
+    driverBasePay: number; // Driver base pay for zero-order
+    driverMileagePay: number; // Flat mileage amount (not per-mile rate)
+    driverBonusPay: number; // Driver bonus for zero-order
+    maxMileage?: number; // Max mileage this applies to (default: distanceThreshold)
   };
 
   // Bridge Toll Settings
@@ -349,19 +378,30 @@ export const TRY_HUNGRY: ClientDeliveryConfiguration = {
 /**
  * HY Food Company Direct Configuration
  * Vendor: HY Food Company
- * Flat $50 driver base pay (unique to this client)
- * Uses same Ready Set payment tiers as Destino
+ *
+ * TWO PRICING MODES:
+ * 1. Zero-Order Mode (headcount = 0 AND foodCost = 0):
+ *    - Ready Set Fee: $50
+ *    - Driver: $13 base + $7 mileage (flat) + $10 bonus = $30 total
+ *    - Applies for standard drives within 10 miles without order details
+ *
+ * 2. Normal Mode (headcount > 0 OR foodCost > 0):
+ *    - Customer Fee: Uses tiered pricing based on headcount/food cost (LESSER rule)
+ *    - Ready Set Fee: $70
+ *    - Driver Base Pay: Tiered by headcount ($13-$53)
+ *    - Driver Mileage: $0.35/mile (no mileage for drives within threshold)
+ *    - Driver Bonus: $10 if qualified
  */
 export const HY_FOOD_COMPANY_DIRECT: ClientDeliveryConfiguration = {
   id: 'hy-food-company-direct',
   clientName: 'HY Food Company Direct',
   vendorName: 'HY Food Company',
-  description: 'HY Food Company pricing with flat $50 driver base pay and Destino-style Ready Set payment tiers',
+  description: 'HY Food Company pricing with zero-order special rates and tiered driver pay for orders with headcount/food cost',
   isActive: true,
 
   pricingTiers: [
-    // Same Ready Set payment tiers as Destino - flat fee pricing
-    // Mileage ($3/mi) only applies AFTER 10 miles
+    // Customer delivery fee tiers - uses LESSER of headcount OR food cost
+    // Mileage ($2.50/mi) only applies AFTER 10 miles (HY Food Company specific rate)
     { headcountMin: 0, headcountMax: 24, foodCostMin: 0, foodCostMax: 299.99, regularRate: 60, within10Miles: 60 },
     { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 70, within10Miles: 70 },
     { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 90, within10Miles: 90 },
@@ -375,7 +415,7 @@ export const HY_FOOD_COMPANY_DIRECT: ClientDeliveryConfiguration = {
     { headcountMin: 300, headcountMax: null, foodCostMin: 2500, foodCostMax: null, regularRate: 0, within10Miles: 0 }
   ],
 
-  mileageRate: 3.0,
+  mileageRate: 2.5, // HY Food Company: $2.50/mile (instead of standard $3.00)
   distanceThreshold: 10,
 
   dailyDriveDiscounts: {
@@ -385,17 +425,49 @@ export const HY_FOOD_COMPANY_DIRECT: ClientDeliveryConfiguration = {
   },
 
   driverPaySettings: {
-    maxPayPerDrop: 50, // Cap enforced on base + mileage combined
-    basePayPerDrop: 50, // Flat $50 base pay (unique to HY Food Company)
+    maxPayPerDrop: null, // No cap for HY Food Company
+    basePayPerDrop: 13, // Default/fallback base pay
     bonusPay: 10,
-    readySetFee: 70
-    // No driverBasePayTiers - uses flat basePayPerDrop instead
-    //
-    // CRITICAL: maxPayPerDrop caps base + mileage at $50. With $50 base + any mileage,
-    // the total base pay is capped at $50 (driver loses mileage compensation).
-    // Bonus and bridge tolls are added AFTER the cap and are not subject to it.
-    //
-    // See docs/BUSINESS_RULES.md for detailed explanation and examples.
+    readySetFee: 60, // Default Ready Set fee (fallback)
+    // Ready Set fee matches the customer delivery fee tier (not a fixed amount)
+    readySetFeeMatchesDeliveryFee: true,
+    // Tiered driver base pay based on headcount (for normal orders)
+    driverBasePayTiers: [
+      { headcountMin: 0, headcountMax: 24, basePay: 13 },    // < 25: $13
+      { headcountMin: 25, headcountMax: 49, basePay: 23 },   // 25-49: $23
+      { headcountMin: 50, headcountMax: 74, basePay: 33 },   // 50-74: $33
+      { headcountMin: 75, headcountMax: 99, basePay: 43 },   // 75-99: $43
+      { headcountMin: 100, headcountMax: null, basePay: 53 } // 100+: $53
+    ],
+    // Tiered driver base pay based on food cost (used when headcount is 0 but food cost > 0)
+    driverFoodCostPayTiers: [
+      { foodCostMin: 0, foodCostMax: 299.99, basePay: 13 },      // < $300: $13
+      { foodCostMin: 300, foodCostMax: 599.99, basePay: 23 },    // $300-$599: $23
+      { foodCostMin: 600, foodCostMax: 899.99, basePay: 33 },    // $600-$899: $33
+      { foodCostMin: 900, foodCostMax: 1199.99, basePay: 43 },   // $900-$1,199: $43
+      { foodCostMin: 1200, foodCostMax: null, basePay: 53 }      // $1,200+: $53
+    ],
+    // Special mileage calculation for HY Food Company:
+    // - Within 10 miles: Flat $7
+    // - Over 10 miles: Total miles × $0.70 (e.g., 11 mi × $0.70 = $7.70)
+    driverMileageSettings: {
+      flatAmountWithinThreshold: 7,    // $7 flat for drives within 10 miles
+      perMileRateOverThreshold: 0.70,  // $0.70/mile for ALL miles when over threshold
+      threshold: 10                     // 10 mile threshold
+    }
+  },
+
+  // Special pricing for zero-order drives (headcount = 0 AND foodCost = 0)
+  // Standard HY Food Company drive within 10 miles
+  zeroOrderSettings: {
+    enabled: true,
+    readySetFee: 50, // Ready Set gets $50
+    customerDeliveryFee: 50, // Customer pays $50
+    driverBasePay: 13, // Driver base: $13
+    driverMileagePay: 7, // Driver mileage: $7 (flat, not per-mile)
+    driverBonusPay: 10, // Driver bonus: $10
+    maxMileage: 10 // Only applies within 10 miles
+    // Total driver pay: $13 + $7 + $10 = $30
   },
 
   bridgeTollSettings: {
@@ -404,8 +476,8 @@ export const HY_FOOD_COMPANY_DIRECT: ClientDeliveryConfiguration = {
   },
 
   createdAt: new Date('2025-11-12'),
-  updatedAt: new Date('2025-11-12'),
-  notes: 'HY Food Company Direct pricing from REA-41 comments. Unique $50 flat driver base pay.'
+  updatedAt: new Date('2026-01-29'),
+  notes: 'HY Food Company Direct pricing. Zero-order: RS $50, Driver $30. Normal orders: tiered driver pay ($13-$53 by headcount).'
 };
 
 /**

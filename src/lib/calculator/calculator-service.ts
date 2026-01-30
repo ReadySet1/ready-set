@@ -15,6 +15,7 @@ import type {
 import {
   calculateDeliveryCost,
   calculateDriverPay,
+  getConfiguration,
   type DeliveryCostInput,
   type DriverPayInput
 } from './delivery-cost-calculator';
@@ -263,6 +264,11 @@ export class CalculatorService {
         ]
       };
 
+      // Get client configuration for mileage rate (defaults to Ready Set Food Standard)
+      const configId = clientConfigId || 'ready-set-food-standard';
+      const clientConfig = getConfiguration(configId);
+      const clientMileageRate = clientConfig?.mileageRate ?? 3.0;
+
       const result: CalculationResult = {
         customerCharges,
         driverPayments,
@@ -276,8 +282,8 @@ export class CalculatorService {
           numberOfDrives: input.numberOfDrives || 1,
           numberOfStops: input.numberOfStops || 1,
           bonusQualified: driverPayBreakdown.bonusQualified,
-          vendorMileageRate: 3.0,
-          readySetMileageRate: 3.0,
+          vendorMileageRate: clientMileageRate,
+          readySetMileageRate: clientMileageRate,
           driverMileageRate: driverPayBreakdown.mileageRate,
           driverMileageMinimum: 7.0,
           readySetFee: driverPayBreakdown.readySetFee,
