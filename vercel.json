@@ -12,6 +12,14 @@
     {
       "path": "/api/admin/mileage-recalculation",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/admin/data-archiving",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/admin/driver-summary-generation",
+      "schedule": "0 4 * * 0"
     }
   ],
   "env": {
