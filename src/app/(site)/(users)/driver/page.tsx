@@ -15,7 +15,8 @@ import {
   PackageIcon,
   CheckCircleIcon,
   AlertCircleIcon,
-  UserIcon
+  UserIcon,
+  HistoryIcon,
 } from "lucide-react";
 import DriverDeliveries from "@/components/Driver/DriverDeliveries";
 import { DriverStatsCard } from "@/components/Driver/DriverStatsCard";
@@ -151,7 +152,7 @@ const DriverPage = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Start Shift / Tracking */}
           <Link href="/driver/tracking" className="block">
             <Card className="h-full border-2 border-transparent hover:border-blue-500 transition-all duration-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg">
@@ -218,6 +219,30 @@ const DriverPage = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* View History */}
+          <Link href="/driver/history" className="block">
+            <Card className="h-full border-2 border-transparent hover:border-purple-500 transition-all duration-200 bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <HistoryIcon className="w-6 h-6" />
+                      <h3 className="text-lg font-semibold">View History</h3>
+                    </div>
+                    <p className="text-purple-100 text-sm">
+                      View and export your delivery history
+                    </p>
+                    <div className="flex items-center space-x-1 text-purple-100">
+                      <ClockIcon className="w-4 h-4" />
+                      <span className="text-xs">Past 12 weeks available</span>
+                    </div>
+                  </div>
+                  <HistoryIcon className="w-8 h-8 opacity-80" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Performance Stats Card */}
