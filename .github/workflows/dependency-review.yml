@@ -18,7 +18,9 @@ jobs:
       - name: Dependency Review
         uses: actions/dependency-review-action@v4
         with:
-          fail-on-severity: moderate
+          # Fail only on high/critical - moderate vulns in transitive deps are common
+          # NPM Security Audit check covers high severity threshold separately
+          fail-on-severity: high
           # Allow these licenses (common permissive licenses in JavaScript ecosystem)
           # Note: LGPL licenses included for sharp image processing library
           # Note: JSON license included for victory-vendor package

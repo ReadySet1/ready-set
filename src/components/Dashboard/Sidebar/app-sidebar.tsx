@@ -178,6 +178,12 @@ export function AppSidebar() {
       icon: Package,
       isActive: pathname?.includes("/admin/logistics-tools") ?? false,
     },
+    {
+      title: "Data Archive",
+      href: "/admin/archive",
+      icon: ArchiveIcon,
+      isActive: pathname?.includes("/admin/archive") ?? false,
+    },
   ];
 
   return (
