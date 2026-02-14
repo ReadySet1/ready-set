@@ -334,7 +334,7 @@ export async function GET(request: NextRequest) {
                   name: driver.driver_name,
                   vehicleNumber: driver.vehicle_number,
                   phoneNumber: driver.phone_number,
-                  isOnDuty: driver.is_on_duty,
+                  isOnDuty: driver.current_shift_id !== null && driver.shift_status === 'active',
                   shiftStartTime: driver.shift_start_time,
                   currentShiftId: driver.current_shift_id,
                   lastKnownLocation: driver.last_known_location_geojson ?
