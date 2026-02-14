@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     template: "%s | Ready Set LLC",
   },
   description:
-    "On-demand courier that specializes in delivery for all your needs. We are Food Safety, and HIPPA Certified. Our team can meet all your Bay Area delivery needs.",
+    "On-demand courier that specializes in delivery for all your needs. We are Food Safety, and HIPAA Certified. Our team can meet all your Bay Area delivery needs.",
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     siteName: "Ready Set LLC",
     title: "Ready Set LLC - Always Ready",
     description:
-      "On-demand courier that specializes in delivery for all your needs. We are Food Safety, and HIPPA Certified. Our team can meet all your Bay Area delivery needs.",
+      "On-demand courier that specializes in delivery for all your needs. We are Food Safety, and HIPAA Certified. Our team can meet all your Bay Area delivery needs.",
     images: [
       {
         url: ogImageUrl,
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Ready Set LLC - Always Ready",
     description:
-      "On-demand courier that specializes in delivery for all your needs. We are Food Safety, and HIPPA Certified.",
+      "On-demand courier that specializes in delivery for all your needs. We are Food Safety, and HIPAA Certified.",
     images: [ogImageUrl],
   },
   robots: {
