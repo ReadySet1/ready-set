@@ -352,7 +352,10 @@ export const TRY_HUNGRY: ClientDeliveryConfiguration = {
     maxPayPerDrop: 40,
     basePayPerDrop: 18, // Default fallback (not used when tiers are present)
     bonusPay: 10,
-    readySetFee: 70,
+    readySetFee: 40, // Default/fallback Ready Set fee (lowest tier)
+    // Ready Set fee matches the customer delivery fee tier (not a fixed amount)
+    // < 25 HC → $40, 25-49 → $50, 50-74 → $60, 75-99 → $70
+    readySetFeeMatchesDeliveryFee: true,
     // Tiered driver base pay based on headcount
     driverBasePayTiers: [
       { headcountMin: 0, headcountMax: 24, basePay: 18 },
@@ -362,7 +365,15 @@ export const TRY_HUNGRY: ClientDeliveryConfiguration = {
       // 100+ requires manual review - will throw error in calculation
       { headcountMin: 100, headcountMax: null, basePay: 0 }
     ],
-    requiresManualReview: true // Flag for 100+ headcount orders
+    requiresManualReview: true, // Flag for 100+ headcount orders
+    // Special mileage calculation for Try Hungry:
+    // - Within 10 miles: Flat $7 ($0.70/mi × 10 mi)
+    // - Over 10 miles: Total miles × $0.70 (e.g., 15 mi × $0.70 = $10.50)
+    driverMileageSettings: {
+      flatAmountWithinThreshold: 7,    // $7 flat for drives within 10 miles
+      perMileRateOverThreshold: 0.70,  // $0.70/mile for ALL miles when over threshold
+      threshold: 10                     // 10 mile threshold
+    }
   },
 
   bridgeTollSettings: {
@@ -371,8 +382,8 @@ export const TRY_HUNGRY: ClientDeliveryConfiguration = {
   },
 
   createdAt: new Date('2025-11-12'),
-  updatedAt: new Date('2025-11-12'),
-  notes: 'Try Hungry pricing from REA-41 comments. Note: 100+ headcount requires manual review (case by case).'
+  updatedAt: new Date('2026-02-11'),
+  notes: 'Try Hungry pricing: RS fee matches headcount tier ($40-$70), driver mileage flat $7 within 10mi or total×$0.70 over 10mi. 100+ headcount requires manual review (case by case).'
 };
 
 /**
