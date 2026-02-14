@@ -94,17 +94,23 @@ export function useLocationTracking(): UseLocationTrackingReturn {
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const locationStoreRef = useRef(getLocationStore());
   const isMountedRef = useRef(true); // Track if component is mounted
+  const cachedDriverIdRef = useRef<string | null>(null);
+  const lastSyncTimeRef = useRef<number>(0);
 
-  // Get driver ID from session (simplified - you'll need to implement proper session management)
+  // Get driver ID from session, cached to avoid repeated /api/auth/session fetches
   const getDriverId = useCallback(async (): Promise<string | null> => {
+    if (cachedDriverIdRef.current) {
+      return cachedDriverIdRef.current;
+    }
     try {
-      // This would normally come from your auth context/session
-      // For now, we'll simulate getting it from the API
       const response = await fetch('/api/auth/session');
       if (response.ok) {
         const session = await response.json();
-        // Assuming the session contains driver info
-        return session.user?.driverId || null;
+        const driverId = session.user?.driverId || null;
+        if (driverId) {
+          cachedDriverIdRef.current = driverId;
+        }
+        return driverId;
       }
       return null;
     } catch (error) {
@@ -264,24 +270,28 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     }
   }, [isOnline]);
 
-  // Update location to server
+  // Update location to server with client-side throttling
+  // Skips server sync if less than 5s since last successful sync (matches server rate limit)
   const syncLocationToServer = useCallback(async (location: LocationUpdate) => {
+    const now = Date.now();
+    const timeSinceLastSync = now - lastSyncTimeRef.current;
+    if (timeSinceLastSync < 5000) {
+      // Too soon since last sync - skip to avoid rate limit spam
+      return;
+    }
+
     try {
       const result = await updateDriverLocation(location.driverId, location);
       if (!result.success) {
-        // Check if this is a rate limit error - handle silently since next update will succeed
         if (result.error?.includes('Rate limit')) {
-          // Rate limiting is expected behavior - don't log as error
-          // The next update after the rate limit window will succeed
           return;
         }
         throw new Error(result.error || 'Failed to update location');
       }
+      lastSyncTimeRef.current = now;
     } catch (error) {
-      // Check if this is a rate limit error message
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('Rate limit')) {
-        // Rate limiting is expected - silently skip
         return;
       }
 
@@ -423,6 +433,10 @@ export function useLocationTracking(): UseLocationTrackingReturn {
       clearInterval(syncIntervalRef.current);
       syncIntervalRef.current = null;
     }
+
+    // Reset cached driver ID so it refreshes on next session
+    cachedDriverIdRef.current = null;
+    lastSyncTimeRef.current = 0;
 
       }, []);
 
