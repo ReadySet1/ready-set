@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import type { LocationUpdate, DeliveryTracking } from '@/types/tracking';
 import { DriverStatus } from '@/types/user';
+import { getTimestampUpdatesForStatus } from '@/lib/delivery-status-transitions';
 
 /**
  * Update delivery status with location and optional proof of delivery
@@ -54,18 +55,8 @@ export async function updateDeliveryStatus(
       paramCounter++;
     }
 
-    // Set timestamp fields based on status (using actual DB columns)
-    switch (status) {
-      case DriverStatus.EN_ROUTE_TO_CLIENT:
-        updateFields.push('picked_up_at = NOW()');
-        break;
-      case DriverStatus.ARRIVED_TO_CLIENT:
-        // No direct column for arrival - timestamp captured in delivery_notes above
-        break;
-      case DriverStatus.COMPLETED:
-        updateFields.push('delivered_at = NOW()');
-        break;
-    }
+    // Set timestamp fields based on status
+    updateFields.push(...getTimestampUpdatesForStatus(status));
 
     // Update delivery record
     await prisma.$executeRawUnsafe(`
@@ -255,7 +246,10 @@ export async function getDriverActiveDeliveries(driverId: string): Promise<Deliv
         d.delivery_photo_url,
         d.delivery_notes,
         d.assigned_at,
+        d.arrived_at_vendor_at,
         d.picked_up_at,
+        d.en_route_at,
+        d.arrived_at_client_at,
         d.created_at,
         d.updated_at
       FROM deliveries d
@@ -283,8 +277,10 @@ export async function getDriverActiveDeliveries(driverId: string): Promise<Deliv
       routePolyline: undefined, // Column doesn't exist in schema
       metadata: delivery.delivery_notes ? { notes: delivery.delivery_notes } : {},
       assignedAt: delivery.assigned_at,
+      arrivedAtVendorAt: delivery.arrived_at_vendor_at,
       startedAt: delivery.picked_up_at,
-      arrivedAt: delivery.delivered_at,
+      enRouteAt: delivery.en_route_at,
+      arrivedAt: delivery.arrived_at_client_at,
       completedAt: delivery.delivered_at,
       createdAt: delivery.created_at,
       updatedAt: delivery.updated_at
@@ -374,7 +370,10 @@ export async function getDriverDeliveryHistory(
         d.delivery_photo_url,
         d.delivery_notes,
         d.assigned_at,
+        d.arrived_at_vendor_at,
         d.picked_up_at,
+        d.en_route_at,
+        d.arrived_at_client_at,
         d.created_at,
         d.updated_at
       FROM deliveries d
@@ -402,8 +401,10 @@ export async function getDriverDeliveryHistory(
       routePolyline: undefined, // Column doesn't exist in schema
       metadata: delivery.delivery_notes ? { notes: delivery.delivery_notes } : {},
       assignedAt: delivery.assigned_at,
+      arrivedAtVendorAt: delivery.arrived_at_vendor_at,
       startedAt: delivery.picked_up_at,
-      arrivedAt: delivery.delivered_at,
+      enRouteAt: delivery.en_route_at,
+      arrivedAt: delivery.arrived_at_client_at,
       completedAt: delivery.delivered_at,
       createdAt: delivery.created_at,
       updatedAt: delivery.updated_at
