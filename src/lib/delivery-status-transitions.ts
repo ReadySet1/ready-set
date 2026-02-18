@@ -169,3 +169,23 @@ export function shouldNotifyCustomer(status: DriverStatus | string): boolean {
 export function shouldNotifyAdmin(status: DriverStatus | string): boolean {
   return ADMIN_NOTIFICATION_STATUSES.includes(status as DriverStatus);
 }
+
+/**
+ * Map a delivery status to the database timestamp column(s) that should be set.
+ * Returns an array of SQL column assignments (e.g., ['picked_up_at = NOW()']).
+ * ASSIGNED is handled separately by assignDeliveryToDriver.
+ */
+export function getTimestampUpdatesForStatus(status: DriverStatus | string): string[] {
+  switch (status) {
+    case DriverStatus.ARRIVED_AT_VENDOR:
+      return ['arrived_at_vendor_at = NOW()'];
+    case DriverStatus.EN_ROUTE_TO_CLIENT:
+      return ['picked_up_at = NOW()', 'en_route_at = NOW()'];
+    case DriverStatus.ARRIVED_TO_CLIENT:
+      return ['arrived_at_client_at = NOW()'];
+    case DriverStatus.COMPLETED:
+      return ['delivered_at = NOW()'];
+    default:
+      return [];
+  }
+}

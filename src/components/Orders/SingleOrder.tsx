@@ -53,6 +53,7 @@ import { decodeOrderNumber } from "@/utils/order";
 import { useDriverRealtimeLocation } from "@/hooks/tracking/useDriverRealtimeLocation";
 import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
 import { RealtimeStatusIndicator } from "./ui/RealtimeStatusIndicator";
+import { DeliveryTimeline } from "@/components/Delivery/DeliveryTimeline";
 
 // Make sure the bucket name is user-assets
 const STORAGE_BUCKET = "user-assets";
@@ -1012,6 +1013,19 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                   onStatusChange={handleOrderStatusChange}
                   canChangeStatus={userRoles.isAdmin || userRoles.isSuperAdmin}
                 />
+                <Separator />
+                <div>
+                  <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                    Delivery Timeline
+                  </h3>
+                  <DeliveryTimeline
+                    createdAt={order.createdAt}
+                    deliveredAt={order.completeDateTime}
+                    estimatedPickupTime={order.pickupDateTime}
+                    estimatedDeliveryTime={order.arrivalDateTime}
+                    currentStatus={order.driverStatus}
+                  />
+                </div>
               </div>
             </div>
 

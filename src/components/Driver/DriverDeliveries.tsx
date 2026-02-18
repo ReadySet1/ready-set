@@ -33,6 +33,8 @@ import {
   AlertTriangle,
   Camera,
   Info,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { CONSTANTS } from "@/constants";
 import {
@@ -53,6 +55,7 @@ import { UserStatus, DriverStatus } from "@/types/user";
 import { encodeOrderNumber } from "@/utils/order";
 import { DeliveryStatusControl } from "./DeliveryStatusControl";
 import { isDeliveryCompleted } from "@/lib/delivery-status-transitions";
+import { DeliveryTimeline } from "@/components/Delivery/DeliveryTimeline";
 
 interface Delivery {
   id: string;
@@ -131,6 +134,7 @@ const DriverDeliveries: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState<boolean>(true);
   const [updatingDeliveryId, setUpdatingDeliveryId] = useState<string | null>(null);
+  const [expandedDeliveryId, setExpandedDeliveryId] = useState<string | null>(null);
   const [historicalDaysLimit, setHistoricalDaysLimit] = useState<number>(
     CONSTANTS.DRIVER_HISTORICAL_DAYS_LIMIT
   );
@@ -695,10 +699,17 @@ const DriverDeliveries: React.FC = () => {
                               ? formatDateTime(delivery.completeDateTime)
                               : null;
 
+                            const isExpanded = expandedDeliveryId === delivery.id;
+
                             return (
+                              <React.Fragment key={`${delivery.id}-${index}`}>
                               <TableRow
-                                key={`${delivery.id}-${index}`}
-                                className="group"
+                                className="group cursor-pointer"
+                                onClick={() =>
+                                  setExpandedDeliveryId(
+                                    isExpanded ? null : delivery.id
+                                  )
+                                }
                               >
                                 <TableCell>
                                   <div className="flex flex-col space-y-1">
@@ -890,24 +901,57 @@ const DriverDeliveries: React.FC = () => {
                                     )}
                                   </div>
                                 </TableCell>
-                                <TableCell>
-                                  <DeliveryStatusControl
-                                    deliveryId={delivery.id}
-                                    orderNumber={delivery.orderNumber}
-                                    orderType={delivery.delivery_type}
-                                    currentStatus={delivery.driverStatus}
-                                    onStatusChange={(newStatus) =>
-                                      handleStatusUpdate(delivery, newStatus)
-                                    }
-                                    isLoading={updatingDeliveryId === delivery.id}
-                                    disabled={
-                                      isDeliveryCompleted(delivery.driverStatus) ||
-                                      userProfile?.status?.toString().toLowerCase() !== UserStatus.ACTIVE
-                                    }
-                                    compact
-                                  />
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center gap-1">
+                                    <DeliveryStatusControl
+                                      deliveryId={delivery.id}
+                                      orderNumber={delivery.orderNumber}
+                                      orderType={delivery.delivery_type}
+                                      currentStatus={delivery.driverStatus}
+                                      onStatusChange={(newStatus) =>
+                                        handleStatusUpdate(delivery, newStatus)
+                                      }
+                                      isLoading={updatingDeliveryId === delivery.id}
+                                      disabled={
+                                        isDeliveryCompleted(delivery.driverStatus) ||
+                                        userProfile?.status?.toString().toLowerCase() !== UserStatus.ACTIVE
+                                      }
+                                      compact
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 shrink-0"
+                                      onClick={() =>
+                                        setExpandedDeliveryId(
+                                          isExpanded ? null : delivery.id
+                                        )
+                                      }
+                                    >
+                                      {isExpanded ? (
+                                        <ChevronUp className="h-4 w-4" />
+                                      ) : (
+                                        <ChevronDown className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  </div>
                                 </TableCell>
                               </TableRow>
+                              {isExpanded && (
+                                <TableRow>
+                                  <TableCell colSpan={6} className="bg-muted/30 px-6 py-3">
+                                    <DeliveryTimeline
+                                      createdAt={delivery.createdAt}
+                                      deliveredAt={delivery.completeDateTime}
+                                      estimatedPickupTime={delivery.pickupDateTime}
+                                      estimatedDeliveryTime={delivery.arrivalDateTime}
+                                      currentStatus={delivery.driverStatus}
+                                      compact
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                              </React.Fragment>
                             );
                           })}
                         </TableBody>
