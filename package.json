@@ -167,7 +167,7 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.11",
     "nookies": "^2.5.2",
-    "prettier": "^3.4.2",
+    "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.1",
     "prismjs": "^1.29.0",
     "react": "^19.2.1",
