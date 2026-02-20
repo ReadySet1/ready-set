@@ -89,6 +89,28 @@ function isNetworkError(event: ErrorEvent): boolean {
 }
 
 /**
+ * Check if error is an AbortError from Supabase Auth's navigator lock timeout
+ * This is a known issue in @supabase/auth-js where the lock acquisition abort
+ * isn't caught internally, causing an unhandled rejection. Not actionable.
+ * Fixes: READY-SET-NEXTJS-1D
+ */
+function isSupabaseLockAbortError(event: ErrorEvent): boolean {
+  const errorType = event.exception?.values?.[0]?.type || '';
+  const errorValue = event.exception?.values?.[0]?.value || '';
+
+  if (errorType !== 'AbortError') return false;
+  if (!errorValue.includes('signal is aborted without reason')) return false;
+
+  // Verify it originates from the Supabase auth-js locks module
+  const frames = event.exception?.values?.[0]?.stacktrace?.frames || [];
+  return frames.some(
+    (frame: { filename?: string; module?: string }) =>
+      frame.filename?.includes('@supabase/auth-js') ||
+      frame.module?.includes('@supabase/auth-js')
+  );
+}
+
+/**
  * Check if error is a non-Error rejection (often from third-party libraries)
  */
 function isNonErrorRejection(hint: EventHint): boolean {
@@ -200,6 +222,11 @@ function applyClientFilters(event: ErrorEvent, hint: EventHint): boolean {
 
   // Filter out SyntaxErrors from bots and outdated browsers (READY-SET-NEXTJS-1E)
   if (isBotOrOutdatedBrowserError(event)) {
+    return false;
+  }
+
+  // Filter out Supabase Auth lock abort errors (READY-SET-NEXTJS-1D)
+  if (isSupabaseLockAbortError(event)) {
     return false;
   }
 
