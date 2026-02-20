@@ -109,6 +109,22 @@ async function fetchUserContext(
     .single();
 
   if (profileError || !profile || !profile.type) {
+    // Supabase auth lock abort is transient — not a real auth failure
+    const errorMessage = profileError?.message || '';
+    const isAbortError = errorMessage.includes('AbortError') ||
+      errorMessage.includes('signal is aborted');
+
+    if (isAbortError) {
+      realtimeLogger.warn('User profile fetch aborted (transient auth lock timeout)', {
+        error: profileError,
+        metadata: { userId, hint: 'Request was aborted (timeout or manual cancellation)' },
+      });
+      throw new RealtimeConnectionError(
+        'Auth session temporarily unavailable. Please retry.',
+        'user-profile-fetch',
+      );
+    }
+
     realtimeLogger.error('Failed to fetch user profile', {
       error: profileError,
       metadata: { userId },
@@ -303,6 +319,21 @@ export class RealtimeClient {
       const { data: { user }, error } = await this.supabase.auth.getUser();
 
       if (error || !user) {
+        const errorMessage = error?.message || '';
+        const isAbortError = errorMessage.includes('AbortError') ||
+          errorMessage.includes('signal is aborted');
+
+        if (isAbortError) {
+          realtimeLogger.warn('Auth getUser aborted (transient lock timeout)', {
+            error,
+            channelName,
+          });
+          throw new RealtimeConnectionError(
+            'Auth session temporarily unavailable. Please retry.',
+            channelName,
+          );
+        }
+
         realtimeLogger.error('User must be authenticated to subscribe', { error });
         throw new UnauthorizedError(
           'User must be authenticated to subscribe to channels'
@@ -467,6 +498,21 @@ export class RealtimeClient {
         // Get authenticated user
         const { data: { user }, error } = await this.supabase.auth.getUser();
         if (error || !user) {
+          const errorMessage = error?.message || '';
+          const isAbortError = errorMessage.includes('AbortError') ||
+            errorMessage.includes('signal is aborted');
+
+          if (isAbortError) {
+            realtimeLogger.warn('Auth getUser aborted (transient lock timeout)', {
+              error,
+              channelName,
+            });
+            throw new RealtimeConnectionError(
+              'Auth session temporarily unavailable. Please retry.',
+              channelName,
+            );
+          }
+
           realtimeLogger.error('User must be authenticated to broadcast', { error });
           throw new UnauthorizedError(
             'User must be authenticated to broadcast events'
