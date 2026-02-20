@@ -134,6 +134,37 @@ function isHandledRealtimeError(event: ErrorEvent): boolean {
 }
 
 /**
+ * Check if error is from a bot or very outdated browser
+ * Headless browsers and ancient versions generate SyntaxErrors on modern JS
+ * that are not actionable. Fixes: READY-SET-NEXTJS-1E
+ */
+function isBotOrOutdatedBrowserError(event: ErrorEvent): boolean {
+  const errorType = event.exception?.values?.[0]?.type || '';
+  if (errorType !== 'SyntaxError') return false;
+
+  const browser = event.contexts?.browser as
+    | { name?: string; version?: string }
+    | undefined;
+  if (!browser) return false;
+
+  const name = browser.name || '';
+  const majorVersion = parseInt(browser.version || '', 10);
+
+  // Headless browsers are bots/crawlers
+  if (name.toLowerCase().includes('headless')) return true;
+
+  // Very old browsers (Chrome <90, Firefox <90, Safari <14, Edge <90)
+  if (!isNaN(majorVersion)) {
+    if (name === 'Chrome' && majorVersion < 90) return true;
+    if (name === 'Firefox' && majorVersion < 90) return true;
+    if (name === 'Safari' && majorVersion < 14) return true;
+    if (name === 'Edge' && majorVersion < 90) return true;
+  }
+
+  return false;
+}
+
+/**
  * Apply client-specific filters
  */
 function applyClientFilters(event: ErrorEvent, hint: EventHint): boolean {
@@ -164,6 +195,11 @@ function applyClientFilters(event: ErrorEvent, hint: EventHint): boolean {
 
   // Filter out handled Realtime connection errors (READY-SET-NEXTJS-6/7/8)
   if (isHandledRealtimeError(event)) {
+    return false;
+  }
+
+  // Filter out SyntaxErrors from bots and outdated browsers (READY-SET-NEXTJS-1E)
+  if (isBotOrOutdatedBrowserError(event)) {
     return false;
   }
 
