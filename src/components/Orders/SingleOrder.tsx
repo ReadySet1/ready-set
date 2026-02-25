@@ -1,6 +1,6 @@
 // src/components/Orders/SingleOrder.tsx
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -48,7 +48,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FileUpload } from "@/types/file";
 import { createClient } from "@/utils/supabase/client";
 import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
-import { UserType } from "@/types/client-enums";
+import { UserType } from "@/types/user";
+import { useUser } from "@/contexts/UserContext";
 import { decodeOrderNumber } from "@/utils/order";
 import { useDriverRealtimeLocation } from "@/hooks/tracking/useDriverRealtimeLocation";
 import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
@@ -184,22 +185,16 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     return decodeURIComponent((pathname ?? "").split("/").pop() || "");
   })();
   const supabase = createClient();
-  const [userRoles, setUserRoles] = useState<{
-    isAdmin: boolean;
-    isSuperAdmin: boolean;
-    isHelpdesk: boolean;
-    isVendor: boolean;
-    isClient: boolean;
-    isDriver: boolean;
-  }>({
-    isAdmin: false,
-    isSuperAdmin: false,
-    isHelpdesk: false,
-    isVendor: false,
-    isClient: false,
-    isDriver: false,
-  });
-  const [rolesLoaded, setRolesLoaded] = useState(false);
+  const { userRole } = useUser();
+  const userRoles = useMemo(() => ({
+    isAdmin: userRole === UserType.ADMIN,
+    isSuperAdmin: userRole === UserType.SUPER_ADMIN,
+    isHelpdesk: userRole === UserType.HELPDESK,
+    isVendor: userRole === UserType.VENDOR,
+    isClient: userRole === UserType.CLIENT,
+    isDriver: userRole === UserType.DRIVER,
+  }), [userRole]);
+  const rolesLoaded = userRole !== null;
 
   // Real-time driver location tracking using Supabase Realtime (WebSocket)
   // This provides instant updates like the admin tracking dashboard
@@ -770,44 +765,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     }
   };
 
-  const fetchUserRoles = useCallback(async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        console.error("No authenticated user found");
-        setRolesLoaded(true);
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("type")
-        .eq("id", user.id)
-        .single();
-
-      if (profile) {
-        setUserRoles({
-          isAdmin: profile.type === UserType.ADMIN,
-          isSuperAdmin: profile.type === UserType.SUPER_ADMIN,
-          isHelpdesk: profile.type === UserType.HELPDESK,
-          isVendor: profile.type === UserType.VENDOR,
-          isClient: profile.type === UserType.CLIENT,
-          isDriver: profile.type === UserType.DRIVER,
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching user roles:", error);
-    } finally {
-      setRolesLoaded(true);
-    }
-  }, [supabase]);
-
-  useEffect(() => {
-    fetchUserRoles();
-  }, [fetchUserRoles]);
 
   const userCanEditOrder = () => {
     return userRoles.isAdmin || userRoles.isSuperAdmin || userRoles.isHelpdesk;

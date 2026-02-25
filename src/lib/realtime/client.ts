@@ -315,6 +315,20 @@ export class RealtimeClient {
     let effectiveUserContext: UserContext;
 
     if (!userContext) {
+      // Ensure we have a fresh token before subscribing
+      const { data: { session } } = await this.supabase.auth.getSession();
+      if (session) {
+        const expiresAt = session.expires_at ?? 0;
+        const now = Math.floor(Date.now() / 1000);
+        if (expiresAt - now < 60) {
+          realtimeLogger.debug('Refreshing near-expiry token before subscribe', {
+            channelName,
+            metadata: { expiresIn: expiresAt - now },
+          });
+          await this.supabase.auth.refreshSession();
+        }
+      }
+
       // Get authenticated user
       const { data: { user }, error } = await this.supabase.auth.getUser();
 
@@ -373,9 +387,11 @@ export class RealtimeClient {
       userType: effectiveUserContext.userType,
     });
 
+    let hasRetriedOnError = false;
+
     return new Promise((resolve, reject) => {
       channel
-        .subscribe((status, error) => {
+        .subscribe(async (status, error) => {
           if (status === 'SUBSCRIBED') {
             this.updateConnectionState(channelName, {
               state: 'connected',
@@ -394,6 +410,26 @@ export class RealtimeClient {
             callbacks?.onConnect?.();
             resolve(channel);
           } else if (status === 'CHANNEL_ERROR') {
+            // Retry once with a token refresh before failing
+            if (!hasRetriedOnError) {
+              hasRetriedOnError = true;
+              realtimeLogger.warn('Channel error, attempting token refresh and retry', {
+                channelName,
+                error,
+              });
+
+              try {
+                await this.supabase.auth.refreshSession();
+                // Supabase Realtime will auto-reconnect with the new token
+                return;
+              } catch (refreshError) {
+                realtimeLogger.error('Token refresh failed during channel error retry', {
+                  channelName,
+                  error: refreshError,
+                });
+              }
+            }
+
             const connectionError = new RealtimeConnectionError(
               error?.message || 'Failed to subscribe to channel',
               channelName,

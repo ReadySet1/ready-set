@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import ScheduleDialog from "@/components/Logistics/Schedule";
 import sendEmail from "@/app/actions/email";
@@ -28,6 +28,16 @@ const CateringContact: React.FC = () => {
   const [message, setMessage] = useState<MessageState | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [recaptchaLoadError, setRecaptchaLoadError] = useState<boolean>(false);
+  const messageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up message timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (messageTimeoutRef.current) {
+        clearTimeout(messageTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Load reCAPTCHA script on component mount with retry logic
   useEffect(() => {
@@ -89,7 +99,8 @@ const CateringContact: React.FC = () => {
         type: "error",
         text: "Please fill in all required fields.",
       });
-      setTimeout(() => {
+      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+      messageTimeoutRef.current = setTimeout(() => {
         setMessage(null);
       }, 3000);
       return;
@@ -126,7 +137,8 @@ const CateringContact: React.FC = () => {
       });
 
       // Reset form after successful submission
-      setTimeout(() => {
+      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+      messageTimeoutRef.current = setTimeout(() => {
         setMessage(null);
         setFormData({
           name: "",
@@ -135,7 +147,7 @@ const CateringContact: React.FC = () => {
           company: "",
           message: "",
         });
-      }, 5000); // Increased timeout to give user more time to see success message
+      }, 5000);
     } catch (error: unknown) {
       let errorMessage =
         "We're sorry, there was an error sending your message.";
@@ -149,9 +161,10 @@ const CateringContact: React.FC = () => {
         text: errorMessage,
       });
 
-      setTimeout(() => {
+      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+      messageTimeoutRef.current = setTimeout(() => {
         setMessage(null);
-      }, 8000); // Increased timeout to give user more time to read error
+      }, 8000);
     } finally {
       setIsLoading(false);
     }
@@ -341,71 +354,74 @@ const CateringContact: React.FC = () => {
               </motion.div>
 
               {/* Success/Error Message - appears right below Submit button */}
-              {message && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`mt-4 rounded-lg border-2 p-5 shadow-lg ${
-                    message.type === "success"
-                      ? "border-green-300 bg-green-50 text-green-800"
-                      : "border-red-300 bg-red-50 text-red-800"
-                  }`}
-                  role="alert"
-                >
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      {message.type === "success" ? (
-                        <svg
-                          className="h-6 w-6 text-green-600"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
+              <AnimatePresence>
+                {message && (
+                  <motion.div
+                    key="form-message"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className={`mt-4 rounded-lg border-2 p-5 shadow-lg ${
+                      message.type === "success"
+                        ? "border-green-300 bg-green-50 text-green-800"
+                        : "border-red-300 bg-red-50 text-red-800"
+                    }`}
+                    role="alert"
+                  >
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        {message.type === "success" ? (
+                          <svg
+                            className="h-6 w-6 text-green-600"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            className="h-6 w-6 text-red-600"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="ml-3 flex-1">
+                        <h3
+                          className={`text-base font-semibold ${
+                            message.type === "success"
+                              ? "text-green-800"
+                              : "text-red-800"
+                          }`}
                         >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="h-6 w-6 text-red-600"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
+                          {message.type === "success"
+                            ? "Message Sent Successfully!"
+                            : "Error Sending Message"}
+                        </h3>
+                        <p
+                          className={`mt-1 text-sm ${
+                            message.type === "success"
+                              ? "text-green-700"
+                              : "text-red-700"
+                          }`}
                         >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      )}
+                          {message.text}
+                        </p>
+                      </div>
                     </div>
-                    <div className="ml-3 flex-1">
-                      <h3
-                        className={`text-base font-semibold ${
-                          message.type === "success"
-                            ? "text-green-800"
-                            : "text-red-800"
-                        }`}
-                      >
-                        {message.type === "success"
-                          ? "Message Sent Successfully!"
-                          : "Error Sending Message"}
-                      </h3>
-                      <p
-                        className={`mt-1 text-sm ${
-                          message.type === "success"
-                            ? "text-green-700"
-                            : "text-red-700"
-                        }`}
-                      >
-                        {message.text}
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <p className="text-xs text-gray-500">
                 Your name won&apos;t be shared. Never submit passwords.
