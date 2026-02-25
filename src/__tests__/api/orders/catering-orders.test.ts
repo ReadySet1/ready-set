@@ -194,8 +194,8 @@ describe('GET /api/orders/catering-orders - List Catering Orders', () => {
                 OR: expect.arrayContaining([
                   { orderNumber: { contains: 'john', mode: 'insensitive' } },
                   { clientAttention: { contains: 'john', mode: 'insensitive' } },
-                  { user: { name: { contains: 'john', mode: 'insensitive' } } },
-                  { user: { email: { contains: 'john', mode: 'insensitive' } } },
+                  { user: { is: { name: { contains: 'john', mode: 'insensitive' } } } },
+                  { user: { is: { email: { contains: 'john', mode: 'insensitive' } } } },
                 ]),
               }),
             ]),
