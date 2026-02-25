@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
 import { DriverStatus } from '@/types/user';
+import { getTimestampUpdatesForStatus } from '@/lib/delivery-status-transitions';
 
 // GET - Get specific delivery details
 export async function GET(
@@ -187,17 +188,7 @@ export async function PUT(
       paramCounter++;
 
       // Set timestamp fields based on status
-      switch (status) {
-        case 'STARTED':
-          updateFields.push('started_at = NOW()');
-          break;
-        case 'ARRIVED':
-          updateFields.push('arrived_at = NOW()');
-          break;
-        case 'DELIVERED':
-          updateFields.push('completed_at = NOW()');
-          break;
-      }
+      updateFields.push(...getTimestampUpdatesForStatus(status));
     }
 
     if (location && location.coordinates) {
