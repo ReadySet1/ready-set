@@ -2,28 +2,94 @@
  * Unit tests for RealtimeClient
  */
 
-// Mock Supabase FIRST (jest.mock is hoisted)
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn(),
+// Mock @/utils/supabase/client (the browser client used by RealtimeClient)
+jest.mock('@/utils/supabase/client');
+
+// Mock dependencies imported by the realtime client
+jest.mock('@/lib/logging/realtime-logger', () => ({
+  realtimeLogger: {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    connection: jest.fn(),
+    broadcast: jest.fn(),
+  },
+}));
+
+jest.mock('@/lib/rate-limiting/location-rate-limiter', () => ({
+  locationRateLimiter: {
+    checkLimit: jest.fn().mockReturnValue({ allowed: true, retryAfter: null, message: 'Request allowed' }),
+    consume: jest.fn(),
+    recordUpdate: jest.fn(),
+  },
+  RateLimitExceededError: class RateLimitExceededError extends Error {
+    public driverId: string;
+    public retryAfter: number;
+    constructor(driverId: string, retryAfter: number) {
+      super(`Rate limit exceeded for driver ${driverId}`);
+      this.name = 'RateLimitExceededError';
+      this.driverId = driverId;
+      this.retryAfter = retryAfter;
+    }
+  },
+}));
+
+jest.mock('@/lib/realtime/schemas', () => ({
+  validatePayload: jest.fn().mockImplementation((_eventName: string, payload: unknown) => payload),
+  PayloadValidationError: class PayloadValidationError extends Error {
+    public eventName: string;
+    public errors: { issues: any[] };
+    constructor(message: string, eventName: string, errors: any) {
+      super(message);
+      this.name = 'PayloadValidationError';
+      this.eventName = eventName;
+      this.errors = errors;
+    }
+  },
+  PayloadSizeError: class PayloadSizeError extends Error {
+    public eventName: string;
+    public size: number;
+    public maxSize: number;
+    constructor(message: string, eventName: string, size: number, maxSize: number) {
+      super(message);
+      this.name = 'PayloadSizeError';
+      this.eventName = eventName;
+      this.size = size;
+      this.maxSize = maxSize;
+    }
+  },
+}));
+
+jest.mock('@/constants/realtime-config', () => ({
+  CONNECTION_CONFIG: {
+    HEARTBEAT_INTERVAL: 30000,
+    RECONNECT_DELAY: 1000,
+    MAX_RECONNECT_ATTEMPTS: 5,
+    MAX_CHANNELS: 100,
+  },
+  PAYLOAD_CONFIG: {
+    MAX_PAYLOAD_SIZE: 65536,
+    MAX_ADDRESS_LENGTH: 500,
+  },
 }));
 
 // Set environment variables BEFORE importing RealtimeClient
-// Note: These must be set before import but after jest.mock (which is hoisted)
 process.env.NODE_ENV = 'test';
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-key';
 
 import { RealtimeClient } from '@/lib/realtime/client';
-import { REALTIME_CHANNELS } from '@/lib/realtime/types';
+import { REALTIME_CHANNELS, type RealtimeChannelName } from '@/lib/realtime/types';
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/client';
 
-/**
- * TODO: REA-211 - RealtimeClient tests require authenticated user mocking
- * The client throws UnauthorizedError when no user is authenticated
- */
-describe.skip('RealtimeClient', () => {
-  let mockSupabaseClient: jest.Mocked<SupabaseClient>;
-  let mockChannels: Map<string, jest.Mocked<RealtimeChannel>>;
+// Helper to flush all pending microtasks (allow async auth/profile checks to complete)
+const flushPromises = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+describe('RealtimeClient', () => {
+  let mockSupabaseClient: any;
+  let mockChannels: Map<string, any>;
   let subscribeCallbacks: Map<string, (status: string, error?: Error) => void>;
 
   beforeEach(() => {
@@ -49,7 +115,7 @@ describe.skip('RealtimeClient', () => {
       return mockChannel;
     };
 
-    // Create mock Supabase client
+    // Create mock Supabase client with auth.getUser returning a valid user
     mockSupabaseClient = {
       channel: jest.fn((channelName: string) => {
         if (!mockChannels.has(channelName)) {
@@ -58,10 +124,37 @@ describe.skip('RealtimeClient', () => {
         return mockChannels.get(channelName);
       }),
       removeChannel: jest.fn().mockResolvedValue({ status: 'ok', error: null }),
+      auth: {
+        getUser: jest.fn().mockResolvedValue({
+          data: { user: { id: 'test-user-id' } },
+          error: null,
+        }),
+      },
+      from: jest.fn((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: jest.fn().mockReturnThis(),
+            eq: jest.fn().mockReturnThis(),
+            single: jest.fn().mockResolvedValue({
+              data: { type: 'ADMIN' },
+              error: null,
+            }),
+          };
+        } else if (table === 'drivers') {
+          return {
+            select: jest.fn().mockReturnThis(),
+            eq: jest.fn().mockReturnThis(),
+            single: jest.fn().mockResolvedValue({
+              data: { id: 'driver-123' },
+              error: null,
+            }),
+          };
+        }
+        return {} as any;
+      }),
     } as any;
 
-    // Mock createClient
-    const { createClient } = require('@supabase/supabase-js');
+    // Mock createClient from @/utils/supabase/client to return our mock
     (createClient as jest.Mock).mockReturnValue(mockSupabaseClient);
 
     // Set required environment variables
@@ -75,12 +168,14 @@ describe.skip('RealtimeClient', () => {
     jest.clearAllTimers();
   });
 
-  // Helper function to trigger subscription callback
-  const triggerSubscription = (
+  // Helper function to trigger subscription callback after async auth checks complete
+  const triggerSubscriptionAfterAuth = async (
     channelName: RealtimeChannelName,
     status: string,
     error?: Error
   ) => {
+    // Wait for microtasks to complete (auth.getUser + fetchUserContext)
+    await flushPromises();
     const callback = subscribeCallbacks.get(channelName);
     if (callback) {
       callback(status, error);
@@ -101,12 +196,6 @@ describe.skip('RealtimeClient', () => {
       const instance2 = RealtimeClient.getInstance();
 
       expect(instance1).not.toBe(instance2);
-    });
-
-    it.skip('should throw error if Supabase credentials are missing', () => {
-      // Skipped: Singleton pattern makes this test difficult to implement
-      // The instance is created before we can delete the environment variables
-      // This scenario is better tested in integration tests
     });
   });
 
@@ -158,11 +247,12 @@ describe.skip('RealtimeClient', () => {
 
       const subscribePromise = client.subscribe(
         REALTIME_CHANNELS.DRIVER_LOCATIONS,
+        undefined,
         { onConnect }
       );
 
-      // Simulate successful subscription
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+      // Trigger after async auth/profile checks complete
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
 
       const channel = await subscribePromise;
 
@@ -178,11 +268,12 @@ describe.skip('RealtimeClient', () => {
 
       const subscribePromise = client.subscribe(
         REALTIME_CHANNELS.DRIVER_LOCATIONS,
+        undefined,
         { onError }
       );
 
-      // Simulate error
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
+      // Trigger error after auth checks
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
 
       await expect(subscribePromise).rejects.toThrow('Subscription failed');
       expect(onError).toHaveBeenCalled();
@@ -195,11 +286,12 @@ describe.skip('RealtimeClient', () => {
 
       const subscribePromise = client.subscribe(
         REALTIME_CHANNELS.DRIVER_LOCATIONS,
+        undefined,
         { onError }
       );
 
-      // Simulate timeout
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'TIMED_OUT');
+      // Trigger timeout after auth checks
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'TIMED_OUT');
 
       await expect(subscribePromise).rejects.toThrow('Channel subscription timed out');
       expect(onError).toHaveBeenCalled();
@@ -211,15 +303,17 @@ describe.skip('RealtimeClient', () => {
 
       const subscribePromise = client.subscribe(
         REALTIME_CHANNELS.DRIVER_LOCATIONS,
+        undefined,
         { onDisconnect }
       );
 
       // First connect
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
       await subscribePromise;
 
-      // Then close
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CLOSED');
+      // Then close (callback already registered, no need to flush again)
+      const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+      if (callback) callback('CLOSED');
 
       expect(onDisconnect).toHaveBeenCalled();
       expect(client.isConnected(REALTIME_CHANNELS.DRIVER_LOCATIONS)).toBe(false);
@@ -230,12 +324,16 @@ describe.skip('RealtimeClient', () => {
 
       const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
 
+      // Wait for auth to complete so channel.subscribe is called and state is 'connecting'
+      await flushPromises();
+
       // Check connecting state
       let state = client.getConnectionState(REALTIME_CHANNELS.DRIVER_LOCATIONS);
       expect(state.state).toBe('connecting');
 
       // Simulate successful connection
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+      const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+      if (callback) callback('SUBSCRIBED');
       await subscribePromise;
 
       // Check connected state
@@ -252,7 +350,7 @@ describe.skip('RealtimeClient', () => {
 
       // First subscribe
       const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
       await subscribePromise;
 
       // Then unsubscribe
@@ -279,9 +377,12 @@ describe.skip('RealtimeClient', () => {
       const subscribe1 = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
       const subscribe2 = client.subscribe(REALTIME_CHANNELS.ADMIN_COMMANDS);
 
-      // Trigger both subscriptions
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
-      triggerSubscription(REALTIME_CHANNELS.ADMIN_COMMANDS, 'SUBSCRIBED');
+      // Trigger both subscriptions after auth
+      await flushPromises();
+      const cb1 = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+      const cb2 = subscribeCallbacks.get(REALTIME_CHANNELS.ADMIN_COMMANDS);
+      if (cb1) cb1('SUBSCRIBED');
+      if (cb2) cb2('SUBSCRIBED');
 
       await Promise.all([subscribe1, subscribe2]);
 
@@ -300,20 +401,21 @@ describe.skip('RealtimeClient', () => {
 
       // First subscribe
       const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
       await subscribePromise;
 
-      // Broadcast event
+      // Broadcast event (as ADMIN, which can broadcast driver:location? No — ADMIN is not in BROADCAST_ACCESS_RULES for driver:location)
+      // Use a generic event name that has no rules defined (backwards compatible = allowed)
       const payload = { lat: 40.7128, lng: -74.006, timestamp: Date.now() };
       await client.broadcast(
         REALTIME_CHANNELS.DRIVER_LOCATIONS,
-        'driver:location',
+        'test:event',
         payload
       );
 
       expect(mockChannels.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!.send).toHaveBeenCalledWith({
         type: 'broadcast',
-        event: 'driver:location',
+        event: 'test:event',
         payload,
       });
     });
@@ -324,7 +426,7 @@ describe.skip('RealtimeClient', () => {
       await expect(
         client.broadcast(
           REALTIME_CHANNELS.DRIVER_LOCATIONS,
-          'driver:location',
+          'test:event',
           {}
         )
       ).rejects.toThrow('Channel driver-locations is not subscribed');
@@ -333,13 +435,13 @@ describe.skip('RealtimeClient', () => {
     it('should throw error when broadcasting to disconnected channel', async () => {
       const client = RealtimeClient.getInstance();
 
-      // Subscribe but don't complete connection
-      client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+      // Create the channel via getChannel but don't subscribe (state = disconnected)
+      client.getChannel(REALTIME_CHANNELS.DRIVER_LOCATIONS);
 
       await expect(
         client.broadcast(
           REALTIME_CHANNELS.DRIVER_LOCATIONS,
-          'driver:location',
+          'test:event',
           {}
         )
       ).rejects.toThrow('Channel driver-locations is not connected');
@@ -350,7 +452,7 @@ describe.skip('RealtimeClient', () => {
 
       // Subscribe successfully
       const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
       await subscribePromise;
 
       // Mock send to fail
@@ -359,7 +461,7 @@ describe.skip('RealtimeClient', () => {
       await expect(
         client.broadcast(
           REALTIME_CHANNELS.DRIVER_LOCATIONS,
-          'driver:location',
+          'test:event',
           {}
         )
       ).rejects.toThrow('Failed to broadcast to channel driver-locations');
@@ -372,7 +474,7 @@ describe.skip('RealtimeClient', () => {
 
       // First subscribe
       const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_STATUS);
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_STATUS, 'SUBSCRIBED');
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_STATUS, 'SUBSCRIBED');
       await subscribePromise;
 
       // Track presence
@@ -387,7 +489,7 @@ describe.skip('RealtimeClient', () => {
 
       // First subscribe
       const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_STATUS);
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_STATUS, 'SUBSCRIBED');
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_STATUS, 'SUBSCRIBED');
       await subscribePromise;
 
       // Untrack presence
@@ -418,10 +520,8 @@ describe.skip('RealtimeClient', () => {
       const client = RealtimeClient.getInstance();
       const state = client.getConnectionState(REALTIME_CHANNELS.DRIVER_LOCATIONS);
 
-      expect(state).toEqual({
-        state: 'disconnected',
-        reconnectAttempts: 0,
-      });
+      expect(state.state).toBe('disconnected');
+      expect(state.reconnectAttempts).toBe(0);
     });
 
     it('should correctly report connection status', async () => {
@@ -430,7 +530,7 @@ describe.skip('RealtimeClient', () => {
       expect(client.isConnected(REALTIME_CHANNELS.DRIVER_LOCATIONS)).toBe(false);
 
       const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
       await subscribePromise;
 
       expect(client.isConnected(REALTIME_CHANNELS.DRIVER_LOCATIONS)).toBe(true);
@@ -445,37 +545,23 @@ describe.skip('RealtimeClient', () => {
 
       // Connecting
       const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+      await flushPromises();
       state = client.getConnectionState(REALTIME_CHANNELS.DRIVER_LOCATIONS);
       expect(state.state).toBe('connecting');
 
       // Connected
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+      const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+      if (callback) callback('SUBSCRIBED');
       await subscribePromise;
       state = client.getConnectionState(REALTIME_CHANNELS.DRIVER_LOCATIONS);
       expect(state.state).toBe('connected');
 
       // Disconnected
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CLOSED');
+      if (callback) callback('CLOSED');
       state = client.getConnectionState(REALTIME_CHANNELS.DRIVER_LOCATIONS);
       expect(state.state).toBe('disconnected');
     });
   });
-
-  /**
-   * NOTE: Heartbeat tests removed
-   *
-   * Custom application-level heartbeat was removed because Supabase Realtime
-   * uses Phoenix Channels which has built-in WebSocket heartbeat functionality.
-   * The WebSocket protocol itself includes ping/pong frames for connection health.
-   *
-   * Previous tests verified:
-   * - Heartbeat pings sent at regular intervals
-   * - Multiple heartbeats over time
-   * - Heartbeat stopped on unsubscribe
-   * - Heartbeat not sent when disconnected
-   *
-   * These behaviors are now handled by the underlying Supabase/Phoenix layer.
-   */
 
   describe('Supabase Client Access', () => {
     it('should provide access to Supabase client', () => {
@@ -492,7 +578,7 @@ describe.skip('RealtimeClient', () => {
       const error = new Error('Connection failed');
 
       const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
 
       await expect(subscribePromise).rejects.toThrow();
 
@@ -506,7 +592,7 @@ describe.skip('RealtimeClient', () => {
 
       // Subscribe to channel
       const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
       await subscribePromise;
 
       // Reset should disconnect all
@@ -523,9 +609,12 @@ describe.skip('RealtimeClient', () => {
       const subscribe1 = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
       const subscribe2 = client.subscribe(REALTIME_CHANNELS.ADMIN_COMMANDS);
 
-      // Trigger both subscriptions
-      triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
-      triggerSubscription(REALTIME_CHANNELS.ADMIN_COMMANDS, 'SUBSCRIBED');
+      // Trigger both subscriptions after auth
+      await flushPromises();
+      const cb1 = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+      const cb2 = subscribeCallbacks.get(REALTIME_CHANNELS.ADMIN_COMMANDS);
+      if (cb1) cb1('SUBSCRIBED');
+      if (cb2) cb2('SUBSCRIBED');
 
       await Promise.all([subscribe1, subscribe2]);
 
@@ -543,40 +632,6 @@ describe.skip('RealtimeClient', () => {
   });
 
   describe('Authorization Tests', () => {
-    beforeEach(() => {
-      // Mock auth.getUser() for authorization tests
-      mockSupabaseClient.auth = {
-        getUser: jest.fn().mockResolvedValue({
-          data: { user: { id: 'test-user-id' } },
-          error: null,
-        }),
-      } as any;
-
-      // Mock from() for database queries
-      mockSupabaseClient.from = jest.fn((table: string) => {
-        if (table === 'profiles') {
-          return {
-            select: jest.fn().mockReturnThis(),
-            eq: jest.fn().mockReturnThis(),
-            single: jest.fn().mockResolvedValue({
-              data: { type: 'ADMIN' },
-              error: null,
-            }),
-          };
-        } else if (table === 'drivers') {
-          return {
-            select: jest.fn().mockReturnThis(),
-            eq: jest.fn().mockReturnThis(),
-            single: jest.fn().mockResolvedValue({
-              data: { id: 'driver-123' },
-              error: null,
-            }),
-          };
-        }
-        return {} as any;
-      }) as any;
-    });
-
     describe('subscribe authorization', () => {
       it('should allow ADMIN to subscribe to DRIVER_LOCATIONS channel', async () => {
         const client = RealtimeClient.getInstance();
@@ -585,7 +640,7 @@ describe.skip('RealtimeClient', () => {
         const promise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
 
         // Trigger subscription success
-        triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+        await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
 
         await expect(promise).resolves.toBeDefined();
         expect(mockSupabaseClient.auth.getUser).toHaveBeenCalled();
@@ -615,7 +670,7 @@ describe.skip('RealtimeClient', () => {
         const client = RealtimeClient.getInstance();
 
         const promise = client.subscribe(REALTIME_CHANNELS.DRIVER_STATUS);
-        triggerSubscription(REALTIME_CHANNELS.DRIVER_STATUS, 'SUBSCRIBED');
+        await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_STATUS, 'SUBSCRIBED');
 
         await promise;
 
@@ -636,7 +691,7 @@ describe.skip('RealtimeClient', () => {
           REALTIME_CHANNELS.ADMIN_COMMANDS,
           userContext
         );
-        triggerSubscription(REALTIME_CHANNELS.ADMIN_COMMANDS, 'SUBSCRIBED');
+        await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.ADMIN_COMMANDS, 'SUBSCRIBED');
 
         await promise;
 
@@ -651,7 +706,7 @@ describe.skip('RealtimeClient', () => {
 
         // Subscribe to channel first
         const promise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-        triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+        await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
         await promise;
       });
 
@@ -723,7 +778,7 @@ describe.skip('RealtimeClient', () => {
         // Should throw UnauthorizedError
         await expect(
           client.broadcast(
-            REALTIME_CHANNELS.ADMIN_COMMANDS,
+            REALTIME_CHANNELS.DRIVER_LOCATIONS,
             'admin:message',
             payload
           )
@@ -761,7 +816,6 @@ describe.skip('RealtimeClient', () => {
         const client = RealtimeClient.getInstance();
 
         const payload = {
-          driverId: 'driver-123',
           lat: 40.7128,
           lng: -74.006,
           timestamp: new Date().toISOString(),
@@ -770,9 +824,10 @@ describe.skip('RealtimeClient', () => {
         // Reset mock call counts
         jest.clearAllMocks();
 
+        // Use a generic event that ADMIN can broadcast (no rules = allowed)
         await client.broadcast(
           REALTIME_CHANNELS.DRIVER_LOCATIONS,
-          'driver:location',
+          'test:event',
           payload
         );
 
@@ -829,7 +884,7 @@ describe.skip('RealtimeClient', () => {
         const client = RealtimeClient.getInstance();
 
         const promise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-        triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+        await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
 
         await promise;
 
@@ -867,7 +922,7 @@ describe.skip('RealtimeClient', () => {
 
         // Should not throw - driver may not be assigned yet
         const promise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-        triggerSubscription(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
+        await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'SUBSCRIBED');
 
         await expect(promise).resolves.toBeDefined();
       });
