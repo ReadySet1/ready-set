@@ -154,13 +154,15 @@ configure({
   testIdAttribute: 'data-testid',
 });
 
-// Set up proper DOM for React 18 createRoot
-beforeEach(() => {
-  // Ensure document.body exists
-  if (!document.body) {
-    document.body = document.createElement('body');
-  }
-});
+// Set up proper DOM for React 18 createRoot (only in jsdom environment)
+if (typeof document !== 'undefined') {
+  beforeEach(() => {
+    // Ensure document.body exists
+    if (!document.body) {
+      document.body = document.createElement('body');
+    }
+  });
+}
 
 // React 18's createRoot is properly supported by React Testing Library
 // No need to mock it - let React Testing Library handle createRoot natively
@@ -240,26 +242,28 @@ if (typeof Element !== 'undefined') {
   }
 }
 
-// Mock window methods
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: jest.fn().mockImplementation(query => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: jest.fn(), // Deprecated
-    removeListener: jest.fn(), // Deprecated
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
-  })),
-});
+// Mock window methods (only in jsdom environment)
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn().mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: jest.fn(), // Deprecated
+      removeListener: jest.fn(), // Deprecated
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })),
+  });
 
-// Mock scrollTo
-Object.defineProperty(window, 'scrollTo', {
-  writable: true,
-  value: jest.fn(),
-});
+  // Mock scrollTo
+  Object.defineProperty(window, 'scrollTo', {
+    writable: true,
+    value: jest.fn(),
+  });
+}
 
 // Mock IntersectionObserver
 global.IntersectionObserver = jest.fn().mockImplementation(() => ({

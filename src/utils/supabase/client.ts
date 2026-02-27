@@ -62,12 +62,16 @@ export const createClient = (): SupabaseClient => {
           remove: (name: string, options: CookieOptions) =>
             removeStorageCookie(name, options)
         },
+        // Increase lockAcquireTimeout from default 10s to 30s to reduce
+        // lock contention with concurrent auth operations (cross-tab sync, token refresh).
+        // lockAcquireTimeout is a valid GoTrueClient option but not exposed in SupabaseClientOptions.
         auth: {
           flowType: 'pkce',
           detectSessionInUrl: true,
           autoRefreshToken: true,
-          persistSession: true
-        },
+          persistSession: true,
+          lockAcquireTimeout: 30000,
+        } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
         realtime: {
           params: {
             eventsPerSecond: 10,

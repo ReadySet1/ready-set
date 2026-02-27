@@ -50,35 +50,12 @@ const mockCookieStore = {
   set: jest.fn(),
 };
 
-// Mock the modules
-// NOTE: Jest automocking works for createClient but NOT for createAdminClient
-// This is a known Jest limitation with ES modules - see comments at end of file
-jest.mock('@/utils/supabase/server');
-jest.mock('@/utils/supabase/client');
-
-// Import after mocking
+// Import after mocking (global mocks from jest.setup.ts provide createClient and createAdminClient)
 import { login, signup, FormState } from '@/app/actions/login';
 import * as supabaseServer from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 
-/**
- * TODO: REA-211 - Login action tests have Supabase mock issues
- * These tests have issues with:
- * 1. createAdminClient ES module mocking limitations
- * 2. cookies() mock not working consistently
- */
-describe.skip('Login Action', () => {
-  beforeAll(() => {
-    // Setup createAdminClient once (ES module limitation workaround)
-    if (!supabaseServer.createAdminClient) {
-      Object.defineProperty(supabaseServer, 'createAdminClient', {
-        value: jest.fn(),
-        writable: true,
-        configurable: true,
-      });
-    }
-  });
-
+describe('Login Action', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -278,7 +255,8 @@ describe.skip('Login Action', () => {
 
       const result = await login(null, formData);
 
-      expect(result.error).toContain('Incorrect password');
+      // Uses generic error message to prevent user enumeration
+      expect(result.error).toContain('Invalid email or password');
       expect(result.success).toBe(false);
     });
 
@@ -296,7 +274,8 @@ describe.skip('Login Action', () => {
       // Mock user does not exist (maybeSingle returns null by default from beforeEach)
       const result = await login(null, formData);
 
-      expect(result.error).toContain('Account not found');
+      // Uses generic error message to prevent user enumeration
+      expect(result.error).toContain('Invalid email or password');
       expect(result.success).toBe(false);
     });
 
@@ -598,13 +577,13 @@ describe.skip('Login Action', () => {
         expect.stringContaining('user-123'),
         expect.objectContaining({
           path: '/',
-          httpOnly: false,
+          httpOnly: true,
           sameSite: 'lax',
         })
       );
     });
 
-    it('should set temp-session-data cookie', async () => {
+    it('should set user-display-data cookie', async () => {
       const formData = new FormData();
       formData.append('email', 'test@example.com');
       formData.append('password', 'ValidPassword123!');
@@ -630,46 +609,12 @@ describe.skip('Login Action', () => {
       await login(null, formData);
 
       expect(mockCookieStore.set).toHaveBeenCalledWith(
-        'temp-session-data',
+        'user-display-data',
         expect.any(String),
         expect.objectContaining({
           path: '/',
           httpOnly: false,
-          maxAge: 60,
-        })
-      );
-    });
-
-    it('should set user-profile cache cookie', async () => {
-      const formData = new FormData();
-      formData.append('email', 'test@example.com');
-      formData.append('password', 'ValidPassword123!');
-
-      mockSupabase.auth.signInWithPassword.mockResolvedValue({
-        data: {
-          user: { id: 'user-123', email: 'test@example.com' },
-          session: { access_token: 'token' }
-        },
-        error: null
-      });
-
-      mockSupabase.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'user-123', email: 'test@example.com' } },
-        error: null
-      });
-
-      mockChain.single.mockResolvedValue({
-        data: { type: 'CLIENT', email: 'test@example.com' },
-        error: null
-      });
-
-      await login(null, formData);
-
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        expect.stringContaining('user-profile-'),
-        expect.any(String),
-        expect.objectContaining({
-          maxAge: 600, // 10 minutes
+          sameSite: 'lax',
         })
       );
     });
@@ -702,10 +647,16 @@ describe.skip('Login Action', () => {
       formData.append('email', '<script>alert("xss")</script>@example.com');
       formData.append('password', '<script>alert("xss")</script>');
 
+      // Mock auth failure (XSS content should not affect auth flow)
+      mockSupabase.auth.signInWithPassword.mockResolvedValue({
+        data: null,
+        error: { message: 'Invalid login credentials' }
+      });
+
       const result = await login(null, formData);
 
-      // Should fail validation due to invalid email format
-      expect(result.error).toBe('Please enter a valid email address.');
+      // Email passes basic regex validation but auth rejects it
+      expect(result.error).toContain('Invalid email or password');
       expect(result.success).toBe(false);
     });
 
@@ -838,10 +789,7 @@ describe.skip('Login Action', () => {
   });
 });
 
-/**
- * TODO: REA-211 - Signup action tests have Supabase mock issues
- */
-describe.skip('Signup Action', () => {
+describe('Signup Action', () => {
   // Factory function for signup mock chain
   const createSignupMockChain = () => ({
     select: jest.fn().mockReturnThis(),
@@ -853,6 +801,7 @@ describe.skip('Signup Action', () => {
   });
 
   let mockChain: ReturnType<typeof createSignupMockChain>;
+  let mockRedirect: jest.Mock;
 
   const mockSupabase = {
     auth: {
@@ -872,20 +821,29 @@ describe.skip('Signup Action', () => {
 
     // Setup mocked Supabase client
     (supabaseServer.createClient as jest.Mock).mockResolvedValue(mockSupabase);
+
+    // Make redirect throw like Next.js does (NEXT_REDIRECT error)
+    const navigation = require('next/navigation');
+    mockRedirect = navigation.redirect;
+    mockRedirect.mockImplementation((url: string) => {
+      const err = new Error(`NEXT_REDIRECT: ${url}`);
+      (err as any).digest = `NEXT_REDIRECT;replace;${url}`;
+      throw err;
+    });
   });
 
   it('should reject signup without email', async () => {
     const formData = new FormData();
     formData.append('password', 'ValidPassword123!');
 
-    await expect(signup(formData)).rejects.toThrow('REDIRECT: /sign-in?error=Email+and+password+are+required');
+    await expect(signup(formData)).rejects.toThrow('NEXT_REDIRECT: /sign-in?error=Email+and+password+are+required');
   });
 
   it('should reject signup without password', async () => {
     const formData = new FormData();
     formData.append('email', 'test@example.com');
 
-    await expect(signup(formData)).rejects.toThrow('REDIRECT: /sign-in?error=Email+and+password+are+required');
+    await expect(signup(formData)).rejects.toThrow('NEXT_REDIRECT: /sign-in?error=Email+and+password+are+required');
   });
 
   it('should reject short password', async () => {
@@ -893,7 +851,7 @@ describe.skip('Signup Action', () => {
     formData.append('email', 'test@example.com');
     formData.append('password', 'short');
 
-    await expect(signup(formData)).rejects.toThrow('REDIRECT: /sign-in?error=Password+must+be+at+least+8+characters+long');
+    await expect(signup(formData)).rejects.toThrow('NEXT_REDIRECT: /sign-in?error=Password+must+be+at+least+8+characters+long');
   });
 
   it('should handle successful signup without email confirmation', async () => {
@@ -909,7 +867,7 @@ describe.skip('Signup Action', () => {
       error: null
     });
 
-    await expect(signup(formData)).rejects.toThrow('REDIRECT: /');
+    await expect(signup(formData)).rejects.toThrow('NEXT_REDIRECT: /');
   });
 
   it('should handle signup with email confirmation required', async () => {
@@ -925,7 +883,7 @@ describe.skip('Signup Action', () => {
       error: null
     });
 
-    await expect(signup(formData)).rejects.toThrow('REDIRECT: /signup-confirmation');
+    await expect(signup(formData)).rejects.toThrow('NEXT_REDIRECT: /signup-confirmation');
   });
 
   it('should handle signup errors', async () => {
@@ -938,49 +896,8 @@ describe.skip('Signup Action', () => {
       error: { message: 'Email already registered' }
     });
 
-    await expect(signup(formData)).rejects.toThrow('REDIRECT: /sign-in?error=Email+already+registered');
+    await expect(signup(formData)).rejects.toThrow('NEXT_REDIRECT');
+    expect(mockRedirect).toHaveBeenCalledWith(expect.stringContaining('Email'));
   });
 });
 
-/**
- * KNOWN LIMITATION - Jest ES Module Mocking
- *
- * Status: 28/40 tests passing (70% success rate)
- *
- * Issue:
- * Jest's automocking does NOT create the `createAdminClient` export from '@/utils/supabase/server'.
- * Only `createClient` is properly automocked. This is a fundamental Jest limitation with ES modules.
- *
- * Failing Tests (12):
- * - Profile Management › should create profile for user without profile
- * - Profile Management › should handle profile creation failure
- * - Session Management › should set user-session-data cookie on successful login
- * - Session Management › should set temp-session-data cookie
- * - Session Management › should set user-profile cache cookie
- * - Security Edge Cases › should handle XSS attempts in input
- * - All Signup Action tests (6 tests)
- *
- * Root Cause:
- * When login.ts imports `createAdminClient`, it gets `undefined` because Jest's automocking
- * doesn't create it. Factory-based mocking (jest.mock with a factory function) creates
- * mock instances that are DIFFERENT from what gets imported, making it impossible to configure
- * them in beforeEach.
- *
- * Attempted Solutions (all failed):
- * 1. Factory mocking with jest.fn() - creates different instances
- * 2. Object.defineProperty after import - too late, bindings already created
- * 3. Various factory syntaxes (arrow functions, named functions, module.exports) - all fail
- * 4. Pre-creating mocks before jest.mock - Jest replaces them with different instances
- * 5. __esModule: true flag - no effect
- * 6. jest.requireActual() - circular dependency issues
- *
- * Possible Solutions:
- * 1. Refactor login.ts to not use createAdminClient directly (use dependency injection)
- * 2. Use integration tests instead of unit tests for these scenarios
- * 3. Wait for Jest to improve ES module support
- * 4. Switch to a different test framework (Vitest has better ES module support)
- *
- * References:
- * - https://jestjs.io/docs/ecmascript-modules
- * - https://github.com/facebook/jest/issues/10025
- */

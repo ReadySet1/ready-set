@@ -18,8 +18,7 @@ import { middleware } from '@/middleware';
 import { withAuth, validateCSRFToken, addSecurityHeaders } from '@/lib/auth-middleware';
 import { createClient } from '@/utils/supabase/server';
 
-// Mock dependencies
-jest.mock('@/utils/supabase/server');
+// Mock dependencies (supabase/server is globally mocked in jest.setup.ts)
 jest.mock('@/utils/supabase/middleware', () => ({
   updateSession: jest.fn((req: NextRequest) => NextResponse.next()),
 }));
@@ -29,17 +28,41 @@ jest.mock('@/utils/logger', () => ({
     warn: jest.fn(),
     error: jest.fn(),
   },
+  securityLogger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
 }));
 jest.mock('@/lib/auth', () => ({
   getUserRole: jest.fn(),
 }));
+jest.mock('@/lib/monitoring/sentry', () => ({
+  setSentryUser: jest.fn(),
+}));
+jest.mock('@/lib/spam-protection', () => ({
+  SpamProtectionManager: { startCleanupScheduler: jest.fn() },
+}));
 
 const { getUserRole } = require('@/lib/auth');
 
+// Helper to create a NextRequest with properly initialized nextUrl
+function createTestRequest(url: string): NextRequest {
+  const req = new NextRequest(new URL(url));
+  // Ensure nextUrl is available (Jest can sometimes lose the getter)
+  if (!req.nextUrl) {
+    Object.defineProperty(req, 'nextUrl', {
+      get() { return new URL(url); },
+      configurable: true,
+    });
+  }
+  return req;
+}
+
 /**
- * TODO: REA-211 - Middleware tests have complex next/server mocking issues
- * The NextRequest.nextUrl.pathname is undefined in jest environment when
- * calling the actual middleware function.
+ * TODO: REA-326 - Middleware tests require node environment but updateSession mock
+ * doesn't intercept properly, and NextRequest.nextUrl needs polyfilling.
+ * The non-middleware tests (RBAC, CSRF, etc.) work correctly.
  */
 describe.skip('Middleware Route Protection', () => {
   let mockSupabase: any;
@@ -62,7 +85,7 @@ describe.skip('Middleware Route Protection', () => {
 
   describe('Public Routes', () => {
     it('should allow access to public routes without authentication', async () => {
-      const request = new NextRequest(new URL('http://localhost:3000/'));
+      const request = createTestRequest('http://localhost:3000/');
 
       const response = await middleware(request);
 
@@ -71,7 +94,7 @@ describe.skip('Middleware Route Protection', () => {
     });
 
     it('should allow access to sign-in page', async () => {
-      const request = new NextRequest(new URL('http://localhost:3000/sign-in'));
+      const request = createTestRequest('http://localhost:3000/sign-in');
 
       const response = await middleware(request);
 
@@ -80,7 +103,7 @@ describe.skip('Middleware Route Protection', () => {
     });
 
     it('should allow access to auth callback', async () => {
-      const request = new NextRequest(new URL('http://localhost:3000/auth/callback'));
+      const request = createTestRequest('http://localhost:3000/auth/callback');
 
       const response = await middleware(request);
 
@@ -108,7 +131,7 @@ describe.skip('Middleware Route Protection', () => {
           error: { message: 'Not authenticated' },
         });
 
-        const request = new NextRequest(new URL(`http://localhost:3000${route}`));
+        const request = createTestRequest(`http://localhost:3000${route}`);
         const response = await middleware(request);
 
         expect(response.status).toBe(307); // Redirect
@@ -133,7 +156,7 @@ describe.skip('Middleware Route Protection', () => {
           });
         }
 
-        const request = new NextRequest(new URL(`http://localhost:3000${route}`));
+        const request = createTestRequest(`http://localhost:3000${route}`);
         const response = await middleware(request);
 
         if (route.startsWith('/admin')) {
@@ -152,7 +175,7 @@ describe.skip('Middleware Route Protection', () => {
         error: { message: 'Not authenticated' },
       });
 
-      const request = new NextRequest(new URL('http://localhost:3000/admin/users'));
+      const request = createTestRequest('http://localhost:3000/admin/users');
       const response = await middleware(request);
 
       expect(response.headers.get('location')).toContain('returnTo=%2Fadmin%2Fusers');
@@ -173,7 +196,7 @@ describe.skip('Middleware Route Protection', () => {
         error: null,
       });
 
-      const request = new NextRequest(new URL('http://localhost:3000/admin'));
+      const request = createTestRequest('http://localhost:3000/admin');
       const response = await middleware(request);
 
       expect(response.status).not.toBe(307);
@@ -193,7 +216,7 @@ describe.skip('Middleware Route Protection', () => {
         error: null,
       });
 
-      const request = new NextRequest(new URL('http://localhost:3000/admin/users'));
+      const request = createTestRequest('http://localhost:3000/admin/users');
       const response = await middleware(request);
 
       expect(response.status).not.toBe(307);
@@ -212,7 +235,7 @@ describe.skip('Middleware Route Protection', () => {
         error: null,
       });
 
-      const request = new NextRequest(new URL('http://localhost:3000/admin'));
+      const request = createTestRequest('http://localhost:3000/admin');
       const response = await middleware(request);
 
       expect(response.status).not.toBe(307);
@@ -231,7 +254,7 @@ describe.skip('Middleware Route Protection', () => {
         error: null,
       });
 
-      const request = new NextRequest(new URL('http://localhost:3000/admin'));
+      const request = createTestRequest('http://localhost:3000/admin');
       const response = await middleware(request);
 
       expect(response.status).toBe(307); // Redirected
@@ -252,7 +275,7 @@ describe.skip('Middleware Route Protection', () => {
         error: null,
       });
 
-      const request = new NextRequest(new URL('http://localhost:3000/admin/users'));
+      const request = createTestRequest('http://localhost:3000/admin/users');
       const response = await middleware(request);
 
       expect(response.status).toBe(307);
@@ -272,7 +295,7 @@ describe.skip('Middleware Route Protection', () => {
         error: null,
       });
 
-      const request = new NextRequest(new URL('http://localhost:3000/admin'));
+      const request = createTestRequest('http://localhost:3000/admin');
       const response = await middleware(request);
 
       expect(response.status).toBe(307);
@@ -291,7 +314,7 @@ describe.skip('Middleware Route Protection', () => {
         error: null,
       });
 
-      const request = new NextRequest(new URL('http://localhost:3000/admin'));
+      const request = createTestRequest('http://localhost:3000/admin');
       const response = await middleware(request);
 
       expect(response.status).toBe(307);
@@ -303,7 +326,7 @@ describe.skip('Middleware Route Protection', () => {
     it('should redirect to sign-in on auth error', async () => {
       mockSupabase.auth.getUser.mockRejectedValue(new Error('Auth service error'));
 
-      const request = new NextRequest(new URL('http://localhost:3000/admin'));
+      const request = createTestRequest('http://localhost:3000/admin');
       const response = await middleware(request);
 
       expect(response.status).toBe(307);
@@ -323,17 +346,13 @@ describe.skip('Middleware Route Protection', () => {
         error: { message: 'Database error' },
       });
 
-      const request = new NextRequest(new URL('http://localhost:3000/admin'));
+      const request = createTestRequest('http://localhost:3000/admin');
       const response = await middleware(request);
 
       expect(response.status).toBe(307); // Redirected due to error
     });
   });
 });
-
-/**
- * TODO: REA-211 - RBAC tests have auth mocking issues
- */
 describe('Role-Based Access Control (RBAC)', () => {
   let mockSupabase: any;
 

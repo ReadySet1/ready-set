@@ -202,7 +202,7 @@ describe('Token Refresh Service', () => {
       await jest.advanceTimersByTimeAsync(100);
     });
 
-    // Skip: Complex interaction between fake timers and async retry logic
+    // Skip: Complex interaction between fake timers and async retry logic — REA-326
     it.skip('should retry on retryable errors', async () => {
       let attemptCount = 0;
       mockSupabase.auth.refreshSession.mockImplementation(() => {
@@ -234,7 +234,7 @@ describe('Token Refresh Service', () => {
       expect(token).toBe('new-token');
     });
 
-    // Skip: Complex interaction between fake timers and async retry logic
+    // Skip: Complex interaction between fake timers and async retry logic — REA-326
     it.skip('should fail after max retries', async () => {
       mockSupabase.auth.refreshSession.mockResolvedValue({
         data: null,
@@ -857,16 +857,7 @@ describe('Enhanced Session Manager', () => {
     });
   });
 
-  /**
-   * @skip Session Lifecycle tests are skipped due to Jest timer issues with async initialization.
-   * The EnhancedSessionManager's constructor uses timers that don't resolve properly with
-   * jest.useFakeTimers() and jest.runAllTimersAsync(). These tests work correctly in
-   * integration/E2E testing but timeout in unit tests.
-   *
-   * TODO: Refactor EnhancedSessionManager to support dependency injection for timers,
-   * or use a different testing approach for these lifecycle tests.
-   */
-  describe.skip('Session Lifecycle', () => {
+  describe('Session Lifecycle', () => {
     beforeEach(async () => {
       sessionManager = new EnhancedSessionManager();
       await jest.advanceTimersByTimeAsync(100);
