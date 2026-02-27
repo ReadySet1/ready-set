@@ -14,6 +14,7 @@
 /playwright-report/
 /test-results/
 /e2e/.auth/
+/reports/
 .playwright-mcp
 *.lcov
 
@@ -30,19 +31,11 @@ next-env.d.ts
 
 # TypeScript
 *.tsbuildinfo
-tsconfig.tsbuildinfo
 
 # Environment Variables
-.env
-.env*.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.development
-.env.production
-.env.test
 .env*
 !.env.example
+!.env.test.example
 
 # Database
 *.db
@@ -126,6 +119,14 @@ temp/
 
 # Sentry
 .sentryclirc
+
+# Auto-generated report/summary files
+API_FAILURE_CATEGORIZATION.md
+LAYER_3_FIXES_SUMMARY.md
+PROGRESS_REVIEW.md
+TEST_FAILURE_REPORT.md
+TEST_IMPROVEMENTS_SUMMARY.md
+TESTING_PROGRESS.md
 
 # Documentation markdown files (if auto-generated)
 docs/markdown/
