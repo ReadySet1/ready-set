@@ -125,6 +125,20 @@ describe('RealtimeClient', () => {
       }),
       removeChannel: jest.fn().mockResolvedValue({ status: 'ok', error: null }),
       auth: {
+        getSession: jest.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: 'test-token',
+              refresh_token: 'test-refresh-token',
+              expires_at: Math.floor(Date.now() / 1000) + 3600,
+            },
+          },
+          error: null,
+        }),
+        refreshSession: jest.fn().mockResolvedValue({
+          data: { session: null },
+          error: null,
+        }),
         getUser: jest.fn().mockResolvedValue({
           data: { user: { id: 'test-user-id' } },
           error: null,
@@ -272,8 +286,13 @@ describe('RealtimeClient', () => {
         { onError }
       );
 
-      // Trigger error after auth checks
+      // First CHANNEL_ERROR triggers a retry (refreshSession + return)
       await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
+      // Wait for the async refreshSession inside the callback to complete
+      await flushPromises();
+      // Second CHANNEL_ERROR actually rejects
+      const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+      if (callback) callback('CHANNEL_ERROR', error);
 
       await expect(subscribePromise).rejects.toThrow('Subscription failed');
       expect(onError).toHaveBeenCalled();
@@ -578,7 +597,12 @@ describe('RealtimeClient', () => {
       const error = new Error('Connection failed');
 
       const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+      // First CHANNEL_ERROR triggers retry
       await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
+      await flushPromises();
+      // Second CHANNEL_ERROR actually rejects
+      const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+      if (callback) callback('CHANNEL_ERROR', error);
 
       await expect(subscribePromise).rejects.toThrow();
 
