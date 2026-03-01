@@ -171,7 +171,7 @@ describe('GET /api/orders/on-demand-orders - List On-Demand Orders', () => {
           where: {
             OR: [
               { orderNumber: { contains: 'jane', mode: 'insensitive' } },
-              { user: { name: { contains: 'jane', mode: 'insensitive' } } },
+              { user: { is: { name: { contains: 'jane', mode: 'insensitive' } } } },
             ],
           },
         })
@@ -436,7 +436,7 @@ describe('GET /api/orders/on-demand-orders - List On-Demand Orders', () => {
             status: OnDemandStatus.COMPLETED,
             OR: [
               { orderNumber: { contains: 'OD-001', mode: 'insensitive' } },
-              { user: { name: { contains: 'OD-001', mode: 'insensitive' } } },
+              { user: { is: { name: { contains: 'OD-001', mode: 'insensitive' } } } },
             ],
           },
         })

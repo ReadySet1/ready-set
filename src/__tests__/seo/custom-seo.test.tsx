@@ -2,21 +2,23 @@
  * @jest-environment jsdom
  */
 import React from "react";
-import { render } from "@testing-library/react";
+import { render, cleanup } from "@testing-library/react";
 import CustomNextSeo from "../../components/Blog/CustomSeo";
 import type { SeoType } from "@/sanity/schemaTypes/seo";
 
-// Mock Next.js Head component
+// Mock Next.js Head component - use ReactDOM.createPortal to render into document.head
 jest.mock("next/head", () => {
-  return function MockHead({ children }: { children: React.ReactNode }) {
-    return <div data-testid="mock-head">{children}</div>;
+  const React = require("react");
+  const ReactDOM = require("react-dom");
+  return {
+    __esModule: true,
+    default: ({ children }: { children: React.ReactNode }) => {
+      return ReactDOM.createPortal(children, document.head);
+    },
   };
 });
 
-/**
- * TODO: REA-211 - CustomNextSeo tests have next/head mocking issues
- */
-describe.skip("CustomNextSeo Component", () => {
+describe("CustomNextSeo Component", () => {
   const baseProps = {
     slug: "/test-blog-post",
   };
@@ -27,7 +29,10 @@ describe.skip("CustomNextSeo Component", () => {
   });
 
   afterEach(() => {
+    cleanup();
     jest.restoreAllMocks();
+    // Clean up elements added to document.head by the portal
+    document.head.querySelectorAll("title, meta, link").forEach((el) => el.remove());
   });
 
   it("should render with null SEO data", () => {
@@ -45,12 +50,11 @@ describe.skip("CustomNextSeo Component", () => {
       nofollowAttributes: false,
     };
 
-    const { container } = render(
+    render(
       <CustomNextSeo seo={seoData} slug={baseProps.slug} />,
     );
 
-    // Check that robots meta tag is set to follow,index
-    const robotsMeta = container.querySelector('meta[name="robots"]');
+    const robotsMeta = document.head.querySelector('meta[name="robots"]');
     expect(robotsMeta).toHaveAttribute("content", "follow,index");
   });
 
@@ -61,12 +65,11 @@ describe.skip("CustomNextSeo Component", () => {
       nofollowAttributes: true,
     };
 
-    const { container } = render(
+    render(
       <CustomNextSeo seo={seoData} slug={baseProps.slug} />,
     );
 
-    // Check that robots meta tag is set to nofollow,noindex
-    const robotsMeta = container.querySelector('meta[name="robots"]');
+    const robotsMeta = document.head.querySelector('meta[name="robots"]');
     expect(robotsMeta).toHaveAttribute("content", "nofollow,noindex");
   });
 
@@ -76,12 +79,11 @@ describe.skip("CustomNextSeo Component", () => {
       metaDescription: "Test Description",
     };
 
-    const { container } = render(
+    render(
       <CustomNextSeo seo={seoData} slug={baseProps.slug} />,
     );
 
-    // Check that robots meta tag defaults to follow,index
-    const robotsMeta = container.querySelector('meta[name="robots"]');
+    const robotsMeta = document.head.querySelector('meta[name="robots"]');
     expect(robotsMeta).toHaveAttribute("content", "follow,index");
   });
 
@@ -91,11 +93,11 @@ describe.skip("CustomNextSeo Component", () => {
       metaDescription: "Test Description",
     };
 
-    const { container } = render(
+    render(
       <CustomNextSeo seo={seoData} slug={baseProps.slug} />,
     );
 
-    const title = container.querySelector("title");
+    const title = document.head.querySelector("title");
     expect(title).toHaveTextContent("Test Blog Post Title");
   });
 
@@ -105,11 +107,11 @@ describe.skip("CustomNextSeo Component", () => {
       metaDescription: "This is a test description for SEO",
     };
 
-    const { container } = render(
+    render(
       <CustomNextSeo seo={seoData} slug={baseProps.slug} />,
     );
 
-    const description = container.querySelector('meta[name="description"]');
+    const description = document.head.querySelector('meta[name="description"]');
     expect(description).toHaveAttribute(
       "content",
       "This is a test description for SEO",
@@ -122,11 +124,11 @@ describe.skip("CustomNextSeo Component", () => {
       metaDescription: "Test Description",
     };
 
-    const { container } = render(
+    render(
       <CustomNextSeo seo={seoData} slug="/blog/test-post" />,
     );
 
-    const canonical = container.querySelector('link[rel="canonical"]');
+    const canonical = document.head.querySelector('link[rel="canonical"]');
     expect(canonical).toHaveAttribute(
       "href",
       "https://readysetllc.com/blog/test-post",
@@ -139,11 +141,11 @@ describe.skip("CustomNextSeo Component", () => {
       metaDescription: "Test Description",
     };
 
-    const { container } = render(
+    render(
       <CustomNextSeo seo={seoData} slug="blog/test-post" />,
     );
 
-    const canonical = container.querySelector('link[rel="canonical"]');
+    const canonical = document.head.querySelector('link[rel="canonical"]');
     expect(canonical).toHaveAttribute(
       "href",
       "https://readysetllc.com/blog/test-post",
@@ -171,25 +173,25 @@ describe.skip("CustomNextSeo Component", () => {
       },
     };
 
-    const { container } = render(
+    render(
       <CustomNextSeo seo={seoData} slug={baseProps.slug} />,
     );
 
     expect(
-      container.querySelector('meta[property="og:title"]'),
+      document.head.querySelector('meta[property="og:title"]'),
     ).toHaveAttribute("content", "OG Test Title");
     expect(
-      container.querySelector('meta[property="og:description"]'),
+      document.head.querySelector('meta[property="og:description"]'),
     ).toHaveAttribute("content", "OG Test Description");
     expect(
-      container.querySelector('meta[property="og:site_name"]'),
+      document.head.querySelector('meta[property="og:site_name"]'),
     ).toHaveAttribute("content", "Ready Set LLC");
-    expect(container.querySelector('meta[property="og:url"]')).toHaveAttribute(
+    expect(document.head.querySelector('meta[property="og:url"]')).toHaveAttribute(
       "content",
       "https://readysetllc.com/test",
     );
     expect(
-      container.querySelector('meta[property="og:image"]'),
+      document.head.querySelector('meta[property="og:image"]'),
     ).toHaveAttribute("content", "https://example.com/image.jpg");
   });
 
@@ -205,18 +207,18 @@ describe.skip("CustomNextSeo Component", () => {
       },
     };
 
-    const { container } = render(
+    render(
       <CustomNextSeo seo={seoData} slug={baseProps.slug} />,
     );
 
     expect(
-      container.querySelector('meta[name="twitter:card"]'),
+      document.head.querySelector('meta[name="twitter:card"]'),
     ).toHaveAttribute("content", "summary_large_image");
     expect(
-      container.querySelector('meta[name="twitter:creator"]'),
+      document.head.querySelector('meta[name="twitter:creator"]'),
     ).toHaveAttribute("content", "@readysetllc");
     expect(
-      container.querySelector('meta[name="twitter:site"]'),
+      document.head.querySelector('meta[name="twitter:site"]'),
     ).toHaveAttribute("content", "@readysetllc");
   });
 
@@ -227,11 +229,11 @@ describe.skip("CustomNextSeo Component", () => {
       seoKeywords: ["catering", "delivery", "bay area", "food service"],
     };
 
-    const { container } = render(
+    render(
       <CustomNextSeo seo={seoData} slug={baseProps.slug} />,
     );
 
-    const keywords = container.querySelector('meta[name="keywords"]');
+    const keywords = document.head.querySelector('meta[name="keywords"]');
     expect(keywords).toHaveAttribute(
       "content",
       "catering, delivery, bay area, food service",
@@ -244,14 +246,14 @@ describe.skip("CustomNextSeo Component", () => {
       metaDescription: "Test Description",
     };
 
-    const { container } = render(
+    render(
       <CustomNextSeo seo={seoData} slug={baseProps.slug} />,
     );
 
-    // These should not be present
-    expect(container.querySelector('meta[property="og:title"]')).toBeNull();
-    expect(container.querySelector('meta[name="twitter:card"]')).toBeNull();
-    expect(container.querySelector('meta[name="keywords"]')).toBeNull();
+    // These should not be present in document.head (from this render)
+    expect(document.head.querySelector('meta[property="og:title"]')).toBeNull();
+    expect(document.head.querySelector('meta[name="twitter:card"]')).toBeNull();
+    expect(document.head.querySelector('meta[name="keywords"]')).toBeNull();
   });
 
   it("should handle missing base URL environment variable", () => {
@@ -262,9 +264,9 @@ describe.skip("CustomNextSeo Component", () => {
       metaDescription: "Test Description",
     };
 
-    const { container } = render(<CustomNextSeo seo={seoData} slug="/test" />);
+    render(<CustomNextSeo seo={seoData} slug="/test" />);
 
-    const canonical = container.querySelector('link[rel="canonical"]');
+    const canonical = document.head.querySelector('link[rel="canonical"]');
     expect(canonical).toHaveAttribute("href", "/test");
   });
 
@@ -276,9 +278,9 @@ describe.skip("CustomNextSeo Component", () => {
       metaDescription: "Test Description",
     };
 
-    const { container } = render(<CustomNextSeo seo={seoData} slug="/test" />);
+    render(<CustomNextSeo seo={seoData} slug="/test" />);
 
-    const canonical = container.querySelector('link[rel="canonical"]');
+    const canonical = document.head.querySelector('link[rel="canonical"]');
     expect(canonical).toHaveAttribute("href", "https://readysetllc.com/test");
   });
 });

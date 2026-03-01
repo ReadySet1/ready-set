@@ -20,6 +20,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { DeliveryTimeline } from "@/components/Delivery/DeliveryTimeline";
 
 type OrderStatus = "active" | "assigned" | "cancelled" | "completed";
 type DriverStatus =
@@ -298,6 +299,20 @@ const UserOrderDetail: React.FC = () => {
             <span className="text-muted-foreground text-sm">Special Notes</span>
             <p>{order.special_notes || "N/A"}</p>
           </div>
+        </CardContent>
+      </Card>
+      <Card className="mx-auto mt-6 w-full max-w-3xl">
+        <CardHeader>
+          <CardTitle className="text-lg">Delivery Timeline</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DeliveryTimeline
+            createdAt={order.date}
+            deliveredAt={order.complete_time}
+            estimatedPickupTime={order.pickup_time}
+            estimatedDeliveryTime={order.arrival_time}
+            currentStatus={order.driver_status}
+          />
         </CardContent>
       </Card>
       <div className="mt-8">

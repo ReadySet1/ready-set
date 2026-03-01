@@ -44,9 +44,11 @@ export async function GET(req: NextRequest) {
         },
         {
           user: {
-            name: {
-              contains: searchTerm,
-              mode: 'insensitive',
+            is: {
+              name: {
+                contains: searchTerm,
+                mode: 'insensitive',
+              },
             },
           },
         },

@@ -71,7 +71,9 @@ export interface DeliveryTracking {
   routePolyline?: string;
   metadata: Record<string, any>;
   assignedAt: Date;
+  arrivedAtVendorAt?: Date;
   startedAt?: Date;
+  enRouteAt?: Date;
   arrivedAt?: Date;
   completedAt?: Date;
   createdAt: Date;

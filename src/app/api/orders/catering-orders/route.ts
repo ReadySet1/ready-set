@@ -178,7 +178,7 @@ export async function GET(req: NextRequest) {
           searchConditions = {
             OR: [
               { clientAttention: { contains: searchTerm, mode: 'insensitive' } },
-              { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
+              { user: { is: { name: { contains: searchTerm, mode: 'insensitive' } } } },
             ]
           };
           break;
@@ -214,8 +214,8 @@ export async function GET(req: NextRequest) {
             OR: [
               { orderNumber: { contains: searchTerm, mode: 'insensitive' } },
               { clientAttention: { contains: searchTerm, mode: 'insensitive' } },
-              { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
-              { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
+              { user: { is: { name: { contains: searchTerm, mode: 'insensitive' } } } },
+              { user: { is: { email: { contains: searchTerm, mode: 'insensitive' } } } },
             ]
           };
       }
