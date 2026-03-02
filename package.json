@@ -148,7 +148,7 @@
     "firebase": "^12.6.0",
     "firebase-admin": "^13.6.0",
     "framer-motion": "^12.23.24",
-    "glob": "11.1.0",
+    "glob": "13.0.6",
     "googleapis": "^164.0.0",
     "graphql": "^16.12.0",
     "graphql-request": "^7.3.5",
@@ -256,14 +256,14 @@
   "resolutions": {
     "abab": "^2.0.6",
     "debug": "^4.4.0",
-    "glob": "11.1.0",
+    "glob": "13.0.6",
     "uuid": "^9.0.1",
     "rimraf": "^5.0.10"
   },
   "pnpm": {
     "overrides": {
       "path-to-regexp": "^8.0.0",
-      "glob": "11.1.0",
+      "glob": "13.0.6",
       "rimraf": "6.0.1",
       "uuid": "11.0.3",
       "semver": "^7.5.2",
