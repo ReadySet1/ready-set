@@ -270,26 +270,20 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
   id: 'cater-valley',
   clientName: 'CaterValley',
   vendorName: 'CaterValley',
-  description: 'CaterValley delivery pricing with $42.50 minimum delivery fee',
+  description: 'CaterValley delivery pricing with $42.50 minimum delivery fee, tiered driver pay, and two-tier mileage',
   isActive: true,
 
   pricingTiers: [
-    // Tier 1: Small orders (≤25 headcount OR ≤$300 food cost)
-    { headcountMin: 0, headcountMax: 25, foodCostMin: 0, foodCostMax: 300, regularRate: 85, within10Miles: 42.50 },
-    // Tier 2: 26-49 headcount OR $300.01-599 food cost
-    { headcountMin: 26, headcountMax: 49, foodCostMin: 300.01, foodCostMax: 599.99, regularRate: 90, within10Miles: 52.50 },
-    // Tier 3: 50-74 headcount OR $600-899 food cost
-    { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 110, within10Miles: 62.50 },
-    // Tier 4: 75-99 headcount OR $900-1199 food cost
-    { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 120, within10Miles: 72.50 },
-    // Tier 5: 100+ headcount OR $1200+ food cost (10% percentage-based pricing)
+    // Flat fee per tier — same rate regardless of distance; mileage ($3/mi) only applies AFTER 10 miles
+    { headcountMin: 0, headcountMax: 25, foodCostMin: 0, foodCostMax: 300, regularRate: 42.50, within10Miles: 42.50 },
+    { headcountMin: 26, headcountMax: 49, foodCostMin: 300.01, foodCostMax: 599.99, regularRate: 52.50, within10Miles: 52.50 },
+    { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 62.50, within10Miles: 62.50 },
+    { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 72.50, within10Miles: 72.50 },
+    // 100+ headcount OR $1200+ food cost → 10% of food cost
     { headcountMin: 100, headcountMax: null, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0, regularRatePercent: 0.10, within10MilesPercent: 0.10 }
   ],
 
-  // CRITICAL: CaterValley mileage rate is $3.00 per mile after 10 miles
-  // Applied to miles OVER the distanceThreshold (10 miles)
-  // Per official Terms & Pricing Chart from CaterValley (see OFFICIAL_PRICING_CHART.md)
-  mileageRate: 3.0,
+  mileageRate: 3.0, // $3.00/mile for miles over 10 (customer/RS add-on fee)
   distanceThreshold: 10,
 
   dailyDriveDiscounts: {
@@ -299,11 +293,25 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
   },
 
   driverPaySettings: {
-    maxPayPerDrop: null, // CaterValley: No cap, driver pay is sum of components
-    basePayPerDrop: 18, // $18 flat rate (confirmed from spreadsheet)
+    maxPayPerDrop: null, // No cap — driver pay is sum of components
+    basePayPerDrop: 18, // Default/fallback (not used when tiers are present)
     bonusPay: 10,
-    readySetFee: 70,
-    driverMileageRate: 0.70 // $0.70/mile for ALL miles (CaterValley-specific)
+    readySetFee: 42.50, // Default/fallback Ready Set fee (lowest tier)
+    readySetFeeMatchesDeliveryFee: true,
+    driverBasePayTiers: [
+      { headcountMin: 0, headcountMax: 24, basePay: 18 },
+      { headcountMin: 25, headcountMax: 49, basePay: 23 },
+      { headcountMin: 50, headcountMax: 74, basePay: 33 },
+      { headcountMin: 75, headcountMax: 99, basePay: 43 },
+      { headcountMin: 100, headcountMax: null, basePay: 0 }
+    ],
+    requiresManualReview: true, // 100+ headcount is "case by case"
+    // Driver mileage: $0.70/mi first 10 miles (flat $7), total miles × $0.70 when over 10
+    driverMileageSettings: {
+      flatAmountWithinThreshold: 7,    // $7 flat for drives within 10 miles ($0.70 × 10)
+      perMileRateOverThreshold: 0.70,  // $0.70/mile for ALL miles when over threshold
+      threshold: 10
+    }
   },
 
   bridgeTollSettings: {
@@ -312,8 +320,8 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
   },
 
   createdAt: new Date('2025-11-10'),
-  updatedAt: new Date('2026-01-14'),
-  notes: 'CaterValley pricing: $42.50 minimum fee, $18 driver base, $0.70/mi driver mileage'
+  updatedAt: new Date('2026-03-01'),
+  notes: 'CaterValley pricing: RS fee matches headcount tier ($42.50-$72.50 or 10%), driver base tiered ($18-$43, 100+ case by case), driver mileage flat $7 within 10mi or total×$0.70 over 10mi, RS mileage $3.00/mi after 10mi.'
 };
 
 /**
