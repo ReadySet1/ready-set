@@ -248,19 +248,23 @@ export class CalculatorService {
         ]
       };
 
+      const adjustments = input.adjustments ?? 0;
+
       const driverPayments: DriverPayments = {
         basePay: driverPayBreakdown.driverBasePayPerDrop,
         mileagePay: driverPayBreakdown.totalMileagePay,
         bonus: driverPayBreakdown.driverBonusPay,
         bridgeToll: driverPayBreakdown.bridgeToll,
         extraStopsBonus: driverPayBreakdown.extraStopsBonus,
-        total: driverPayBreakdown.totalDriverPay,
+        adjustments,
+        total: driverPayBreakdown.totalDriverPay + adjustments,
         breakdown: [
           { label: 'Base Pay', amount: driverPayBreakdown.driverBasePayPerDrop },
           { label: `Mileage (${driverPayBreakdown.totalMileage} mi × $${driverPayBreakdown.mileageRate}/mi)`, amount: driverPayBreakdown.totalMileagePay },
           { label: 'Bonus', amount: driverPayBreakdown.driverBonusPay },
           { label: 'Extra Stops Bonus', amount: driverPayBreakdown.extraStopsBonus },
-          { label: 'Bridge Toll', amount: driverPayBreakdown.bridgeToll }
+          { label: 'Bridge Toll', amount: driverPayBreakdown.bridgeToll },
+          { label: 'Adjustments', amount: adjustments }
         ]
       };
 
