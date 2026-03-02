@@ -18,7 +18,7 @@
  * | 200-249   | $2100-$2299    | $280         |
  * | 250-299   | $2300-$2499    | $310         |
  *
- * Mileage: $2.50/mile ONLY for miles beyond 10 (HY Food Company specific rate)
+ * Mileage: $3.00/mile ONLY for miles beyond 10 (HY Food Company rate)
  */
 
 import { calculateDeliveryCost, calculateDriverPay } from '../delivery-cost-calculator';
@@ -55,10 +55,9 @@ describe('HY Food Company Pricing matches Ready Set Flat Fee', () => {
       });
     });
 
-    it('should have custom mileage rate ($2.50/mile) for HY Food Company', () => {
-      // HY Food Company has a special lower mileage rate
-      expect(HY_FOOD_COMPANY_DIRECT.mileageRate).toBe(2.5);
-      // This is different from Ready Set standard ($3.00)
+    it('should have $3.00/mile mileage rate for HY Food Company', () => {
+      expect(HY_FOOD_COMPANY_DIRECT.mileageRate).toBe(3.0);
+      // Same as Ready Set standard ($3.00)
       expect(READY_SET_FOOD_STANDARD.mileageRate).toBe(3.0);
     });
 
@@ -144,8 +143,8 @@ describe('HY Food Company Pricing matches Ready Set Flat Fee', () => {
         expect(hyResultWithin.deliveryCost).toBe(expectedFee);
         expect(hyResultBeyond.deliveryCost).toBe(expectedFee);
 
-        // Beyond 10 miles should add mileage charge (HY Food Company: $2.50/mi)
-        expect(hyResultBeyond.totalMileagePay).toBe(12.5); // (15-10) * $2.50 = $12.50
+        // Beyond 10 miles should add mileage charge (HY Food Company: $3.00/mi)
+        expect(hyResultBeyond.totalMileagePay).toBe(15); // (15-10) * $3.00 = $15.00
       });
     });
   });
@@ -177,7 +176,7 @@ describe('HY Food Company Pricing matches Ready Set Flat Fee', () => {
       expect(result.deliveryFee).toBe(70);
     });
 
-    it('should charge $2.50/mile for miles beyond 10 (HY Food Company specific rate)', () => {
+    it('should charge $3.00/mile for miles beyond 10 (HY Food Company rate)', () => {
       const result = calculateDeliveryCost({
         headcount: 25,
         foodCost: 400,
@@ -186,18 +185,18 @@ describe('HY Food Company Pricing matches Ready Set Flat Fee', () => {
       });
 
       expect(result.deliveryCost).toBe(70); // Flat fee unchanged
-      expect(result.totalMileagePay).toBe(12.5); // (15-10) * $2.50 = $12.50
-      expect(result.deliveryFee).toBe(82.5); // $70 + $12.50 = $82.50
+      expect(result.totalMileagePay).toBe(15); // (15-10) * $3.00 = $15.00
+      expect(result.deliveryFee).toBe(85); // $70 + $15.00 = $85.00
     });
 
-    it('should calculate mileage correctly for various distances (HY Food Company: $2.50/mi)', () => {
+    it('should calculate mileage correctly for various distances (HY Food Company: $3.00/mi)', () => {
       const testDistances = [
         { miles: 10, expectedMileage: 0 },
-        { miles: 11, expectedMileage: 2.5 },   // (11-10) * $2.50
-        { miles: 12, expectedMileage: 5 },     // (12-10) * $2.50
-        { miles: 15, expectedMileage: 12.5 },  // (15-10) * $2.50
-        { miles: 20, expectedMileage: 25 },    // (20-10) * $2.50
-        { miles: 25, expectedMileage: 37.5 }, // (25-10) * $2.50
+        { miles: 11, expectedMileage: 3 },    // (11-10) * $3.00
+        { miles: 12, expectedMileage: 6 },    // (12-10) * $3.00
+        { miles: 15, expectedMileage: 15 },   // (15-10) * $3.00
+        { miles: 20, expectedMileage: 30 },   // (20-10) * $3.00
+        { miles: 25, expectedMileage: 45 },   // (25-10) * $3.00
       ];
 
       testDistances.forEach(({ miles, expectedMileage }) => {
@@ -375,7 +374,7 @@ describe('HY Food Company Pricing matches Ready Set Flat Fee', () => {
       expect(result.deliveryFee).toBe(70);
     });
 
-    it('Headcount 25, Food $400, 15 miles → $70 + (5 × $2.50) = $82.50', () => {
+    it('Headcount 25, Food $400, 15 miles → $70 + (5 × $3.00) = $85.00', () => {
       const result = calculateDeliveryCost({
         headcount: 25,
         foodCost: 400,
@@ -384,8 +383,8 @@ describe('HY Food Company Pricing matches Ready Set Flat Fee', () => {
       });
 
       expect(result.deliveryCost).toBe(70);
-      expect(result.totalMileagePay).toBe(12.5); // 5 miles × $2.50
-      expect(result.deliveryFee).toBe(82.5);
+      expect(result.totalMileagePay).toBe(15); // 5 miles × $3.00
+      expect(result.deliveryFee).toBe(85);
     });
 
     it('Headcount 50, Food $700, 10 miles → $90 (exactly at threshold)', () => {
@@ -401,7 +400,7 @@ describe('HY Food Company Pricing matches Ready Set Flat Fee', () => {
       expect(result.deliveryFee).toBe(90);
     });
 
-    it('Headcount 50, Food $700, 12 miles → $90 + (2 × $2.50) = $95', () => {
+    it('Headcount 50, Food $700, 12 miles → $90 + (2 × $3.00) = $96', () => {
       const result = calculateDeliveryCost({
         headcount: 50,
         foodCost: 700,
@@ -410,8 +409,8 @@ describe('HY Food Company Pricing matches Ready Set Flat Fee', () => {
       });
 
       expect(result.deliveryCost).toBe(90);
-      expect(result.totalMileagePay).toBe(5); // 2 miles × $2.50
-      expect(result.deliveryFee).toBe(95);
+      expect(result.totalMileagePay).toBe(6); // 2 miles × $3.00
+      expect(result.deliveryFee).toBe(96);
     });
   });
 
@@ -515,7 +514,11 @@ describe('HY Food Company Pricing matches Ready Set Flat Fee', () => {
      * - $23.00 if headcount 25-49
      * - $33.00 if headcount 50-74
      * - $43.00 if headcount 75-99
-     * - $53.00 if headcount > 100
+     * - $63.00 if headcount 100-124
+     * - $73.00 if headcount 125-149
+     * - $83.00 if headcount 150-174
+     * - $93.00 if headcount 175-199
+     * - Case by case if headcount 200+
      */
     it('should pay $13 driver base for headcount < 25', () => {
       const result = calculateDriverPay({
@@ -569,7 +572,7 @@ describe('HY Food Company Pricing matches Ready Set Flat Fee', () => {
       expect(result.driverBasePayPerDrop).toBe(43);
     });
 
-    it('should pay $53 driver base for headcount > 100', () => {
+    it('should pay $63 driver base for headcount 100-124', () => {
       const result = calculateDriverPay({
         headcount: 120,
         foodCost: 1400,
@@ -579,7 +582,59 @@ describe('HY Food Company Pricing matches Ready Set Flat Fee', () => {
         clientConfigId: 'hy-food-company-direct',
       });
 
-      expect(result.driverBasePayPerDrop).toBe(53);
+      expect(result.driverBasePayPerDrop).toBe(63);
+    });
+
+    it('should pay $73 driver base for headcount 125-149', () => {
+      const result = calculateDriverPay({
+        headcount: 130,
+        foodCost: 1600,
+        totalMileage: 5,
+        bonusQualified: true,
+        bonusQualifiedPercent: 100,
+        clientConfigId: 'hy-food-company-direct',
+      });
+
+      expect(result.driverBasePayPerDrop).toBe(73);
+    });
+
+    it('should pay $83 driver base for headcount 150-174', () => {
+      const result = calculateDriverPay({
+        headcount: 160,
+        foodCost: 1800,
+        totalMileage: 5,
+        bonusQualified: true,
+        bonusQualifiedPercent: 100,
+        clientConfigId: 'hy-food-company-direct',
+      });
+
+      expect(result.driverBasePayPerDrop).toBe(83);
+    });
+
+    it('should pay $93 driver base for headcount 175-199', () => {
+      const result = calculateDriverPay({
+        headcount: 190,
+        foodCost: 2000,
+        totalMileage: 5,
+        bonusQualified: true,
+        bonusQualifiedPercent: 100,
+        clientConfigId: 'hy-food-company-direct',
+      });
+
+      expect(result.driverBasePayPerDrop).toBe(93);
+    });
+
+    it('should require manual review for headcount 200+ (case by case)', () => {
+      expect(() => {
+        calculateDriverPay({
+          headcount: 200,
+          foodCost: 2200,
+          totalMileage: 5,
+          bonusQualified: true,
+          bonusQualifiedPercent: 100,
+          clientConfigId: 'hy-food-company-direct',
+        });
+      }).toThrow(/manual review/i);
     });
 
     it('should calculate correct total driver pay for tier 25-49 (within 10 miles)', () => {

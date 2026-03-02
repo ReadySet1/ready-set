@@ -58,7 +58,7 @@ export interface DriverPayBreakdown {
   readySetTotalFee: number; // Total Ready Set fees
   driverBonusPay: number; // Bonus if qualified (0 if direct tip received)
   directTip: number; // Direct tip amount (100% to driver)
-  totalDriverPay: number; // Final driver payment (base + mileage + bonus + extraStops + tip)
+  totalDriverPay: number; // Final driver payment (base + mileage + bonus + extraStops + bridgeToll + tip)
   bonusQualifiedPercent: number; // 0-100%
   bonusQualified: boolean; // Whether driver qualifies for bonus
 }
@@ -683,6 +683,7 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
       zeroOrderSettings.driverMileagePay +
       driverBonusPay +
       extraStopsBonus +
+      effectiveBridgeToll +
       directTip;
 
     return {
@@ -768,9 +769,9 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
   const driverTotalBasePay = driverBasePay;
 
   // Step 7: Calculate Driver Total Pay
-  // Formula: Base Pay + Mileage + Bonus + Extra Stops + Direct Tip
-  // When tip received: 0 + Mileage + 0 + Extra Stops + Tip
-  const totalDriverPay = driverTotalBasePay + totalMileagePay + driverBonusPay + extraStopsBonus + directTip;
+  // Formula: Base Pay + Mileage + Bonus + Extra Stops + Bridge Toll + Direct Tip
+  // When tip received: 0 + Mileage + 0 + Extra Stops + Bridge Toll + Tip
+  const totalDriverPay = driverTotalBasePay + totalMileagePay + driverBonusPay + extraStopsBonus + effectiveBridgeToll + directTip;
 
   // Step 8: Ready Set fees
   // For clients like HY Food Company, Ready Set fee matches the customer delivery fee tier
