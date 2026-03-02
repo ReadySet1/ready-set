@@ -73,6 +73,12 @@ const DeliveryPartners: React.FC = () => {
       alt: "Food.ee logo",
       url: "https://specials.tryhungry.com/foodeeandhungry",
     },
+    {
+      name: "La BBQ",
+      image: getCloudinaryUrl("food/partners/labbq"),
+      alt: "La BBQ logo",
+      url: "https://labarbecue.com/#",
+    },
   ];
 
   return (
@@ -128,34 +134,39 @@ const DeliveryPartners: React.FC = () => {
               </motion.div>
             ))}
           </div>
-          {/* Last logo centered */}
-          {partners[8] && (
-            <motion.div
-              className="mt-8 flex justify-center md:mt-10"
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{
-                duration: 0.5,
-                delay: 0.8,
-              }}
-            >
-              <a
-                href={partners[8].url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="relative h-24 w-full max-w-[200px] transition-transform hover:scale-105 md:h-32 lg:h-36"
-                aria-label={`Visit ${partners[8].name} website`}
-              >
-                <Image
-                  src={partners[8].image}
-                  alt={partners[8].alt}
-                  fill
-                  className="object-contain"
-                  sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 200px"
-                />
-              </a>
-            </motion.div>
+          {/* Remaining logos centered */}
+          {partners.length > 8 && (
+            <div className="mt-8 flex flex-wrap justify-center gap-6 md:mt-10 md:gap-8 lg:gap-10">
+              {partners.slice(8).map((partner, index) => (
+                <motion.div
+                  key={partner.name}
+                  className="flex w-[calc(50%-12px)] items-center justify-center md:w-[calc(25%-24px)]"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{
+                    duration: 0.5,
+                    delay: 0.8 + index * 0.1,
+                  }}
+                >
+                  <a
+                    href={partner.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="relative h-24 w-full max-w-[200px] transition-transform hover:scale-105 md:h-32 lg:h-36"
+                    aria-label={`Visit ${partner.name} website`}
+                  >
+                    <Image
+                      src={partner.image}
+                      alt={partner.alt}
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 200px"
+                    />
+                  </a>
+                </motion.div>
+              ))}
+            </div>
           )}
         </div>
 
