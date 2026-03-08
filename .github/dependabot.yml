@@ -3,7 +3,13 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       # Ignore major version updates for Next.js - requires manual migration
       - dependency-name: "next"

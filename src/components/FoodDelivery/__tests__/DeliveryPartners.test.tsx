@@ -131,6 +131,7 @@ describe("DeliveryPartners", () => {
         "Roost Roast logo",
         "Noor Indian Fusion Kitchen logo",
         "Food.ee logo",
+        "La BBQ logo",
       ];
 
       expectedPartners.forEach((altText) => {
@@ -151,6 +152,7 @@ describe("DeliveryPartners", () => {
         "/images/food/partners/roostroast",
         "/images/food/partners/noor",
         "/images/food/partners/foodee",
+        "/images/food/partners/labbq",
       ];
 
       expectedPaths.forEach((path) => {
@@ -163,56 +165,71 @@ describe("DeliveryPartners", () => {
       render(<DeliveryPartners />);
 
       const hoverContainers = document.querySelectorAll(".hover\\:scale-105");
-      // 8 in grid + 1 centered = 9 total
-      expect(hoverContainers).toHaveLength(9);
+      // 8 in grid + 2 overflow = 10 total
+      expect(hoverContainers).toHaveLength(10);
     });
   });
 
-  describe("Last Partner Centered", () => {
-    it("renders the 9th partner (Food.ee) in a centered container", () => {
+  describe("Overflow Partners Section", () => {
+    it("renders overflow partners in a centered flex-wrap container", () => {
       render(<DeliveryPartners />);
 
-      const centeredContainer = document.querySelector(".mt-8.flex.justify-center");
-      expect(centeredContainer).toBeInTheDocument();
-      expect(centeredContainer).toHaveClass("mt-8", "flex", "justify-center", "md:mt-10");
+      const overflowContainer = document.querySelector(".mt-8.flex.flex-wrap.justify-center");
+      expect(overflowContainer).toBeInTheDocument();
+      expect(overflowContainer).toHaveClass("mt-8", "flex", "flex-wrap", "justify-center", "md:mt-10");
     });
 
-    it("renders the last partner image in the centered section", () => {
+    it("renders both overflow partner images (Food.ee and La BBQ)", () => {
       render(<DeliveryPartners />);
 
-      const centeredContainer = document.querySelector(".mt-8.flex.justify-center");
-      expect(centeredContainer).toBeInTheDocument();
+      const overflowContainer = document.querySelector(".mt-8.flex.flex-wrap.justify-center");
+      expect(overflowContainer).toBeInTheDocument();
 
-      const lastPartnerImage = within(centeredContainer as HTMLElement).getByAltText("Food.ee logo");
-      expect(lastPartnerImage).toBeInTheDocument();
-      expect(lastPartnerImage).toHaveAttribute("src", "/images/food/partners/foodee");
+      const foodeeImage = within(overflowContainer as HTMLElement).getByAltText("Food.ee logo");
+      expect(foodeeImage).toBeInTheDocument();
+      expect(foodeeImage).toHaveAttribute("src", "/images/food/partners/foodee");
+
+      const labbqImage = within(overflowContainer as HTMLElement).getByAltText("La BBQ logo");
+      expect(labbqImage).toBeInTheDocument();
+      expect(labbqImage).toHaveAttribute("src", "/images/food/partners/labbq");
     });
 
-    it("applies correct styling to the centered partner container", () => {
+    it("renders exactly 2 images in the overflow section", () => {
       render(<DeliveryPartners />);
 
-      const centeredContainer = document.querySelector(".mt-8.flex.justify-center");
-      const innerLink = centeredContainer?.querySelector("a.relative.h-24");
-      
-      expect(innerLink).toHaveClass(
-        "relative",
-        "h-24",
-        "w-full",
-        "max-w-[200px]",
-        "transition-transform",
-        "hover:scale-105",
-        "md:h-32",
-        "lg:h-36"
-      );
+      const overflowContainer = document.querySelector(".mt-8.flex.flex-wrap.justify-center");
+      const overflowImages = overflowContainer?.querySelectorAll("img");
+      expect(overflowImages).toHaveLength(2);
+    });
+
+    it("applies correct styling to overflow partner links", () => {
+      render(<DeliveryPartners />);
+
+      const overflowContainer = document.querySelector(".mt-8.flex.flex-wrap.justify-center");
+      const innerLinks = overflowContainer?.querySelectorAll("a.relative.h-24");
+
+      expect(innerLinks).toHaveLength(2);
+      innerLinks?.forEach((link) => {
+        expect(link).toHaveClass(
+          "relative",
+          "h-24",
+          "w-full",
+          "max-w-[200px]",
+          "transition-transform",
+          "hover:scale-105",
+          "md:h-32",
+          "lg:h-36"
+        );
+      });
     });
   });
 
   describe("Conditional Rendering", () => {
-    it("renders all 9 partners total", () => {
+    it("renders all 10 partners total", () => {
       render(<DeliveryPartners />);
 
       const allImages = screen.getAllByRole("img");
-      expect(allImages).toHaveLength(9);
+      expect(allImages).toHaveLength(10);
     });
 
     it("renders the correct number of partners in each section", () => {
@@ -223,10 +240,10 @@ describe("DeliveryPartners", () => {
       const gridImages = grid?.querySelectorAll("img");
       expect(gridImages).toHaveLength(8);
 
-      // Centered section should have 1 partner
-      const centeredContainer = document.querySelector(".mt-8.flex.justify-center");
-      const centeredImages = centeredContainer?.querySelectorAll("img");
-      expect(centeredImages).toHaveLength(1);
+      // Overflow section should have 2 partners
+      const overflowContainer = document.querySelector(".mt-8.flex.flex-wrap.justify-center");
+      const overflowImages = overflowContainer?.querySelectorAll("img");
+      expect(overflowImages).toHaveLength(2);
     });
   });
 
@@ -244,7 +261,7 @@ describe("DeliveryPartners", () => {
       render(<DeliveryPartners />);
 
       const links = screen.getAllByRole("link");
-      expect(links).toHaveLength(9);
+      expect(links).toHaveLength(10);
 
       links.forEach((link) => {
         expect(link).toHaveClass(
@@ -377,11 +394,11 @@ describe("DeliveryPartners", () => {
       });
     });
 
-    it("applies responsive margin to centered partner section", () => {
+    it("applies responsive margin to overflow partner section", () => {
       render(<DeliveryPartners />);
 
-      const centeredContainer = document.querySelector(".mt-8.flex.justify-center");
-      expect(centeredContainer).toHaveClass("mt-8", "md:mt-10");
+      const overflowContainer = document.querySelector(".mt-8.flex.flex-wrap.justify-center");
+      expect(overflowContainer).toHaveClass("mt-8", "md:mt-10");
     });
   });
 
@@ -396,13 +413,14 @@ describe("DeliveryPartners", () => {
       { name: "Roost Roast", url: "https://www.roostandroast.com/" },
       { name: "Noor Indian Fusion Kitchen", url: "https://noorfusionkitchen.com/" },
       { name: "Food.ee", url: "https://specials.tryhungry.com/foodeeandhungry" },
+      { name: "La BBQ", url: "https://labarbecue.com/#" },
     ];
 
     it("renders all partner logos as clickable links", () => {
       render(<DeliveryPartners />);
 
       const links = screen.getAllByRole("link");
-      expect(links).toHaveLength(9);
+      expect(links).toHaveLength(10);
     });
 
     it("renders partner links with correct href URLs", () => {
@@ -477,11 +495,18 @@ describe("DeliveryPartners", () => {
       expect(destinoLink).toHaveAttribute("href", "https://www.destinosf.com/");
     });
 
-    it("renders Food.ee link with correct URL in centered section", () => {
+    it("renders Food.ee link with correct URL in overflow section", () => {
       render(<DeliveryPartners />);
 
       const foodeeLink = screen.getByRole("link", { name: /visit food\.ee website/i });
       expect(foodeeLink).toHaveAttribute("href", "https://specials.tryhungry.com/foodeeandhungry");
+    });
+
+    it("renders La BBQ link with correct URL", () => {
+      render(<DeliveryPartners />);
+
+      const labbqLink = screen.getByRole("link", { name: /visit la bbq website/i });
+      expect(labbqLink).toHaveAttribute("href", "https://labarbecue.com/#");
     });
   });
 
@@ -536,9 +561,7 @@ describe("DeliveryPartners", () => {
       render(<DeliveryPartners />);
 
       const images = screen.getAllByRole("img");
-      // Verify that images are present - the onError handler is tested implicitly
-      // through TypeScript type checking and the component's implementation
-      expect(images).toHaveLength(9);
+      expect(images).toHaveLength(10);
     });
   });
 });
