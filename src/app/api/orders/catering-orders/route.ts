@@ -12,7 +12,7 @@ import {
     CateringStatus,
     CateringRequestWhereInput
 } from "@/types/prisma"; 
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library"; 
+// PrismaClientKnownRequestError is now at Prisma.PrismaClientKnownRequestError in Prisma 7
 
 const ITEMS_PER_PAGE = 10;
 
@@ -335,14 +335,13 @@ export async function GET(req: NextRequest) {
     let errorMessage = "An internal server error occurred";
     let statusCode = 500;
 
-    if (error instanceof PrismaClientKnownRequestError) { 
-       const prismaError = error as PrismaClientKnownRequestError;
-       if (prismaError.code === 'P1001') {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) { 
+       if (error.code === 'P1001') {
           errorMessage = "Database connection issue. Please try again later.";
           statusCode = 503; 
        } else {
           errorMessage = process.env.NODE_ENV === 'development' 
-            ? `Database query failed: ${prismaError.message} (Code: ${prismaError.code}).`
+            ? `Database query failed: ${error.message} (Code: ${error.code}).`
             : "Database query failed";
        }
     } else if (error instanceof Error) {

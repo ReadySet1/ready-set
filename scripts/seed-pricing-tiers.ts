@@ -5,8 +5,8 @@
  * Run with: pnpm tsx scripts/seed-pricing-tiers.ts
  */
 
-import { PrismaClient } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { PrismaClient, Prisma } from '@prisma/client';
+import { Decimal } from 'decimal.js';
 import { PRICING_TIER_CONSTANTS } from '../src/types/pricing';
 
 const prisma = new PrismaClient();
