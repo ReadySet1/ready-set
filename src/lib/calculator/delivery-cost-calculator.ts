@@ -299,9 +299,15 @@ function checkManualReviewRequired(headcount: number, config: ClientDeliveryConf
  * when headcount is 0 but food cost > 0.
  * For clients without tiers, returns the flat basePayPerDrop.
  *
+ * Some clients (e.g., Kasa) have distance-based driver base pay: a lower rate for drives
+ * within the distance threshold and the standard rate for drives over the threshold.
+ * When `isWithinThreshold` is true and a tier has `basePayWithinThreshold` defined,
+ * that rate is used instead of `basePay`.
+ *
  * @param headcount - Number of people to serve
  * @param config - Client delivery configuration
  * @param foodCost - Food cost amount (used when headcount is 0)
+ * @param isWithinThreshold - Whether the drive is within the distance threshold
  * @returns Driver base pay amount in dollars
  * @throws {Error} If no matching tier found or configuration invalid (e.g., basePay === 0)
  *
@@ -316,11 +322,17 @@ function checkManualReviewRequired(headcount: number, config: ClientDeliveryConf
  * // Try Hungry with 30 headcount returns $23 (tier 25-49)
  * const basePay = determineDriverBasePay(30, TRY_HUNGRY); // Returns 23
  *
- * // HY Food Company with headcount 0 and food cost $300 returns $23 (food cost tier $300-$599)
- * const basePay = determineDriverBasePay(0, HY_FOOD_COMPANY_DIRECT, 300); // Returns 23
+ * // Kasa with 30 headcount within 10mi returns $13; over 10mi returns $23
+ * const basePay = determineDriverBasePay(30, KASA, 0, true); // Returns 13
+ * const basePay = determineDriverBasePay(30, KASA, 0, false); // Returns 23
  * ```
  */
-function determineDriverBasePay(headcount: number, config: ClientDeliveryConfiguration, foodCost: number = 0): number {
+function determineDriverBasePay(
+  headcount: number,
+  config: ClientDeliveryConfiguration,
+  foodCost: number = 0,
+  isWithinThreshold: boolean = false
+): number {
   // Special case: When headcount is 0 but food cost > 0, use food cost tiers if available
   // This is for clients like HY Food Company where driver base pay can be determined by food cost
   if (headcount === 0 && foodCost > 0 && config.driverPaySettings.driverFoodCostPayTiers && config.driverPaySettings.driverFoodCostPayTiers.length > 0) {
@@ -332,15 +344,20 @@ function determineDriverBasePay(headcount: number, config: ClientDeliveryConfigu
       throw new Error(`No driver base pay tier found for food cost: ${foodCost}`);
     }
 
+    // Use within-threshold rate when available and applicable
+    const effectiveBasePay = (isWithinThreshold && tier.basePayWithinThreshold !== undefined)
+      ? tier.basePayWithinThreshold
+      : tier.basePay;
+
     // Validate tier configuration - basePay should not be 0
-    if (tier.basePay === 0) {
+    if (effectiveBasePay === 0 && tier.basePay === 0) {
       throw new Error(
         `Invalid tier configuration: basePay is 0 for food cost ${foodCost}. ` +
         `This indicates a pricing configuration error for ${config.clientName}.`
       );
     }
 
-    return tier.basePay;
+    return effectiveBasePay;
   }
 
   // If config has tiered driver base pay by headcount, use it
@@ -374,6 +391,11 @@ function determineDriverBasePay(headcount: number, config: ClientDeliveryConfigu
         `Invalid configuration: basePay is 0 for headcount ${headcount} ` +
         `and manual review was not triggered. Check tier configuration for ${config.clientName}.`
       );
+    }
+
+    // Use within-threshold rate when available and applicable
+    if (isWithinThreshold && tier.basePayWithinThreshold !== undefined) {
+      return tier.basePayWithinThreshold;
     }
 
     return tier.basePay;
@@ -636,13 +658,18 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
   // Driver only receives tip + mileage when a direct tip is given
   const hasDirectTip = directTip > 0;
 
+  // Determine if within distance threshold (used for distance-based driver base pay, e.g. Kasa)
+  const mileageThreshold = config.driverPaySettings.driverMileageSettings?.threshold ?? config.distanceThreshold;
+  const isWithinThreshold = totalMileage <= mileageThreshold;
+
   // Step 1: Determine driver base pay
   // If direct tip received, base pay is $0
   // Uses client's tier/flat settings from config (headcount tiers, or food cost tiers
   // when headcount is 0 but food cost > 0)
+  // For clients with distance-based rates (e.g. Kasa), uses lower rate within threshold
   let driverBasePay = 0;
   if (!hasDirectTip) {
-    driverBasePay = determineDriverBasePay(headcount, config, foodCost);
+    driverBasePay = determineDriverBasePay(headcount, config, foodCost, isWithinThreshold);
   }
 
   // Step 2: Calculate driver mileage pay

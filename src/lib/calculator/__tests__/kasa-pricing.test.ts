@@ -6,41 +6,24 @@
  * Key rules for Kasa:
  * 1. Ready Set fee is TIER-BASED (matches customer delivery fee via LESSER rule)
  * 2. Two distinct rate structures: within 10 miles vs over 10 miles
- * 3. Driver mileage: flat $7 within 10mi, total × $0.70 over 10mi
- * 4. Customer/RS mileage add-on: $3.00/mile after 10 miles
- * 5. 125+ headcount requires manual review (case by case)
- * 6. RS Total = RS Fee + Addon + Toll + Tip
- * 7. Driver Total = Base Pay + Mileage + Bonus + Extra Stops + Bridge Toll + Tip
+ * 3. Driver base pay is DISTANCE-DEPENDENT: lower rates within 10mi, standard over 10mi
+ * 4. Driver mileage: flat $7 within 10mi, total × $0.70 over 10mi
+ * 5. Customer/RS mileage add-on: $3.00/mile after 10 miles
+ * 6. 125+ headcount requires manual review (case by case)
+ * 7. RS Total = RS Fee + Addon + Toll + Tip
+ * 8. Driver Total = Base Pay + Mileage + Bonus + Extra Stops + Bridge Toll + Tip
  *
- * Ready Set Fee (within 10 miles):
- * | Headcount | Food Cost       | RS Fee |
- * |-----------|-----------------|--------|
- * | 0-24      | < $300          | $30    |
- * | 25-49     | $300-$599       | $40    |
- * | 50-74     | $600-$899       | $60    |
- * | 75-99     | $900-$1,199     | $70    |
- * | 100-124   | $1,200-$1,499   | $80    |
- * | 125-149   | $1,500-$1,699   | $90    |
- * | 150-174   | $1,700-$1,899   | $100   |
- * | 175-199   | $1,900-$2,099   | $110   |
- * | 200-249   | $2,100-$2,299   | $120   |
- * | 250-299   | $2,300-$2,499   | $130   |
+ * Driver Base Pay (within 10 miles):
+ * | Headcount | Food Cost       | Base Pay |
+ * |-----------|-----------------|----------|
+ * | 0-24      | < $300          | $3       |
+ * | 25-49     | $300-$599       | $13      |
+ * | 50-74     | $600-$899       | $23      |
+ * | 75-99     | $900-$1,199     | $33      |
+ * | 100-124   | $1,200-$1,499   | $43      |
+ * | 125+      | $1,500+         | Case by case |
  *
- * Ready Set Fee (over 10 miles):
- * | Headcount | Food Cost       | RS Fee |
- * |-----------|-----------------|--------|
- * | 0-24      | < $300          | $60    |
- * | 25-49     | $300-$599       | $70    |
- * | 50-74     | $600-$899       | $90    |
- * | 75-99     | $900-$1,199     | $100   |
- * | 100-124   | $1,200-$1,499   | $120   |
- * | 125-149   | $1,500-$1,699   | $150   |
- * | 150-174   | $1,700-$1,899   | $180   |
- * | 175-199   | $1,900-$2,099   | $210   |
- * | 200-249   | $2,100-$2,299   | $280   |
- * | 250-299   | $2,300-$2,499   | $310   |
- *
- * Driver Base Payment:
+ * Driver Base Pay (over 10 miles):
  * | Headcount | Food Cost       | Base Pay |
  * |-----------|-----------------|----------|
  * | 0-24      | < $300          | $18      |
@@ -113,6 +96,22 @@ describe('Kasa Pricing', () => {
     it('should have distinct within/beyond 10 miles rates (not flat)', () => {
       KASA.pricingTiers.slice(0, -1).forEach((tier) => {
         expect(tier.within10Miles).toBeLessThan(tier.regularRate);
+      });
+    });
+
+    it('should have basePayWithinThreshold on headcount tiers (except manual review)', () => {
+      const tiers = KASA.driverPaySettings.driverBasePayTiers!;
+      tiers.slice(0, -1).forEach((tier) => {
+        expect(tier.basePayWithinThreshold).toBeDefined();
+        expect(tier.basePayWithinThreshold!).toBeLessThan(tier.basePay);
+      });
+    });
+
+    it('should have basePayWithinThreshold on food cost tiers (except manual review)', () => {
+      const tiers = KASA.driverPaySettings.driverFoodCostPayTiers!;
+      tiers.slice(0, -1).forEach((tier) => {
+        expect(tier.basePayWithinThreshold).toBeDefined();
+        expect(tier.basePayWithinThreshold!).toBeLessThan(tier.basePay);
       });
     });
   });
@@ -380,11 +379,46 @@ describe('Kasa Pricing', () => {
   });
 
   // ============================================================================
-  // DRIVER BASE PAY — TIERED BY HEADCOUNT
+  // DRIVER BASE PAY — WITHIN 10 MILES (LOWER RATES)
   // ============================================================================
 
-  describe('Driver Base Pay — Tiered by Headcount', () => {
-    const basePayCases = [
+  describe('Driver Base Pay — Within 10 Miles (Lower Rates)', () => {
+    const within10MiBasePayCases = [
+      { headcount: 10, expected: 3, tier: '0-24' },
+      { headcount: 24, expected: 3, tier: '0-24 (boundary)' },
+      { headcount: 25, expected: 13, tier: '25-49' },
+      { headcount: 49, expected: 13, tier: '25-49 (boundary)' },
+      { headcount: 50, expected: 23, tier: '50-74' },
+      { headcount: 74, expected: 23, tier: '50-74 (boundary)' },
+      { headcount: 75, expected: 33, tier: '75-99' },
+      { headcount: 99, expected: 33, tier: '75-99 (boundary)' },
+      { headcount: 100, expected: 43, tier: '100-124' },
+      { headcount: 124, expected: 43, tier: '100-124 (boundary)' },
+    ];
+
+    within10MiBasePayCases.forEach(({ headcount, expected, tier }) => {
+      it(`Tier ${tier}: HC ${headcount}, within 10mi → $${expected} base pay`, () => {
+        const result = calculateDriverPay({
+          headcount,
+          foodCost: 0,
+          totalMileage: 5, // Within 10 miles
+          bonusQualified: true,
+          bonusQualifiedPercent: 100,
+          clientConfigId: 'kasa',
+        });
+
+        expect(result.driverBasePayPerDrop).toBe(expected);
+        expect(result.driverTotalBasePay).toBe(expected);
+      });
+    });
+  });
+
+  // ============================================================================
+  // DRIVER BASE PAY — OVER 10 MILES (STANDARD RATES)
+  // ============================================================================
+
+  describe('Driver Base Pay — Over 10 Miles (Standard Rates)', () => {
+    const over10MiBasePayCases = [
       { headcount: 10, expected: 18, tier: '0-24' },
       { headcount: 24, expected: 18, tier: '0-24 (boundary)' },
       { headcount: 25, expected: 23, tier: '25-49' },
@@ -397,12 +431,12 @@ describe('Kasa Pricing', () => {
       { headcount: 124, expected: 53, tier: '100-124 (boundary)' },
     ];
 
-    basePayCases.forEach(({ headcount, expected, tier }) => {
-      it(`Tier ${tier}: HC ${headcount} → $${expected} base pay`, () => {
+    over10MiBasePayCases.forEach(({ headcount, expected, tier }) => {
+      it(`Tier ${tier}: HC ${headcount}, over 10mi → $${expected} base pay`, () => {
         const result = calculateDriverPay({
           headcount,
           foodCost: 0,
-          totalMileage: 5,
+          totalMileage: 15, // Over 10 miles
           bonusQualified: true,
           bonusQualifiedPercent: 100,
           clientConfigId: 'kasa',
@@ -418,21 +452,21 @@ describe('Kasa Pricing', () => {
   // DRIVER BASE PAY — FOOD COST TIERS (WHEN HEADCOUNT = 0)
   // ============================================================================
 
-  describe('Driver Base Pay — Food Cost Tiers (headcount = 0)', () => {
-    const foodCostBasePayCases = [
-      { foodCost: 200, expected: 18, tier: '< $300' },
-      { foodCost: 400, expected: 23, tier: '$300-$599' },
-      { foodCost: 750, expected: 33, tier: '$600-$899' },
-      { foodCost: 1000, expected: 43, tier: '$900-$1,199' },
-      { foodCost: 1300, expected: 53, tier: '$1,200-$1,499' },
+  describe('Driver Base Pay — Food Cost Tiers Within 10mi (headcount = 0)', () => {
+    const foodCostWithin10MiCases = [
+      { foodCost: 200, expected: 3, tier: '< $300' },
+      { foodCost: 400, expected: 13, tier: '$300-$599' },
+      { foodCost: 750, expected: 23, tier: '$600-$899' },
+      { foodCost: 1000, expected: 33, tier: '$900-$1,199' },
+      { foodCost: 1300, expected: 43, tier: '$1,200-$1,499' },
     ];
 
-    foodCostBasePayCases.forEach(({ foodCost, expected, tier }) => {
-      it(`Food cost tier ${tier}: FC $${foodCost} → $${expected} base pay`, () => {
+    foodCostWithin10MiCases.forEach(({ foodCost, expected, tier }) => {
+      it(`Food cost tier ${tier}: FC $${foodCost}, within 10mi → $${expected} base pay`, () => {
         const result = calculateDriverPay({
           headcount: 0,
           foodCost,
-          totalMileage: 5,
+          totalMileage: 5, // Within 10 miles
           bonusQualified: true,
           bonusQualifiedPercent: 100,
           clientConfigId: 'kasa',
@@ -441,6 +475,66 @@ describe('Kasa Pricing', () => {
         expect(result.driverBasePayPerDrop).toBe(expected);
         expect(result.driverTotalBasePay).toBe(expected);
       });
+    });
+  });
+
+  describe('Driver Base Pay — Food Cost Tiers Over 10mi (headcount = 0)', () => {
+    const foodCostOver10MiCases = [
+      { foodCost: 200, expected: 18, tier: '< $300' },
+      { foodCost: 400, expected: 23, tier: '$300-$599' },
+      { foodCost: 750, expected: 33, tier: '$600-$899' },
+      { foodCost: 1000, expected: 43, tier: '$900-$1,199' },
+      { foodCost: 1300, expected: 53, tier: '$1,200-$1,499' },
+    ];
+
+    foodCostOver10MiCases.forEach(({ foodCost, expected, tier }) => {
+      it(`Food cost tier ${tier}: FC $${foodCost}, over 10mi → $${expected} base pay`, () => {
+        const result = calculateDriverPay({
+          headcount: 0,
+          foodCost,
+          totalMileage: 15, // Over 10 miles
+          bonusQualified: true,
+          bonusQualifiedPercent: 100,
+          clientConfigId: 'kasa',
+        });
+
+        expect(result.driverBasePayPerDrop).toBe(expected);
+        expect(result.driverTotalBasePay).toBe(expected);
+      });
+    });
+  });
+
+  // ============================================================================
+  // DRIVER BASE PAY — BOUNDARY AT EXACTLY 10 MILES
+  // ============================================================================
+
+  describe('Driver Base Pay — 10-Mile Boundary', () => {
+    it('should use within-threshold rate at exactly 10 miles', () => {
+      const result = calculateDriverPay({
+        headcount: 30,
+        foodCost: 400,
+        totalMileage: 10,
+        bonusQualified: true,
+        bonusQualifiedPercent: 100,
+        clientConfigId: 'kasa',
+      });
+
+      // 10 miles = within threshold → $13 (not $23)
+      expect(result.driverBasePayPerDrop).toBe(13);
+    });
+
+    it('should use over-threshold rate at 10.1 miles', () => {
+      const result = calculateDriverPay({
+        headcount: 30,
+        foodCost: 400,
+        totalMileage: 10.1,
+        bonusQualified: true,
+        bonusQualifiedPercent: 100,
+        clientConfigId: 'kasa',
+      });
+
+      // 10.1 miles = over threshold → $23
+      expect(result.driverBasePayPerDrop).toBe(23);
     });
   });
 
@@ -597,7 +691,7 @@ describe('Kasa Pricing', () => {
   // ============================================================================
 
   describe('Direct Tip — Mutually Exclusive with Base Pay & Bonus', () => {
-    it('should set base pay and bonus to $0 when direct tip is received', () => {
+    it('should set base pay and bonus to $0 when direct tip is received (within 10mi)', () => {
       const result = calculateDriverPay({
         headcount: 60,
         foodCost: 750,
@@ -684,7 +778,7 @@ describe('Kasa Pricing', () => {
       expect(result.deliveryFee).toBe(48.50);
     });
 
-    it('should include bridge toll in driver pay', () => {
+    it('should include bridge toll in driver pay (within 10mi)', () => {
       const result = calculateDriverPay({
         headcount: 30,
         foodCost: 400,
@@ -696,8 +790,8 @@ describe('Kasa Pricing', () => {
       });
 
       expect(result.bridgeToll).toBe(8.50);
-      // $23 base + $7 mileage + $10 bonus + $8.50 toll = $48.50
-      expect(result.totalDriverPay).toBe(48.50);
+      // $13 base (within 10mi) + $7 mileage + $10 bonus + $8.50 toll = $38.50
+      expect(result.totalDriverPay).toBe(38.50);
     });
   });
 
@@ -706,7 +800,7 @@ describe('Kasa Pricing', () => {
   // ============================================================================
 
   describe('Complete Calculation Scenarios', () => {
-    it('Scenario 1: HC 10, FC $200, 5mi, bonus — within 10mi', () => {
+    it('Scenario 1: HC 10, FC $200, 5mi, bonus — within 10mi (lower driver base)', () => {
       const deliveryCost = calculateDeliveryCost({
         headcount: 10,
         foodCost: 200,
@@ -731,14 +825,14 @@ describe('Kasa Pricing', () => {
       expect(driverPay.readySetFee).toBe(30);
       expect(driverPay.readySetTotalFee).toBe(30);
 
-      // Driver: $18 base + $7 mileage + $10 bonus = $35
-      expect(driverPay.driverTotalBasePay).toBe(18);
+      // Driver: $3 base (within 10mi) + $7 mileage + $10 bonus = $20
+      expect(driverPay.driverTotalBasePay).toBe(3);
       expect(driverPay.totalMileagePay).toBe(7);
       expect(driverPay.driverBonusPay).toBe(10);
-      expect(driverPay.totalDriverPay).toBe(35);
+      expect(driverPay.totalDriverPay).toBe(20);
     });
 
-    it('Scenario 2: HC 40, FC $500, 15mi, bonus — over 10mi', () => {
+    it('Scenario 2: HC 40, FC $500, 15mi, bonus — over 10mi (standard driver base)', () => {
       const deliveryCost = calculateDeliveryCost({
         headcount: 40,
         foodCost: 500,
@@ -763,7 +857,7 @@ describe('Kasa Pricing', () => {
       // RS fee: $70 (over 10mi tier)
       expect(driverPay.readySetFee).toBe(70);
 
-      // Driver: $23 base + $10.50 mileage (15 × $0.70) + $10 bonus = $43.50
+      // Driver: $23 base (over 10mi) + $10.50 mileage (15 × $0.70) + $10 bonus = $43.50
       expect(driverPay.driverTotalBasePay).toBe(23);
       expect(driverPay.totalMileagePay).toBe(10.50);
       expect(driverPay.driverBonusPay).toBe(10);
@@ -797,11 +891,11 @@ describe('Kasa Pricing', () => {
       expect(driverPay.readySetFee).toBe(80);
       expect(driverPay.readySetTotalFee).toBe(88.50);
 
-      // Driver: $53 base + $7 mileage + $10 bonus + $8.50 toll = $78.50
-      expect(driverPay.driverTotalBasePay).toBe(53);
+      // Driver: $43 base (within 10mi) + $7 mileage + $10 bonus + $8.50 toll = $68.50
+      expect(driverPay.driverTotalBasePay).toBe(43);
       expect(driverPay.totalMileagePay).toBe(7);
       expect(driverPay.driverBonusPay).toBe(10);
-      expect(driverPay.totalDriverPay).toBe(78.50);
+      expect(driverPay.totalDriverPay).toBe(68.50);
     });
 
     it('Scenario 4: HC 60, FC $750, 8mi, direct tip $25 — within 10mi', () => {
@@ -843,12 +937,42 @@ describe('Kasa Pricing', () => {
       expect(driverPay.readySetFee).toBe(70);
       expect(driverPay.readySetTotalFee).toBe(88.50);
 
-      // Driver: $23 base + $14 mileage (20 × $0.70) + $10 bonus + $8.50 toll = $55.50
+      // Driver: $23 base (over 10mi) + $14 mileage (20 × $0.70) + $10 bonus + $8.50 toll = $55.50
       expect(driverPay.driverTotalBasePay).toBe(23);
       expect(driverPay.totalMileagePay).toBe(14.00);
       expect(driverPay.driverBonusPay).toBe(10);
       expect(driverPay.bridgeToll).toBe(8.50);
       expect(driverPay.totalDriverPay).toBe(55.50);
+    });
+
+    it('Scenario 6: HC 75, FC $1000, 8mi, bonus — within 10mi vs over 10mi comparison', () => {
+      const within = calculateDriverPay({
+        headcount: 75,
+        foodCost: 1000,
+        totalMileage: 8,
+        bonusQualified: true,
+        bonusQualifiedPercent: 100,
+        clientConfigId: 'kasa',
+      });
+
+      const over = calculateDriverPay({
+        headcount: 75,
+        foodCost: 1000,
+        totalMileage: 15,
+        bonusQualified: true,
+        bonusQualifiedPercent: 100,
+        clientConfigId: 'kasa',
+      });
+
+      // Within 10mi: $33 base + $7 mileage + $10 bonus = $50
+      expect(within.driverTotalBasePay).toBe(33);
+      expect(within.totalMileagePay).toBe(7);
+      expect(within.totalDriverPay).toBe(50);
+
+      // Over 10mi: $43 base + $10.50 mileage (15 × $0.70) + $10 bonus = $63.50
+      expect(over.driverTotalBasePay).toBe(43);
+      expect(over.totalMileagePay).toBe(10.50);
+      expect(over.totalDriverPay).toBe(63.50);
     });
   });
 
@@ -917,8 +1041,53 @@ describe('Kasa Pricing', () => {
 
       // 2 extra stops × $2.50 = $5
       expect(result.extraStopsBonus).toBe(5);
-      // $23 base + $7 mileage + $10 bonus + $5 extra stops = $45
-      expect(result.totalDriverPay).toBe(45);
+      // $13 base (within 10mi) + $7 mileage + $10 bonus + $5 extra stops = $35
+      expect(result.totalDriverPay).toBe(35);
+    });
+  });
+
+  // ============================================================================
+  // NO IMPACT ON OTHER CLIENTS (REGRESSION)
+  // ============================================================================
+
+  describe('Regression — Other Clients Unaffected', () => {
+    it('CaterValley driver base pay should remain $23 for HC 30 within 10mi', () => {
+      const result = calculateDriverPay({
+        headcount: 30,
+        foodCost: 400,
+        totalMileage: 8,
+        bonusQualified: true,
+        bonusQualifiedPercent: 100,
+        clientConfigId: 'cater-valley',
+      });
+
+      expect(result.driverBasePayPerDrop).toBe(23);
+    });
+
+    it('Try Hungry driver base pay should remain $18 for HC 10 within 10mi', () => {
+      const result = calculateDriverPay({
+        headcount: 10,
+        foodCost: 0,
+        totalMileage: 5,
+        bonusQualified: true,
+        bonusQualifiedPercent: 100,
+        clientConfigId: 'try-hungry',
+      });
+
+      expect(result.driverBasePayPerDrop).toBe(18);
+    });
+
+    it('Destino driver base pay should remain $18 for HC 10 within 10mi', () => {
+      const result = calculateDriverPay({
+        headcount: 10,
+        foodCost: 0,
+        totalMileage: 5,
+        bonusQualified: true,
+        bonusQualifiedPercent: 100,
+        clientConfigId: 'ready-set-food-standard',
+      });
+
+      expect(result.driverBasePayPerDrop).toBe(18);
     });
   });
 });
