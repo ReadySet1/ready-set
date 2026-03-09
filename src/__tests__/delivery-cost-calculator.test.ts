@@ -32,10 +32,7 @@ import {
   calculateVendorPay,
   validateDeliveryCostInput,
   DeliveryCostInput,
-  DriverPayInput,
-  PRICING_TIERS,
-  MILEAGE_RATE,
-  DISTANCE_THRESHOLD
+  DriverPayInput
 } from '../lib/calculator/delivery-cost-calculator';
 
 describe('Delivery Cost Calculator', () => {
@@ -219,31 +216,29 @@ describe('Delivery Cost Calculator', () => {
         bonusQualified: true,
         readySetFee: 70,
         readySetAddonFee: 0,
-        clientConfigId: 'ready-set-food-standard' // Use specific client config
+        clientConfigId: 'ready-set-food-standard'
       };
 
       const result = calculateDriverPay(input);
 
-      // Expected with tiered driver base pay (ready-set-food-standard config):
       // Headcount 28 is in 25-49 tier → Driver Base Pay: $23.00
-      // Mileage: 3.1 miles × $0.35 = $1.09 (Destino rate, no minimum)
+      // Mileage: 3.1 miles within 10mi → flat $7.00
       // Driver Total Base Pay: $23.00
       // Driver Bonus Pay: $10.00
-      // Total Driver Pay: $23.00 + $1.09 + $10.00 = $34.09
-      // Ready Set Fee: $70.00
-      // Ready Set Total Fee: $70.00
+      // Total Driver Pay: $23.00 + $7.00 + $10.00 = $40.00
+      // Ready Set Fee: $70.00 (explicit override)
 
-      expect(result.driverMaxPayPerDrop).toBe(40);
+      expect(result.driverMaxPayPerDrop).toBeNull(); // No cap
       expect(result.driverBasePayPerDrop).toBe(23); // Tiered rate for 25-49 headcount
-      expect(result.driverTotalBasePay).toBe(23); // Base pay from tier
+      expect(result.driverTotalBasePay).toBe(23);
       expect(result.readySetFee).toBe(70);
       expect(result.readySetAddonFee).toBe(0);
-      expect(result.readySetTotalFee).toBe(70);
+      expect(result.readySetTotalFee).toBe(70); // RS fee + no addon/toll/tip
       expect(result.driverBonusPay).toBe(10);
-      expect(result.totalDriverPay).toBeCloseTo(34.09, 2); // $23 base + $1.09 mileage + $10 bonus
+      expect(result.totalDriverPay).toBe(40); // $23 base + $7 mileage + $10 bonus
       expect(result.bonusQualifiedPercent).toBe(100);
       expect(result.bonusQualified).toBe(true);
-      expect(result.totalMileagePay).toBeCloseTo(1.09, 2); // 3.1 miles × $0.35
+      expect(result.totalMileagePay).toBe(7); // Flat $7 within 10mi
     });
 
     test('driver pay with tiered base pay (50-74 headcount)', () => {
@@ -254,22 +249,19 @@ describe('Delivery Cost Calculator', () => {
         numberOfDrives: 1,
         bonusQualified: true,
         readySetFee: 70,
-        clientConfigId: 'ready-set-food-standard' // Use specific client config
+        clientConfigId: 'ready-set-food-standard'
       };
 
       const result = calculateDriverPay(input);
 
-      // With tiered driver base pay (ready-set-food-standard config):
-      // Headcount 50 is in 50-74 tier → Driver Base Pay: $33.00
-      // Mileage: 12 miles × $0.35 = $4.20 (Destino rate, no minimum)
-      // Driver Total Base Pay: $33.00
-      // Driver Bonus Pay: $10.00
-      // Total Driver Pay: $33.00 + $4.20 + $10.00 = $47.20
-      expect(result.driverBasePayPerDrop).toBe(33); // Tiered rate for 50-74 headcount
-      expect(result.driverTotalBasePay).toBe(33); // Base pay from tier
-      expect(result.totalMileagePay).toBeCloseTo(4.20, 2); // 12 × $0.35
+      // Headcount 50 in 50-74 tier → $33.00
+      // Mileage: 12mi over 10mi → 12 × $0.70 = $8.40
+      // Total: $33 + $8.40 + $10 = $51.40
+      expect(result.driverBasePayPerDrop).toBe(33);
+      expect(result.driverTotalBasePay).toBe(33);
+      expect(result.totalMileagePay).toBeCloseTo(8.40, 2); // 12 × $0.70
       expect(result.driverBonusPay).toBe(10);
-      expect(result.totalDriverPay).toBeCloseTo(47.20, 2); // $33 base + $4.20 mileage + $10 bonus
+      expect(result.totalDriverPay).toBeCloseTo(51.40, 2); // $33 + $8.40 + $10
     });
 
     test('no bonus when not qualified', () => {
@@ -280,7 +272,7 @@ describe('Delivery Cost Calculator', () => {
         numberOfDrives: 1,
         bonusQualified: false,
         readySetFee: 70,
-        clientConfigId: 'ready-set-food-standard' // Use specific client config
+        clientConfigId: 'ready-set-food-standard'
       };
 
       const result = calculateDriverPay(input);
@@ -288,16 +280,14 @@ describe('Delivery Cost Calculator', () => {
       expect(result.driverBonusPay).toBe(0);
       expect(result.bonusQualifiedPercent).toBe(0);
       expect(result.bonusQualified).toBe(false);
-      // With tiered driver base pay (ready-set-food-standard config):
-      // Headcount 30 is in 25-49 tier → Driver Base Pay: $23.00
-      // Mileage: 12 miles × $0.35 = $4.20 (Destino rate)
-      // Driver Total Base Pay: $23.00
-      // No bonus since not qualified
-      // Total: $23.00 + $4.20 = $27.20
-      expect(result.driverBasePayPerDrop).toBe(23); // Tiered rate for 25-49 headcount
-      expect(result.driverTotalBasePay).toBe(23); // Base pay from tier
-      expect(result.totalMileagePay).toBeCloseTo(4.20, 2); // 12 × $0.35
-      expect(result.totalDriverPay).toBeCloseTo(27.20, 2); // No bonus
+      // Headcount 30 in 25-49 tier → $23.00
+      // Mileage: 12mi over 10mi → 12 × $0.70 = $8.40
+      // No bonus
+      // Total: $23 + $8.40 = $31.40
+      expect(result.driverBasePayPerDrop).toBe(23);
+      expect(result.driverTotalBasePay).toBe(23);
+      expect(result.totalMileagePay).toBeCloseTo(8.40, 2); // 12 × $0.70
+      expect(result.totalDriverPay).toBeCloseTo(31.40, 2); // No bonus
     });
   });
 
@@ -577,7 +567,7 @@ describe('Delivery Cost Calculator', () => {
       expect(result.deliveryFee).toBe(52.50);
     });
 
-    test('CaterValley: Small order over 10 miles uses $85.00 rate plus mileage', () => {
+    test('CaterValley: Small order over 10 miles uses flat $42.50 rate plus mileage', () => {
       const input: DeliveryCostInput = {
         headcount: 20,
         foodCost: 250,
@@ -588,12 +578,12 @@ describe('Delivery Cost Calculator', () => {
 
       const result = calculateDeliveryCost(input);
 
-      // Over 10 miles uses regularRate of $85
-      expect(result.deliveryCost).toBe(85);
+      // CaterValley uses flat fee pricing: regularRate = within10Miles = $42.50
+      expect(result.deliveryCost).toBe(42.50);
       // Mileage: (15 - 10) × $3.00 = $15.00
       expect(result.totalMileagePay).toBeCloseTo(15.00, 2);
-      // Total: $85 + $15.00 = $100.00
-      expect(result.deliveryFee).toBeCloseTo(100.00, 2);
+      // Total: $42.50 + $15.00 = $57.50
+      expect(result.deliveryFee).toBeCloseTo(57.50, 2);
     });
 
     test('CaterValley: Large order (50-74 headcount) within 10 miles shows $62.50', () => {
@@ -643,7 +633,7 @@ describe('Delivery Cost Calculator', () => {
       expect(result.deliveryFee).toBe(42.50); // Just the base rate
     });
 
-    test('CaterValley: Edge case - 10.1 miles uses regularRate plus mileage', () => {
+    test('CaterValley: Edge case - 10.1 miles uses flat rate plus mileage', () => {
       const input: DeliveryCostInput = {
         headcount: 20,
         foodCost: 250,
@@ -654,10 +644,10 @@ describe('Delivery Cost Calculator', () => {
 
       const result = calculateDeliveryCost(input);
 
-      // Over 10 miles, should use regularRate
-      expect(result.deliveryCost).toBe(85); // Regular rate for tier 1
+      // CaterValley flat fee: regularRate = $42.50
+      expect(result.deliveryCost).toBe(42.50);
       expect(result.totalMileagePay).toBeCloseTo(0.30, 2); // (10.1 - 10) × $3.00 = $0.30
-      expect(result.deliveryFee).toBeCloseTo(85.30, 2); // $85 + $0.30
+      expect(result.deliveryFee).toBeCloseTo(42.80, 2); // $42.50 + $0.30
     });
 
     test('CaterValley: Edge case - 9.9 miles uses within10Miles rate', () => {
@@ -834,52 +824,41 @@ describe('Delivery Cost Calculator', () => {
     });
 
     test('CaterValley BUG FIX: Mileage rate is $3.00 per mile (official rate)', () => {
-      // SCENARIO: Verify correct mileage rate per official CaterValley pricing chart
-      // EXPECTED: 15-mile order should charge $3.00/mile for 5 extra miles = $15.00
       const input: DeliveryCostInput = {
         headcount: 1,
         foodCost: 16.75,
-        totalMileage: 15, // 5 miles over threshold
+        totalMileage: 15,
         numberOfDrives: 1,
         clientConfigId: 'cater-valley'
       };
 
       const result = calculateDeliveryCost(input);
 
-      // Over 10 miles, uses regularRate (not within10Miles)
-      expect(result.deliveryCost).toBe(85); // Tier 1 regularRate
-      
-      // Mileage calculation: (15 - 10) × $3.00 = $15.00
+      // CaterValley flat fee: $42.50
+      expect(result.deliveryCost).toBe(42.50);
+      // Mileage: (15 - 10) × $3.00 = $15.00
       expect(result.totalMileagePay).toBeCloseTo(15.00, 2);
-      
-      // Total: $85 + $15.00 = $100.00
-      expect(result.deliveryFee).toBeCloseTo(100.00, 2);
+      // Total: $42.50 + $15.00 = $57.50
+      expect(result.deliveryFee).toBeCloseTo(57.50, 2);
     });
 
     test('CaterValley BUG FIX: Corrected mileage calculation for 15-mile order', () => {
-      // SCENARIO: Testing correct mileage rate with orders over 10 miles
-      // For Tier 1 over 10 miles: regularRate (85) + mileage
       const input: DeliveryCostInput = {
         headcount: 1,
         foodCost: 16.75,
-        totalMileage: 15, // 5 miles over threshold
+        totalMileage: 15,
         numberOfDrives: 1,
         clientConfigId: 'cater-valley'
       };
 
       const result = calculateDeliveryCost(input);
 
-      // Over 10 miles, uses regularRate
-      expect(result.deliveryCost).toBe(85); // Tier 1 regularRate
-      
+      // CaterValley flat fee: $42.50
+      expect(result.deliveryCost).toBe(42.50);
       // Mileage: (15 - 10) × $3.00 = $15.00
       expect(result.totalMileagePay).toBeCloseTo(15.00, 2);
-      
-      // Total: $85 + $15.00 = $100.00
-      expect(result.deliveryFee).toBeCloseTo(100.00, 2);
-      
-      // Verify calculation is correct per official pricing chart
-      expect(result.deliveryFee).toBe(100);
+      // Total: $42.50 + $15.00 = $57.50
+      expect(result.deliveryFee).toBeCloseTo(57.50, 2);
     });
 
     test('CaterValley BUG FIX: No short-distance orders should ever show $130', () => {
@@ -963,11 +942,11 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
-        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
+        // Mileage: 5mi within 10mi → flat $7
         expect(result.driverBasePayPerDrop).toBe(18); // Tier 0-24
-        expect(result.driverTotalBasePay).toBe(18); // Just base pay
-        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
-        expect(result.totalDriverPay).toBeCloseTo(19.75, 2); // $18 + $1.75 mileage, no bonus
+        expect(result.driverTotalBasePay).toBe(18);
+        expect(result.totalMileagePay).toBe(7);
+        expect(result.totalDriverPay).toBe(25); // $18 + $7 mileage, no bonus
       });
 
       test('uses correct driver base pay for 25-49 headcount tier', () => {
@@ -981,11 +960,11 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
-        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
+        // Mileage: 5mi within 10mi → flat $7
         expect(result.driverBasePayPerDrop).toBe(23); // Tier 25-49
-        expect(result.driverTotalBasePay).toBe(23); // Just base pay
-        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
-        expect(result.totalDriverPay).toBeCloseTo(34.75, 2); // $23 + $1.75 + $10 bonus
+        expect(result.driverTotalBasePay).toBe(23);
+        expect(result.totalMileagePay).toBe(7);
+        expect(result.totalDriverPay).toBe(40); // $23 + $7 + $10 bonus
       });
 
       test('uses correct driver base pay for 50-74 headcount tier', () => {
@@ -999,11 +978,11 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
-        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
+        // Mileage: 5mi within 10mi → flat $7
         expect(result.driverBasePayPerDrop).toBe(33); // Tier 50-74
-        expect(result.driverTotalBasePay).toBe(33); // Just base pay
-        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
-        expect(result.totalDriverPay).toBeCloseTo(34.75, 2); // $33 + $1.75, no bonus
+        expect(result.driverTotalBasePay).toBe(33);
+        expect(result.totalMileagePay).toBe(7);
+        expect(result.totalDriverPay).toBe(40); // $33 + $7, no bonus
       });
 
       test('uses correct driver base pay for 75-99 headcount tier', () => {
@@ -1017,11 +996,11 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
-        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
+        // Mileage: 5mi within 10mi → flat $7
         expect(result.driverBasePayPerDrop).toBe(43); // Tier 75-99
-        expect(result.driverTotalBasePay).toBe(43); // Just base pay
-        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
-        expect(result.totalDriverPay).toBeCloseTo(44.75, 2); // $43 + $1.75, no bonus
+        expect(result.driverTotalBasePay).toBe(43);
+        expect(result.totalMileagePay).toBe(7);
+        expect(result.totalDriverPay).toBe(50); // $43 + $7, no bonus
       });
 
       test('tier boundary: 24 headcount uses 0-24 tier', () => {
@@ -1162,11 +1141,11 @@ describe('Delivery Cost Calculator', () => {
         const result = calculateDriverPay(input);
 
         // Should use 0-24 tier
-        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
+        // Mileage: 5mi within 10mi → flat $7
         expect(result.driverBasePayPerDrop).toBe(18);
-        expect(result.driverTotalBasePay).toBe(18); // Just base pay
-        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
-        expect(result.totalDriverPay).toBeCloseTo(19.75, 2); // $18 + $1.75
+        expect(result.driverTotalBasePay).toBe(18);
+        expect(result.totalMileagePay).toBe(7);
+        expect(result.totalDriverPay).toBe(25); // $18 + $7
       });
 
       test('concurrent conditions: 100 headcount with multiple edge cases', () => {
@@ -1211,7 +1190,7 @@ describe('Delivery Cost Calculator', () => {
     });
 
     describe('HY Food Company Configuration', () => {
-      test('uses flat $50 driver base pay regardless of headcount (10 people)', () => {
+      test('uses tiered driver base pay for 0-24 headcount ($13)', () => {
         const input: DriverPayInput = {
           headcount: 10,
           foodCost: 150,
@@ -1222,14 +1201,14 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
-        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
-        expect(result.driverBasePayPerDrop).toBe(50); // Flat $50
-        expect(result.driverTotalBasePay).toBe(50); // Base pay
-        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
-        expect(result.totalDriverPay).toBeCloseTo(51.75, 2); // $50 + $1.75
+        // Mileage: 5mi within 10mi → flat $7
+        expect(result.driverBasePayPerDrop).toBe(13); // Tier 0-24
+        expect(result.driverTotalBasePay).toBe(13);
+        expect(result.totalMileagePay).toBe(7);
+        expect(result.totalDriverPay).toBe(20); // $13 + $7
       });
 
-      test('uses flat $50 driver base pay regardless of headcount (50 people)', () => {
+      test('uses tiered driver base pay for 50-74 headcount ($33)', () => {
         const input: DriverPayInput = {
           headcount: 50,
           foodCost: 600,
@@ -1240,14 +1219,14 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
-        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
-        expect(result.driverBasePayPerDrop).toBe(50); // Flat $50
-        expect(result.driverTotalBasePay).toBe(50); // Base pay
-        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
-        expect(result.totalDriverPay).toBeCloseTo(51.75, 2); // $50 + $1.75
+        // Mileage: 5mi within 10mi → flat $7
+        expect(result.driverBasePayPerDrop).toBe(33); // Tier 50-74
+        expect(result.driverTotalBasePay).toBe(33);
+        expect(result.totalMileagePay).toBe(7);
+        expect(result.totalDriverPay).toBe(40); // $33 + $7
       });
 
-      test('uses flat $50 driver base pay regardless of headcount (100 people)', () => {
+      test('uses tiered driver base pay for 100-124 headcount ($63)', () => {
         const input: DriverPayInput = {
           headcount: 100,
           foodCost: 1200,
@@ -1258,28 +1237,29 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
-        // Mileage: 5 × $0.35 = $1.75 (Destino rate)
-        expect(result.driverBasePayPerDrop).toBe(50); // Flat $50
-        expect(result.driverTotalBasePay).toBe(50); // Base pay
-        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
-        expect(result.totalDriverPay).toBeCloseTo(51.75, 2); // $50 + $1.75
+        // Mileage: 5mi within 10mi → flat $7
+        expect(result.driverBasePayPerDrop).toBe(63); // Tier 100-124
+        expect(result.driverTotalBasePay).toBe(63);
+        expect(result.totalMileagePay).toBe(7);
+        expect(result.totalDriverPay).toBe(70); // $63 + $7
       });
 
-      test('mileage is calculated at Destino rate (12 miles scenario)', () => {
+      test('mileage over 10 miles uses $0.70 per mile', () => {
         const input: DriverPayInput = {
           headcount: 30,
           foodCost: 400,
-          totalMileage: 12, // 12 miles × $0.35 = $4.20
+          totalMileage: 12,
           bonusQualified: false,
           clientConfigId: 'hy-food-company-direct'
         };
 
         const result = calculateDriverPay(input);
 
-        expect(result.driverBasePayPerDrop).toBe(50); // Flat $50
-        expect(result.totalMileagePay).toBeCloseTo(4.20, 2); // 12 × $0.35
-        expect(result.driverTotalBasePay).toBe(50); // Base pay
-        expect(result.totalDriverPay).toBeCloseTo(54.20, 2); // $50 + $4.20
+        // Mileage: 12mi over 10mi → 12 × $0.70 = $8.40
+        expect(result.driverBasePayPerDrop).toBe(23); // Tier 25-49
+        expect(result.totalMileagePay).toBeCloseTo(8.40, 2);
+        expect(result.driverTotalBasePay).toBe(23);
+        expect(result.totalDriverPay).toBeCloseTo(31.40, 2); // $23 + $8.40
       });
 
       test('mileage and bonus calculation', () => {
@@ -1293,11 +1273,11 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
-        expect(result.driverBasePayPerDrop).toBe(50);
-        expect(result.totalMileagePay).toBeCloseTo(4.20, 2); // 12 × $0.35
+        expect(result.driverBasePayPerDrop).toBe(23); // Tier 25-49
+        expect(result.totalMileagePay).toBeCloseTo(8.40, 2); // 12 × $0.70
         expect(result.driverBonusPay).toBe(10);
-        expect(result.driverTotalBasePay).toBe(50); // Base pay
-        expect(result.totalDriverPay).toBeCloseTo(64.20, 2); // $50 + $4.20 + $10 bonus
+        expect(result.driverTotalBasePay).toBe(23);
+        expect(result.totalDriverPay).toBeCloseTo(41.40, 2); // $23 + $8.40 + $10
       });
 
       test('bridge toll calculation', () => {
@@ -1312,14 +1292,14 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
-        expect(result.driverTotalBasePay).toBe(50); // Base pay
-        expect(result.bridgeToll).toBe(8.00);
-        expect(result.totalMileagePay).toBeCloseTo(4.20, 2); // 12 × $0.35
+        expect(result.driverTotalBasePay).toBe(23); // Tier 25-49
+        expect(result.bridgeToll).toBe(8.50);
+        expect(result.totalMileagePay).toBeCloseTo(8.40, 2); // 12 × $0.70
         // Total: base + mileage + bridge toll
-        expect(result.totalDriverPay).toBeCloseTo(54.20, 2); // $50 + $4.20 (bridge toll not in totalDriverPay, it's in readySetTotalFee)
+        expect(result.totalDriverPay).toBeCloseTo(39.90, 2); // $23 + $8.40 + $8.50
       });
 
-      test('handles edge case: zero headcount with flat rate', () => {
+      test('handles edge case: zero headcount with food cost uses food cost tier', () => {
         const input: DriverPayInput = {
           headcount: 0,
           foodCost: 100,
@@ -1330,27 +1310,28 @@ describe('Delivery Cost Calculator', () => {
 
         const result = calculateDriverPay(input);
 
-        // Mileage: 5 × $0.35 = $1.75
-        expect(result.driverBasePayPerDrop).toBe(50); // Flat $50 for any headcount
-        expect(result.driverTotalBasePay).toBe(50); // Base pay
-        expect(result.totalMileagePay).toBeCloseTo(1.75, 2);
-        expect(result.totalDriverPay).toBeCloseTo(51.75, 2);
+        // HC=0, FC=$100 → food cost tier 0-299 = $13
+        // Mileage: 5mi within 10mi → flat $7
+        expect(result.driverBasePayPerDrop).toBe(13); // Food cost tier 0-299
+        expect(result.driverTotalBasePay).toBe(13);
+        expect(result.totalMileagePay).toBe(7);
+        expect(result.totalDriverPay).toBe(20); // $13 + $7
       });
 
-      test('mileage pay uses Destino rate for HY Food Company', () => {
+      test('mileage pay uses flat $7 within 10mi for HY Food Company', () => {
         const input: DriverPayInput = {
           headcount: 30,
           foodCost: 400,
-          totalMileage: 3, // 3 miles × $0.35 = $1.05
+          totalMileage: 3,
           bonusQualified: false,
           clientConfigId: 'hy-food-company-direct'
         };
 
         const result = calculateDriverPay(input);
 
-        expect(result.totalMileagePay).toBeCloseTo(1.05, 2); // 3 × $0.35
-        // $50 + $1.05 = $51.05
-        expect(result.driverTotalBasePay).toBe(50); // Capped at maxPayPerDrop
+        // 3mi within 10mi → flat $7
+        expect(result.totalMileagePay).toBe(7);
+        expect(result.driverTotalBasePay).toBe(23); // Tier 25-49
       });
     });
   });

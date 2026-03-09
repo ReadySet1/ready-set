@@ -60,6 +60,10 @@ export interface ClientDeliveryConfiguration {
     // Optional: Ready Set fee matches customer delivery fee (for HY Food Company)
     // When true, Ready Set fee = customer tier-based delivery fee (not fixed amount)
     readySetFeeMatchesDeliveryFee?: boolean;
+    // Optional: Include direct tip in Ready Set total fee calculation
+    // When true: RS Total = RS Fee + Addon + Toll + Tip (Destino formula)
+    // When false/undefined: RS Total = RS Fee + Addon + Toll
+    includeDirectTipInReadySetTotal?: boolean;
   };
 
   // Zero Order Settings - Special pricing when headcount = 0 AND foodCost = 0
@@ -132,10 +136,12 @@ export const READY_SET_FOOD_STANDARD: ClientDeliveryConfiguration = {
   },
 
   driverPaySettings: {
-    maxPayPerDrop: 40,
+    maxPayPerDrop: null, // No cap - driver pay = base + mileage + bonus
     basePayPerDrop: 23, // Default fallback (not used when tiers are present)
     bonusPay: 10,
-    readySetFee: 70,
+    readySetFee: 60, // Default/fallback RS fee (lowest tier)
+    readySetFeeMatchesDeliveryFee: true,
+    includeDirectTipInReadySetTotal: true,
     // Tiered driver base pay based on headcount (from REA-41 comments)
     driverBasePayTiers: [
       { headcountMin: 0, headcountMax: 24, basePay: 18 },
@@ -143,7 +149,13 @@ export const READY_SET_FOOD_STANDARD: ClientDeliveryConfiguration = {
       { headcountMin: 50, headcountMax: 74, basePay: 33 },
       { headcountMin: 75, headcountMax: 99, basePay: 43 },
       { headcountMin: 100, headcountMax: null, basePay: 53 }
-    ]
+    ],
+    // Driver mileage: flat $7 within 10mi, total miles × $0.70 when over 10mi
+    driverMileageSettings: {
+      flatAmountWithinThreshold: 7,
+      perMileRateOverThreshold: 0.70,
+      threshold: 10
+    }
   },
 
   bridgeTollSettings: {
@@ -152,8 +164,8 @@ export const READY_SET_FOOD_STANDARD: ClientDeliveryConfiguration = {
   },
 
   createdAt: new Date('2025-01-01'),
-  updatedAt: new Date('2025-01-01'),
-  notes: 'Standard Ready Set Food pricing based on official documents'
+  updatedAt: new Date('2026-03-08'),
+  notes: 'Standard Ready Set Food (Destino) pricing. RS fee matches headcount tier ($60-$310, LESSER rule). Driver base pay by headcount ($18-$53). Driver mileage: flat $7 within 10mi or total×$0.70 over 10mi. RS Total includes tip.'
 };
 
 /**
