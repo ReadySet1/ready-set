@@ -217,7 +217,7 @@
     "@types/jest": "^30.0.0",
     "@types/jsdom": "^27.0.0",
     "@types/mapbox-gl": "^3.4.1",
-    "@types/node": "^24.8.1",
+    "@types/node": "^25.4.0",
     "@types/node-fetch": "^2.6.12",
     "@types/nodemailer": "^7.0.2",
     "@types/prismjs": "^1.26.5",
