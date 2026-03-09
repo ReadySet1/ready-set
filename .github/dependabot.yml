@@ -6,8 +6,9 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     groups:
-      minor-and-patch:
+      all-dependencies:
         update-types:
+          - "major"
           - "minor"
           - "patch"
     ignore:
