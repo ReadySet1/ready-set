@@ -229,25 +229,24 @@ export const KASA: ClientDeliveryConfiguration = {
   id: 'kasa',
   clientName: 'Kasa',
   vendorName: 'Kasa',
-  description: 'Kasa delivery pricing with within/beyond 10 miles rate structure',
+  description: 'Kasa delivery pricing with within/beyond 10 miles rate structure, tiered driver pay, and RS fee matching delivery tier',
   isActive: true,
 
   pricingTiers: [
-    // Based on "New Kasa Pricing" table from Image 3
-    { headcountMin: 0, headcountMax: 24, foodCostMin: 0, foodCostMax: 300, regularRate: 60, within10Miles: 30 },
+    { headcountMin: 0, headcountMax: 24, foodCostMin: 0, foodCostMax: 299.99, regularRate: 60, within10Miles: 30 },
     { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 70, within10Miles: 40 },
     { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 90, within10Miles: 60 },
     { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 100, within10Miles: 70 },
     { headcountMin: 100, headcountMax: 124, foodCostMin: 1200, foodCostMax: 1499.99, regularRate: 120, within10Miles: 80 },
-    { headcountMin: 125, headcountMax: 149, foodCostMin: 1500, foodCostMax: 1799.99, regularRate: 140, within10Miles: 90 },
-    { headcountMin: 150, headcountMax: 174, foodCostMin: 1800, foodCostMax: 2099.99, regularRate: 160, within10Miles: 100 },
-    { headcountMin: 175, headcountMax: 199, foodCostMin: 2100, foodCostMax: 2399.99, regularRate: 180, within10Miles: 110 },
-    { headcountMin: 200, headcountMax: 249, foodCostMin: 2400, foodCostMax: 2999.99, regularRate: 200, within10Miles: 120 },
-    { headcountMin: 250, headcountMax: 299, foodCostMin: 3000, foodCostMax: 3499.99, regularRate: 220, within10Miles: 130 },
-    { headcountMin: 300, headcountMax: null, foodCostMin: 3500, foodCostMax: null, regularRate: 0, within10Miles: 0 } // TBD
+    { headcountMin: 125, headcountMax: 149, foodCostMin: 1500, foodCostMax: 1699.99, regularRate: 150, within10Miles: 90 },
+    { headcountMin: 150, headcountMax: 174, foodCostMin: 1700, foodCostMax: 1899.99, regularRate: 180, within10Miles: 100 },
+    { headcountMin: 175, headcountMax: 199, foodCostMin: 1900, foodCostMax: 2099.99, regularRate: 210, within10Miles: 110 },
+    { headcountMin: 200, headcountMax: 249, foodCostMin: 2100, foodCostMax: 2299.99, regularRate: 280, within10Miles: 120 },
+    { headcountMin: 250, headcountMax: 299, foodCostMin: 2300, foodCostMax: 2499.99, regularRate: 310, within10Miles: 130 },
+    { headcountMin: 300, headcountMax: null, foodCostMin: 2500, foodCostMax: null, regularRate: 0, within10Miles: 0 } // TBD
   ],
 
-  mileageRate: 3.0,
+  mileageRate: 3.0, // $3.00/mile for miles over 10 (customer/RS mileage fee)
   distanceThreshold: 10,
 
   dailyDriveDiscounts: {
@@ -257,10 +256,34 @@ export const KASA: ClientDeliveryConfiguration = {
   },
 
   driverPaySettings: {
-    maxPayPerDrop: 98.69,
-    basePayPerDrop: 63.00,
+    maxPayPerDrop: null, // No cap — driver pay is sum of components
+    basePayPerDrop: 18, // Default/fallback (not used when tiers are present)
     bonusPay: 10,
-    readySetFee: 135.00
+    readySetFee: 30, // Default/fallback RS fee (lowest within-10-miles tier)
+    readySetFeeMatchesDeliveryFee: true,
+    includeDirectTipInReadySetTotal: true,
+    driverBasePayTiers: [
+      { headcountMin: 0, headcountMax: 24, basePay: 18 },
+      { headcountMin: 25, headcountMax: 49, basePay: 23 },
+      { headcountMin: 50, headcountMax: 74, basePay: 33 },
+      { headcountMin: 75, headcountMax: 99, basePay: 43 },
+      { headcountMin: 100, headcountMax: 124, basePay: 53 },
+      { headcountMin: 125, headcountMax: null, basePay: 0 } // 125+ case by case
+    ],
+    requiresManualReview: true, // 125+ headcount requires manual review
+    driverFoodCostPayTiers: [
+      { foodCostMin: 0, foodCostMax: 299.99, basePay: 18 },
+      { foodCostMin: 300, foodCostMax: 599.99, basePay: 23 },
+      { foodCostMin: 600, foodCostMax: 899.99, basePay: 33 },
+      { foodCostMin: 900, foodCostMax: 1199.99, basePay: 43 },
+      { foodCostMin: 1200, foodCostMax: 1499.99, basePay: 53 },
+      { foodCostMin: 1500, foodCostMax: null, basePay: 0 } // $1,500+ case by case
+    ],
+    driverMileageSettings: {
+      flatAmountWithinThreshold: 7,    // $7 flat for drives within 10 miles
+      perMileRateOverThreshold: 0.70,  // $0.70/mile for ALL miles when over threshold
+      threshold: 10
+    }
   },
 
   bridgeTollSettings: {
@@ -269,8 +292,8 @@ export const KASA: ClientDeliveryConfiguration = {
   },
 
   createdAt: new Date('2025-01-01'),
-  updatedAt: new Date('2025-01-01'),
-  notes: 'Kasa pricing based on New Kasa Pricing table (Image 3)'
+  updatedAt: new Date('2026-03-08'),
+  notes: 'Kasa pricing: RS fee matches delivery tier ($30-$130 within 10mi, $60-$310 over 10mi, LESSER rule). Driver base tiered ($18-$53 by headcount or food cost, 125+ HC / $1,500+ FC case by case). Driver mileage: flat $7 within 10mi or total×$0.70 over 10mi. RS mileage: $3.00/mi after 10mi. RS Total = RS Fee + Addon + Toll + Tip. Daily drive discount: $5/$10/$15.'
 };
 
 /**
