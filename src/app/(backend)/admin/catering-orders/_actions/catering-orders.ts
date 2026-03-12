@@ -3,7 +3,8 @@
 import { prisma } from '@/lib/db/prisma';
 import { revalidatePath } from 'next/cache';
 import { Prisma, PrismaClient } from '@prisma/client';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+
+// PrismaClientKnownRequestError is now at Prisma.PrismaClientKnownRequestError in Prisma 7
 import { v4 as uuidv4 } from 'uuid';
 import {
   ClientListItem,
@@ -399,7 +400,7 @@ export async function createCateringOrder(formData: CreateCateringOrderInput): P
     }
     
     // Check if the error is a Prisma unique constraint violation on orderNumber
-    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       // Assuming the unique constraint is on 'orderNumber'. Adjust field name if different.
       const targetFields = error.meta?.target as string[] | undefined;
       if (targetFields?.includes('orderNumber')) {

@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { Decimal } from "@prisma/client/runtime/library";
+import { Decimal } from 'decimal.js';
 
 // Export Decimal type for use in other files
 export { Decimal, Prisma };

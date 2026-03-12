@@ -20,12 +20,13 @@ const isDevelopment = process.env.NODE_ENV === 'development' || process.env.VERC
 
 // Import PrismaClient for type definitions
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 // Create function to make a new Prisma client
 const createPrismaClient = (): PrismaClient => {
-  // Use environment variable to control detailed logging  
+  // Use environment variable to control detailed logging
   const enableDetailedLogs = process.env.PRISMA_LOG_LEVEL?.split(',') || process.env.NEXT_PUBLIC_LOG_LEVEL === 'debug';
-  
+
   let logConfig: any[];
   if (enableDetailedLogs && Array.isArray(enableDetailedLogs)) {
     logConfig = enableDetailedLogs;
@@ -37,7 +38,9 @@ const createPrismaClient = (): PrismaClient => {
     logConfig = ['error', 'warn'];
   }
 
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
   return new PrismaClient({
+    adapter,
     log: logConfig,
   });
 };

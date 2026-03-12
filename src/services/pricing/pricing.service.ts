@@ -1,5 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { PrismaClient, Prisma } from '@prisma/client';
+import { Decimal } from 'decimal.js';
 import { prisma } from '@/lib/db/prisma';
 import type { 
   PricingTier, 
