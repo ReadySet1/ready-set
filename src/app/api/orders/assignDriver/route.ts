@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/utils/prismaDB";
 import { Prisma } from "@prisma/client";
-import { Decimal } from "@/types/prisma";
+// Decimal class is now under Prisma namespace in Prisma 7
 import { createClient } from "@/utils/supabase/server";
 import { validateUserNotSoftDeleted, getActiveDriversForDispatch } from "@/lib/soft-delete-handlers";
 
@@ -10,8 +10,8 @@ function serializeData(obj: unknown): number | string | Date | Record<string, un
     return Number(obj);
   } else if (obj instanceof Date) {
     return obj.toISOString();
-  } else if (obj instanceof Decimal) {
-    return obj.toNumber();
+  } else if (typeof obj === 'object' && obj !== null && 'toNumber' in obj && typeof (obj as { toNumber: unknown }).toNumber === 'function') {
+    return (obj as { toNumber: () => number }).toNumber();
   } else if (Array.isArray(obj)) {
     return obj.map(serializeData);
   } else if (typeof obj === "object" && obj !== null) {

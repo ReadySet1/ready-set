@@ -1,13 +1,17 @@
 import { Prisma } from "@prisma/client";
-import { PrismaClientKnownRequestError, PrismaClientInitializationError, PrismaClientValidationError } from '@prisma/client/runtime/library';
-import { Decimal } from '@prisma/client/runtime/library';
 
-// Export errors and Decimal for use in other files
-export { 
-  PrismaClientKnownRequestError, 
-  PrismaClientInitializationError, 
-  PrismaClientValidationError, 
-  Decimal 
+import { Decimal } from 'decimal.js';
+
+// Re-export error classes and Decimal from Prisma namespace for use in other files
+const PrismaClientKnownRequestError = Prisma.PrismaClientKnownRequestError;
+const PrismaClientInitializationError = Prisma.PrismaClientInitializationError;
+const PrismaClientValidationError = Prisma.PrismaClientValidationError;
+
+export {
+  PrismaClientKnownRequestError,
+  PrismaClientInitializationError,
+  PrismaClientValidationError,
+  Decimal
 };
 
 // Define constants for Prisma enum values (matching the Prisma schema exactly)
@@ -194,7 +198,7 @@ export function convertToCateringNeedHost(needHost: PrismaCateringNeedHostValue)
 }
 
 // Prisma helper types
-export type PrismaError = Error | PrismaClientKnownRequestError | PrismaClientInitializationError | PrismaClientValidationError;
+export type PrismaError = Error | InstanceType<typeof PrismaClientKnownRequestError> | InstanceType<typeof PrismaClientInitializationError> | InstanceType<typeof PrismaClientValidationError>;
 
 /**
  * Type for Prisma transaction client
