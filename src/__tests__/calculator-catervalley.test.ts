@@ -4,7 +4,7 @@
  * Tests specific to CaterValley vendor configuration:
  * - Flat fee pricing (same rate within/beyond 10 miles per tier)
  * - Mileage: $3.00/mile after 10 miles (added to delivery fee)
- * - Bridge toll: Driver compensation paid by Ready Set (NOT charged to customer)
+ * - Bridge toll: Added to customer delivery fee when bridge crossing required
  * - Percentage-based pricing for 100+ headcount (10% of food cost)
  * - Driver mileage: flat $7 within 10mi, $0.70/mile × total miles over 10mi
  * - Driver base pay: tiered by headcount ($18/$23/$33/$43, 100+ case by case)
@@ -183,7 +183,7 @@ describe('CaterValley Calculator - Client Pricing', () => {
   });
 
   describe('Bridge toll handling - CaterValley specific', () => {
-    it('should NOT add bridge toll to customer delivery fee', () => {
+    it('should add bridge toll to customer delivery fee', () => {
       const input: DeliveryCostInput = {
         headcount: 40,
         foodCost: 500,
@@ -195,12 +195,12 @@ describe('CaterValley Calculator - Client Pricing', () => {
       };
 
       const result = calculateDeliveryCost(input);
-      // CaterValley: bridge toll NOT added to customer fee
       // Tier 2 flat fee: $52.50
       expect(result.deliveryCost).toBe(52.50);
       expect(result.totalMileagePay).toBe(6.00); // (12 - 10) × $3.00
-      // Bridge toll NOT included in deliveryFee for CaterValley
-      expect(result.deliveryFee).toBe(58.50); // $52.50 + $6
+      expect(result.bridgeToll).toBe(8);
+      // deliveryFee = deliveryCost + mileage + bridgeToll
+      expect(result.deliveryFee).toBe(66.50); // $52.50 + $6 + $8
     });
   });
 
