@@ -7,15 +7,41 @@ import { CalculatorService } from '@/lib/calculator/calculator-service';
 import { CalculationInputSchema, ConfigurationError, CalculatorError } from '@/types/calculator';
 import { createClient } from '@/utils/supabase/server';
 
+const AUTH_TIMEOUT_MS = 3000;
+
+/**
+ * Authenticates via getUser() with a short timeout.
+ * Returns the user on success, or null on auth failure / network timeout.
+ * Throws only on unexpected errors.
+ */
+async function authenticateRequest(supabase: ReturnType<Awaited<ReturnType<typeof createClient>>['auth']['getUser']> extends Promise<infer R> ? { auth: { getUser: () => Promise<R> } } : never) {
+  // @ts-expect-error - supabase typing is complex; runtime types are correct
+  return Promise.race([
+    supabase.auth.getUser(),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('AUTH_TIMEOUT')), AUTH_TIMEOUT_MS)
+    )
+  ]);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
+
+    let user;
+    try {
+      const { data, error } = await authenticateRequest(supabase as any);
+      if (error || !data?.user) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      user = data.user;
+    } catch {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, error: 'Authentication service temporarily unavailable. Please try again.' },
+        { status: 503 }
       );
     }
 
@@ -29,28 +55,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate calculation input
     const validatedInput = CalculationInputSchema.parse({
       ...inputData,
       customFields: {
         ...inputData.customFields,
-        userId: user?.id || 'test-user'
+        userId: user.id
       }
     });
 
-    // Debug: Check what template we're trying to load
-    
-    // Perform calculation
     const result = await CalculatorService.calculate(
       supabase,
       templateId,
       validatedInput,
       clientConfigId,
-      user?.id || 'test-user'
+      user.id
     );
 
-    
-    // Save to history if requested
     if (saveHistory) {
       await CalculatorService.saveCalculationHistory(
         supabase,
@@ -58,10 +78,10 @@ export async function POST(request: NextRequest) {
         validatedInput,
         result,
         clientConfigId,
-        user?.id || 'test-user'
+        user.id
       );
     }
-    
+
     return NextResponse.json({
       success: true,
       data: result,
@@ -90,12 +110,21 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
+
+    let user;
+    try {
+      const { data, error } = await authenticateRequest(supabase as any);
+      if (error || !data?.user) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      user = data.user;
+    } catch {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, error: 'Authentication service temporarily unavailable. Please try again.' },
+        { status: 503 }
       );
     }
 
@@ -111,7 +140,7 @@ export async function GET(request: NextRequest) {
     }
 
     const config = await CalculatorService.getCalculatorConfig(templateId, clientConfigId);
-    
+
     return NextResponse.json({
       success: true,
       data: config,

@@ -330,8 +330,14 @@ const handleShutdown = async () => {
   prismaLogger.debug('✅ Prisma client disconnected')
 }
 
-// Register shutdown handlers
-if (typeof process !== 'undefined') {
+// Register shutdown handlers (guarded to prevent listener accumulation during HMR)
+declare global {
+  // eslint-disable-next-line no-var
+  var __prismaShutdownRegistered: boolean | undefined;
+}
+
+if (typeof process !== 'undefined' && !globalThis.__prismaShutdownRegistered) {
+  globalThis.__prismaShutdownRegistered = true
   process.on('SIGTERM', handleShutdown)
   process.on('SIGINT', handleShutdown)
   process.on('beforeExit', handleShutdown)
