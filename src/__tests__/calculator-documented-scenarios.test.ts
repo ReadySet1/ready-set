@@ -145,17 +145,14 @@ describe('Destino Calculator - Driver Compensation (Documented Scenarios)', () =
       directTip: 0
     };
 
-    it('should calculate base pay as $30.00', () => {
+    it('should calculate base pay as $23.00 (headcount tier 25-49)', () => {
       const result = calculateDriverPay(input);
-      // Tier: 25-49 headcount = $30
-      expect(result.driverTotalBasePay).toBe(30);
+      expect(result.driverTotalBasePay).toBe(23);
     });
 
-    it('should calculate mileage pay as $1.09', () => {
+    it('should calculate mileage pay as $7.00 (flat within 10mi)', () => {
       const result = calculateDriverPay(input);
-      // 3.1 miles × $0.35 = $1.085 ≈ $1.09
-      // Note: All mileage paid at $0.35/mile
-      expect(result.totalMileagePay).toBeCloseTo(1.09, 2);
+      expect(result.totalMileagePay).toBe(7);
     });
 
     it('should include $10 bonus (100% qualified)', () => {
@@ -163,14 +160,20 @@ describe('Destino Calculator - Driver Compensation (Documented Scenarios)', () =
       expect(result.driverBonusPay).toBe(10);
     });
 
-    it('should calculate total driver pay as $41.09', () => {
+    it('should calculate total driver pay as $40.00', () => {
       const result = calculateDriverPay(input);
-      // Base $30 + Mileage $1.09 + Bonus $10 = $41.09
-      expect(result.totalDriverPay).toBeCloseTo(41.09, 2);
+      // Base $23 + Mileage $7 + Bonus $10 = $40
+      expect(result.totalDriverPay).toBe(40);
+    });
+
+    it('should calculate RS fee as $70.00 (LESSER: HC 25-49=$70, FC $300-599=$70)', () => {
+      const result = calculateDriverPay(input);
+      expect(result.readySetFee).toBe(70);
+      expect(result.readySetTotalFee).toBe(70); // No addon, no toll, no tip
     });
   });
 
-  describe('Test D2: Order Value Limits Tier (Lesser Rule)', () => {
+  describe('Test D2: Headcount Tier 50-74, Over 10 Miles', () => {
     // Scenario: 60 people, $500 order, 20 miles, no tips, no infractions
     const input: DriverPayInput = {
       headcount: 60,
@@ -182,24 +185,26 @@ describe('Destino Calculator - Driver Compensation (Documented Scenarios)', () =
       directTip: 0
     };
 
-    it('should use LESSER tier - food cost tier ($40) vs headcount tier ($50)', () => {
+    it('should use headcount tier 50-74 = $33', () => {
       const result = calculateDriverPay(input);
-      // Headcount 60 suggests Tier 3 ($50 for 50-74)
-      // Food cost $500 suggests Tier 2 ($40 for $300-599)
-      // LESSER = $40
-      expect(result.driverTotalBasePay).toBe(40);
+      expect(result.driverTotalBasePay).toBe(33);
     });
 
-    it('should calculate mileage pay as $7.00', () => {
+    it('should calculate mileage pay as $14.00 (20mi × $0.70)', () => {
       const result = calculateDriverPay(input);
-      // 20 miles × $0.35 = $7.00
-      expect(result.totalMileagePay).toBe(7);
+      // Over 10 miles: total miles × $0.70
+      expect(result.totalMileagePay).toBe(14);
     });
 
     it('should calculate total driver pay as $57.00', () => {
       const result = calculateDriverPay(input);
-      // Base $40 + Mileage $7 + Bonus $10 = $57
+      // Base $33 + Mileage $14 + Bonus $10 = $57
       expect(result.totalDriverPay).toBe(57);
+    });
+
+    it('should calculate RS fee as $70.00 (LESSER: HC 50-74=$90, FC $300-599=$70)', () => {
+      const result = calculateDriverPay(input);
+      expect(result.readySetFee).toBe(70);
     });
   });
 
@@ -218,14 +223,13 @@ describe('Destino Calculator - Driver Compensation (Documented Scenarios)', () =
 
     it('should have NO base pay when direct tip received', () => {
       const result = calculateDriverPay(input);
-      // Direct tip = base pay excluded
       expect(result.driverTotalBasePay).toBe(0);
     });
 
-    it('should calculate mileage pay as $5.25', () => {
+    it('should calculate mileage pay as $10.50 (15mi × $0.70)', () => {
       const result = calculateDriverPay(input);
-      // 15 miles × $0.35 = $5.25
-      expect(result.totalMileagePay).toBe(5.25);
+      // Over 10 miles: total miles × $0.70
+      expect(result.totalMileagePay).toBe(10.5);
     });
 
     it('should have NO bonus when direct tip received', () => {
@@ -238,10 +242,17 @@ describe('Destino Calculator - Driver Compensation (Documented Scenarios)', () =
       expect(result.directTip).toBe(20);
     });
 
-    it('should calculate total driver pay as $25.25', () => {
+    it('should calculate total driver pay as $30.50', () => {
       const result = calculateDriverPay(input);
-      // Mileage $5.25 + Tip $20 = $25.25
-      expect(result.totalDriverPay).toBe(25.25);
+      // Mileage $10.50 + Tip $20 = $30.50
+      expect(result.totalDriverPay).toBe(30.5);
+    });
+
+    it('should include tip in RS total fee', () => {
+      const result = calculateDriverPay(input);
+      // RS Total = RS Fee ($70) + Addon ($0) + Toll ($0) + Tip ($20) = $90
+      expect(result.readySetFee).toBe(70);
+      expect(result.readySetTotalFee).toBe(90);
     });
   });
 
@@ -258,16 +269,15 @@ describe('Destino Calculator - Driver Compensation (Documented Scenarios)', () =
       directTip: 0
     };
 
-    it('should calculate base pay as $50.00', () => {
+    it('should calculate base pay as $33.00 (headcount tier 50-74)', () => {
       const result = calculateDriverPay(input);
-      // Tier: 50-74 headcount = $50
-      expect(result.driverTotalBasePay).toBe(50);
+      expect(result.driverTotalBasePay).toBe(33);
     });
 
-    it('should calculate mileage pay as $3.50', () => {
+    it('should calculate mileage pay as $7.00 (flat within 10mi)', () => {
       const result = calculateDriverPay(input);
-      // 10 miles × $0.35 = $3.50
-      expect(result.totalMileagePay).toBe(3.5);
+      // Within 10 miles: flat $7
+      expect(result.totalMileagePay).toBe(7);
     });
 
     it('should calculate reduced bonus as $8.50 (85%)', () => {
@@ -276,10 +286,16 @@ describe('Destino Calculator - Driver Compensation (Documented Scenarios)', () =
       expect(result.driverBonusPay).toBe(8.5);
     });
 
-    it('should calculate total driver pay as $62.00', () => {
+    it('should calculate total driver pay as $48.50', () => {
       const result = calculateDriverPay(input);
-      // Base $50 + Mileage $3.50 + Bonus $8.50 = $62.00
-      expect(result.totalDriverPay).toBe(62);
+      // Base $33 + Mileage $7 + Bonus $8.50 = $48.50
+      expect(result.totalDriverPay).toBe(48.5);
+    });
+
+    it('should calculate RS fee as $90.00 (LESSER: HC 50-74=$90, FC $600-899=$90)', () => {
+      const result = calculateDriverPay(input);
+      expect(result.readySetFee).toBe(90);
+      expect(result.readySetTotalFee).toBe(90);
     });
   });
 
@@ -295,16 +311,15 @@ describe('Destino Calculator - Driver Compensation (Documented Scenarios)', () =
       directTip: 0
     };
 
-    it('should calculate base pay as $50.00 (case by case estimate)', () => {
+    it('should calculate base pay as $53.00 (headcount tier 100+)', () => {
       const result = calculateDriverPay(input);
-      // Over 100 headcount is "case by case" - estimated Tier 4 = $50
-      expect(result.driverTotalBasePay).toBe(50);
+      expect(result.driverTotalBasePay).toBe(53);
     });
 
-    it('should calculate mileage pay as $8.75', () => {
+    it('should calculate mileage pay as $17.50 (25mi × $0.70)', () => {
       const result = calculateDriverPay(input);
-      // 25 miles × $0.35 = $8.75
-      expect(result.totalMileagePay).toBe(8.75);
+      // Over 10 miles: total miles × $0.70
+      expect(result.totalMileagePay).toBe(17.5);
     });
 
     it('should include $10 bonus', () => {
@@ -312,10 +327,16 @@ describe('Destino Calculator - Driver Compensation (Documented Scenarios)', () =
       expect(result.driverBonusPay).toBe(10);
     });
 
-    it('should calculate total driver pay as $68.75', () => {
+    it('should calculate total driver pay as $80.50', () => {
       const result = calculateDriverPay(input);
-      // Base $50 + Mileage $8.75 + Bonus $10 = $68.75
-      expect(result.totalDriverPay).toBe(68.75);
+      // Base $53 + Mileage $17.50 + Bonus $10 = $80.50
+      expect(result.totalDriverPay).toBe(80.5);
+    });
+
+    it('should calculate RS fee as $120.00 (LESSER: HC 100-124=$120, FC $1500-1699=$150)', () => {
+      const result = calculateDriverPay(input);
+      expect(result.readySetFee).toBe(120);
+      expect(result.readySetTotalFee).toBe(120);
     });
   });
 });

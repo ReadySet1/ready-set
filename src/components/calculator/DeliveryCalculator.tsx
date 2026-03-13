@@ -141,7 +141,7 @@ export function DeliveryCalculator({
     if (config && Object.values(input).some(val => val !== 0 && val !== '')) {
       const timer = setTimeout(() => {
         calculate(input);
-      }, 300); // Debounce calculations
+      }, 600);
 
       return () => clearTimeout(timer);
     }

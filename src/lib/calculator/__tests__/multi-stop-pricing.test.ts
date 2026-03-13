@@ -421,12 +421,13 @@ describe('Multi-Stop Pricing', () => {
       // Verify bridge toll is included
       expect(driverResult.bridgeToll).toBeGreaterThan(0);
 
-      // Verify total is sum of components
+      // Verify total is sum of components (including bridge toll)
       const expectedDriverTotal =
         driverResult.driverTotalBasePay +
         driverResult.totalMileagePay +
         driverResult.driverBonusPay +
         driverResult.extraStopsBonus +
+        driverResult.bridgeToll +
         driverResult.directTip;
       expect(driverResult.totalDriverPay).toBe(expectedDriverTotal);
     });
@@ -592,12 +593,13 @@ describe('Multi-Stop Pricing', () => {
         clientConfigId: 'ready-set-food-standard',
       });
 
-      // Total = basePay + mileagePay + bonus + extraStopsBonus + directTip
+      // Total = basePay + mileagePay + bonus + extraStopsBonus + bridgeToll + directTip
       const calculatedTotal =
         result.driverTotalBasePay +
         result.totalMileagePay +
         result.driverBonusPay +
         result.extraStopsBonus +
+        result.bridgeToll +
         result.directTip;
 
       expect(result.totalDriverPay).toBe(calculatedTotal);

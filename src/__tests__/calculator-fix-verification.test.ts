@@ -242,9 +242,8 @@ describe('Calculator Fix Verification', () => {
 
       const result = calculateDriverPay(input);
 
-      // Zero mileage = $0 mileage pay (no minimum in current implementation)
-      // Default config uses $0.35/mile, 0 × $0.35 = $0
-      expect(result.totalMileagePay).toBe(0);
+      // Zero mileage is within 10mi threshold → flat $7 driver mileage
+      expect(result.totalMileagePay).toBe(7);
     });
 
     it('should handle boundary value - 24 vs 25 headcount', () => {
@@ -367,9 +366,9 @@ describe('Calculator Fix Verification', () => {
       // Vendor mileage: (20 - 10) × $3.00 = $30.00
       expect(vendorResult.totalMileagePay).toBe(30);
 
-      // Driver mileage (default config): 20 × $0.35 = $7.00
-      expect(driverResult.totalMileagePay).toBe(7);
-      expect(driverResult.mileageRate).toBe(0.35);
+      // Driver mileage (default config): 20mi over 10mi → 20 × $0.70 = $14.00
+      expect(driverResult.totalMileagePay).toBe(14);
+      expect(driverResult.mileageRate).toBe(0.70);
     });
 
     it('should use CaterValley-specific mileage rate for driver', () => {

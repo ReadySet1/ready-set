@@ -15,6 +15,7 @@ import type {
 import {
   calculateDeliveryCost,
   calculateDriverPay,
+  getConfiguration,
   type DeliveryCostInput,
   type DriverPayInput
 } from './delivery-cost-calculator';
@@ -47,52 +48,75 @@ export class CalculatorService {
   /**
    * Get template with its pricing rules
    */
-  static async getTemplateWithRules(supabase: any, templateId: string): Promise<CalculatorTemplate | null> {
-    try {
-      const { data: template, error: templateError } = await supabase
-        .from('calculator_templates')
-        .select('*')
-        .eq('id', templateId)
-        .single();
+  static async getTemplateWithRules(supabase: any, templateId: string, maxRetries = 2): Promise<CalculatorTemplate | null> {
+    let lastError: any;
 
-      if (templateError || !template) {
-        console.error('Error fetching template:', templateError);
-        return null;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const { data: template, error: templateError } = await supabase
+          .from('calculator_templates')
+          .select('*')
+          .eq('id', templateId)
+          .single();
+
+        if (templateError || !template) {
+          const isTransient = templateError?.message?.includes('fetch failed') ||
+            templateError?.message?.includes('SocketError') ||
+            templateError?.message?.includes('ECONNRESET');
+
+          if (isTransient && attempt < maxRetries) {
+            await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+            continue;
+          }
+
+          console.error('Error fetching template:', templateError);
+          return null;
+        }
+
+        const { data: rules, error: rulesError } = await supabase
+          .from('pricing_rules')
+          .select('*')
+          .eq('template_id', templateId)
+          .order('priority', { ascending: false });
+
+        if (rulesError) {
+          console.error('Error fetching rules:', rulesError);
+          throw new Error('Failed to fetch pricing rules');
+        }
+
+        const mappedRules = (rules || []).map((rule: any) => ({
+          id: rule.id,
+          templateId: rule.template_id,
+          ruleType: rule.rule_type,
+          ruleName: rule.rule_name,
+          baseAmount: rule.base_amount ? parseFloat(rule.base_amount.toString()) : undefined,
+          perUnitAmount: rule.per_unit_amount ? parseFloat(rule.per_unit_amount.toString()) : undefined,
+          thresholdValue: rule.threshold_value ? parseFloat(rule.threshold_value.toString()) : undefined,
+          thresholdType: rule.threshold_type,
+          appliesWhen: rule.applies_when ? JSON.parse(rule.applies_when) : undefined,
+          priority: rule.priority
+        }));
+
+        return {
+          ...template,
+          pricingRules: mappedRules
+        };
+      } catch (error: any) {
+        lastError = error;
+        const isTransient = error?.message?.includes('fetch failed') ||
+          error?.message?.includes('SocketError') ||
+          error?.message?.includes('ECONNRESET') ||
+          error?.cause?.code === 'UND_ERR_SOCKET';
+
+        if (isTransient && attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+          continue;
+        }
       }
-
-      const { data: rules, error: rulesError } = await supabase
-        .from('pricing_rules')
-        .select('*')
-        .eq('template_id', templateId)
-        .order('priority', { ascending: false });
-
-      if (rulesError) {
-        console.error('Error fetching rules:', rulesError);
-        throw new Error('Failed to fetch pricing rules');
-      }
-
-      // Map database fields to interface fields
-      const mappedRules = (rules || []).map((rule: any) => ({
-        id: rule.id,
-        templateId: rule.template_id,
-        ruleType: rule.rule_type,
-        ruleName: rule.rule_name,
-        baseAmount: rule.base_amount ? parseFloat(rule.base_amount.toString()) : undefined,
-        perUnitAmount: rule.per_unit_amount ? parseFloat(rule.per_unit_amount.toString()) : undefined,
-        thresholdValue: rule.threshold_value ? parseFloat(rule.threshold_value.toString()) : undefined,
-        thresholdType: rule.threshold_type,
-        appliesWhen: rule.applies_when ? JSON.parse(rule.applies_when) : undefined,
-        priority: rule.priority
-      }));
-
-      return {
-        ...template,
-        pricingRules: mappedRules
-      };
-    } catch (error) {
-      console.error('Error in getTemplateWithRules:', error);
-      throw error;
     }
+
+    console.error('Error in getTemplateWithRules after retries:', lastError);
+    throw lastError;
   }
 
   /**
@@ -220,15 +244,18 @@ export class CalculatorService {
       };
 
       // Prepare input for driver pay calculator
-      // Use tips field as bonus amount - if tips > 0, bonus is qualified
+      // bonusQualified is false here because we handle bonus via input.tips directly
       const driverInput: DriverPayInput = {
         ...deliveryInput,
-        bonusQualified: (input.tips ?? 0) > 0
+        bonusQualified: false
       };
 
       // Calculate using updated formulas
       const deliveryCostBreakdown = calculateDeliveryCost(deliveryInput);
       const driverPayBreakdown = calculateDriverPay(driverInput);
+
+      // User-entered driver bonus pay (from the "Driver Bonus Pay" field)
+      const driverBonusPay = input.tips ?? 0;
 
       // Build result in CalculationResult format
       const customerCharges: CustomerCharges = {
@@ -247,21 +274,30 @@ export class CalculatorService {
         ]
       };
 
+      const adjustments = input.adjustments ?? 0;
+
       const driverPayments: DriverPayments = {
         basePay: driverPayBreakdown.driverBasePayPerDrop,
         mileagePay: driverPayBreakdown.totalMileagePay,
-        bonus: driverPayBreakdown.driverBonusPay,
+        bonus: driverBonusPay,
         bridgeToll: driverPayBreakdown.bridgeToll,
         extraStopsBonus: driverPayBreakdown.extraStopsBonus,
-        total: driverPayBreakdown.totalDriverPay,
+        adjustments,
+        total: driverPayBreakdown.totalDriverPay + driverBonusPay + adjustments,
         breakdown: [
           { label: 'Base Pay', amount: driverPayBreakdown.driverBasePayPerDrop },
           { label: `Mileage (${driverPayBreakdown.totalMileage} mi × $${driverPayBreakdown.mileageRate}/mi)`, amount: driverPayBreakdown.totalMileagePay },
-          { label: 'Bonus', amount: driverPayBreakdown.driverBonusPay },
+          { label: 'Bonus', amount: driverBonusPay },
           { label: 'Extra Stops Bonus', amount: driverPayBreakdown.extraStopsBonus },
-          { label: 'Bridge Toll', amount: driverPayBreakdown.bridgeToll }
+          { label: 'Bridge Toll', amount: driverPayBreakdown.bridgeToll },
+          { label: 'Adjustments', amount: adjustments }
         ]
       };
+
+      // Get client configuration for mileage rate (defaults to Ready Set Food Standard)
+      const configId = clientConfigId || 'ready-set-food-standard';
+      const clientConfig = getConfiguration(configId);
+      const clientMileageRate = clientConfig?.mileageRate ?? 3.0;
 
       const result: CalculationResult = {
         customerCharges,
@@ -276,8 +312,8 @@ export class CalculatorService {
           numberOfDrives: input.numberOfDrives || 1,
           numberOfStops: input.numberOfStops || 1,
           bonusQualified: driverPayBreakdown.bonusQualified,
-          vendorMileageRate: 3.0,
-          readySetMileageRate: 3.0,
+          vendorMileageRate: clientMileageRate,
+          readySetMileageRate: clientMileageRate,
           driverMileageRate: driverPayBreakdown.mileageRate,
           driverMileageMinimum: 7.0,
           readySetFee: driverPayBreakdown.readySetFee,

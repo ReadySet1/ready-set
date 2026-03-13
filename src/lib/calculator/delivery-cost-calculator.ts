@@ -49,7 +49,7 @@ export interface DriverPayBreakdown {
   driverBasePayPerDrop: number; // Base pay rate (not used in actual calculation)
   driverTotalBasePay: number; // Actual base pay (0 if direct tip received)
   totalMileage: number; // Total miles driven
-  mileageRate: number; // Driver mileage rate (CaterValley: $0.70, Destino: $0.35)
+  mileageRate: number; // Driver mileage rate ($0.70/mi for Destino, CaterValley, Try Hungry, HY Food; 0 when flat rate applies)
   totalMileagePay: number; // Driver mileage pay (all miles × rate)
   bridgeToll: number; // Bridge toll amount
   extraStopsBonus: number; // Driver bonus for extra stops
@@ -58,7 +58,7 @@ export interface DriverPayBreakdown {
   readySetTotalFee: number; // Total Ready Set fees
   driverBonusPay: number; // Bonus if qualified (0 if direct tip received)
   directTip: number; // Direct tip amount (100% to driver)
-  totalDriverPay: number; // Final driver payment (base + mileage + bonus + extraStops + tip)
+  totalDriverPay: number; // Final driver payment (base + mileage + bonus + extraStops + bridgeToll + tip)
   bonusQualifiedPercent: number; // 0-100%
   bonusQualified: boolean; // Whether driver qualifies for bonus
 }
@@ -107,7 +107,7 @@ const PRICING_TIERS: PricingTier[] = [
 // ============================================================================
 
 const VENDOR_MILEAGE_RATE = 3.0; // $3.00 per mile (vendor charges)
-const DRIVER_MILEAGE_RATE = 0.35; // $0.35 per mile (driver pay - Destino)
+const DRIVER_MILEAGE_RATE = 0.35; // $0.35 per mile (fallback for configs without driverMileageSettings)
 const DISTANCE_THRESHOLD = 10; // miles
 
 /**
@@ -293,12 +293,21 @@ function checkManualReviewRequired(headcount: number, config: ClientDeliveryConf
 }
 
 /**
- * Determines driver base pay based on headcount using tiered system or flat rate.
+ * Determines driver base pay based on headcount or food cost using tiered system or flat rate.
  * For clients with driverBasePayTiers, looks up the appropriate tier using O(n) search.
+ * For clients with driverFoodCostPayTiers (like HY Food Company), uses food cost tiers
+ * when headcount is 0 but food cost > 0.
  * For clients without tiers, returns the flat basePayPerDrop.
+ *
+ * Some clients (e.g., Kasa) have distance-based driver base pay: a lower rate for drives
+ * within the distance threshold and the standard rate for drives over the threshold.
+ * When `isWithinThreshold` is true and a tier has `basePayWithinThreshold` defined,
+ * that rate is used instead of `basePay`.
  *
  * @param headcount - Number of people to serve
  * @param config - Client delivery configuration
+ * @param foodCost - Food cost amount (used when headcount is 0)
+ * @param isWithinThreshold - Whether the drive is within the distance threshold
  * @returns Driver base pay amount in dollars
  * @throws {Error} If no matching tier found or configuration invalid (e.g., basePay === 0)
  *
@@ -306,18 +315,52 @@ function checkManualReviewRequired(headcount: number, config: ClientDeliveryConf
  * - Tier lookup is O(n) but acceptable for small tier arrays (typically 5-11 tiers)
  * - Validates that basePay is not 0 unless manual review is explicitly required
  * - For manual review cases, delegates to checkManualReviewRequired()
+ * - When headcount is 0 but food cost > 0, uses driverFoodCostPayTiers if configured
  *
  * @example
  * ```typescript
  * // Try Hungry with 30 headcount returns $23 (tier 25-49)
  * const basePay = determineDriverBasePay(30, TRY_HUNGRY); // Returns 23
  *
- * // HY Food Company returns flat $50 for any headcount
- * const basePay = determineDriverBasePay(50, HY_FOOD_COMPANY_DIRECT); // Returns 50
+ * // Kasa with 30 headcount within 10mi returns $13; over 10mi returns $23
+ * const basePay = determineDriverBasePay(30, KASA, 0, true); // Returns 13
+ * const basePay = determineDriverBasePay(30, KASA, 0, false); // Returns 23
  * ```
  */
-function determineDriverBasePay(headcount: number, config: ClientDeliveryConfiguration): number {
-  // If config has tiered driver base pay, use it
+function determineDriverBasePay(
+  headcount: number,
+  config: ClientDeliveryConfiguration,
+  foodCost: number = 0,
+  isWithinThreshold: boolean = false
+): number {
+  // Special case: When headcount is 0 but food cost > 0, use food cost tiers if available
+  // This is for clients like HY Food Company where driver base pay can be determined by food cost
+  if (headcount === 0 && foodCost > 0 && config.driverPaySettings.driverFoodCostPayTiers && config.driverPaySettings.driverFoodCostPayTiers.length > 0) {
+    const tier = config.driverPaySettings.driverFoodCostPayTiers.find(t =>
+      isInTier(foodCost, t.foodCostMin, t.foodCostMax)
+    );
+
+    if (!tier) {
+      throw new Error(`No driver base pay tier found for food cost: ${foodCost}`);
+    }
+
+    // Use within-threshold rate when available and applicable
+    const effectiveBasePay = (isWithinThreshold && tier.basePayWithinThreshold !== undefined)
+      ? tier.basePayWithinThreshold
+      : tier.basePay;
+
+    // Validate tier configuration - basePay should not be 0
+    if (effectiveBasePay === 0 && tier.basePay === 0) {
+      throw new Error(
+        `Invalid tier configuration: basePay is 0 for food cost ${foodCost}. ` +
+        `This indicates a pricing configuration error for ${config.clientName}.`
+      );
+    }
+
+    return effectiveBasePay;
+  }
+
+  // If config has tiered driver base pay by headcount, use it
   if (config.driverPaySettings.driverBasePayTiers && config.driverPaySettings.driverBasePayTiers.length > 0) {
     const tier = config.driverPaySettings.driverBasePayTiers.find(t =>
       isInTier(headcount, t.headcountMin, t.headcountMax)
@@ -350,86 +393,16 @@ function determineDriverBasePay(headcount: number, config: ClientDeliveryConfigu
       );
     }
 
+    // Use within-threshold rate when available and applicable
+    if (isWithinThreshold && tier.basePayWithinThreshold !== undefined) {
+      return tier.basePayWithinThreshold;
+    }
+
     return tier.basePay;
   }
 
   // Otherwise, use flat base pay
   return config.driverPaySettings.basePayPerDrop;
-}
-
-/**
- * Driver base pay tiers for Destino calculator
- * IMPORTANT: Headcount and food cost have SEPARATE tier mappings with different base pay values!
- * The LESSER rule compares the base pay from each lookup, not the tier indices.
- *
- * Derived from documented test cases (D1-D5):
- * - D1: HC 28 ($30) vs FC $400 ($40) → $30
- * - D2: HC 60 ($50) vs FC $500 ($40) → $40
- * - D4: HC 50 ($50) vs FC $700 ($50) → $50
- */
-interface DriverTier {
-  min: number;
-  max: number | null;
-  basePay: number;
-}
-
-/**
- * Headcount-based tiers for driver base pay
- */
-const DRIVER_HEADCOUNT_TIERS: DriverTier[] = [
-  { min: 0, max: 24, basePay: 25 },
-  { min: 25, max: 49, basePay: 30 },
-  { min: 50, max: 74, basePay: 50 },    // $50 based on D2/D4 expected results
-  { min: 75, max: 99, basePay: 60 },    // Higher tier - estimated
-  { min: 100, max: null, basePay: 50 }, // Case by case, using $50 estimate
-];
-
-/**
- * Food cost-based tiers for driver base pay
- * NOTE: These have DIFFERENT base pay values than headcount tiers for same tier index!
- */
-const DRIVER_FOOD_COST_TIERS: DriverTier[] = [
-  { min: 0, max: 299.99, basePay: 25 },
-  { min: 300, max: 599.99, basePay: 40 },   // $40 based on D2 expected result
-  { min: 600, max: 899.99, basePay: 50 },   // $50 based on D4 expected result
-  { min: 900, max: 1099.99, basePay: 60 },  // Higher tier - estimated
-  { min: 1100, max: null, basePay: 50 },    // Case by case, using $50 estimate
-];
-
-/**
- * Determines driver base pay using LESSER rule (headcount vs food cost tier)
- * This implements the Destino driver compensation rules.
- *
- * IMPORTANT: Headcount and food cost use SEPARATE tier arrays with DIFFERENT
- * base pay values. The LESSER rule returns the lower of the two base pay amounts.
- *
- * @param headcount - Number of people to serve
- * @param foodCost - Total food cost
- * @param config - Client delivery configuration (unused but kept for consistency)
- * @returns Driver base pay amount in dollars
- */
-function determineDriverBasePayByLesser(headcount: number, foodCost: number, config: ClientDeliveryConfiguration): number {
-  // Find tier by headcount using headcount-specific tiers
-  const headcountTier = DRIVER_HEADCOUNT_TIERS.find(tier =>
-    isInTier(headcount, tier.min, tier.max)
-  );
-
-  // Find tier by food cost using food cost-specific tiers
-  const foodCostTier = DRIVER_FOOD_COST_TIERS.find(tier =>
-    isInTier(foodCost, tier.min, tier.max)
-  );
-
-  // Default to lowest tier if not found
-  if (!headcountTier && !foodCostTier) {
-    return DRIVER_HEADCOUNT_TIERS[0]?.basePay ?? 25;
-  }
-
-  // If only one is found, use that one
-  if (!headcountTier) return foodCostTier!.basePay;
-  if (!foodCostTier) return headcountTier.basePay;
-
-  // Return the LESSER of the two base pay amounts
-  return Math.min(headcountTier.basePay, foodCostTier.basePay);
 }
 
 // ============================================================================
@@ -468,6 +441,26 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   const config = clientConfigId
     ? getConfiguration(clientConfigId) || READY_SET_FOOD_STANDARD
     : READY_SET_FOOD_STANDARD;
+
+  // Check for zero-order scenario (headcount = 0 AND foodCost = 0)
+  // Some clients like HY Food Company have special pricing for standard drives
+  const isZeroOrder = headcount === 0 && foodCost === 0;
+  const zeroOrderSettings = config.zeroOrderSettings;
+  const maxMileageForZeroOrder = zeroOrderSettings?.maxMileage ?? config.distanceThreshold;
+
+  if (isZeroOrder && zeroOrderSettings?.enabled && totalMileage <= maxMileageForZeroOrder) {
+    // Use zero-order pricing (e.g., HY Food Company standard drive)
+    const effectiveBridgeToll = requiresBridge ? (bridgeToll || config.bridgeTollSettings.defaultTollAmount) : 0;
+
+    return {
+      deliveryCost: zeroOrderSettings.customerDeliveryFee,
+      totalMileagePay: 0, // No additional mileage charge for zero-order
+      dailyDriveDiscount: 0,
+      extraStopsCharge: calculateExtraStopsCharge(numberOfStops, CUSTOMER_EXTRA_STOP_RATE),
+      bridgeToll: effectiveBridgeToll,
+      deliveryFee: zeroOrderSettings.customerDeliveryFee + calculateExtraStopsCharge(numberOfStops, CUSTOMER_EXTRA_STOP_RATE) + effectiveBridgeToll
+    };
+  }
 
   // Validate inputs
   if (headcount < 0) throw new Error('Headcount cannot be negative');
@@ -508,13 +501,7 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   const effectiveMileagePay = totalMileagePay;
   const effectiveBridgeToll = requiresBridge ? (bridgeToll || config.bridgeTollSettings.defaultTollAmount) : 0;
 
-  // IMPORTANT: CaterValley-specific business rule
-  // For CaterValley, bridge toll ($8) is driver compensation paid by Ready Set
-  // It should NOT be added to the customer's delivery fee
-  // Other clients may include bridge toll in their delivery fee
-  const bridgeTollForCustomer = config.clientName === 'CaterValley' ? 0 : effectiveBridgeToll;
-
-  const deliveryFee = deliveryCost + effectiveMileagePay - dailyDriveDiscount + extraStopsCharge + bridgeTollForCustomer;
+  const deliveryFee = deliveryCost + effectiveMileagePay - dailyDriveDiscount + extraStopsCharge + effectiveBridgeToll;
 
   // CRITICAL: Validate that delivery cost is not zero for non-zero orders
   // This prevents revenue loss from configuration errors
@@ -563,20 +550,22 @@ export function calculateMileagePay(totalMileage: number, clientConfigId?: strin
 }
 
 /**
- * Calculates driver pay with all components (Destino calculator)
+ * Calculates driver pay with all components
  *
  * KEY BUSINESS RULES:
- * 1. Use LESSER tier (headcount vs food cost) for base pay
- * 2. ALL mileage paid at $0.35/mile (not just over 10 miles)
+ * 1. Driver base pay determined by headcount tier from client config
+ * 2. Driver mileage: flat $7 within 10mi, total miles × $0.70 over 10mi (configurable per client)
  * 3. $10 bonus standard (affected by infractions via bonusQualifiedPercent)
  * 4. Direct tip = NO base pay, NO bonus (mutually exclusive)
  * 5. Infractions are cumulative across entire week
+ * 6. Zero-order mode: Special pricing when headcount = 0 AND foodCost = 0 (e.g., HY Food Company)
+ * 7. RS Total = RS Fee (tier-based, LESSER rule) + Addon + Toll + Tip (when configured)
  *
  * @param input - Driver payment parameters
  * @returns Complete breakdown of driver payments
  *
  * @example
- * // Test D1: Basic Delivery
+ * // Test D1: Basic Delivery (Destino)
  * const result = calculateDriverPay({
  *   headcount: 28,
  *   foodCost: 400,
@@ -585,7 +574,7 @@ export function calculateMileagePay(totalMileage: number, clientConfigId?: strin
  *   bonusQualified: true,
  *   bonusQualifiedPercent: 100
  * });
- * // Expected: base $30, mileage $1.09, bonus $10, total $41.09
+ * // Expected: base $23, mileage $7 (flat), bonus $10, total $40
  */
 export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
   const {
@@ -615,32 +604,90 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
     ? getConfiguration(clientConfigId) || READY_SET_FOOD_STANDARD
     : READY_SET_FOOD_STANDARD;
 
+  // Check for zero-order scenario (headcount = 0 AND foodCost = 0)
+  // Some clients like HY Food Company have special pricing for standard drives
+  const isZeroOrder = headcount === 0 && foodCost === 0;
+  const zeroOrderSettings = config.zeroOrderSettings;
+  const maxMileageForZeroOrder = zeroOrderSettings?.maxMileage ?? config.distanceThreshold;
+
+  if (isZeroOrder && zeroOrderSettings?.enabled && totalMileage <= maxMileageForZeroOrder) {
+    // Use zero-order pricing (e.g., HY Food Company: RS $50, Driver $30)
+    const effectiveBridgeToll = requiresBridge ? (bridgeToll || config.bridgeTollSettings.defaultTollAmount) : 0;
+    const extraStopsBonus = calculateExtraStopsCharge(numberOfStops, DRIVER_EXTRA_STOP_BONUS);
+
+    // Apply bonus qualification percentage
+    const driverBonusPay = bonusQualified
+      ? zeroOrderSettings.driverBonusPay * (bonusQualifiedPercent / 100)
+      : 0;
+
+    // Total driver pay for zero-order
+    const totalDriverPay = zeroOrderSettings.driverBasePay +
+      zeroOrderSettings.driverMileagePay +
+      driverBonusPay +
+      extraStopsBonus +
+      effectiveBridgeToll +
+      directTip;
+
+    return {
+      driverMaxPayPerDrop: null, // No cap for zero-order
+      driverBasePayPerDrop: zeroOrderSettings.driverBasePay,
+      driverTotalBasePay: zeroOrderSettings.driverBasePay,
+      totalMileage,
+      mileageRate: 0, // Flat mileage, not per-mile rate
+      totalMileagePay: zeroOrderSettings.driverMileagePay,
+      bridgeToll: effectiveBridgeToll,
+      extraStopsBonus,
+      readySetFee: zeroOrderSettings.readySetFee,
+      readySetAddonFee,
+      readySetTotalFee: zeroOrderSettings.readySetFee + readySetAddonFee + effectiveBridgeToll,
+      driverBonusPay,
+      directTip,
+      totalDriverPay,
+      bonusQualifiedPercent,
+      bonusQualified
+    };
+  }
+
   // CRITICAL RULE: Direct tip = NO base pay, NO bonus
   // Driver only receives tip + mileage when a direct tip is given
   const hasDirectTip = directTip > 0;
 
+  // Determine if within distance threshold (used for distance-based driver base pay, e.g. Kasa)
+  const mileageThreshold = config.driverPaySettings.driverMileageSettings?.threshold ?? config.distanceThreshold;
+  const isWithinThreshold = totalMileage <= mileageThreshold;
+
   // Step 1: Determine driver base pay
   // If direct tip received, base pay is $0
-  // Different calculation methods based on whether a specific client config is provided:
-  // - If clientConfigId is provided: use that client's specific tier/flat settings
-  // - If no clientConfigId: use Destino LESSER rule (headcount vs food cost)
+  // Uses client's tier/flat settings from config (headcount tiers, or food cost tiers
+  // when headcount is 0 but food cost > 0)
+  // For clients with distance-based rates (e.g. Kasa), uses lower rate within threshold
   let driverBasePay = 0;
   if (!hasDirectTip) {
-    if (clientConfigId) {
-      // Specific client config provided - use client's headcount-only lookup or flat rate
-      driverBasePay = determineDriverBasePay(headcount, config);
-    } else {
-      // No specific client config: Use Destino LESSER rule (headcount vs food cost)
-      driverBasePay = determineDriverBasePayByLesser(headcount, foodCost, config);
-    }
+    driverBasePay = determineDriverBasePay(headcount, config, foodCost, isWithinThreshold);
   }
 
-  // Step 2: Calculate driver mileage pay - ALL miles at configured rate
-  // Use client-specific rate if available, otherwise default to $0.35/mile
-  // CaterValley uses $0.70/mile, Destino uses $0.35/mile
-  const driverMileageRate = config.driverPaySettings.driverMileageRate ?? DRIVER_MILEAGE_RATE;
-  // Round to 2 decimal places for currency precision
-  const totalMileagePay = Math.round(totalMileage * driverMileageRate * 100) / 100;
+  // Step 2: Calculate driver mileage pay
+  // Check for special mileage settings (e.g., HY Food Company: flat $7 within 10mi, then total × $0.70)
+  let totalMileagePay: number;
+  let driverMileageRate: number;
+
+  const mileageSettings = config.driverPaySettings.driverMileageSettings;
+  if (mileageSettings) {
+    const mileageThreshold = mileageSettings.threshold ?? config.distanceThreshold;
+    if (totalMileage <= mileageThreshold) {
+      // Within threshold: flat amount (e.g., $7)
+      totalMileagePay = mileageSettings.flatAmountWithinThreshold;
+      driverMileageRate = 0; // Flat rate, not per-mile
+    } else {
+      // Over threshold: total miles × rate (e.g., 11 mi × $0.70 = $7.70)
+      driverMileageRate = mileageSettings.perMileRateOverThreshold;
+      totalMileagePay = Math.round(totalMileage * driverMileageRate * 100) / 100;
+    }
+  } else {
+    // Default: ALL miles at configured rate (CaterValley $0.70, Destino $0.35)
+    driverMileageRate = config.driverPaySettings.driverMileageRate ?? DRIVER_MILEAGE_RATE;
+    totalMileagePay = Math.round(totalMileage * driverMileageRate * 100) / 100;
+  }
 
   // Step 3: Driver bonus - apply percentage for infractions
   // If direct tip received, bonus is $0
@@ -661,13 +708,30 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
   const driverTotalBasePay = driverBasePay;
 
   // Step 7: Calculate Driver Total Pay
-  // Formula: Base Pay + Mileage + Bonus + Extra Stops + Direct Tip
-  // When tip received: 0 + Mileage + 0 + Extra Stops + Tip
-  const totalDriverPay = driverTotalBasePay + totalMileagePay + driverBonusPay + extraStopsBonus + directTip;
+  // Formula: Base Pay + Mileage + Bonus + Extra Stops + Bridge Toll + Direct Tip
+  // When tip received: 0 + Mileage + 0 + Extra Stops + Bridge Toll + Tip
+  const totalDriverPay = driverTotalBasePay + totalMileagePay + driverBonusPay + extraStopsBonus + effectiveBridgeToll + directTip;
 
-  // Step 8: Ready Set fees - from config
-  const readySetFee = input.readySetFee || config.driverPaySettings.readySetFee;
-  const readySetTotalFee = readySetFee + readySetAddonFee + effectiveBridgeToll;
+  // Step 8: Ready Set fees
+  // For clients like HY Food Company, Ready Set fee matches the customer delivery fee tier
+  let readySetFee: number;
+  if (input.readySetFee) {
+    // Explicit fee provided - use it
+    readySetFee = input.readySetFee;
+  } else if (config.driverPaySettings.readySetFeeMatchesDeliveryFee) {
+    // Ready Set fee matches customer tier-based delivery fee
+    const isWithin10Miles = totalMileage <= config.distanceThreshold;
+    const tier = determinePricingTier(headcount, foodCost, config.pricingTiers, isWithin10Miles);
+    readySetFee = isWithin10Miles
+      ? (tier.within10MilesPercent ? foodCost * tier.within10MilesPercent : tier.within10Miles)
+      : (tier.regularRatePercent ? foodCost * tier.regularRatePercent : tier.regularRate);
+  } else {
+    // Default: use fixed Ready Set fee from config
+    readySetFee = config.driverPaySettings.readySetFee;
+  }
+  // RS Total = RS Fee + Addon + Toll (+ Tip when configured, e.g. Destino)
+  const tipForRsTotal = config.driverPaySettings.includeDirectTipInReadySetTotal ? directTip : 0;
+  const readySetTotalFee = readySetFee + readySetAddonFee + effectiveBridgeToll + tipForRsTotal;
 
   return {
     driverMaxPayPerDrop: config.driverPaySettings.maxPayPerDrop,
@@ -747,8 +811,6 @@ const deliveryCostCalculator = {
   validateDeliveryCostInput,
   // Export constants for testing
   PRICING_TIERS,
-  DRIVER_HEADCOUNT_TIERS,
-  DRIVER_FOOD_COST_TIERS,
   VENDOR_MILEAGE_RATE,
   DRIVER_MILEAGE_RATE,
   DISTANCE_THRESHOLD,
