@@ -10,12 +10,11 @@ import { createClient } from '@/utils/supabase/server';
 const AUTH_TIMEOUT_MS = 3000;
 
 /**
- * Authenticates via getUser() with a short timeout.
- * Returns the user on success, or null on auth failure / network timeout.
- * Throws only on unexpected errors.
+ * Authenticates via getUser() with a short timeout to avoid hanging
+ * when Supabase auth servers are unreachable.
+ * Throws on timeout or network error.
  */
-async function authenticateRequest(supabase: ReturnType<Awaited<ReturnType<typeof createClient>>['auth']['getUser']> extends Promise<infer R> ? { auth: { getUser: () => Promise<R> } } : never) {
-  // @ts-expect-error - supabase typing is complex; runtime types are correct
+async function authenticateRequest(supabase: Awaited<ReturnType<typeof createClient>>) {
   return Promise.race([
     supabase.auth.getUser(),
     new Promise<never>((_, reject) =>
@@ -30,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     let user;
     try {
-      const { data, error } = await authenticateRequest(supabase as any);
+      const { data, error } = await authenticateRequest(supabase);
       if (error || !data?.user) {
         return NextResponse.json(
           { success: false, error: 'Unauthorized' },
@@ -113,7 +112,7 @@ export async function GET(request: NextRequest) {
 
     let user;
     try {
-      const { data, error } = await authenticateRequest(supabase as any);
+      const { data, error } = await authenticateRequest(supabase);
       if (error || !data?.user) {
         return NextResponse.json(
           { success: false, error: 'Unauthorized' },
