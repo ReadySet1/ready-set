@@ -5,7 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { NavigationIcon, History, Calculator } from 'lucide-react';
-import { MileageForm, MileageResults } from '@/components/MileageCalculator';
+import {
+  MileageForm,
+  MileageResults,
+  MileageMap,
+} from '@/components/MileageCalculator';
 import type {
   MileageStop,
   MileageCalculation,
@@ -223,9 +227,9 @@ export default function MileageCalculatorClient({
 
           {/* Calculator Tab */}
           <TabsContent value="calculator">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left: Form */}
-              <div>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              {/* Left: Form (2/5 on desktop) */}
+              <div className="lg:col-span-2">
                 <MileageForm
                   onCalculate={handleCalculate}
                   isLoading={status === 'loading'}
@@ -233,17 +237,19 @@ export default function MileageCalculatorClient({
                 />
               </div>
 
-              {/* Right: Results */}
-              <div>
+              {/* Right: Map + Results (3/5 on desktop) */}
+              <div className="lg:col-span-3 space-y-5">
+                <MileageMap calculation={currentCalculation} />
+
                 {currentCalculation ? (
                   <MileageResults calculation={currentCalculation} />
                 ) : (
                   <Card className="border-0 shadow-sm rounded-2xl bg-white/80">
-                    <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                      <div className="p-4 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full w-20 h-20 mb-5 flex items-center justify-center">
-                        <NavigationIcon className="h-10 w-10 text-slate-400" />
+                    <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+                      <div className="p-3 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full w-16 h-16 mb-4 flex items-center justify-center">
+                        <NavigationIcon className="h-8 w-8 text-slate-400" />
                       </div>
-                      <p className="text-lg font-medium text-slate-600 mb-1">
+                      <p className="text-base font-medium text-slate-600 mb-1">
                         No calculation yet
                       </p>
                       <p className="text-sm text-slate-400 max-w-xs">
