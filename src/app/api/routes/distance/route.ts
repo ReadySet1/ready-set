@@ -10,12 +10,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
-import { DistanceMatrixRequestSchema } from '@/types/routing';
-import type {
-  RouteApiResponse,
-  DistanceMatrixResult,
-  DistanceMatrixEntry,
-} from '@/types/routing';
+import {
+  DistanceMatrixRequestSchema,
+  type RouteApiResponse,
+  type DistanceMatrixResult,
+  type DistanceMatrixEntry,
+} from '../../../../types/routing';
 import { createClient } from '@/utils/supabase/server';
 
 const GOOGLE_DISTANCE_MATRIX_URL =
@@ -76,7 +76,13 @@ export async function POST(
 
     const data = await response.json();
     if (data.status !== 'OK') {
-      throw new Error(`Distance Matrix error: ${data.status}`);
+      const detail = data.error_message ? ` — ${data.error_message}` : '';
+      console.error('[DistanceMatrix] Google API error:', {
+        status: data.status,
+        error_message: data.error_message,
+        apiKeyPrefix: apiKey.slice(0, 10) + '...',
+      });
+      throw new Error(`Distance Matrix error: ${data.status}${detail}`);
     }
 
     const entries: DistanceMatrixEntry[] = [];
