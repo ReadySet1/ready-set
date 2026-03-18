@@ -104,7 +104,7 @@ export default function MileageMap({
         source: ROUTE_SOURCE_ID,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': '#1e40af',
+          'line-color': '#111928',
           'line-width': 8,
           'line-opacity': 0.25,
         },
@@ -116,7 +116,7 @@ export default function MileageMap({
         source: ROUTE_SOURCE_ID,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': '#3b82f6',
+          'line-color': '#E5BE00',
           'line-width': 4,
           'line-opacity': 0.9,
         },
@@ -128,7 +128,7 @@ export default function MileageMap({
 
     // Pickup marker (emerald)
     if (pickup.lat != null && pickup.lng != null) {
-      const el = createMarkerEl('#059669', 'P');
+      const el = createMarkerEl('#FBD113', 'P', '#111928');
       const popup = new mapboxgl.Popup({ offset: 25, closeButton: false }).setHTML(
         `<div style="font-size:13px"><strong>Pickup</strong><br/>${escapeHtml(truncate(pickup.address, 60))}</div>`,
       );
@@ -144,7 +144,7 @@ export default function MileageMap({
     dropoffs.forEach((stop, i) => {
       if (stop.lat == null || stop.lng == null) return;
       const label = dropoffs.length === 1 ? 'D' : String(i + 1);
-      const el = createMarkerEl('#dc2626', label);
+      const el = createMarkerEl('#111928', label);
       const popup = new mapboxgl.Popup({ offset: 25, closeButton: false }).setHTML(
         `<div style="font-size:13px"><strong>Drop-off${dropoffs.length > 1 ? ` ${i + 1}` : ''}</strong><br/>${escapeHtml(truncate(stop.address, 60))}</div>`,
       );
@@ -216,11 +216,11 @@ export default function MileageMap({
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function createMarkerEl(color: string, label: string): HTMLDivElement {
+function createMarkerEl(color: string, label: string, textColor = '#fff'): HTMLDivElement {
   const el = document.createElement('div');
   el.style.cssText = `
     width: 32px; height: 32px; border-radius: 50%;
-    background: ${color}; color: #fff;
+    background: ${color}; color: ${textColor};
     display: flex; align-items: center; justify-content: center;
     font-size: 13px; font-weight: 700;
     border: 2.5px solid #fff;

@@ -149,7 +149,7 @@ export default function MileageForm({
       <Button
         type="submit"
         disabled={!canSubmit || isLoading}
-        className="w-full h-12 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold shadow-lg transition-all duration-200 disabled:opacity-50"
+        className="w-full h-12 rounded-xl bg-gradient-to-r from-primary to-amber-500 hover:from-amber-400 hover:to-amber-600 text-slate-900 font-semibold shadow-lg transition-all duration-200 disabled:opacity-50"
       >
         {isLoading ? (
           <>

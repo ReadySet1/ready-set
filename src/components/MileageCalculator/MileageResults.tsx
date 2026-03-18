@@ -50,33 +50,33 @@ export default function MileageResults({ calculation }: MileageResultsProps) {
     <div className="space-y-5">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="border-0 shadow-sm rounded-2xl bg-gradient-to-br from-emerald-50 to-green-50">
+        <Card className="border-0 shadow-sm rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50">
           <CardContent className="pt-4 pb-4 text-center">
-            <Navigation className="h-5 w-5 text-emerald-600 mx-auto mb-1.5" />
-            <div className="text-2xl font-bold text-emerald-700">
+            <Navigation className="h-5 w-5 text-amber-600 mx-auto mb-1.5" />
+            <div className="text-2xl font-bold text-amber-700">
               {calculation.totalDistanceMiles.toFixed(1)}
             </div>
-            <div className="text-xs font-medium text-emerald-600/70">miles</div>
+            <div className="text-xs font-medium text-amber-600/70">miles</div>
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50">
+        <Card className="border-0 shadow-sm rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100">
           <CardContent className="pt-4 pb-4 text-center">
-            <Clock className="h-5 w-5 text-blue-600 mx-auto mb-1.5" />
-            <div className="text-2xl font-bold text-blue-700">
+            <Clock className="h-5 w-5 text-slate-700 mx-auto mb-1.5" />
+            <div className="text-2xl font-bold text-slate-800">
               {formatDuration(calculation.totalDurationMinutes)}
             </div>
-            <div className="text-xs font-medium text-blue-600/70">drive time</div>
+            <div className="text-xs font-medium text-slate-500">drive time</div>
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm rounded-2xl bg-gradient-to-br from-purple-50 to-violet-50">
+        <Card className="border-0 shadow-sm rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50">
           <CardContent className="pt-4 pb-4 text-center">
-            <MapPin className="h-5 w-5 text-purple-600 mx-auto mb-1.5" />
-            <div className="text-2xl font-bold text-purple-700">
+            <MapPin className="h-5 w-5 text-amber-600 mx-auto mb-1.5" />
+            <div className="text-2xl font-bold text-amber-700">
               {calculation.dropoffs.length}
             </div>
-            <div className="text-xs font-medium text-purple-600/70">
+            <div className="text-xs font-medium text-amber-600/70">
               {calculation.dropoffs.length === 1 ? 'stop' : 'stops'}
             </div>
           </CardContent>
@@ -178,10 +178,10 @@ export default function MileageResults({ calculation }: MileageResultsProps) {
                   >
                     Total
                   </td>
-                  <td className="py-2.5 px-2 text-right font-bold text-emerald-700">
+                  <td className="py-2.5 px-2 text-right font-bold text-amber-700">
                     {calculation.totalDistanceMiles.toFixed(1)} mi
                   </td>
-                  <td className="py-2.5 px-2 text-right font-semibold text-blue-700">
+                  <td className="py-2.5 px-2 text-right font-semibold text-slate-800">
                     {formatDuration(calculation.totalDurationMinutes)}
                   </td>
                 </tr>

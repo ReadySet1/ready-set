@@ -175,14 +175,14 @@ export default function MileageCalculatorClient({
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50/40 to-white">
       <div className="container mx-auto py-6 px-4 space-y-6 max-w-6xl">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <h1 className="text-2xl font-bold flex items-center gap-3 text-slate-900">
-              <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg">
-                <NavigationIcon className="h-6 w-6 text-white" />
+              <div className="p-2 bg-gradient-to-br from-primary to-amber-500 rounded-xl shadow-lg">
+                <NavigationIcon className="h-6 w-6 text-slate-900" />
               </div>
               Total Mileage Calculation
             </h1>
@@ -195,7 +195,7 @@ export default function MileageCalculatorClient({
           <div className="flex items-center gap-3">
             <Badge
               variant="secondary"
-              className="px-4 py-2 bg-blue-100 text-blue-700 border-blue-200 shadow-sm"
+              className="px-4 py-2 bg-amber-100 text-amber-800 border-amber-300 shadow-sm"
             >
               Google Maps
             </Badge>
@@ -205,10 +205,10 @@ export default function MileageCalculatorClient({
         {/* Tabs */}
         <Tabs defaultValue="calculator" className="w-full">
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-2 mb-8">
-            <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-slate-50 to-slate-100 p-1.5 rounded-xl shadow-inner h-14">
+            <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-slate-50 to-amber-50/50 p-1.5 rounded-xl shadow-inner h-14">
               <TabsTrigger
                 value="calculator"
-                className="flex items-center justify-center gap-2 rounded-lg px-4 py-3 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-slate-900 text-slate-600 font-semibold transition-all duration-200 hover:text-slate-800 whitespace-nowrap"
+                className="flex items-center justify-center gap-2 rounded-lg px-4 py-3 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-slate-900 data-[state=active]:border-b-2 data-[state=active]:border-primary text-slate-600 font-semibold transition-all duration-200 hover:text-slate-800 whitespace-nowrap"
               >
                 <NavigationIcon className="h-4 w-4 flex-shrink-0" />
                 <span className="hidden sm:inline">Mileage Calculator</span>
@@ -216,7 +216,7 @@ export default function MileageCalculatorClient({
               </TabsTrigger>
               <TabsTrigger
                 value="history"
-                className="flex items-center justify-center gap-2 rounded-lg px-4 py-3 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-slate-900 text-slate-600 font-semibold transition-all duration-200 hover:text-slate-800 whitespace-nowrap"
+                className="flex items-center justify-center gap-2 rounded-lg px-4 py-3 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-slate-900 data-[state=active]:border-b-2 data-[state=active]:border-primary text-slate-600 font-semibold transition-all duration-200 hover:text-slate-800 whitespace-nowrap"
               >
                 <History className="h-4 w-4 flex-shrink-0" />
                 <span className="hidden sm:inline">Recent Calculations</span>
@@ -246,8 +246,8 @@ export default function MileageCalculatorClient({
                 ) : (
                   <Card className="border-0 shadow-sm rounded-2xl bg-white/80">
                     <CardContent className="flex flex-col items-center justify-center py-10 text-center">
-                      <div className="p-3 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full w-16 h-16 mb-4 flex items-center justify-center">
-                        <NavigationIcon className="h-8 w-8 text-slate-400" />
+                      <div className="p-3 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full w-16 h-16 mb-4 flex items-center justify-center">
+                        <NavigationIcon className="h-8 w-8 text-amber-500" />
                       </div>
                       <p className="text-base font-medium text-slate-600 mb-1">
                         No calculation yet
@@ -268,8 +268,8 @@ export default function MileageCalculatorClient({
             <Card className="border-0 shadow-lg rounded-3xl bg-white/80 backdrop-blur-sm">
               <CardHeader className="pb-6">
                 <CardTitle className="text-2xl font-semibold text-slate-800 flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl shadow-sm">
-                    <History className="h-5 w-5 text-white" />
+                  <div className="p-2 bg-gradient-to-br from-primary to-amber-500 rounded-xl shadow-sm">
+                    <History className="h-5 w-5 text-slate-900" />
                   </div>
                   Recent Calculations
                 </CardTitle>
@@ -288,7 +288,7 @@ export default function MileageCalculatorClient({
                               <div className="text-sm font-medium text-slate-500">
                                 Total Distance
                               </div>
-                              <div className="text-xl font-bold text-emerald-600">
+                              <div className="text-xl font-bold text-amber-600">
                                 {calc.totalDistanceMiles.toFixed(1)} mi
                               </div>
                             </div>
@@ -296,7 +296,7 @@ export default function MileageCalculatorClient({
                               <div className="text-sm font-medium text-slate-500">
                                 Drive Time
                               </div>
-                              <div className="text-xl font-bold text-blue-600">
+                              <div className="text-xl font-bold text-slate-800">
                                 {formatDurationShort(calc.totalDurationMinutes)}
                               </div>
                             </div>
@@ -304,7 +304,7 @@ export default function MileageCalculatorClient({
                               <div className="text-sm font-medium text-slate-500">
                                 Stops
                               </div>
-                              <div className="text-xl font-bold text-purple-600">
+                              <div className="text-xl font-bold text-amber-600">
                                 {calc.dropoffs.length}
                               </div>
                             </div>
@@ -324,14 +324,14 @@ export default function MileageCalculatorClient({
 
                         <div className="mt-4 pt-4 border-t border-slate-200">
                           <div className="flex flex-wrap gap-3 text-sm">
-                            <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full">
+                            <span className="bg-amber-50 text-amber-800 px-3 py-1 rounded-full">
                               <strong>From:</strong>{' '}
                               {truncateAddress(calc.pickup.address)}
                             </span>
                             {calc.dropoffs.map((d, i) => (
                               <span
                                 key={i}
-                                className="bg-red-50 text-red-700 px-3 py-1 rounded-full"
+                                className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full"
                               >
                                 <strong>To{calc.dropoffs.length > 1 ? ` ${i + 1}` : ''}:</strong>{' '}
                                 {truncateAddress(d.address)}
@@ -344,8 +344,8 @@ export default function MileageCalculatorClient({
                   </div>
                 ) : (
                   <div className="text-center text-slate-500 py-16">
-                    <div className="p-4 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-                      <Calculator className="h-12 w-12 text-slate-400" />
+                    <div className="p-4 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+                      <Calculator className="h-12 w-12 text-amber-500" />
                     </div>
                     <p className="text-xl font-medium text-slate-600 mb-2">
                       No calculations yet
