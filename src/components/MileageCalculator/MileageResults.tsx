@@ -121,7 +121,7 @@ export default function MileageResults({ calculation }: MileageResultsProps) {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm" aria-label="Route leg breakdown">
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left py-2 px-2 text-xs font-medium text-slate-500 uppercase tracking-wider">
