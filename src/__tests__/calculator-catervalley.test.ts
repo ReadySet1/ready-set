@@ -2,12 +2,12 @@
  * CaterValley Calculator Tests
  *
  * Tests specific to CaterValley vendor configuration:
- * - Minimum delivery fee: $42.50
- * - Bridge toll: Driver compensation paid by Ready Set (NOT charged to customer)
+ * - Flat fee pricing (same rate within/beyond 10 miles per tier)
+ * - Mileage: $3.00/mile after 10 miles (added to delivery fee)
+ * - Bridge toll: Added to customer delivery fee when bridge crossing required
  * - Percentage-based pricing for 100+ headcount (10% of food cost)
- * - Customer mileage rate: $3.00/mile after 10 miles
- * - Driver mileage rate: $0.70/mile for ALL miles
- * - Driver base pay: $18.00 flat
+ * - Driver mileage: flat $7 within 10mi, $0.70/mile × total miles over 10mi
+ * - Driver base pay: tiered by headcount ($18/$23/$33/$43, 100+ case by case)
  */
 
 import {
@@ -34,7 +34,7 @@ describe('CaterValley Calculator - Client Pricing', () => {
       expect(result.deliveryFee).toBe(42.50);
     });
 
-    it('should calculate $85.00 over 10 miles', () => {
+    it('should calculate $42.50 plus mileage over 10 miles (flat fee)', () => {
       const input: DeliveryCostInput = {
         headcount: 20,
         foodCost: 250,
@@ -44,10 +44,11 @@ describe('CaterValley Calculator - Client Pricing', () => {
       };
 
       const result = calculateDeliveryCost(input);
-      expect(result.deliveryCost).toBe(85.00);
+      // CaterValley uses flat fee: regularRate = within10Miles = $42.50
+      expect(result.deliveryCost).toBe(42.50);
       // Mileage: (12 - 10) × $3.00 = $6.00
       expect(result.totalMileagePay).toBe(6.00);
-      expect(result.deliveryFee).toBe(91.00);
+      expect(result.deliveryFee).toBe(48.50);
     });
   });
 
@@ -66,7 +67,7 @@ describe('CaterValley Calculator - Client Pricing', () => {
       expect(result.deliveryFee).toBe(52.50);
     });
 
-    it('should calculate $90.00 over 10 miles', () => {
+    it('should calculate $52.50 plus mileage over 10 miles (flat fee)', () => {
       const input: DeliveryCostInput = {
         headcount: 35,
         foodCost: 450,
@@ -76,10 +77,10 @@ describe('CaterValley Calculator - Client Pricing', () => {
       };
 
       const result = calculateDeliveryCost(input);
-      expect(result.deliveryCost).toBe(90.00);
+      expect(result.deliveryCost).toBe(52.50);
       // Mileage: (15 - 10) × $3.00 = $15.00
       expect(result.totalMileagePay).toBe(15.00);
-      expect(result.deliveryFee).toBe(105.00);
+      expect(result.deliveryFee).toBe(67.50);
     });
   });
 
@@ -98,7 +99,7 @@ describe('CaterValley Calculator - Client Pricing', () => {
       expect(result.deliveryFee).toBe(62.50);
     });
 
-    it('should calculate $110.00 over 10 miles', () => {
+    it('should calculate $62.50 plus mileage over 10 miles (flat fee)', () => {
       const input: DeliveryCostInput = {
         headcount: 65,
         foodCost: 800,
@@ -108,10 +109,10 @@ describe('CaterValley Calculator - Client Pricing', () => {
       };
 
       const result = calculateDeliveryCost(input);
-      expect(result.deliveryCost).toBe(110.00);
+      expect(result.deliveryCost).toBe(62.50);
       // Mileage: (14 - 10) × $3.00 = $12.00
       expect(result.totalMileagePay).toBe(12.00);
-      expect(result.deliveryFee).toBe(122.00);
+      expect(result.deliveryFee).toBe(74.50);
     });
   });
 
@@ -130,7 +131,7 @@ describe('CaterValley Calculator - Client Pricing', () => {
       expect(result.deliveryFee).toBe(72.50);
     });
 
-    it('should calculate $120.00 over 10 miles', () => {
+    it('should calculate $72.50 plus mileage over 10 miles (flat fee)', () => {
       const input: DeliveryCostInput = {
         headcount: 90,
         foodCost: 1100,
@@ -140,10 +141,10 @@ describe('CaterValley Calculator - Client Pricing', () => {
       };
 
       const result = calculateDeliveryCost(input);
-      expect(result.deliveryCost).toBe(120.00);
+      expect(result.deliveryCost).toBe(72.50);
       // Mileage: (18 - 10) × $3.00 = $24.00
       expect(result.totalMileagePay).toBe(24.00);
-      expect(result.deliveryFee).toBe(144.00);
+      expect(result.deliveryFee).toBe(96.50);
     });
   });
 
@@ -182,7 +183,7 @@ describe('CaterValley Calculator - Client Pricing', () => {
   });
 
   describe('Bridge toll handling - CaterValley specific', () => {
-    it('should NOT add bridge toll to customer delivery fee', () => {
+    it('should add bridge toll to customer delivery fee', () => {
       const input: DeliveryCostInput = {
         headcount: 40,
         foodCost: 500,
@@ -194,12 +195,12 @@ describe('CaterValley Calculator - Client Pricing', () => {
       };
 
       const result = calculateDeliveryCost(input);
-      // Bridge toll should NOT be added to customer fee for CaterValley
-      // Base $90 + Mileage $6 = $96 (no bridge toll)
-      expect(result.deliveryCost).toBe(90.00);
-      expect(result.totalMileagePay).toBe(6.00);
-      // Bridge toll NOT included in deliveryFee for CaterValley
-      expect(result.deliveryFee).toBe(96.00);
+      // Tier 2 flat fee: $52.50
+      expect(result.deliveryCost).toBe(52.50);
+      expect(result.totalMileagePay).toBe(6.00); // (12 - 10) × $3.00
+      expect(result.bridgeToll).toBe(8);
+      // deliveryFee = deliveryCost + mileage + bridgeToll
+      expect(result.deliveryFee).toBe(66.50); // $52.50 + $6 + $8
     });
   });
 
@@ -222,7 +223,7 @@ describe('CaterValley Calculator - Client Pricing', () => {
 
 describe('CaterValley Calculator - Driver Compensation', () => {
   describe('Base pay calculation', () => {
-    it('should calculate driver base pay based on headcount tier', () => {
+    it('should calculate driver base pay based on headcount tier (25-49 = $23)', () => {
       const input: DriverPayInput = {
         headcount: 30,
         foodCost: 400,
@@ -235,13 +236,13 @@ describe('CaterValley Calculator - Driver Compensation', () => {
       };
 
       const result = calculateDriverPay(input);
-      // CaterValley driver base pay: $18 flat
-      expect(result.driverTotalBasePay).toBe(18);
+      // CaterValley tiered base pay: HC 25-49 = $23
+      expect(result.driverTotalBasePay).toBe(23);
     });
   });
 
   describe('Mileage pay calculation', () => {
-    it('should calculate mileage at $0.70/mile for all miles', () => {
+    it('should calculate flat $7 mileage within 10 miles', () => {
       const input: DriverPayInput = {
         headcount: 30,
         foodCost: 400,
@@ -254,7 +255,7 @@ describe('CaterValley Calculator - Driver Compensation', () => {
       };
 
       const result = calculateDriverPay(input);
-      // 10 miles × $0.70 = $7.00
+      // Within 10mi: flat $7
       expect(result.totalMileagePay).toBe(7.00);
     });
   });
@@ -296,7 +297,7 @@ describe('CaterValley Calculator - Driver Compensation', () => {
   });
 
   describe('Bridge toll as driver compensation', () => {
-    it('should track bridge toll separately for CaterValley', () => {
+    it('should include bridge toll in total driver pay', () => {
       const input: DriverPayInput = {
         headcount: 40,
         foodCost: 500,
@@ -311,11 +312,9 @@ describe('CaterValley Calculator - Driver Compensation', () => {
       };
 
       const result = calculateDriverPay(input);
-      // Bridge toll tracked separately for CaterValley (paid by Ready Set)
       expect(result.bridgeToll).toBe(8);
-      // Base $18 + Mileage (12 × $0.70 = $8.40) + Bonus $10 = $36.40
-      // Bridge toll is separate reimbursement, not in totalDriverPay
-      expect(result.totalDriverPay).toBeCloseTo(36.40, 2);
+      // HC 26-49 = $23 base + Mileage (12 × $0.70 = $8.40) + Bonus $10 + Toll $8 = $49.40
+      expect(result.totalDriverPay).toBeCloseTo(49.40, 2);
     });
   });
 
@@ -333,9 +332,8 @@ describe('CaterValley Calculator - Driver Compensation', () => {
       };
 
       const result = calculateDriverPay(input);
-      // Base $18 + Mileage (15 × $0.70 = $10.50) + Bonus $10 = $38.50
-      const expectedTotal = 18 + 10.50 + 10;
-      expect(result.totalDriverPay).toBeCloseTo(expectedTotal, 2);
+      // HC 50-74 = $33 base + Mileage (15 × $0.70 = $10.50) + Bonus $10 = $53.50
+      expect(result.totalDriverPay).toBeCloseTo(53.50, 2);
     });
   });
 });

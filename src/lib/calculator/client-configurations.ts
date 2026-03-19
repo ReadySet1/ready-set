@@ -41,8 +41,43 @@ export interface ClientDeliveryConfiguration {
       headcountMin: number;
       headcountMax: number | null;
       basePay: number;
+      basePayWithinThreshold?: number; // Optional: lower rate for drives within distance threshold (e.g., Kasa)
+    }>;
+    // Optional: Tiered driver base pay based on food cost (used when headcount is 0 but food cost > 0)
+    // For HY Food Company: mirrors headcount tiers but based on food cost ranges
+    driverFoodCostPayTiers?: Array<{
+      foodCostMin: number;
+      foodCostMax: number | null;
+      basePay: number;
+      basePayWithinThreshold?: number; // Optional: lower rate for drives within distance threshold (e.g., Kasa)
     }>;
     requiresManualReview?: boolean; // Flag for "case by case" scenarios
+    // Optional: Special mileage calculation settings
+    // For clients like HY Food Company: flat $7 within threshold, then total miles × rate
+    driverMileageSettings?: {
+      flatAmountWithinThreshold: number; // e.g., $7 for drives within 10 miles
+      perMileRateOverThreshold: number;  // e.g., $0.70/mile for ALL miles when over threshold
+      threshold?: number; // Defaults to distanceThreshold if not specified
+    };
+    // Optional: Ready Set fee matches customer delivery fee (for HY Food Company)
+    // When true, Ready Set fee = customer tier-based delivery fee (not fixed amount)
+    readySetFeeMatchesDeliveryFee?: boolean;
+    // Optional: Include direct tip in Ready Set total fee calculation
+    // When true: RS Total = RS Fee + Addon + Toll + Tip (Destino formula)
+    // When false/undefined: RS Total = RS Fee + Addon + Toll
+    includeDirectTipInReadySetTotal?: boolean;
+  };
+
+  // Zero Order Settings - Special pricing when headcount = 0 AND foodCost = 0
+  // Used for standard/default drives without specific order details (e.g., HY Food Company)
+  zeroOrderSettings?: {
+    enabled: boolean;
+    readySetFee: number; // Ready Set fee for zero-order drives
+    customerDeliveryFee: number; // What customer pays (may equal readySetFee)
+    driverBasePay: number; // Driver base pay for zero-order
+    driverMileagePay: number; // Flat mileage amount (not per-mile rate)
+    driverBonusPay: number; // Driver bonus for zero-order
+    maxMileage?: number; // Max mileage this applies to (default: distanceThreshold)
   };
 
   // Bridge Toll Settings
@@ -103,10 +138,12 @@ export const READY_SET_FOOD_STANDARD: ClientDeliveryConfiguration = {
   },
 
   driverPaySettings: {
-    maxPayPerDrop: 40,
+    maxPayPerDrop: null, // No cap - driver pay = base + mileage + bonus
     basePayPerDrop: 23, // Default fallback (not used when tiers are present)
     bonusPay: 10,
-    readySetFee: 70,
+    readySetFee: 60, // Default/fallback RS fee (lowest tier)
+    readySetFeeMatchesDeliveryFee: true,
+    includeDirectTipInReadySetTotal: true,
     // Tiered driver base pay based on headcount (from REA-41 comments)
     driverBasePayTiers: [
       { headcountMin: 0, headcountMax: 24, basePay: 18 },
@@ -114,17 +151,23 @@ export const READY_SET_FOOD_STANDARD: ClientDeliveryConfiguration = {
       { headcountMin: 50, headcountMax: 74, basePay: 33 },
       { headcountMin: 75, headcountMax: 99, basePay: 43 },
       { headcountMin: 100, headcountMax: null, basePay: 53 }
-    ]
+    ],
+    // Driver mileage: flat $7 within 10mi, total miles × $0.70 when over 10mi
+    driverMileageSettings: {
+      flatAmountWithinThreshold: 7,
+      perMileRateOverThreshold: 0.70,
+      threshold: 10
+    }
   },
 
   bridgeTollSettings: {
-    defaultTollAmount: 8.00,
+    defaultTollAmount: 8.50,
     autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County']
   },
 
   createdAt: new Date('2025-01-01'),
-  updatedAt: new Date('2025-01-01'),
-  notes: 'Standard Ready Set Food pricing based on official documents'
+  updatedAt: new Date('2026-03-08'),
+  notes: 'Standard Ready Set Food (Destino) pricing. RS fee matches headcount tier ($60-$310, LESSER rule). Driver base pay by headcount ($18-$53). Driver mileage: flat $7 within 10mi or total×$0.70 over 10mi. RS Total includes tip.'
 };
 
 /**
@@ -170,7 +213,7 @@ export const READY_SET_FOOD_PREMIUM: ClientDeliveryConfiguration = {
   },
 
   bridgeTollSettings: {
-    defaultTollAmount: 10.00,
+    defaultTollAmount: 8.50,
     autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County', 'Berkeley']
   },
 
@@ -188,25 +231,24 @@ export const KASA: ClientDeliveryConfiguration = {
   id: 'kasa',
   clientName: 'Kasa',
   vendorName: 'Kasa',
-  description: 'Kasa delivery pricing with within/beyond 10 miles rate structure',
+  description: 'Kasa delivery pricing with within/beyond 10 miles rate structure, tiered driver pay, and RS fee matching delivery tier',
   isActive: true,
 
   pricingTiers: [
-    // Based on "New Kasa Pricing" table from Image 3
-    { headcountMin: 0, headcountMax: 24, foodCostMin: 0, foodCostMax: 300, regularRate: 60, within10Miles: 30 },
+    { headcountMin: 0, headcountMax: 24, foodCostMin: 0, foodCostMax: 299.99, regularRate: 60, within10Miles: 30 },
     { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 70, within10Miles: 40 },
     { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 90, within10Miles: 60 },
     { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 100, within10Miles: 70 },
     { headcountMin: 100, headcountMax: 124, foodCostMin: 1200, foodCostMax: 1499.99, regularRate: 120, within10Miles: 80 },
-    { headcountMin: 125, headcountMax: 149, foodCostMin: 1500, foodCostMax: 1799.99, regularRate: 140, within10Miles: 90 },
-    { headcountMin: 150, headcountMax: 174, foodCostMin: 1800, foodCostMax: 2099.99, regularRate: 160, within10Miles: 100 },
-    { headcountMin: 175, headcountMax: 199, foodCostMin: 2100, foodCostMax: 2399.99, regularRate: 180, within10Miles: 110 },
-    { headcountMin: 200, headcountMax: 249, foodCostMin: 2400, foodCostMax: 2999.99, regularRate: 200, within10Miles: 120 },
-    { headcountMin: 250, headcountMax: 299, foodCostMin: 3000, foodCostMax: 3499.99, regularRate: 220, within10Miles: 130 },
-    { headcountMin: 300, headcountMax: null, foodCostMin: 3500, foodCostMax: null, regularRate: 0, within10Miles: 0 } // TBD
+    { headcountMin: 125, headcountMax: 149, foodCostMin: 1500, foodCostMax: 1699.99, regularRate: 150, within10Miles: 90 },
+    { headcountMin: 150, headcountMax: 174, foodCostMin: 1700, foodCostMax: 1899.99, regularRate: 180, within10Miles: 100 },
+    { headcountMin: 175, headcountMax: 199, foodCostMin: 1900, foodCostMax: 2099.99, regularRate: 210, within10Miles: 110 },
+    { headcountMin: 200, headcountMax: 249, foodCostMin: 2100, foodCostMax: 2299.99, regularRate: 280, within10Miles: 120 },
+    { headcountMin: 250, headcountMax: 299, foodCostMin: 2300, foodCostMax: 2499.99, regularRate: 310, within10Miles: 130 },
+    { headcountMin: 300, headcountMax: null, foodCostMin: 2500, foodCostMax: null, regularRate: 0, within10Miles: 0 } // TBD
   ],
 
-  mileageRate: 3.0,
+  mileageRate: 3.0, // $3.00/mile for miles over 10 (customer/RS mileage fee)
   distanceThreshold: 10,
 
   dailyDriveDiscounts: {
@@ -216,20 +258,44 @@ export const KASA: ClientDeliveryConfiguration = {
   },
 
   driverPaySettings: {
-    maxPayPerDrop: 98.69,
-    basePayPerDrop: 63.00,
+    maxPayPerDrop: null, // No cap — driver pay is sum of components
+    basePayPerDrop: 18, // Default/fallback (not used when tiers are present)
     bonusPay: 10,
-    readySetFee: 135.00
+    readySetFee: 30, // Default/fallback RS fee (lowest within-10-miles tier)
+    readySetFeeMatchesDeliveryFee: true,
+    includeDirectTipInReadySetTotal: true,
+    driverBasePayTiers: [
+      { headcountMin: 0, headcountMax: 24, basePay: 18, basePayWithinThreshold: 3 },
+      { headcountMin: 25, headcountMax: 49, basePay: 23, basePayWithinThreshold: 13 },
+      { headcountMin: 50, headcountMax: 74, basePay: 33, basePayWithinThreshold: 23 },
+      { headcountMin: 75, headcountMax: 99, basePay: 43, basePayWithinThreshold: 33 },
+      { headcountMin: 100, headcountMax: 124, basePay: 53, basePayWithinThreshold: 43 },
+      { headcountMin: 125, headcountMax: null, basePay: 0 } // 125+ case by case
+    ],
+    requiresManualReview: true, // 125+ headcount requires manual review
+    driverFoodCostPayTiers: [
+      { foodCostMin: 0, foodCostMax: 299.99, basePay: 18, basePayWithinThreshold: 3 },
+      { foodCostMin: 300, foodCostMax: 599.99, basePay: 23, basePayWithinThreshold: 13 },
+      { foodCostMin: 600, foodCostMax: 899.99, basePay: 33, basePayWithinThreshold: 23 },
+      { foodCostMin: 900, foodCostMax: 1199.99, basePay: 43, basePayWithinThreshold: 33 },
+      { foodCostMin: 1200, foodCostMax: 1499.99, basePay: 53, basePayWithinThreshold: 43 },
+      { foodCostMin: 1500, foodCostMax: null, basePay: 0 } // $1,500+ case by case
+    ],
+    driverMileageSettings: {
+      flatAmountWithinThreshold: 7,    // $7 flat for drives within 10 miles
+      perMileRateOverThreshold: 0.70,  // $0.70/mile for ALL miles when over threshold
+      threshold: 10
+    }
   },
 
   bridgeTollSettings: {
-    defaultTollAmount: 8.00,
+    defaultTollAmount: 8.50,
     autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County']
   },
 
   createdAt: new Date('2025-01-01'),
-  updatedAt: new Date('2025-01-01'),
-  notes: 'Kasa pricing based on New Kasa Pricing table (Image 3)'
+  updatedAt: new Date('2026-03-08'),
+  notes: 'Kasa pricing: RS fee matches delivery tier ($30-$130 within 10mi, $60-$310 over 10mi, LESSER rule). Driver base pay is DISTANCE-DEPENDENT: within 10mi ($3-$43), over 10mi ($18-$53), by headcount or food cost. 125+ HC / $1,500+ FC case by case. Driver mileage: flat $7 within 10mi or total×$0.70 over 10mi. RS mileage: $3.00/mi after 10mi. RS Total = RS Fee + Addon + Toll + Tip. Daily drive discount: $5/$10/$15.'
 };
 
 /**
@@ -241,26 +307,20 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
   id: 'cater-valley',
   clientName: 'CaterValley',
   vendorName: 'CaterValley',
-  description: 'CaterValley delivery pricing with $42.50 minimum delivery fee',
+  description: 'CaterValley delivery pricing with $42.50 minimum delivery fee, tiered driver pay, and two-tier mileage',
   isActive: true,
 
   pricingTiers: [
-    // Tier 1: Small orders (≤25 headcount OR ≤$300 food cost)
-    { headcountMin: 0, headcountMax: 25, foodCostMin: 0, foodCostMax: 300, regularRate: 85, within10Miles: 42.50 },
-    // Tier 2: 26-49 headcount OR $300.01-599 food cost
-    { headcountMin: 26, headcountMax: 49, foodCostMin: 300.01, foodCostMax: 599.99, regularRate: 90, within10Miles: 52.50 },
-    // Tier 3: 50-74 headcount OR $600-899 food cost
-    { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 110, within10Miles: 62.50 },
-    // Tier 4: 75-99 headcount OR $900-1199 food cost
-    { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 120, within10Miles: 72.50 },
-    // Tier 5: 100+ headcount OR $1200+ food cost (10% percentage-based pricing)
+    // Flat fee per tier — same rate regardless of distance; mileage ($3/mi) only applies AFTER 10 miles
+    { headcountMin: 0, headcountMax: 25, foodCostMin: 0, foodCostMax: 300, regularRate: 42.50, within10Miles: 42.50 },
+    { headcountMin: 26, headcountMax: 49, foodCostMin: 300.01, foodCostMax: 599.99, regularRate: 52.50, within10Miles: 52.50 },
+    { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 62.50, within10Miles: 62.50 },
+    { headcountMin: 75, headcountMax: 99, foodCostMin: 900, foodCostMax: 1199.99, regularRate: 72.50, within10Miles: 72.50 },
+    // 100+ headcount OR $1200+ food cost → 10% of food cost
     { headcountMin: 100, headcountMax: null, foodCostMin: 1200, foodCostMax: null, regularRate: 0, within10Miles: 0, regularRatePercent: 0.10, within10MilesPercent: 0.10 }
   ],
 
-  // CRITICAL: CaterValley mileage rate is $3.00 per mile after 10 miles
-  // Applied to miles OVER the distanceThreshold (10 miles)
-  // Per official Terms & Pricing Chart from CaterValley (see OFFICIAL_PRICING_CHART.md)
-  mileageRate: 3.0,
+  mileageRate: 3.0, // $3.00/mile for miles over 10 (customer/RS add-on fee)
   distanceThreshold: 10,
 
   dailyDriveDiscounts: {
@@ -270,21 +330,35 @@ export const CATER_VALLEY: ClientDeliveryConfiguration = {
   },
 
   driverPaySettings: {
-    maxPayPerDrop: null, // CaterValley: No cap, driver pay is sum of components
-    basePayPerDrop: 18, // $18 flat rate (confirmed from spreadsheet)
+    maxPayPerDrop: null, // No cap — driver pay is sum of components
+    basePayPerDrop: 18, // Default/fallback (not used when tiers are present)
     bonusPay: 10,
-    readySetFee: 70,
-    driverMileageRate: 0.70 // $0.70/mile for ALL miles (CaterValley-specific)
+    readySetFee: 42.50, // Default/fallback Ready Set fee (lowest tier)
+    readySetFeeMatchesDeliveryFee: true,
+    driverBasePayTiers: [
+      { headcountMin: 0, headcountMax: 24, basePay: 18 },
+      { headcountMin: 25, headcountMax: 49, basePay: 23 },
+      { headcountMin: 50, headcountMax: 74, basePay: 33 },
+      { headcountMin: 75, headcountMax: 99, basePay: 43 },
+      { headcountMin: 100, headcountMax: null, basePay: 0 }
+    ],
+    requiresManualReview: true, // 100+ headcount is "case by case"
+    // Driver mileage: $0.70/mi first 10 miles (flat $7), total miles × $0.70 when over 10
+    driverMileageSettings: {
+      flatAmountWithinThreshold: 7,    // $7 flat for drives within 10 miles ($0.70 × 10)
+      perMileRateOverThreshold: 0.70,  // $0.70/mile for ALL miles when over threshold
+      threshold: 10
+    }
   },
 
   bridgeTollSettings: {
-    defaultTollAmount: 8.00,
+    defaultTollAmount: 8.50,
     autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County']
   },
 
   createdAt: new Date('2025-11-10'),
-  updatedAt: new Date('2026-01-14'),
-  notes: 'CaterValley pricing: $42.50 minimum fee, $18 driver base, $0.70/mi driver mileage'
+  updatedAt: new Date('2026-03-01'),
+  notes: 'CaterValley pricing: RS fee matches headcount tier ($42.50-$72.50 or 10%), driver base tiered ($18-$43, 100+ case by case), driver mileage flat $7 within 10mi or total×$0.70 over 10mi, RS mileage $3.00/mi after 10mi.'
 };
 
 /**
@@ -323,7 +397,10 @@ export const TRY_HUNGRY: ClientDeliveryConfiguration = {
     maxPayPerDrop: 40,
     basePayPerDrop: 18, // Default fallback (not used when tiers are present)
     bonusPay: 10,
-    readySetFee: 70,
+    readySetFee: 40, // Default/fallback Ready Set fee (lowest tier)
+    // Ready Set fee matches the customer delivery fee tier (not a fixed amount)
+    // < 25 HC → $40, 25-49 → $50, 50-74 → $60, 75-99 → $70
+    readySetFeeMatchesDeliveryFee: true,
     // Tiered driver base pay based on headcount
     driverBasePayTiers: [
       { headcountMin: 0, headcountMax: 24, basePay: 18 },
@@ -333,35 +410,54 @@ export const TRY_HUNGRY: ClientDeliveryConfiguration = {
       // 100+ requires manual review - will throw error in calculation
       { headcountMin: 100, headcountMax: null, basePay: 0 }
     ],
-    requiresManualReview: true // Flag for 100+ headcount orders
+    requiresManualReview: true, // Flag for 100+ headcount orders
+    // Special mileage calculation for Try Hungry:
+    // - Within 10 miles: Flat $7 ($0.70/mi × 10 mi)
+    // - Over 10 miles: Total miles × $0.70 (e.g., 15 mi × $0.70 = $10.50)
+    driverMileageSettings: {
+      flatAmountWithinThreshold: 7,    // $7 flat for drives within 10 miles
+      perMileRateOverThreshold: 0.70,  // $0.70/mile for ALL miles when over threshold
+      threshold: 10                     // 10 mile threshold
+    }
   },
 
   bridgeTollSettings: {
-    defaultTollAmount: 8.00,
+    defaultTollAmount: 8.50,
     autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County']
   },
 
   createdAt: new Date('2025-11-12'),
-  updatedAt: new Date('2025-11-12'),
-  notes: 'Try Hungry pricing from REA-41 comments. Note: 100+ headcount requires manual review (case by case).'
+  updatedAt: new Date('2026-02-11'),
+  notes: 'Try Hungry pricing: RS fee matches headcount tier ($40-$70), driver mileage flat $7 within 10mi or total×$0.70 over 10mi. 100+ headcount requires manual review (case by case).'
 };
 
 /**
  * HY Food Company Direct Configuration
  * Vendor: HY Food Company
- * Flat $50 driver base pay (unique to this client)
- * Uses same Ready Set payment tiers as Destino
+ *
+ * TWO PRICING MODES:
+ * 1. Zero-Order Mode (headcount = 0 AND foodCost = 0):
+ *    - Ready Set Fee: $50
+ *    - Driver: $13 base + $7 mileage (flat) + $10 bonus = $30 total
+ *    - Applies for standard drives within 10 miles without order details
+ *
+ * 2. Normal Mode (headcount > 0 OR foodCost > 0):
+ *    - Customer Fee: Uses tiered pricing based on headcount/food cost (LESSER rule)
+ *    - Ready Set Fee: $70
+ *    - Driver Base Pay: Tiered by headcount ($13-$93, 200+ case by case)
+ *    - Driver Mileage: Flat $7 within 10mi, $0.70/mi × total miles over 10mi
+ *    - Driver Bonus: $10 if qualified
  */
 export const HY_FOOD_COMPANY_DIRECT: ClientDeliveryConfiguration = {
   id: 'hy-food-company-direct',
   clientName: 'HY Food Company Direct',
   vendorName: 'HY Food Company',
-  description: 'HY Food Company pricing with flat $50 driver base pay and Destino-style Ready Set payment tiers',
+  description: 'HY Food Company pricing with zero-order special rates and tiered driver pay for orders with headcount/food cost',
   isActive: true,
 
   pricingTiers: [
-    // Same Ready Set payment tiers as Destino - flat fee pricing
-    // Mileage ($3/mi) only applies AFTER 10 miles
+    // Customer delivery fee tiers - uses LESSER of headcount OR food cost
+    // Mileage ($3.00/mi) only applies AFTER 10 miles
     { headcountMin: 0, headcountMax: 24, foodCostMin: 0, foodCostMax: 299.99, regularRate: 60, within10Miles: 60 },
     { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 70, within10Miles: 70 },
     { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 90, within10Miles: 90 },
@@ -375,7 +471,7 @@ export const HY_FOOD_COMPANY_DIRECT: ClientDeliveryConfiguration = {
     { headcountMin: 300, headcountMax: null, foodCostMin: 2500, foodCostMax: null, regularRate: 0, within10Miles: 0 }
   ],
 
-  mileageRate: 3.0,
+  mileageRate: 3.0, // HY Food Company: $3.00/mile over 10 miles for Ready Set/customer fee
   distanceThreshold: 10,
 
   dailyDriveDiscounts: {
@@ -385,27 +481,64 @@ export const HY_FOOD_COMPANY_DIRECT: ClientDeliveryConfiguration = {
   },
 
   driverPaySettings: {
-    maxPayPerDrop: 50, // Cap enforced on base + mileage combined
-    basePayPerDrop: 50, // Flat $50 base pay (unique to HY Food Company)
+    maxPayPerDrop: null, // No cap for HY Food Company
+    basePayPerDrop: 13, // Default/fallback base pay
     bonusPay: 10,
-    readySetFee: 70
-    // No driverBasePayTiers - uses flat basePayPerDrop instead
-    //
-    // CRITICAL: maxPayPerDrop caps base + mileage at $50. With $50 base + any mileage,
-    // the total base pay is capped at $50 (driver loses mileage compensation).
-    // Bonus and bridge tolls are added AFTER the cap and are not subject to it.
-    //
-    // See docs/BUSINESS_RULES.md for detailed explanation and examples.
+    readySetFee: 60, // Default Ready Set fee (fallback)
+    // Ready Set fee matches the customer delivery fee tier (not a fixed amount)
+    readySetFeeMatchesDeliveryFee: true,
+    // Tiered driver base pay based on headcount (for normal orders)
+    driverBasePayTiers: [
+      { headcountMin: 0, headcountMax: 24, basePay: 13 },    // < 25: $13
+      { headcountMin: 25, headcountMax: 49, basePay: 23 },   // 25-49: $23
+      { headcountMin: 50, headcountMax: 74, basePay: 33 },   // 50-74: $33
+      { headcountMin: 75, headcountMax: 99, basePay: 43 },   // 75-99: $43
+      { headcountMin: 100, headcountMax: 124, basePay: 63 }, // 100-124: $63
+      { headcountMin: 125, headcountMax: 149, basePay: 73 }, // 125-149: $73
+      { headcountMin: 150, headcountMax: 174, basePay: 83 }, // 150-174: $83
+      { headcountMin: 175, headcountMax: 199, basePay: 93 }, // 175-199: $93
+      { headcountMin: 200, headcountMax: null, basePay: 0 }  // 200+: Case by case
+    ],
+    requiresManualReview: true, // 200+ headcount requires manual review (case by case)
+    // Tiered driver base pay based on food cost (used when headcount is 0 but food cost > 0)
+    driverFoodCostPayTiers: [
+      { foodCostMin: 0, foodCostMax: 299.99, basePay: 13 },      // < $300: $13
+      { foodCostMin: 300, foodCostMax: 599.99, basePay: 23 },    // $300-$599: $23
+      { foodCostMin: 600, foodCostMax: 899.99, basePay: 33 },    // $600-$899: $33
+      { foodCostMin: 900, foodCostMax: 1199.99, basePay: 43 },   // $900-$1,199: $43
+      { foodCostMin: 1200, foodCostMax: null, basePay: 53 }      // $1,200+: $53
+    ],
+    // Special mileage calculation for HY Food Company:
+    // - Within 10 miles: Flat $7
+    // - Over 10 miles: Total miles × $0.70 (e.g., 11 mi × $0.70 = $7.70)
+    driverMileageSettings: {
+      flatAmountWithinThreshold: 7,    // $7 flat for drives within 10 miles
+      perMileRateOverThreshold: 0.70,  // $0.70/mile for ALL miles when over threshold
+      threshold: 10                     // 10 mile threshold
+    }
+  },
+
+  // Special pricing for zero-order drives (headcount = 0 AND foodCost = 0)
+  // Standard HY Food Company drive within 10 miles
+  zeroOrderSettings: {
+    enabled: true,
+    readySetFee: 50, // Ready Set gets $50
+    customerDeliveryFee: 50, // Customer pays $50
+    driverBasePay: 13, // Driver base: $13
+    driverMileagePay: 7, // Driver mileage: $7 (flat, not per-mile)
+    driverBonusPay: 10, // Driver bonus: $10
+    maxMileage: 10 // Only applies within 10 miles
+    // Total driver pay: $13 + $7 + $10 = $30
   },
 
   bridgeTollSettings: {
-    defaultTollAmount: 8.00,
+    defaultTollAmount: 8.50,
     autoApplyForAreas: ['San Francisco', 'Oakland', 'Marin County']
   },
 
   createdAt: new Date('2025-11-12'),
-  updatedAt: new Date('2025-11-12'),
-  notes: 'HY Food Company Direct pricing from REA-41 comments. Unique $50 flat driver base pay.'
+  updatedAt: new Date('2026-01-29'),
+  notes: 'HY Food Company Direct pricing. Zero-order: RS $50, Driver $30. Normal orders: tiered driver pay ($13-$93 by headcount, 200+ case by case). Mileage: $3.00/mi over 10mi for customer/RS fee.'
 };
 
 /**
@@ -443,7 +576,7 @@ export const GENERIC_TEMPLATE: ClientDeliveryConfiguration = {
   },
 
   bridgeTollSettings: {
-    defaultTollAmount: 7.00
+    defaultTollAmount: 8.50
   },
 
   createdAt: new Date('2025-01-01'),

@@ -198,12 +198,28 @@ describe('CalculatorService', () => {
       expect(result?.pricingRules?.[0].baseAmount).toBe(65.0);
     });
 
-    it('should return null when template not found', async () => {
+    it('should throw when database returns an error', async () => {
       const mockSupabase = {
         from: jest.fn().mockReturnValue({
           select: jest.fn().mockReturnValue({
             eq: jest.fn().mockReturnValue({
               single: jest.fn().mockResolvedValue({ data: null, error: { message: 'Not found' } }),
+            }),
+          }),
+        }),
+      };
+
+      await expect(
+        CalculatorService.getTemplateWithRules(mockSupabase, 'non-existent')
+      ).rejects.toThrow('Failed to fetch template non-existent: Not found');
+    });
+
+    it('should return null when template does not exist (no error)', async () => {
+      const mockSupabase = {
+        from: jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({ data: null, error: null }),
             }),
           }),
         }),
@@ -460,7 +476,7 @@ describe('CalculatorService', () => {
 
       await expect(
         CalculatorService.calculate(mockSupabase, 'non-existent', input)
-      ).rejects.toThrow('Calculator template not found');
+      ).rejects.toThrow('Failed to fetch template non-existent: Not found');
     });
 
     it('should include metadata in calculation result', async () => {
@@ -683,76 +699,40 @@ describe('CalculatorService', () => {
     });
   });
 
-  describe('placeholder methods', () => {
+  describe('unimplemented methods', () => {
     describe('createRule', () => {
-      it('should return mock rule', async () => {
-        const input = {
-          templateId: 'template-1',
-          ruleName: 'test_rule',
-          ruleType: 'customer_charge',
-          baseAmount: 100,
-        };
-
-        const result = await CalculatorService.createRule(input);
-
-        expect(result.ruleName).toBe('test_rule');
-        expect(result.baseAmount).toBe(100);
-        expect(result.id).toContain('mock-');
+      it('should throw not implemented error', async () => {
+        await expect(CalculatorService.createRule({})).rejects.toThrow('Not implemented: createRule requires database integration');
       });
     });
 
     describe('updateRule', () => {
-      it('should return mock updated rule', async () => {
-        const updates = {
-          ruleName: 'updated_rule',
-          baseAmount: 200,
-        };
-
-        const result = await CalculatorService.updateRule('rule-1', updates);
-
-        expect(result.id).toBe('rule-1');
-        expect(result.ruleName).toBe('updated_rule');
-        expect(result.baseAmount).toBe(200);
+      it('should throw not implemented error', async () => {
+        await expect(CalculatorService.updateRule('rule-1', {})).rejects.toThrow('Not implemented: updateRule requires database integration');
       });
     });
 
     describe('deleteRule', () => {
-      it('should not throw', async () => {
-        await expect(CalculatorService.deleteRule('rule-1')).resolves.not.toThrow();
+      it('should throw not implemented error', async () => {
+        await expect(CalculatorService.deleteRule('rule-1')).rejects.toThrow('Not implemented: deleteRule requires database integration');
       });
     });
 
     describe('createTemplate', () => {
-      it('should return mock template', async () => {
-        const input = { name: 'New Template', description: 'Test template' };
-
-        const result = await CalculatorService.createTemplate(input);
-
-        expect(result.name).toBe('New Template');
-        expect(result.description).toBe('Test template');
-        expect(result.id).toContain('mock-template-');
+      it('should throw not implemented error', async () => {
+        await expect(CalculatorService.createTemplate({})).rejects.toThrow('Not implemented: createTemplate requires database integration');
       });
     });
 
     describe('updateTemplate', () => {
-      it('should return mock updated template', async () => {
-        const updates = { name: 'Updated Template' };
-
-        const result = await CalculatorService.updateTemplate('template-1', updates);
-
-        expect(result.id).toBe('template-1');
-        expect(result.name).toBe('Updated Template');
+      it('should throw not implemented error', async () => {
+        await expect(CalculatorService.updateTemplate('template-1', {})).rejects.toThrow('Not implemented: updateTemplate requires database integration');
       });
     });
 
     describe('getCalculatorConfig', () => {
-      it('should return basic config structure', async () => {
-        const result = await CalculatorService.getCalculatorConfig('template-1', 'config-1');
-
-        expect(result.templateId).toBe('template-1');
-        expect(result.clientConfigId).toBe('config-1');
-        expect(result.template).toBeNull();
-        expect(result.clientConfig).toBeNull();
+      it('should throw not implemented error', async () => {
+        await expect(CalculatorService.getCalculatorConfig('template-1', 'config-1')).rejects.toThrow('Not implemented: getCalculatorConfig requires database integration');
       });
     });
   });
