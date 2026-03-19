@@ -1,6 +1,7 @@
 // Calculator Service - Business logic for calculator system operations
 // Handles CRUD operations for templates, rules, configurations, and calculations
 
+import * as Sentry from '@sentry/nextjs';
 import type {
   CalculatorTemplate,
   PricingRule,
@@ -59,7 +60,7 @@ export class CalculatorService {
           .eq('id', templateId)
           .single();
 
-        if (templateError || !template) {
+        if (templateError) {
           const isTransient = templateError?.message?.includes('fetch failed') ||
             templateError?.message?.includes('SocketError') ||
             templateError?.message?.includes('ECONNRESET');
@@ -69,7 +70,11 @@ export class CalculatorService {
             continue;
           }
 
-          console.error('Error fetching template:', templateError);
+          // Non-transient error: propagate instead of silently returning null
+          throw new Error(`Failed to fetch template ${templateId}: ${templateError.message}`);
+        }
+
+        if (!template) {
           return null;
         }
 
@@ -359,6 +364,10 @@ export class CalculatorService {
         // Don't throw here - saving history is not critical
       }
     } catch (error) {
+      Sentry.captureException(error, {
+        tags: { operation: 'save-calculation-history' },
+        level: 'warning',
+      });
       console.error('Error in saveCalculationHistory:', error);
       // Don't throw here - saving history is not critical
     }
@@ -428,98 +437,44 @@ export class CalculatorService {
   }
 
   /**
-   * Create a new pricing rule (placeholder implementation)
+   * Create a new pricing rule
    */
-  static async createRule(input: any): Promise<PricingRule> {
-    // This would typically create a rule in the database
-    // For now, return a mock rule to prevent errors
-    console.warn('createRule called but not implemented - returning mock rule');
-    return {
-      id: 'mock-' + Date.now(),
-      templateId: input.templateId || 'mock-template',
-      ruleName: input.ruleName || 'mock_rule',
-      ruleType: input.ruleType || 'customer_charge',
-      baseAmount: input.baseAmount || 0,
-      perUnitAmount: input.perUnitAmount || 0,
-      thresholdValue: input.thresholdValue || 0,
-      thresholdType: input.thresholdType || undefined,
-      priority: input.priority || 1
-    };
+  static async createRule(_input: any): Promise<PricingRule> {
+    throw new Error('Not implemented: createRule requires database integration');
   }
 
   /**
-   * Update an existing pricing rule (placeholder implementation)
+   * Update an existing pricing rule
    */
-  static async updateRule(id: string, updates: any): Promise<PricingRule> {
-    // This would typically update a rule in the database
-    // For now, return a mock updated rule to prevent errors
-    console.warn('updateRule called but not implemented - returning mock rule');
-    return {
-      id,
-      templateId: updates.templateId || 'mock-template',
-      ruleName: updates.ruleName || 'updated_rule',
-      ruleType: updates.ruleType || 'customer_charge',
-      baseAmount: updates.baseAmount || 0,
-      perUnitAmount: updates.perUnitAmount || 0,
-      thresholdValue: updates.thresholdValue || 0,
-      thresholdType: updates.thresholdType || undefined,
-      priority: updates.priority || 1
-    };
+  static async updateRule(_id: string, _updates: any): Promise<PricingRule> {
+    throw new Error('Not implemented: updateRule requires database integration');
   }
 
   /**
-   * Delete a pricing rule (placeholder implementation)
+   * Delete a pricing rule
    */
-  static async deleteRule(id: string): Promise<void> {
-    // This would typically delete a rule from the database
-    // For now, just log the action to prevent errors
-    console.warn('deleteRule called but not implemented - rule ID:', id);
+  static async deleteRule(_id: string): Promise<void> {
+    throw new Error('Not implemented: deleteRule requires database integration');
   }
 
   /**
-   * Create a new calculator template (placeholder implementation)
+   * Create a new calculator template
    */
-  static async createTemplate(input: any): Promise<CalculatorTemplate> {
-    // This would typically create a template in the database
-    // For now, return a mock template to prevent errors
-    console.warn('createTemplate called but not implemented - returning mock template');
-    return {
-      id: 'mock-template-' + Date.now(),
-      name: input.name || 'Mock Template',
-      description: input.description || 'Mock template for development',
-      isActive: input.isActive !== undefined ? input.isActive : true,
-      pricingRules: []
-    };
+  static async createTemplate(_input: any): Promise<CalculatorTemplate> {
+    throw new Error('Not implemented: createTemplate requires database integration');
   }
 
   /**
-   * Update an existing calculator template (placeholder implementation)
+   * Update an existing calculator template
    */
-  static async updateTemplate(id: string, updates: any): Promise<CalculatorTemplate> {
-    // This would typically update a template in the database
-    // For now, return a mock updated template to prevent errors
-    console.warn('updateTemplate called but not implemented - returning mock template');
-    return {
-      id,
-      name: updates.name || 'Updated Template',
-      description: updates.description || 'Updated template for development',
-      isActive: updates.isActive !== undefined ? updates.isActive : true,
-      pricingRules: []
-    };
+  static async updateTemplate(_id: string, _updates: any): Promise<CalculatorTemplate> {
+    throw new Error('Not implemented: updateTemplate requires database integration');
   }
 
   /**
    * Get calculator configuration for a template and optional client config
    */
-  static async getCalculatorConfig(templateId: string, clientConfigId?: string): Promise<any> {
-    // This would typically combine template and client config data
-    // For now, return a basic configuration
-    console.warn('getCalculatorConfig called but returning basic config');
-    return {
-      templateId,
-      clientConfigId,
-      template: null,
-      clientConfig: null
-    };
+  static async getCalculatorConfig(_templateId: string, _clientConfigId?: string): Promise<any> {
+    throw new Error('Not implemented: getCalculatorConfig requires database integration');
   }
 }

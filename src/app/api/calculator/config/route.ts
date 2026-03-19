@@ -2,6 +2,7 @@
 // GET: Retrieve calculator configuration for a specific template and client config
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { ConfigurationError } from '@/types/calculator';
 import { createClient } from '@/utils/supabase/server';
 import { getConfiguration } from '@/lib/calculator/client-configurations';
@@ -147,8 +148,11 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
+    Sentry.captureException(error, {
+      tags: { operation: 'calculator-config-get' },
+    });
     console.error('Failed to fetch calculator configuration:', error);
-    
+
     if (error instanceof ConfigurationError) {
       return NextResponse.json(
         { success: false, error: error.message },

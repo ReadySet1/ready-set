@@ -9,7 +9,7 @@
  * 5. Driver Pay includes max cap, base pay, bonuses, and Ready Set fees
  */
 
-import { ClientDeliveryConfiguration, getConfiguration, READY_SET_FOOD_STANDARD } from './client-configurations';
+import { ClientDeliveryConfiguration, getConfiguration, getActiveConfigurations, READY_SET_FOOD_STANDARD } from './client-configurations';
 import { captureMessage } from '@/lib/monitoring/sentry';
 
 // ============================================================================
@@ -437,10 +437,25 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
     clientConfigId
   } = input;
 
+  // Validate inputs (before config lookup to fail fast on bad data)
+  if (headcount < 0) throw new Error('Headcount cannot be negative');
+  if (foodCost < 0) throw new Error('Food cost cannot be negative');
+  if (totalMileage < 0) throw new Error('Total mileage cannot be negative');
+  if (numberOfDrives < 1) throw new Error('Number of drives must be at least 1');
+
   // Get client configuration (default to Ready Set Food Standard)
-  const config = clientConfigId
-    ? getConfiguration(clientConfigId) || READY_SET_FOOD_STANDARD
-    : READY_SET_FOOD_STANDARD;
+  let config: ClientDeliveryConfiguration;
+  if (clientConfigId) {
+    const found = getConfiguration(clientConfigId);
+    if (!found) {
+      throw new Error(
+        `Unknown client configuration: "${clientConfigId}". Available: ${getActiveConfigurations().map(c => c.id).join(', ')}`
+      );
+    }
+    config = found;
+  } else {
+    config = READY_SET_FOOD_STANDARD;
+  }
 
   // Check for zero-order scenario (headcount = 0 AND foodCost = 0)
   // Some clients like HY Food Company have special pricing for standard drives
@@ -461,12 +476,6 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
       deliveryFee: zeroOrderSettings.customerDeliveryFee + calculateExtraStopsCharge(numberOfStops, CUSTOMER_EXTRA_STOP_RATE) + effectiveBridgeToll
     };
   }
-
-  // Validate inputs
-  if (headcount < 0) throw new Error('Headcount cannot be negative');
-  if (foodCost < 0) throw new Error('Food cost cannot be negative');
-  if (totalMileage < 0) throw new Error('Total mileage cannot be negative');
-  if (numberOfDrives < 1) throw new Error('Number of drives must be at least 1');
 
   // 1. Determine if within 10 miles
   const isWithin10Miles = totalMileage <= config.distanceThreshold;
@@ -540,9 +549,18 @@ export function calculateMileagePay(totalMileage: number, clientConfigId?: strin
   if (totalMileage < 0) throw new Error('Total mileage cannot be negative');
 
   // Get client configuration
-  const config = clientConfigId
-    ? getConfiguration(clientConfigId) || READY_SET_FOOD_STANDARD
-    : READY_SET_FOOD_STANDARD;
+  let config: ClientDeliveryConfiguration;
+  if (clientConfigId) {
+    const found = getConfiguration(clientConfigId);
+    if (!found) {
+      throw new Error(
+        `Unknown client configuration: "${clientConfigId}". Available: ${getActiveConfigurations().map(c => c.id).join(', ')}`
+      );
+    }
+    config = found;
+  } else {
+    config = READY_SET_FOOD_STANDARD;
+  }
 
   // Only charge for miles over threshold
   const extraMiles = Math.max(0, totalMileage - config.distanceThreshold);
@@ -600,9 +618,18 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
   if (directTip < 0) throw new Error('Direct tip cannot be negative');
 
   // Get client configuration
-  const config = clientConfigId
-    ? getConfiguration(clientConfigId) || READY_SET_FOOD_STANDARD
-    : READY_SET_FOOD_STANDARD;
+  let config: ClientDeliveryConfiguration;
+  if (clientConfigId) {
+    const found = getConfiguration(clientConfigId);
+    if (!found) {
+      throw new Error(
+        `Unknown client configuration: "${clientConfigId}". Available: ${getActiveConfigurations().map(c => c.id).join(', ')}`
+      );
+    }
+    config = found;
+  } else {
+    config = READY_SET_FOOD_STANDARD;
+  }
 
   // Check for zero-order scenario (headcount = 0 AND foodCost = 0)
   // Some clients like HY Food Company have special pricing for standard drives

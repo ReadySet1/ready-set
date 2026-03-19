@@ -221,8 +221,8 @@ describe('Multi-Stop Pricing', () => {
       expect(driverResult.extraStopsBonus).toBe(5.0);
 
       // Verify the charges are included in totals
-      expect(deliveryResult.deliveryFee).toContain;
-      expect(driverResult.totalDriverPay).toContain;
+      expect(deliveryResult.deliveryFee).toBeGreaterThan(0);
+      expect(driverResult.totalDriverPay).toBeGreaterThan(0);
     });
 
     it('should work correctly with bridge toll and multiple stops', () => {
