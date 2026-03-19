@@ -32,6 +32,8 @@ export interface RouteRequest {
   avoidTolls?: boolean;
   avoidHighways?: boolean;
   departureTime?: string | 'now';
+  /** When true, requests alternative routes and selects the median by distance. */
+  preferMedianRoute?: boolean;
 }
 
 export interface RouteStep {
@@ -101,6 +103,7 @@ export const RouteRequestSchema = z.object({
   avoidTolls: z.boolean().optional(),
   avoidHighways: z.boolean().optional(),
   departureTime: z.string().optional(),
+  preferMedianRoute: z.boolean().optional(),
 });
 
 export const DistanceMatrixRequestSchema = z.object({

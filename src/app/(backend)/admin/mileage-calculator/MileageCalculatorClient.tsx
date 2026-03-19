@@ -98,6 +98,7 @@ export default function MileageCalculatorClient({
                   .slice(0, -1)
                   .map((d) => ({ address: d.address })),
                 optimizeWaypoints: false,
+                preferMedianRoute: true,
               }),
             });
 
@@ -127,7 +128,9 @@ export default function MileageCalculatorClient({
             // Polyline/directions are optional; distance matrix data is sufficient
           }
         } else {
-          // Single drop-off: also fetch directions for the polyline
+          // Single drop-off: fetch directions with median route selection.
+          // The Directions API result overrides Distance Matrix values because
+          // the median route may differ from the fastest route that Distance Matrix returns.
           try {
             const optimizeRes = await fetch('/api/routes/optimize', {
               method: 'POST',
@@ -135,6 +138,7 @@ export default function MileageCalculatorClient({
               body: JSON.stringify({
                 pickup: { address: pickup.address },
                 dropoff: { address: dropoffs[0]!.address },
+                preferMedianRoute: true,
               }),
             });
 
@@ -144,10 +148,22 @@ export default function MileageCalculatorClient({
 
               if (optimizeData.success && optimizeData.data) {
                 polyline = optimizeData.data.polyline;
+                totalDistanceMiles = optimizeData.data.totalDistanceMiles;
+                totalDurationMinutes = optimizeData.data.totalDurationMinutes;
+
+                legs.length = 0;
+                for (const routeLeg of optimizeData.data.legs) {
+                  legs.push({
+                    from: routeLeg.startAddress,
+                    to: routeLeg.endAddress,
+                    distanceMiles: routeLeg.distanceMiles,
+                    durationMinutes: routeLeg.durationMinutes,
+                  });
+                }
               }
             }
           } catch {
-            // Polyline is optional enhancement
+            // Falls back to Distance Matrix values if directions fail
           }
         }
 

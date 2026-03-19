@@ -42,6 +42,8 @@ export interface RouteRequest {
   avoidTolls?: boolean;
   avoidHighways?: boolean;
   departureTime?: string | 'now';
+  /** When true, requests alternative routes and selects the median by distance. */
+  preferMedianRoute?: boolean;
 }
 
 export interface RouteStep {
@@ -179,6 +181,16 @@ export async function getDirections(
     params.set('departure_time', ts);
   }
 
+  // Request alternative routes when median selection is enabled.
+  // Google only returns alternatives for direct routes (no waypoints).
+  const wantsMedian =
+    request.preferMedianRoute &&
+    (!request.waypoints || request.waypoints.length === 0);
+
+  if (wantsMedian) {
+    params.set('alternatives', 'true');
+  }
+
   const url = `${GOOGLE_DIRECTIONS_URL}?${params.toString()}`;
 
   const response = await fetch(url);
@@ -194,12 +206,43 @@ export async function getDirections(
     );
   }
 
-  const route = data.routes[0];
-  if (!route) {
+  if (data.routes.length === 0) {
     throw new Error('No route found between the given locations');
   }
 
+  const route = wantsMedian
+    ? selectMedianRoute(data.routes)
+    : data.routes[0]!;
+
   return mapGoogleRouteToResult(route);
+}
+
+/**
+ * Given multiple route alternatives, sort by total distance and return
+ * the median (middle) route. This avoids both the shortest shortcut
+ * and the longest detour, giving a balanced "standard" route.
+ *
+ * - 1 route  → return it
+ * - 2 routes → return the shorter one
+ * - 3+ routes → sort by distance ascending, pick the middle index
+ */
+function selectMedianRoute(routes: GoogleRoute[]): GoogleRoute {
+  if (routes.length <= 1) return routes[0]!;
+
+  const scored = routes.map((route, originalIdx) => {
+    const totalMeters = route.legs.reduce(
+      (sum, leg) => sum + leg.distance.value,
+      0,
+    );
+    return { route, totalMeters, originalIdx };
+  });
+
+  scored.sort((a, b) => a.totalMeters - b.totalMeters);
+
+  const medianIdx = Math.floor((scored.length - 1) / 2);
+  const selected = scored[medianIdx]!;
+
+  return selected.route;
 }
 
 /**
