@@ -101,29 +101,53 @@ async function validateWithExternalApi(address: AddressRequest): Promise<Externa
   }
 }
 
-// Mock function for geocoding
+// Geocode address using Mapbox Geocoding API
 async function geocodeAddress(address: AddressRequest): Promise<GeocodeResponse> {
-  try {
-    // Simulate geocoding API call
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Simulate random geocoding errors
-    if (Math.random() < 0.15) {
-      throw new Error('Geocoding service unavailable');
-    }
-    
-    // Sample geocoding logic
-    // In real implementation, this would call a geocoding service like Google Maps
+  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.MAPBOX_ACCESS_TOKEN;
+
+  if (!mapboxToken) {
+    console.error('Mapbox access token not configured');
     return {
-      success: true,
-      coordinates: {
-        lat: 37.7749 + (Math.random() - 0.5) * 0.1, // Random around San Francisco
-        lng: -122.4194 + (Math.random() - 0.5) * 0.1
-      }
+      success: false,
+      error: 'Geocoding service not configured (missing MAPBOX_ACCESS_TOKEN)'
+    };
+  }
+
+  try {
+    const fullAddress = `${address.street}, ${address.city}, ${address.state} ${address.postalCode}, ${address.country}`;
+    const encodedAddress = encodeURIComponent(fullAddress);
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${mapboxToken}&limit=1`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      console.error(`Mapbox Geocoding API error: ${response.status}`);
+      return {
+        success: false,
+        error: `Geocoding API returned status ${response.status}`
+      };
+    }
+
+    const data = await response.json();
+
+    if (data.features && data.features.length > 0 && data.features[0]) {
+      const [lng, lat] = data.features[0].center;
+      return {
+        success: true,
+        coordinates: { lat, lng }
+      };
+    }
+
+    return {
+      success: false,
+      error: 'No geocoding results found for the given address'
     };
   } catch (error) {
     console.error('Geocoding error:', error);
-    throw error;
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Geocoding failed'
+    };
   }
 }
 

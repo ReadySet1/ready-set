@@ -735,6 +735,9 @@ describe('RealtimeClient', () => {
       });
 
       it('should allow DRIVER to broadcast driver:location events', async () => {
+        // Clear cached user context from beforeEach subscribe (which cached ADMIN)
+        RealtimeClient.getInstance().clearUserContextCache();
+
         // Mock as DRIVER user type
         mockSupabaseClient.from = jest.fn((table: string) => {
           if (table === 'profiles') {
@@ -782,6 +785,9 @@ describe('RealtimeClient', () => {
       });
 
       it('should prevent DRIVER from broadcasting admin:message events', async () => {
+        // Clear cached user context so test can set up its own mock
+        RealtimeClient.getInstance().clearUserContextCache();
+
         // Mock as DRIVER user type
         mockSupabaseClient.from = jest.fn(() => ({
           select: jest.fn().mockReturnThis(),
@@ -838,6 +844,8 @@ describe('RealtimeClient', () => {
 
       it('should fetch user context from database when not provided for broadcast', async () => {
         const client = RealtimeClient.getInstance();
+        // Clear cached context so broadcast actually fetches from database
+        client.clearUserContextCache();
 
         const payload = {
           lat: 40.7128,
