@@ -38,9 +38,9 @@ const getDatabaseUrl = (): string => {
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url: getDatabaseUrl(),
-    },
-  },
+      url: getDatabaseUrl()
+    }
+  }
 });
 
 interface AddressRecord {

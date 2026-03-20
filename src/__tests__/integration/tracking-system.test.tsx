@@ -387,7 +387,7 @@ describe('Tracking System Integration', () => {
       render(<AdminTrackingDashboard />);
 
       // Should show realtime connection status
-      expect(screen.getByText(/real-time/i)).toBeInTheDocument();
+      expect(screen.getByText(/WebSocket connected/i)).toBeInTheDocument();
     });
   });
 

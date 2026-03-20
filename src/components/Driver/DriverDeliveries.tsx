@@ -914,7 +914,8 @@ const DriverDeliveries: React.FC = () => {
                                       isLoading={updatingDeliveryId === delivery.id}
                                       disabled={
                                         isDeliveryCompleted(delivery.driverStatus) ||
-                                        userProfile?.status?.toString().toLowerCase() !== UserStatus.ACTIVE
+                                        userProfile?.status?.toString().toLowerCase() === UserStatus.DELETED ||
+                                        userProfile?.status?.toString().toLowerCase() === UserStatus.PENDING
                                       }
                                       compact
                                     />
