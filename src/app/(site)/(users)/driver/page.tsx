@@ -17,10 +17,19 @@ import {
   AlertCircleIcon,
   UserIcon,
   HistoryIcon,
+  LogOutIcon,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import DriverDeliveries from "@/components/Driver/DriverDeliveries";
 import { DriverStatsCard } from "@/components/Driver/DriverStatsCard";
 import { useDriverStats } from "@/hooks/tracking/useDriverStats";
+import { useUser } from "@/contexts/UserContext";
 
 interface ShiftStatus {
   isActive: boolean;
@@ -34,6 +43,8 @@ const DriverPage = () => {
   const [shiftStatus, setShiftStatus] = useState<ShiftStatus>({ isActive: false });
   const [driverName, setDriverName] = useState("Driver");
   const [driverId, setDriverId] = useState<string | null>(null);
+
+  const { logout } = useUser();
 
   // Fetch driver stats for the quick summary
   const { data: stats } = useDriverStats({
@@ -120,16 +131,43 @@ const DriverPage = () => {
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-lg font-bold text-gray-900 dark:text-white" suppressHydrationWarning>
-                {isMounted ? formatTime(currentTime) : ''}
+            <div className="flex items-center space-x-3">
+              <div className="text-right">
+                <div className="text-lg font-bold text-gray-900 dark:text-white" suppressHydrationWarning>
+                  {isMounted ? formatTime(currentTime) : ''}
+                </div>
+                <div className="flex items-center space-x-1">
+                  <div className={`w-2 h-2 rounded-full ${shiftStatus.isActive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {shiftStatus.isActive ? 'On Shift' : 'Off Shift'}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center space-x-1">
-                <div className={`w-2 h-2 rounded-full ${shiftStatus.isActive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {shiftStatus.isActive ? 'On Shift' : 'Off Shift'}
-                </span>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full">
+                    <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                      <UserIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem asChild>
+                    <Link href="/driver/profile" className="flex items-center">
+                      <UserIcon className="w-4 h-4 mr-2" />
+                      My Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => logout()}
+                    className="text-red-600 dark:text-red-400"
+                  >
+                    <LogOutIcon className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>

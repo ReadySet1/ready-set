@@ -119,20 +119,28 @@ export default function AdminTrackingDashboard({ className }: AdminTrackingDashb
           <div className="flex flex-col space-y-1">
             <div className="flex items-center space-x-2">
               <div className={cn('w-3 h-3 rounded-full', {
-                'bg-green-500 animate-pulse': isConnected,
+                'bg-green-500 animate-pulse': isConnected && connectionMode === 'realtime' && isRealtimeConnected,
+                'bg-amber-500 animate-pulse': isConnected && connectionMode === 'sse',
+                'bg-blue-500 animate-pulse': isConnected && connectionMode === 'hybrid',
                 'bg-red-500': !isConnected
               })} />
               <span className="text-sm font-medium">
-                {isConnected ? 'Live Data' : 'Disconnected'}
+                {!isConnected
+                  ? 'Disconnected'
+                  : connectionMode === 'sse'
+                    ? 'SSE Fallback'
+                    : connectionMode === 'hybrid'
+                      ? 'Connecting...'
+                      : 'Live Data'}
               </span>
             </div>
 
             {/* Realtime connection status */}
             {isRealtimeEnabled && (
               <span className="text-xs text-muted-foreground ml-5">
-                {connectionMode === 'realtime' && isRealtimeConnected && '✓ Real-time WebSocket connected'}
-                {connectionMode === 'hybrid' && '⟳ Connecting to WebSocket...'}
-                {connectionMode === 'sse' && 'SSE mode (polling every 5s)'}
+                {connectionMode === 'realtime' && isRealtimeConnected && 'WebSocket connected'}
+                {connectionMode === 'hybrid' && 'Connecting to WebSocket...'}
+                {connectionMode === 'sse' && 'WebSocket unavailable, polling every 5s'}
               </span>
             )}
           </div>

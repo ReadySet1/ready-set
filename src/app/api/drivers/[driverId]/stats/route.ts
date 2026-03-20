@@ -105,9 +105,10 @@ export async function GET(
     }
 
     // Authorization check: Drivers can only view their own stats
+    // Check both user_id and profile_id to handle cases where user_id hasn't been backfilled
     if (authContext.user.type === 'DRIVER') {
       const ownDriver = await prisma.$queryRawUnsafe<{ id: string }[]>(
-        `SELECT id FROM drivers WHERE user_id = $1::uuid AND deleted_at IS NULL`,
+        `SELECT id FROM drivers WHERE (user_id = $1::uuid OR profile_id = $1::uuid) AND deleted_at IS NULL`,
         authContext.user.id
       );
 

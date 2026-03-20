@@ -223,6 +223,39 @@ export async function GET(
 
     if (order) {
       const serializedOrder = serializeOrder(order);
+
+      // Enrich with delivery stage timestamps from the Delivery tracking model
+      try {
+        const delivery = await prisma.delivery.findFirst({
+          where: {
+            orderNumber: order.orderNumber,
+          },
+          select: {
+            assignedAt: true,
+            arrivedAtVendorAt: true,
+            pickedUpAt: true,
+            enRouteAt: true,
+            arrivedAtClientAt: true,
+            deliveredAt: true,
+          },
+        });
+
+        if (delivery) {
+          const toISO = (d: Date | null) => d?.toISOString() ?? null;
+          serializedOrder.deliveryTimestamps = {
+            assignedAt: toISO(delivery.assignedAt),
+            arrivedAtVendorAt: toISO(delivery.arrivedAtVendorAt),
+            pickedUpAt: toISO(delivery.pickedUpAt),
+            enRouteAt: toISO(delivery.enRouteAt),
+            arrivedAtClientAt: toISO(delivery.arrivedAtClientAt),
+            deliveredAt: toISO(delivery.deliveredAt),
+          };
+        }
+      } catch (deliveryError) {
+        // Non-critical: don't fail the order response if delivery lookup fails
+        console.warn('Failed to fetch delivery timestamps:', deliveryError);
+      }
+
       return NextResponse.json(serializedOrder);
     }
 

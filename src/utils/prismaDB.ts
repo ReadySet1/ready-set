@@ -20,7 +20,6 @@ const isDevelopment = process.env.NODE_ENV === 'development' || process.env.VERC
 
 // Import PrismaClient for type definitions
 import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
 
 // Create function to make a new Prisma client
 const createPrismaClient = (): PrismaClient => {
@@ -38,9 +37,12 @@ const createPrismaClient = (): PrismaClient => {
     logConfig = ['error', 'warn'];
   }
 
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
   return new PrismaClient({
-    adapter,
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL!
+      }
+    },
     log: logConfig,
   });
 };

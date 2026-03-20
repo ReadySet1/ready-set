@@ -186,6 +186,22 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   })();
   const supabase = createClient();
   const { userRole } = useUser();
+
+  // Cache session per mount cycle to reduce auth lock contention
+  const sessionRef = React.useRef<{ session: any; fetchedAt: number } | null>(null);
+  const getValidSession = useCallback(async () => {
+    const now = Date.now();
+    // Reuse cached session if less than 60 seconds old
+    if (sessionRef.current && (now - sessionRef.current.fetchedAt) < 60000) {
+      return sessionRef.current.session;
+    }
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session) {
+      return null;
+    }
+    sessionRef.current = { session, fetchedAt: now };
+    return session;
+  }, [supabase.auth]);
   const userRoles = useMemo(() => ({
     isAdmin: userRole === UserType.ADMIN,
     isSuperAdmin: userRole === UserType.SUPER_ADMIN,
@@ -213,6 +229,19 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     lng: realtimeLocation.lng,
   } : null;
 
+  // Stagger the second channel subscription to prevent simultaneous auth lock contention
+  const [secondChannelReady, setSecondChannelReady] = useState(false);
+  useEffect(() => {
+    if (isRealtimeConnected) {
+      // Second channel connects once first channel is established
+      setSecondChannelReady(true);
+    } else if (isActiveOrder && order?.id) {
+      // Fallback: enable after 2s delay if first channel hasn't connected yet
+      const timer = setTimeout(() => setSecondChannelReady(true), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isRealtimeConnected, isActiveOrder, order?.id]);
+
   // Real-time delivery status tracking using Supabase Realtime (WebSocket)
   // This allows helpdesk, vendor, and client users to see status changes instantly
   const {
@@ -223,7 +252,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     reconnect: reconnectStatus,
   } = useDeliveryStatusRealtime({
     orderId: order?.id,
-    enabled: !!order?.id && !!isActiveOrder,
+    enabled: !!order?.id && !!isActiveOrder && secondChannelReady,
     showNotifications: true,
     onStatusUpdate: (payload) => {
       console.log('[SingleOrder] Realtime delivery status update:', payload.status);
@@ -240,14 +269,10 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   // Check for bucket existence but don't try to create it (requires admin privileges)
   const ensureStorageBucketExists = useCallback(async () => {
     try {
-      // Refresh auth session
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+      const session = await getValidSession();
 
-      if (sessionError || !session) {
-        console.error("Authentication error:", sessionError?.message);
+      if (!session) {
+        console.error("Authentication error: no session");
         return;
       }
 
@@ -294,7 +319,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     } catch (error) {
       console.error("Error checking storage bucket:", error);
     }
-  }, [supabase]);
+  }, [supabase, getValidSession]);
 
   const fetchOrderDetails = useCallback(async () => {
     if (!orderNumber) {
@@ -306,16 +331,11 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     setIsLoading(true);
 
     try {
-      // Refresh auth session before making the request
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+      const session = await getValidSession();
 
-      if (sessionError || !session) {
-        console.error("Authentication error:", sessionError?.message);
+      if (!session) {
         toast.error("Authentication error. Please try logging in again.");
-        router.push("/auth/login"); // Redirect to login if session is invalid
+        router.push("/auth/login");
         return;
       }
 
@@ -450,7 +470,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     }
   }, [
     orderNumber,
-    supabase.auth,
+    getValidSession,
     router,
     setIsLoading,
     setOrder,
@@ -480,13 +500,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       }
 
       try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+        const session = await getValidSession();
 
-        if (sessionError || !session) {
-          console.error("Authentication error:", sessionError?.message);
+        if (!session) {
           toast.error("Authentication error. Please try logging in again.");
           router.push("/auth/login");
           return;
@@ -522,7 +538,7 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     };
 
     fetchDrivers();
-  }, [setDrivers, supabase.auth, router, rolesLoaded, userRoles.isVendor]);
+  }, [setDrivers, getValidSession, router, rolesLoaded, userRoles.isVendor]);
 
   const handleOpenDriverDialog = () => {
     setIsDriverDialogOpen(true);
@@ -536,15 +552,11 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
             return;
     }
 
-    
-    try {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
 
-      if (sessionError || !session) {
-        console.error("Authentication error:", sessionError?.message);
+    try {
+      const session = await getValidSession();
+
+      if (!session) {
         toast.error("Authentication error. Please try logging in again.");
         router.push("/auth/login");
         return;
@@ -629,13 +641,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     if (!order) return;
 
     try {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+      const session = await getValidSession();
 
-      if (sessionError || !session) {
-        console.error("Authentication error:", sessionError?.message);
+      if (!session) {
         toast.error("Authentication error. Please try logging in again.");
         router.push("/auth/login");
         return;
@@ -697,13 +705,9 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     if (!order) return;
 
     const internalUpdatePromise = async () => {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+      const session = await getValidSession();
 
-      if (sessionError || !session) {
-        console.error("Authentication error:", sessionError?.message);
+      if (!session) {
         toast.error("Authentication error. Please try logging in again.");
         router.push("/auth/login");
         return;
@@ -977,7 +981,12 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                   </h3>
                   <DeliveryTimeline
                     createdAt={order.createdAt}
-                    deliveredAt={order.completeDateTime}
+                    assignedAt={(order as any).deliveryTimestamps?.assignedAt}
+                    arrivedAtVendorAt={(order as any).deliveryTimestamps?.arrivedAtVendorAt}
+                    pickedUpAt={(order as any).deliveryTimestamps?.pickedUpAt}
+                    enRouteAt={(order as any).deliveryTimestamps?.enRouteAt}
+                    arrivedAtClientAt={(order as any).deliveryTimestamps?.arrivedAtClientAt}
+                    deliveredAt={(order as any).deliveryTimestamps?.deliveredAt ?? order.completeDateTime}
                     estimatedPickupTime={order.pickupDateTime}
                     estimatedDeliveryTime={order.arrivalDateTime}
                     currentStatus={order.driverStatus}
@@ -1208,60 +1217,19 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                 </h2>
               </div>
               <div className="p-6">
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-2 h-2 w-2 rounded-full bg-blue-500"></div>
-                    <div>
-                      <div className="text-sm font-medium text-slate-800">
-                        Order Created
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {order.createdAt
-                          ? new Date(order.createdAt).toLocaleString()
-                          : "N/A"}
-                      </div>
-                    </div>
-                  </div>
-                  {order.pickupDateTime && (
-                    <div className="flex items-start gap-3">
-                      <div className="mt-2 h-2 w-2 rounded-full bg-amber-500"></div>
-                      <div>
-                        <div className="text-sm font-medium text-slate-800">
-                          Scheduled Pickup
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {new Date(order.pickupDateTime).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {order.arrivalDateTime && (
-                    <div className="flex items-start gap-3">
-                      <div className="mt-2 h-2 w-2 rounded-full bg-green-500"></div>
-                      <div>
-                        <div className="text-sm font-medium text-slate-800">
-                          Driver Arrived
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {new Date(order.arrivalDateTime).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {order.completeDateTime && (
-                    <div className="flex items-start gap-3">
-                      <div className="mt-2 h-2 w-2 rounded-full bg-emerald-500"></div>
-                      <div>
-                        <div className="text-sm font-medium text-slate-800">
-                          Order Completed
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {new Date(order.completeDateTime).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <DeliveryTimeline
+                  createdAt={order.createdAt}
+                  assignedAt={(order as any).deliveryTimestamps?.assignedAt}
+                  arrivedAtVendorAt={(order as any).deliveryTimestamps?.arrivedAtVendorAt}
+                  pickedUpAt={(order as any).deliveryTimestamps?.pickedUpAt}
+                  enRouteAt={(order as any).deliveryTimestamps?.enRouteAt}
+                  arrivedAtClientAt={(order as any).deliveryTimestamps?.arrivedAtClientAt}
+                  deliveredAt={(order as any).deliveryTimestamps?.deliveredAt ?? order.completeDateTime}
+                  estimatedPickupTime={order.pickupDateTime}
+                  estimatedDeliveryTime={order.arrivalDateTime}
+                  currentStatus={order.driverStatus}
+                  compact
+                />
               </div>
             </div>
           </div>
