@@ -17,7 +17,6 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
 
 // Use direct database URL if available, otherwise modify the pooler URL for statement mode
 const getDatabaseUrl = (): string => {
@@ -36,8 +35,13 @@ const getDatabaseUrl = (): string => {
   return url;
 };
 
-const adapter = new PrismaPg({ connectionString: getDatabaseUrl() });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: getDatabaseUrl()
+    }
+  }
+});
 
 interface AddressRecord {
   id: string;

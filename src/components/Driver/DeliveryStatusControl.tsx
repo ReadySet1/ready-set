@@ -67,6 +67,9 @@ export function DeliveryStatusControl({
   };
 
   if (compact) {
+    // Use a prominent CTA for the first action (e.g., "Start Delivery" when ASSIGNED)
+    const isFirstAction = !currentStatus || currentStatus === DriverStatus.ASSIGNED;
+
     return (
       <div className="flex items-center gap-2">
         <Badge variant={getBadgeVariant()} className="text-xs">
@@ -75,10 +78,13 @@ export function DeliveryStatusControl({
         {canAdvance && (
           <Button
             size="sm"
-            variant="outline"
+            variant={isFirstAction ? "default" : "outline"}
             onClick={handleAdvance}
             disabled={isLoading || disabled}
-            className="h-7 px-2 text-xs"
+            className={cn(
+              "h-7 px-2 text-xs",
+              isFirstAction && "bg-blue-600 text-white hover:bg-blue-700"
+            )}
           >
             {isLoading ? (
               <Loader2 className="h-3 w-3 animate-spin" />

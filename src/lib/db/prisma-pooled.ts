@@ -1,6 +1,5 @@
 import { PrismaClient } from '@prisma/client'
 import type { Prisma } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
 import { prismaLogger } from '../../utils/logger'
 
 /**
@@ -228,9 +227,12 @@ const createOptimizedPrismaClient = (): PrismaClient => {
     connectionUrl = pooledUrl.toString()
   }
 
-  const adapter = new PrismaPg({ connectionString: connectionUrl })
   const client = new PrismaClient({
-    adapter,
+    datasources: {
+      db: {
+        url: connectionUrl
+      }
+    },
     log: LOG_CONFIG,
     errorFormat: isDevelopment ? 'pretty' : 'minimal',
     transactionOptions: {

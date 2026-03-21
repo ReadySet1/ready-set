@@ -641,6 +641,27 @@ export default function LiveDriverMap({
         </div>
       )}
 
+      {/* Drivers without GPS data info panel */}
+      {mapLoaded && (() => {
+        const driversWithoutGPS = drivers.filter(d => !d.lastKnownLocation?.coordinates);
+        if (driversWithoutGPS.length === 0) return null;
+        return (
+          <div className="absolute bottom-4 right-4 bg-amber-50 border border-amber-200 rounded-lg shadow-lg p-3 z-10 max-w-xs">
+            <div className="flex items-start space-x-2">
+              <AlertTriangleIcon className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-medium text-amber-800">
+                  {driversWithoutGPS.length} driver{driversWithoutGPS.length > 1 ? 's' : ''} without GPS data
+                </p>
+                <p className="text-xs text-amber-700 mt-1">
+                  {driversWithoutGPS.map(d => d.employeeId || `#${d.id.substring(0, 6)}`).join(', ')}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Loading state */}
       {!mapLoaded && !mapError && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
