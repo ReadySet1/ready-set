@@ -236,9 +236,8 @@ const createOptimizedPrismaClient = (): PrismaClient => {
     log: LOG_CONFIG,
     errorFormat: isDevelopment ? 'pretty' : 'minimal',
     transactionOptions: {
-      // Serverless-optimized timeouts
-      maxWait: isVercelServerless ? 20000 : POOL_CONFIG.acquireTimeout, // 20s for serverless vs 60s
-      timeout: isVercelServerless ? 30000 : POOL_CONFIG.transactionTimeout, // 30s for serverless vs 60s
+      maxWait: isVercelServerless ? 20000 : POOL_CONFIG.acquireTimeout,
+      timeout: isVercelServerless ? 30000 : POOL_CONFIG.transactionTimeout,
       isolationLevel: 'ReadCommitted'
     }
   });
