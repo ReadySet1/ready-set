@@ -1,8 +1,10 @@
 import FlowerHero from "@/components/FlowersDelivery/FlowerHero";
 import { FlowersServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
-import DeliveryTermsAndPricing from "@/components/FlowersDelivery/DeliveryTermsAndPricing";
+// import DeliveryTermsAndPricing from "@/components/FlowersDelivery/DeliveryTermsAndPricing";
+import FlowersAbout from "@/components/FlowersDelivery/FlowersAbout";
 import { Metadata } from "next";
-import ExpertSupportSection from "@/components/FlowersDelivery/ExpertSupportSection";
+// import ExpertSupportSection from "@/components/FlowersDelivery/ExpertSupportSection";
+import FlowersDeliveryPartners from "@/components/FlowersDelivery/FlowersDeliveryPartners";
 import ServiceProcessCarousel from "@/components/FlowersDelivery/ServiceProcessCarousel";
 import DelicateBlooms from "@/components/FlowersDelivery/DelicateBlooms";
 import FAQSection from "@/components/FlowersDelivery/FAQSection";
@@ -96,8 +98,10 @@ const FlowersPage = () => {
     <main>
       <FlowerHero />
       <FlowersServiceFeatures />
-      <DeliveryTermsAndPricing />
-      <ExpertSupportSection />
+      {/* <DeliveryTermsAndPricing /> */}
+      <FlowersAbout />
+      {/* <ExpertSupportSection /> */}
+      <FlowersDeliveryPartners />
       <ServiceProcessCarousel />
       <DelicateBlooms />
       <FAQSection />

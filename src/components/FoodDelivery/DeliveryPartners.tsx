@@ -6,19 +6,25 @@ import { motion } from "framer-motion";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 import ScheduleDialog from "@/components/Logistics/Schedule";
 
-// Logistics calendar URL for scheduling appointments
 const LOGISTICS_CALENDAR_URL =
   "https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true";
 
-interface PartnerLogo {
+export interface PartnerLogo {
   name: string;
   image: string;
   alt: string;
   url: string;
 }
 
-const DeliveryPartners: React.FC = () => {
-  const partners: PartnerLogo[] = [
+export interface DeliveryPartnersProps {
+  title?: string;
+  subtitle?: string;
+  partners?: PartnerLogo[];
+  ctaLabel?: string;
+  calendarUrl?: string;
+}
+
+const DEFAULT_FOOD_PARTNERS: PartnerLogo[] = [
     {
       name: "Destino",
       image: getCloudinaryUrl("food/partners/destino"),
@@ -81,6 +87,13 @@ const DeliveryPartners: React.FC = () => {
     },
   ];
 
+const DeliveryPartners: React.FC<DeliveryPartnersProps> = ({
+  title = "Our Food Delivery Partners",
+  subtitle = "We're proud to collaborate with some of the top names in the industry:",
+  partners = DEFAULT_FOOD_PARTNERS,
+  ctaLabel = "Partner With Us",
+  calendarUrl = LOGISTICS_CALENDAR_URL,
+}) => {
   return (
     <div className="w-full bg-white py-16 md:py-20 lg:py-24">
       <div className="mx-auto max-w-7xl px-4">
@@ -93,11 +106,10 @@ const DeliveryPartners: React.FC = () => {
           transition={{ duration: 0.6 }}
         >
           <h2 className="mb-3 font-[Montserrat] text-3xl font-black text-gray-800 md:text-4xl lg:text-5xl">
-            Our Food Delivery Partners
+            {title}
           </h2>
           <p className="font-[Montserrat] text-base font-medium text-gray-600 md:text-lg">
-            We&apos;re proud to collaborate with some of the top names in the
-            industry:
+            {subtitle}
           </p>
         </motion.div>
 
@@ -179,8 +191,8 @@ const DeliveryPartners: React.FC = () => {
           transition={{ duration: 0.5, delay: 0.9 }}
         >
           <ScheduleDialog
-            buttonText="Partner With Us"
-            calendarUrl={LOGISTICS_CALENDAR_URL}
+            buttonText={ctaLabel}
+            calendarUrl={calendarUrl}
             className="rounded-lg bg-yellow-400 px-8 py-4 font-[Montserrat] text-lg font-extrabold text-gray-800 shadow-md transition-all hover:translate-y-[-2px] hover:bg-yellow-500 hover:shadow-lg"
           />
         </motion.div>
