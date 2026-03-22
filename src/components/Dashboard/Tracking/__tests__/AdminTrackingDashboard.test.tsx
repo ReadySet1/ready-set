@@ -286,7 +286,7 @@ describe('AdminTrackingDashboard', () => {
     it('should show WebSocket connected status when realtime is enabled', () => {
       render(<AdminTrackingDashboard />);
 
-      expect(screen.getByText('✓ Real-time WebSocket connected')).toBeInTheDocument();
+      expect(screen.getByText('WebSocket connected')).toBeInTheDocument();
     });
 
     it('should show connecting status in hybrid mode', () => {
@@ -306,7 +306,7 @@ describe('AdminTrackingDashboard', () => {
 
       render(<AdminTrackingDashboard />);
 
-      expect(screen.getByText('⟳ Connecting to WebSocket...')).toBeInTheDocument();
+      expect(screen.getByText('Connecting to WebSocket...')).toBeInTheDocument();
     });
 
     it('should show SSE mode status', () => {
@@ -326,7 +326,7 @@ describe('AdminTrackingDashboard', () => {
 
       render(<AdminTrackingDashboard />);
 
-      expect(screen.getByText('SSE mode (polling every 5s)')).toBeInTheDocument();
+      expect(screen.getByText('WebSocket unavailable, polling every 5s')).toBeInTheDocument();
     });
   });
 

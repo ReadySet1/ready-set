@@ -20,7 +20,6 @@ const isDevelopment = process.env.NODE_ENV === 'development' || process.env.VERC
 
 // Import PrismaClient for type definitions
 import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
 
 // Create function to make a new Prisma client
 const createPrismaClient = (): PrismaClient => {
@@ -38,9 +37,12 @@ const createPrismaClient = (): PrismaClient => {
     logConfig = ['error', 'warn'];
   }
 
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
   return new PrismaClient({
-    adapter,
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL!
+      }
+    },
     log: logConfig,
   });
 };
@@ -250,10 +252,8 @@ export async function withDatabaseRetry<T>(
   throw lastError || new Error('Unreachable code in withDatabaseRetry');
 }
 
-// Graceful shutdown for serverless
-process.on('beforeExit', async () => {
-    await disconnectPrisma();
-});
+// Graceful shutdown is handled by prisma-pooled.ts — no need to duplicate here.
+
 // Types for better TypeScript support
 export type PrismaClientInstance = typeof prismaPooled;
 export type PrismaTransaction = Parameters<Parameters<typeof prismaPooled.$transaction>[0]>[0];

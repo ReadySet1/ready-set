@@ -388,22 +388,13 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     setIsTracking(true);
     setError(null);
 
-    // Start watching position
+    // Start watching position — watchPosition provides continuous updates,
+    // so no additional setInterval polling is needed (removed redundant GPS polling)
     watchIdRef.current = navigator.geolocation.watchPosition(
       handlePositionUpdate,
       handleGeolocationError,
       HIGH_ACCURACY_OPTIONS
     );
-
-    // Set up periodic location updates
-    intervalIdRef.current = setInterval(async () => {
-      try {
-        const position = await getCurrentPosition();
-        await handlePositionUpdate(position);
-      } catch (error) {
-        console.error('Periodic location update failed:', error);
-      }
-    }, TRACKING_INTERVAL);
 
     // Set up periodic offline sync (every 2 minutes)
     syncIntervalRef.current = setInterval(() => {
@@ -413,7 +404,7 @@ export function useLocationTracking(): UseLocationTrackingReturn {
     // Trigger initial sync on start
     syncOfflineLocations();
 
-      }, [handlePositionUpdate, handleGeolocationError, getCurrentPosition, syncOfflineLocations]);
+      }, [handlePositionUpdate, handleGeolocationError, syncOfflineLocations]);
 
   // Stop location tracking
   const stopTracking = useCallback(() => {

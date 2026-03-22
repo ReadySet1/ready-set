@@ -1,6 +1,5 @@
 import { PrismaClient } from '@prisma/client'
 import type { Prisma } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
 import { prismaLogger } from '../../utils/logger'
 
 /**
@@ -228,9 +227,12 @@ const createOptimizedPrismaClient = (): PrismaClient => {
     connectionUrl = pooledUrl.toString()
   }
 
-  const adapter = new PrismaPg({ connectionString: connectionUrl })
   const client = new PrismaClient({
-    adapter,
+    datasources: {
+      db: {
+        url: connectionUrl
+      }
+    },
     log: LOG_CONFIG,
     errorFormat: isDevelopment ? 'pretty' : 'minimal',
     transactionOptions: {
@@ -330,8 +332,14 @@ const handleShutdown = async () => {
   prismaLogger.debug('✅ Prisma client disconnected')
 }
 
-// Register shutdown handlers
-if (typeof process !== 'undefined') {
+// Register shutdown handlers (guarded to prevent listener accumulation during HMR)
+declare global {
+  // eslint-disable-next-line no-var
+  var __prismaShutdownRegistered: boolean | undefined;
+}
+
+if (typeof process !== 'undefined' && !globalThis.__prismaShutdownRegistered) {
+  globalThis.__prismaShutdownRegistered = true
   process.on('SIGTERM', handleShutdown)
   process.on('SIGINT', handleShutdown)
   process.on('beforeExit', handleShutdown)

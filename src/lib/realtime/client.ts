@@ -176,9 +176,87 @@ export class RealtimeClient {
   private channelLastUsed: Map<string, number> = new Map(); // Track last access time for LRU eviction
   private readonly MAX_CHANNELS = 100;
 
+  // Cache for user context to avoid redundant auth calls that cause LockManager contention
+  private userContextCache: { context: UserContext; expiresAt: number } | null = null;
+  private userContextPromise: Promise<UserContext> | null = null;
+  private static readonly USER_CONTEXT_TTL = 5 * 60 * 1000; // 5 minutes
+
   private constructor() {
     // Use the browser client that has access to auth session cookies
     this.supabase = createBrowserClient();
+  }
+
+  /**
+   * Resolve user context with caching and in-flight deduplication.
+   * Prevents redundant getSession()/getUser() calls that cause LockManager contention.
+   */
+  private async resolveUserContext(): Promise<UserContext> {
+    // Check cache first
+    if (this.userContextCache && Date.now() < this.userContextCache.expiresAt) {
+      return this.userContextCache.context;
+    }
+
+    // Deduplicate in-flight requests
+    if (this.userContextPromise) {
+      return this.userContextPromise;
+    }
+
+    this.userContextPromise = (async () => {
+      try {
+        // Get session and refresh if near-expiry
+        const { data: { session } } = await this.supabase.auth.getSession();
+        if (session) {
+          const expiresAt = session.expires_at ?? 0;
+          const now = Math.floor(Date.now() / 1000);
+          if (expiresAt - now < 60) {
+            realtimeLogger.debug('Refreshing near-expiry token before resolveUserContext');
+            await this.supabase.auth.refreshSession();
+          }
+        }
+
+        const { data: { user }, error } = await this.supabase.auth.getUser();
+
+        if (error || !user) {
+          const errorMessage = error?.message || '';
+          const isAbortError = errorMessage.includes('AbortError') ||
+            errorMessage.includes('signal is aborted');
+
+          if (isAbortError) {
+            // Retry once after a short delay for transient LockManager timeouts
+            realtimeLogger.warn('Auth getUser aborted, retrying after 1s delay');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            const { data: { user: retryUser }, error: retryError } = await this.supabase.auth.getUser();
+            if (retryError || !retryUser) {
+              throw new RealtimeConnectionError(
+                'Auth session temporarily unavailable after retry.',
+                'user-context-resolve',
+              );
+            }
+
+            const context = await fetchUserContext(this.supabase, retryUser.id);
+            this.userContextCache = {
+              context,
+              expiresAt: Date.now() + RealtimeClient.USER_CONTEXT_TTL,
+            };
+            return context;
+          }
+
+          throw new UnauthorizedError('User must be authenticated');
+        }
+
+        const context = await fetchUserContext(this.supabase, user.id);
+        this.userContextCache = {
+          context,
+          expiresAt: Date.now() + RealtimeClient.USER_CONTEXT_TTL,
+        };
+        return context;
+      } finally {
+        this.userContextPromise = null;
+      }
+    })();
+
+    return this.userContextPromise;
   }
 
   /**
@@ -196,9 +274,19 @@ export class RealtimeClient {
    */
   public static resetInstance(): void {
     if (RealtimeClient.instance) {
+      RealtimeClient.instance.userContextCache = null;
+      RealtimeClient.instance.userContextPromise = null;
       RealtimeClient.instance.disconnectAll();
       RealtimeClient.instance = null;
     }
+  }
+
+  /**
+   * Clear the cached user context (useful for testing or role changes)
+   */
+  public clearUserContextCache(): void {
+    this.userContextCache = null;
+    this.userContextPromise = null;
   }
 
   /**
@@ -311,55 +399,12 @@ export class RealtimeClient {
       onError?: (error: Error) => void;
     },
   ): Promise<RealtimeChannel> {
-    // Get or fetch user context for authorization
+    // Get or fetch user context for authorization (cached + deduplicated)
     let effectiveUserContext: UserContext;
 
     if (!userContext) {
-      // Ensure we have a fresh token before subscribing
-      const { data: { session } } = await this.supabase.auth.getSession();
-      if (session) {
-        const expiresAt = session.expires_at ?? 0;
-        const now = Math.floor(Date.now() / 1000);
-        if (expiresAt - now < 60) {
-          realtimeLogger.debug('Refreshing near-expiry token before subscribe', {
-            channelName,
-            metadata: { expiresIn: expiresAt - now },
-          });
-          await this.supabase.auth.refreshSession();
-        }
-      }
-
-      // Get authenticated user
-      const { data: { user }, error } = await this.supabase.auth.getUser();
-
-      if (error || !user) {
-        const errorMessage = error?.message || '';
-        const isAbortError = errorMessage.includes('AbortError') ||
-          errorMessage.includes('signal is aborted');
-
-        if (isAbortError) {
-          realtimeLogger.warn('Auth getUser aborted (transient lock timeout)', {
-            error,
-            channelName,
-          });
-          throw new RealtimeConnectionError(
-            'Auth session temporarily unavailable. Please retry.',
-            channelName,
-          );
-        }
-
-        realtimeLogger.error('User must be authenticated to subscribe', { error });
-        throw new UnauthorizedError(
-          'User must be authenticated to subscribe to channels'
-        );
-      }
-
-      // Fetch user context from database
-      realtimeLogger.debug('Fetching user context for authorization', {
-        channelName,
-        metadata: { userId: user.id },
-      });
-      effectiveUserContext = await fetchUserContext(this.supabase, user.id);
+      realtimeLogger.debug('Resolving user context for subscribe', { channelName });
+      effectiveUserContext = await this.resolveUserContext();
     } else {
       effectiveUserContext = userContext;
     }
@@ -527,40 +572,14 @@ export class RealtimeClient {
     userContext?: UserContext,
   ): Promise<void> {
     try {
-      // Get or fetch user context for authorization
+      // Get or fetch user context for authorization (cached + deduplicated)
       let effectiveUserContext: UserContext;
 
       if (!userContext) {
-        // Get authenticated user
-        const { data: { user }, error } = await this.supabase.auth.getUser();
-        if (error || !user) {
-          const errorMessage = error?.message || '';
-          const isAbortError = errorMessage.includes('AbortError') ||
-            errorMessage.includes('signal is aborted');
-
-          if (isAbortError) {
-            realtimeLogger.warn('Auth getUser aborted (transient lock timeout)', {
-              error,
-              channelName,
-            });
-            throw new RealtimeConnectionError(
-              'Auth session temporarily unavailable. Please retry.',
-              channelName,
-            );
-          }
-
-          realtimeLogger.error('User must be authenticated to broadcast', { error });
-          throw new UnauthorizedError(
-            'User must be authenticated to broadcast events'
-          );
-        }
-
-        // Fetch user context from database
-        realtimeLogger.debug('Fetching user context for broadcast authorization', {
+        realtimeLogger.debug('Resolving user context for broadcast', {
           eventType: eventName,
-          metadata: { userId: user.id },
         });
-        effectiveUserContext = await fetchUserContext(this.supabase, user.id);
+        effectiveUserContext = await this.resolveUserContext();
       } else {
         effectiveUserContext = userContext;
       }

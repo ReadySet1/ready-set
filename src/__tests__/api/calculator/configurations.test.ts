@@ -13,7 +13,7 @@ jest.mock('@/lib/prisma', () => ({
       findUnique: jest.fn(),
       findMany: jest.fn(),
       upsert: jest.fn(),
-      delete: jest.fn(),
+      update: jest.fn(),
     },
   },
 }));
@@ -569,10 +569,18 @@ describe('/api/calculator/configurations API', () => {
   });
 
   describe('DELETE /api/calculator/configurations', () => {
+    beforeEach(() => {
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-123', email: 'test@example.com' } },
+        error: null,
+      });
+    });
+
     describe('✅ Successful Configuration Deletion', () => {
-      it('should delete configuration', async () => {
-        (prisma.deliveryConfiguration.delete as jest.Mock).mockResolvedValue({
+      it('should soft-delete configuration', async () => {
+        (prisma.deliveryConfiguration.update as jest.Mock).mockResolvedValue({
           configId: 'delete-config-123',
+          isActive: false,
         });
 
         const request = createDeleteRequest('http://localhost:3000/api/calculator/configurations?id=delete-config-123');
@@ -584,14 +592,18 @@ describe('/api/calculator/configurations API', () => {
         expect(data.message).toBe('Configuration deleted successfully');
       });
 
-      it('should call delete with correct configId', async () => {
-        (prisma.deliveryConfiguration.delete as jest.Mock).mockResolvedValue({});
+      it('should call update with correct configId for soft-delete', async () => {
+        (prisma.deliveryConfiguration.update as jest.Mock).mockResolvedValue({});
 
         const request = createDeleteRequest('http://localhost:3000/api/calculator/configurations?id=specific-config-456');
         await DELETE(request);
 
-        expect(prisma.deliveryConfiguration.delete).toHaveBeenCalledWith({
+        expect(prisma.deliveryConfiguration.update).toHaveBeenCalledWith({
           where: { configId: 'specific-config-456' },
+          data: {
+            isActive: false,
+            updatedAt: expect.any(Date),
+          },
         });
       });
     });
@@ -610,13 +622,13 @@ describe('/api/calculator/configurations API', () => {
         const request = createDeleteRequest('http://localhost:3000/api/calculator/configurations');
         await DELETE(request);
 
-        expect(prisma.deliveryConfiguration.delete).not.toHaveBeenCalled();
+        expect(prisma.deliveryConfiguration.update).not.toHaveBeenCalled();
       });
     });
 
     describe('❌ Error Handling Tests', () => {
       it('should return 500 when deletion fails', async () => {
-        (prisma.deliveryConfiguration.delete as jest.Mock).mockRejectedValue(
+        (prisma.deliveryConfiguration.update as jest.Mock).mockRejectedValue(
           new Error('Database error')
         );
 
@@ -631,7 +643,7 @@ describe('/api/calculator/configurations API', () => {
       it('should log deletion errors to console', async () => {
         const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-        (prisma.deliveryConfiguration.delete as jest.Mock).mockRejectedValue(
+        (prisma.deliveryConfiguration.update as jest.Mock).mockRejectedValue(
           new Error('Test error')
         );
 
@@ -731,9 +743,10 @@ describe('/api/calculator/configurations API', () => {
       expect(getSingleData.success).toBe(true);
       expect(getSingleData.data.id).toBe('integration-config');
 
-      // 4. DELETE configuration
-      (prisma.deliveryConfiguration.delete as jest.Mock).mockResolvedValue({
+      // 4. DELETE (soft-delete) configuration
+      (prisma.deliveryConfiguration.update as jest.Mock).mockResolvedValue({
         configId: 'integration-config',
+        isActive: false,
       });
 
       const deleteRequest = createDeleteRequest('http://localhost:3000/api/calculator/configurations?id=integration-config');

@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/lib/prisma';
 import {
@@ -14,7 +15,11 @@ import {
 } from '@/lib/calculator/client-configurations';
 
 // Helper function to convert DB record to ClientDeliveryConfiguration
+// Merges with in-memory configuration for fields not stored in database (e.g., zeroOrderSettings)
 function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
+  // Get the in-memory configuration to merge any fields not in the database
+  const inMemoryConfig = getConfiguration(dbConfig.configId);
+  
   return {
     id: dbConfig.configId,
     clientName: dbConfig.clientName,
@@ -27,6 +32,8 @@ function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
     dailyDriveDiscounts: dbConfig.dailyDriveDiscounts as any,
     driverPaySettings: dbConfig.driverPaySettings as any,
     bridgeTollSettings: dbConfig.bridgeTollSettings as any,
+    // Merge zeroOrderSettings from in-memory config (not stored in database yet)
+    zeroOrderSettings: dbConfig.zeroOrderSettings || inMemoryConfig?.zeroOrderSettings,
     customSettings: dbConfig.customSettings as any,
     createdAt: dbConfig.createdAt,
     updatedAt: dbConfig.updatedAt,
@@ -56,7 +63,7 @@ function configToDb(config: ClientDeliveryConfiguration, userId?: string) {
   };
 }
 
-// GET: Fetch all configurations or a specific one
+// GET: Fetch all configurations or a specific one (public — no auth required)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -66,13 +73,17 @@ export async function GET(request: NextRequest) {
       try {
         // Try to fetch from database first
         const dbConfig = await prisma.deliveryConfiguration.findUnique({
-          where: { configId }
+          where: { configId, isActive: true }
         });
 
         if (dbConfig) {
-          return NextResponse.json({ success: true, data: dbToConfig(dbConfig) });
+          return NextResponse.json({ success: true, data: dbToConfig(dbConfig), source: 'database' });
         }
       } catch (dbError) {
+        Sentry.captureException(dbError, {
+          tags: { operation: 'calculator-configurations-get-single' },
+          level: 'warning',
+        });
         console.warn('Database query failed, falling back to in-memory configs:', dbError);
       }
 
@@ -81,7 +92,7 @@ export async function GET(request: NextRequest) {
       if (!config) {
         return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
       }
-      return NextResponse.json({ success: true, data: config });
+      return NextResponse.json({ success: true, data: config, source: 'in-memory' });
     } else {
       try {
         // Try to fetch all from database
@@ -93,17 +104,24 @@ export async function GET(request: NextRequest) {
         // If DB has configs, return them
         if (dbConfigs.length > 0) {
           const configurations = dbConfigs.map(dbToConfig);
-          return NextResponse.json({ success: true, data: configurations });
+          return NextResponse.json({ success: true, data: configurations, source: 'database' });
         }
       } catch (dbError) {
+        Sentry.captureException(dbError, {
+          tags: { operation: 'calculator-configurations-get-all' },
+          level: 'warning',
+        });
         console.warn('Database query failed, falling back to in-memory configs:', dbError);
       }
 
       // Fallback to in-memory defaults
       const configurations = getActiveConfigurations();
-      return NextResponse.json({ success: true, data: configurations });
+      return NextResponse.json({ success: true, data: configurations, source: 'in-memory' });
     }
   } catch (error) {
+    Sentry.captureException(error, {
+      tags: { operation: 'calculator-configurations-get' },
+    });
     console.error('Error fetching configurations:', error);
     // Even on error, try to return in-memory defaults
     try {
@@ -123,6 +141,13 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
     const body = await request.json();
     const config: ClientDeliveryConfiguration = body;
@@ -151,6 +176,9 @@ export async function POST(request: NextRequest) {
       message: 'Configuration saved successfully'
     });
   } catch (error) {
+    Sentry.captureException(error, {
+      tags: { operation: 'calculator-configurations-post' },
+    });
     console.error('Error saving configuration:', error);
     return NextResponse.json(
       { error: 'Failed to save configuration' },
@@ -159,9 +187,19 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE: Delete a configuration
+// DELETE: Soft-delete a configuration (sets isActive to false)
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const configId = searchParams.get('id');
 
@@ -172,8 +210,12 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await prisma.deliveryConfiguration.delete({
-      where: { configId }
+    await prisma.deliveryConfiguration.update({
+      where: { configId },
+      data: {
+        isActive: false,
+        updatedAt: new Date(),
+      }
     });
 
     return NextResponse.json({
@@ -181,6 +223,9 @@ export async function DELETE(request: NextRequest) {
       message: 'Configuration deleted successfully'
     });
   } catch (error) {
+    Sentry.captureException(error, {
+      tags: { operation: 'calculator-configurations-delete' },
+    });
     console.error('Error deleting configuration:', error);
     return NextResponse.json(
       { error: 'Failed to delete configuration' },
