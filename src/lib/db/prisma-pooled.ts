@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import type { Prisma } from '@prisma/client'
 import { prismaLogger } from '../../utils/logger'
+import { softDeleteExtension } from './soft-delete-extension'
 
 /**
  * Optimized Prisma Client with Connection Pooling
@@ -292,6 +293,12 @@ const createOptimizedPrismaClient = (): PrismaClient => {
     supabase: databaseUrl.includes('supabase.co'),
     preparedStatements: isVercelServerless && databaseUrl.includes('supabase.co') ? 'disabled' : 'enabled'
   })
+
+  // Apply soft-delete extension (auto-injects deletedAt: null into read queries)
+  const softDeleteMode = process.env.SOFT_DELETE_MODE || 'enforce'
+  if (softDeleteMode !== 'off') {
+    return client.$extends(softDeleteExtension) as unknown as PrismaClient
+  }
 
   return client
 }
