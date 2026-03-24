@@ -66,13 +66,19 @@ export default function LocationInput({
       setIsSearching(true);
       try {
         const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-        if (!mapboxToken) return;
+        if (!mapboxToken) {
+          console.warn('[LocationInput] NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN not configured — autocomplete disabled');
+          return;
+        }
 
         const encoded = encodeURIComponent(query.trim());
         const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${mapboxToken}&limit=5&country=US&types=address,poi`;
 
         const res = await fetch(url);
-        if (!res.ok) return;
+        if (!res.ok) {
+          console.warn(`[LocationInput] Mapbox geocoding returned ${res.status}`);
+          return;
+        }
 
         const data = await res.json();
         const results: GeocodeSuggestion[] = (data.features ?? []).map(
@@ -85,7 +91,8 @@ export default function LocationInput({
 
         setSuggestions(results);
         setShowDropdown(results.length > 0);
-      } catch {
+      } catch (err) {
+        console.warn('[LocationInput] Geocoding error:', err instanceof Error ? err.message : err);
         setSuggestions([]);
       } finally {
         setIsSearching(false);

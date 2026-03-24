@@ -15,12 +15,32 @@ import {
   type RouteApiResponse,
   type DistanceMatrixResult,
   type DistanceMatrixEntry,
-} from '../../../../types/routing';
+} from '@/types/routing';
 import { createClient } from '@/utils/supabase/server';
 
 const GOOGLE_DISTANCE_MATRIX_URL =
   'https://maps.googleapis.com/maps/api/distancematrix/json';
 const METERS_TO_MILES = 0.000621371;
+
+// ─── Google Distance Matrix API Response Types ──────────────────────────────
+
+interface GoogleDistanceMatrixElement {
+  status: string;
+  distance?: { value: number; text: string };
+  duration?: { value: number; text: string };
+}
+
+interface GoogleDistanceMatrixRow {
+  elements: GoogleDistanceMatrixElement[];
+}
+
+interface GoogleDistanceMatrixResponse {
+  status: string;
+  error_message?: string;
+  origin_addresses: string[];
+  destination_addresses: string[];
+  rows: GoogleDistanceMatrixRow[];
+}
 
 export async function POST(
   request: NextRequest,
@@ -51,6 +71,7 @@ export async function POST(
 
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
+      Sentry.captureMessage('GOOGLE_MAPS_API_KEY not configured', { level: 'error' });
       return NextResponse.json(
         { success: false, error: 'Google Maps API key not configured', timestamp: new Date().toISOString() },
         { status: 500 },
@@ -74,30 +95,40 @@ export async function POST(
       throw new Error(`Google Distance Matrix API returned ${response.status}`);
     }
 
-    const data = await response.json();
+    const data: GoogleDistanceMatrixResponse = await response.json();
     if (data.status !== 'OK') {
       const detail = data.error_message ? ` — ${data.error_message}` : '';
       console.error('[DistanceMatrix] Google API error:', {
         status: data.status,
         error_message: data.error_message,
-        apiKeyPrefix: apiKey.slice(0, 10) + '...',
       });
       throw new Error(`Distance Matrix error: ${data.status}${detail}`);
     }
 
     const entries: DistanceMatrixEntry[] = [];
     for (let i = 0; i < data.rows.length; i++) {
-      for (let j = 0; j < data.rows[i].elements.length; j++) {
-        const el = data.rows[i].elements[j];
+      const row = data.rows[i];
+      if (!row) continue;
+      for (let j = 0; j < row.elements.length; j++) {
+        const el = row.elements[j];
+        if (!el) continue;
+
+        if (el.status !== 'OK') {
+          console.warn(`[DistanceMatrix] Element status: ${el.status}`, {
+            origin: data.origin_addresses[i],
+            destination: data.destination_addresses[j],
+          });
+        }
+
         entries.push({
-          originAddress: data.origin_addresses[i],
-          destinationAddress: data.destination_addresses[j],
+          originAddress: data.origin_addresses[i] ?? '',
+          destinationAddress: data.destination_addresses[j] ?? '',
           distanceMiles:
-            el.status === 'OK'
+            el.status === 'OK' && el.distance
               ? Math.round(el.distance.value * METERS_TO_MILES * 100) / 100
               : 0,
           durationMinutes:
-            el.status === 'OK'
+            el.status === 'OK' && el.duration
               ? Math.round((el.duration.value / 60) * 10) / 10
               : 0,
           status: el.status,

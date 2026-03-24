@@ -41,9 +41,13 @@ export default function MileageResults({ calculation }: MileageResultsProps) {
           `  ${i + 1}. ${leg.from} → ${leg.to}: ${leg.distanceMiles.toFixed(1)} mi, ${formatDuration(leg.durationMinutes)}`,
       ),
     ];
-    await navigator.clipboard.writeText(lines.join('\n'));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.warn('[MileageResults] Clipboard write failed:', err instanceof Error ? err.message : err);
+    }
   };
 
   return (

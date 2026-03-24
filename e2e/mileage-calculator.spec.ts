@@ -16,8 +16,8 @@
 import { test, expect, Page } from '@playwright/test';
 
 const TEST_USER = {
-  email: 'emmanuel@alanis.dev',
-  password: 'Spark2026@',
+  email: process.env.E2E_TEST_USER_EMAIL || '',
+  password: process.env.E2E_TEST_USER_PASSWORD || '',
 };
 
 async function loginAndNavigateToMileageCalc(page: Page): Promise<void> {

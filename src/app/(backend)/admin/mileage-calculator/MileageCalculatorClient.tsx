@@ -124,8 +124,8 @@ export default function MileageCalculatorClient({
                 }
               }
             }
-          } catch {
-            // Polyline/directions are optional; distance matrix data is sufficient
+          } catch (err) {
+            console.warn('[MileageCalculator] Route optimization failed, using Distance Matrix fallback:', err instanceof Error ? err.message : err);
           }
         } else {
           // Single drop-off: fetch directions with median route selection.
@@ -162,8 +162,8 @@ export default function MileageCalculatorClient({
                 }
               }
             }
-          } catch {
-            // Falls back to Distance Matrix values if directions fail
+          } catch (err) {
+            console.warn('[MileageCalculator] Route optimization failed, using Distance Matrix fallback:', err instanceof Error ? err.message : err);
           }
         }
 
