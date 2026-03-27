@@ -601,7 +601,7 @@ describe('Delivery Cost Calculator', () => {
       expect(result.deliveryFee).toBe(62.50);
     });
 
-    test('CaterValley: Fallback to default configuration if config not found', () => {
+    test('CaterValley: Throws error for non-existent configuration', () => {
       const input: DeliveryCostInput = {
         headcount: 20,
         foodCost: 250,
@@ -610,10 +610,9 @@ describe('Delivery Cost Calculator', () => {
         clientConfigId: 'non-existent-config'
       };
 
-      const result = calculateDeliveryCost(input);
-
-      // Should fallback to Ready Set Food Standard (Flat Fee Pricing: $60)
-      expect(result.deliveryCost).toBe(60);
+      expect(() => calculateDeliveryCost(input)).toThrow(
+        'Unknown client configuration: "non-existent-config"'
+      );
     });
 
     test('CaterValley: Edge case - Exactly 10.0 miles uses within10Miles rate', () => {
