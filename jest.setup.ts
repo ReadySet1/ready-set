@@ -541,6 +541,7 @@ const mockPrismaClientInstance: any = {
   $executeRaw: jest.fn().mockResolvedValue(0),
   $queryRawUnsafe: jest.fn().mockResolvedValue([]),
   $executeRawUnsafe: jest.fn().mockResolvedValue(0),
+  $extends: jest.fn().mockReturnThis(),
 };
 
 // Mock @prisma/client
@@ -569,6 +570,8 @@ jest.mock('@prisma/client', () => ({
         this.name = 'PrismaClientInitializationError';
       }
     },
+    defineExtension: (ext: any) => ext,
+    getExtensionContext: (ctx: any) => ctx,
   },
 }));
 

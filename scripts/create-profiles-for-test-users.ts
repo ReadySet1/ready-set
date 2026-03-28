@@ -82,7 +82,7 @@ async function createProfilesForTestUsers() {
 
       console.log(`✅ Profile ${profile.id ? 'updated' : 'created'} successfully`);
       console.log(`\n   📧 Email: ${email}`);
-      console.log(`   🔑 Password: ${config.password}`);
+      console.log(`   🔑 Password: ${'*'.repeat(config.password.length)}`);
       console.log(`   👤 Type: ${config.type}`);
       console.log(`   🆔 ID: ${authUser.id}`);
 
@@ -102,7 +102,7 @@ async function createProfilesForTestUsers() {
       for (const [email, config] of Object.entries(testUserConfig)) {
         console.log(`\n${config.type}:`);
         console.log(`  Email: ${email}`);
-        console.log(`  Password: ${config.password}`);
+        console.log(`  Password: ${'*'.repeat(config.password.length)}`);
       }
       console.log('\n✅ You can now use these credentials to test the application!');
     }
