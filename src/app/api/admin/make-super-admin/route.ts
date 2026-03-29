@@ -5,6 +5,15 @@ const SUPER_ADMIN_SECRET = process.env.SUPER_ADMIN_SECRET;
 
 export async function POST(request: Request) {
   try {
+    // Fail fast if SUPER_ADMIN_SECRET is not configured
+    if (!SUPER_ADMIN_SECRET) {
+      console.warn('⚠️ SUPER_ADMIN_SECRET is not set — make-super-admin endpoint is disabled');
+      return NextResponse.json(
+        { error: 'Service unavailable — SUPER_ADMIN_SECRET is not configured' },
+        { status: 503 }
+      );
+    }
+
     // Check if Prisma client is properly initialized
     if (!prisma || typeof prisma.profile === 'undefined') {
       console.error('❌ Prisma client not properly initialized');
@@ -17,7 +26,7 @@ export async function POST(request: Request) {
     const { email, secret } = await request.json();
 
     // Validate secret key
-    if (!SUPER_ADMIN_SECRET || secret !== SUPER_ADMIN_SECRET) {
+    if (secret !== SUPER_ADMIN_SECRET) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }

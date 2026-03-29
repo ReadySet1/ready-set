@@ -1,7 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient as createSupabaseServerClient } from '@/utils/supabase/server';
 import { setSentryUser } from '@/lib/monitoring/sentry';
+import { withRateLimit, RateLimitConfigs } from '@/lib/rate-limiting';
+
+const callbackRateLimit = withRateLimit(RateLimitConfigs.authCallback);
 
 // Define default home routes for each user type
 const USER_HOME_ROUTES: Record<string, string> = {
@@ -13,7 +16,10 @@ const USER_HOME_ROUTES: Record<string, string> = {
   client: "/client"
 };
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const rateLimitResponse = await callbackRateLimit(request);
+  if (rateLimitResponse) return rateLimitResponse;
+
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
   const next = requestUrl.searchParams.get('next') || '/';

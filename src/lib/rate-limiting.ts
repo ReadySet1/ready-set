@@ -148,11 +148,31 @@ export interface RateLimitConfig {
 
 // Rate limit tiers for different endpoint types
 export const RATE_LIMIT_TIERS = {
-  // Very strict for authentication endpoints
+  // Very strict for authentication endpoints (5 req/min per IP)
   AUTH: {
-    windowMs: 15 * 60 * 1000, // 15 minutes
+    windowMs: 60_000,
     maxRequests: 5,
-    message: 'Too many authentication attempts. Please try again in 15 minutes.',
+    message: 'Too many authentication attempts. Please try again later.',
+    strategy: 'sliding-window' as const,
+    skipSuccessfulRequests: false,
+    skipFailedRequests: false
+  },
+
+  // Auth callback / OAuth code exchange (10 req/min per IP)
+  AUTH_CALLBACK: {
+    windowMs: 60_000,
+    maxRequests: 10,
+    message: 'Too many authentication callback requests. Please try again later.',
+    strategy: 'sliding-window' as const,
+    skipSuccessfulRequests: false,
+    skipFailedRequests: false
+  },
+
+  // Password reset requests (3 req/min per IP)
+  AUTH_PASSWORD_RESET: {
+    windowMs: 60_000,
+    maxRequests: 3,
+    message: 'Too many password reset attempts. Please try again later.',
     strategy: 'sliding-window' as const,
     skipSuccessfulRequests: false,
     skipFailedRequests: false
@@ -339,6 +359,12 @@ export function setupRateLimitStorage(redisClient?: any): void {
 export const RateLimitConfigs = {
   // Very strict for authentication endpoints
   auth: RATE_LIMIT_TIERS.AUTH,
+
+  // Auth callback / OAuth code exchange
+  authCallback: RATE_LIMIT_TIERS.AUTH_CALLBACK,
+
+  // Password reset requests
+  authPasswordReset: RATE_LIMIT_TIERS.AUTH_PASSWORD_RESET,
 
   // Moderate for general API usage
   api: RATE_LIMIT_TIERS.API,
