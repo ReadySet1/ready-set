@@ -96,7 +96,6 @@ export async function GET(request: NextRequest, context: RouteParams) {
           gte: startDate,
           lte: endDate,
         },
-        deletedAt: null,
       },
       orderBy: { weekStart: 'desc' },
     });

@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         
     // Find affected files
     const filesToFix = await prisma.fileUpload.findMany({
-      where: { ...whereClause, deletedAt: null },
+      where: whereClause,
       select: {
         id: true,
         fileUrl: true

@@ -92,7 +92,6 @@ export async function POST(request: NextRequest) {
           userId: userId || user.id,
           cateringRequestId: null,
           onDemandId: null,
-          deletedAt: null,
         },
         select: {
           id: true,
@@ -188,7 +187,7 @@ export async function POST(request: NextRequest) {
       
       // Step 1: Get file records for the entity
       const fileRecords = await prisma.fileUpload.findMany({
-        where: { ...whereClause, deletedAt: null },
+        where: whereClause,
         select: {
           id: true,
           fileUrl: true,
