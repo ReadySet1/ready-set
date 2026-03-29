@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 
     
     const files = await prisma.fileUpload.findMany({
-      where: whereClause,
+      where: { ...whereClause, deletedAt: null },
       orderBy: {
         uploadedAt: "desc",
       },
