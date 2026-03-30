@@ -162,6 +162,7 @@ describe("/api/driver-deliveries", () => {
           cateringRequestId: true,
           onDemandId: true,
         },
+        take: 500,
       });
     });
 
@@ -455,6 +456,7 @@ describe("/api/driver-deliveries", () => {
           cateringRequestId: true,
           onDemandId: true,
         },
+        take: 500,
       });
 
       expect(mockPrisma.dispatch.findMany).not.toHaveBeenCalledWith(

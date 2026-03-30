@@ -77,6 +77,7 @@ describe('/api/drivers GET API', () => {
           createdAt: true,
           updatedAt: true,
         },
+        take: 200,
       });
     });
 
