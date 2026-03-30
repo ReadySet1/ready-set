@@ -43,20 +43,18 @@ export async function GET(req: NextRequest) {
           pickupAddress: true,
           deliveryAddress: true
         },
-        take: 200,
       }),
       prisma.onDemand.findMany({
-        where: { 
+        where: {
           userId: user.id,
-          deletedAt: null 
+          deletedAt: null
         },
         orderBy: { createdAt: 'desc' },
-        include: { 
+        include: {
           user: { select: { name: true, email: true } },
           pickupAddress: true,
           deliveryAddress: true
         },
-        take: 200,
       }),
     ]);
 

@@ -72,7 +72,6 @@ export async function GET(req: NextRequest) {
         cateringRequestId: true,
         onDemandId: true,
       },
-      take: 500,
     });
 
     // Separate catering and on-demand IDs
@@ -113,7 +112,6 @@ export async function GET(req: NextRequest) {
           select: { id: true, fileUrl: true, category: true, uploadedAt: true },
         },
       },
-      take: 200,
     });
 
     // Fetch on-demand deliveries with historical limit
@@ -135,7 +133,6 @@ export async function GET(req: NextRequest) {
           select: { id: true, fileUrl: true, category: true, uploadedAt: true },
         },
       },
-      take: 200,
     });
 
     // Fetch delivery addresses for on-demand deliveries

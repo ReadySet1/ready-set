@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       where: {
         cateringRequestId: cateringRequestId
       },
+      orderBy: { uploadedAt: 'desc' },
       take: 100,
     });
     

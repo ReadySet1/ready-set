@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
         id: true,
         fileUrl: true
       },
+      orderBy: { uploadedAt: 'desc' },
       take: 200,
     });
     

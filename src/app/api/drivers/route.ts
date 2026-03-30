@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         updatedAt: true
       },
+      orderBy: { createdAt: 'desc' },
       take: 200,
     });
 
