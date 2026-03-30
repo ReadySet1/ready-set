@@ -18,7 +18,11 @@ const USER_HOME_ROUTES: Record<string, string> = {
 
 export async function GET(request: NextRequest) {
   const rateLimitResponse = await callbackRateLimit(request);
-  if (rateLimitResponse) return rateLimitResponse;
+  if (rateLimitResponse) {
+    const errorUrl = new URL('/auth/auth-code-error', new URL(request.url).origin);
+    errorUrl.searchParams.set('error', 'Too many requests. Please try again later.');
+    return NextResponse.redirect(errorUrl);
+  }
 
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');

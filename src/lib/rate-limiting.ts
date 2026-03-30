@@ -227,7 +227,7 @@ type RateLimitTier = keyof typeof RATE_LIMIT_TIERS;
 export function withRateLimit(config: RateLimitConfig | RateLimitTier) {
   return async function rateLimit(request: NextRequest): Promise<NextResponse | null> {
 
-    if ((process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) && !process.env.FORCE_RATE_LIMIT) {
+    if (process.env.NODE_ENV === 'test' && !process.env.FORCE_RATE_LIMIT) {
       return null; // Returning null means "Allow petition"
     }
     const rateLimitConfig = typeof config === 'string' ? RATE_LIMIT_TIERS[config] : config;

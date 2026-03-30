@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     if (!SUPER_ADMIN_SECRET) {
       console.warn('⚠️ SUPER_ADMIN_SECRET is not set — make-super-admin endpoint is disabled');
       return NextResponse.json(
-        { error: 'Service unavailable — SUPER_ADMIN_SECRET is not configured' },
+        { error: 'Service unavailable' },
         { status: 503 }
       );
     }
