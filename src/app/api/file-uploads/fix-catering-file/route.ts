@@ -25,7 +25,9 @@ export async function GET(request: NextRequest) {
     const files = await prisma.fileUpload.findMany({
       where: {
         cateringRequestId: cateringRequestId
-      }
+      },
+      orderBy: { uploadedAt: 'desc' },
+      take: 100,
     });
     
         

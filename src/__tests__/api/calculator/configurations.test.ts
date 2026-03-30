@@ -213,6 +213,7 @@ describe('/api/calculator/configurations API', () => {
         expect(prisma.deliveryConfiguration.findMany).toHaveBeenCalledWith({
           where: { isActive: true },
           orderBy: { updatedAt: 'desc' },
+          take: 100,
         });
       });
     });

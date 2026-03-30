@@ -98,7 +98,8 @@ export async function GET(request: NextRequest) {
         // Try to fetch all from database
         const dbConfigs = await prisma.deliveryConfiguration.findMany({
           where: { isActive: true },
-          orderBy: { updatedAt: 'desc' }
+          orderBy: { updatedAt: 'desc' },
+          take: 100,
         });
 
         // If DB has configs, return them

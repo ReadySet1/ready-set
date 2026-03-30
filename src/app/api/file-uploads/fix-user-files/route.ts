@@ -59,7 +59,9 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         fileUrl: true
-      }
+      },
+      orderBy: { uploadedAt: 'desc' },
+      take: 200,
     });
     
         

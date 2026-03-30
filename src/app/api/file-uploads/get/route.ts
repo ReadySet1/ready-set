@@ -78,6 +78,7 @@ export async function GET(request: NextRequest) {
       orderBy: {
         uploadedAt: "desc",
       },
+      take: 100,
     });
 
     
