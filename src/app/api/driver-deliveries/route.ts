@@ -72,6 +72,7 @@ export async function GET(req: NextRequest) {
         cateringRequestId: true,
         onDemandId: true,
       },
+      take: 500,
     });
 
     // Separate catering and on-demand IDs
@@ -99,8 +100,8 @@ export async function GET(req: NextRequest) {
       where: {
         id: { in: cateringIds },
         OR: [
-          { completeDateTime: null }, // Include incomplete deliveries regardless of age
-          { createdAt: { gte: historicalCutoffDate } }, // Include recent completed deliveries
+          { completeDateTime: null },
+          { createdAt: { gte: historicalCutoffDate } },
         ],
       },
       include: {
@@ -112,6 +113,7 @@ export async function GET(req: NextRequest) {
           select: { id: true, fileUrl: true, category: true, uploadedAt: true },
         },
       },
+      take: 200,
     });
 
     // Fetch on-demand deliveries with historical limit
@@ -120,8 +122,8 @@ export async function GET(req: NextRequest) {
       where: {
         id: { in: onDemandIds },
         OR: [
-          { completeDateTime: null }, // Include incomplete deliveries regardless of age
-          { createdAt: { gte: historicalCutoffDate } }, // Include recent completed deliveries
+          { completeDateTime: null },
+          { createdAt: { gte: historicalCutoffDate } },
         ],
       },
       include: {
@@ -133,6 +135,7 @@ export async function GET(req: NextRequest) {
           select: { id: true, fileUrl: true, category: true, uploadedAt: true },
         },
       },
+      take: 200,
     });
 
     // Fetch delivery addresses for on-demand deliveries

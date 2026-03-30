@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
           pickupAddress: true,
           deliveryAddress: true
         },
+        take: 200,
       }),
       prisma.onDemand.findMany({
         where: { 
@@ -55,6 +56,7 @@ export async function GET(req: NextRequest) {
           pickupAddress: true,
           deliveryAddress: true
         },
+        take: 200,
       }),
     ]);
 

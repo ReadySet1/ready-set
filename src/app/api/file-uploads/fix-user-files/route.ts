@@ -59,7 +59,8 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         fileUrl: true
-      }
+      },
+      take: 200,
     });
     
         
