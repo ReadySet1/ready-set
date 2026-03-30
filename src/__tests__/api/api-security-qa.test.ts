@@ -56,6 +56,13 @@ function createTestRequest(path: string, options?: RequestInit): NextRequest {
 }
 
 describe('API Security Enhancements QA', () => {
+  beforeAll(() => {
+    process.env.FORCE_RATE_LIMIT = 'true';
+  });
+
+  afterAll(() => {
+    delete process.env.FORCE_RATE_LIMIT;
+  });
   beforeEach(() => {
     jest.clearAllMocks();
   });
