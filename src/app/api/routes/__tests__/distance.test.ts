@@ -10,6 +10,7 @@ import { NextRequest } from 'next/server';
 // Mock Sentry to avoid real error tracking
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
+  captureMessage: jest.fn(),
 }));
 
 // Mock Supabase — authenticated user by default

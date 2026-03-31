@@ -37,7 +37,9 @@ export async function GET(request: NextRequest) {
         status: true,
         createdAt: true,
         updatedAt: true
-      }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
     });
 
     return NextResponse.json(drivers);

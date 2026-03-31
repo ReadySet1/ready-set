@@ -100,6 +100,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         expect(prisma.fileUpload.findMany).toHaveBeenCalledWith({
           where: { userId: TEST_USER_ID },
           orderBy: { uploadedAt: 'desc' },
+          take: 100,
         });
       });
 
@@ -265,6 +266,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         expect(prisma.fileUpload.findMany).toHaveBeenCalledWith({
           where: { userId: TEST_USER_ID },
           orderBy: { uploadedAt: 'desc' },
+          take: 100,
         });
       });
 
@@ -540,6 +542,7 @@ describe('/api/users/[userId]/files and /api/users/files APIs', () => {
         expect(prisma.fileUpload.findMany).toHaveBeenCalledWith({
           where: { userId: OTHER_USER_ID },
           orderBy: { uploadedAt: 'desc' },
+          take: 100,
         });
       });
     });

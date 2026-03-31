@@ -98,6 +98,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
         },
       },
       orderBy: { weekStart: 'desc' },
+      take: 200,
     });
 
     // Fetch recent shifts (for more detailed data)
@@ -111,6 +112,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
         deletedAt: null,
       },
       orderBy: { shiftStart: 'desc' },
+      take: 200,
       select: {
         id: true,
         shiftStart: true,

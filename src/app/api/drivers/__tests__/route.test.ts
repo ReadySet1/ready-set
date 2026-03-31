@@ -296,6 +296,7 @@ describe("/api/drivers", () => {
             createdAt: true,
             updatedAt: true,
           },
+          take: 200,
         });
       });
 
