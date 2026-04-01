@@ -92,11 +92,13 @@ export async function GET(req: NextRequest) {
     ));
 
     // Return Response
-    return NextResponse.json({
+    const response = NextResponse.json({
       orders: serializedOrders,
       totalPages,
       totalCount,
     }, { status: 200 });
+    response.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+    return response;
 
   } catch (error) {
     console.error("Error fetching on-demand orders:", error);

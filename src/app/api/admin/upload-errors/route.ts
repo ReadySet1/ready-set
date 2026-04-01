@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
     const totalCount = await prisma.uploadError.count({ where: whereClause });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       errors: errors.map(error => ({
         id: error.id,
@@ -81,6 +81,8 @@ export async function GET(request: NextRequest) {
         hasMore: offset + limit < totalCount
       }
     });
+    response.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+    return response;
   } catch (error) {
     console.error("Error fetching upload errors:", error);
     return NextResponse.json(

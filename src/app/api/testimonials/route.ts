@@ -84,12 +84,14 @@ export async function GET(request: NextRequest) {
       updatedAt: testimonial.updated_at ?? new Date().toISOString(),
     }));
     
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       count: formattedTestimonials.length,
       testimonials: formattedTestimonials,
     });
-    
+    response.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+    return response;
+
   } catch (error) {
     console.error('Unexpected error in testimonials API:', error);
     return NextResponse.json(

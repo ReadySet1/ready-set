@@ -17,9 +17,11 @@ export async function GET(request: NextRequest) {
     const guides = await getGuides();
     
     // Return guides in a consistent format
-    return NextResponse.json({
+    const response = NextResponse.json({
       data: guides
     });
+    response.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+    return response;
   } catch (error) {
     // Log error for debugging
     console.error('Error fetching guides:', error);

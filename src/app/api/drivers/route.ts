@@ -42,7 +42,9 @@ export async function GET(request: NextRequest) {
       take: 200,
     });
 
-    return NextResponse.json(drivers);
+    const response = NextResponse.json(drivers);
+    response.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+    return response;
   } catch (error) {
     console.error("Error fetching drivers:", error);
     return NextResponse.json(

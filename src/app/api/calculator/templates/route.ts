@@ -61,12 +61,14 @@ export async function GET(request: NextRequest) {
       }))
     }));
     
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: mappedTemplates,
       total: mappedTemplates.length,
       timestamp: new Date().toISOString()
     });
+    response.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+    return response;
   } catch (error) {
     console.error('Failed to fetch calculator templates:', error);
     
