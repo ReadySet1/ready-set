@@ -53,8 +53,8 @@ export async function GET(request: NextRequest, context: RouteParams) {
     const isSuperAdmin = (user.app_metadata as AppMetadata)?.role === 'super_admin';
 
     // Check if user can access this driver's data
-    const driver = await prisma.driver.findUnique({
-      where: { id: driverId },
+    const driver = await prisma.driver.findFirst({
+      where: { id: driverId, deletedAt: null },
       include: {
         profile: {
           select: { id: true, name: true, email: true },

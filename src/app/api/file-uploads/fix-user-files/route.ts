@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
     }
     
     // Get admin status from database
-    const profile = await prisma.profile.findUnique({
-      where: { id: user.id },
+    const profile = await prisma.profile.findFirst({
+      where: { id: user.id, deletedAt: null },
       select: { type: true }
     });
     
