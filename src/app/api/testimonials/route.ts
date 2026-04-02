@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
       count: formattedTestimonials.length,
       testimonials: formattedTestimonials,
     });
-    response.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+    response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
     return response;
 
   } catch (error) {

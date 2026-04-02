@@ -240,7 +240,7 @@ export async function GET(req: NextRequest) {
       totalCount: allOrders.length,
       hasMore: allOrders.length > (skip + take),
     });
-    response.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+    response.headers.set('Cache-Control', 'private, max-age=60');
     return response;
 
   } catch (error: any) {

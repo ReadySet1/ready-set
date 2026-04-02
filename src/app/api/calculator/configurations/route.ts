@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
 
         if (dbConfig) {
           const response = NextResponse.json({ success: true, data: dbToConfig(dbConfig), source: 'database' });
-          response.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+          response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
           return response;
         }
       } catch (dbError) {
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
       }
       const singleInMemoryResponse = NextResponse.json({ success: true, data: config, source: 'in-memory' });
-      singleInMemoryResponse.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+      singleInMemoryResponse.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
       return singleInMemoryResponse;
     } else {
       try {
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
         if (dbConfigs.length > 0) {
           const configurations = dbConfigs.map(dbToConfig);
           const dbListResponse = NextResponse.json({ success: true, data: configurations, source: 'database' });
-          dbListResponse.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+          dbListResponse.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
           return dbListResponse;
         }
       } catch (dbError) {
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
       // Fallback to in-memory defaults
       const configurations = getActiveConfigurations();
       const inMemoryListResponse = NextResponse.json({ success: true, data: configurations, source: 'in-memory' });
-      inMemoryListResponse.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+      inMemoryListResponse.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
       return inMemoryListResponse;
     }
   } catch (error) {

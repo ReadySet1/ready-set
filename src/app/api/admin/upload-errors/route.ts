@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         hasMore: offset + limit < totalCount
       }
     });
-    response.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+    response.headers.set('Cache-Control', 'private, max-age=60');
     return response;
   } catch (error) {
     console.error("Error fetching upload errors:", error);

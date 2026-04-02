@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       total: template.pricingRules?.length || 0,
       timestamp: new Date().toISOString()
     });
-    response.headers.set('Cache-Control', 'private, s-maxage=60, stale-while-revalidate=120');
+    response.headers.set('Cache-Control', 'private, max-age=60');
     return response;
   } catch (error) {
     console.error('Failed to fetch pricing rules:', error);
