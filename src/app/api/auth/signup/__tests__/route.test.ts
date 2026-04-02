@@ -31,7 +31,7 @@ jest.mock("@/utils/supabase/server", () => ({
 jest.mock("@/utils/prismaDB", () => ({
   prisma: {
     profile: {
-      findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
   },
@@ -58,7 +58,7 @@ describe("/api/auth/signup", () => {
     jest.clearAllMocks();
 
     // Default: no existing user
-    mockPrisma.profile.findUnique.mockResolvedValue(null);
+    mockPrisma.profile.findFirst.mockResolvedValue(null);
 
     // Default: successful Supabase signup
     mockCreateClient.mockResolvedValue({
@@ -182,7 +182,7 @@ describe("/api/auth/signup", () => {
 
     it("should reject duplicate email addresses", async () => {
       // Mock existing user
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         id: "existing-user-id",
         email: validSignupData.email,
         name: "Existing User",
@@ -385,12 +385,12 @@ describe("/api/auth/signup", () => {
       await POST(request);
 
       // Verify Prisma check happens first
-      expect(mockPrisma.profile.findUnique).toHaveBeenCalledWith({
-        where: { email: validSignupData.email },
+      expect(mockPrisma.profile.findFirst).toHaveBeenCalledWith({
+        where: { email: validSignupData.email, deletedAt: null },
       });
 
       // Verify it was called before Supabase signUp
-      const prismaCallOrder = mockPrisma.profile.findUnique.mock.invocationCallOrder[0];
+      const prismaCallOrder = mockPrisma.profile.findFirst.mock.invocationCallOrder[0];
       const mockAuth = (await mockCreateClient()).auth as any;
       const supabaseCallOrder = mockAuth.signUp.mock?.invocationCallOrder?.[0] || Infinity;
 
@@ -400,7 +400,7 @@ describe("/api/auth/signup", () => {
     it("should handle concurrent signups gracefully", async () => {
       // Simulate race condition where user is created between check and signup
       let callCount = 0;
-      mockPrisma.profile.findUnique.mockImplementation(() => {
+      mockPrisma.profile.findFirst.mockImplementation(() => {
         callCount++;
         if (callCount === 1) {
           return Promise.resolve(null); // First check: no user
@@ -421,7 +421,7 @@ describe("/api/auth/signup", () => {
 
     it("should validate email case-insensitivity", async () => {
       // Create user with lowercase email
-      mockPrisma.profile.findUnique.mockResolvedValue({
+      mockPrisma.profile.findFirst.mockResolvedValue({
         id: "existing-user",
         email: "test@example.com",
         name: "Existing User",

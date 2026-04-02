@@ -67,7 +67,7 @@ describe('/api/drivers GET API', () => {
       expect(response.status).toBe(200);
       expect(data).toEqual(mockDrivers);
       expect(prisma.profile.findMany).toHaveBeenCalledWith({
-        where: { type: 'DRIVER' },
+        where: { type: 'DRIVER', deletedAt: null },
         select: {
           id: true,
           name: true,
@@ -77,6 +77,8 @@ describe('/api/drivers GET API', () => {
           createdAt: true,
           updatedAt: true,
         },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
       });
     });
 
@@ -562,7 +564,7 @@ describe('/api/drivers GET API', () => {
 
       expect(prisma.profile.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { type: 'DRIVER' },
+          where: { type: 'DRIVER', deletedAt: null },
         })
       );
     });

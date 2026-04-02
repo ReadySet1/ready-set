@@ -56,6 +56,13 @@ function createTestRequest(path: string, options?: RequestInit): NextRequest {
 }
 
 describe('API Security Enhancements QA', () => {
+  beforeAll(() => {
+    process.env.FORCE_RATE_LIMIT = 'true';
+  });
+
+  afterAll(() => {
+    delete process.env.FORCE_RATE_LIMIT;
+  });
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -63,7 +70,7 @@ describe('API Security Enhancements QA', () => {
   describe('Rate Limiting System', () => {
     describe('Rate Limit Configuration', () => {
       it('should have correct rate limit tiers defined', () => {
-        expect(RateLimitConfigs.auth.windowMs).toBe(15 * 60 * 1000); // 15 minutes
+        expect(RateLimitConfigs.auth.windowMs).toBe(60 * 1000); // 1 minute per Q2 audit
         expect(RateLimitConfigs.auth.maxRequests).toBe(5);
         expect(RateLimitConfigs.auth.strategy).toBe('sliding-window');
 

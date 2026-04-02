@@ -100,6 +100,7 @@ describe('GET /api/orders/[order_number]/files - Fetch Order Files', () => {
         orderBy: {
           uploadedAt: 'desc',
         },
+        take: 100,
       });
     });
 
@@ -489,6 +490,7 @@ describe('GET /api/orders/[order_number]/files - Fetch Order Files', () => {
         orderBy: {
           uploadedAt: 'desc',
         },
+        take: 100,
       });
     });
   });

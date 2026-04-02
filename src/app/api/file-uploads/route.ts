@@ -439,10 +439,10 @@ export async function POST(request: NextRequest) {
       } else {
         // Only try to validate as UUID for non-temp IDs
         try {
-          const jobApp = await prisma.jobApplication.findUnique({
-            where: { id: finalEntityId }
+          const jobApp = await prisma.jobApplication.findFirst({
+            where: { id: finalEntityId, deletedAt: null }
           });
-          
+
           if (jobApp) {
                         filePath = `job-applications/${jobApp.id}/${fileName}`;
           } else {
@@ -794,10 +794,10 @@ export async function POST(request: NextRequest) {
           
           // Double-check the catering request exists
           try {
-            const cateringRequest = await prisma.cateringRequest.findUnique({
-              where: { id: finalEntityId }
+            const cateringRequest = await prisma.cateringRequest.findFirst({
+              where: { id: finalEntityId, deletedAt: null }
             });
-            
+
             if (cateringRequest) {
                             // Make sure category is set consistently to improve retrieval
               dbData.category = "catering-order";
@@ -836,10 +836,10 @@ export async function POST(request: NextRequest) {
         // Skip UUID validation completely for temp_ format IDs
         if (finalEntityId && !finalEntityId.startsWith('temp-') && !finalEntityId.startsWith('temp_')) {
           try {
-            const jobApp = await prisma.jobApplication.findUnique({
-              where: { id: finalEntityId }
+            const jobApp = await prisma.jobApplication.findFirst({
+              where: { id: finalEntityId, deletedAt: null }
             });
-            
+
             if (jobApp) {
                             dbData.jobApplicationId = finalEntityId;
               dbData.isTemporary = false;
@@ -865,10 +865,10 @@ export async function POST(request: NextRequest) {
           
           // Check if user exists
           try {
-            const userProfile = await prisma.profile.findUnique({
-              where: { id: finalEntityId }
+            const userProfile = await prisma.profile.findFirst({
+              where: { id: finalEntityId, deletedAt: null }
             });
-            
+
             if (userProfile) {
                             dbData.isTemporary = false;
             } else {

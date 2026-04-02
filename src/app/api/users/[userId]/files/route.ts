@@ -80,7 +80,8 @@ export async function GET(
       },
       orderBy: {
         uploadedAt: 'desc'
-      }
+      },
+      take: 100,
     });
     
         

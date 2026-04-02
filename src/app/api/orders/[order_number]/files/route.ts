@@ -132,7 +132,8 @@ export async function GET(
       },
       orderBy: {
         uploadedAt: 'desc'
-      }
+      },
+      take: 100,
     });
 
     // Generate fresh signed URLs using batch cache for better performance

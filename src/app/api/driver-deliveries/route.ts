@@ -99,8 +99,8 @@ export async function GET(req: NextRequest) {
       where: {
         id: { in: cateringIds },
         OR: [
-          { completeDateTime: null }, // Include incomplete deliveries regardless of age
-          { createdAt: { gte: historicalCutoffDate } }, // Include recent completed deliveries
+          { completeDateTime: null },
+          { createdAt: { gte: historicalCutoffDate } },
         ],
       },
       include: {
@@ -120,8 +120,8 @@ export async function GET(req: NextRequest) {
       where: {
         id: { in: onDemandIds },
         OR: [
-          { completeDateTime: null }, // Include incomplete deliveries regardless of age
-          { createdAt: { gte: historicalCutoffDate } }, // Include recent completed deliveries
+          { completeDateTime: null },
+          { createdAt: { gte: historicalCutoffDate } },
         ],
       },
       include: {

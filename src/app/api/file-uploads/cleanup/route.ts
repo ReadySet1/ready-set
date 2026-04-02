@@ -33,9 +33,10 @@ export async function POST(request: NextRequest) {
         // Only check for an existing order if the ID isn't a temporary ID
         if (!entityId.startsWith('temp-')) {
           // Check if a catering request with this ID exists
-          const existingOrder = await prisma.cateringRequest.findUnique({
+          const existingOrder = await prisma.cateringRequest.findFirst({
             where: {
-              id: entityId
+              id: entityId,
+              deletedAt: null,
             },
             select: {
               id: true,
@@ -58,9 +59,10 @@ export async function POST(request: NextRequest) {
         // Only check for an existing order if the ID isn't a temporary ID
         if (!entityId.startsWith('temp-')) {
           // Check if an on_demand order with this ID exists
-          const existingOrder = await prisma.onDemand.findUnique({
+          const existingOrder = await prisma.onDemand.findFirst({
             where: {
-              id: entityId
+              id: entityId,
+              deletedAt: null,
             },
             select: {
               id: true,
@@ -87,8 +89,7 @@ export async function POST(request: NextRequest) {
           id: {
             in: fileKeys,
           },
-          userId: userId || user.id, // Use provided userId or fall back to authenticated user
-          // Don't delete files linked to real orders
+          userId: userId || user.id,
           cateringRequestId: null,
           onDemandId: null,
         },

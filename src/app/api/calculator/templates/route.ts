@@ -33,7 +33,8 @@ export async function GET(request: NextRequest) {
       },
       orderBy: {
         createdAt: 'desc'
-      }
+      },
+      take: 100,
     });
 
     // Map Prisma data to our format
@@ -60,12 +61,14 @@ export async function GET(request: NextRequest) {
       }))
     }));
     
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: mappedTemplates,
       total: mappedTemplates.length,
       timestamp: new Date().toISOString()
     });
+    response.headers.set('Cache-Control', 'private, max-age=60');
+    return response;
   } catch (error) {
     console.error('Failed to fetch calculator templates:', error);
     
