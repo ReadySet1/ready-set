@@ -23,30 +23,36 @@ export async function PUT(request: NextRequest) {
     const hasSession = !!session;
     
     
+    // Build entity-specific OR conditions based on entityType
+    const entityIdConditions: Record<string, unknown>[] = [
+      // Look for files with category containing the old entity ID
+      {
+        isTemporary: true,
+        category: { contains: oldEntityId },
+      },
+      // Look for files with URLs containing the old entity ID
+      {
+        isTemporary: true,
+        fileUrl: { contains: oldEntityId },
+      },
+    ];
+
+    // Add entity-specific FK lookup based on entityType
+    if (!oldEntityId.startsWith('temp-') && !oldEntityId.startsWith('temp_')) {
+      if (entityType === 'on_demand') {
+        entityIdConditions.push({ isTemporary: true, onDemandId: oldEntityId });
+      } else if (entityType === 'job_application') {
+        entityIdConditions.push({ isTemporary: true, jobApplicationId: oldEntityId });
+      } else {
+        // Default to catering for backwards compatibility
+        entityIdConditions.push({ isTemporary: true, cateringRequestId: oldEntityId });
+      }
+    }
+
     // Get all files with temp entity ID, using different approaches
     let fileRecords = await prisma.fileUpload.findMany({
       where: {
-        OR: [
-          // Look for direct matches in entity ID fields (legacy records)
-          { 
-            isTemporary: true,
-            cateringRequestId: oldEntityId.startsWith('temp-') ? null : oldEntityId 
-          },
-          // Look for files with category containing the old entity ID
-          {
-            isTemporary: true,
-            category: {
-              contains: oldEntityId
-            }
-          },
-          // Look for files with URLs containing the old entity ID
-          {
-            isTemporary: true,
-            fileUrl: {
-              contains: oldEntityId
-            }
-          }
-        ]
+        OR: entityIdConditions,
       },
       select: {
         id: true,
@@ -96,12 +102,19 @@ export async function PUT(request: NextRequest) {
                 fileRecords = fileRecords.concat(pathFileRecords);
       } else {
         // If still no files found, check if any files already exist with the new entity ID
+        const newIdOrConditions: Record<string, unknown>[] = [
+          { fileUrl: { contains: newEntityId } },
+        ];
+        if (entityType === 'on_demand') {
+          newIdOrConditions.push({ onDemandId: newEntityId });
+        } else if (entityType === 'job_application') {
+          newIdOrConditions.push({ jobApplicationId: newEntityId });
+        } else {
+          newIdOrConditions.push({ cateringRequestId: newEntityId });
+        }
         const newIdFileRecords = await prisma.fileUpload.findMany({
           where: {
-            OR: [
-              { cateringRequestId: newEntityId },
-              { fileUrl: { contains: newEntityId } }
-            ]
+            OR: newIdOrConditions,
           },
           select: {
             id: true,
@@ -133,14 +146,20 @@ export async function PUT(request: NextRequest) {
     for (const file of fileRecords) {
       
       try {
-        // First update the DB record
+        // First update the DB record with the correct FK based on entityType
+        const entityData: Record<string, unknown> = { isTemporary: false };
+        if (entityType === 'on_demand') {
+          entityData.onDemandId = newEntityId;
+          entityData.cateringRequestId = null;
+        } else if (entityType === 'job_application') {
+          entityData.jobApplicationId = newEntityId;
+          entityData.cateringRequestId = null;
+        } else {
+          entityData.cateringRequestId = newEntityId;
+        }
         await prisma.fileUpload.update({
           where: { id: file.id },
-          data: {
-            cateringRequestId: newEntityId,
-            isTemporary: false,
-            // Remove metadata field as it's not in the schema
-          }
+          data: entityData,
         });
 
         // Now try to move the file in storage
@@ -196,6 +215,12 @@ export async function PUT(request: NextRequest) {
                     }
                   }
                 }
+              } else if (pathAfterBucket.includes(oldEntityId)) {
+                // Generic handler: file path contains the old entity ID anywhere
+                // This covers on-demand and other entity types
+                const decodedPath = decodeURIComponent(pathAfterBucket);
+                oldPath = decodedPath;
+                newPath = decodedPath.replace(oldEntityId, newEntityId);
               }
               
               if (oldPath && newPath) {
