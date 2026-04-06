@@ -2,17 +2,9 @@
 
 import React from "react";
 import Image from "next/image";
-import { Playfair_Display } from "next/font/google";
 import { motion } from "framer-motion";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 import Link from "next/link";
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["700", "800", "900"],
-  style: ["normal", "italic"],
-});
 
 interface StatProps {
   value: string;
@@ -60,7 +52,7 @@ const FlowersAbout: React.FC = () => {
             transition={{ duration: 0.6 }}
           >
             <h2
-              className={`${playfair.className} mb-6 text-3xl font-black italic leading-tight text-gray-900 md:text-4xl lg:text-5xl`}
+              className="mb-6 font-[Montserrat] text-3xl font-black leading-tight text-gray-900 md:text-4xl lg:text-5xl"
             >
               Keep Every Bouquet
               <br />
@@ -115,7 +107,7 @@ const FlowersAbout: React.FC = () => {
             >
               <Link
                 href="/vendor-hero#vendor-hero"
-                className="inline-block rounded-lg border-2 border-gray-900 px-10 py-3.5 text-base font-extrabold text-gray-900 transition-all hover:-translate-y-0.5 hover:bg-gray-900 hover:text-white hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+                className="inline-block rounded-full bg-yellow-400 px-12 py-4 text-lg font-extrabold text-gray-900 transition-all hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2"
               >
                 How Our Service Works
               </Link>

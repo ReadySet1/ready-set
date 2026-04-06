@@ -101,9 +101,9 @@ const FlowersPage = () => {
       {/* <DeliveryTermsAndPricing /> */}
       <FlowersAbout />
       {/* <ExpertSupportSection /> */}
-      <FlowersDeliveryPartners />
-      <ServiceProcessCarousel />
-      <DelicateBlooms />
+      {/* <FlowersDeliveryPartners /> */}
+      {/* <ServiceProcessCarousel /> */}
+      {/* <DelicateBlooms /> */}
       <FAQSection />
     </main>
   );

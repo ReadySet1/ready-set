@@ -2,17 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { Playfair_Display } from "next/font/google";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 import ScheduleDialog from "../Logistics/Schedule";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["700", "800", "900"],
-  style: ["normal", "italic"],
-});
 
 interface FlowerHeroProps {
   imagePath?: string;
@@ -44,7 +36,7 @@ const FlowerHero: React.FC<FlowerHeroProps> = ({
                 className={`transition-all duration-700 ease-in-out ${isTextAnimated ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"}`}
               >
                 <h1
-                  className={`${playfair.className} mb-6 text-4xl font-black italic leading-[1.15] tracking-tight text-gray-900 sm:text-5xl md:mb-8 lg:text-6xl`}
+                  className="mb-6 font-[Montserrat] text-4xl font-black leading-[1.15] tracking-tight text-gray-900 sm:text-5xl md:mb-8 lg:text-6xl"
                 >
                   Your Go-To Flower
                   <br />
@@ -78,7 +70,7 @@ const FlowerHero: React.FC<FlowerHeroProps> = ({
                   buttonText="Book a Call"
                   calendarUrl="https://calendar.google.com/calendar/appointments/schedules/AcZssZ0J6woLwahSRd6c1KrJ_X1cOl99VPr6x-Rp240gi87kaD28RsU1rOuiLVyLQKleUqoVJQqDEPVu?gv=true"
                   customButton={
-                    <button className="rounded-lg border-2 border-yellow-400 px-7 py-3 text-base font-bold text-gray-900 transition-all duration-300 hover:-translate-y-0.5 hover:bg-yellow-50 hover:shadow-lg sm:px-10">
+                    <button className="rounded-lg bg-yellow-400 px-7 py-3 text-base font-bold text-gray-900 transition-all duration-300 hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg sm:px-10">
                       Book a Call
                     </button>
                   }
