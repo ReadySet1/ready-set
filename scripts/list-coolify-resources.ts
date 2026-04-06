@@ -176,12 +176,7 @@ async function listResources() {
 
   } catch (error: any) {
     console.error('❌ Failed to list resources:');
-    if (error.status) {
-      console.error(`Status: ${error.status}`);
-      console.error(`Error: ${JSON.stringify(error.data, null, 2)}`);
-    } else {
-      console.error(error.message);
-    }
+    console.error(error.message);
 
     process.exit(1);
   }
@@ -210,9 +205,16 @@ async function tryAlternativeEndpoints() {
         console.log(`Checking ${endpoint}...`);
       }
 
-      const { ok, data } = await fetchJson(`${COOLIFY_URL}${endpoint}`);
+      const { ok, status, data } = await fetchJson(`${COOLIFY_URL}${endpoint}`);
 
-      if (ok && data && Array.isArray(data) && data.length > 0) {
+      if (!ok) {
+        if (isVerboseMode) {
+          console.error(`Error with ${endpoint}: HTTP ${status}`);
+        }
+        continue;
+      }
+
+      if (data && Array.isArray(data) && data.length > 0) {
         // Add endpoint type to resources
         const resources = data.map((r: any) => ({
           ...r,
@@ -256,9 +258,14 @@ async function tryGetEnvironmentVariablesStructure(resourceId: string | number) 
   for (const endpoint of endpoints) {
     try {
       console.log(`Testing: ${endpoint}...`);
-      const { ok, data } = await fetchJson(`${COOLIFY_URL}${endpoint}`);
+      const { ok, status, data } = await fetchJson(`${COOLIFY_URL}${endpoint}`);
 
-      if (ok && data) {
+      if (!ok) {
+        console.log(`❌ ${endpoint}: HTTP ${status}`);
+        continue;
+      }
+
+      if (data) {
         console.log(`✅ Found environment variables at ${endpoint}`);
         console.log(`Structure: ${JSON.stringify(data).substring(0, 100)}...`);
         console.log('This endpoint should work with the env:sync script.');

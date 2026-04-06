@@ -214,13 +214,19 @@ const sendDeliveryQuoteRequest = async (data: DeliveryFormData) => {
       body: JSON.stringify(emailData),
     });
 
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => "");
+      console.error(`Brevo API error: ${response.status}`, errorBody);
+      throw new Error(`Email service error: ${response.status}`);
+    }
+
     if (response.status === 201) {
-            return { 
-        success: true, 
-        message: "Your quote request was sent successfully." 
+      return {
+        success: true,
+        message: "Your quote request was sent successfully."
       };
     } else {
-      throw new Error("Unexpected response from email service");
+      throw new Error(`Unexpected response from email service: ${response.status}`);
     }
   } catch (error) {
     console.error("Email sending error:", error);

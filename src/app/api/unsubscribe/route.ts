@@ -97,6 +97,20 @@ export async function DELETE(request: Request) {
       headers: sendGridHeaders,
     });
 
+    if (!deleteResponse.ok) {
+      const status = deleteResponse.status;
+      const errorMessages: Record<number, string> = {
+        400: "Invalid request format. Please try again.",
+        401: "Server authentication failed. Please try again later.",
+        429: "Too many requests. Please try again in a few minutes.",
+        500: "Server error. Please try again later.",
+      };
+      return NextResponse.json(
+        { error: errorMessages[status] ?? "An unexpected error occurred." },
+        { status },
+      );
+    }
+
     // Return 202 to match SendGrid's status code
     if (deleteResponse.status === 202) {
       return NextResponse.json({
