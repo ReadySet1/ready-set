@@ -221,9 +221,6 @@ importers:
       '@vercel/postgres':
         specifier: ^0.10.0
         version: 0.10.0
-      axios:
-        specifier: ^1.13.6
-        version: 1.13.6(debug@4.4.3)
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3

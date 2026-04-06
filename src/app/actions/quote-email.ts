@@ -1,7 +1,5 @@
 "use server";
 
-import axios from "axios";
-
 // Base interfaces for shared fields
 interface BaseFormData {
   // Common vendor info fields
@@ -206,17 +204,15 @@ const sendDeliveryQuoteRequest = async (data: DeliveryFormData) => {
   };
 
   try {
-    const response = await axios.post(
-      "https://api.brevo.com/v3/smtp/email",
-      emailData,
-      {
-        headers: {
-          accept: "application/json",
-          "api-key": process.env.BREVO_API_KEY,
-          "content-type": "application/json",
-        },
-      }
-    );
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "api-key": process.env.BREVO_API_KEY ?? "",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(emailData),
+    });
 
     if (response.status === 201) {
             return { 
