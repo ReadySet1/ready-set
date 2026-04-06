@@ -235,11 +235,13 @@ export async function GET(req: NextRequest) {
     // Apply pagination to combined results
     const paginatedOrders = allOrders.slice(skip, skip + take);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       orders: paginatedOrders,
       totalCount: allOrders.length,
       hasMore: allOrders.length > (skip + take),
     });
+    response.headers.set('Cache-Control', 'private, max-age=60');
+    return response;
 
   } catch (error: any) {
     console.error('Error fetching orders:', error);

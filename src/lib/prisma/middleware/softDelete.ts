@@ -2,6 +2,11 @@ import { Prisma } from '@prisma/client';
 import { prismaLogger } from '@/utils/logger';
 
 /**
+ * @deprecated Replaced by the $extends() client extension in src/lib/db/soft-delete-extension.ts.
+ * This $use() middleware is NOT integrated into the Prisma client and was never activated.
+ * Use the new extension which is auto-applied via prisma-pooled.ts.
+ * This file will be removed in a future cleanup.
+ *
  * Prisma middleware for automatic soft delete filtering
  *
  * This middleware automatically filters out soft-deleted records from all queries

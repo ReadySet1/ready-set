@@ -24,8 +24,10 @@ export async function GET(request: NextRequest) {
     // Try to fetch files with the updated record to confirm
     const files = await prisma.fileUpload.findMany({
       where: {
-        cateringRequestId: cateringRequestId
-      }
+        cateringRequestId: cateringRequestId,
+      },
+      orderBy: { uploadedAt: 'desc' },
+      take: 100,
     });
     
         

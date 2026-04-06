@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { z } from "zod";
 import { prisma } from "@/utils/prismaDB";
+import { withRateLimit, RateLimitConfigs } from "@/lib/rate-limiting";
+
+const authRateLimit = withRateLimit(RateLimitConfigs.auth);
 
 // Schema for validation
 const userSchema = z.object({
@@ -14,6 +17,9 @@ const userSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const rateLimitResponse = await authRateLimit(req);
+    if (rateLimitResponse) return rateLimitResponse;
+
     // Parse request body
     const body = await req.json();
 
@@ -32,8 +38,8 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient();
 
     // Check if user exists in Prisma
-    const existingUser = await prisma.profile.findUnique({
-      where: { email },
+    const existingUser = await prisma.profile.findFirst({
+      where: { email, deletedAt: null },
     });
 
     if (existingUser) {

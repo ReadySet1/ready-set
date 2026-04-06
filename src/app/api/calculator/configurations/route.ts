@@ -77,7 +77,9 @@ export async function GET(request: NextRequest) {
         });
 
         if (dbConfig) {
-          return NextResponse.json({ success: true, data: dbToConfig(dbConfig), source: 'database' });
+          const response = NextResponse.json({ success: true, data: dbToConfig(dbConfig), source: 'database' });
+          response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
+          return response;
         }
       } catch (dbError) {
         Sentry.captureException(dbError, {
@@ -92,19 +94,24 @@ export async function GET(request: NextRequest) {
       if (!config) {
         return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
       }
-      return NextResponse.json({ success: true, data: config, source: 'in-memory' });
+      const singleInMemoryResponse = NextResponse.json({ success: true, data: config, source: 'in-memory' });
+      singleInMemoryResponse.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
+      return singleInMemoryResponse;
     } else {
       try {
         // Try to fetch all from database
         const dbConfigs = await prisma.deliveryConfiguration.findMany({
           where: { isActive: true },
-          orderBy: { updatedAt: 'desc' }
+          orderBy: { updatedAt: 'desc' },
+          take: 100,
         });
 
         // If DB has configs, return them
         if (dbConfigs.length > 0) {
           const configurations = dbConfigs.map(dbToConfig);
-          return NextResponse.json({ success: true, data: configurations, source: 'database' });
+          const dbListResponse = NextResponse.json({ success: true, data: configurations, source: 'database' });
+          dbListResponse.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
+          return dbListResponse;
         }
       } catch (dbError) {
         Sentry.captureException(dbError, {
@@ -116,7 +123,9 @@ export async function GET(request: NextRequest) {
 
       // Fallback to in-memory defaults
       const configurations = getActiveConfigurations();
-      return NextResponse.json({ success: true, data: configurations, source: 'in-memory' });
+      const inMemoryListResponse = NextResponse.json({ success: true, data: configurations, source: 'in-memory' });
+      inMemoryListResponse.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
+      return inMemoryListResponse;
     }
   } catch (error) {
     Sentry.captureException(error, {

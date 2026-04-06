@@ -54,6 +54,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           createdAt: true,
         },
         orderBy: { createdAt: "desc" },
+        take: 50,
       }),
     ]);
 

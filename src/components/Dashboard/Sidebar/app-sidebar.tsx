@@ -173,6 +173,12 @@ export function AppSidebar() {
       isActive: pathname?.includes("/admin/calculator") ?? false,
     },
     {
+      title: "Total Mileage Calculation",
+      href: "/admin/mileage-calculator",
+      icon: NavigationIcon,
+      isActive: pathname?.includes("/admin/mileage-calculator") ?? false,
+    },
+    {
       title: "Logistics Tools",
       href: "/admin/logistics-tools",
       icon: Package,

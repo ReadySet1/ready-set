@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
     // Fetch all drivers - only authorized personnel can see this sensitive data
     const drivers = await prisma.profile.findMany({
       where: {
-        type: 'DRIVER'
+        type: 'DRIVER',
+        deletedAt: null
       },
       select: {
         id: true,
@@ -37,10 +38,14 @@ export async function GET(request: NextRequest) {
         status: true,
         createdAt: true,
         updatedAt: true
-      }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
     });
 
-    return NextResponse.json(drivers);
+    const response = NextResponse.json(drivers);
+    response.headers.set('Cache-Control', 'private, max-age=60');
+    return response;
   } catch (error) {
     console.error("Error fetching drivers:", error);
     return NextResponse.json(
