@@ -23,17 +23,8 @@
   font-display: swap;
 }
 
-@keyframes pulse-gentle {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.02); }
-}
-
 /* Custom utility classes */
 @layer utilities {
-  .animate-pulse-gentle {
-    animation: pulse-gentle 3s ease-in-out infinite;
-  }
-
   .scrollbar-hide {
     /* Hide scrollbar for Chrome, Safari and Opera */
     -webkit-overflow-scrolling: touch;
