@@ -366,7 +366,13 @@ describe('/api/orders API - Main Endpoint', () => {
             include: expect.objectContaining({
               dispatches: expect.objectContaining({
                 include: expect.objectContaining({
-                  driver: true,
+                  driver: expect.objectContaining({
+                    select: expect.objectContaining({
+                      id: true,
+                      name: true,
+                      email: true,
+                    }),
+                  }),
                 }),
               }),
               user: expect.objectContaining({
