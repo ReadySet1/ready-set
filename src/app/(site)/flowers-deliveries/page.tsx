@@ -7,7 +7,9 @@ import { Metadata } from "next";
 import FlowersDeliveryPartners from "@/components/FlowersDelivery/FlowersDeliveryPartners";
 import ServiceProcessCarousel from "@/components/FlowersDelivery/ServiceProcessCarousel";
 import DelicateBlooms from "@/components/FlowersDelivery/DelicateBlooms";
+import FlowersSetupCarousel from "@/components/FlowersDelivery/FlowersSetupCarousel";
 import FAQSection from "@/components/FlowersDelivery/FAQSection";
+import CateringContact from "@/components/FoodDelivery/CateringContact";
 
 export const metadata: Metadata = {
   title: "Floral Delivery Logistics for Flower Shops | Ready Set",
@@ -104,7 +106,9 @@ const FlowersPage = () => {
       {/* <FlowersDeliveryPartners /> */}
       {/* <ServiceProcessCarousel /> */}
       {/* <DelicateBlooms /> */}
-      <FAQSection />
+      <FlowersSetupCarousel />
+      <CateringContact />
+      {/* <FAQSection /> */}
     </main>
   );
 };

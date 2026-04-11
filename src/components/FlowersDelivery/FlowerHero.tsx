@@ -35,9 +35,7 @@ const FlowerHero: React.FC<FlowerHeroProps> = ({
               <div
                 className={`transition-all duration-700 ease-in-out ${isTextAnimated ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"}`}
               >
-                <h1
-                  className="mb-6 font-[Montserrat] text-4xl font-black leading-[1.15] tracking-tight text-gray-900 sm:text-5xl md:mb-8 lg:text-6xl"
-                >
+                <h1 className="mb-6 font-[Montserrat] text-4xl font-black leading-[1.15] tracking-tight text-gray-900 sm:text-5xl md:mb-8 lg:text-6xl">
                   Your Go-To Flower
                   <br />
                   Delivery Partner
@@ -80,15 +78,15 @@ const FlowerHero: React.FC<FlowerHeroProps> = ({
 
             {/* Hero Image */}
             <div
-              className={`relative w-full md:w-1/2 transition-all delay-300 duration-700 ease-in-out ${isTextAnimated ? "translate-x-0 opacity-100" : "translate-x-8 opacity-0"}`}
+              className={`relative w-full self-end transition-all delay-300 duration-700 ease-in-out md:w-[45%] ${isTextAnimated ? "translate-x-0 opacity-100" : "translate-x-8 opacity-0"}`}
             >
-              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
+              <div className="relative aspect-[6/5] w-full overflow-hidden rounded-lg">
                 <Image
                   src={imagePath}
                   alt="Flower delivery driver handing a bouquet to a customer"
                   fill
                   className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 50vw"
+                  sizes="(max-width: 768px) 100vw, 45vw"
                   priority
                 />
               </div>
