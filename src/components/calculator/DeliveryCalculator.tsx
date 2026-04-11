@@ -14,14 +14,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Calculator, DollarSign, Truck, Users, MapPin, Check, Save, Settings, History, AlertTriangle } from 'lucide-react';
+import { Loader2, Calculator, DollarSign, Truck, Users, MapPin, Check, Save, Settings, History, AlertTriangle, Clock, Route } from 'lucide-react';
 import { useCalculatorConfig, useCalculator, useCalculatorHistory } from '@/hooks/useCalculatorConfig';
-import { 
-  CalculationInput, 
+import {
+  CalculationInput,
   CalculationResult,
   CalculatorTemplate,
   ClientConfiguration
 } from '@/types/calculator';
+import type { RouteApiResponse, RouteResult } from '@/types/routing';
+import LocationInput from '@/components/RouteOptimizer/LocationInput';
 
 interface DeliveryCalculatorProps {
   templateId?: string;
@@ -113,6 +115,15 @@ export function DeliveryCalculator({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [selectedClientConfigId, setSelectedClientConfigId] = useState<string | undefined>(clientConfigId);
+
+  // Address-based mileage calculation state
+  const [addressMode, setAddressMode] = useState(false);
+  const [pickupAddress, setPickupAddress] = useState('');
+  const [dropoffAddress, setDropoffAddress] = useState('');
+  const [departureTime, setDepartureTime] = useState('');
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [estimatedDriveTime, setEstimatedDriveTime] = useState<number | null>(null);
 
   // Track if we've already auto-selected a client config to prevent loops
   const hasAutoSelectedClientConfig = useRef(false);
@@ -254,6 +265,63 @@ export function DeliveryCalculator({
       mileageRate: 0.70,
       deliveryArea: ''
     });
+    setPickupAddress('');
+    setDropoffAddress('');
+    setDepartureTime('');
+    setEstimatedDriveTime(null);
+    setRouteError(null);
+  };
+
+  // Calculate mileage from addresses using Google Directions API
+  const calculateMileageFromAddresses = async () => {
+    if (!pickupAddress || !dropoffAddress) {
+      setRouteError('Please enter both pickup and dropoff addresses');
+      return;
+    }
+
+    setIsCalculatingRoute(true);
+    setRouteError(null);
+    setEstimatedDriveTime(null);
+
+    try {
+      const routeRequest: { pickup: { address: string }; dropoff: { address: string }; preferMedianRoute: boolean; departureTime?: string } = {
+        pickup: { address: pickupAddress },
+        dropoff: { address: dropoffAddress },
+        preferMedianRoute: true,
+      };
+
+      if (departureTime) {
+        routeRequest.departureTime = new Date(departureTime).toISOString();
+      }
+
+      const res = await fetch('/api/routes/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(routeRequest),
+      });
+
+      if (!res.ok) {
+        const errorBody = await res.json() as RouteApiResponse<never>;
+        throw new Error(errorBody.error ?? 'Failed to calculate route');
+      }
+
+      const data = await res.json() as RouteApiResponse<RouteResult>;
+
+      if (!data.success || !data.data) {
+        throw new Error(data.error ?? 'No route data returned');
+      }
+
+      const totalMiles = Math.round(data.data.totalDistanceMiles * 100) / 100;
+      const totalMinutes = Math.round(data.data.totalDurationMinutes * 10) / 10;
+
+      handleInputChange('mileage', totalMiles);
+      setEstimatedDriveTime(totalMinutes);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Route calculation failed';
+      setRouteError(message);
+    } finally {
+      setIsCalculatingRoute(false);
+    }
   };
 
   // Memoized Ready Set earnings breakdown
@@ -289,6 +357,16 @@ export function DeliveryCalculator({
       breakdown
     };
   }, [result]);
+
+  // Memoized Net Profit (Ready Set Earnings - Driver Pay)
+  const netProfit = useMemo(() => {
+    if (!readySetEarnings || !result) return null;
+    const readySetTotal = readySetEarnings.totalFee;
+    const driverTotal = result.driverPayments.total;
+    const profit = readySetTotal - driverTotal;
+    const margin = readySetTotal > 0 ? (profit / readySetTotal) * 100 : 0;
+    return { profit, margin, readySetTotal, driverTotal };
+  }, [readySetEarnings, result]);
 
   if (isLoading || isLoadingTemplates) {
     return (
@@ -524,6 +602,86 @@ export function DeliveryCalculator({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Address mode toggle */}
+                <div className="flex items-center space-x-3 p-3 bg-gradient-to-r from-teal-50 to-emerald-50 rounded-lg border border-teal-200">
+                  <Switch
+                    id="addressMode"
+                    checked={addressMode}
+                    onCheckedChange={setAddressMode}
+                    className="data-[state=checked]:bg-teal-500"
+                  />
+                  <Label htmlFor="addressMode" className="text-slate-700 font-medium cursor-pointer text-sm">
+                    Calculate from addresses
+                  </Label>
+                  {estimatedDriveTime !== null && (
+                    <Badge variant="secondary" className="ml-auto bg-teal-100 text-teal-700 border-teal-200">
+                      <Clock className="h-3 w-3 mr-1" />
+                      {estimatedDriveTime >= 60
+                        ? `${Math.floor(estimatedDriveTime / 60)}h ${Math.round(estimatedDriveTime % 60)}m`
+                        : `${Math.round(estimatedDriveTime)} min`}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Address-based mileage calculation */}
+                {addressMode && (
+                  <div className="space-y-3 p-3 bg-slate-50/80 rounded-xl border border-slate-200">
+                    <LocationInput
+                      label="Pickup Location"
+                      placeholder="Enter pickup address..."
+                      value={pickupAddress}
+                      onChange={setPickupAddress}
+                      icon="pickup"
+                    />
+                    <LocationInput
+                      label="Dropoff Location"
+                      placeholder="Enter dropoff address..."
+                      value={dropoffAddress}
+                      onChange={setDropoffAddress}
+                      icon="dropoff"
+                    />
+                    <div className="space-y-1.5">
+                      <Label htmlFor="departureTime" className="flex items-center gap-1.5 text-sm font-medium">
+                        <Clock className="h-3.5 w-3.5 text-teal-600" />
+                        Departure Date & Time
+                      </Label>
+                      <Input
+                        id="departureTime"
+                        type="datetime-local"
+                        value={departureTime}
+                        onChange={(e) => setDepartureTime(e.target.value)}
+                        className="h-9 border-slate-200 focus:border-teal-400 focus:ring-teal-200 bg-white/80"
+                      />
+                      <p className="text-xs text-slate-400">Set date & time for traffic-aware estimates</p>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={calculateMileageFromAddresses}
+                      disabled={isCalculatingRoute || !pickupAddress || !dropoffAddress}
+                      className="w-full bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white shadow-sm"
+                      size="sm"
+                    >
+                      {isCalculatingRoute ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Calculating Route...
+                        </>
+                      ) : (
+                        <>
+                          <Route className="h-4 w-4 mr-2" />
+                          Calculate Route
+                        </>
+                      )}
+                    </Button>
+                    {routeError && (
+                      <Alert variant="destructive" className="py-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription className="text-xs">{routeError}</AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="mileage" className="text-slate-700 font-medium text-sm">
                     Total Mileage
@@ -536,6 +694,7 @@ export function DeliveryCalculator({
                     value={input.mileage}
                     onChange={(e) => handleInputChange('mileage', parseFloat(e.target.value) || 0)}
                     placeholder="Round trip distance"
+                    disabled={isCalculatingRoute}
                     className="h-9 border-slate-200 focus:border-slate-400 focus:ring-slate-200 bg-white/80"
                   />
                 </div>
@@ -840,6 +999,59 @@ export function DeliveryCalculator({
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Net Profit */}
+              {netProfit && (
+                <Card className={`border-0 shadow-lg rounded-2xl lg:col-span-2 ${
+                  netProfit.profit >= 0
+                    ? 'bg-gradient-to-r from-emerald-50/80 to-green-50/80 backdrop-blur-sm'
+                    : 'bg-gradient-to-r from-red-50/80 to-rose-50/80 backdrop-blur-sm'
+                }`}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                      <div className={`p-1.5 rounded-lg shadow-sm ${
+                        netProfit.profit >= 0
+                          ? 'bg-gradient-to-br from-emerald-500 to-green-600'
+                          : 'bg-gradient-to-br from-red-500 to-rose-600'
+                      }`}>
+                        <DollarSign className="h-4 w-4 text-white" />
+                      </div>
+                      <span className={netProfit.profit >= 0 ? 'text-emerald-700' : 'text-red-700'}>
+                        Net Profit
+                      </span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="text-center p-3 bg-white/60 rounded-xl">
+                        <p className="text-sm text-slate-500 font-medium mb-1">Ready Set Earnings</p>
+                        <p className="text-xl font-bold text-emerald-700">${formatCurrency(netProfit.readySetTotal)}</p>
+                      </div>
+                      <div className="text-center p-3 bg-white/60 rounded-xl">
+                        <p className="text-sm text-slate-500 font-medium mb-1">Driver Pay</p>
+                        <p className="text-xl font-bold text-blue-700">${formatCurrency(netProfit.driverTotal)}</p>
+                      </div>
+                      <div className={`text-center p-4 rounded-xl border-2 ${
+                        netProfit.profit >= 0
+                          ? 'bg-emerald-100/80 border-emerald-300'
+                          : 'bg-red-100/80 border-red-300'
+                      }`}>
+                        <p className="text-sm font-medium mb-1 text-slate-600">Net Profit</p>
+                        <p className={`text-2xl font-bold ${
+                          netProfit.profit >= 0 ? 'text-emerald-800' : 'text-red-800'
+                        }`}>
+                          ${formatCurrency(netProfit.profit)}
+                        </p>
+                        <p className={`text-xs font-medium mt-1 ${
+                          netProfit.profit >= 0 ? 'text-emerald-600' : 'text-red-600'
+                        }`}>
+                          {formatPercent(netProfit.margin)}% margin
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
 

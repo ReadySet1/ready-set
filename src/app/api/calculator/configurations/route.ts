@@ -15,11 +15,11 @@ import {
 } from '@/lib/calculator/client-configurations';
 
 // Helper function to convert DB record to ClientDeliveryConfiguration
-// Merges with in-memory configuration for fields not stored in database (e.g., zeroOrderSettings)
 function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
-  // Get the in-memory configuration to merge any fields not in the database
+  // Get the in-memory configuration as fallback for legacy records without zeroOrderSettings
   const inMemoryConfig = getConfiguration(dbConfig.configId);
-  
+  const customSettings = dbConfig.customSettings as Record<string, any> | null;
+
   return {
     id: dbConfig.configId,
     clientName: dbConfig.clientName,
@@ -32,9 +32,8 @@ function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
     dailyDriveDiscounts: dbConfig.dailyDriveDiscounts as any,
     driverPaySettings: dbConfig.driverPaySettings as any,
     bridgeTollSettings: dbConfig.bridgeTollSettings as any,
-    // Merge zeroOrderSettings from in-memory config (not stored in database yet)
-    zeroOrderSettings: dbConfig.zeroOrderSettings || inMemoryConfig?.zeroOrderSettings,
-    customSettings: dbConfig.customSettings as any,
+    zeroOrderSettings: customSettings?.zeroOrderSettings || inMemoryConfig?.zeroOrderSettings,
+    customSettings: customSettings as any,
     createdAt: dbConfig.createdAt,
     updatedAt: dbConfig.updatedAt,
     createdBy: dbConfig.createdBy || undefined,
@@ -44,6 +43,12 @@ function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
 
 // Helper function to convert ClientDeliveryConfiguration to DB format
 function configToDb(config: ClientDeliveryConfiguration, userId?: string) {
+  // Store zeroOrderSettings inside customSettings JSON field
+  const customSettings = {
+    ...(config.customSettings as Record<string, any> || {}),
+    ...(config.zeroOrderSettings ? { zeroOrderSettings: config.zeroOrderSettings } : {}),
+  };
+
   return {
     configId: config.id,
     clientName: config.clientName,
@@ -56,7 +61,7 @@ function configToDb(config: ClientDeliveryConfiguration, userId?: string) {
     dailyDriveDiscounts: config.dailyDriveDiscounts as any,
     driverPaySettings: config.driverPaySettings as any,
     bridgeTollSettings: config.bridgeTollSettings as any,
-    customSettings: config.customSettings as any,
+    customSettings: customSettings as any,
     createdBy: userId,
     notes: config.notes,
     updatedAt: new Date()
