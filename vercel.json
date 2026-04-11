@@ -20,6 +20,14 @@
     {
       "path": "/api/admin/driver-summary-generation",
       "schedule": "0 4 * * 0"
+    },
+    {
+      "path": "/api/admin/sms-reminders/cron?type=next_day",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/admin/sms-reminders/cron?type=same_day",
+      "schedule": "0 13 * * *"
     }
   ],
   "env": {

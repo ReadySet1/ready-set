@@ -7,6 +7,7 @@ import {
   ArchiveIcon,
   Gauge,
   Home,
+  MessageSquareText,
   Settings,
   Truck,
   Users,
@@ -183,6 +184,12 @@ export function AppSidebar() {
       href: "/admin/logistics-tools",
       icon: Package,
       isActive: pathname?.includes("/admin/logistics-tools") ?? false,
+    },
+    {
+      title: "SMS Reminders",
+      href: "/admin/sms-reminders",
+      icon: MessageSquareText,
+      isActive: pathname?.includes("/admin/sms-reminders") ?? false,
     },
     {
       title: "Data Archive",

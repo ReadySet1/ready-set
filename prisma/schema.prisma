@@ -1009,3 +1009,51 @@ model DriverWeeklySummary {
   @@schema("public")
   @@map("driver_weekly_summaries")
 }
+
+// SMS Reminder System
+// ===================
+// Tracks automated SMS reminders sent to drivers about their daily deliveries.
+
+model SmsReminderBatch {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type         String    @map("type") @db.VarChar(20) // "next_day" | "same_day"
+  targetDate   DateTime  @map("target_date") @db.Date
+  status       String    @map("status") @db.VarChar(20) // "pending" | "in_progress" | "completed" | "failed"
+  totalDrivers Int       @default(0) @map("total_drivers")
+  totalSent    Int       @default(0) @map("total_sent")
+  totalFailed  Int       @default(0) @map("total_failed")
+  totalSkipped Int       @default(0) @map("total_skipped")
+  triggeredBy  String?   @map("triggered_by") @db.VarChar(100) // admin email or "cron"
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  logs SmsReminderLog[]
+
+  @@index([targetDate])
+  @@index([status])
+  @@index([createdAt])
+  @@map("sms_reminder_batches")
+  @@schema("public")
+}
+
+model SmsReminderLog {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId       String    @map("batch_id") @db.Uuid
+  driverName    String    @map("driver_name") @db.VarChar(255)
+  phoneNumber   String?   @map("phone_number") @db.VarChar(20)
+  messageBody   String    @map("message_body")
+  status        String    @map("status") @db.VarChar(20) // "sent" | "delivered" | "failed" | "skipped"
+  providerMsgId String?   @map("provider_msg_id") @db.VarChar(100)
+  errorMessage  String?   @map("error_message")
+  orderNumbers  Json?     @map("order_numbers") // string[]
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deliveredAt   DateTime? @map("delivered_at") @db.Timestamptz(6)
+
+  batch SmsReminderBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([status])
+  @@index([providerMsgId])
+  @@map("sms_reminder_logs")
+  @@schema("public")
+}

@@ -191,6 +191,7 @@
     "tailgrids": "^2.3.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
+    "twilio": "^5.13.1",
     "uuid": "13.0.0",
     "vercel": "^50.38.2",
     "yup": "^1.7.1",
@@ -264,7 +265,7 @@
       "prisma"
     ],
     "overrides": {
-      "path-to-regexp": "^8.0.0",
+      "path-to-regexp": ">=8.4.0",
       "glob": "11.1.0",
       "rimraf": "6.0.1",
       "uuid": "11.0.3",
@@ -325,8 +326,7 @@
       "picomatch@>=4.0.0 <4.0.4": ">=4.0.4",
       "picomatch": ">=4.0.4",
       "smol-toml@<1.6.1": ">=1.6.1",
-      "srvx@<0.9.1": ">=0.9.1",
-      "path-to-regexp": ">=8.4.0"
+      "srvx@<0.9.1": ">=0.9.1"
     }
   },
   "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748"
