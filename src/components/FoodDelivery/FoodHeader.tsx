@@ -1,40 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import ScheduleDialog from "../Logistics/Schedule";
 import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const FoodHeader: React.FC = () => {
-  const [isMobile, setIsMobile] = useState(false);
-  const [marginTopClass, setMarginTopClass] = useState("mt-0");
   const { openForm, DialogForm } = FormManager();
-
-  useEffect(() => {
-    const updateMarginTopClass = (width: number) => {
-      if (width < 768) {
-        setMarginTopClass("mt-6");
-      } else if (width < 1024) {
-        setMarginTopClass("mt-8");
-      } else {
-        setMarginTopClass("mt-4");
-      }
-    };
-
-    const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-      updateMarginTopClass(window.innerWidth);
-    };
-
-    checkIfMobile();
-    window.addEventListener("resize", checkIfMobile);
-
-    return () => {
-      window.removeEventListener("resize", checkIfMobile);
-    };
-  }, []);
 
   const handleQuoteClick = () => {
     openForm("food");
@@ -83,19 +56,9 @@ const FoodHeader: React.FC = () => {
     tap: { scale: 0.95 },
   };
 
-  const pulseAnimation = {
-    scale: [1, 1.02, 1],
-    transition: {
-      duration: 3,
-      repeat: Infinity,
-      repeatType: "reverse" as const,
-    },
-  };
-
   return (
     <section
-      className={`relative min-h-[500px] w-full md:h-[70vh] md:min-h-[600px] ${marginTopClass} mb-16 md:mb-24 lg:mb-32`}
-      suppressHydrationWarning
+      className="relative min-h-[500px] w-full md:h-[70vh] md:min-h-[600px] mt-6 md:mt-8 lg:mt-4 mb-16 md:mb-24 lg:mb-32"
     >
       {/* Background image container */}
       <div className="absolute inset-0 z-0 overflow-hidden">

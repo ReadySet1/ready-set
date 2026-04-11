@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
-import axios from 'axios';
 import * as path from 'path';
 
 // Load environment variables from .env.local
@@ -18,7 +17,7 @@ const resourceId = args[0];
 const isDebugMode = args.includes('--debug');
 const isDryRun = args.includes('--dry-run');
 const hasFilter = args.some(arg => arg.startsWith('--filter='));
-const filterPrefix = hasFilter 
+const filterPrefix = hasFilter
   ? args.find(arg => arg.startsWith('--filter='))?.split('=')[1] || ''
   : null;
 
@@ -65,18 +64,16 @@ if (!resourceId) {
 }
 
 // Debug logging function
-function debug(...args: any[]) {
+function debug(...debugArgs: any[]) {
   if (isDebugMode) {
-    console.log('[DEBUG]', ...args);
+    console.log('[DEBUG]', ...debugArgs);
   }
 }
 
-// Configure axios headers
-const axiosConfig = {
-  headers: {
-    'Authorization': `Bearer ${COOLIFY_TOKEN}`,
-    'Content-Type': 'application/json'
-  }
+// Common headers for all requests
+const defaultHeaders: Record<string, string> = {
+  'Authorization': `Bearer ${COOLIFY_TOKEN}`,
+  'Content-Type': 'application/json',
 };
 
 // Resource type detection - affects API endpoints
@@ -88,30 +85,30 @@ const API_ENDPOINT_VARIATIONS = [
   '/v1/resources/{id}/environment-variables',
   '/v1/resources/{id}/environment',
   '/v1/resources/{id}/env',
-  
+
   // Try alternative endpoints
   '/v1/services/{id}/environment-variables',
   '/v1/services/{id}/environment',
   '/v1/services/{id}/env',
-  
+
   // Application-specific endpoints
   '/v1/applications/{id}/environment-variables',
   '/v1/applications/{id}/environment',
   '/v1/applications/{id}/env',
-  
+
   // Try v2 endpoints if they exist
   '/v2/resources/{id}/environment-variables',
   '/v2/resources/{id}/environment',
   '/v2/resources/{id}/env',
-  
+
   // Try v3 endpoints in case of future updates
   '/v3/resources/{id}/environment-variables',
-  
+
   // Try without resource prefix
   '/v1/{id}/environment-variables',
   '/v1/{id}/environment',
   '/v1/{id}/env',
-  
+
   // Try direct endpoint
   '/v1/environment-variables/{id}',
   '/v1/environment/{id}',
@@ -140,52 +137,52 @@ async function tryApiRequest(method: string, endpointTemplate: string, data?: an
   // Ensure resourceId is treated as a string
   const endpoint = formatEndpoint(endpointTemplate, resourceId as string);
   const url = `${COOLIFY_URL}${endpoint}`;
-  
+
   debug(`Trying ${method} request to: ${url}`);
   if (data && isDebugMode) {
     debug('Request data:', JSON.stringify(data).substring(0, 100) + '...');
   }
-  
-  try {
-    let response;
-    if (method === 'GET') {
-      response = await axios.get(url, axiosConfig);
-    } else if (method === 'POST') {
-      response = await axios.post(url, data, axiosConfig);
-    } else if (method === 'PUT') {
-      response = await axios.put(url, data, axiosConfig);
-    } else if (method === 'DELETE') {
-      response = await axios.delete(url, axiosConfig);
-    }
-    
-    debug(`Response status: ${response?.status}`);
-    if (response?.data && isDebugMode) {
-      debug(`Response data:`, JSON.stringify(response.data).substring(0, 200) + '...');
-    }
-    return response;
-  } catch (error: any) {
-    if (error.response) {
-      debug(`Error ${error.response.status} for ${url}: ${JSON.stringify(error.response.data)}`);
-      
-      if (error.response.status === 404) {
-        // Return null for 404 so we can try the next endpoint
-        return null;
-      }
-    } else {
-      debug(`Network error for ${url}: ${error.message}`);
-    }
-    // For other errors, re-throw
+
+  const options: RequestInit = {
+    method,
+    headers: defaultHeaders,
+  };
+
+  if (data && method !== 'GET') {
+    options.body = JSON.stringify(data);
+  }
+
+  const response = await fetch(url, options);
+
+  debug(`Response status: ${response.status}`);
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    debug(`Error ${response.status} for ${url}: ${JSON.stringify(errorData)}`);
+    const error: any = new Error(`Request failed: ${response.status}`);
+    error.response = { status: response.status, data: errorData };
     throw error;
   }
+
+  const responseData = await response.json().catch(() => null);
+  if (responseData && isDebugMode) {
+    debug(`Response data:`, JSON.stringify(responseData).substring(0, 200) + '...');
+  }
+
+  return { status: response.status, data: responseData };
 }
 
 async function tryApiEndpoints(method: string, data?: any): Promise<any> {
   let lastError = null;
   let endpoint: string;
-  
+
   // If we have a detected resource type, prioritize those endpoints
   let endpoints = [...API_ENDPOINT_VARIATIONS];
-  
+
   for (endpoint of endpoints) {
     try {
       const response = await tryApiRequest(method, endpoint, data);
@@ -203,7 +200,7 @@ async function tryApiEndpoints(method: string, data?: any): Promise<any> {
       lastError = error;
     }
   }
-  
+
   // If we get here, all endpoints failed
   throw lastError || new Error('All API endpoints failed with 404');
 }
@@ -214,13 +211,19 @@ async function deleteVariable(variableId: string): Promise<boolean> {
       const deleteEndpoint = `${endpoint}/${variableId}`;
       // Ensure resourceId is treated as a string
       const url = `${COOLIFY_URL}${formatEndpoint(deleteEndpoint, resourceId as string)}`;
-      
+
       if (isDryRun) {
         debug(`[DRY RUN] Would delete variable ID ${variableId} at ${url}`);
         return true;
       }
-      
-      await axios.delete(url, axiosConfig);
+
+      const response = await fetch(url, { method: 'DELETE', headers: defaultHeaders });
+      if (response.status === 404) continue;
+      if (!response.ok) {
+        const error: any = new Error(`Delete failed: ${response.status}`);
+        error.response = { status: response.status, data: await response.json().catch(() => null) };
+        throw error;
+      }
       return true;
     } catch (error: any) {
       if (error.response && error.response.status === 404) {
@@ -236,68 +239,78 @@ async function deleteVariable(variableId: string): Promise<boolean> {
 // Try to discover API endpoints and resource type
 async function discoverEndpoints(): Promise<void> {
   console.log('Attempting to discover API endpoints and resource type...');
-  
+
   // Try to get API docs or version info
   try {
-    const response = await axios.get(`${COOLIFY_URL}`, axiosConfig);
-    console.log('API info found:', response.data);
-    
-    // Try to extract version
-    if (response.data.version) {
-      console.log(`Coolify API version: ${response.data.version}`);
+    const response = await fetch(`${COOLIFY_URL}`, { headers: defaultHeaders });
+    if (response.ok) {
+      const data = await response.json();
+      console.log('API info found:', data);
+      if (data.version) {
+        console.log(`Coolify API version: ${data.version}`);
+      }
     }
   } catch (error: any) {
     console.log('Could not get API info');
   }
-  
+
   // Try to discover resource type
   try {
     // Check if it's a service
-    const servicesResponse = await axios.get(`${COOLIFY_URL}/v1/services`, axiosConfig);
-    if (servicesResponse.data && Array.isArray(servicesResponse.data)) {
-      const service = servicesResponse.data.find((r: any) => r.id.toString() === resourceId);
-      if (service) {
-        detectedResourceType = 'services';
-        console.log(`Resource found as service: ${service.name}`);
-        return;
+    const servicesResponse = await fetch(`${COOLIFY_URL}/v1/services`, { headers: defaultHeaders });
+    if (servicesResponse.ok) {
+      const servicesData = await servicesResponse.json();
+      if (servicesData && Array.isArray(servicesData)) {
+        const service = servicesData.find((r: any) => r.id.toString() === resourceId);
+        if (service) {
+          detectedResourceType = 'services';
+          console.log(`Resource found as service: ${service.name}`);
+          return;
+        }
       }
     }
   } catch (error: any) {
     debug('Resource is not a service');
   }
-  
+
   try {
     // Check if it's an application
-    const applicationsResponse = await axios.get(`${COOLIFY_URL}/v1/applications`, axiosConfig);
-    if (applicationsResponse.data && Array.isArray(applicationsResponse.data)) {
-      const application = applicationsResponse.data.find((r: any) => r.id.toString() === resourceId);
-      if (application) {
-        detectedResourceType = 'applications';
-        console.log(`Resource found as application: ${application.name}`);
-        return;
+    const appsResponse = await fetch(`${COOLIFY_URL}/v1/applications`, { headers: defaultHeaders });
+    if (appsResponse.ok) {
+      const appsData = await appsResponse.json();
+      if (appsData && Array.isArray(appsData)) {
+        const application = appsData.find((r: any) => r.id.toString() === resourceId);
+        if (application) {
+          detectedResourceType = 'applications';
+          console.log(`Resource found as application: ${application.name}`);
+          return;
+        }
       }
     }
   } catch (error: any) {
     debug('Resource is not an application');
   }
-  
+
   // Try general resources list
   try {
-    const response = await axios.get(`${COOLIFY_URL}/v1/resources`, axiosConfig);
-    console.log('Resources found:', response.data.length);
-    // Look for the specific resource
-    const resource = response.data.find((r: any) => r.id.toString() === resourceId);
-    if (resource) {
-      console.log('Found resource:', resource.name, 'type:', resource.type || 'unknown');
-      if (resource.type) {
-        detectedResourceType = `${resource.type}s`; // Add plural for endpoint
-        console.log(`Setting detected resource type to: ${detectedResourceType}`);
+    const response = await fetch(`${COOLIFY_URL}/v1/resources`, { headers: defaultHeaders });
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Resources found:', data.length);
+      // Look for the specific resource
+      const resource = data.find((r: any) => r.id.toString() === resourceId);
+      if (resource) {
+        console.log('Found resource:', resource.name, 'type:', resource.type || 'unknown');
+        if (resource.type) {
+          detectedResourceType = `${resource.type}s`; // Add plural for endpoint
+          console.log(`Setting detected resource type to: ${detectedResourceType}`);
+        }
+      } else {
+        console.log('⚠️ Resource ID not found! Available resource IDs:');
+        data.slice(0, 5).forEach((r: any) => {
+          console.log(`- ID: ${r.id}, Name: ${r.name}, Type: ${r.type || 'unknown'}`);
+        });
       }
-    } else {
-      console.log('⚠️ Resource ID not found! Available resource IDs:');
-      response.data.slice(0, 5).forEach((r: any) => {
-        console.log(`- ID: ${r.id}, Name: ${r.name}, Type: ${r.type || 'unknown'}`);
-      });
     }
   } catch (error: any) {
     console.log('Could not list resources');
@@ -311,23 +324,23 @@ async function syncEnvironmentVariables() {
     } else {
       console.log(`Starting environment variable sync for resource ${resourceId}...`);
     }
-    
+
     if (filterPrefix) {
       console.log(`Filtering variables: only syncing variables starting with '${filterPrefix}'`);
     }
-    
+
     // Step 1: Read .env.local file
     console.log(`Reading variables from ${ENV_FILE}...`);
     const envContent = fs.readFileSync(ENV_FILE, 'utf8');
     const envVars = dotenv.parse(envContent);
-    
+
     // Filter variables if prefix is specified
     let filteredVars = Object.entries(envVars);
     if (filterPrefix) {
       filteredVars = filteredVars.filter(([name]) => name.startsWith(filterPrefix));
       console.log(`Filtered to ${filteredVars.length} variables starting with '${filterPrefix}'`);
     }
-    
+
     // Format variables for API
     const newVariables = filteredVars
       // Don't include the Coolify token itself in the variables we send
@@ -338,15 +351,15 @@ async function syncEnvironmentVariables() {
         isBuildVariable: false, // Set to true for build-time variables if needed
         isSecret: name.includes('SECRET') || name.includes('KEY') || name.includes('PASSWORD')
       }));
-    
+
     console.log(`Found ${newVariables.length} variables to sync`);
-    
+
     // Discover API endpoints and resource type first
     await discoverEndpoints();
-    
+
     // Step 2: Get existing variables from Coolify
     console.log(`Fetching existing variables from Coolify...`);
-    
+
     let getResponse;
     try {
       getResponse = await tryApiEndpoints('GET');
@@ -354,7 +367,7 @@ async function syncEnvironmentVariables() {
       console.error('❌ Failed to fetch existing variables. Will attempt to upload new ones anyway.');
       getResponse = { data: { variables: [] } };
     }
-    
+
     // Try to normalize the response data structure
     let existingVariables: EnvVariable[] = [];
     if (getResponse.data) {
@@ -368,43 +381,43 @@ async function syncEnvironmentVariables() {
         existingVariables = getResponse.data.env;
       }
     }
-    
+
     console.log(`Found ${existingVariables.length} existing variables in Coolify`);
-    
+
     // Filter existing variables if a prefix is specified
     if (filterPrefix) {
       const originalCount = existingVariables.length;
       existingVariables = existingVariables.filter(v => v.name.startsWith(filterPrefix));
       console.log(`Filtered existing variables: ${existingVariables.length} of ${originalCount} match prefix '${filterPrefix}'`);
     }
-    
+
     // Print tables for comparison
     if (isDebugMode || isDryRun) {
       console.log('\nExisting variables in Coolify:');
       console.log('-'.repeat(60));
       console.log('| Name'.padEnd(30) + '| Value'.padEnd(30) + '|');
       console.log('-'.repeat(60));
-      
+
       existingVariables.forEach(v => {
         const displayValue = v.isSecret ? '********' : (v.value || '').substring(0, 25);
         console.log(`| ${v.name.padEnd(28)}| ${displayValue.padEnd(28)}|`);
       });
-      
+
       console.log('-'.repeat(60));
-      
+
       console.log('\nNew variables from local file:');
       console.log('-'.repeat(60));
       console.log('| Name'.padEnd(30) + '| Value'.padEnd(30) + '|');
       console.log('-'.repeat(60));
-      
+
       newVariables.forEach(v => {
         const displayValue = v.isSecret ? '********' : v.value.substring(0, 25);
         console.log(`| ${v.name.padEnd(28)}| ${displayValue.padEnd(28)}|`);
       });
-      
+
       console.log('-'.repeat(60));
     }
-    
+
     if (isDryRun) {
       console.log('\n[DRY RUN] Summary of changes:');
       console.log(`- Would remove: ${existingVariables.length} variables`);
@@ -412,11 +425,11 @@ async function syncEnvironmentVariables() {
       console.log('\nRun without --dry-run to apply these changes.');
       return;
     }
-    
+
     // Step 3: Delete all existing variables
     if (existingVariables.length > 0) {
       console.log(`Removing ${existingVariables.length} existing variables...`);
-      
+
       // Some APIs require deleting variables one by one
       for (const variable of existingVariables) {
         try {
@@ -429,15 +442,15 @@ async function syncEnvironmentVariables() {
           // Continue with other variables even if one fails
         }
       }
-      
+
       console.log(`Existing variables removed`);
     }
-    
+
     // Step 4: Upload all new variables
     console.log(`Uploading ${newVariables.length} variables from local file...`);
-    
+
     let uploadSuccess = false;
-    
+
     // Try different payload formats
     const payloadVariations = [
       { variables: newVariables },                  // Standard format
@@ -446,11 +459,11 @@ async function syncEnvironmentVariables() {
       { environmentVariables: newVariables },       // Another variation
       newVariables,                                 // Direct array
     ];
-    
+
     // First try POST with different payload formats
     for (const payload of payloadVariations) {
       if (uploadSuccess) break;
-      
+
       try {
         await tryApiEndpoints('POST', payload);
         uploadSuccess = true;
@@ -460,15 +473,15 @@ async function syncEnvironmentVariables() {
         // Continue to next format
       }
     }
-    
+
     // If POST failed, try PUT with different payload formats
     if (!uploadSuccess) {
       console.error('❌ Failed to upload variables using POST method.');
       console.error('Attempting with PUT method...');
-      
+
       for (const payload of payloadVariations) {
         if (uploadSuccess) break;
-        
+
         try {
           await tryApiEndpoints('PUT', payload);
           uploadSuccess = true;
@@ -479,13 +492,13 @@ async function syncEnvironmentVariables() {
         }
       }
     }
-    
+
     // As a last resort, try uploading variables one by one
     if (!uploadSuccess) {
       console.error('❌ Failed to upload variables using PUT method.');
       console.log('Attempting to upload variables one by one...');
       let successCount = 0;
-      
+
       for (const variable of newVariables) {
         try {
           // Try different formats for single variable upload too
@@ -508,7 +521,7 @@ async function syncEnvironmentVariables() {
           console.error(`Failed to upload variable ${variable.name}: ${singleError.message}`);
         }
       }
-      
+
       if (successCount > 0) {
         console.log(`✅ Successfully uploaded ${successCount} out of ${newVariables.length} variables.`);
         uploadSuccess = true;
@@ -516,36 +529,36 @@ async function syncEnvironmentVariables() {
         throw new Error('All upload methods failed');
       }
     }
-    
+
     if (uploadSuccess) {
       // Print summary
       console.log('\nSync Summary:');
       console.log(`- Removed: ${existingVariables.length} variables`);
       console.log(`- Added: ${newVariables.length} variables`);
-      
+
       // Print the first few variable names that were synced (without values for security)
       console.log('\nSynced variables (sample):');
       newVariables.slice(0, Math.min(5, newVariables.length)).forEach(v => {
         console.log(`- ${v.name}`);
       });
-      
+
       if (newVariables.length > 5) {
         console.log(`... and ${newVariables.length - 5} more variables`);
       }
-      
+
       console.log('\nDone. To redeploy your application with the new variables, use the Coolify dashboard.');
     }
-    
+
   } catch (error: any) {
     console.error('\n❌ Failed to sync environment variables:');
-    
+
     if (error.response) {
       console.error(`Status: ${error.response.status}`);
       console.error(`Error: ${JSON.stringify(error.response.data, null, 2)}`);
     } else {
       console.error(error.message);
     }
-    
+
     console.error('\nTroubleshooting suggestions:');
     console.error('1. Verify your COOLIFY_TOKEN is correct');
     console.error('2. Check that the resource ID is valid and accessible with your token');
@@ -554,10 +567,10 @@ async function syncEnvironmentVariables() {
     console.error('5. Run with --debug flag for more information: pnpm env:sync 4 --debug');
     console.error('6. Run with --dry-run flag to test without making changes: pnpm env:sync 4 --dry-run');
     console.error('7. Try filtering to a subset of variables: pnpm env:sync 4 --filter=DATABASE_');
-    
+
     process.exit(1);
   }
 }
 
 // Execute the sync
-syncEnvironmentVariables(); 
+syncEnvironmentVariables();

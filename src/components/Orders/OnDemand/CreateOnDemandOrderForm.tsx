@@ -202,6 +202,7 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
     handleSubmit,
     formState: { errors },
     setValue,
+    setError,
     watch,
   } = form;
 
@@ -261,6 +262,40 @@ export const CreateOnDemandOrderForm: React.FC<CreateOnDemandOrderFormProps> = (
       const result = await createOnDemandOrder(submitData);
 
       if (result.error) {
+        // Map server-side field errors to react-hook-form for inline display
+        if (result.fieldErrors) {
+          const fieldNames = [
+            'userId', 'clientAttention', 'pickupDateTime', 'arrivalDateTime',
+            'vehicleType', 'orderNumber', 'hoursNeeded', 'orderTotal', 'tip',
+            'itemDelivered', 'pickupNotes', 'specialNotes',
+            'length', 'width', 'height', 'weight',
+          ] as const;
+
+          for (const field of fieldNames) {
+            const fieldError = result.fieldErrors[field];
+            if (fieldError && '_errors' in fieldError && fieldError._errors.length > 0) {
+              setError(field, { type: 'server', message: fieldError._errors[0] });
+            }
+          }
+
+          // Handle nested address field errors
+          const addressFields = ['pickupAddress', 'deliveryAddress'] as const;
+          const addressSubFields = ['street1', 'street2', 'city', 'state', 'zip', 'county'] as const;
+          for (const addr of addressFields) {
+            const addrError = result.fieldErrors[addr];
+            if (addrError && typeof addrError === 'object') {
+              for (const sub of addressSubFields) {
+                const subError = (addrError as Record<string, { _errors?: string[] }>)[sub];
+                if (subError && '_errors' in subError && subError._errors && subError._errors.length > 0) {
+                  setError(`${addr}.${sub}`, { type: 'server', message: subError._errors[0] });
+                }
+              }
+            }
+          }
+
+          console.warn('[OnDemandOrder] Server validation errors:', JSON.stringify(result.fieldErrors, null, 2));
+        }
+
         setGeneralError(result.error);
         scrollToTop();
         return;
