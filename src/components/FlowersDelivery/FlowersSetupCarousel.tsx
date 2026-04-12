@@ -4,7 +4,7 @@ const FlowersSetupCarousel: React.FC = () => {
   return (
     <SetupCarousel
       imageBasePath="flowers/flowersetup/flowersetup"
-      imageCount={10}
+      imageCount={6}
       altPrefix="Flower arrangement"
     />
   );
