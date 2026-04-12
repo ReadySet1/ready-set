@@ -80,12 +80,13 @@ const FlowerHero: React.FC<FlowerHeroProps> = ({
             <div
               className={`relative w-full self-end transition-all delay-300 duration-700 ease-in-out md:w-[45%] ${isTextAnimated ? "translate-x-0 opacity-100" : "translate-x-8 opacity-0"}`}
             >
-              <div className="relative aspect-[6/5] w-full overflow-hidden rounded-lg">
+              <div className="overflow-hidden rounded-3xl shadow-md">
                 <Image
                   src={imagePath}
                   alt="Flower delivery driver handing a bouquet to a customer"
-                  fill
-                  className="object-cover"
+                  width={600}
+                  height={500}
+                  className="h-auto w-full"
                   sizes="(max-width: 768px) 100vw, 45vw"
                   priority
                 />

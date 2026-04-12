@@ -87,7 +87,7 @@ const FlowersAbout: React.FC = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <div className="relative w-full overflow-hidden rounded-3xl border-t-4 border-yellow-400">
+            <div className="relative w-full overflow-hidden rounded-3xl">
               <Image
                 src={getCloudinaryUrl("flowers/flowers-about")}
                 alt="Florist arranging bouquets in a flower shop"
