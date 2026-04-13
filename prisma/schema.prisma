@@ -748,6 +748,9 @@ model DeliveryConfiguration {
   // Bridge Toll Settings
   bridgeTollSettings    Json     @map("bridge_toll_settings")
 
+  // Zero Order Settings (special pricing when headcount=0 AND foodCost=0)
+  zeroOrderSettings     Json?    @map("zero_order_settings")
+
   // Custom Settings (flexible for future additions)
   customSettings        Json?    @map("custom_settings")
 
