@@ -6,11 +6,15 @@ import { prisma } from '@/utils/prismaDB';
 import { createPostRequest } from '@/__tests__/helpers/api-test-helpers';
 
 // Mock dependencies
+jest.mock('@/lib/rate-limiting', () => ({
+  withRateLimit: jest.fn(() => jest.fn(async () => null)),
+  RateLimitConfigs: { auth: {} },
+}));
 jest.mock('@/utils/supabase/server');
 jest.mock('@/utils/prismaDB', () => ({
   prisma: {
     profile: {
-      findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
   },
@@ -110,7 +114,7 @@ describe('/api/auth/signup POST API', () => {
         name: 'Existing User',
       };
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue(existingUser);
+      (prisma.profile.findFirst as jest.Mock).mockResolvedValue(existingUser);
 
       const request = createPostRequest('http://localhost:3000/api/auth/signup', {
         email: 'existing@example.com',
@@ -123,8 +127,8 @@ describe('/api/auth/signup POST API', () => {
 
       expect(response.status).toBe(400);
       expect(data.message).toBe('User with this email already exists');
-      expect(prisma.profile.findUnique).toHaveBeenCalledWith({
-        where: { email: 'existing@example.com' },
+      expect(prisma.profile.findFirst).toHaveBeenCalledWith({
+        where: { email: 'existing@example.com', deletedAt: null },
       });
     });
   });
@@ -144,7 +148,7 @@ describe('/api/auth/signup POST API', () => {
         name: 'John Doe',
       };
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.profile.findFirst as jest.Mock).mockResolvedValue(null);
       mockSupabaseClient.auth.signUp.mockResolvedValue({
         data: mockAuthData,
         error: null,
@@ -192,7 +196,7 @@ describe('/api/auth/signup POST API', () => {
 
   describe('❌ Supabase Error Handling Tests', () => {
     it('should return 500 when Supabase auth.signUp fails', async () => {
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.profile.findFirst as jest.Mock).mockResolvedValue(null);
       mockSupabaseClient.auth.signUp.mockResolvedValue({
         data: { user: null },
         error: { message: 'Supabase authentication failed' },
@@ -212,7 +216,7 @@ describe('/api/auth/signup POST API', () => {
     });
 
     it('should return 500 when Supabase returns no user data', async () => {
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.profile.findFirst as jest.Mock).mockResolvedValue(null);
       mockSupabaseClient.auth.signUp.mockResolvedValue({
         data: { user: null },
         error: null,
@@ -234,7 +238,7 @@ describe('/api/auth/signup POST API', () => {
 
   describe('🗄️ Database Error Handling Tests', () => {
     it('should handle Prisma findUnique errors gracefully', async () => {
-      (prisma.profile.findUnique as jest.Mock).mockRejectedValue(
+      (prisma.profile.findFirst as jest.Mock).mockRejectedValue(
         new Error('Database connection failed')
       );
 
@@ -259,7 +263,7 @@ describe('/api/auth/signup POST API', () => {
         },
       };
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.profile.findFirst as jest.Mock).mockResolvedValue(null);
       mockSupabaseClient.auth.signUp.mockResolvedValue({
         data: mockAuthData,
         error: null,
@@ -289,7 +293,7 @@ describe('/api/auth/signup POST API', () => {
         },
       };
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.profile.findFirst as jest.Mock).mockResolvedValue(null);
       mockSupabaseClient.auth.signUp.mockResolvedValue({
         data: mockAuthData,
         error: null,
@@ -328,7 +332,7 @@ describe('/api/auth/signup POST API', () => {
         name: 'John Doe',
       };
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.profile.findFirst as jest.Mock).mockResolvedValue(null);
       mockSupabaseClient.auth.signUp.mockResolvedValue({
         data: mockAuthData,
         error: null,
@@ -360,7 +364,7 @@ describe('/api/auth/signup POST API', () => {
         name: 'José García',
       };
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.profile.findFirst as jest.Mock).mockResolvedValue(null);
       mockSupabaseClient.auth.signUp.mockResolvedValue({
         data: mockAuthData,
         error: null,
@@ -393,7 +397,7 @@ describe('/api/auth/signup POST API', () => {
         name: 'John Doe',
       };
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.profile.findFirst as jest.Mock).mockResolvedValue(null);
       mockSupabaseClient.auth.signUp.mockResolvedValue({
         data: mockAuthData,
         error: null,
@@ -414,7 +418,7 @@ describe('/api/auth/signup POST API', () => {
 
   describe('🔒 Security Tests', () => {
     it('should not expose sensitive error details to client', async () => {
-      (prisma.profile.findUnique as jest.Mock).mockRejectedValue(
+      (prisma.profile.findFirst as jest.Mock).mockRejectedValue(
         new Error('Internal database connection string: postgres://secret:password@host')
       );
 
@@ -463,7 +467,7 @@ describe('/api/auth/signup POST API', () => {
         name: 'John Doe',
       };
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.profile.findFirst as jest.Mock).mockResolvedValue(null);
       mockSupabaseClient.auth.signUp.mockResolvedValue({
         data: mockAuthData,
         error: null,
@@ -502,7 +506,7 @@ describe('/api/auth/signup POST API', () => {
         password: 'should-not-be-returned',
       };
 
-      (prisma.profile.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.profile.findFirst as jest.Mock).mockResolvedValue(null);
       mockSupabaseClient.auth.signUp.mockResolvedValue({
         data: mockAuthData,
         error: null,
