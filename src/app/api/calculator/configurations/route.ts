@@ -43,7 +43,7 @@ function configToDb(config: ClientDeliveryConfiguration, userId?: string) {
     configId: config.id,
     clientName: config.clientName,
     vendorName: config.vendorName,
-    description: config.description,
+    description: config.description ?? null,
     isActive: config.isActive,
     pricingTiers: config.pricingTiers as any,
     mileageRate: config.mileageRate,
@@ -52,9 +52,9 @@ function configToDb(config: ClientDeliveryConfiguration, userId?: string) {
     driverPaySettings: config.driverPaySettings as any,
     bridgeTollSettings: config.bridgeTollSettings as any,
     zeroOrderSettings: config.zeroOrderSettings as any ?? null,
-    customSettings: config.customSettings as any,
-    createdBy: userId,
-    notes: config.notes,
+    customSettings: config.customSettings as any ?? null,
+    createdBy: userId ?? null,
+    notes: config.notes ?? null,
     updatedAt: new Date()
   };
 }

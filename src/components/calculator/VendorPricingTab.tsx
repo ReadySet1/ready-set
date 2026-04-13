@@ -28,11 +28,12 @@ export function VendorPricingTab() {
   const [isSaving, setIsSaving] = useState(false);
   const [pendingSave, setPendingSave] = useState<ClientDeliveryConfiguration | null>(null);
 
-  const fetchConfigs = useCallback(async () => {
+  const fetchConfigs = useCallback(async (showLoading = true) => {
     try {
-      setIsLoading(true);
+      if (showLoading) setIsLoading(true);
       const response = await fetch('/api/calculator/configurations', {
         credentials: 'include',
+        cache: 'no-store',
       });
 
       if (!response.ok) {
@@ -42,13 +43,16 @@ export function VendorPricingTab() {
       const result = await response.json();
       if (result.success && result.data) {
         setConfigs(result.data);
+        return result.data as ClientDeliveryConfiguration[];
       }
+      return null;
     } catch (error) {
       toast({
         title: 'Error loading configurations',
         description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive',
       });
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -82,15 +86,31 @@ export function VendorPricingTab() {
         throw new Error(result.error || 'Failed to save configuration');
       }
 
+      // Immediately update selected config with the saved data from POST response
+      const savedConfig: ClientDeliveryConfiguration | null = result.data ?? null;
+      if (savedConfig) {
+        setSelectedConfig(savedConfig);
+        // Optimistically update the configs array too
+        setConfigs((prev) =>
+          prev.map((c) => (c.id === savedConfig.id ? savedConfig : c))
+        );
+      }
+
       toast({
         title: 'Configuration saved',
         description: `Pricing for ${configToSave.vendorName} has been updated.`,
       });
 
-      // Refresh configs and update selected
-      await fetchConfigs();
-      if (result.data) {
-        setSelectedConfig(result.data);
+      // Background refresh without loading skeleton to sync any other changes
+      const freshConfigs = await fetchConfigs(false);
+      if (freshConfigs && savedConfig) {
+        // Re-select from the fresh configs array to stay in sync
+        const updated = freshConfigs.find(
+          (c: ClientDeliveryConfiguration) => c.id === savedConfig.id
+        );
+        if (updated) {
+          setSelectedConfig(updated);
+        }
       }
     } catch (error) {
       toast({
