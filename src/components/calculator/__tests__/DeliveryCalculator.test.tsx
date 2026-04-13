@@ -689,4 +689,189 @@ describe('DeliveryCalculator Component', () => {
       expect(wrapper).toHaveClass('custom-class');
     });
   });
+
+  describe('Ready Set Net Earnings', () => {
+    beforeEach(() => {
+      mockUseCalculatorConfig.mockReturnValue({
+        ...defaultConfigHookReturn,
+        templates: mockTemplates,
+        clientConfigs: mockClientConfigs,
+        config: mockConfig,
+      });
+    });
+
+    it('should render the Net Earnings card when result has metadata', async () => {
+      const user = userEvent.setup();
+
+      mockUseCalculator.mockReturnValue({
+        ...defaultCalculatorHookReturn,
+        result: mockResult,
+      });
+
+      render(<DeliveryCalculator />);
+
+      const resultsTab = screen.getByText('Results').closest('button');
+      await user.click(resultsTab!);
+
+      expect(screen.getByText('Ready Set Net Earnings')).toBeInTheDocument();
+    });
+
+    it('should not render Net Earnings card when result has no metadata', async () => {
+      const user = userEvent.setup();
+
+      const resultWithoutMetadata = {
+        ...mockResult,
+        metadata: undefined,
+      };
+
+      mockUseCalculator.mockReturnValue({
+        ...defaultCalculatorHookReturn,
+        result: resultWithoutMetadata,
+      });
+
+      render(<DeliveryCalculator />);
+
+      const resultsTab = screen.getByText('Results').closest('button');
+      await user.click(resultsTab!);
+
+      expect(screen.queryByText('Ready Set Net Earnings')).not.toBeInTheDocument();
+    });
+
+    it('should not render Net Earnings card when there is no result', async () => {
+      const user = userEvent.setup();
+
+      mockUseCalculator.mockReturnValue({
+        ...defaultCalculatorHookReturn,
+        result: null,
+      });
+
+      render(<DeliveryCalculator />);
+
+      const resultsTab = screen.getByText('Results').closest('button');
+      await user.click(resultsTab!);
+
+      expect(screen.queryByText('Ready Set Net Earnings')).not.toBeInTheDocument();
+    });
+
+    it('should display gross earnings and driver payments breakdown', async () => {
+      const user = userEvent.setup();
+
+      mockUseCalculator.mockReturnValue({
+        ...defaultCalculatorHookReturn,
+        result: mockResult,
+      });
+
+      render(<DeliveryCalculator />);
+
+      const resultsTab = screen.getByText('Results').closest('button');
+      await user.click(resultsTab!);
+
+      expect(screen.getByText('Gross Earnings (Ready Set Fee):')).toBeInTheDocument();
+      expect(screen.getByText('Driver Payments:')).toBeInTheDocument();
+      expect(screen.getByText('Net Earnings:')).toBeInTheDocument();
+    });
+
+    it('should apply negative styling when net earnings are negative', async () => {
+      const user = userEvent.setup();
+
+      // mockResult: readySetFee=45, mileage=15, rate=3.0
+      // totalReadySetFee = 45 + (5 * 3.0) + 0 = 60
+      // driverPayments.total = 70
+      // Net = 60 - 70 = -10 (negative)
+      mockUseCalculator.mockReturnValue({
+        ...defaultCalculatorHookReturn,
+        result: mockResult,
+      });
+
+      render(<DeliveryCalculator />);
+
+      const resultsTab = screen.getByText('Results').closest('button');
+      await user.click(resultsTab!);
+
+      const netEarningsLabel = screen.getByText('Net Earnings:');
+      expect(netEarningsLabel).toHaveClass('text-red-800');
+    });
+
+    it('should apply positive styling when net earnings are positive', async () => {
+      const user = userEvent.setup();
+
+      const positiveResult = {
+        ...mockResult,
+        driverPayments: {
+          ...mockResult.driverPayments,
+          total: 30, // totalReadySetFee=60 > 30, so net is positive
+        },
+        metadata: {
+          readySetFee: 80,
+          readySetMileageRate: 3.0,
+          mileage: 15,
+        },
+      };
+
+      mockUseCalculator.mockReturnValue({
+        ...defaultCalculatorHookReturn,
+        result: positiveResult,
+      });
+
+      render(<DeliveryCalculator />);
+
+      const resultsTab = screen.getByText('Results').closest('button');
+      await user.click(resultsTab!);
+
+      const netEarningsLabel = screen.getByText('Net Earnings:');
+      expect(netEarningsLabel).toHaveClass('text-amber-800');
+    });
+
+    it('should show minus sign prefix for negative net earnings', async () => {
+      const user = userEvent.setup();
+
+      // Net = 60 - 70 = -10 → displays as "-$10.00"
+      mockUseCalculator.mockReturnValue({
+        ...defaultCalculatorHookReturn,
+        result: mockResult,
+      });
+
+      render(<DeliveryCalculator />);
+
+      const resultsTab = screen.getByText('Results').closest('button');
+      await user.click(resultsTab!);
+
+      // The net earnings value should show the minus sign and absolute value
+      const netEarningsValue = screen.getByText('-$10.00');
+      expect(netEarningsValue).toBeInTheDocument();
+    });
+
+    it('should not show minus sign for positive net earnings', async () => {
+      const user = userEvent.setup();
+
+      const positiveResult = {
+        ...mockResult,
+        driverPayments: {
+          ...mockResult.driverPayments,
+          total: 30,
+        },
+        metadata: {
+          readySetFee: 80,
+          readySetMileageRate: 3.0,
+          mileage: 15,
+        },
+      };
+      // totalReadySetFee = 80 + (5 * 3.0) + 0 = 95
+      // net = 95 - 30 = 65
+
+      mockUseCalculator.mockReturnValue({
+        ...defaultCalculatorHookReturn,
+        result: positiveResult,
+      });
+
+      render(<DeliveryCalculator />);
+
+      const resultsTab = screen.getByText('Results').closest('button');
+      await user.click(resultsTab!);
+
+      const netEarningsValue = screen.getByText('$65.00');
+      expect(netEarningsValue).toBeInTheDocument();
+      expect(screen.queryByText('-$65.00')).not.toBeInTheDocument();
+    });
+  });
 });
