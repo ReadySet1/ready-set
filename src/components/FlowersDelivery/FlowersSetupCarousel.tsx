@@ -1,6 +1,7 @@
+import type { FC } from "react";
 import SetupCarousel from "@/components/shared/SetupCarousel";
 
-const FlowersSetupCarousel: React.FC = () => {
+const FlowersSetupCarousel: FC = () => {
   return (
     <SetupCarousel
       imageBasePath="flowers/flowersetup/flowersetup"

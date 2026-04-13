@@ -91,7 +91,7 @@ export const metadata: Metadata = {
       "Reliable Delivery, On-Time Service, Careful Handling, Real-Time Tracking, Dedicated Drivers, Upholding Shop Reputation, Efficient Logistics",
   },
   alternates: {
-    canonical: "https://readysetllc.com/flowers", // Replace with the actual URL of this page
+    canonical: "https://readysetllc.com/flowers-deliveries",
   },
 };
 
