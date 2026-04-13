@@ -133,60 +133,14 @@ describe("FoodHeader Component", () => {
       expect(section).toHaveClass("mt-6");
     });
 
-    it("applies correct margin class for tablet (768px - 1023px)", () => {
-      // Mock tablet viewport
-      Object.defineProperty(window, "innerWidth", {
-        writable: true,
-        configurable: true,
-        value: 900,
-      });
-
+    it("applies responsive margin classes via Tailwind", () => {
       render(<FoodHeader />);
 
       const section = screen.getByText("From Pickup to Complete Setup").closest("section");
-      expect(section).toHaveClass("mt-8");
-    });
-
-    it("applies correct margin class for desktop (>= 1024px)", () => {
-      // Mock desktop viewport
-      Object.defineProperty(window, "innerWidth", {
-        writable: true,
-        configurable: true,
-        value: 1200,
-      });
-
-      render(<FoodHeader />);
-
-      const section = screen.getByText("From Pickup to Complete Setup").closest("section");
-      expect(section).toHaveClass("mt-4");
-    });
-
-    it("updates margin class on window resize", async () => {
-      // Start with desktop
-      Object.defineProperty(window, "innerWidth", {
-        writable: true,
-        configurable: true,
-        value: 1200,
-      });
-
-      render(<FoodHeader />);
-
-      const section = screen.getByText("From Pickup to Complete Setup").closest("section");
-      expect(section).toHaveClass("mt-4");
-
-      // Change to mobile
-      Object.defineProperty(window, "innerWidth", {
-        writable: true,
-        configurable: true,
-        value: 600,
-      });
-
-      // Trigger resize event
-      window.dispatchEvent(new Event("resize"));
-
-      await waitFor(() => {
-        expect(section).toHaveClass("mt-6");
-      });
+      // Component uses Tailwind responsive classes: mt-6 md:mt-8 lg:mt-4
+      expect(section).toHaveClass("mt-6");
+      expect(section).toHaveClass("md:mt-8");
+      expect(section).toHaveClass("lg:mt-4");
     });
 
     it("has responsive text sizing for heading", () => {

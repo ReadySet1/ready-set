@@ -286,6 +286,7 @@ describe("/api/drivers", () => {
         expect(mockPrisma.profile.findMany).toHaveBeenCalledWith({
           where: {
             type: "DRIVER",
+            deletedAt: null,
           },
           select: {
             id: true,
@@ -297,6 +298,7 @@ describe("/api/drivers", () => {
             updatedAt: true,
           },
           take: 200,
+          orderBy: { createdAt: "desc" },
         });
       });
 
@@ -441,6 +443,7 @@ describe("/api/drivers", () => {
           expect.objectContaining({
             where: {
               type: "DRIVER",
+              deletedAt: null,
             },
           })
         );
