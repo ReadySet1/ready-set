@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Calculator, DollarSign, Truck, Users, MapPin, Check, Save, Settings, History, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Loader2, Calculator, DollarSign, Truck, Users, MapPin, Check, Save, Settings, History, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 import { useCalculatorConfig, useCalculator, useCalculatorHistory } from '@/hooks/useCalculatorConfig';
 import { 
   CalculationInput, 
@@ -866,15 +866,22 @@ export function DeliveryCalculator({
 
                       <Separator className="my-4" />
                       {(() => {
-                        const netEarnings = readySetEarnings.totalFee - result.driverPayments.total;
+                        const rawNet = readySetEarnings.totalFee - result.driverPayments.total;
+                        const netEarnings = Math.round(rawNet * 100) / 100;
                         const isPositive = netEarnings >= 0;
+                        const TrendIcon = isPositive ? TrendingUp : TrendingDown;
                         return (
-                          <div className={`flex justify-between items-center p-4 rounded-xl border ${
-                            isPositive
-                              ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200'
-                              : 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200'
-                          }`}>
-                            <span className={`text-lg font-bold ${isPositive ? 'text-amber-800' : 'text-red-800'}`}>
+                          <div
+                            role="status"
+                            aria-label={`Net earnings ${isPositive ? 'profit' : 'loss'} of ${isPositive ? '' : 'negative '}${formatCurrency(Math.abs(netEarnings))} dollars`}
+                            className={`flex justify-between items-center p-4 rounded-xl border ${
+                              isPositive
+                                ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200'
+                                : 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200'
+                            }`}
+                          >
+                            <span className={`flex items-center gap-2 text-lg font-bold ${isPositive ? 'text-amber-800' : 'text-red-800'}`}>
+                              <TrendIcon className="h-5 w-5" aria-hidden="true" />
                               Net Earnings:
                             </span>
                             <span className={`text-2xl font-bold ${isPositive ? 'text-amber-900' : 'text-red-900'}`}>
