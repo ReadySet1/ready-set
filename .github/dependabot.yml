@@ -1,17 +1,11 @@
 version: 2
+# Dependabot version-update PRs are disabled (open-pull-requests-limit: 0).
+# Security advisories and Dependabot security-update PRs are unaffected —
+# they are controlled in Settings → Code security and still run.
+# To re-enable routine version bumps, raise open-pull-requests-limit above 0.
 updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "monthly"
-    open-pull-requests-limit: 5
-    groups:
-      all-dependencies:
-        update-types:
-          - "major"
-          - "minor"
-          - "patch"
-    ignore:
-      # Ignore major version updates for Next.js - requires manual migration
-      - dependency-name: "next"
-        update-types: ["version-update:semver-major"]
+    open-pull-requests-limit: 0
