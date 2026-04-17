@@ -1,17 +1,10 @@
 // app/api/unsubscribe/route.ts
 import { NextResponse } from 'next/server';
-import axios from "axios";
 import { z } from "zod";
 
 // Types
-interface SendGridContact {
-  id: string;
-  email: string;
-  created_at: string;
-}
-
 interface SendGridSearchResponse {
-  result: SendGridContact[];
+  result: { id: string; email: string; created_at: string }[];
 }
 
 // Schema
@@ -28,10 +21,10 @@ export async function DELETE(request: Request) {
 
     const emailValidation = EmailSchema.safeParse(email);
     if (!emailValidation.success) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: emailValidation.error.issues[0]?.message || "Invalid email address"
-      }, { 
-        status: 400 
+      }, {
+        status: 400
       });
     }
 
@@ -41,38 +34,49 @@ export async function DELETE(request: Request) {
       console.error('SendGrid API key is not configured');
       return NextResponse.json({
         error: "Server configuration error. Please try again later."
-      }, { 
-        status: 500 
+      }, {
+        status: 500
       });
     }
 
     // SendGrid API configuration
-    const sendGridConfig = {
-      headers: {
-        "Authorization": `Bearer ${SENDGRID_API_KEY}`,
-        "Content-Type": "application/json"
-      }
+    const sendGridHeaders = {
+      "Authorization": `Bearer ${SENDGRID_API_KEY}`,
+      "Content-Type": "application/json",
     };
 
     // Step 1: Search for contact
     const searchUrl = 'https://api.sendgrid.com/v3/marketing/contacts/search';
-    const searchData = {
-      query: `email LIKE '${emailValidation.data}'`
-    };
+    const searchResponse = await fetch(searchUrl, {
+      method: "POST",
+      headers: sendGridHeaders,
+      body: JSON.stringify({ query: `email LIKE '${emailValidation.data}'` }),
+    });
 
-    const searchResponse = await axios.post<SendGridSearchResponse>(
-      searchUrl, 
-      searchData, 
-      sendGridConfig
-    );
+    if (!searchResponse.ok) {
+      const status = searchResponse.status;
+      const errorMessages: Record<number, string> = {
+        400: "Invalid request format. Please try again.",
+        401: "Server authentication failed. Please try again later.",
+        404: "Email not found in our mailing list.",
+        405: "API method not allowed. Please contact support.",
+        429: "Too many requests. Please try again in a few minutes.",
+        500: "Server error. Please try again later.",
+      };
+      return NextResponse.json(
+        { error: errorMessages[status] ?? "An unexpected error occurred." },
+        { status },
+      );
+    }
 
-    const contacts = searchResponse.data.result;
+    const searchData: SendGridSearchResponse = await searchResponse.json();
+    const contacts = searchData.result;
 
     if (!contacts?.length) {
       return NextResponse.json({
         error: "This email is not subscribed to our newsletter."
-      }, { 
-        status: 404 
+      }, {
+        status: 404
       });
     }
 
@@ -81,20 +85,37 @@ export async function DELETE(request: Request) {
     if (!contactId) {
       return NextResponse.json({
         error: "Invalid contact information."
-      }, { 
-        status: 400 
+      }, {
+        status: 400
       });
     }
 
     // Step 2: Delete contact
     const deleteUrl = `https://api.sendgrid.com/v3/marketing/contacts?ids=${contactId}`;
-    const deleteResponse = await axios.delete(deleteUrl, sendGridConfig);
+    const deleteResponse = await fetch(deleteUrl, {
+      method: "DELETE",
+      headers: sendGridHeaders,
+    });
+
+    if (!deleteResponse.ok) {
+      const status = deleteResponse.status;
+      const errorMessages: Record<number, string> = {
+        400: "Invalid request format. Please try again.",
+        401: "Server authentication failed. Please try again later.",
+        429: "Too many requests. Please try again in a few minutes.",
+        500: "Server error. Please try again later.",
+      };
+      return NextResponse.json(
+        { error: errorMessages[status] ?? "An unexpected error occurred." },
+        { status },
+      );
+    }
 
     // Return 202 to match SendGrid's status code
     if (deleteResponse.status === 202) {
       return NextResponse.json({
         message: "Successfully unsubscribed from the newsletter."
-      }, { 
+      }, {
         status: 202  // Match SendGrid's status code
       });
     }
@@ -102,37 +123,13 @@ export async function DELETE(request: Request) {
     throw new Error('Unexpected response from SendGrid');
 
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error('SendGrid API Error:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-
-      const status = error.response?.status ?? 500;
-      const errorMessages: Record<number, string> = {
-        400: "Invalid request format. Please try again.",
-        401: "Server authentication failed. Please try again later.",
-        404: "Email not found in our mailing list.",
-        405: "API method not allowed. Please contact support.",
-        429: "Too many requests. Please try again in a few minutes.",
-        500: "Server error. Please try again later."
-      };
-
-      return NextResponse.json({ 
-        error: errorMessages[status] ?? "An unexpected error occurred." 
-      }, { 
-        status 
-      });
-    }
-
     // Log unexpected errors
     console.error('Unexpected error:', error);
-    
+
     return NextResponse.json({
       error: "An unexpected error occurred. Please try again later."
-    }, { 
-      status: 500 
+    }, {
+      status: 500
     });
   }
 }

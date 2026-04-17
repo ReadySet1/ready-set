@@ -145,7 +145,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
       `;
     }
 
-    // Compute period totals
+    // Compute period totals from weekly summaries first
     const periodSummary = {
       totalShifts: 0,
       completedShifts: 0,
@@ -164,6 +164,40 @@ export async function GET(request: NextRequest, context: RouteParams) {
       periodSummary.gpsMiles += Number(summary.gpsMiles);
     }
 
+    // Fallback: if weekly summaries are empty, compute from shifts and deliveries directly
+    if (summaries.length === 0) {
+      const allShifts = [...shifts, ...archivedShifts];
+      for (const shift of allShifts) {
+        periodSummary.totalShifts += 1;
+        if (shift.status === 'COMPLETED') {
+          periodSummary.completedShifts += 1;
+        }
+        if (shift.shiftStart && shift.shiftEnd) {
+          const start = shift.shiftStart instanceof Date ? shift.shiftStart : new Date(shift.shiftStart);
+          const end = shift.shiftEnd instanceof Date ? shift.shiftEnd : new Date(shift.shiftEnd);
+          periodSummary.totalHours += (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        }
+        periodSummary.totalDeliveries += Number(shift.deliveryCount || 0);
+        periodSummary.totalMiles += Number(shift.totalDistanceMiles || 0);
+        periodSummary.gpsMiles += Number(shift.gpsDistanceMiles || 0);
+      }
+
+      // Also query deliveries directly in case shift deliveryCount is not populated
+      if (periodSummary.totalDeliveries === 0) {
+        const deliveryCount = await prisma.delivery.count({
+          where: {
+            driverId,
+            createdAt: {
+              gte: startDate,
+              lte: endDate,
+            },
+            deletedAt: null,
+          },
+        });
+        periodSummary.totalDeliveries = deliveryCount;
+      }
+    }
+
     // Return CSV format
     if (responseFormat === 'csv') {
       const headers = [
@@ -178,17 +212,34 @@ export async function GET(request: NextRequest, context: RouteParams) {
         'GPS Miles',
       ];
 
-      const rows = summaries.map((s: typeof summaries[number]) => [
-        `Week ${s.weekNumber} ${s.year}`,
-        format(s.weekStart, 'yyyy-MM-dd'),
-        format(s.weekEnd, 'yyyy-MM-dd'),
-        s.totalShifts,
-        s.completedShifts,
-        Number(s.totalShiftHours).toFixed(1),
-        s.totalDeliveries,
-        Number(s.totalMiles).toFixed(1),
-        Number(s.gpsMiles).toFixed(1),
-      ]);
+      let rows: (string | number)[][];
+
+      if (summaries.length > 0) {
+        rows = summaries.map((s: typeof summaries[number]) => [
+          `Week ${s.weekNumber} ${s.year}`,
+          format(s.weekStart, 'yyyy-MM-dd'),
+          format(s.weekEnd, 'yyyy-MM-dd'),
+          s.totalShifts,
+          s.completedShifts,
+          Number(s.totalShiftHours).toFixed(1),
+          s.totalDeliveries,
+          Number(s.totalMiles).toFixed(1),
+          Number(s.gpsMiles).toFixed(1),
+        ]);
+      } else {
+        // Fallback: generate a single summary row from computed period totals
+        rows = [[
+          `${format(startDate, 'yyyy-MM-dd')} to ${format(endDate, 'yyyy-MM-dd')}`,
+          format(startDate, 'yyyy-MM-dd'),
+          format(endDate, 'yyyy-MM-dd'),
+          periodSummary.totalShifts,
+          periodSummary.completedShifts,
+          periodSummary.totalHours.toFixed(1),
+          periodSummary.totalDeliveries,
+          periodSummary.totalMiles.toFixed(1),
+          periodSummary.gpsMiles.toFixed(1),
+        ]];
+      }
 
       const csv = [
         `Driver History - ${driver.profile?.name || 'Unknown'}`,

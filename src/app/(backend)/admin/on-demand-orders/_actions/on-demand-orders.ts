@@ -230,9 +230,12 @@ export async function createOnDemandOrder(formData: CreateOnDemandOrderInput): P
   // 1. Validate the input data
   const validationResult = createOnDemandOrderSchema.safeParse(formData);
   if (!validationResult.success) {
+    const failingFields = validationResult.error.issues.map(i => i.path.join('.')).filter(Boolean);
+    const uniqueFields = [...new Set(failingFields)];
+    const fieldList = uniqueFields.length > 0 ? ` Issues with: ${uniqueFields.join(', ')}.` : '';
     return {
       success: false,
-      error: "Validation failed. Please check the form fields.",
+      error: `Validation failed. Please check the form fields.${fieldList}`,
       fieldErrors: validationResult.error.format(),
     };
   }
