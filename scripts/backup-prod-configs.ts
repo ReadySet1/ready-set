@@ -9,11 +9,11 @@ async function main() {
     "utf-8"
   );
   const match = envContent.match(/^DATABASE_URL="([^"]+)"/m);
-  if (!match) {
+  if (!match || !match[1]) {
     console.error("ERROR: Could not find DATABASE_URL in .env.production");
     process.exit(1);
   }
-  const databaseUrl = match[1];
+  const databaseUrl: string = match[1];
 
   const pool = new Pool({ connectionString: databaseUrl });
 
