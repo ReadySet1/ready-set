@@ -48,17 +48,19 @@ interface DriverStatusCardProps {
 // Update the status maps to use the enum with UPPERCASE keys
 const driverStatusMap: Record<DriverStatus, string> = {
   [DriverStatus.ASSIGNED]: "🚗 Assigned",
-  [DriverStatus.ARRIVED_AT_VENDOR]: "🏪 At Vendor",
-  [DriverStatus.EN_ROUTE_TO_CLIENT]: "🚚 On the Way",
-  [DriverStatus.ARRIVED_TO_CLIENT]: "🏁 Arrived",
-  [DriverStatus.COMPLETED]: "✅ Completed",
+  [DriverStatus.ARRIVED_AT_VENDOR]: "🏪 Arrived at Vendor",
+  [DriverStatus.PICKED_UP]: "📦 Pick Up Completed",
+  [DriverStatus.EN_ROUTE_TO_CLIENT]: "🚚 En Route to Client",
+  [DriverStatus.ARRIVED_TO_CLIENT]: "🏁 Arrived at Client",
+  [DriverStatus.COMPLETED]: "✅ Delivered",
 };
 
 const driverStatusProgress: Record<DriverStatus, number> = {
   [DriverStatus.ASSIGNED]: 0,
-  [DriverStatus.ARRIVED_AT_VENDOR]: 25,
-  [DriverStatus.EN_ROUTE_TO_CLIENT]: 50,
-  [DriverStatus.ARRIVED_TO_CLIENT]: 75,
+  [DriverStatus.ARRIVED_AT_VENDOR]: 20,
+  [DriverStatus.PICKED_UP]: 40,
+  [DriverStatus.EN_ROUTE_TO_CLIENT]: 60,
+  [DriverStatus.ARRIVED_TO_CLIENT]: 80,
   [DriverStatus.COMPLETED]: 100,
 };
 
@@ -66,6 +68,7 @@ const driverStatusProgress: Record<DriverStatus, number> = {
 const driverStatusColors: Record<DriverStatus, string> = {
   [DriverStatus.ASSIGNED]: "border-yellow-300 bg-yellow-100 text-yellow-800",
   [DriverStatus.ARRIVED_AT_VENDOR]: "border-blue-300 bg-blue-100 text-blue-800",
+  [DriverStatus.PICKED_UP]: "border-cyan-300 bg-cyan-100 text-cyan-800",
   [DriverStatus.EN_ROUTE_TO_CLIENT]:
     "border-green-300 bg-green-100 text-green-800",
   [DriverStatus.ARRIVED_TO_CLIENT]:
@@ -117,6 +120,9 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
         timeEstimate = "~30-45 min";
         break;
       case DriverStatus.ARRIVED_AT_VENDOR:
+        timeEstimate = "~25-35 min";
+        break;
+      case DriverStatus.PICKED_UP:
         timeEstimate = "~20-30 min";
         break;
       case DriverStatus.EN_ROUTE_TO_CLIENT:
@@ -221,7 +227,7 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                 </div>
               </div>
 
-              {/* Enhanced progress bar with timestamps */}
+              {/* Enhanced progress bar */}
               <div className="relative">
                 <Progress
                   value={getProgressValue(order.driver_status)}
@@ -231,6 +237,8 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                       order.driver_status === DriverStatus.ASSIGNED,
                     "bg-blue-500":
                       order.driver_status === DriverStatus.ARRIVED_AT_VENDOR,
+                    "bg-cyan-500":
+                      order.driver_status === DriverStatus.PICKED_UP,
                     "bg-green-500":
                       order.driver_status === DriverStatus.EN_ROUTE_TO_CLIENT,
                     "bg-purple-500":
@@ -243,27 +251,21 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                 <div className="mt-1 flex justify-between text-xs text-slate-500">
                   <div className="flex flex-col items-center">
                     <span>Assigned</span>
-                    <span className="text-[10px]">
-                      {formatDateTime(order.pickup_time)}
-                    </span>
                   </div>
                   <div className="flex flex-col items-center">
-                    <span>At Vendor</span>
+                    <span>Arrived at Vendor</span>
                   </div>
                   <div className="flex flex-col items-center">
-                    <span>En Route</span>
+                    <span>Pick Up Completed</span>
                   </div>
                   <div className="flex flex-col items-center">
-                    <span>Arrived</span>
-                    <span className="text-[10px]">
-                      {formatDateTime(order.arrival_time)}
-                    </span>
+                    <span>En Route to Client</span>
                   </div>
                   <div className="flex flex-col items-center">
-                    <span>Completed</span>
-                    <span className="text-[10px]">
-                      {formatDateTime(order.complete_time)}
-                    </span>
+                    <span>Arrived at Client</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span>Delivered</span>
                   </div>
                 </div>
               </div>

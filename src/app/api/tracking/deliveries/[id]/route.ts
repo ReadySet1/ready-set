@@ -169,7 +169,7 @@ export async function PUT(
     }
 
     // Validate status transition
-    const validStatuses: DriverStatus[] = [DriverStatus.ASSIGNED, DriverStatus.EN_ROUTE_TO_CLIENT, DriverStatus.ARRIVED_TO_CLIENT, DriverStatus.COMPLETED];
+    const validStatuses: DriverStatus[] = [DriverStatus.ASSIGNED, DriverStatus.ARRIVED_AT_VENDOR, DriverStatus.PICKED_UP, DriverStatus.EN_ROUTE_TO_CLIENT, DriverStatus.ARRIVED_TO_CLIENT, DriverStatus.COMPLETED];
     if (status && !validStatuses.includes(status)) {
       return NextResponse.json(
         { success: false, error: 'Invalid status' },

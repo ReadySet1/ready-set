@@ -13,9 +13,14 @@ describe('getTimestampUpdatesForStatus', () => {
     expect(updates).toEqual(['arrived_at_vendor_at = NOW()']);
   });
 
-  it('should return picked_up_at and en_route_at for EN_ROUTE_TO_CLIENT', () => {
+  it('should return picked_up_at for PICKED_UP', () => {
+    const updates = getTimestampUpdatesForStatus(DriverStatus.PICKED_UP);
+    expect(updates).toEqual(['picked_up_at = NOW()']);
+  });
+
+  it('should return en_route_at for EN_ROUTE_TO_CLIENT', () => {
     const updates = getTimestampUpdatesForStatus(DriverStatus.EN_ROUTE_TO_CLIENT);
-    expect(updates).toEqual(['picked_up_at = NOW()', 'en_route_at = NOW()']);
+    expect(updates).toEqual(['en_route_at = NOW()']);
   });
 
   it('should return arrived_at_client_at for ARRIVED_TO_CLIENT', () => {
@@ -73,6 +78,7 @@ describe('delivery lifecycle timestamp coverage', () => {
     expect(STATUS_ORDER).toEqual([
       DriverStatus.ASSIGNED,
       DriverStatus.ARRIVED_AT_VENDOR,
+      DriverStatus.PICKED_UP,
       DriverStatus.EN_ROUTE_TO_CLIENT,
       DriverStatus.ARRIVED_TO_CLIENT,
       DriverStatus.COMPLETED,

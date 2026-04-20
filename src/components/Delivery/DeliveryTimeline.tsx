@@ -135,14 +135,15 @@ export function DeliveryTimeline({
   const currentStatusIndex = getStatusIndex(currentStatus);
 
   // Map STATUS_ORDER index to stage index (stages include 'created' at index 0)
-  // STATUS_ORDER: ASSIGNED(0), ARRIVED_AT_VENDOR(1), EN_ROUTE(2), ARRIVED(3), COMPLETED(4)
+  // STATUS_ORDER: ASSIGNED(0), ARRIVED_AT_VENDOR(1), PICKED_UP(2), EN_ROUTE(3), ARRIVED(4), COMPLETED(5)
   // stages:       created(0), assigned(1), at_vendor(2), picked_up(3), en_route(4), arrived(5), delivered(6)
   const statusToStageMap: Record<number, number> = {
     0: 1, // ASSIGNED -> assigned stage
     1: 2, // ARRIVED_AT_VENDOR -> at_vendor stage
-    2: 4, // EN_ROUTE_TO_CLIENT -> en_route stage
-    3: 5, // ARRIVED_TO_CLIENT -> arrived stage
-    4: 6, // COMPLETED -> delivered stage
+    2: 3, // PICKED_UP -> picked_up stage
+    3: 4, // EN_ROUTE_TO_CLIENT -> en_route stage
+    4: 5, // ARRIVED_TO_CLIENT -> arrived stage
+    5: 6, // COMPLETED -> delivered stage
   };
 
   const activeStageIndex = currentStatusIndex >= 0 ? (statusToStageMap[currentStatusIndex] ?? -1) : -1;
