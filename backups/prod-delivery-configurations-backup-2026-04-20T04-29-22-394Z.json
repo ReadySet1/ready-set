@@ -1,0 +1,515 @@
+[
+  {
+    "id": "fa2ae056-9e1c-440e-a6b8-d8695e084405",
+    "config_id": "cater-valley",
+    "client_name": "CaterValley",
+    "vendor_name": "CaterValley",
+    "description": "CaterValley delivery pricing with $42.50 minimum delivery fee",
+    "is_active": true,
+    "pricing_tiers": [
+      {
+        "foodCostMax": 300,
+        "foodCostMin": 0,
+        "regularRate": 85,
+        "headcountMax": 25,
+        "headcountMin": 0,
+        "within10Miles": 42.5
+      },
+      {
+        "foodCostMax": 599.99,
+        "foodCostMin": 300.01,
+        "regularRate": 90,
+        "headcountMax": 49,
+        "headcountMin": 26,
+        "within10Miles": 52.5
+      },
+      {
+        "foodCostMax": 899.99,
+        "foodCostMin": 600,
+        "regularRate": 110,
+        "headcountMax": 74,
+        "headcountMin": 50,
+        "within10Miles": 62.5
+      },
+      {
+        "foodCostMax": 1199.99,
+        "foodCostMin": 900,
+        "regularRate": 120,
+        "headcountMax": 99,
+        "headcountMin": 75,
+        "within10Miles": 72.5
+      },
+      {
+        "foodCostMax": null,
+        "foodCostMin": 1200,
+        "regularRate": 0,
+        "headcountMax": null,
+        "headcountMin": 100,
+        "within10Miles": 0,
+        "regularRatePercent": 0.1,
+        "within10MilesPercent": 0.1
+      }
+    ],
+    "mileage_rate": "3.00",
+    "distance_threshold": "10.00",
+    "daily_drive_discounts": {
+      "twoDrivers": 5,
+      "threeDrivers": 10,
+      "fourPlusDrivers": 15
+    },
+    "driver_pay_settings": {
+      "bonusPay": 10,
+      "readySetFee": 70,
+      "maxPayPerDrop": null,
+      "basePayPerDrop": 18,
+      "driverMileageRate": 0.7
+    },
+    "bridge_toll_settings": {
+      "autoApplyForAreas": [
+        "San Francisco",
+        "Oakland",
+        "Marin County"
+      ],
+      "defaultTollAmount": 8
+    },
+    "custom_settings": {
+      "tollPaidByReadySet": true
+    },
+    "created_at": "2026-01-15T17:21:29.117Z",
+    "updated_at": "2026-01-15T17:21:29.117Z",
+    "created_by": null,
+    "notes": "CaterValley pricing with $42.50 minimum delivery fee. Driver pay: $18 base + $10 bonus + ($0.70/mile). Bridge toll ($8) is driver compensation paid by Ready Set, NOT charged to customer."
+  },
+  {
+    "id": "bd969530-382b-4621-b004-a891b2cc8482",
+    "config_id": "generic-template",
+    "client_name": "Generic Template",
+    "vendor_name": "Generic Vendor",
+    "description": "Customizable base configuration for new clients",
+    "is_active": false,
+    "pricing_tiers": [
+      {
+        "foodCostMax": 299.99,
+        "foodCostMin": 0,
+        "regularRate": 50,
+        "headcountMax": 24,
+        "headcountMin": 0,
+        "within10Miles": 25
+      },
+      {
+        "foodCostMax": 599.99,
+        "foodCostMin": 300,
+        "regularRate": 60,
+        "headcountMax": 49,
+        "headcountMin": 25,
+        "within10Miles": 35
+      },
+      {
+        "foodCostMax": 899.99,
+        "foodCostMin": 600,
+        "regularRate": 75,
+        "headcountMax": 74,
+        "headcountMin": 50,
+        "within10Miles": 45
+      },
+      {
+        "foodCostMax": 1199.99,
+        "foodCostMin": 900,
+        "regularRate": 90,
+        "headcountMax": 99,
+        "headcountMin": 75,
+        "within10Miles": 55
+      },
+      {
+        "foodCostMax": null,
+        "foodCostMin": 1200,
+        "regularRate": 110,
+        "headcountMax": null,
+        "headcountMin": 100,
+        "within10Miles": 65
+      }
+    ],
+    "mileage_rate": "2.50",
+    "distance_threshold": "10.00",
+    "daily_drive_discounts": {
+      "twoDrivers": 5,
+      "threeDrivers": 10,
+      "fourPlusDrivers": 15
+    },
+    "driver_pay_settings": {
+      "bonusPay": 8,
+      "readySetFee": 60,
+      "maxPayPerDrop": 35,
+      "basePayPerDrop": 20
+    },
+    "bridge_toll_settings": {
+      "defaultTollAmount": 7
+    },
+    "custom_settings": null,
+    "created_at": "2025-10-09T16:43:46.939Z",
+    "updated_at": "2025-10-09T18:03:45.926Z",
+    "created_by": null,
+    "notes": "Base template for creating custom client configurations"
+  },
+  {
+    "id": "7ac4086f-27be-44a7-8c5a-b22c6d02343b",
+    "config_id": "kasa",
+    "client_name": "Kasa",
+    "vendor_name": "Kasa",
+    "description": "Kasa delivery pricing with within/beyond 10 miles rate structure",
+    "is_active": true,
+    "pricing_tiers": [
+      {
+        "foodCostMax": 300,
+        "foodCostMin": 0,
+        "regularRate": 60,
+        "headcountMax": 24,
+        "headcountMin": 0,
+        "within10Miles": 30
+      },
+      {
+        "foodCostMax": 599.99,
+        "foodCostMin": 300,
+        "regularRate": 70,
+        "headcountMax": 49,
+        "headcountMin": 25,
+        "within10Miles": 40
+      },
+      {
+        "foodCostMax": 899.99,
+        "foodCostMin": 600,
+        "regularRate": 90,
+        "headcountMax": 74,
+        "headcountMin": 50,
+        "within10Miles": 60
+      },
+      {
+        "foodCostMax": 1199.99,
+        "foodCostMin": 900,
+        "regularRate": 100,
+        "headcountMax": 99,
+        "headcountMin": 75,
+        "within10Miles": 70
+      },
+      {
+        "foodCostMax": 1499.99,
+        "foodCostMin": 1200,
+        "regularRate": 120,
+        "headcountMax": 124,
+        "headcountMin": 100,
+        "within10Miles": 80
+      },
+      {
+        "foodCostMax": 1799.99,
+        "foodCostMin": 1500,
+        "regularRate": 140,
+        "headcountMax": 149,
+        "headcountMin": 125,
+        "within10Miles": 90
+      },
+      {
+        "foodCostMax": 2099.99,
+        "foodCostMin": 1800,
+        "regularRate": 160,
+        "headcountMax": 174,
+        "headcountMin": 150,
+        "within10Miles": 100
+      },
+      {
+        "foodCostMax": 2399.99,
+        "foodCostMin": 2100,
+        "regularRate": 180,
+        "headcountMax": 199,
+        "headcountMin": 175,
+        "within10Miles": 110
+      },
+      {
+        "foodCostMax": 2999.99,
+        "foodCostMin": 2400,
+        "regularRate": 200,
+        "headcountMax": 249,
+        "headcountMin": 200,
+        "within10Miles": 120
+      },
+      {
+        "foodCostMax": 3499.99,
+        "foodCostMin": 3000,
+        "regularRate": 220,
+        "headcountMax": 299,
+        "headcountMin": 250,
+        "within10Miles": 130
+      },
+      {
+        "foodCostMax": null,
+        "foodCostMin": 3500,
+        "regularRate": 0,
+        "headcountMax": null,
+        "headcountMin": 300,
+        "within10Miles": 0
+      }
+    ],
+    "mileage_rate": "3.00",
+    "distance_threshold": "10.00",
+    "daily_drive_discounts": {
+      "twoDrivers": 5,
+      "threeDrivers": 10,
+      "fourPlusDrivers": 15
+    },
+    "driver_pay_settings": {
+      "bonusPay": 10,
+      "readySetFee": 70,
+      "maxPayPerDrop": 40,
+      "basePayPerDrop": 23
+    },
+    "bridge_toll_settings": {
+      "autoApplyForAreas": [
+        "San Francisco",
+        "Oakland",
+        "Marin County"
+      ],
+      "defaultTollAmount": 8
+    },
+    "custom_settings": null,
+    "created_at": "2025-10-09T16:43:46.879Z",
+    "updated_at": "2025-10-09T18:03:45.847Z",
+    "created_by": null,
+    "notes": "Kasa pricing based on New Kasa Pricing table (Image 3)"
+  },
+  {
+    "id": "404d45e9-e421-4a10-b414-07c368e77cab",
+    "config_id": "ready-set-food-premium",
+    "client_name": "Ready Set Food - Premium",
+    "vendor_name": "Destino",
+    "description": "Premium delivery pricing with enhanced driver compensation",
+    "is_active": false,
+    "pricing_tiers": [
+      {
+        "foodCostMax": 299.99,
+        "foodCostMin": 0,
+        "regularRate": 70,
+        "headcountMax": 24,
+        "headcountMin": 0,
+        "within10Miles": 40
+      },
+      {
+        "foodCostMax": 599.99,
+        "foodCostMin": 300,
+        "regularRate": 85,
+        "headcountMax": 49,
+        "headcountMin": 25,
+        "within10Miles": 50
+      },
+      {
+        "foodCostMax": 899.99,
+        "foodCostMin": 600,
+        "regularRate": 105,
+        "headcountMax": 74,
+        "headcountMin": 50,
+        "within10Miles": 70
+      },
+      {
+        "foodCostMax": 1199.99,
+        "foodCostMin": 900,
+        "regularRate": 120,
+        "headcountMax": 99,
+        "headcountMin": 75,
+        "within10Miles": 85
+      },
+      {
+        "foodCostMax": 1499.99,
+        "foodCostMin": 1200,
+        "regularRate": 140,
+        "headcountMax": 124,
+        "headcountMin": 100,
+        "within10Miles": 95
+      },
+      {
+        "foodCostMax": 1699.99,
+        "foodCostMin": 1500,
+        "regularRate": 170,
+        "headcountMax": 149,
+        "headcountMin": 125,
+        "within10Miles": 105
+      },
+      {
+        "foodCostMax": 1899.99,
+        "foodCostMin": 1700,
+        "regularRate": 200,
+        "headcountMax": 174,
+        "headcountMin": 150,
+        "within10Miles": 115
+      },
+      {
+        "foodCostMax": 2099.99,
+        "foodCostMin": 1900,
+        "regularRate": 230,
+        "headcountMax": 199,
+        "headcountMin": 175,
+        "within10Miles": 125
+      },
+      {
+        "foodCostMax": 2299.99,
+        "foodCostMin": 2100,
+        "regularRate": 300,
+        "headcountMax": 249,
+        "headcountMin": 200,
+        "within10Miles": 140
+      },
+      {
+        "foodCostMax": 2499.99,
+        "foodCostMin": 2300,
+        "regularRate": 340,
+        "headcountMax": 299,
+        "headcountMin": 250,
+        "within10Miles": 150
+      },
+      {
+        "foodCostMax": null,
+        "foodCostMin": 2500,
+        "regularRate": 0,
+        "headcountMax": null,
+        "headcountMin": 300,
+        "within10Miles": 0
+      }
+    ],
+    "mileage_rate": "3.50",
+    "distance_threshold": "10.00",
+    "daily_drive_discounts": {
+      "twoDrivers": 7,
+      "threeDrivers": 12,
+      "fourPlusDrivers": 18
+    },
+    "driver_pay_settings": {
+      "bonusPay": 15,
+      "readySetFee": 85,
+      "maxPayPerDrop": 50,
+      "basePayPerDrop": 28
+    },
+    "bridge_toll_settings": {
+      "autoApplyForAreas": [
+        "San Francisco",
+        "Oakland",
+        "Marin County",
+        "Berkeley"
+      ],
+      "defaultTollAmount": 10
+    },
+    "custom_settings": null,
+    "created_at": "2025-10-09T16:43:46.816Z",
+    "updated_at": "2025-10-09T18:03:45.779Z",
+    "created_by": null,
+    "notes": "Premium service with higher driver compensation and customer charges"
+  },
+  {
+    "id": "cbe18935-0b91-472c-adf2-a3d096d7f5be",
+    "config_id": "ready-set-food-standard",
+    "client_name": "Ready Set Food - Standard",
+    "vendor_name": "Destino",
+    "description": "Standard delivery pricing for Ready Set Food with tiered compensation rules",
+    "is_active": true,
+    "pricing_tiers": [
+      {
+        "foodCostMax": 299.99,
+        "foodCostMin": 0,
+        "regularRate": 60,
+        "headcountMax": 24,
+        "headcountMin": 0,
+        "within10Miles": 60
+      },
+      {
+        "foodCostMax": 599.99,
+        "foodCostMin": 300,
+        "regularRate": 70,
+        "headcountMax": 49,
+        "headcountMin": 25,
+        "within10Miles": 70
+      },
+      {
+        "foodCostMax": 899.99,
+        "foodCostMin": 600,
+        "regularRate": 90,
+        "headcountMax": 74,
+        "headcountMin": 50,
+        "within10Miles": 90
+      },
+      {
+        "foodCostMax": 1199.99,
+        "foodCostMin": 900,
+        "regularRate": 100,
+        "headcountMax": 99,
+        "headcountMin": 75,
+        "within10Miles": 100
+      },
+      {
+        "foodCostMax": 1499.99,
+        "foodCostMin": 1200,
+        "regularRate": 120,
+        "headcountMax": 124,
+        "headcountMin": 100,
+        "within10Miles": 120
+      },
+      {
+        "foodCostMax": 1699.99,
+        "foodCostMin": 1500,
+        "regularRate": 150,
+        "headcountMax": 149,
+        "headcountMin": 125,
+        "within10Miles": 150
+      },
+      {
+        "foodCostMax": 1899.99,
+        "foodCostMin": 1700,
+        "regularRate": 180,
+        "headcountMax": 174,
+        "headcountMin": 150,
+        "within10Miles": 180
+      },
+      {
+        "foodCostMax": 2099.99,
+        "foodCostMin": 1900,
+        "regularRate": 210,
+        "headcountMax": 199,
+        "headcountMin": 175,
+        "within10Miles": 210
+      },
+      {
+        "foodCostMax": 2299.99,
+        "foodCostMin": 2100,
+        "regularRate": 280,
+        "headcountMax": 249,
+        "headcountMin": 200,
+        "within10Miles": 280
+      },
+      {
+        "foodCostMax": 2499.99,
+        "foodCostMin": 2300,
+        "regularRate": 310,
+        "headcountMax": 299,
+        "headcountMin": 250,
+        "within10Miles": 310
+      }
+    ],
+    "mileage_rate": "3.00",
+    "distance_threshold": "10.00",
+    "daily_drive_discounts": {
+      "twoDrivers": 5,
+      "threeDrivers": 10,
+      "fourPlusDrivers": 15
+    },
+    "driver_pay_settings": {
+      "bonusPay": 0,
+      "readySetFee": 0,
+      "maxPayPerDrop": 100,
+      "basePayPerDrop": 30
+    },
+    "bridge_toll_settings": {
+      "autoApplyForAreas": [],
+      "defaultTollAmount": 9
+    },
+    "custom_settings": null,
+    "created_at": "2025-10-09T16:56:33.599Z",
+    "updated_at": "2025-10-09T16:56:33.599Z",
+    "created_by": null,
+    "notes": null
+  }
+]
