@@ -2,7 +2,10 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
-// Mock all dependencies before importing FlowerHero
+jest.mock("next/font/google", () => ({
+  Playfair_Display: () => ({ className: "playfair-mock" }),
+}));
+
 jest.mock("@/components/Logistics/QuoteRequest/Quotes/FormManager", () => ({
   FormManager: () => ({
     openForm: jest.fn(),
@@ -39,8 +42,10 @@ describe("FlowerHero - Minimal Test", () => {
 
   it("should display the main heading", () => {
     render(<FlowerHero />);
-    expect(screen.getByText("Your Go-To Flower")).toBeInTheDocument();
-    expect(screen.getByText("Delivery Partner")).toBeInTheDocument();
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveTextContent("Your Go-To Flower");
+    expect(heading).toHaveTextContent("Delivery Partner");
+    expect(heading).toHaveTextContent("Since 2019");
   });
 
   it("should display the schedule dialog", () => {
