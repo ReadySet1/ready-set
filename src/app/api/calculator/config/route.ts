@@ -95,6 +95,24 @@ export async function GET(request: NextRequest) {
         });
 
         if (dbConfig) {
+          // Selectively merge boolean flags from in-memory defaults into
+          // DB driverPaySettings. Only boolean flags are safe to inherit —
+          // structural data (tiers, mileage settings) must NOT be merged
+          // because their absence in the DB means the flat fallback values
+          // (basePayPerDrop, driverMileageRate) should be used instead.
+          const inMemoryConfig = getConfiguration(clientConfigId);
+          const dbDriverPay = dbConfig.driverPaySettings as any;
+          const inMemoryDriverPay = inMemoryConfig?.driverPaySettings;
+          const mergedDriverPaySettings = {
+            ...dbDriverPay,
+            readySetFeeMatchesDeliveryFee:
+              dbDriverPay.readySetFeeMatchesDeliveryFee ?? inMemoryDriverPay?.readySetFeeMatchesDeliveryFee,
+            requiresManualReview:
+              dbDriverPay.requiresManualReview ?? inMemoryDriverPay?.requiresManualReview,
+            includeDirectTipInReadySetTotal:
+              dbDriverPay.includeDirectTipInReadySetTotal ?? inMemoryDriverPay?.includeDirectTipInReadySetTotal,
+          };
+
           clientConfig = {
             id: dbConfig.configId,
             clientId: dbConfig.configId,
@@ -108,7 +126,7 @@ export async function GET(request: NextRequest) {
             mileageRate: parseFloat(dbConfig.mileageRate.toString()),
             distanceThreshold: parseFloat(dbConfig.distanceThreshold.toString()),
             dailyDriveDiscounts: dbConfig.dailyDriveDiscounts as any,
-            driverPaySettings: dbConfig.driverPaySettings as any,
+            driverPaySettings: mergedDriverPaySettings,
             bridgeTollSettings: dbConfig.bridgeTollSettings as any,
             zeroOrderSettings: dbConfig.zeroOrderSettings as any ?? undefined,
             createdAt: dbConfig.createdAt,

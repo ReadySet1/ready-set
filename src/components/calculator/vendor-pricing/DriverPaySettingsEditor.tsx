@@ -154,7 +154,9 @@ export function DriverPaySettingsEditor({ settings, onChange }: DriverPaySetting
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="dp-base-pay">Base Pay Per Drop</Label>
+            <Label htmlFor="dp-base-pay" className={hasBasePayTiers ? 'text-slate-400' : ''}>
+              Base Pay Per Drop {hasBasePayTiers && '(fallback)'}
+            </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
               <Input
@@ -164,9 +166,14 @@ export function DriverPaySettingsEditor({ settings, onChange }: DriverPaySetting
                 step="0.01"
                 value={settings.basePayPerDrop}
                 onChange={(e) => update('basePayPerDrop', parseFloat(e.target.value) || 0)}
-                className="pl-7"
+                className={`pl-7 ${hasBasePayTiers ? 'opacity-50' : ''}`}
               />
             </div>
+            {hasBasePayTiers && (
+              <p className="text-xs text-amber-600">
+                Overridden by headcount tiers below. Change the tier Base Pay ($) values instead.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
