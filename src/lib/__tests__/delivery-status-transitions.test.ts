@@ -77,6 +77,7 @@ describe('delivery lifecycle timestamp coverage', () => {
   it('should follow the correct status order for transitions', () => {
     expect(STATUS_ORDER).toEqual([
       DriverStatus.ASSIGNED,
+      DriverStatus.EN_ROUTE_TO_VENDOR,
       DriverStatus.ARRIVED_AT_VENDOR,
       DriverStatus.PICKED_UP,
       DriverStatus.EN_ROUTE_TO_CLIENT,

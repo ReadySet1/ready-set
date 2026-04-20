@@ -150,6 +150,7 @@ export interface DeliveryAssignedPayload extends DeliveryAssignmentPayload {
  */
 export type DeliveryTrackingStatus =
   | 'ASSIGNED'
+  | 'EN_ROUTE_TO_VENDOR'
   | 'ARRIVED_AT_VENDOR'
   | 'PICKED_UP'
   | 'EN_ROUTE_TO_CLIENT'

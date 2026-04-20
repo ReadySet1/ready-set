@@ -59,6 +59,7 @@ export interface EventReportResult {
  */
 const DRIVER_STATUS_TO_EZCATER_EVENT: Record<DriverStatus, EzCaterCourierEventType | null> = {
   ASSIGNED: 'COURIER_ASSIGNED',
+  EN_ROUTE_TO_VENDOR: null,
   ARRIVED_AT_VENDOR: 'ARRIVED_AT_PICKUP',
   PICKED_UP: 'ORDER_PICKED_UP',
   EN_ROUTE_TO_CLIENT: 'EN_ROUTE_TO_DROPOFF',
