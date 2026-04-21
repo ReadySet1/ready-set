@@ -23,6 +23,7 @@ import type { DeliveryStatusUpdatedPayload, DeliveryTrackingStatus } from '@/lib
 // Status display configuration
 const STATUS_DISPLAY: Record<DeliveryTrackingStatus, { emoji: string; label: string }> = {
   ASSIGNED: { emoji: '📋', label: 'Driver Assigned' },
+  EN_ROUTE_TO_VENDOR: { emoji: '🚗', label: 'Driver En Route to Resto' },
   ARRIVED_AT_VENDOR: { emoji: '🏪', label: 'Driver Arrived at Pickup' },
   PICKED_UP: { emoji: '📦', label: 'Order Picked Up' },
   EN_ROUTE_TO_CLIENT: { emoji: '🚚', label: 'Driver En Route' },

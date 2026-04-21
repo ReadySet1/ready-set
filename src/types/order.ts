@@ -4,7 +4,9 @@
 // --- Enums (Matching Prisma Schema Names/Values) ---
 export enum DriverStatus {
   ASSIGNED = "ASSIGNED", // Match Prisma values
+  EN_ROUTE_TO_VENDOR = "EN_ROUTE_TO_VENDOR",
   ARRIVED_AT_VENDOR = "ARRIVED_AT_VENDOR",
+  PICKED_UP = "PICKED_UP",
   EN_ROUTE_TO_CLIENT = "EN_ROUTE_TO_CLIENT",
   ARRIVED_TO_CLIENT = "ARRIVED_TO_CLIENT",
   COMPLETED = "COMPLETED"

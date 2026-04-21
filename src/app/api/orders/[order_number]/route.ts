@@ -22,6 +22,7 @@ import {
 
 // Map DriverStatus to dispatch notification status
 const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
+  [DriverStatus.EN_ROUTE_TO_VENDOR]: 'EN_ROUTE_TO_PICKUP',
   [DriverStatus.ARRIVED_AT_VENDOR]: 'ARRIVED_AT_PICKUP',
   [DriverStatus.PICKED_UP]: 'PICKUP_COMPLETE', // Legacy - kept for backwards compatibility
   [DriverStatus.EN_ROUTE_TO_CLIENT]: 'EN_ROUTE_TO_DELIVERY',
@@ -32,6 +33,7 @@ const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
 // Map DriverStatus transitions to order status updates
 // When driver starts working on delivery, order status should sync
 const DRIVER_STATUS_TO_ORDER_STATUS: Record<string, string> = {
+  [DriverStatus.EN_ROUTE_TO_VENDOR]: 'IN_PROGRESS',
   [DriverStatus.ARRIVED_AT_VENDOR]: 'IN_PROGRESS',
   [DriverStatus.PICKED_UP]: 'IN_PROGRESS',
   [DriverStatus.EN_ROUTE_TO_CLIENT]: 'IN_PROGRESS',
@@ -41,6 +43,7 @@ const DRIVER_STATUS_TO_ORDER_STATUS: Record<string, string> = {
 
 // Statuses that should trigger customer notifications
 const CUSTOMER_NOTIFICATION_STATUSES = [
+  DriverStatus.EN_ROUTE_TO_VENDOR,
   DriverStatus.ARRIVED_AT_VENDOR,
   DriverStatus.EN_ROUTE_TO_CLIENT,
   DriverStatus.ARRIVED_TO_CLIENT,
@@ -54,6 +57,20 @@ const ADMIN_NOTIFICATION_STATUSES = [
 
 // Roles that can edit orders
 const ORDER_EDIT_ROLES = ['ADMIN', 'SUPER_ADMIN', 'HELPDESK'];
+
+// Map DriverStatus to the corresponding Delivery model timestamp field
+function getDeliveryTimestampField(status: string): string | null {
+  const map: Record<string, string> = {
+    [DriverStatus.ASSIGNED]: 'assignedAt',
+    [DriverStatus.EN_ROUTE_TO_VENDOR]: 'enRouteToVendorAt',
+    [DriverStatus.ARRIVED_AT_VENDOR]: 'arrivedAtVendorAt',
+    [DriverStatus.PICKED_UP]: 'pickedUpAt',
+    [DriverStatus.EN_ROUTE_TO_CLIENT]: 'enRouteAt',
+    [DriverStatus.ARRIVED_TO_CLIENT]: 'arrivedAtClientAt',
+    [DriverStatus.COMPLETED]: 'deliveredAt',
+  };
+  return map[status] ?? null;
+}
 
 type CateringRequest = CateringRequestGetPayload<{
   include: {
@@ -228,10 +245,11 @@ export async function GET(
       try {
         const delivery = await prisma.delivery.findFirst({
           where: {
-            orderNumber: order.orderNumber,
+            orderNumber: { equals: order.orderNumber, mode: 'insensitive' },
           },
           select: {
             assignedAt: true,
+            enRouteToVendorAt: true,
             arrivedAtVendorAt: true,
             pickedUpAt: true,
             enRouteAt: true,
@@ -244,6 +262,7 @@ export async function GET(
           const toISO = (d: Date | null) => d?.toISOString() ?? null;
           serializedOrder.deliveryTimestamps = {
             assignedAt: toISO(delivery.assignedAt),
+            enRouteToVendorAt: toISO(delivery.enRouteToVendorAt),
             arrivedAtVendorAt: toISO(delivery.arrivedAtVendorAt),
             pickedUpAt: toISO(delivery.pickedUpAt),
             enRouteAt: toISO(delivery.enRouteAt),
@@ -252,7 +271,6 @@ export async function GET(
           };
         }
       } catch (deliveryError) {
-        // Non-critical: don't fail the order response if delivery lookup fails
         console.warn('Failed to fetch delivery timestamps:', deliveryError);
       }
 
@@ -537,6 +555,50 @@ export async function PATCH(
     }
 
     if (updatedOrder) {
+      // Track the timestamp we're setting so we can include it in the response
+      // even if the DB read-back fails.
+      let justSetTimestamp: { field: string; value: Date } | null = null;
+
+      // Update delivery tracking timestamps when driver status changes.
+      // Use the actual DB order number (from the fetched order) so the
+      // Delivery record is consistent with what the GET handler looks up.
+      if (driverStatus) {
+        const timestampField = getDeliveryTimestampField(driverStatus);
+        if (timestampField) {
+          const now = new Date();
+          const dbOrderNumber = (existingOrder as any).orderNumber as string;
+          justSetTimestamp = { field: timestampField, value: now };
+          try {
+            // Resolve the Driver record ID from the dispatch's profile-based
+            // driver reference. Dispatch.driver references Profile, but
+            // Delivery.driverId references the Driver model (drivers table).
+            const dispatchDriverProfileId = (updatedOrder as any).dispatches?.[0]?.driver?.id as string | undefined;
+            let deliveryDriverId: string | null = null;
+            if (dispatchDriverProfileId) {
+              const driverRecord = await prisma.driver.findFirst({
+                where: { profileId: dispatchDriverProfileId },
+                select: { id: true },
+              });
+              deliveryDriverId = driverRecord?.id ?? null;
+            }
+
+            await prisma.delivery.upsert({
+              where: { orderNumber: dbOrderNumber },
+              update: { [timestampField]: now },
+              create: {
+                orderNumber: dbOrderNumber,
+                deliveryAddress: (existingOrder as any).deliveryAddress?.street1 ?? '',
+                driverId: deliveryDriverId,
+                status: driverStatus,
+                [timestampField]: now,
+              },
+            });
+          } catch (deliveryErr) {
+            console.error('Failed to update delivery timestamps:', deliveryErr);
+          }
+        }
+      }
+
       // Send notifications for driver status updates (non-blocking)
       if (driverStatus) {
         const dispatchStatus = DRIVER_STATUS_TO_DISPATCH_STATUS[driverStatus];
@@ -590,7 +652,7 @@ export async function PATCH(
               orderNumber: (updatedOrder as any).orderNumber,
               orderType: orderType,
               driverId: driverId,
-              status: driverStatus as 'ASSIGNED' | 'ARRIVED_AT_VENDOR' | 'PICKED_UP' | 'EN_ROUTE_TO_CLIENT' | 'ARRIVED_TO_CLIENT' | 'COMPLETED',
+              status: driverStatus as 'ASSIGNED' | 'EN_ROUTE_TO_VENDOR' | 'ARRIVED_AT_VENDOR' | 'PICKED_UP' | 'EN_ROUTE_TO_CLIENT' | 'ARRIVED_TO_CLIENT' | 'COMPLETED',
               previousStatus: (existingOrder as any)?.driverStatus || undefined,
               driverName: driverName || undefined,
               timestamp: new Date().toISOString(),
@@ -654,6 +716,48 @@ export async function PATCH(
       }
 
       const serializedOrder = serializeOrder(updatedOrder);
+
+      // Enrich with latest delivery timestamps so the frontend stays in sync
+      try {
+        const delivery = await prisma.delivery.findFirst({
+          where: { orderNumber: { equals: (updatedOrder as any).orderNumber, mode: 'insensitive' } },
+          select: {
+            assignedAt: true,
+            enRouteToVendorAt: true,
+            arrivedAtVendorAt: true,
+            pickedUpAt: true,
+            enRouteAt: true,
+            arrivedAtClientAt: true,
+            deliveredAt: true,
+          },
+        });
+        if (delivery) {
+          const toISO = (d: Date | null) => d?.toISOString() ?? null;
+          serializedOrder.deliveryTimestamps = {
+            assignedAt: toISO(delivery.assignedAt),
+            enRouteToVendorAt: toISO(delivery.enRouteToVendorAt),
+            arrivedAtVendorAt: toISO(delivery.arrivedAtVendorAt),
+            pickedUpAt: toISO(delivery.pickedUpAt),
+            enRouteAt: toISO(delivery.enRouteAt),
+            arrivedAtClientAt: toISO(delivery.arrivedAtClientAt),
+            deliveredAt: toISO(delivery.deliveredAt),
+          };
+        }
+      } catch (deliveryErr) {
+        console.warn('Failed to fetch delivery timestamps after update:', deliveryErr);
+      }
+
+      // Guarantee the just-set timestamp is present in the response even if
+      // the Delivery record could not be read back (e.g. DB permission issue).
+      if (justSetTimestamp) {
+        if (!serializedOrder.deliveryTimestamps) {
+          serializedOrder.deliveryTimestamps = {};
+        }
+        if (!serializedOrder.deliveryTimestamps[justSetTimestamp.field]) {
+          serializedOrder.deliveryTimestamps[justSetTimestamp.field] = justSetTimestamp.value.toISOString();
+        }
+      }
+
       return NextResponse.json(serializedOrder);
     }
 

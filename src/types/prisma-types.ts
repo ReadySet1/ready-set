@@ -32,6 +32,7 @@ export const PRISMA_USER_STATUS = {
 
 export const PRISMA_DRIVER_STATUS = {
   ARRIVED_AT_VENDOR: 'ARRIVED_AT_VENDOR',
+  EN_ROUTE_TO_VENDOR: 'EN_ROUTE_TO_VENDOR',
   EN_ROUTE_TO_CLIENT: 'EN_ROUTE_TO_CLIENT',
   ARRIVED_TO_CLIENT: 'ARRIVED_TO_CLIENT',
   ASSIGNED: 'ASSIGNED',
@@ -133,6 +134,7 @@ export function convertToPrismaUserStatus(status: AppUserStatus): PrismaUserStat
 export function convertToPrismaDriverStatus(status: AppDriverStatus): PrismaDriverStatusValue {
   switch(status) {
     case AppDriverStatus.ARRIVED_AT_VENDOR: return PRISMA_DRIVER_STATUS.ARRIVED_AT_VENDOR;
+    case AppDriverStatus.EN_ROUTE_TO_VENDOR: return PRISMA_DRIVER_STATUS.EN_ROUTE_TO_VENDOR;
     case AppDriverStatus.EN_ROUTE_TO_CLIENT: return PRISMA_DRIVER_STATUS.EN_ROUTE_TO_CLIENT;
     case AppDriverStatus.ARRIVED_TO_CLIENT: return PRISMA_DRIVER_STATUS.ARRIVED_TO_CLIENT;
     case AppDriverStatus.ASSIGNED: return PRISMA_DRIVER_STATUS.ASSIGNED;

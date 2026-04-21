@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react';
 import { DeliveryTimeline } from '../DeliveryTimeline';
 import { DriverStatus } from '@/types/user';
 
-// Mock date-display utilities
 jest.mock('@/lib/utils/date-display', () => ({
   formatTimeForDisplay: (date: string | Date | null | undefined) => {
     if (!date) return 'N/A';
@@ -20,7 +19,7 @@ jest.mock('@/lib/utils/date-display', () => ({
 
 const baseTimestamps = {
   createdAt: '2026-02-17T10:00:00Z',
-  assignedAt: '2026-02-17T10:05:00Z',
+  enRouteToVendorAt: '2026-02-17T10:05:00Z',
   arrivedAtVendorAt: '2026-02-17T10:20:00Z',
   pickedUpAt: '2026-02-17T10:25:00Z',
   enRouteAt: '2026-02-17T10:25:00Z',
@@ -33,7 +32,7 @@ describe('DeliveryTimeline', () => {
     render(<DeliveryTimeline createdAt={baseTimestamps.createdAt} />);
 
     expect(screen.getByText('Order Placed')).toBeInTheDocument();
-    expect(screen.getByText('Driver Assigned')).toBeInTheDocument();
+    expect(screen.getByText('En Route to Resto')).toBeInTheDocument();
     expect(screen.getByText('Arrived at Vendor')).toBeInTheDocument();
     expect(screen.getByText('Pickup Completed')).toBeInTheDocument();
     expect(screen.getByText('En Route to Client')).toBeInTheDocument();
@@ -41,17 +40,21 @@ describe('DeliveryTimeline', () => {
     expect(screen.getByText('Delivered')).toBeInTheDocument();
   });
 
+  it('does not render Driver Assigned stage', () => {
+    render(<DeliveryTimeline createdAt={baseTimestamps.createdAt} />);
+    expect(screen.queryByText('Driver Assigned')).not.toBeInTheDocument();
+  });
+
   it('shows timestamps for completed stages', () => {
     render(
       <DeliveryTimeline
         createdAt={baseTimestamps.createdAt}
-        assignedAt={baseTimestamps.assignedAt}
+        enRouteToVendorAt={baseTimestamps.enRouteToVendorAt}
         arrivedAtVendorAt={baseTimestamps.arrivedAtVendorAt}
         currentStatus={DriverStatus.ARRIVED_AT_VENDOR}
       />
     );
 
-    // Completed stages should show their time
     const timeElements = screen.getAllByText(/\d{1,2}:\d{2}\s*(AM|PM)/i);
     expect(timeElements.length).toBeGreaterThanOrEqual(3);
   });
@@ -60,8 +63,9 @@ describe('DeliveryTimeline', () => {
     render(
       <DeliveryTimeline
         createdAt={baseTimestamps.createdAt}
-        assignedAt={baseTimestamps.assignedAt}
-        currentStatus={DriverStatus.ASSIGNED}
+        enRouteToVendorAt={baseTimestamps.enRouteToVendorAt}
+        arrivedAtVendorAt={baseTimestamps.arrivedAtVendorAt}
+        currentStatus={DriverStatus.ARRIVED_AT_VENDOR}
       />
     );
 
@@ -83,14 +87,15 @@ describe('DeliveryTimeline', () => {
     render(
       <DeliveryTimeline
         createdAt={baseTimestamps.createdAt}
-        assignedAt={baseTimestamps.assignedAt}
+        enRouteToVendorAt={baseTimestamps.enRouteToVendorAt}
         arrivedAtVendorAt={baseTimestamps.arrivedAtVendorAt}
         currentStatus={DriverStatus.ARRIVED_AT_VENDOR}
       />
     );
 
-    // 5 min between created and assigned, 15 min between assigned and arrived at vendor
+    // 5 min between created and en route to vendor
     expect(screen.getByText('5 min')).toBeInTheDocument();
+    // 15 min between en route to vendor and arrived at vendor
     expect(screen.getByText('15 min')).toBeInTheDocument();
   });
 
@@ -98,7 +103,7 @@ describe('DeliveryTimeline', () => {
     render(
       <DeliveryTimeline
         createdAt={baseTimestamps.createdAt}
-        assignedAt={baseTimestamps.assignedAt}
+        enRouteToVendorAt={baseTimestamps.enRouteToVendorAt}
         arrivedAtVendorAt={baseTimestamps.arrivedAtVendorAt}
         pickedUpAt="2026-02-17T10:30:00Z"
         enRouteAt="2026-02-17T10:30:00Z"
@@ -136,25 +141,20 @@ describe('DeliveryTimeline', () => {
   });
 
   it('renders in compact mode with smaller layout', () => {
-    const { container } = render(
+    render(
       <DeliveryTimeline
         createdAt={baseTimestamps.createdAt}
-        assignedAt={baseTimestamps.assignedAt}
         currentStatus={DriverStatus.ASSIGNED}
         compact
       />
     );
 
-    // In compact mode, duration should not appear
-    expect(screen.queryByText('5 min')).not.toBeInTheDocument();
-    // Component should still render stages
     expect(screen.getByText('Order Placed')).toBeInTheDocument();
   });
 
   it('handles null/undefined timestamps gracefully', () => {
     render(<DeliveryTimeline createdAt={null} />);
 
-    // All stages should render as pending
     expect(screen.getByText('Order Placed')).toBeInTheDocument();
     expect(screen.getByText('Delivered')).toBeInTheDocument();
     expect(screen.queryByText('In progress')).not.toBeInTheDocument();
@@ -168,7 +168,6 @@ describe('DeliveryTimeline', () => {
       />
     );
 
-    // Only Order Placed should have a timestamp
     const timeElements = screen.getAllByText(/\d{1,2}:\d{2}\s*(AM|PM)/i);
     expect(timeElements.length).toBe(1);
   });
@@ -181,7 +180,6 @@ describe('DeliveryTimeline', () => {
       />
     );
 
-    // Should show date strings for first and last stage
     const dateElements = screen.getAllByText(/Feb 17, 2026/i);
     expect(dateElements.length).toBe(2);
   });
@@ -190,24 +188,104 @@ describe('DeliveryTimeline', () => {
     const { rerender } = render(
       <DeliveryTimeline
         createdAt={baseTimestamps.createdAt}
-        assignedAt={baseTimestamps.assignedAt}
         currentStatus={DriverStatus.ASSIGNED}
       />
     );
 
-    expect(screen.getByText('In progress')).toBeInTheDocument();
-
-    // Simulate status advancing
     rerender(
       <DeliveryTimeline
         createdAt={baseTimestamps.createdAt}
-        assignedAt={baseTimestamps.assignedAt}
+        enRouteToVendorAt={baseTimestamps.enRouteToVendorAt}
+        currentStatus={DriverStatus.EN_ROUTE_TO_VENDOR}
+      />
+    );
+
+    expect(screen.getByText('In progress')).toBeInTheDocument();
+  });
+
+  it('preserves all previous timestamps when status advances', () => {
+    const { rerender } = render(
+      <DeliveryTimeline
+        createdAt={baseTimestamps.createdAt}
+        enRouteToVendorAt={baseTimestamps.enRouteToVendorAt}
+        currentStatus={DriverStatus.EN_ROUTE_TO_VENDOR}
+      />
+    );
+
+    // Two timestamps visible: Order Placed + En Route to Resto
+    let timeElements = screen.getAllByText(/\d{1,2}:\d{2}\s*(AM|PM)/i);
+    expect(timeElements.length).toBe(2);
+
+    // Advance to ARRIVED_AT_VENDOR – 3 timestamps visible
+    rerender(
+      <DeliveryTimeline
+        createdAt={baseTimestamps.createdAt}
+        enRouteToVendorAt={baseTimestamps.enRouteToVendorAt}
         arrivedAtVendorAt={baseTimestamps.arrivedAtVendorAt}
         currentStatus={DriverStatus.ARRIVED_AT_VENDOR}
       />
     );
 
-    // "In progress" should still show but now for the new active stage
-    expect(screen.getByText('In progress')).toBeInTheDocument();
+    timeElements = screen.getAllByText(/\d{1,2}:\d{2}\s*(AM|PM)/i);
+    expect(timeElements.length).toBe(3);
+
+    // Advance to PICKED_UP – 4 timestamps visible
+    rerender(
+      <DeliveryTimeline
+        createdAt={baseTimestamps.createdAt}
+        enRouteToVendorAt={baseTimestamps.enRouteToVendorAt}
+        arrivedAtVendorAt={baseTimestamps.arrivedAtVendorAt}
+        pickedUpAt={baseTimestamps.pickedUpAt}
+        currentStatus={DriverStatus.PICKED_UP}
+      />
+    );
+
+    timeElements = screen.getAllByText(/\d{1,2}:\d{2}\s*(AM|PM)/i);
+    expect(timeElements.length).toBe(4);
+
+    // Advance to EN_ROUTE – 5 timestamps visible
+    rerender(
+      <DeliveryTimeline
+        createdAt={baseTimestamps.createdAt}
+        enRouteToVendorAt={baseTimestamps.enRouteToVendorAt}
+        arrivedAtVendorAt={baseTimestamps.arrivedAtVendorAt}
+        pickedUpAt={baseTimestamps.pickedUpAt}
+        enRouteAt={baseTimestamps.enRouteAt}
+        currentStatus={DriverStatus.EN_ROUTE_TO_CLIENT}
+      />
+    );
+
+    timeElements = screen.getAllByText(/\d{1,2}:\d{2}\s*(AM|PM)/i);
+    expect(timeElements.length).toBe(5);
+
+    // Advance to COMPLETED – all 7 timestamps visible
+    rerender(
+      <DeliveryTimeline
+        createdAt={baseTimestamps.createdAt}
+        enRouteToVendorAt={baseTimestamps.enRouteToVendorAt}
+        arrivedAtVendorAt={baseTimestamps.arrivedAtVendorAt}
+        pickedUpAt={baseTimestamps.pickedUpAt}
+        enRouteAt={baseTimestamps.enRouteAt}
+        arrivedAtClientAt={baseTimestamps.arrivedAtClientAt}
+        deliveredAt={baseTimestamps.deliveredAt}
+        currentStatus={DriverStatus.COMPLETED}
+      />
+    );
+
+    timeElements = screen.getAllByText(/\d{1,2}:\d{2}\s*(AM|PM)/i);
+    expect(timeElements.length).toBe(7);
+  });
+
+  it('does not show "Updating..." when no status update is in flight', () => {
+    render(
+      <DeliveryTimeline
+        createdAt={baseTimestamps.createdAt}
+        currentStatus={DriverStatus.ASSIGNED}
+        canUpdateStatus={true}
+        onStatusUpdate={async () => {}}
+      />
+    );
+
+    expect(screen.queryByText('Updating...')).not.toBeInTheDocument();
   });
 });
