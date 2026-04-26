@@ -7,8 +7,6 @@ import { validateUserNotSoftDeleted, getActiveDriversForDispatch } from "@/lib/s
 import { CateringStatus, DriverStatus as DriverStatusEnum } from "@/types/user";
 import {
   transitionOrder,
-  isStateMachineEnabled,
-  canTransitionOrder,
   StateTransitionError,
 } from "@/lib/state-machine/transition";
 import type { OrderStatus, OrderType } from "@/lib/state-machine/transition";
@@ -142,55 +140,30 @@ export async function POST(request: Request) {
           });
         }
 
-        // Update the order status — gated by USE_STATE_MACHINE flag.
-        // Shadow-mode (flag off): legacy write runs, state machine logs any disagreement.
+        // Update the order status via the state machine — composes with the
+        // ambient $transaction by passing the tx client through.
         let updatedOrder;
-        if (isStateMachineEnabled()) {
-          try {
-            await transitionOrder(
-              {
-                orderType: orderType as OrderType,
-                orderId: String(orderId),
-                currentStatus: (order.status as OrderStatus) ?? null,
-                currentDriverStatus: (order.driverStatus as DriverStatusEnum | null) ?? null,
-                nextOrderStatus: CateringStatus.ASSIGNED,
-              },
-              prisma,
-            );
-            updatedOrder = await (orderType === "catering"
-              ? prisma.cateringRequest.findUniqueOrThrow({ where: { id: String(orderId) } })
-              : prisma.onDemand.findUniqueOrThrow({ where: { id: String(orderId) } }));
-          } catch (err) {
-            if (err instanceof StateTransitionError) {
-              throw new Error(
-                `Cannot assign driver: order status ${order.status} cannot transition to ASSIGNED`,
-              );
-            }
-            throw err;
-          }
-        } else {
-          const machineAllowed = canTransitionOrder(
-            (order.status as OrderStatus) ?? null,
-            CateringStatus.ASSIGNED,
-          );
-          if (!machineAllowed) {
-            console.warn("[state-machine shadow] order-transition would reject", {
+        try {
+          await transitionOrder(
+            {
+              orderType: orderType as OrderType,
               orderId: String(orderId),
-              orderType,
-              from: order.status,
-              to: CateringStatus.ASSIGNED,
-            });
-          }
-
+              currentStatus: (order.status as OrderStatus) ?? null,
+              currentDriverStatus: (order.driverStatus as DriverStatusEnum | null) ?? null,
+              nextOrderStatus: CateringStatus.ASSIGNED,
+            },
+            prisma,
+          );
           updatedOrder = await (orderType === "catering"
-            ? prisma.cateringRequest.update({
-                where: { id: String(orderId) },
-                data: { status: "ASSIGNED" },
-              })
-            : prisma.onDemand.update({
-                where: { id: String(orderId) },
-                data: { status: "ASSIGNED" },
-              }));
+            ? prisma.cateringRequest.findUniqueOrThrow({ where: { id: String(orderId) } })
+            : prisma.onDemand.findUniqueOrThrow({ where: { id: String(orderId) } }));
+        } catch (err) {
+          if (err instanceof StateTransitionError) {
+            throw new Error(
+              `Cannot assign driver: order status ${order.status} cannot transition to ASSIGNED`,
+            );
+          }
+          throw err;
         }
 
         return { updatedOrder, dispatch };

@@ -207,6 +207,7 @@ describe("/api/orders/assignDriver", () => {
             cateringRequest: {
               findUnique: jest.fn().mockResolvedValue(mockCateringOrder),
               update: jest.fn().mockResolvedValue({ ...mockCateringOrder, status: "ASSIGNED" }),
+              findUniqueOrThrow: jest.fn().mockResolvedValue({ ...mockCateringOrder, status: "ASSIGNED" }),
             },
             dispatch: {
               findFirst: jest.fn().mockResolvedValue(null),
@@ -236,6 +237,7 @@ describe("/api/orders/assignDriver", () => {
             cateringRequest: {
               findUnique: jest.fn().mockResolvedValue(mockCateringOrder),
               update: jest.fn().mockResolvedValue({ ...mockCateringOrder, status: "ASSIGNED" }),
+              findUniqueOrThrow: jest.fn().mockResolvedValue({ ...mockCateringOrder, status: "ASSIGNED" }),
             },
             dispatch: {
               findFirst: jest.fn().mockResolvedValue(null),
@@ -279,6 +281,7 @@ describe("/api/orders/assignDriver", () => {
             cateringRequest: {
               findUnique: jest.fn().mockResolvedValue(mockCateringOrder),
               update: jest.fn().mockResolvedValue({ ...mockCateringOrder, status: "ASSIGNED" }),
+              findUniqueOrThrow: jest.fn().mockResolvedValue({ ...mockCateringOrder, status: "ASSIGNED" }),
             },
             dispatch: {
               findFirst: jest.fn().mockResolvedValue(existingDispatch),
@@ -333,7 +336,7 @@ describe("/api/orders/assignDriver", () => {
 
         expect(mockOrderUpdate).toHaveBeenCalledWith(
           expect.objectContaining({
-            data: { status: "ASSIGNED" },
+            data: expect.objectContaining({ status: "ASSIGNED" }),
           })
         );
       });
@@ -348,6 +351,7 @@ describe("/api/orders/assignDriver", () => {
             onDemand: {
               findUnique: jest.fn().mockResolvedValue(mockOnDemandOrder),
               update: jest.fn().mockResolvedValue({ ...mockOnDemandOrder, status: "ASSIGNED" }),
+              findUniqueOrThrow: jest.fn().mockResolvedValue({ ...mockOnDemandOrder, status: "ASSIGNED" }),
             },
             dispatch: {
               findFirst: jest.fn().mockResolvedValue(null),
@@ -404,7 +408,7 @@ describe("/api/orders/assignDriver", () => {
 
         expect(mockOrderUpdate).toHaveBeenCalledWith(
           expect.objectContaining({
-            data: { status: "ASSIGNED" },
+            data: expect.objectContaining({ status: "ASSIGNED" }),
           })
         );
       });
@@ -486,6 +490,7 @@ describe("/api/orders/assignDriver", () => {
             cateringRequest: {
               findUnique: jest.fn().mockResolvedValue(mockCateringOrder),
               update: jest.fn().mockResolvedValue(updatedOrder),
+              findUniqueOrThrow: jest.fn().mockResolvedValue(updatedOrder),
             },
             dispatch: {
               findFirst: jest.fn().mockResolvedValue(null),
@@ -514,6 +519,7 @@ describe("/api/orders/assignDriver", () => {
             cateringRequest: {
               findUnique: jest.fn().mockResolvedValue(mockCateringOrder),
               update: jest.fn().mockResolvedValue({ ...mockCateringOrder, status: "ASSIGNED" }),
+              findUniqueOrThrow: jest.fn().mockResolvedValue({ ...mockCateringOrder, status: "ASSIGNED" }),
             },
             dispatch: {
               findFirst: jest.fn().mockResolvedValue(null),

@@ -143,7 +143,6 @@ function collectSideEffects(
 }
 
 // Re-export so callers can import everything from one path.
-export { isStateMachineEnabled } from './feature-flag';
 export { canTransitionOrder, assertOrderTransition } from './order-state';
 export {
   canTransitionDriver,

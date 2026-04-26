@@ -20,7 +20,6 @@ import {
   type FieldChange,
 } from './schemas';
 import {
-  isStateMachineEnabled,
   canTransitionDriver,
   canTransitionOrder,
   deriveOrderStatusFromDriver,
@@ -455,47 +454,34 @@ export async function PATCH(
     // Build the update data
     const updateData: Record<string, unknown> = {};
 
-    // Validate transitions via the centralized state machine.
-    // Flag on → reject illegal transitions with 422.
-    // Flag off → shadow-log disagreement so we can soak before flipping.
+    // Validate transitions via the centralized state machine; reject illegal
+    // transitions with 422. Source of truth: src/lib/state-machine/.
     const currentStatus = ((existingOrder as any).status as OrderStatus | null) ?? null;
     const currentDriverStatus = ((existingOrder as any).driverStatus as DriverStatus | null) ?? null;
 
-    if (driverStatus && driverStatus !== currentDriverStatus) {
-      const allowed = canTransitionDriver(currentDriverStatus, driverStatus as DriverStatus);
-      if (isStateMachineEnabled() && !allowed) {
-        return NextResponse.json(
-          {
-            message: `Cannot transition driverStatus from ${currentDriverStatus ?? 'NO_STATUS'} to ${driverStatus}`,
-          },
-          { status: 422 },
-        );
-      }
-      if (!isStateMachineEnabled() && !allowed) {
-        console.warn('[state-machine shadow] driver-transition would reject', {
-          orderNumber: order_number,
-          from: currentDriverStatus,
-          to: driverStatus,
-        });
-      }
+    if (
+      driverStatus &&
+      driverStatus !== currentDriverStatus &&
+      !canTransitionDriver(currentDriverStatus, driverStatus as DriverStatus)
+    ) {
+      return NextResponse.json(
+        {
+          message: `Cannot transition driverStatus from ${currentDriverStatus ?? 'NO_STATUS'} to ${driverStatus}`,
+        },
+        { status: 422 },
+      );
     }
-    if (status && status !== currentStatus) {
-      const allowed = canTransitionOrder(currentStatus, status as OrderStatus);
-      if (isStateMachineEnabled() && !allowed) {
-        return NextResponse.json(
-          {
-            message: `Cannot transition status from ${currentStatus ?? 'NO_STATUS'} to ${status}`,
-          },
-          { status: 422 },
-        );
-      }
-      if (!isStateMachineEnabled() && !allowed) {
-        console.warn('[state-machine shadow] order-transition would reject', {
-          orderNumber: order_number,
-          from: currentStatus,
-          to: status,
-        });
-      }
+    if (
+      status &&
+      status !== currentStatus &&
+      !canTransitionOrder(currentStatus, status as OrderStatus)
+    ) {
+      return NextResponse.json(
+        {
+          message: `Cannot transition status from ${currentStatus ?? 'NO_STATUS'} to ${status}`,
+        },
+        { status: 422 },
+      );
     }
 
     // Add status updates if provided
