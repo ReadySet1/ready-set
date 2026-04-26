@@ -4,17 +4,29 @@
 import { createGetRequest, createPatchRequest } from '@/__tests__/helpers/api-test-helpers';
 
 // Mock dependencies BEFORE imports
-jest.mock('@/lib/db/prisma', () => ({
-  prisma: {
-    cateringRequest: {
-      findUnique: jest.fn(),
-      update: jest.fn(),
-    },
-    dispatch: {
-      create: jest.fn(),
-    },
-  },
-}));
+jest.mock('@/lib/db/prisma', () => {
+  const cateringRequest = {
+    findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+    update: jest.fn(),
+  };
+  const onDemand = {
+    findUniqueOrThrow: jest.fn(),
+    update: jest.fn(),
+  };
+  const dispatch = { create: jest.fn() };
+  const driver = { findFirst: jest.fn() };
+  const mock = {
+    cateringRequest,
+    onDemand,
+    dispatch,
+    driver,
+    // $transaction runs the callback synchronously against the same mock so
+    // calls to tx.cateringRequest.update land on the same jest.fn instances.
+    $transaction: jest.fn(async (cb: (tx: unknown) => unknown) => cb(mock)),
+  };
+  return { prisma: mock };
+});
 
 jest.mock('@/lib/services/carrierService', () => ({
   CarrierService: {
@@ -64,6 +76,15 @@ describe('/api/catering-requests/[orderId]/status API', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default findUniqueOrThrow: returns whatever the most-recent update call
+    // produced — mirrors the route reading the "after" row from the same tx.
+    (prisma.cateringRequest.findUniqueOrThrow as jest.Mock).mockImplementation(
+      async () => {
+        const results = (prisma.cateringRequest.update as jest.Mock).mock.results;
+        const last = results[results.length - 1]?.value;
+        return last ?? mockOrder;
+      },
+    );
   });
 
   describe('GET /api/catering-requests/[orderId]/status', () => {
@@ -211,6 +232,7 @@ describe('/api/catering-requests/[orderId]/status API', () => {
     it('should update status to COMPLETED and set completeDateTime', async () => {
       (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue({
         ...mockOrder,
+        status: 'IN_PROGRESS',
         driverStatus: 'ARRIVED_TO_CLIENT',
       });
       (prisma.cateringRequest.update as jest.Mock).mockResolvedValue({
@@ -263,6 +285,7 @@ describe('/api/catering-requests/[orderId]/status API', () => {
     it('should allow transitioning from ASSIGNED to ARRIVED_AT_VENDOR', async () => {
       (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValue({
         ...mockOrder,
+        status: 'ASSIGNED',
         driverStatus: 'ASSIGNED',
       });
       (prisma.cateringRequest.update as jest.Mock).mockResolvedValue({
