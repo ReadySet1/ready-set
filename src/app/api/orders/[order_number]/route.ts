@@ -19,6 +19,13 @@ import {
   type AddressUpdate,
   type FieldChange,
 } from './schemas';
+import {
+  isStateMachineEnabled,
+  canTransitionDriver,
+  canTransitionOrder,
+  deriveOrderStatusFromDriver,
+} from '@/lib/state-machine/transition';
+import type { OrderStatus } from '@/lib/state-machine/transition';
 
 // Map DriverStatus to dispatch notification status
 const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
@@ -30,16 +37,8 @@ const DRIVER_STATUS_TO_DISPATCH_STATUS: Record<string, string> = {
   [DriverStatus.COMPLETED]: 'DELIVERY_COMPLETE',
 };
 
-// Map DriverStatus transitions to order status updates
-// When driver starts working on delivery, order status should sync
-const DRIVER_STATUS_TO_ORDER_STATUS: Record<string, string> = {
-  [DriverStatus.EN_ROUTE_TO_VENDOR]: 'IN_PROGRESS',
-  [DriverStatus.ARRIVED_AT_VENDOR]: 'IN_PROGRESS',
-  [DriverStatus.PICKED_UP]: 'IN_PROGRESS',
-  [DriverStatus.EN_ROUTE_TO_CLIENT]: 'IN_PROGRESS',
-  [DriverStatus.ARRIVED_TO_CLIENT]: 'IN_PROGRESS',
-  [DriverStatus.COMPLETED]: 'DELIVERED',
-};
+// Driver→Order status mapping is owned by the state machine; see
+// src/lib/state-machine/driver-state.ts (deriveOrderStatusFromDriver).
 
 // Statuses that should trigger customer notifications
 const CUSTOMER_NOTIFICATION_STATUSES = [
@@ -456,14 +455,57 @@ export async function PATCH(
     // Build the update data
     const updateData: Record<string, unknown> = {};
 
+    // Validate transitions via the centralized state machine.
+    // Flag on → reject illegal transitions with 422.
+    // Flag off → shadow-log disagreement so we can soak before flipping.
+    const currentStatus = ((existingOrder as any).status as OrderStatus | null) ?? null;
+    const currentDriverStatus = ((existingOrder as any).driverStatus as DriverStatus | null) ?? null;
+
+    if (driverStatus && driverStatus !== currentDriverStatus) {
+      const allowed = canTransitionDriver(currentDriverStatus, driverStatus as DriverStatus);
+      if (isStateMachineEnabled() && !allowed) {
+        return NextResponse.json(
+          {
+            message: `Cannot transition driverStatus from ${currentDriverStatus ?? 'NO_STATUS'} to ${driverStatus}`,
+          },
+          { status: 422 },
+        );
+      }
+      if (!isStateMachineEnabled() && !allowed) {
+        console.warn('[state-machine shadow] driver-transition would reject', {
+          orderNumber: order_number,
+          from: currentDriverStatus,
+          to: driverStatus,
+        });
+      }
+    }
+    if (status && status !== currentStatus) {
+      const allowed = canTransitionOrder(currentStatus, status as OrderStatus);
+      if (isStateMachineEnabled() && !allowed) {
+        return NextResponse.json(
+          {
+            message: `Cannot transition status from ${currentStatus ?? 'NO_STATUS'} to ${status}`,
+          },
+          { status: 422 },
+        );
+      }
+      if (!isStateMachineEnabled() && !allowed) {
+        console.warn('[state-machine shadow] order-transition would reject', {
+          orderNumber: order_number,
+          from: currentStatus,
+          to: status,
+        });
+      }
+    }
+
     // Add status updates if provided
     if (status) updateData.status = status;
     if (driverStatus) {
       updateData.driverStatus = driverStatus;
 
-      // Automatically sync order status based on driver status transitions
-      // This ensures the order status reflects the delivery progress
-      const mappedOrderStatus = DRIVER_STATUS_TO_ORDER_STATUS[driverStatus];
+      // Automatically sync order status based on driver status transitions.
+      // Source of truth: src/lib/state-machine/driver-state.ts (DRIVER_TO_ORDER).
+      const mappedOrderStatus = deriveOrderStatusFromDriver(driverStatus as DriverStatus);
       if (mappedOrderStatus && !status) {
         // Only auto-update order status if not explicitly provided
         updateData.status = mappedOrderStatus;
