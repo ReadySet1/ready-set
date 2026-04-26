@@ -144,12 +144,14 @@ API Route → Server Action → Service Layer → Utils → Prisma
 
 ### Git Workflow
 
-**IMPORTANT: Always create a Pull Request before merging into `main`.**
+**IMPORTANT: All new work targets `development` first, then `development` is promoted to `main`.**
 
-- Never merge directly into `main` - always create a PR first
-- PRs require passing CI checks before merge
-- Use feature branches: `feature/REA-XXX-description`
-- Run `pnpm pre-push-check` and `pnpm test:ci` before creating PRs
+- **Branch flow:** `feature/* → development → main`. Open every PR against `development`, never directly against `main`.
+- The only PRs that target `main` are periodic promotion PRs from `development` (typically named `chore/sync-main-into-development` or similar).
+- Never merge directly into `main` or `development` - always create a PR first.
+- PRs require passing CI checks before merge.
+- Use feature branches: `feature/REA-XXX-description` (or `refactor/...`, `fix/...`, `chore/...` as appropriate).
+- Run `pnpm pre-push-check` and `pnpm test:ci` before creating PRs.
 
 ### External Integrations
 
