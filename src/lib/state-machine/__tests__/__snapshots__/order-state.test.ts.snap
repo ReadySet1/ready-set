@@ -1,0 +1,34 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`ORDER_TRANSITIONS graph snapshot matches expected shape — guard against accidental edits 1`] = `
+{
+  "ACTIVE": [
+    "ASSIGNED",
+    "CANCELLED",
+  ],
+  "ASSIGNED": [
+    "IN_PROGRESS",
+    "CANCELLED",
+  ],
+  "CANCELLED": [],
+  "COMPLETED": [],
+  "CONFIRMED": [
+    "ACTIVE",
+    "ASSIGNED",
+    "CANCELLED",
+  ],
+  "DELIVERED": [
+    "COMPLETED",
+  ],
+  "IN_PROGRESS": [
+    "DELIVERED",
+    "COMPLETED",
+    "CANCELLED",
+  ],
+  "PENDING": [
+    "CONFIRMED",
+    "ACTIVE",
+    "CANCELLED",
+  ],
+}
+`;

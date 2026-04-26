@@ -1,0 +1,46 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`graph snapshots DRIVER_TO_ORDER matches expected shape 1`] = `
+{
+  "ARRIVED_AT_VENDOR": "IN_PROGRESS",
+  "ARRIVED_TO_CLIENT": "IN_PROGRESS",
+  "COMPLETED": "COMPLETED",
+  "EN_ROUTE_TO_CLIENT": "IN_PROGRESS",
+  "EN_ROUTE_TO_VENDOR": "IN_PROGRESS",
+  "PICKED_UP": "IN_PROGRESS",
+}
+`;
+
+exports[`graph snapshots DRIVER_TRANSITIONS matches expected shape 1`] = `
+{
+  "ARRIVED_AT_VENDOR": [
+    "PICKED_UP",
+    "EN_ROUTE_TO_CLIENT",
+    "COMPLETED",
+  ],
+  "ARRIVED_TO_CLIENT": [
+    "COMPLETED",
+  ],
+  "ASSIGNED": [
+    "EN_ROUTE_TO_VENDOR",
+    "ARRIVED_AT_VENDOR",
+    "COMPLETED",
+  ],
+  "COMPLETED": [],
+  "EN_ROUTE_TO_CLIENT": [
+    "ARRIVED_TO_CLIENT",
+    "COMPLETED",
+  ],
+  "EN_ROUTE_TO_VENDOR": [
+    "ARRIVED_AT_VENDOR",
+    "COMPLETED",
+  ],
+  "PICKED_UP": [
+    "EN_ROUTE_TO_CLIENT",
+    "COMPLETED",
+  ],
+  "null": [
+    "ASSIGNED",
+  ],
+}
+`;
