@@ -17,6 +17,7 @@ import {
   Calculator,
   Package,
   NavigationIcon,
+  FileSpreadsheet,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -177,6 +178,12 @@ export function AppSidebar() {
       href: "/admin/mileage-calculator",
       icon: NavigationIcon,
       isActive: pathname?.includes("/admin/mileage-calculator") ?? false,
+    },
+    {
+      title: "Drives Calculator",
+      href: "/admin/drives-calculator",
+      icon: FileSpreadsheet,
+      isActive: pathname?.includes("/admin/drives-calculator") ?? false,
     },
     {
       title: "Logistics Tools",
