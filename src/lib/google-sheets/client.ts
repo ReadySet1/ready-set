@@ -85,7 +85,11 @@ export async function updateSheetData(
   await client.spreadsheets.values.update({
     spreadsheetId,
     range: fullRange,
-    valueInputOption: "USER_ENTERED",
+    // RAW (not USER_ENTERED) so values starting with `= + - @` are stored as
+    // literal text instead of evaluated as formulas. Defuses sheet-side
+    // formula injection if any string-typed field is ever added to the write
+    // path. Numeric outputs round-trip identically under either mode.
+    valueInputOption: "RAW",
     requestBody: { values },
   });
 }
@@ -107,7 +111,11 @@ export async function batchUpdateSheetData(
   await client.spreadsheets.values.batchUpdate({
     spreadsheetId,
     requestBody: {
-      valueInputOption: "USER_ENTERED",
+      // RAW (not USER_ENTERED) so values starting with `= + - @` are stored as
+    // literal text instead of evaluated as formulas. Defuses sheet-side
+    // formula injection if any string-typed field is ever added to the write
+    // path. Numeric outputs round-trip identically under either mode.
+    valueInputOption: "RAW",
       data,
     },
   });
