@@ -233,8 +233,8 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                 </div>
               </div>
 
-              {/* Enhanced progress bar */}
-              <div className="relative">
+              {/* Enhanced progress bar — Desktop: single bar + single label row */}
+              <div className="relative hidden md:block">
                 <Progress
                   value={getProgressValue(order.driver_status)}
                   className="h-3 w-full bg-slate-200"
@@ -255,25 +255,78 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                       order.driver_status === DriverStatus.COMPLETED,
                   })}
                 />
-
                 <div className="mt-1 flex justify-between text-xs text-slate-500">
-                  <div className="flex flex-col items-center">
-                    <span>En Route to Resto</span>
+                  <span className="text-center">En Route to Resto</span>
+                  <span className="text-center">Arrived at Vendor</span>
+                  <span className="text-center">Pick Up Completed</span>
+                  <span className="text-center">En Route to Client</span>
+                  <span className="text-center">Arrived at Client</span>
+                  <span className="text-center">Delivered</span>
+                </div>
+              </div>
+
+              {/* Enhanced progress bar — Mobile: two bars, each with 3 labels */}
+              <div className="space-y-4 md:hidden">
+                {/* First bar: Assigned → Pick Up Completed */}
+                <div className="relative">
+                  <Progress
+                    value={(() => {
+                      const s = order.driver_status;
+                      if (!s || s === DriverStatus.ASSIGNED) return 0;
+                      if (s === DriverStatus.EN_ROUTE_TO_VENDOR) return 33;
+                      if (s === DriverStatus.ARRIVED_AT_VENDOR) return 66;
+                      return 100;
+                    })()}
+                    className="h-3 w-full bg-slate-200"
+                    indicatorClassName={cn("transition-all duration-500", {
+                      "bg-yellow-400":
+                        order.driver_status === DriverStatus.ASSIGNED,
+                      "bg-orange-500":
+                        order.driver_status === DriverStatus.EN_ROUTE_TO_VENDOR,
+                      "bg-blue-500":
+                        order.driver_status === DriverStatus.ARRIVED_AT_VENDOR,
+                      "bg-cyan-500":
+                        order.driver_status === DriverStatus.PICKED_UP,
+                      "bg-green-500":
+                        order.driver_status === DriverStatus.EN_ROUTE_TO_CLIENT,
+                      "bg-purple-500":
+                        order.driver_status === DriverStatus.ARRIVED_TO_CLIENT,
+                      "bg-slate-500":
+                        order.driver_status === DriverStatus.COMPLETED,
+                    })}
+                  />
+                  <div className="mt-1 flex justify-between text-[11px] text-slate-500">
+                    <span className="text-center">En Route<br />to Resto</span>
+                    <span className="text-center">Arrived<br />at Vendor</span>
+                    <span className="text-center">Pick Up<br />Completed</span>
                   </div>
-                  <div className="flex flex-col items-center">
-                    <span>Arrived at Vendor</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span>Pick Up Completed</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span>En Route to Client</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span>Arrived at Client</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span>Delivered</span>
+                </div>
+
+                {/* Second bar: En Route to Client → Delivered */}
+                <div className="relative">
+                  <Progress
+                    value={(() => {
+                      const s = order.driver_status;
+                      if (!s) return 0;
+                      if (s === DriverStatus.EN_ROUTE_TO_CLIENT) return 33;
+                      if (s === DriverStatus.ARRIVED_TO_CLIENT) return 66;
+                      if (s === DriverStatus.COMPLETED) return 100;
+                      return 0;
+                    })()}
+                    className="h-3 w-full bg-slate-200"
+                    indicatorClassName={cn("transition-all duration-500", {
+                      "bg-green-500":
+                        order.driver_status === DriverStatus.EN_ROUTE_TO_CLIENT,
+                      "bg-purple-500":
+                        order.driver_status === DriverStatus.ARRIVED_TO_CLIENT,
+                      "bg-slate-500":
+                        order.driver_status === DriverStatus.COMPLETED,
+                    })}
+                  />
+                  <div className="mt-1 flex justify-between text-[11px] text-slate-500">
+                    <span className="text-center">En Route<br />to Client</span>
+                    <span className="text-center">Arrived<br />at Client</span>
+                    <span className="text-center">Delivered</span>
                   </div>
                 </div>
               </div>
