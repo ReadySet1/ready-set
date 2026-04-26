@@ -661,6 +661,163 @@ describe('/api/calculator/configurations API', () => {
     });
   });
 
+  describe('📋 Audit Logging Tests', () => {
+    it('should log audit entry when creating new configuration', async () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-audit-1', email: 'audit@example.com' } },
+        error: null,
+      });
+
+      (validateConfiguration as jest.Mock).mockReturnValue({ valid: true, errors: [] });
+
+      // No existing config
+      (prisma.deliveryConfiguration.findUnique as jest.Mock).mockResolvedValue(null);
+
+      (prisma.deliveryConfiguration.upsert as jest.Mock).mockResolvedValue({
+        configId: 'new-audit-config',
+        clientName: 'Audit Client',
+        vendorName: 'Audit Vendor',
+        isActive: true,
+        mileageRate: '2.50',
+        distanceThreshold: '10',
+        pricingTiers: [],
+        dailyDriveDiscounts: {},
+        driverPaySettings: {},
+        bridgeTollSettings: {},
+        customSettings: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        createdBy: 'user-audit-1',
+      });
+
+      const request = createPostRequest('http://localhost:3000/api/calculator/configurations', {
+        id: 'new-audit-config',
+        clientName: 'Audit Client',
+        vendorName: 'Audit Vendor',
+        isActive: true,
+        mileageRate: 2.5,
+        distanceThreshold: 10,
+        pricingTiers: [],
+        dailyDriveDiscounts: {},
+        driverPaySettings: {},
+        bridgeTollSettings: {},
+        customSettings: {},
+      });
+
+      await POST(request);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[AUDIT] Configuration change:',
+        expect.stringContaining('"action":"create"')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[AUDIT] Configuration change:',
+        expect.stringContaining('"userId":"user-audit-1"')
+      );
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should log changed fields when updating existing configuration', async () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-audit-2', email: 'editor@example.com' } },
+        error: null,
+      });
+
+      (validateConfiguration as jest.Mock).mockReturnValue({ valid: true, errors: [] });
+
+      // Existing config found
+      (prisma.deliveryConfiguration.findUnique as jest.Mock).mockResolvedValue({
+        configId: 'existing-audit-config',
+        clientName: 'Old Name',
+        vendorName: 'Test Vendor',
+        isActive: true,
+        mileageRate: '2.50',
+        distanceThreshold: '10',
+        pricingTiers: [],
+        dailyDriveDiscounts: {},
+        driverPaySettings: {},
+        bridgeTollSettings: {},
+        customSettings: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      (prisma.deliveryConfiguration.upsert as jest.Mock).mockResolvedValue({
+        configId: 'existing-audit-config',
+        clientName: 'New Name',
+        vendorName: 'Test Vendor',
+        isActive: true,
+        mileageRate: '3.00',
+        distanceThreshold: '10',
+        pricingTiers: [],
+        dailyDriveDiscounts: {},
+        driverPaySettings: {},
+        bridgeTollSettings: {},
+        customSettings: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        createdBy: 'user-audit-2',
+      });
+
+      const request = createPostRequest('http://localhost:3000/api/calculator/configurations', {
+        id: 'existing-audit-config',
+        clientName: 'New Name',
+        vendorName: 'Test Vendor',
+        isActive: true,
+        mileageRate: 3.0,
+        distanceThreshold: 10,
+        pricingTiers: [],
+        dailyDriveDiscounts: {},
+        driverPaySettings: {},
+        bridgeTollSettings: {},
+        customSettings: {},
+      });
+
+      await POST(request);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[AUDIT] Configuration change:',
+        expect.stringContaining('"action":"update"')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[AUDIT] Configuration change:',
+        expect.stringContaining('"clientName"')
+      );
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should log audit entry when soft-deleting configuration', async () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-delete-1', email: 'deleter@example.com' } },
+        error: null,
+      });
+
+      (prisma.deliveryConfiguration.update as jest.Mock).mockResolvedValue({
+        configId: 'delete-audit-config',
+        isActive: false,
+      });
+
+      const request = createDeleteRequest('http://localhost:3000/api/calculator/configurations?id=delete-audit-config');
+      await DELETE(request);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[AUDIT] Configuration deleted:',
+        expect.stringContaining('"action":"soft-delete"')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[AUDIT] Configuration deleted:',
+        expect.stringContaining('"userId":"user-delete-1"')
+      );
+
+      consoleLogSpy.mockRestore();
+    });
+  });
+
   describe('🎯 Integration Tests', () => {
     it('should handle complete configuration lifecycle', async () => {
       // 1. GET all configurations (initially empty, fallback to memory)

@@ -4,6 +4,12 @@ import { Prisma } from "@prisma/client";
 // Decimal class is now under Prisma namespace in Prisma 7
 import { createClient } from "@/utils/supabase/server";
 import { validateUserNotSoftDeleted, getActiveDriversForDispatch } from "@/lib/soft-delete-handlers";
+import { CateringStatus, DriverStatus as DriverStatusEnum } from "@/types/user";
+import {
+  transitionOrder,
+  StateTransitionError,
+} from "@/lib/state-machine/transition";
+import type { OrderStatus, OrderType } from "@/lib/state-machine/transition";
 
 function serializeData(obj: unknown): number | string | Date | Record<string, unknown> | unknown {
   if (typeof obj === "bigint") {
@@ -134,16 +140,31 @@ export async function POST(request: Request) {
           });
         }
 
-        // Update the order status
-        const updatedOrder = await (orderType === "catering"
-          ? prisma.cateringRequest.update({
-              where: { id: String(orderId) },
-              data: { status: "ASSIGNED" },
-            })
-          : prisma.onDemand.update({
-              where: { id: String(orderId) },
-              data: { status: "ASSIGNED" },
-            }));
+        // Update the order status via the state machine — composes with the
+        // ambient $transaction by passing the tx client through.
+        let updatedOrder;
+        try {
+          await transitionOrder(
+            {
+              orderType: orderType as OrderType,
+              orderId: String(orderId),
+              currentStatus: (order.status as OrderStatus) ?? null,
+              currentDriverStatus: (order.driverStatus as DriverStatusEnum | null) ?? null,
+              nextOrderStatus: CateringStatus.ASSIGNED,
+            },
+            prisma,
+          );
+          updatedOrder = await (orderType === "catering"
+            ? prisma.cateringRequest.findUniqueOrThrow({ where: { id: String(orderId) } })
+            : prisma.onDemand.findUniqueOrThrow({ where: { id: String(orderId) } }));
+        } catch (err) {
+          if (err instanceof StateTransitionError) {
+            throw new Error(
+              `Cannot assign driver: order status ${order.status} cannot transition to ASSIGNED`,
+            );
+          }
+          throw err;
+        }
 
         return { updatedOrder, dispatch };
       });

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import axios from "axios";
 import { z } from "zod";
 
 const EmailSchema = z
@@ -36,23 +35,39 @@ export async function POST(request: Request) {
     contacts: [{ email: emailValidation.data }]
   };
 
-  // Set request headers
-  const options = {
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${SENDGRID_API_KEY}`
-    },
-  };
-
   try {
     // Use PUT instead of POST for the Marketing Contacts API
-    const response = await axios.put(url, data, options);
-    
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SENDGRID_API_KEY}`,
+      },
+      body: JSON.stringify(data),
+    });
+
     // SendGrid returns 202 Accepted for successful requests
     if (response.status === 202) {
-      return NextResponse.json({ 
-        message: "Awesome! You have successfully subscribed!" 
+      return NextResponse.json({
+        message: "Awesome! You have successfully subscribed!"
       }, { status: 201 });
+    }
+
+    if (!response.ok) {
+      const status = response.status;
+      console.error(`SendGrid API Error: ${status}`);
+
+      const errorMessages: Record<number, string> = {
+        400: "Invalid request format. Please check your email address.",
+        401: "Server authentication failed. Please try again later.",
+        404: "Mailing list not found. Please contact support.",
+        405: "API method not allowed. Please contact support.",
+      };
+
+      return NextResponse.json(
+        { error: errorMessages[status] ?? "Oops! There was an error subscribing you." },
+        { status },
+      );
     }
 
     // Handle unexpected success status
@@ -61,35 +76,7 @@ export async function POST(request: Request) {
     }, { status: 500 });
 
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error(
-        `SendGrid API Error: ${error.response?.status}`,
-        JSON.stringify(error.response?.data),
-      );
-
-      // Handle specific error cases
-      const status = error.response?.status;
-      let errorMessage = "Oops! There was an error subscribing you.";
-
-      switch (status) {
-        case 400:
-          errorMessage = "Invalid request format. Please check your email address.";
-          break;
-        case 401:
-          errorMessage = "Server authentication failed. Please try again later.";
-          break;
-        case 404:
-          errorMessage = "Mailing list not found. Please contact support.";
-          break;
-        case 405:
-          errorMessage = "API method not allowed. Please contact support.";
-          break;
-      }
-
-      return NextResponse.json({ error: errorMessage }, { status: status || 500 });
-    }
-
-    // Handle non-Axios errors
+    console.error('Unexpected error:', error);
     return NextResponse.json({
       error: "Unexpected system error. Please try again or contact support."
     }, { status: 500 });

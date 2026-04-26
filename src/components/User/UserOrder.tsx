@@ -25,6 +25,7 @@ import { DeliveryTimeline } from "@/components/Delivery/DeliveryTimeline";
 type OrderStatus = "active" | "assigned" | "cancelled" | "completed";
 type DriverStatus =
   | "assigned"
+  | "en_route_to_vendor"
   | "arrived_at_vendor"
   | "en_route_to_client"
   | "arrived_to_client"
@@ -48,6 +49,16 @@ interface Dispatch {
   driver: Driver;
 }
 
+interface DeliveryTimestamps {
+  assignedAt?: string | null;
+  enRouteToVendorAt?: string | null;
+  arrivedAtVendorAt?: string | null;
+  pickedUpAt?: string | null;
+  enRouteAt?: string | null;
+  arrivedAtClientAt?: string | null;
+  deliveredAt?: string | null;
+}
+
 interface BaseOrder {
   id: string;
   order_number: string;
@@ -64,6 +75,7 @@ interface BaseOrder {
   arrival_time: string | null;
   complete_time: string | null;
   updated_at: string | null;
+  deliveryTimestamps?: DeliveryTimestamps | null;
 }
 
 interface CateringOrder extends BaseOrder {
@@ -308,7 +320,12 @@ const UserOrderDetail: React.FC = () => {
         <CardContent>
           <DeliveryTimeline
             createdAt={order.date}
-            deliveredAt={order.complete_time}
+            enRouteToVendorAt={order.deliveryTimestamps?.enRouteToVendorAt}
+            arrivedAtVendorAt={order.deliveryTimestamps?.arrivedAtVendorAt}
+            pickedUpAt={order.deliveryTimestamps?.pickedUpAt}
+            enRouteAt={order.deliveryTimestamps?.enRouteAt}
+            arrivedAtClientAt={order.deliveryTimestamps?.arrivedAtClientAt}
+            deliveredAt={order.deliveryTimestamps?.deliveredAt}
             estimatedPickupTime={order.pickup_time}
             estimatedDeliveryTime={order.arrival_time}
             currentStatus={order.driver_status}

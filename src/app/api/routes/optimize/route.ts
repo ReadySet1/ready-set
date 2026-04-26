@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
+import { z } from 'zod';
 import { RouteRequestSchema } from '@/types/routing';
 import type { RouteApiResponse, RouteResult } from '@/types/routing';
 import { getDirections } from '@/services/routing/google-directions';
@@ -38,7 +39,7 @@ export async function POST(
     const parsed = RouteRequestSchema.safeParse(body);
 
     if (!parsed.success) {
-      const errors = parsed.error.issues.map((i) => i.message).join(', ');
+      const errors = parsed.error.issues.map((i: z.ZodIssue) => i.message).join(', ');
       return NextResponse.json(
         { success: false, error: `Validation error: ${errors}`, timestamp: new Date().toISOString() },
         { status: 400 },

@@ -91,13 +91,27 @@ export async function middleware(request: NextRequest) {
           });
         }
 
-        // Check if user has a temporary password and needs to change it
+        // Check if user has a temporary password or has been soft-deleted
         // This check applies to ALL protected routes
         const { data: tempPasswordProfile } = await supabase
           .from('profiles')
-          .select('isTemporaryPassword')
+          .select('isTemporaryPassword, deletedAt')
           .eq('id', user.id)
           .maybeSingle();
+
+        // Block soft-deleted users from accessing any protected route
+        if (tempPasswordProfile?.deletedAt !== null && tempPasswordProfile?.deletedAt !== undefined) {
+          securityLogger.warn('Middleware: Soft-deleted user attempted to access protected route', {
+            userId: user.id,
+            pathname,
+          });
+          const redirectUrl = new URL('/sign-in?deactivated=true', request.url);
+          const response = NextResponse.redirect(redirectUrl);
+          response.headers.set('x-auth-redirect', 'true');
+          response.headers.set('x-redirect-from', pathname);
+          response.headers.set('x-redirect-reason', 'account-deactivated');
+          return response;
+        }
 
         if (tempPasswordProfile?.isTemporaryPassword) {
           // User has temporary password - redirect to force password change page

@@ -64,6 +64,7 @@ describe("Client Enums Import Safety", () => {
   describe("DriverStatus Enum", () => {
     it("should export all required driver statuses", () => {
       expect(DriverStatus.ARRIVED_AT_VENDOR).toBe("ARRIVED_AT_VENDOR");
+      expect(DriverStatus.EN_ROUTE_TO_VENDOR).toBe("EN_ROUTE_TO_VENDOR");
       expect(DriverStatus.EN_ROUTE_TO_CLIENT).toBe("EN_ROUTE_TO_CLIENT");
       expect(DriverStatus.ARRIVED_TO_CLIENT).toBe("ARRIVED_TO_CLIENT");
       expect(DriverStatus.ASSIGNED).toBe("ASSIGNED");
@@ -81,12 +82,13 @@ describe("Client Enums Import Safety", () => {
         "EN_ROUTE_TO_CLIENT", 
         "ARRIVED_TO_CLIENT",
         "ASSIGNED",
-        "COMPLETED"
+        "COMPLETED",
+        "EN_ROUTE_TO_VENDOR"
       ];
       const actualValues = Object.values(DriverStatus);
       
       expect(actualValues).toEqual(expectedValues);
-      expect(actualValues).toHaveLength(5);
+      expect(actualValues).toHaveLength(6);
     });
   });
 

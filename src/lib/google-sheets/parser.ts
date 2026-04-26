@@ -1,4 +1,5 @@
 export interface SheetDeliveryRow {
+  rowIndex: number; // 1-based sheet row number (header = row 1, first data = row 2)
   coolfireUpload: string;
   type: string;
   date: string;
@@ -7,6 +8,7 @@ export interface SheetDeliveryRow {
   routeOrder: string;
   pickupTime: string;
   headcount: string;
+  cost: string; // Food cost column
   driverName: string;
   driverPhone: string;
   backupDriver: string;
@@ -15,7 +17,23 @@ export interface SheetDeliveryRow {
   client: string;
   clientAddress: string;
   specialNotes: string;
-  driverPay: string;
+  // Financial output columns (may be empty if not yet calculated)
+  driverMaxPayPerDrop: string;
+  driverBasePayPerDrop: string;
+  totalMileage: string;
+  mileageRate: string;
+  totalMileagePay: string;
+  driverTotalBasePay: string;
+  bonusVariance: string;
+  readySetFee: string;
+  readySetAddonFee: string;
+  readySetMileageRate: string;
+  readySetTotalFee: string;
+  toll: string;
+  tip: string;
+  driverBonusPay: string;
+  adjustment: string;
+  totalDriverPay: string;
 }
 
 export interface DriverGroup {
@@ -71,7 +89,6 @@ function parseSheetDate(dateStr: string): Date | null {
 
   if (isNaN(month) || isNaN(day) || isNaN(year)) return null;
 
-  // Handle 2-digit years: 26 -> 2026
   if (year < 100) {
     year += 2000;
   }
@@ -98,7 +115,6 @@ export function parseDeliveryRows(rows: string[][]): SheetDeliveryRow[] {
 
   const columnMap = buildColumnMap(headers);
 
-  // Validate required headers exist
   const missingHeaders = REQUIRED_HEADERS.filter(
     (h) => columnMap[h] === undefined,
   );
@@ -122,6 +138,7 @@ export function parseDeliveryRows(rows: string[][]): SheetDeliveryRow[] {
     if (!parsedDate) continue;
 
     result.push({
+      rowIndex: i + 1, // 1-based: header is row 1, first data row is row 2
       coolfireUpload: getCell(row, columnMap, "Coolfire Upload"),
       type: getCell(row, columnMap, "Type"),
       date: dateStr,
@@ -130,6 +147,7 @@ export function parseDeliveryRows(rows: string[][]): SheetDeliveryRow[] {
       routeOrder: getCell(row, columnMap, "Route/Order"),
       pickupTime: getCell(row, columnMap, "Pick Up"),
       headcount: getCell(row, columnMap, "Headcount / Total Drops"),
+      cost: getCell(row, columnMap, "Cost"),
       driverName,
       driverPhone: getCell(row, columnMap, "Driver Phone"),
       backupDriver: getCell(row, columnMap, "Backup Driver"),
@@ -138,7 +156,23 @@ export function parseDeliveryRows(rows: string[][]): SheetDeliveryRow[] {
       client: getCell(row, columnMap, "Client"),
       clientAddress: getCell(row, columnMap, "Client Address"),
       specialNotes: getCell(row, columnMap, "Special Notes"),
-      driverPay: getCell(row, columnMap, "Driver Max Pay Per Drop"),
+      // Financial columns
+      driverMaxPayPerDrop: getCell(row, columnMap, "Driver Max Pay Per Drop"),
+      driverBasePayPerDrop: getCell(row, columnMap, "Driver Base Pay Per Drop"),
+      totalMileage: getCell(row, columnMap, "Total Mileage"),
+      mileageRate: getCell(row, columnMap, "Mileage Rate"),
+      totalMileagePay: getCell(row, columnMap, "Total Mileage Pay"),
+      driverTotalBasePay: getCell(row, columnMap, "Driver Total Base Pay"),
+      bonusVariance: getCell(row, columnMap, "Bonus Varience"),
+      readySetFee: getCell(row, columnMap, "Ready Set Fee"),
+      readySetAddonFee: getCell(row, columnMap, "ReadySet Add-on Fee"),
+      readySetMileageRate: getCell(row, columnMap, "Ready Set Mileage Rate"),
+      readySetTotalFee: getCell(row, columnMap, "Ready Set Total Fee"),
+      toll: getCell(row, columnMap, "Toll"),
+      tip: getCell(row, columnMap, "Tip"),
+      driverBonusPay: getCell(row, columnMap, "Driver Bonus Pay"),
+      adjustment: getCell(row, columnMap, "Adjustment"),
+      totalDriverPay: getCell(row, columnMap, "Total Driver Pay"),
     });
   }
 
@@ -152,6 +186,24 @@ export function filterByDate(
   return rows.filter((row) => isSameDate(row.parsedDate, targetDate));
 }
 
+export function filterByDateRange(
+  rows: SheetDeliveryRow[],
+  startDate: Date,
+  endDate: Date,
+): SheetDeliveryRow[] {
+  const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+  return rows.filter((row) => {
+    const rowDate = new Date(
+      row.parsedDate.getFullYear(),
+      row.parsedDate.getMonth(),
+      row.parsedDate.getDate(),
+    );
+    return rowDate >= start && rowDate <= end;
+  });
+}
+
 export function groupByDriver(rows: SheetDeliveryRow[]): DriverGroup[] {
   const driverMap = new Map<string, DriverGroup>();
 
@@ -161,7 +213,6 @@ export function groupByDriver(rows: SheetDeliveryRow[]): DriverGroup[] {
 
     if (existing) {
       existing.orders.push(row);
-      // Use the first non-empty phone found
       if (!existing.phone && row.driverPhone) {
         existing.phone = row.driverPhone;
       }

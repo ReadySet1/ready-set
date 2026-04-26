@@ -8,10 +8,16 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
 import { CarrierService, CarrierWebhookService } from '@/lib/services/carrierService';
 import { DriverStatus } from '@/types/prisma';
+import { DriverStatus as DriverStatusEnum } from '@/types/user';
 import { getEmailPreferencesForUser } from "@/lib/email-preferences";
 import { sendDeliveryStatusEmail } from "@/services/notifications/email";
 import { invalidateVendorCacheOnStatusUpdate } from '@/lib/cache/cache-invalidation';
 import { courierEventService, CourierEventService } from '@/services/ezcater';
+import {
+  transitionOrder,
+  StateTransitionError,
+} from '@/lib/state-machine/transition';
+import type { OrderStatus } from '@/lib/state-machine/transition';
 
 // Validation schema for status update request
 const StatusUpdateSchema = z.object({
@@ -118,29 +124,40 @@ export async function PATCH(
       );
     }
 
-    // 3. Validate business rules
-    if (!canUpdateToStatus(order.driverStatus, validatedData.driverStatus)) {
-      return NextResponse.json(
-        {
-          error: `Cannot transition from ${order.driverStatus || 'NO_STATUS'} to ${validatedData.driverStatus}`,
-        },
-        { status: 422 }
-      );
+    // 3. Validate + write via the centralized state machine.
+    //    completeDateTime is route-owned (not state) — kept in the same tx.
+    let updatedOrder: Awaited<ReturnType<typeof prisma.cateringRequest.update>>;
+    try {
+      updatedOrder = await prisma.$transaction(async (tx) => {
+        await transitionOrder(
+          {
+            orderType: 'catering',
+            orderId,
+            currentStatus: (order.status as OrderStatus) ?? null,
+            currentDriverStatus: (order.driverStatus as DriverStatusEnum | null) ?? null,
+            nextDriverStatus: validatedData.driverStatus as DriverStatusEnum,
+          },
+          tx,
+        );
+        if (validatedData.driverStatus === 'COMPLETED') {
+          return tx.cateringRequest.update({
+            where: { id: orderId },
+            data: { completeDateTime: new Date() },
+          });
+        }
+        return tx.cateringRequest.findUniqueOrThrow({ where: { id: orderId } });
+      });
+    } catch (err) {
+      if (err instanceof StateTransitionError) {
+        return NextResponse.json(
+          {
+            error: `Cannot transition from ${order.driverStatus || 'NO_STATUS'} to ${validatedData.driverStatus}`,
+          },
+          { status: 422 },
+        );
+      }
+      throw err;
     }
-
-    // 4. Update the order status
-    const updatedOrder = await prisma.cateringRequest.update({
-      where: { id: orderId },
-      data: {
-        driverStatus: validatedData.driverStatus,
-        updatedAt: new Date(),
-        // Optionally update other fields based on status
-        ...(validatedData.driverStatus === 'COMPLETED' && {
-          completeDateTime: new Date(),
-          status: 'COMPLETED',
-        }),
-      },
-    });
 
     // 5. Handle external partner webhooks
     const webhookResults: StatusUpdateResponse['webhookResults'] = {};
@@ -320,27 +337,6 @@ export async function PATCH(
       { status: 500 }
     );
   }
-}
-
-/**
- * Validates if a status transition is allowed
- */
-function canUpdateToStatus(currentStatus: DriverStatus | null, newStatus: DriverStatus): boolean {
-  // Define valid status transitions
-  const validTransitions: Record<string, DriverStatus[]> = {
-    'null': ['ASSIGNED'],
-    'ASSIGNED': ['ARRIVED_AT_VENDOR', 'COMPLETED'], // Can skip directly to completed if needed
-    'ARRIVED_AT_VENDOR': ['PICKED_UP', 'EN_ROUTE_TO_CLIENT', 'COMPLETED'],
-    'PICKED_UP': ['EN_ROUTE_TO_CLIENT', 'COMPLETED'],
-    'EN_ROUTE_TO_CLIENT': ['ARRIVED_TO_CLIENT', 'COMPLETED'],
-    'ARRIVED_TO_CLIENT': ['COMPLETED'],
-    'COMPLETED': [], // Terminal status - no further transitions
-  };
-
-  const currentKey = currentStatus || 'null';
-  const allowedStatuses = validTransitions[currentKey] || [];
-
-  return allowedStatuses.includes(newStatus);
 }
 
 /**

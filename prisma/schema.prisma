@@ -563,6 +563,7 @@ enum DriverStatus {
   ARRIVED_TO_CLIENT
   ASSIGNED
   COMPLETED
+  EN_ROUTE_TO_VENDOR
   @@schema("public")
 }
 
@@ -748,6 +749,9 @@ model DeliveryConfiguration {
   // Bridge Toll Settings
   bridgeTollSettings    Json     @map("bridge_toll_settings")
 
+  // Zero Order Settings (special pricing when headcount=0 AND foodCost=0)
+  zeroOrderSettings     Json?    @map("zero_order_settings")
+
   // Custom Settings (flexible for future additions)
   customSettings        Json?    @map("custom_settings")
 
@@ -887,6 +891,7 @@ model Delivery {
   status                 String    @default("pending") @db.VarChar(20)
   assignedAt             DateTime? @map("assigned_at") @db.Timestamptz(6)
   acceptedAt             DateTime? @map("accepted_at") @db.Timestamptz(6)
+  enRouteToVendorAt      DateTime? @map("en_route_to_vendor_at") @db.Timestamptz(6)
   arrivedAtVendorAt      DateTime? @map("arrived_at_vendor_at") @db.Timestamptz(6)
   pickedUpAt             DateTime? @map("picked_up_at") @db.Timestamptz(6)
   enRouteAt              DateTime? @map("en_route_at") @db.Timestamptz(6)

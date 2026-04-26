@@ -42,8 +42,8 @@ export function buildNextDayMessage(
     message += `DROP OFF:\n`;
     message += `${order.client} - ${order.clientAddress}\n`;
 
-    if (order.driverPay) {
-      message += `\nPAY: ${order.driverPay}\n`;
+    if (order.driverMaxPayPerDrop) {
+      message += `\nPAY: ${order.driverMaxPayPerDrop}\n`;
     }
     if (order.headcount) {
       message += `HEADCOUNT: ${order.headcount}\n`;

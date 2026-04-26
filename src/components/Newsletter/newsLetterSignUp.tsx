@@ -1,7 +1,6 @@
 // src/components/Newsletter/newsLetterSignUp.tsx
 "use client";
 
-import axios from 'axios';
 import React, { FormEvent, useState } from 'react';
 import toast from "react-hot-toast";
 
@@ -12,17 +11,23 @@ const NewsletterSignup = () => {
   async function handleSubscribe(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus("loading");
-    
+
     try {
-      const response = await axios.post("/api/subscribe", { email });
+      const res = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "An error occurred");
+      }
       setStatus("success");
       setEmail("");
-      toast.success(response.data.message);
+      toast.success(data.message);
     } catch (err) {
       setStatus("error");
-      if (axios.isAxiosError(err)) {
-        toast.error(err.response?.data.error || "An error occurred");
-      }
+      toast.error(err instanceof Error ? err.message : "An error occurred");
     } finally {
       // Reset status after a delay
       setTimeout(() => setStatus("idle"), 3000);

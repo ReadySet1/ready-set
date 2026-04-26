@@ -128,7 +128,16 @@ export async function GET(req: NextRequest) {
         include: {
           dispatches: {
             include: {
-              driver: true,
+              driver: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  contactNumber: true,
+                  status: true,
+                  deletedAt: true,
+                },
+              },
             },
           },
           user: {
@@ -155,7 +164,16 @@ export async function GET(req: NextRequest) {
         include: {
           dispatches: {
             include: {
-              driver: true,
+              driver: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  contactNumber: true,
+                  status: true,
+                  deletedAt: true,
+                },
+              },
             },
           },
           user: {

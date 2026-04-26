@@ -25,6 +25,7 @@ export interface DeliveryCostInput {
   requiresBridge?: boolean;
   bridgeToll?: number;
   clientConfigId?: string; // Optional: use specific client configuration
+  configOverride?: ClientDeliveryConfiguration; // Optional: pre-loaded config (e.g., from DB) bypasses in-memory lookup
 }
 
 export interface DeliveryCostBreakdown {
@@ -434,7 +435,8 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
     numberOfStops = 1,
     requiresBridge = false,
     bridgeToll,
-    clientConfigId
+    clientConfigId,
+    configOverride
   } = input;
 
   // Validate inputs (before config lookup to fail fast on bad data)
@@ -444,8 +446,11 @@ export function calculateDeliveryCost(input: DeliveryCostInput): DeliveryCostBre
   if (numberOfDrives < 1) throw new Error('Number of drives must be at least 1');
 
   // Get client configuration (default to Ready Set Food Standard)
+  // configOverride takes priority (e.g., DB-loaded config from Adjust Vendor Pricing)
   let config: ClientDeliveryConfiguration;
-  if (clientConfigId) {
+  if (configOverride) {
+    config = configOverride;
+  } else if (clientConfigId) {
     const found = getConfiguration(clientConfigId);
     if (!found) {
       throw new Error(
@@ -606,7 +611,8 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
     numberOfStops = 1,
     requiresBridge = false,
     bridgeToll,
-    clientConfigId
+    clientConfigId,
+    configOverride
   } = input;
 
   // Validate inputs - prevent negative values
@@ -618,8 +624,11 @@ export function calculateDriverPay(input: DriverPayInput): DriverPayBreakdown {
   if (directTip < 0) throw new Error('Direct tip cannot be negative');
 
   // Get client configuration
+  // configOverride takes priority (e.g., DB-loaded config from Adjust Vendor Pricing)
   let config: ClientDeliveryConfiguration;
-  if (clientConfigId) {
+  if (configOverride) {
+    config = configOverride;
+  } else if (clientConfigId) {
     const found = getConfiguration(clientConfigId);
     if (!found) {
       throw new Error(

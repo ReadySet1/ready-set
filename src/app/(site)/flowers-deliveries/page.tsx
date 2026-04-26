@@ -1,11 +1,15 @@
 import FlowerHero from "@/components/FlowersDelivery/FlowerHero";
 import { FlowersServiceFeatures } from "@/components/FlowersDelivery/ServiceFeaturesSection";
-import DeliveryTermsAndPricing from "@/components/FlowersDelivery/DeliveryTermsAndPricing";
+// import DeliveryTermsAndPricing from "@/components/FlowersDelivery/DeliveryTermsAndPricing";
+import FlowersAbout from "@/components/FlowersDelivery/FlowersAbout";
 import { Metadata } from "next";
-import ExpertSupportSection from "@/components/FlowersDelivery/ExpertSupportSection";
+// import ExpertSupportSection from "@/components/FlowersDelivery/ExpertSupportSection";
+import FlowersDeliveryPartners from "@/components/FlowersDelivery/FlowersDeliveryPartners";
 import ServiceProcessCarousel from "@/components/FlowersDelivery/ServiceProcessCarousel";
 import DelicateBlooms from "@/components/FlowersDelivery/DelicateBlooms";
+import FlowersSetupCarousel from "@/components/FlowersDelivery/FlowersSetupCarousel";
 import FAQSection from "@/components/FlowersDelivery/FAQSection";
+import CateringContact from "@/components/FoodDelivery/CateringContact";
 
 export const metadata: Metadata = {
   title: "Floral Delivery Logistics for Flower Shops | Ready Set",
@@ -87,7 +91,7 @@ export const metadata: Metadata = {
       "Reliable Delivery, On-Time Service, Careful Handling, Real-Time Tracking, Dedicated Drivers, Upholding Shop Reputation, Efficient Logistics",
   },
   alternates: {
-    canonical: "https://readysetllc.com/flowers", // Replace with the actual URL of this page
+    canonical: "https://readysetllc.com/flowers-deliveries",
   },
 };
 
@@ -96,11 +100,15 @@ const FlowersPage = () => {
     <main>
       <FlowerHero />
       <FlowersServiceFeatures />
-      <DeliveryTermsAndPricing />
-      <ExpertSupportSection />
-      <ServiceProcessCarousel />
-      <DelicateBlooms />
-      <FAQSection />
+      {/* <DeliveryTermsAndPricing /> */}
+      <FlowersAbout />
+      {/* <ExpertSupportSection /> */}
+      {/* <FlowersDeliveryPartners /> */}
+      {/* <ServiceProcessCarousel /> */}
+      {/* <DelicateBlooms /> */}
+      <FlowersSetupCarousel />
+      <CateringContact />
+      {/* <FAQSection /> */}
     </main>
   );
 };

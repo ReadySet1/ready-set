@@ -81,7 +81,7 @@ export interface DistanceMatrixResult {
 
 // ─── Generic API Response Wrapper ───────────────────────────────────────────
 
-export interface RouteApiResponse<T> {
+export interface RouteApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -102,7 +102,7 @@ export const RouteRequestSchema = z.object({
   optimizeWaypoints: z.boolean().optional(),
   avoidTolls: z.boolean().optional(),
   avoidHighways: z.boolean().optional(),
-  departureTime: z.string().optional(),
+  departureTime: z.union([z.string(), z.literal('now')]).optional(),
   preferMedianRoute: z.boolean().optional(),
 });
 
