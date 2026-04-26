@@ -11,6 +11,7 @@
 
 import { GET } from '../route';
 import { createClient } from '@/utils/supabase/server';
+import { prisma } from '@/lib/prisma';
 import {
   createRequestWithParams,
   createGetRequest,
@@ -25,7 +26,16 @@ jest.mock('@/utils/supabase/server', () => ({
   createClient: jest.fn(),
 }));
 
+jest.mock('@/lib/prisma', () => ({
+  prisma: {
+    deliveryConfiguration: {
+      findFirst: jest.fn(),
+    },
+  },
+}));
+
 const mockCreateClient = createClient as jest.MockedFunction<typeof createClient>;
+const mockPrismaFindFirst = prisma.deliveryConfiguration.findFirst as jest.MockedFunction<typeof prisma.deliveryConfiguration.findFirst>;
 
 describe('/api/calculator/config', () => {
   const mockUser = {
@@ -89,6 +99,9 @@ describe('/api/calculator/config', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // By default, Prisma returns no delivery configuration (falls through to in-memory/Supabase)
+    mockPrismaFindFirst.mockResolvedValue(null);
 
     mockSupabase = {
       auth: {
