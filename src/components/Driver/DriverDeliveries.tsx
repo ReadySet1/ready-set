@@ -111,6 +111,15 @@ interface Delivery {
     category?: string | null;
     uploadedAt?: string;
   }>;
+  deliveryTimestamps?: {
+    assignedAt?: string | null;
+    enRouteToVendorAt?: string | null;
+    arrivedAtVendorAt?: string | null;
+    pickedUpAt?: string | null;
+    enRouteAt?: string | null;
+    arrivedAtClientAt?: string | null;
+    deliveredAt?: string | null;
+  };
 }
 
 interface UserProfile extends ProfileResponse {
@@ -943,9 +952,14 @@ const DriverDeliveries: React.FC = () => {
                                   <TableCell colSpan={6} className="bg-muted/30 px-6 py-3">
                                     <DeliveryTimeline
                                       createdAt={delivery.createdAt}
-                                      deliveredAt={delivery.completeDateTime}
+                                      enRouteToVendorAt={delivery.deliveryTimestamps?.enRouteToVendorAt}
+                                      arrivedAtVendorAt={delivery.deliveryTimestamps?.arrivedAtVendorAt}
+                                      pickedUpAt={delivery.deliveryTimestamps?.pickedUpAt}
+                                      enRouteAt={delivery.deliveryTimestamps?.enRouteAt}
+                                      arrivedAtClientAt={delivery.deliveryTimestamps?.arrivedAtClientAt}
+                                      deliveredAt={delivery.deliveryTimestamps?.deliveredAt}
                                       estimatedPickupTime={delivery.pickupDateTime}
-                                      estimatedDeliveryTime={delivery.arrivalDateTime}
+                                      estimatedDeliveryTime={delivery.arrivalDateTime ?? delivery.completeDateTime}
                                       currentStatus={delivery.driverStatus}
                                       compact
                                     />

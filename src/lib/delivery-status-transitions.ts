@@ -7,11 +7,13 @@ import { DriverStatus } from '@/types/user';
 
 /**
  * Ordered list of driver statuses representing the delivery lifecycle
- * Flow: Assigned → At Vendor → En Route → Arrived → Completed
+ * Flow: Assigned → En Route to Resto → Arrived at Vendor → Pick Up Completed → En Route to Client → Arrived at Client → Delivered
  */
 export const STATUS_ORDER: DriverStatus[] = [
   DriverStatus.ASSIGNED,
+  DriverStatus.EN_ROUTE_TO_VENDOR,
   DriverStatus.ARRIVED_AT_VENDOR,
+  DriverStatus.PICKED_UP,
   DriverStatus.EN_ROUTE_TO_CLIENT,
   DriverStatus.ARRIVED_TO_CLIENT,
   DriverStatus.COMPLETED,
@@ -22,21 +24,23 @@ export const STATUS_ORDER: DriverStatus[] = [
  */
 export const STATUS_LABELS: Record<DriverStatus, string> = {
   [DriverStatus.ASSIGNED]: 'Assigned',
-  [DriverStatus.ARRIVED_AT_VENDOR]: 'At Vendor',
-  [DriverStatus.PICKED_UP]: 'Picked Up',
-  [DriverStatus.EN_ROUTE_TO_CLIENT]: 'En Route',
-  [DriverStatus.ARRIVED_TO_CLIENT]: 'Arrived',
-  [DriverStatus.COMPLETED]: 'Completed',
+  [DriverStatus.EN_ROUTE_TO_VENDOR]: 'En Route to Resto',
+  [DriverStatus.ARRIVED_AT_VENDOR]: 'Arrived at Vendor',
+  [DriverStatus.PICKED_UP]: 'Pick Up Completed',
+  [DriverStatus.EN_ROUTE_TO_CLIENT]: 'En Route to Client',
+  [DriverStatus.ARRIVED_TO_CLIENT]: 'Arrived at Client',
+  [DriverStatus.COMPLETED]: 'Delivered',
 };
 
 /**
  * Short action labels for the "next step" button
- * Matches the 5-step flow: Start → En Route → Arrived → Complete → Done
+ * Matches the 6-step flow: Start → Picked Up → En Route → Arrived → Complete → Done
  */
 export const NEXT_ACTION_LABELS: Record<DriverStatus, string> = {
   [DriverStatus.ASSIGNED]: 'Start',
-  [DriverStatus.ARRIVED_AT_VENDOR]: 'En Route',
-  [DriverStatus.PICKED_UP]: 'En Route', // Legacy - kept for backwards compatibility
+  [DriverStatus.EN_ROUTE_TO_VENDOR]: 'Arrived',
+  [DriverStatus.ARRIVED_AT_VENDOR]: 'Picked Up',
+  [DriverStatus.PICKED_UP]: 'En Route',
   [DriverStatus.EN_ROUTE_TO_CLIENT]: 'Arrived',
   [DriverStatus.ARRIVED_TO_CLIENT]: 'Complete',
   [DriverStatus.COMPLETED]: 'Done',
@@ -143,6 +147,7 @@ export function isDeliveryCompleted(status: DriverStatus | string | null | undef
  * Statuses that trigger customer notifications
  */
 export const CUSTOMER_NOTIFICATION_STATUSES: DriverStatus[] = [
+  DriverStatus.EN_ROUTE_TO_VENDOR,
   DriverStatus.ARRIVED_AT_VENDOR,
   DriverStatus.EN_ROUTE_TO_CLIENT,
   DriverStatus.ARRIVED_TO_CLIENT,
@@ -177,10 +182,14 @@ export function shouldNotifyAdmin(status: DriverStatus | string): boolean {
  */
 export function getTimestampUpdatesForStatus(status: DriverStatus | string): string[] {
   switch (status) {
+    case DriverStatus.EN_ROUTE_TO_VENDOR:
+      return ['en_route_to_vendor_at = NOW()'];
     case DriverStatus.ARRIVED_AT_VENDOR:
       return ['arrived_at_vendor_at = NOW()'];
+    case DriverStatus.PICKED_UP:
+      return ['picked_up_at = NOW()'];
     case DriverStatus.EN_ROUTE_TO_CLIENT:
-      return ['picked_up_at = NOW()', 'en_route_at = NOW()'];
+      return ['en_route_at = NOW()'];
     case DriverStatus.ARRIVED_TO_CLIENT:
       return ['arrived_at_client_at = NOW()'];
     case DriverStatus.COMPLETED:

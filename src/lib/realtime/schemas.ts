@@ -176,6 +176,7 @@ export const DeliveryAssignedPayloadSchema = DeliveryAssignmentPayloadSchema.ext
 
 export const DeliveryTrackingStatusSchema = z.enum([
   'ASSIGNED',
+  'EN_ROUTE_TO_VENDOR',
   'ARRIVED_AT_VENDOR',
   'PICKED_UP',
   'EN_ROUTE_TO_CLIENT',

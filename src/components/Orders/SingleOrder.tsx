@@ -256,13 +256,15 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     showNotifications: true,
     onStatusUpdate: (payload) => {
       console.log('[SingleOrder] Realtime delivery status update:', payload.status);
-      // Update the order's driver status when we receive a real-time update
-      if (order && payload.orderId === order.id) {
-        setOrder({
-          ...order,
+      // Use functional state update to avoid stale closures overwriting
+      // deliveryTimestamps that were just set by the PATCH response.
+      setOrder((prev) => {
+        if (!prev || payload.orderId !== prev.id) return prev;
+        return {
+          ...prev,
           driverStatus: payload.status as DriverStatus,
-        });
-      }
+        };
+      });
     },
   });
 
@@ -640,6 +642,19 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
   const updateDriverStatus = async (newStatus: DriverStatus) => {
     if (!order) return;
 
+    // Map DriverStatus to the deliveryTimestamps field name
+    const STATUS_TO_TIMESTAMP_FIELD: Record<string, string> = {
+      [DriverStatus.ASSIGNED]: "assignedAt",
+      [DriverStatus.EN_ROUTE_TO_VENDOR]: "enRouteToVendorAt",
+      [DriverStatus.ARRIVED_AT_VENDOR]: "arrivedAtVendorAt",
+      [DriverStatus.PICKED_UP]: "pickedUpAt",
+      [DriverStatus.EN_ROUTE_TO_CLIENT]: "enRouteAt",
+      [DriverStatus.ARRIVED_TO_CLIENT]: "arrivedAtClientAt",
+      [DriverStatus.COMPLETED]: "deliveredAt",
+    };
+
+    const clickedAt = new Date().toISOString();
+
     try {
       const session = await getValidSession();
 
@@ -669,7 +684,6 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
           return;
         }
 
-        // Get error details
         let errorText = "";
         try {
           const errorData = await response.json();
@@ -684,10 +698,24 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
       }
 
       const updatedOrder = await response.json();
-      setOrder(updatedOrder);
+
+      // Merge deliveryTimestamps: combine the current state's timestamps
+      // with those from the API response (which should have all of them).
+      // Also set the clicked timestamp as a fallback in case the API's
+      // Delivery upsert silently failed.
+      const tsField = STATUS_TO_TIMESTAMP_FIELD[newStatus];
+
+      setOrder((prev) => {
+        const prevTimestamps = (prev as any)?.deliveryTimestamps ?? {};
+        const apiTimestamps = (updatedOrder as any).deliveryTimestamps ?? {};
+        const mergedTimestamps = { ...prevTimestamps, ...apiTimestamps };
+        if (tsField && !mergedTimestamps[tsField]) {
+          mergedTimestamps[tsField] = clickedAt;
+        }
+        return { ...updatedOrder, deliveryTimestamps: mergedTimestamps } as Order;
+      });
       toast.success("Driver status updated successfully!");
 
-      // If driver status is updated to completed, also update the main order status
       if (newStatus === DriverStatus.COMPLETED) {
         await handleOrderStatusChange(OrderStatus.COMPLETED);
       }
@@ -751,9 +779,17 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
     try {
       // Perform internal update first
       const updatedOrder = await internalUpdatePromise();
-      if (!updatedOrder) return; // Handle case where promise returns undefined due to auth error
+      if (!updatedOrder) return;
 
-      setOrder(updatedOrder); // Update local state immediately after internal success
+      // Preserve deliveryTimestamps from the current state if the API
+      // response doesn't include them (status-only updates may omit them).
+      setOrder((prev) => {
+        const merged = { ...updatedOrder } as any;
+        if (!merged.deliveryTimestamps && (prev as any)?.deliveryTimestamps) {
+          merged.deliveryTimestamps = (prev as any).deliveryTimestamps;
+        }
+        return merged as Order;
+      });
       toast.success("Order status updated successfully!");
 
       // Sync with Broker
@@ -790,6 +826,11 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
 
   // Determine if user can assign drivers based on role
   const canUserAssignDriver = canAssignDriver && !userRoles.isVendor;
+
+  // Timeline click-to-update: use the prop directly since the parent page
+  // already sets it based on the route (driver, helpdesk via admin, admin).
+  // Route protection middleware ensures only authorized roles reach these pages.
+  const canUserUpdateTimeline = canUpdateDriverStatus;
 
   if (isLoading) {
     return <OrderSkeleton />;
@@ -981,15 +1022,17 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
                   </h3>
                   <DeliveryTimeline
                     createdAt={order.createdAt}
-                    assignedAt={(order as any).deliveryTimestamps?.assignedAt}
+                    enRouteToVendorAt={(order as any).deliveryTimestamps?.enRouteToVendorAt}
                     arrivedAtVendorAt={(order as any).deliveryTimestamps?.arrivedAtVendorAt}
                     pickedUpAt={(order as any).deliveryTimestamps?.pickedUpAt}
                     enRouteAt={(order as any).deliveryTimestamps?.enRouteAt}
                     arrivedAtClientAt={(order as any).deliveryTimestamps?.arrivedAtClientAt}
-                    deliveredAt={(order as any).deliveryTimestamps?.deliveredAt ?? order.completeDateTime}
+                    deliveredAt={(order as any).deliveryTimestamps?.deliveredAt}
                     estimatedPickupTime={order.pickupDateTime}
-                    estimatedDeliveryTime={order.arrivalDateTime}
+                    estimatedDeliveryTime={order.arrivalDateTime ?? order.completeDateTime}
                     currentStatus={order.driverStatus}
+                    canUpdateStatus={canUserUpdateTimeline}
+                    onStatusUpdate={updateDriverStatus}
                   />
                 </div>
               </div>
@@ -1219,15 +1262,17 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
               <div className="p-6">
                 <DeliveryTimeline
                   createdAt={order.createdAt}
-                  assignedAt={(order as any).deliveryTimestamps?.assignedAt}
+                  enRouteToVendorAt={(order as any).deliveryTimestamps?.enRouteToVendorAt}
                   arrivedAtVendorAt={(order as any).deliveryTimestamps?.arrivedAtVendorAt}
                   pickedUpAt={(order as any).deliveryTimestamps?.pickedUpAt}
                   enRouteAt={(order as any).deliveryTimestamps?.enRouteAt}
                   arrivedAtClientAt={(order as any).deliveryTimestamps?.arrivedAtClientAt}
-                  deliveredAt={(order as any).deliveryTimestamps?.deliveredAt ?? order.completeDateTime}
+                  deliveredAt={(order as any).deliveryTimestamps?.deliveredAt}
                   estimatedPickupTime={order.pickupDateTime}
-                  estimatedDeliveryTime={order.arrivalDateTime}
+                  estimatedDeliveryTime={order.arrivalDateTime ?? order.completeDateTime}
                   currentStatus={order.driverStatus}
+                  canUpdateStatus={canUserUpdateTimeline}
+                  onStatusUpdate={updateDriverStatus}
                   compact
                 />
               </div>

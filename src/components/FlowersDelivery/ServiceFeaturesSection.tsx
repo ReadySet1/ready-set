@@ -3,10 +3,12 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { MapPin, Headset, Truck } from "lucide-react";
+import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 interface ServiceFeatureData {
-  icon: string;
+  icon: string | React.ReactNode;
   title?: string;
   altText?: string;
   description: React.ReactNode;
@@ -15,7 +17,7 @@ interface ServiceFeatureData {
 
 interface ServiceFeatureProps extends ServiceFeatureData {
   showTitleInBox?: boolean;
-  variant?: "box" | "specialty";
+  variant?: "box" | "specialty" | "outline";
 }
 
 interface ServiceFeaturesSectionProps {
@@ -23,9 +25,11 @@ interface ServiceFeaturesSectionProps {
   showTitleInBox?: boolean;
   backgroundImage?: string;
   backgroundColor?: string;
-  variant?: "box" | "specialty";
+  variant?: "box" | "specialty" | "outline";
   title?: string;
   subtitle?: string;
+  ctaLabel?: string;
+  onCtaClick?: (e: React.MouseEvent) => void;
 }
 
 const FeatureBox: React.FC<ServiceFeatureProps> = ({
@@ -48,6 +52,45 @@ const FeatureBox: React.FC<ServiceFeatureProps> = ({
       title
     );
 
+  if (variant === "outline") {
+    return (
+      <motion.div
+        className="flex flex-col items-center"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: delay / 1000 }}
+      >
+        <motion.div
+          className="flex h-full w-full flex-col items-center justify-start rounded-3xl border border-gray-200 px-8 py-10"
+          whileHover={{ scale: 1.02, y: -4 }}
+          transition={{ type: "spring", stiffness: 300 }}
+        >
+          <div className="mb-6 text-gray-400">
+            {typeof icon === "string" ? (
+              <Image
+                src={icon}
+                alt={altText || (typeof title === "string" ? title : "")}
+                width={48}
+                height={48}
+                className="opacity-50"
+              />
+            ) : (
+              icon
+            )}
+          </div>
+          {title && (
+            <h3 className="mb-4 text-center text-sm font-extrabold uppercase tracking-widest text-gray-800">
+              {adjustedTitle}
+            </h3>
+          )}
+          <p className="text-center text-sm leading-relaxed text-gray-500">
+            {description}
+          </p>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
   if (variant === "specialty") {
     return (
       <motion.div
@@ -62,7 +105,7 @@ const FeatureBox: React.FC<ServiceFeatureProps> = ({
           transition={{ type: "spring", stiffness: 300 }}
         >
           <Image
-            src={icon}
+            src={icon as string}
             alt={altText || (typeof title === "string" ? title : "")}
             fill
             sizes="(max-width: 768px) 100vw, 280px"
@@ -90,7 +133,7 @@ const FeatureBox: React.FC<ServiceFeatureProps> = ({
         transition={{ type: "spring", stiffness: 300 }}
       >
         <Image
-          src={icon}
+          src={icon as string}
           alt={altText || (typeof title === "string" ? title : "")}
           width={450}
           height={450}
@@ -120,6 +163,8 @@ const ServiceFeaturesSection: React.FC<ServiceFeaturesSectionProps> = ({
   variant = "box",
   title = "It's Not Just What We Do",
   subtitle = "It's How We Do It",
+  ctaLabel,
+  onCtaClick,
 }) => {
   const containerStyle = backgroundImage
     ? {
@@ -132,20 +177,26 @@ const ServiceFeaturesSection: React.FC<ServiceFeaturesSectionProps> = ({
       ? { backgroundColor }
       : {};
 
+  const isOutline = variant === "outline";
+
   const containerClasses =
     variant === "specialty"
       ? "w-full bg-cover bg-center bg-no-repeat"
-      : "w-full";
+      : isOutline
+        ? "w-full bg-gray-50"
+        : "w-full";
 
   const innerContainerClasses =
     variant === "specialty"
       ? "mx-auto max-w-7xl px-4 py-8"
-      : "mx-auto max-w-7xl px-4 py-16";
+      : "mx-auto max-w-7xl px-4 py-16 md:py-24";
 
   const titleClasses =
     variant === "specialty"
       ? "text-[clamp(1.5rem,5vw,2.25rem)] font-bold leading-tight text-black"
-      : "text-4xl font-bold text-gray-800 md:text-5xl";
+      : isOutline
+        ? "text-3xl font-bold text-gray-900 md:text-4xl"
+        : "text-4xl font-bold text-gray-800 md:text-5xl";
 
   const gridClasses =
     variant === "specialty"
@@ -157,15 +208,21 @@ const ServiceFeaturesSection: React.FC<ServiceFeaturesSectionProps> = ({
       <div className={innerContainerClasses}>
         <div
           className={
-            variant === "specialty" ? "mb-12 text-center" : "mb-14 text-center"
+            variant === "specialty"
+              ? "mb-12 text-center"
+              : isOutline
+                ? "mb-12 text-center"
+                : "mb-14 text-center"
           }
         >
-          <h2 className={`mb-2 ${titleClasses}`}>{title}</h2>
-          <h2
-            className={`${titleClasses} ${variant === "specialty" ? "mb-8" : ""}`}
-          >
-            {subtitle}
-          </h2>
+          <h2 className={titleClasses}>{title}</h2>
+          {subtitle && (
+            <h2
+              className={`mt-2 ${titleClasses} ${variant === "specialty" ? "mb-8" : ""}`}
+            >
+              {subtitle}
+            </h2>
+          )}
         </div>
 
         <div className={gridClasses}>
@@ -182,6 +239,17 @@ const ServiceFeaturesSection: React.FC<ServiceFeaturesSectionProps> = ({
             />
           ))}
         </div>
+
+        {ctaLabel && onCtaClick && (
+          <div className="mt-12 flex justify-center">
+            <button
+              onClick={onCtaClick}
+              className="rounded-lg bg-yellow-400 px-8 py-3 text-base font-bold text-gray-900 transition-all duration-300 hover:-translate-y-0.5 hover:bg-yellow-500 hover:shadow-lg"
+            >
+              {ctaLabel}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -190,39 +258,50 @@ const ServiceFeaturesSection: React.FC<ServiceFeaturesSectionProps> = ({
 // Export both the main component and a configured version for flowers
 export default ServiceFeaturesSection;
 
-// Pre-configured component for flowers delivery (backward compatibility)
+// Pre-configured component for flowers delivery
 export const FlowersServiceFeatures: React.FC = () => {
-  const flowersFeatures = [
+  const { openForm, DialogForm } = FormManager();
+
+  const flowersFeatures: ServiceFeatureData[] = [
     {
-      icon: getCloudinaryUrl("flowers/computer"),
+      icon: <MapPin size={48} strokeWidth={1.2} className="text-gray-400" />,
       title: "Bulk Orders? No Problem!",
-      description: (
-        <span>
-          We handle a{" "}
-          <span className="font-extrabold">minimum of 10 bulk orders</span> per
-          route, making your logistics smoother and more efficient.
-        </span>
-      ),
+      description:
+        "We handle at least 10 orders per route, keeping your logistics smooth and efficient.",
       delay: 0,
     },
     {
-      icon: getCloudinaryUrl("flowers/truck"),
-      title: "Personalized Delivery Service",
+      icon: <Headset size={48} strokeWidth={1.2} className="text-gray-400" />,
+      title: "Hands-On Support",
       description:
-        "You'll get a dedicated driver assigned to your shop. No more guessing who's coming—just familiar, reliable service every time.",
+        "We monitor every delivery from dispatch to doorstep with real-time updates.",
       delay: 200,
     },
     {
-      icon: getCloudinaryUrl("flowers/agent"),
-      title: "Hands-On Support",
+      icon: <Truck size={48} strokeWidth={1.2} className="text-gray-400" />,
+      title: "Personalized Delivery Service",
       description:
-        "Our helpdesk monitors every delivery from dispatch to doorstep, keeping you updated in real-time so you're never in the dark — so you can focus more on operations while we handle the admin work.",
+        "A dedicated driver assigned to your shop. Reliable, familiar service every time.",
       delay: 400,
     },
   ];
 
   return (
-    <ServiceFeaturesSection features={flowersFeatures} showTitleInBox={true} />
+    <>
+      <ServiceFeaturesSection
+        features={flowersFeatures}
+        showTitleInBox={true}
+        variant="outline"
+        title="More Than Just Delivery"
+        subtitle=""
+        ctaLabel="Get Started"
+        onCtaClick={(e) => {
+          e.preventDefault();
+          openForm("flower");
+        }}
+      />
+      {DialogForm}
+    </>
   );
 };
 

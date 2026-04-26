@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Calculator, DollarSign, Truck, Users, MapPin, Check, Save, Settings, History, AlertTriangle, Clock, Route } from 'lucide-react';
+import { Loader2, Calculator, DollarSign, Truck, Users, MapPin, Check, Save, Settings, History, AlertTriangle, Clock, Route, TrendingUp, TrendingDown } from 'lucide-react';
 import { useCalculatorConfig, useCalculator, useCalculatorHistory } from '@/hooks/useCalculatorConfig';
 import {
   CalculationInput,
@@ -358,16 +358,6 @@ export function DeliveryCalculator({
     };
   }, [result]);
 
-  // Memoized Net Profit (Ready Set Earnings - Driver Pay)
-  const netProfit = useMemo(() => {
-    if (!readySetEarnings || !result) return null;
-    const readySetTotal = readySetEarnings.totalFee;
-    const driverTotal = result.driverPayments.total;
-    const profit = readySetTotal - driverTotal;
-    const margin = readySetTotal > 0 ? (profit / readySetTotal) * 100 : 0;
-    return { profit, margin, readySetTotal, driverTotal };
-  }, [readySetEarnings, result]);
-
   if (isLoading || isLoadingTemplates) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -386,7 +376,7 @@ export function DeliveryCalculator({
         <div className="flex items-start justify-between mb-6">
           <div className="space-y-2">
             <h1 className="text-xl font-bold flex items-center gap-3 text-slate-900">
-              <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg shadow-md">
+              <div className="p-2 bg-gradient-to-br from-primary to-amber-500 rounded-lg shadow-md">
                 <Calculator className="h-4 w-4 text-white" />
               </div>
               Delivery Calculator
@@ -401,8 +391,8 @@ export function DeliveryCalculator({
               variant={saveSuccess ? "default" : "outline"}
               disabled={isSaving}
               className={`h-10 px-6 font-medium transition-all duration-200 flex items-center gap-2 ${
-                saveSuccess 
-                  ? "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-lg" 
+                saveSuccess
+                  ? "bg-gradient-to-r from-primary to-amber-500 hover:from-amber-400 hover:to-amber-600 text-slate-900 shadow-lg"
                   : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
               }`}
             >
@@ -432,14 +422,14 @@ export function DeliveryCalculator({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <Label htmlFor="template-select" className="text-slate-700 font-semibold text-sm flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
                   Calculator Template
                 </Label>
                 <Select
                   value={config?.template?.id || templateId || ''}
                   onValueChange={handleTemplateChange}
                 >
-                  <SelectTrigger className="h-10 border-slate-200 focus:border-blue-400 focus:ring-blue-200 bg-white shadow-sm transition-all duration-200 hover:border-slate-300">
+                  <SelectTrigger className="h-10 border-slate-200 focus:border-amber-400 focus:ring-amber-200 bg-white shadow-sm transition-all duration-200 hover:border-slate-300">
                     <SelectValue placeholder="Select a calculator template" />
                   </SelectTrigger>
                   <SelectContent>
@@ -454,14 +444,14 @@ export function DeliveryCalculator({
 
               <div className="space-y-3">
                 <Label htmlFor="client-config-select" className="text-slate-700 font-semibold text-sm flex items-center gap-2">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <div className="w-2 h-2 bg-slate-900 rounded-full"></div>
                   Client Configuration <span className="text-slate-500 font-normal">(Optional)</span>
                 </Label>
                 <Select
                   value={selectedClientConfigId || config?.clientConfig?.id || ''}
                   onValueChange={handleClientConfigChange}
                 >
-                  <SelectTrigger className="h-10 border-slate-200 focus:border-purple-400 focus:ring-purple-200 bg-white shadow-sm transition-all duration-200 hover:border-slate-300">
+                  <SelectTrigger className="h-10 border-slate-200 focus:border-amber-400 focus:ring-amber-200 bg-white shadow-sm transition-all duration-200 hover:border-slate-300">
                     <SelectValue placeholder="No customization (use template defaults)" />
                   </SelectTrigger>
                   <SelectContent>
@@ -504,7 +494,7 @@ export function DeliveryCalculator({
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <Card className="border-0 shadow-lg rounded-2xl bg-white/95 backdrop-blur-sm mb-6">
           <CardContent className="p-2">
-            <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-slate-50 to-slate-100 p-1.5 rounded-xl shadow-inner h-12">
+            <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-slate-50 to-amber-50/50 p-1.5 rounded-xl shadow-inner h-12">
               <TabsTrigger 
                 value="input" 
                 className="flex items-center justify-center gap-2 rounded-lg px-3 py-2 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-slate-900 text-slate-600 font-semibold transition-all duration-200 hover:text-slate-800 whitespace-nowrap min-h-[2.5rem]"
@@ -537,7 +527,7 @@ export function DeliveryCalculator({
             <Card className="border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-800">
-                  <div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-sm">
+                  <div className="p-1.5 bg-slate-900 rounded-lg shadow-sm">
                     <Users className="h-4 w-4 text-white" />
                   </div>
                   Basic Information
@@ -595,7 +585,7 @@ export function DeliveryCalculator({
             <Card className="border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-800">
-                  <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg shadow-sm">
+                  <div className="p-1.5 bg-gradient-to-br from-primary to-amber-500 rounded-lg shadow-sm">
                     <MapPin className="h-4 w-4 text-white" />
                   </div>
                   Distance & Location
@@ -720,7 +710,7 @@ export function DeliveryCalculator({
                     id="bridge"
                     checked={input.requiresBridge}
                     onCheckedChange={(checked) => handleInputChange('requiresBridge', checked)}
-                    className="data-[state=checked]:bg-emerald-500"
+                    className="data-[state=checked]:bg-amber-500"
                   />
                   <Label htmlFor="bridge" className="text-slate-700 font-medium cursor-pointer text-sm">
                     Requires Bridge Crossing
@@ -733,7 +723,7 @@ export function DeliveryCalculator({
             <Card className="border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg font-semibold text-slate-800">
-                  <div className="p-1.5 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg shadow-sm">
+                  <div className="p-1.5 bg-slate-900 rounded-lg shadow-sm">
                     <Truck className="h-4 w-4 text-white" />
                   </div>
                   Additional Services
@@ -816,7 +806,7 @@ export function DeliveryCalculator({
                 {result && (
                   <Button 
                     onClick={() => setActiveTab('results')} 
-                    className="w-full h-9 font-medium bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg transition-all duration-200"
+                    className="w-full h-9 font-medium bg-gradient-to-r from-primary to-amber-500 hover:from-amber-400 hover:to-amber-600 text-slate-900 shadow-lg transition-all duration-200"
                   >
                     View Results
                   </Button>
@@ -831,8 +821,8 @@ export function DeliveryCalculator({
           {isCalculating && (
             <div className="flex items-center justify-center p-8">
               <div className="text-center">
-                <div className="p-3 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                <div className="p-3 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-amber-600" />
                 </div>
                 <span className="text-base font-medium text-slate-700">Calculating...</span>
               </div>
@@ -845,10 +835,10 @@ export function DeliveryCalculator({
               <Card className="border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                    <div className="p-1.5 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg shadow-sm">
+                    <div className="p-1.5 bg-slate-900 rounded-lg shadow-sm">
                       <DollarSign className="h-4 w-4 text-white" />
                     </div>
-                    <span className="text-purple-700">Customer Charges</span>
+                    <span className="text-slate-800">Customer Charges</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -868,9 +858,9 @@ export function DeliveryCalculator({
                     )}
 
                     {(result.customerCharges.extraStopsCharge ?? 0) > 0 && (
-                      <div className="flex justify-between items-center py-2 bg-emerald-50 -mx-4 px-4 rounded-lg border border-emerald-100">
-                        <span className="text-emerald-700 font-medium">Extra Stops Charge:</span>
-                        <span className="font-semibold text-emerald-700">${formatCurrency(result.customerCharges.extraStopsCharge)}</span>
+                      <div className="flex justify-between items-center py-2 bg-amber-50 -mx-4 px-4 rounded-lg border border-amber-100">
+                        <span className="text-amber-700 font-medium">Extra Stops Charge:</span>
+                        <span className="font-semibold text-amber-700">${formatCurrency(result.customerCharges.extraStopsCharge)}</span>
                       </div>
                     )}
 
@@ -889,9 +879,9 @@ export function DeliveryCalculator({
                     )}
 
                     <Separator className="my-4" />
-                    <div className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl border border-purple-200">
-                      <span className="text-lg font-bold text-purple-800">Total Customer Fee:</span>
-                      <span className="text-2xl font-bold text-purple-900">${formatCurrency(result.customerCharges.total)}</span>
+                    <div className="flex justify-between items-center p-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl border border-amber-200">
+                      <span className="text-lg font-bold text-amber-800">Total Customer Fee:</span>
+                      <span className="text-2xl font-bold text-amber-900">${formatCurrency(result.customerCharges.total)}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -902,10 +892,10 @@ export function DeliveryCalculator({
                 <Card className="border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                      <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg shadow-sm">
+                      <div className="p-1.5 bg-gradient-to-br from-primary to-amber-500 rounded-lg shadow-sm">
                         <DollarSign className="h-4 w-4 text-white" />
                       </div>
-                      <span className="text-emerald-700">Ready Set Earnings</span>
+                      <span className="text-amber-700">Ready Set Earnings</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -918,9 +908,9 @@ export function DeliveryCalculator({
                       ))}
 
                       <Separator className="my-4" />
-                      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-200">
-                        <span className="text-lg font-bold text-emerald-800">Total Ready Set Fee:</span>
-                        <span className="text-2xl font-bold text-emerald-900">${formatCurrency(readySetEarnings.totalFee)}</span>
+                      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl border border-amber-200">
+                        <span className="text-lg font-bold text-amber-800">Total Ready Set Fee:</span>
+                        <span className="text-2xl font-bold text-amber-900">${formatCurrency(readySetEarnings.totalFee)}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -931,10 +921,10 @@ export function DeliveryCalculator({
               <Card className="border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                    <div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-sm">
+                    <div className="p-1.5 bg-slate-900 rounded-lg shadow-sm">
                       <Truck className="h-4 w-4 text-white" />
                     </div>
-                    <span className="text-blue-700">Driver Payments</span>
+                    <span className="text-slate-800">Driver Payments</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -954,7 +944,7 @@ export function DeliveryCalculator({
                     {(result.driverPayments.bonus ?? 0) > 0 && (
                       <div className="flex justify-between items-center py-2">
                         <span className="text-slate-600 font-medium">Driver Bonus Pay:</span>
-                        <span className="font-semibold text-emerald-600">${formatCurrency(result.driverPayments.bonus)}</span>
+                        <span className="font-semibold text-amber-600">${formatCurrency(result.driverPayments.bonus)}</span>
                       </div>
                     )}
 
@@ -976,7 +966,7 @@ export function DeliveryCalculator({
                     {(result.driverPayments.adjustments ?? 0) !== 0 && (
                       <div className="flex justify-between items-center py-2">
                         <span className="text-slate-600 font-medium">Adjustments:</span>
-                        <span className={`font-semibold ${(result.driverPayments.adjustments ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <span className={`font-semibold ${(result.driverPayments.adjustments ?? 0) >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
                           ${formatCurrency(result.driverPayments.adjustments)}
                         </span>
                       </div>
@@ -992,62 +982,72 @@ export function DeliveryCalculator({
                     ))}
 
                     <Separator className="my-4" />
-                    <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-                      <span className="text-lg font-bold text-blue-800">Total:</span>
-                      <span className="text-2xl font-bold text-blue-900">${formatCurrency(result.driverPayments.total)}</span>
+                    <div className="flex justify-between items-center p-4 bg-gradient-to-r from-slate-100 to-slate-50 rounded-xl border border-slate-200">
+                      <span className="text-lg font-bold text-slate-800">Total:</span>
+                      <span className="text-2xl font-bold text-slate-900">${formatCurrency(result.driverPayments.total)}</span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Net Profit */}
-              {netProfit && (
-                <Card className={`border-0 shadow-lg rounded-2xl lg:col-span-2 ${
-                  netProfit.profit >= 0
-                    ? 'bg-gradient-to-r from-emerald-50/80 to-green-50/80 backdrop-blur-sm'
-                    : 'bg-gradient-to-r from-red-50/80 to-rose-50/80 backdrop-blur-sm'
-                }`}>
+              {/* Net Earnings (Ready Set Earnings - Driver Payments) */}
+              {readySetEarnings && (
+                <Card className="border-0 shadow-lg rounded-2xl bg-white/80 backdrop-blur-sm lg:col-span-2">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                      <div className={`p-1.5 rounded-lg shadow-sm ${
-                        netProfit.profit >= 0
-                          ? 'bg-gradient-to-br from-emerald-500 to-green-600'
-                          : 'bg-gradient-to-br from-red-500 to-rose-600'
-                      }`}>
-                        <DollarSign className="h-4 w-4 text-white" />
+                      <div className="p-1.5 bg-gradient-to-br from-primary to-amber-500 rounded-lg shadow-sm">
+                        <TrendingUp className="h-4 w-4 text-slate-900" />
                       </div>
-                      <span className={netProfit.profit >= 0 ? 'text-emerald-700' : 'text-red-700'}>
-                        Net Profit
-                      </span>
+                      <span className="text-amber-700">Ready Set Net Earnings</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="text-center p-3 bg-white/60 rounded-xl">
-                        <p className="text-sm text-slate-500 font-medium mb-1">Ready Set Earnings</p>
-                        <p className="text-xl font-bold text-emerald-700">${formatCurrency(netProfit.readySetTotal)}</p>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-slate-600 font-medium">Gross Earnings (Ready Set Fee):</span>
+                        <span className="font-semibold text-slate-900">${formatCurrency(readySetEarnings.totalFee)}</span>
                       </div>
-                      <div className="text-center p-3 bg-white/60 rounded-xl">
-                        <p className="text-sm text-slate-500 font-medium mb-1">Driver Pay</p>
-                        <p className="text-xl font-bold text-blue-700">${formatCurrency(netProfit.driverTotal)}</p>
+
+                      <div className="flex justify-between items-center py-2 text-red-600">
+                        <span className="font-medium">Driver Payments:</span>
+                        <span className="font-semibold">-${formatCurrency(result.driverPayments.total)}</span>
                       </div>
-                      <div className={`text-center p-4 rounded-xl border-2 ${
-                        netProfit.profit >= 0
-                          ? 'bg-emerald-100/80 border-emerald-300'
-                          : 'bg-red-100/80 border-red-300'
-                      }`}>
-                        <p className="text-sm font-medium mb-1 text-slate-600">Net Profit</p>
-                        <p className={`text-2xl font-bold ${
-                          netProfit.profit >= 0 ? 'text-emerald-800' : 'text-red-800'
-                        }`}>
-                          ${formatCurrency(netProfit.profit)}
-                        </p>
-                        <p className={`text-xs font-medium mt-1 ${
-                          netProfit.profit >= 0 ? 'text-emerald-600' : 'text-red-600'
-                        }`}>
-                          {formatPercent(netProfit.margin)}% margin
-                        </p>
-                      </div>
+
+                      <Separator className="my-4" />
+                      {(() => {
+                        const rawNet = readySetEarnings.totalFee - result.driverPayments.total;
+                        const netEarnings = Math.round(rawNet * 100) / 100;
+                        const isPositive = netEarnings >= 0;
+                        const TrendIcon = isPositive ? TrendingUp : TrendingDown;
+                        const margin =
+                          readySetEarnings.totalFee > 0
+                            ? (netEarnings / readySetEarnings.totalFee) * 100
+                            : 0;
+                        return (
+                          <div
+                            role="status"
+                            aria-label={`Net earnings ${isPositive ? 'profit' : 'loss'} of ${isPositive ? '' : 'negative '}${formatCurrency(Math.abs(netEarnings))} dollars (${formatPercent(margin)}% margin)`}
+                            className={`flex justify-between items-center p-4 rounded-xl border ${
+                              isPositive
+                                ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200'
+                                : 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200'
+                            }`}
+                          >
+                            <span className={`flex items-center gap-2 text-lg font-bold ${isPositive ? 'text-amber-800' : 'text-red-800'}`}>
+                              <TrendIcon className="h-5 w-5" aria-hidden="true" />
+                              Net Earnings:
+                            </span>
+                            <div className="text-right">
+                              <span className={`block text-2xl font-bold ${isPositive ? 'text-amber-900' : 'text-red-900'}`}>
+                                {isPositive ? '' : '-'}${formatCurrency(Math.abs(netEarnings))}
+                              </span>
+                              <span className={`block text-xs font-medium mt-0.5 ${isPositive ? 'text-amber-700' : 'text-red-700'}`}>
+                                {formatPercent(margin)}% margin
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
@@ -1104,10 +1104,10 @@ export function DeliveryCalculator({
                         <div className="flex justify-between items-center">
                           <div className="flex gap-6">
                             <span className="font-semibold text-slate-900">
-                              Customer: <span className="text-emerald-600">${formatCurrency(customerTotal)}</span>
+                              Customer: <span className="text-amber-600">${formatCurrency(customerTotal)}</span>
                             </span>
                             <span className="font-semibold text-slate-900">
-                              Driver: <span className="text-blue-600">${formatCurrency(driverTotal)}</span>
+                              Driver: <span className="text-slate-700">${formatCurrency(driverTotal)}</span>
                             </span>
                             <span className={`font-semibold ${profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                               Profit: ${formatCurrency(profit)}
