@@ -128,6 +128,30 @@ export async function runSmsReminderBatch(
   helpdeskAgent: string = DEFAULT_HELPDESK_AGENT,
   driverFilter?: string[],
 ): Promise<BatchSummary> {
+  // Idempotency guard: cron retries and double-clicks must not send duplicate
+  // SMS to drivers. Skip if a batch for this (type, targetDate) is already
+  // in_progress or completed. Failed batches stay retryable.
+  const existing = await prisma.smsReminderBatch.findFirst({
+    where: {
+      type,
+      targetDate,
+      status: { in: ["in_progress", "completed"] },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (existing) {
+    return {
+      batchId: existing.id,
+      type,
+      targetDate: targetDate.toISOString().split("T")[0] ?? "",
+      totalDrivers: existing.totalDrivers,
+      totalSent: existing.totalSent,
+      totalFailed: existing.totalFailed,
+      totalSkipped: existing.totalSkipped,
+    };
+  }
+
   let driverGroups = await fetchAndParseSheet(targetDate);
 
   // Filter to specific drivers if requested
