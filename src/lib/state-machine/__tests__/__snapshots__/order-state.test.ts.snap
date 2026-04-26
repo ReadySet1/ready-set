@@ -28,6 +28,7 @@ exports[`ORDER_TRANSITIONS graph snapshot matches expected shape — guard again
   "PENDING": [
     "CONFIRMED",
     "ACTIVE",
+    "ASSIGNED",
     "CANCELLED",
   ],
 }
