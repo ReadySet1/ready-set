@@ -18,8 +18,10 @@ import {
   calculateDriverPay,
   getConfiguration,
   type DeliveryCostInput,
-  type DriverPayInput
+  type DriverPayInput,
+  type ClientDeliveryConfiguration
 } from './delivery-cost-calculator';
+import { prisma } from '@/lib/prisma';
 
 export class CalculatorService {
 
@@ -236,6 +238,59 @@ export class CalculatorService {
         throw new Error('Calculator template not found');
       }
 
+      // Fetch client config from DB first (authoritative source for operator edits),
+      // fall back to in-memory config
+      const configId = clientConfigId || 'ready-set-food-standard';
+      let dbConfig: ClientDeliveryConfiguration | undefined;
+      try {
+        const dbRecord = await prisma.deliveryConfiguration.findFirst({
+          where: { configId, isActive: true }
+        });
+        if (dbRecord) {
+          // Selectively merge boolean flags from in-memory defaults into
+          // DB driverPaySettings. Only boolean flags are safe to inherit —
+          // structural data (tiers, mileage settings) must NOT be merged
+          // because their absence in the DB means the flat fallback values
+          // (basePayPerDrop, driverMileageRate) should be used instead.
+          const inMemoryConfig = getConfiguration(configId);
+          const dbDriverPay = dbRecord.driverPaySettings as any;
+          const inMemoryDriverPay = inMemoryConfig?.driverPaySettings;
+          const mergedDriverPaySettings = {
+            ...dbDriverPay,
+            // Only inherit boolean flags when missing from DB
+            readySetFeeMatchesDeliveryFee:
+              dbDriverPay.readySetFeeMatchesDeliveryFee ?? inMemoryDriverPay?.readySetFeeMatchesDeliveryFee,
+            requiresManualReview:
+              dbDriverPay.requiresManualReview ?? inMemoryDriverPay?.requiresManualReview,
+            includeDirectTipInReadySetTotal:
+              dbDriverPay.includeDirectTipInReadySetTotal ?? inMemoryDriverPay?.includeDirectTipInReadySetTotal,
+          };
+
+          dbConfig = {
+            id: dbRecord.configId,
+            clientName: dbRecord.clientName,
+            vendorName: dbRecord.vendorName,
+            description: dbRecord.description || undefined,
+            isActive: dbRecord.isActive,
+            pricingTiers: dbRecord.pricingTiers as any,
+            mileageRate: parseFloat(dbRecord.mileageRate.toString()),
+            distanceThreshold: parseFloat(dbRecord.distanceThreshold.toString()),
+            dailyDriveDiscounts: dbRecord.dailyDriveDiscounts as any,
+            driverPaySettings: mergedDriverPaySettings,
+            bridgeTollSettings: dbRecord.bridgeTollSettings as any,
+            zeroOrderSettings: dbRecord.zeroOrderSettings as any ?? undefined,
+            customSettings: dbRecord.customSettings as any ?? undefined,
+            createdAt: dbRecord.createdAt,
+            updatedAt: dbRecord.updatedAt,
+            createdBy: dbRecord.createdBy || undefined,
+            notes: dbRecord.notes || undefined
+          };
+        }
+      } catch (dbError) {
+        // Log but don't fail — fall through to in-memory fallback
+        console.warn('DB lookup failed for client config in calculate, falling back to in-memory:', dbError);
+      }
+
       // Prepare input for delivery cost calculator
       const deliveryInput: DeliveryCostInput = {
         headcount: input.headcount || 0,
@@ -245,7 +300,8 @@ export class CalculatorService {
         numberOfStops: input.numberOfStops || 1,
         requiresBridge: input.requiresBridge || false,
         bridgeToll: input.bridgeToll,
-        clientConfigId: clientConfigId || 'ready-set-food-standard'
+        clientConfigId: configId,
+        configOverride: dbConfig
       };
 
       // Prepare input for driver pay calculator
@@ -299,9 +355,8 @@ export class CalculatorService {
         ]
       };
 
-      // Get client configuration for mileage rate (defaults to Ready Set Food Standard)
-      const configId = clientConfigId || 'ready-set-food-standard';
-      const clientConfig = getConfiguration(configId);
+      // Get client configuration for mileage rate (prefer DB config, fall back to in-memory)
+      const clientConfig = dbConfig || getConfiguration(configId);
       const clientMileageRate = clientConfig?.mileageRate ?? 3.0;
 
       const result: CalculationResult = {

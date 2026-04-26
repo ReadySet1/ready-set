@@ -15,11 +15,7 @@ import {
 } from '@/lib/calculator/client-configurations';
 
 // Helper function to convert DB record to ClientDeliveryConfiguration
-// Merges with in-memory configuration for fields not stored in database (e.g., zeroOrderSettings)
 function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
-  // Get the in-memory configuration to merge any fields not in the database
-  const inMemoryConfig = getConfiguration(dbConfig.configId);
-  
   return {
     id: dbConfig.configId,
     clientName: dbConfig.clientName,
@@ -32,8 +28,7 @@ function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
     dailyDriveDiscounts: dbConfig.dailyDriveDiscounts as any,
     driverPaySettings: dbConfig.driverPaySettings as any,
     bridgeTollSettings: dbConfig.bridgeTollSettings as any,
-    // Merge zeroOrderSettings from in-memory config (not stored in database yet)
-    zeroOrderSettings: dbConfig.zeroOrderSettings || inMemoryConfig?.zeroOrderSettings,
+    zeroOrderSettings: dbConfig.zeroOrderSettings as any,
     customSettings: dbConfig.customSettings as any,
     createdAt: dbConfig.createdAt,
     updatedAt: dbConfig.updatedAt,
@@ -48,7 +43,7 @@ function configToDb(config: ClientDeliveryConfiguration, userId?: string) {
     configId: config.id,
     clientName: config.clientName,
     vendorName: config.vendorName,
-    description: config.description,
+    description: config.description ?? null,
     isActive: config.isActive,
     pricingTiers: config.pricingTiers as any,
     mileageRate: config.mileageRate,
@@ -56,9 +51,10 @@ function configToDb(config: ClientDeliveryConfiguration, userId?: string) {
     dailyDriveDiscounts: config.dailyDriveDiscounts as any,
     driverPaySettings: config.driverPaySettings as any,
     bridgeTollSettings: config.bridgeTollSettings as any,
-    customSettings: config.customSettings as any,
-    createdBy: userId,
-    notes: config.notes,
+    zeroOrderSettings: config.zeroOrderSettings as any ?? null,
+    customSettings: config.customSettings as any ?? null,
+    createdBy: userId ?? null,
+    notes: config.notes ?? null,
     updatedAt: new Date()
   };
 }
@@ -145,6 +141,40 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Helper: compute changed fields between previous and new config
+function computeConfigChanges(
+  previous: ClientDeliveryConfiguration | null,
+  updated: ClientDeliveryConfiguration
+): { field: string; oldValue: unknown; newValue: unknown }[] {
+  if (!previous) return [{ field: '_action', oldValue: null, newValue: 'created' }];
+
+  const changes: { field: string; oldValue: unknown; newValue: unknown }[] = [];
+  const fieldsToCompare: (keyof ClientDeliveryConfiguration)[] = [
+    'clientName', 'vendorName', 'description', 'isActive',
+    'mileageRate', 'distanceThreshold', 'notes',
+  ];
+
+  for (const field of fieldsToCompare) {
+    if (previous[field] !== updated[field]) {
+      changes.push({ field, oldValue: previous[field], newValue: updated[field] });
+    }
+  }
+
+  // Deep-compare JSON fields
+  const jsonFields: (keyof ClientDeliveryConfiguration)[] = [
+    'pricingTiers', 'dailyDriveDiscounts', 'driverPaySettings',
+    'bridgeTollSettings', 'zeroOrderSettings', 'customSettings',
+  ];
+
+  for (const field of jsonFields) {
+    if (JSON.stringify(previous[field]) !== JSON.stringify(updated[field])) {
+      changes.push({ field, oldValue: previous[field], newValue: updated[field] });
+    }
+  }
+
+  return changes;
+}
+
 // POST: Create/Update configuration
 export async function POST(request: NextRequest) {
   try {
@@ -170,6 +200,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fetch previous config for audit logging
+    let previousConfig: ClientDeliveryConfiguration | null = null;
+    try {
+      const existingRecord = await prisma.deliveryConfiguration.findUnique({
+        where: { configId: config.id }
+      });
+      if (existingRecord) {
+        previousConfig = dbToConfig(existingRecord);
+      }
+    } catch {
+      // Non-critical: proceed without previous config
+    }
+
     // Save to database
     const dbData = configToDb(config, user?.id);
 
@@ -177,6 +220,32 @@ export async function POST(request: NextRequest) {
       where: { configId: config.id },
       update: dbData,
       create: dbData
+    });
+
+    // Audit logging
+    const changes = computeConfigChanges(previousConfig, config);
+    const auditEntry = {
+      configId: config.id,
+      userId: user.id,
+      userEmail: user.email,
+      action: previousConfig ? 'update' : 'create',
+      changedFields: changes.map(c => c.field),
+      changes,
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log('[AUDIT] Configuration change:', JSON.stringify(auditEntry));
+
+    Sentry.addBreadcrumb({
+      category: 'configuration-audit',
+      message: `${auditEntry.action} config "${config.id}" by ${user.email}`,
+      level: 'info',
+      data: {
+        configId: config.id,
+        userId: user.id,
+        action: auditEntry.action,
+        changedFields: auditEntry.changedFields,
+      },
     });
 
     return NextResponse.json({
@@ -225,6 +294,23 @@ export async function DELETE(request: NextRequest) {
         isActive: false,
         updatedAt: new Date(),
       }
+    });
+
+    // Audit logging for deletion
+    const deleteAudit = {
+      configId,
+      userId: user.id,
+      userEmail: user.email,
+      action: 'soft-delete',
+      timestamp: new Date().toISOString(),
+    };
+    console.log('[AUDIT] Configuration deleted:', JSON.stringify(deleteAudit));
+
+    Sentry.addBreadcrumb({
+      category: 'configuration-audit',
+      message: `soft-delete config "${configId}" by ${user.email}`,
+      level: 'info',
+      data: { configId, userId: user.id, action: 'soft-delete' },
     });
 
     return NextResponse.json({
