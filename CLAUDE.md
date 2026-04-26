@@ -106,6 +106,24 @@ API Route → Server Action → Service Layer → Utils → Prisma
 - Routes: `/admin/*`, `/driver/*`, `/client/*`, `/helpdesk/*`
 - Config: `src/middleware/routeProtection.ts`
 
+### Delivery Calculator — Vendor Pricing
+
+**Config Resolution**: DB-first with in-memory fallback
+- `src/app/api/calculator/config/route.ts` queries `delivery_configurations` table first
+- Falls back to in-memory configs from `src/lib/calculator/client-configurations.ts`
+- Changes saved via the Adjust Vendor Pricing UI take effect immediately
+
+**Adjust Vendor Pricing Tab** (Admin > Calculator > 4th tab):
+- `src/components/calculator/VendorPricingTab.tsx` — Vendor selection + save wrapper
+- `src/components/calculator/VendorPricingEditor.tsx` — Main accordion-based form editor
+- Sub-components in `src/components/calculator/vendor-pricing/`:
+  - `PricingTiersEditor.tsx`, `DriverPaySettingsEditor.tsx`, `BridgeTollEditor.tsx`
+  - `ZeroOrderSettingsEditor.tsx`, `AdvancedFlagsEditor.tsx`
+- Validation: `src/types/vendor-pricing.ts` (Zod schema) + `validateConfiguration()` from client-configurations
+- API: `POST /api/calculator/configurations` with audit logging (userId, changed fields, timestamps)
+
+**Seed Script**: `scripts/seed-delivery-configurations.ts` — Seeds in-memory configs to DB
+
 ### Testing
 
 **Jest** (`jest.config.js`):

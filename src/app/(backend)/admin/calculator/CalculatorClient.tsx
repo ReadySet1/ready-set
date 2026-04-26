@@ -12,8 +12,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calculator, History, Info, CheckCircle, AlertTriangle, Settings } from 'lucide-react';
+import { Calculator, History, Info, CheckCircle, AlertTriangle, Settings, DollarSign } from 'lucide-react';
 import Link from 'next/link';
+import { VendorPricingTab } from '@/components/calculator/VendorPricingTab';
 
 interface CalculatorClientProps {
   userType: string;
@@ -151,7 +152,7 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
 
         <Tabs defaultValue="calculator" className="w-full">
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-2 mb-8">
-            <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-slate-50 to-slate-100 p-1.5 rounded-xl shadow-inner h-14">
+            <TabsList className="grid w-full grid-cols-4 bg-gradient-to-r from-slate-50 to-slate-100 p-1.5 rounded-xl shadow-inner h-14">
               <TabsTrigger 
                 value="calculator" 
                 className="flex items-center justify-center gap-2 rounded-lg px-4 py-3 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-slate-900 text-slate-600 font-semibold transition-all duration-200 hover:text-slate-800 whitespace-nowrap"
@@ -167,12 +168,20 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
                 <span className="hidden sm:inline">Recent Calculations</span>
                 <span className="sm:hidden">Recent</span>
               </TabsTrigger>
-              <TabsTrigger 
-                value="templates" 
+              <TabsTrigger
+                value="templates"
                 className="flex items-center justify-center gap-2 rounded-lg px-4 py-3 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-slate-900 text-slate-600 font-semibold transition-all duration-200 hover:text-slate-800 whitespace-nowrap"
               >
                 <Info className="h-4 w-4 flex-shrink-0" />
                 <span className="hidden sm:inline">Templates</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="vendor-pricing"
+                className="flex items-center justify-center gap-2 rounded-lg px-4 py-3 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-slate-900 text-slate-600 font-semibold transition-all duration-200 hover:text-slate-800 whitespace-nowrap"
+              >
+                <DollarSign className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Adjust Vendor Pricing</span>
+                <span className="sm:hidden">Pricing</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -427,6 +436,11 @@ export default function CalculatorClient({ userType }: CalculatorClientProps) {
                 </div>
               </CardContent>
             </Card>
+        </TabsContent>
+
+        {/* Vendor Pricing Tab */}
+        <TabsContent value="vendor-pricing">
+          <VendorPricingTab />
         </TabsContent>
       </Tabs>
     </div>

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { ConfigurationError } from '@/types/calculator';
 import { createClient } from '@/utils/supabase/server';
+import { prisma } from '@/lib/prisma';
 import { getConfiguration } from '@/lib/calculator/client-configurations';
 
 export async function GET(request: NextRequest) {
@@ -83,36 +84,89 @@ export async function GET(request: NextRequest) {
     };
 
     // Get client configuration if specified
-    // First try in-memory configurations (which have the full pricing details)
-    // Then fall back to database if not found
+    // DB-first: query delivery_configurations table first, fall back to in-memory
+    // This ensures that operator edits saved via the API take effect immediately
     let clientConfig = null;
     if (clientConfigId) {
-      // Try in-memory config first (has complete pricing data including zeroOrderSettings)
-      const inMemoryConfig = getConfiguration(clientConfigId);
-      
-      if (inMemoryConfig) {
-        clientConfig = {
-          id: inMemoryConfig.id,
-          clientId: inMemoryConfig.id,
-          templateId: template.id,
-          clientName: inMemoryConfig.clientName,
-          vendorName: inMemoryConfig.vendorName,
-          ruleOverrides: {},
-          areaRules: [],
-          isActive: inMemoryConfig.isActive,
-          // Include the full configuration for use in calculations
-          pricingTiers: inMemoryConfig.pricingTiers,
-          mileageRate: inMemoryConfig.mileageRate,
-          distanceThreshold: inMemoryConfig.distanceThreshold,
-          dailyDriveDiscounts: inMemoryConfig.dailyDriveDiscounts,
-          driverPaySettings: inMemoryConfig.driverPaySettings,
-          bridgeTollSettings: inMemoryConfig.bridgeTollSettings,
-          zeroOrderSettings: inMemoryConfig.zeroOrderSettings,
-          createdAt: inMemoryConfig.createdAt,
-          updatedAt: inMemoryConfig.updatedAt
-        };
-      } else {
-        // Fall back to database lookup
+      try {
+        // Try database first (authoritative source for operator-edited configs)
+        const dbConfig = await prisma.deliveryConfiguration.findFirst({
+          where: { configId: clientConfigId, isActive: true }
+        });
+
+        if (dbConfig) {
+          // Selectively merge boolean flags from in-memory defaults into
+          // DB driverPaySettings. Only boolean flags are safe to inherit —
+          // structural data (tiers, mileage settings) must NOT be merged
+          // because their absence in the DB means the flat fallback values
+          // (basePayPerDrop, driverMileageRate) should be used instead.
+          const inMemoryConfig = getConfiguration(clientConfigId);
+          const dbDriverPay = dbConfig.driverPaySettings as any;
+          const inMemoryDriverPay = inMemoryConfig?.driverPaySettings;
+          const mergedDriverPaySettings = {
+            ...dbDriverPay,
+            readySetFeeMatchesDeliveryFee:
+              dbDriverPay.readySetFeeMatchesDeliveryFee ?? inMemoryDriverPay?.readySetFeeMatchesDeliveryFee,
+            requiresManualReview:
+              dbDriverPay.requiresManualReview ?? inMemoryDriverPay?.requiresManualReview,
+            includeDirectTipInReadySetTotal:
+              dbDriverPay.includeDirectTipInReadySetTotal ?? inMemoryDriverPay?.includeDirectTipInReadySetTotal,
+          };
+
+          clientConfig = {
+            id: dbConfig.configId,
+            clientId: dbConfig.configId,
+            templateId: template.id,
+            clientName: dbConfig.clientName,
+            vendorName: dbConfig.vendorName,
+            ruleOverrides: {},
+            areaRules: [],
+            isActive: dbConfig.isActive,
+            pricingTiers: dbConfig.pricingTiers as any,
+            mileageRate: parseFloat(dbConfig.mileageRate.toString()),
+            distanceThreshold: parseFloat(dbConfig.distanceThreshold.toString()),
+            dailyDriveDiscounts: dbConfig.dailyDriveDiscounts as any,
+            driverPaySettings: mergedDriverPaySettings,
+            bridgeTollSettings: dbConfig.bridgeTollSettings as any,
+            zeroOrderSettings: dbConfig.zeroOrderSettings as any ?? undefined,
+            createdAt: dbConfig.createdAt,
+            updatedAt: dbConfig.updatedAt
+          };
+        }
+      } catch (dbError) {
+        // Log but don't fail — fall through to in-memory fallback
+        console.warn('DB lookup failed for client config, falling back to in-memory:', dbError);
+      }
+
+      // Fall back to in-memory delivery configuration if DB had no record
+      if (!clientConfig) {
+        const inMemoryConfig = getConfiguration(clientConfigId);
+
+        if (inMemoryConfig) {
+          clientConfig = {
+            id: inMemoryConfig.id,
+            clientId: inMemoryConfig.id,
+            templateId: template.id,
+            clientName: inMemoryConfig.clientName,
+            vendorName: inMemoryConfig.vendorName,
+            ruleOverrides: {},
+            areaRules: [],
+            isActive: inMemoryConfig.isActive,
+            pricingTiers: inMemoryConfig.pricingTiers,
+            mileageRate: inMemoryConfig.mileageRate,
+            distanceThreshold: inMemoryConfig.distanceThreshold,
+            dailyDriveDiscounts: inMemoryConfig.dailyDriveDiscounts,
+            driverPaySettings: inMemoryConfig.driverPaySettings,
+            bridgeTollSettings: inMemoryConfig.bridgeTollSettings,
+            zeroOrderSettings: inMemoryConfig.zeroOrderSettings,
+            createdAt: inMemoryConfig.createdAt,
+            updatedAt: inMemoryConfig.updatedAt
+          };
+        }
+      }
+
+      // Final fallback: check client_configurations table (legacy rule overrides)
+      if (!clientConfig) {
         const { data: configs, error: configError } = await supabase
           .from('client_configurations')
           .select('*')
