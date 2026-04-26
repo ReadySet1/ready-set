@@ -1,24 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { authorizeSmsAdmin } from "../_auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-interface AppMetadata {
-  role?: string;
-}
-
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    const role = (user?.app_metadata as AppMetadata)?.role;
-    if (!user || (role !== "admin" && role !== "super_admin")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await authorizeSmsAdmin();
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { error: auth.status === 401 ? "Unauthorized" : "Forbidden" },
+        { status: auth.status },
+      );
     }
 
     const { searchParams } = new URL(request.url);

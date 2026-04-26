@@ -1,45 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { createClient } from "@/utils/supabase/server";
 import {
   runSmsReminderBatch,
   type ReminderType,
 } from "@/services/sms-reminders";
+import { authorizeSmsAdmin } from "../_auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-interface AppMetadata {
-  role?: string;
-}
-
 export async function GET(request: NextRequest) {
   try {
     const cronSecret = process.env.CRON_SECRET;
+    const authHeader = request.headers.get("authorization");
+    const isValidCronRequest =
+      !!cronSecret && authHeader === `Bearer ${cronSecret}`;
+
     if (process.env.NODE_ENV === "production" && !cronSecret) {
       Sentry.captureMessage(
-        "CRON_SECRET not set in production - SMS reminder cron requires authentication",
-        "warning",
+        "CRON_SECRET not set in production — refusing SMS reminder cron",
+        "error",
+      );
+      return NextResponse.json(
+        { error: "CRON_SECRET not configured" },
+        { status: 500 },
       );
     }
 
-    const authHeader = request.headers.get("authorization");
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    const isValidCronRequest =
-      cronSecret && authHeader === `Bearer ${cronSecret}`;
-    const role = (user?.app_metadata as AppMetadata)?.role;
-    const isAdminUser = user && (role === "admin" || role === "super_admin");
-    const isAuthorized = isValidCronRequest || isAdminUser;
-
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { error: "Unauthorized - admin access or valid cron secret required" },
-        { status: 401 },
-      );
+    if (!isValidCronRequest) {
+      const auth = await authorizeSmsAdmin(true);
+      if (!auth.authorized) {
+        return NextResponse.json(
+          {
+            error:
+              "Unauthorized - admin access or valid cron secret required",
+          },
+          { status: 401 },
+        );
+      }
     }
 
     const { searchParams } = new URL(request.url);
@@ -58,7 +56,6 @@ export async function GET(request: NextRequest) {
     if (type === "next_day") {
       targetDate.setDate(targetDate.getDate() + 1);
     }
-    // Reset time to midnight
     targetDate.setHours(0, 0, 0, 0);
 
     const result = await runSmsReminderBatch(type, targetDate, "cron");
