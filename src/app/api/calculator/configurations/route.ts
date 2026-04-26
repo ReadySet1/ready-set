@@ -13,9 +13,51 @@ import {
   getActiveConfigurations,
   getConfiguration
 } from '@/lib/calculator/client-configurations';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-// Helper function to convert DB record to ClientDeliveryConfiguration
+// Calculator pricing changes affect every order — gate writes to admin roles
+// only. Middleware excludes /api routes, so this check has to live in-route.
+async function authorizeCalculatorAdmin(
+  supabase: SupabaseClient,
+): Promise<
+  | { authorized: true; userId: string; userEmail: string | undefined }
+  | { authorized: false; status: 401 | 403 }
+> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { authorized: false, status: 401 };
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('type')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const userType = (profile?.type ?? '').toLowerCase();
+  if (!['admin', 'super_admin'].includes(userType)) {
+    return { authorized: false, status: 403 };
+  }
+
+  return { authorized: true, userId: user.id, userEmail: user.email };
+}
+
+// Helper function to convert DB record to ClientDeliveryConfiguration.
+// Reads zeroOrderSettings from the dedicated column first; falls back to the
+// nested customSettings location (written by an earlier revision of this PR)
+// and finally to the in-memory default. Keeping the legacy nested read lets us
+// recover any rows that were written during the buggy window without a backfill.
 function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
+  const inMemoryConfig = getConfiguration(dbConfig.configId);
+  const customSettings = dbConfig.customSettings as Record<string, any> | null;
+  const zeroOrderSettings =
+    dbConfig.zeroOrderSettings ??
+    customSettings?.zeroOrderSettings ??
+    inMemoryConfig?.zeroOrderSettings;
+
+  // Strip zeroOrderSettings out of customSettings so we don't echo it back as
+  // a nested duplicate after a read.
+  const { zeroOrderSettings: _stripped, ...restCustomSettings } =
+    customSettings ?? {};
+
   return {
     id: dbConfig.configId,
     clientName: dbConfig.clientName,
@@ -28,8 +70,11 @@ function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
     dailyDriveDiscounts: dbConfig.dailyDriveDiscounts as any,
     driverPaySettings: dbConfig.driverPaySettings as any,
     bridgeTollSettings: dbConfig.bridgeTollSettings as any,
-    zeroOrderSettings: dbConfig.zeroOrderSettings as any,
-    customSettings: dbConfig.customSettings as any,
+    zeroOrderSettings,
+    customSettings:
+      Object.keys(restCustomSettings).length > 0
+        ? (restCustomSettings as any)
+        : undefined,
     createdAt: dbConfig.createdAt,
     updatedAt: dbConfig.updatedAt,
     createdBy: dbConfig.createdBy || undefined,
@@ -37,7 +82,9 @@ function dbToConfig(dbConfig: any): ClientDeliveryConfiguration {
   };
 }
 
-// Helper function to convert ClientDeliveryConfiguration to DB format
+// Helper function to convert ClientDeliveryConfiguration to DB format.
+// zeroOrderSettings goes back into its dedicated Prisma column; customSettings
+// stays a separate JSON bag for genuinely custom future fields.
 function configToDb(config: ClientDeliveryConfiguration, userId?: string) {
   return {
     configId: config.id,
@@ -51,8 +98,8 @@ function configToDb(config: ClientDeliveryConfiguration, userId?: string) {
     dailyDriveDiscounts: config.dailyDriveDiscounts as any,
     driverPaySettings: config.driverPaySettings as any,
     bridgeTollSettings: config.bridgeTollSettings as any,
-    zeroOrderSettings: config.zeroOrderSettings as any ?? null,
-    customSettings: config.customSettings as any ?? null,
+    zeroOrderSettings: (config.zeroOrderSettings as any) ?? null,
+    customSettings: (config.customSettings as any) ?? null,
     createdBy: userId ?? null,
     notes: config.notes ?? null,
     updatedAt: new Date()
@@ -175,16 +222,15 @@ function computeConfigChanges(
   return changes;
 }
 
-// POST: Create/Update configuration
+// POST: Create/Update configuration (admin/super_admin only)
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const auth = await authorizeCalculatorAdmin(supabase);
+    if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, error: auth.status === 401 ? 'Unauthorized' : 'Forbidden' },
+        { status: auth.status }
       );
     }
 
@@ -214,7 +260,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Save to database
-    const dbData = configToDb(config, user?.id);
+    const dbData = configToDb(config, auth.userId);
 
     const savedConfig = await prisma.deliveryConfiguration.upsert({
       where: { configId: config.id },
@@ -226,8 +272,8 @@ export async function POST(request: NextRequest) {
     const changes = computeConfigChanges(previousConfig, config);
     const auditEntry = {
       configId: config.id,
-      userId: user.id,
-      userEmail: user.email,
+      userId: auth.userId,
+      userEmail: auth.userEmail,
       action: previousConfig ? 'update' : 'create',
       changedFields: changes.map(c => c.field),
       changes,
@@ -238,11 +284,11 @@ export async function POST(request: NextRequest) {
 
     Sentry.addBreadcrumb({
       category: 'configuration-audit',
-      message: `${auditEntry.action} config "${config.id}" by ${user.email}`,
+      message: `${auditEntry.action} config "${config.id}" by ${auth.userEmail ?? auth.userId}`,
       level: 'info',
       data: {
         configId: config.id,
-        userId: user.id,
+        userId: auth.userId,
         action: auditEntry.action,
         changedFields: auditEntry.changedFields,
       },
@@ -265,16 +311,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE: Soft-delete a configuration (sets isActive to false)
+// DELETE: Soft-delete a configuration (admin/super_admin only)
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const auth = await authorizeCalculatorAdmin(supabase);
+    if (!auth.authorized) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, error: auth.status === 401 ? 'Unauthorized' : 'Forbidden' },
+        { status: auth.status }
       );
     }
 
@@ -299,8 +344,8 @@ export async function DELETE(request: NextRequest) {
     // Audit logging for deletion
     const deleteAudit = {
       configId,
-      userId: user.id,
-      userEmail: user.email,
+      userId: auth.userId,
+      userEmail: auth.userEmail,
       action: 'soft-delete',
       timestamp: new Date().toISOString(),
     };
@@ -308,9 +353,9 @@ export async function DELETE(request: NextRequest) {
 
     Sentry.addBreadcrumb({
       category: 'configuration-audit',
-      message: `soft-delete config "${configId}" by ${user.email}`,
+      message: `soft-delete config "${configId}" by ${auth.userEmail ?? auth.userId}`,
       level: 'info',
-      data: { configId, userId: user.id, action: 'soft-delete' },
+      data: { configId, userId: auth.userId, action: 'soft-delete' },
     });
 
     return NextResponse.json({
