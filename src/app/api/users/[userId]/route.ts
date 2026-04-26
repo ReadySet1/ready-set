@@ -17,6 +17,7 @@ import { UserType, PrismaClientKnownRequestError } from '@/types/prisma';
 import { PrismaTransaction } from '@/types/prisma-types';
 import { UserAuditService } from '@/services/userAuditService';
 import { AuditAction } from '@/types/audit';
+import { setProfileAddress } from '@/lib/profile/address';
 
 export async function GET(request: NextRequest) {
     try {
@@ -415,11 +416,37 @@ export async function PUT(
         );
       }
 
-      // Use transaction for create + audit logging
+      // Use transaction for create + audit logging.
+      // Address fields land in the Address table via setProfileAddress(), not
+      // on Profile. The embedded Profile.street1..zip columns are deprecated
+      // (Phase 2); we still allow profile.create to seed them so legacy reads
+      // see consistent data until the schema migration drops the columns.
       profile = await prisma.$transaction(async (tx) => {
         const newProfile = await tx.profile.create({
           data: profileData,
         });
+
+        // Mirror the same address into the canonical Address+UserAddress.
+        if (
+          profileData.street1 &&
+          profileData.city &&
+          profileData.state &&
+          profileData.zip
+        ) {
+          await setProfileAddress(
+            newProfile.id,
+            {
+              street1: profileData.street1,
+              street2: profileData.street2 ?? null,
+              city: profileData.city,
+              state: profileData.state,
+              zip: profileData.zip,
+              locationNumber: profileData.locationNumber ?? null,
+              parkingLoading: profileData.parkingLoading ?? null,
+            },
+            tx,
+          );
+        }
 
         // Create audit entry for user creation
         const auditService = new UserAuditService();
@@ -481,12 +508,37 @@ export async function PUT(
         );
       }
 
-      // Use transaction for update + audit logging
+      // Use transaction for update + audit logging.
+      // Phase 2 bug fix: address writes now route through setProfileAddress()
+      // so the canonical Address row stays in sync with the user's profile.
+      // The embedded Profile.street1..zip fields are still updated for now
+      // (legacy fallback) until the schema migration drops them.
       profile = await prisma.$transaction(async (tx) => {
         const updatedProfile = await tx.profile.update({
           where: { id: userId },
           data: profileData,
         });
+
+        if (
+          profileData.street1 &&
+          profileData.city &&
+          profileData.state &&
+          profileData.zip
+        ) {
+          await setProfileAddress(
+            userId,
+            {
+              street1: profileData.street1,
+              street2: profileData.street2 ?? null,
+              city: profileData.city,
+              state: profileData.state,
+              zip: profileData.zip,
+              locationNumber: profileData.locationNumber ?? null,
+              parkingLoading: profileData.parkingLoading ?? null,
+            },
+            tx,
+          );
+        }
 
         // Prepare before/after states for audit (only include changed fields)
         const beforeState = UserAuditService.sanitizeForAudit({
