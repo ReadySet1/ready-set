@@ -30,6 +30,8 @@ import DriverDeliveries from "@/components/Driver/DriverDeliveries";
 import { DriverStatsCard } from "@/components/Driver/DriverStatsCard";
 import { useDriverStats } from "@/hooks/tracking/useDriverStats";
 import { useUser } from "@/contexts/UserContext";
+import { clearAuthCookies } from "@/utils/auth/cookies";
+import { createClient } from "@/utils/supabase/client";
 
 interface ShiftStatus {
   isActive: boolean;
@@ -45,6 +47,17 @@ const DriverPage = () => {
   const [driverId, setDriverId] = useState<string | null>(null);
 
   const { logout } = useUser();
+  const supabase = createClient();
+
+  const handleSignOut = async () => {
+    try {
+      clearAuthCookies();
+      await supabase.auth.signOut();
+      window.location.href = "/sign-in";
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   // Fetch driver stats for the quick summary
   const { data: stats } = useDriverStats({
@@ -160,7 +173,7 @@ const DriverPage = () => {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={() => logout()}
+                    onClick={handleSignOut}
                     className="text-red-600 dark:text-red-400"
                   >
                     <LogOutIcon className="w-4 h-4 mr-2" />
