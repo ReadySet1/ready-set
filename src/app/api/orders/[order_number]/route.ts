@@ -457,7 +457,19 @@ export async function PATCH(
     // Validate transitions via the centralized state machine; reject illegal
     // transitions with 422. Source of truth: src/lib/state-machine/.
     const currentStatus = ((existingOrder as any).status as OrderStatus | null) ?? null;
-    const currentDriverStatus = ((existingOrder as any).driverStatus as DriverStatus | null) ?? null;
+    let currentDriverStatus = ((existingOrder as any).driverStatus as DriverStatus | null) ?? null;
+
+    // Legacy fix: if driverStatus is null but a driver has been assigned via
+    // Dispatch, treat the current status as ASSIGNED so subsequent transitions
+    // (e.g. EN_ROUTE_TO_VENDOR) are valid.
+    if (currentDriverStatus === null) {
+      const dispatches = (existingOrder as any).dispatches;
+      const hasAssignedDriver =
+        Array.isArray(dispatches) && dispatches.length > 0 && dispatches[0]?.driver;
+      if (hasAssignedDriver) {
+        currentDriverStatus = DriverStatus.ASSIGNED;
+      }
+    }
 
     if (
       driverStatus &&
