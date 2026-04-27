@@ -252,8 +252,9 @@ jobs:
       - name: Build application
         run: |
           pnpm prisma generate
-          node --max-old-space-size=6144 ./node_modules/.bin/next build
+          pnpm exec next build
         env:
+          NODE_OPTIONS: '--max-old-space-size=6144'
           SKIP_TYPECHECK: 'true'
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
           NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
