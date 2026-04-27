@@ -51,6 +51,7 @@ import { syncOrderStatusWithBroker } from "@/lib/services/brokerSyncService";
 import { UserType } from "@/types/user";
 import { useUser } from "@/contexts/UserContext";
 import { decodeOrderNumber } from "@/utils/order";
+import { getCloudinaryUrl } from "@/lib/cloudinary";
 import { useDriverRealtimeLocation } from "@/hooks/tracking/useDriverRealtimeLocation";
 import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
 import { RealtimeStatusIndicator } from "./ui/RealtimeStatusIndicator";
@@ -877,6 +878,15 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
         transition={{ duration: 0.4 }}
         className={`container mx-auto px-6 pb-8 ${effectivePermissions.canViewOrderTitle ? "pt-8" : "pt-16"}`}
       >
+        {/* Mobile logo */}
+        <div className="flex justify-center py-4 md:hidden">
+          <img
+            src={getCloudinaryUrl("logo/new-logo-ready-set")}
+            alt="Ready Set logo"
+            className="h-auto w-48"
+          />
+        </div>
+
         {/* Modern Header */}
         <div className="mb-8">
           {/* Title Section */}
@@ -1252,8 +1262,8 @@ const SingleOrder: React.FC<SingleOrderProps> = ({
               </div>
             </div>
 
-            {/* Order Timeline */}
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            {/* Order Timeline — hidden on mobile, visible on desktop sidebar */}
+            <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
               <div className="border-b border-slate-100 p-6">
                 <h2 className="text-lg font-semibold text-slate-800">
                   Timeline
