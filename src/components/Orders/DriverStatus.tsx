@@ -238,22 +238,7 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                 <Progress
                   value={getProgressValue(order.driver_status)}
                   className="h-3 w-full bg-slate-200"
-                  indicatorClassName={cn("transition-all duration-500", {
-                    "bg-yellow-400":
-                      order.driver_status === DriverStatus.ASSIGNED,
-                    "bg-orange-500":
-                      order.driver_status === DriverStatus.EN_ROUTE_TO_VENDOR,
-                    "bg-blue-500":
-                      order.driver_status === DriverStatus.ARRIVED_AT_VENDOR,
-                    "bg-cyan-500":
-                      order.driver_status === DriverStatus.PICKED_UP,
-                    "bg-green-500":
-                      order.driver_status === DriverStatus.EN_ROUTE_TO_CLIENT,
-                    "bg-purple-500":
-                      order.driver_status === DriverStatus.ARRIVED_TO_CLIENT,
-                    "bg-slate-500":
-                      order.driver_status === DriverStatus.COMPLETED,
-                  })}
+                  indicatorClassName="transition-all duration-500 bg-amber-600"
                 />
                 <div className="mt-1 flex justify-between text-xs text-slate-500">
                   <span className="text-center">En Route to Resto</span>

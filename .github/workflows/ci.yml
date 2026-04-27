@@ -250,8 +250,11 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Build application
-        run: pnpm build:no-typecheck
+        run: |
+          pnpm prisma generate
+          pnpm exec next build
         env:
+          NODE_OPTIONS: '--max-old-space-size=6144'
           SKIP_TYPECHECK: 'true'
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
           NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
