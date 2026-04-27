@@ -250,7 +250,9 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Build application
-        run: pnpm build:no-typecheck
+        run: |
+          pnpm prisma generate
+          node --max-old-space-size=6144 ./node_modules/.bin/next build
         env:
           SKIP_TYPECHECK: 'true'
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
