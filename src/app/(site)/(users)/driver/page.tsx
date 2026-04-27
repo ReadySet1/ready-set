@@ -115,13 +115,13 @@ const DriverPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-gray-900 dark:to-gray-800">
       {/* Mobile-optimized header */}
       <div className="bg-white dark:bg-gray-900 shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center">
                 <TruckIcon className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -146,8 +146,8 @@ const DriverPage = () => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full">
-                    <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                      <UserIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <div className="w-9 h-9 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center">
+                      <UserIcon className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
@@ -177,8 +177,8 @@ const DriverPage = () => {
         {/* Welcome Section */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-              <UserIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center">
+              <UserIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white" suppressHydrationWarning>
@@ -193,7 +193,7 @@ const DriverPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Start Shift / Tracking */}
           <Link href="/driver/tracking" className="block">
-            <Card className="h-full border-2 border-transparent hover:border-blue-500 transition-all duration-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg">
+            <Card className="h-full border-2 border-transparent hover:border-amber-500 transition-all duration-200 bg-gradient-to-r from-amber-400 to-yellow-400 text-gray-900 hover:shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-2">
@@ -207,38 +207,38 @@ const DriverPage = () => {
                         {shiftStatus.isActive ? 'Manage Shift' : 'Start Shift'}
                       </h3>
                     </div>
-                    <p className="text-blue-100 text-sm">
-                      {shiftStatus.isActive 
-                        ? 'Track location & manage deliveries' 
+                    <p className="text-gray-700 text-sm">
+                      {shiftStatus.isActive
+                        ? 'Track location & manage deliveries'
                         : 'Begin tracking your shift & location'
                       }
                     </p>
                     {shiftStatus.isActive && shiftStatus.duration && (
-                      <div className="flex items-center space-x-1 text-blue-100">
+                      <div className="flex items-center space-x-1 text-gray-700">
                         <ClockIcon className="w-4 h-4" />
                         <span className="text-xs">Active for {shiftStatus.duration}</span>
                       </div>
                     )}
                   </div>
-                  <NavigationIcon className="w-8 h-8 opacity-80" />
+                  <NavigationIcon className="w-8 h-8 opacity-60" />
                 </div>
               </CardContent>
             </Card>
           </Link>
 
           {/* View Deliveries */}
-          <Card className="h-full border-2 border-transparent hover:border-green-500 transition-all duration-200 bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-lg">
+          <Card className="h-full border-2 border-transparent hover:border-amber-400 transition-all duration-200 bg-gradient-to-r from-gray-800 to-gray-900 text-white hover:shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
-                    <MapPinIcon className="w-6 h-6" />
+                    <MapPinIcon className="w-6 h-6 text-amber-400" />
                     <h3 className="text-lg font-semibold">My Deliveries</h3>
                   </div>
-                  <p className="text-green-100 text-sm">
+                  <p className="text-gray-300 text-sm">
                     View today's delivery schedule
                   </p>
-                  <div className="flex items-center space-x-4 text-green-100">
+                  <div className="flex items-center space-x-4 text-amber-300">
                     <div className="flex items-center space-x-1">
                       <PackageIcon className="w-4 h-4" />
                       <span className="text-xs">
@@ -253,14 +253,14 @@ const DriverPage = () => {
                     </div>
                   </div>
                 </div>
-                <MapPinIcon className="w-8 h-8 opacity-80" />
+                <MapPinIcon className="w-8 h-8 text-amber-400 opacity-60" />
               </div>
             </CardContent>
           </Card>
 
           {/* View History */}
           <Link href="/driver/history" className="block">
-            <Card className="h-full border-2 border-transparent hover:border-purple-500 transition-all duration-200 bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:shadow-lg">
+            <Card className="h-full border-2 border-transparent hover:border-yellow-500 transition-all duration-200 bg-gradient-to-r from-yellow-500 to-amber-500 text-gray-900 hover:shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-2">
@@ -268,15 +268,15 @@ const DriverPage = () => {
                       <HistoryIcon className="w-6 h-6" />
                       <h3 className="text-lg font-semibold">View History</h3>
                     </div>
-                    <p className="text-purple-100 text-sm">
+                    <p className="text-gray-700 text-sm">
                       View and export your delivery history
                     </p>
-                    <div className="flex items-center space-x-1 text-purple-100">
+                    <div className="flex items-center space-x-1 text-gray-700">
                       <ClockIcon className="w-4 h-4" />
                       <span className="text-xs">Past 12 weeks available</span>
                     </div>
                   </div>
-                  <HistoryIcon className="w-8 h-8 opacity-80" />
+                  <HistoryIcon className="w-8 h-8 opacity-60" />
                 </div>
               </CardContent>
             </Card>

@@ -83,7 +83,7 @@ export function DeliveryStatusControl({
             disabled={isLoading || disabled}
             className={cn(
               "h-7 px-2 text-xs",
-              isFirstAction && "bg-blue-600 text-white hover:bg-blue-700"
+              isFirstAction && "bg-amber-500 text-gray-900 hover:bg-amber-600"
             )}
           >
             {isLoading ? (
@@ -97,7 +97,7 @@ export function DeliveryStatusControl({
           </Button>
         )}
         {isCompleted && (
-          <CheckCircle2 className="h-4 w-4 text-green-600" />
+          <CheckCircle2 className="h-4 w-4 text-amber-600" />
         )}
       </div>
     );
@@ -111,7 +111,7 @@ export function DeliveryStatusControl({
           <div
             className={cn(
               'h-full transition-all duration-300 rounded-full',
-              isCompleted ? 'bg-green-500' : 'bg-blue-500'
+              isCompleted ? 'bg-amber-500' : 'bg-amber-400'
             )}
             style={{ width: `${progress}%` }}
           />
@@ -145,7 +145,7 @@ export function DeliveryStatusControl({
             )}
           </Button>
         ) : (
-          <div className="flex items-center gap-1 text-green-600">
+          <div className="flex items-center gap-1 text-amber-600">
             <CheckCircle2 className="h-4 w-4" />
             <span className="text-sm font-medium">Done</span>
           </div>

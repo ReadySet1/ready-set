@@ -238,41 +238,26 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                 <Progress
                   value={getProgressValue(order.driver_status)}
                   className="h-3 w-full bg-slate-200"
-                  indicatorClassName={cn("transition-all duration-500", {
-                    "bg-yellow-400":
-                      order.driver_status === DriverStatus.ASSIGNED,
-                    "bg-orange-500":
-                      order.driver_status === DriverStatus.EN_ROUTE_TO_VENDOR,
-                    "bg-blue-500":
-                      order.driver_status === DriverStatus.ARRIVED_AT_VENDOR,
-                    "bg-cyan-500":
-                      order.driver_status === DriverStatus.PICKED_UP,
-                    "bg-green-500":
-                      order.driver_status === DriverStatus.EN_ROUTE_TO_CLIENT,
-                    "bg-purple-500":
-                      order.driver_status === DriverStatus.ARRIVED_TO_CLIENT,
-                    "bg-slate-500":
-                      order.driver_status === DriverStatus.COMPLETED,
-                  })}
+                  indicatorClassName="transition-all duration-500 bg-amber-600"
                 />
 
                 <div className="mt-1 flex justify-between text-xs text-slate-500">
-                  <div className="flex flex-col items-center">
-                    <span>En Route to Resto</span>
+                  <div className="flex flex-col items-center text-center">
+                    <span>En Route<span className="hidden md:inline"><br />to Resto</span><span className="md:hidden"> to Resto</span></span>
                   </div>
-                  <div className="flex flex-col items-center">
-                    <span>Arrived at Vendor</span>
+                  <div className="flex flex-col items-center text-center">
+                    <span>Arrived<span className="hidden md:inline"><br />at Vendor</span><span className="md:hidden"> at Vendor</span></span>
                   </div>
-                  <div className="flex flex-col items-center">
-                    <span>Pick Up Completed</span>
+                  <div className="flex flex-col items-center text-center">
+                    <span>Pick Up<span className="hidden md:inline"><br />Completed</span><span className="md:hidden"> Completed</span></span>
                   </div>
-                  <div className="flex flex-col items-center">
-                    <span>En Route to Client</span>
+                  <div className="flex flex-col items-center text-center">
+                    <span>En Route<span className="hidden md:inline"><br />to Client</span><span className="md:hidden"> to Client</span></span>
                   </div>
-                  <div className="flex flex-col items-center">
-                    <span>Arrived at Client</span>
+                  <div className="flex flex-col items-center text-center">
+                    <span>Arrived<span className="hidden md:inline"><br />at Client</span><span className="md:hidden"> at Client</span></span>
                   </div>
-                  <div className="flex flex-col items-center">
+                  <div className="flex flex-col items-center text-center">
                     <span>Delivered</span>
                   </div>
                 </div>

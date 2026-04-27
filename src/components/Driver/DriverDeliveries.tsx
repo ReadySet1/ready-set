@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ProfileResponse } from "@/types/api";
 import {
@@ -50,6 +50,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { useToast } from "@/components/ui/use-toast";
 import { UserStatus, DriverStatus } from "@/types/user";
 import { encodeOrderNumber } from "@/utils/order";
@@ -134,8 +143,8 @@ const DriverDeliveries: React.FC = () => {
   const [filteredDeliveries, setFilteredDeliveries] = useState<Delivery[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const ITEMS_PER_PAGE = 5;
+  const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState<
     "upcoming" | "today" | "completed"
   >("today");
@@ -172,7 +181,7 @@ const DriverDeliveries: React.FC = () => {
   useEffect(() => {
     const fetchDeliveries = async () => {
       setIsLoading(true);
-      const apiUrl = `/api/driver-deliveries?page=${page}&limit=${limit}`;
+      const apiUrl = `/api/driver-deliveries?page=1&limit=999`;
       try {
         const response = await fetch(apiUrl);
         if (!response.ok) {
@@ -201,7 +210,7 @@ const DriverDeliveries: React.FC = () => {
     };
 
     fetchDeliveries();
-  }, [page, limit]);
+  }, []);
 
   // Filter deliveries based on activeTab and statusFilter
   useEffect(() => {
@@ -239,6 +248,25 @@ const DriverDeliveries: React.FC = () => {
 
     setFilteredDeliveries(filtered);
   }, [deliveries, activeTab, statusFilter]);
+
+  // Reset to page 1 when tab or status filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, statusFilter]);
+
+  // Clear expanded row when page changes
+  useEffect(() => {
+    setExpandedDeliveryId(null);
+  }, [currentPage]);
+
+  // Compute paginated slice of filtered deliveries
+  const totalPages = Math.ceil(filteredDeliveries.length / ITEMS_PER_PAGE);
+  const safePage = Math.min(currentPage, Math.max(1, totalPages));
+  const paginatedDeliveries = useMemo(() => {
+    const start = (safePage - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    return filteredDeliveries.slice(start, end);
+  }, [filteredDeliveries, safePage, ITEMS_PER_PAGE]);
 
   // Handle status update for a delivery
   const handleStatusUpdate = async (delivery: Delivery, newStatus: DriverStatus) => {
@@ -278,21 +306,18 @@ const DriverDeliveries: React.FC = () => {
     }
   };
 
-  const handleNextPage = () => setPage((prev) => prev + 1);
-  const handlePrevPage = () => setPage((prev) => Math.max(1, prev - 1));
-
   const getDeliveryTypeBadge = (type: "catering" | "on_demand") => {
     switch (type) {
       case "catering":
         return (
-          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300">
             <ClipboardList className="mr-1 h-3 w-3" />
             Catering
           </Badge>
         );
       case "on_demand":
         return (
-          <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+          <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
             <Package className="mr-1 h-3 w-3" />
             On Demand
           </Badge>
@@ -326,7 +351,7 @@ const DriverDeliveries: React.FC = () => {
         return (
           <Badge
             variant="outline"
-            className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+            className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
           >
             Assigned
           </Badge>
@@ -335,7 +360,7 @@ const DriverDeliveries: React.FC = () => {
         return (
           <Badge
             variant="outline"
-            className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+            className="bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
           >
             <CheckCircle2 className="mr-1 h-3 w-3" />
             Completed
@@ -562,7 +587,7 @@ const DriverDeliveries: React.FC = () => {
               </CardHeader>
               <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-0">
                 <div className="flex items-center">
-                  <Calendar className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-blue-500" />
+                  <Calendar className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-amber-500" />
                   <div className="text-2xl sm:text-3xl font-bold">{todayCount}</div>
                 </div>
               </CardContent>
@@ -574,7 +599,7 @@ const DriverDeliveries: React.FC = () => {
               </CardHeader>
               <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-0">
                 <div className="flex items-center">
-                  <Clock className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-purple-500" />
+                  <Clock className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-amber-600" />
                   <div className="text-2xl sm:text-3xl font-bold">{upcomingCount}</div>
                 </div>
               </CardContent>
@@ -586,7 +611,7 @@ const DriverDeliveries: React.FC = () => {
               </CardHeader>
               <CardContent className="px-4 sm:px-6 pb-4 sm:pb-5 pt-0">
                 <div className="flex items-center">
-                  <CheckCircle2 className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-green-500" />
+                  <CheckCircle2 className="mr-2 sm:mr-3 h-6 w-6 sm:h-7 sm:w-7 text-amber-500" />
                   <div className="text-2xl sm:text-3xl font-bold">{completedCount}</div>
                 </div>
               </CardContent>
@@ -697,7 +722,7 @@ const DriverDeliveries: React.FC = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredDeliveries.map((delivery, index) => {
+                          {paginatedDeliveries.map((delivery, index) => {
                             const pickupTime = formatDateTime(
                               delivery.pickupDateTime,
                             );
@@ -724,7 +749,8 @@ const DriverDeliveries: React.FC = () => {
                                   <div className="flex flex-col space-y-1">
                                     <Link
                                       href={`/driver/deliveries/${encodeOrderNumber(delivery.orderNumber)}`}
-                                      className="font-medium text-primary hover:underline"
+                                      className="font-bold text-gray-900 dark:text-gray-100 hover:underline"
+                                      onClick={(e) => e.stopPropagation()}
                                     >
                                       #{delivery.orderNumber}
                                     </Link>
@@ -813,7 +839,7 @@ const DriverDeliveries: React.FC = () => {
                                             href={`https://maps.google.com/?q=${delivery.address.latitude},${delivery.address.longitude}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="mt-1 inline-block text-xs text-blue-600 hover:underline"
+                                            className="mt-1 inline-block text-xs text-amber-600 hover:underline"
                                           >
                                             Open in Maps
                                           </a>
@@ -840,7 +866,7 @@ const DriverDeliveries: React.FC = () => {
                                               href={`https://maps.google.com/?q=${delivery.delivery_address.latitude},${delivery.delivery_address.longitude}`}
                                               target="_blank"
                                               rel="noopener noreferrer"
-                                              className="mt-1 inline-block text-xs text-blue-600 hover:underline"
+                                              className="mt-1 inline-block text-xs text-amber-600 hover:underline"
                                             >
                                               Open in Maps
                                             </a>
@@ -863,7 +889,7 @@ const DriverDeliveries: React.FC = () => {
                                       {getPODUrl(delivery) && (
                                         <HoverCard>
                                           <HoverCardTrigger asChild>
-                                            <div className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400">
+                                            <div className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-400">
                                               <Camera className="h-3.5 w-3.5" />
                                             </div>
                                           </HoverCardTrigger>
@@ -902,7 +928,7 @@ const DriverDeliveries: React.FC = () => {
                                           new Date(delivery.pickupDateTime) <
                                           new Date()
                                             ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
-                                            : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                                            : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
                                         }`}
                                       >
                                         {getTimeUntil(delivery.pickupDateTime)}
@@ -975,19 +1001,19 @@ const DriverDeliveries: React.FC = () => {
 
                     {/* Historical Data Limit Notice - Only show in Completed tab */}
                     {activeTab === "completed" && filteredDeliveries.length > 0 && (
-                      <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950">
+                      <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
                         <div className="flex items-start space-x-3">
-                          <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                          <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
                           <div>
-                            <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                            <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200">
                               Showing Last {historicalDaysLimit} Days
                             </h4>
-                            <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                            <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
                               Your completed deliveries history is limited to the last {historicalDaysLimit} days.
                               For older records, please contact our admin team at{" "}
                               <a
                                 href="mailto:support@readysetllc.com"
-                                className="font-medium underline hover:text-blue-900 dark:hover:text-blue-100"
+                                className="font-medium underline hover:text-amber-900 dark:hover:text-amber-100"
                               >
                                 support@readysetllc.com
                               </a>
@@ -997,24 +1023,105 @@ const DriverDeliveries: React.FC = () => {
                       </div>
                     )}
 
-                    {Array.isArray(deliveries) && deliveries.length > limit && (
-                      <div className="mt-6 flex justify-between">
-                        <Button
-                          variant="outline"
-                          onClick={handlePrevPage}
-                          disabled={page === 1}
-                        >
-                          Previous
-                        </Button>
-                        <Button
-                          onClick={handleNextPage}
-                          disabled={
-                            !Array.isArray(filteredDeliveries) ||
-                            filteredDeliveries.length < limit
-                          }
-                        >
-                          Next
-                        </Button>
+                    {totalPages > 1 && (
+                      <div className="mt-6">
+                        <Pagination>
+                          <PaginationContent className="flex-wrap gap-1">
+                            <PaginationItem>
+                              <PaginationPrevious
+                                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                className={`text-sm ${
+                                  safePage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"
+                                }`}
+                              />
+                            </PaginationItem>
+                            {(() => {
+                              const pageNumbers = [];
+                              const maxVisiblePages = 5;
+
+                              if (totalPages <= maxVisiblePages) {
+                                for (let i = 1; i <= totalPages; i++) {
+                                  pageNumbers.push(
+                                    <PaginationItem key={i} className="hidden sm:block">
+                                      <PaginationLink
+                                        onClick={() => setCurrentPage(i)}
+                                        isActive={safePage === i}
+                                        className={`cursor-pointer text-sm ${safePage === i ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "hover:bg-slate-200"}`}
+                                      >
+                                        {i}
+                                      </PaginationLink>
+                                    </PaginationItem>,
+                                  );
+                                }
+                              } else {
+                                const leftBound = Math.max(1, safePage - 2);
+                                const rightBound = Math.min(totalPages, leftBound + 4);
+
+                                if (leftBound > 1) {
+                                  pageNumbers.push(
+                                    <PaginationItem key={1} className="hidden sm:block">
+                                      <PaginationLink
+                                        onClick={() => setCurrentPage(1)}
+                                        className="cursor-pointer text-sm hover:bg-slate-200"
+                                      >
+                                        1
+                                      </PaginationLink>
+                                    </PaginationItem>,
+                                  );
+                                  if (leftBound > 2) {
+                                    pageNumbers.push(<PaginationEllipsis key="leftEllipsis" className="hidden sm:flex" />);
+                                  }
+                                }
+
+                                for (let i = leftBound; i <= rightBound; i++) {
+                                  pageNumbers.push(
+                                    <PaginationItem key={i} className="hidden sm:block">
+                                      <PaginationLink
+                                        onClick={() => setCurrentPage(i)}
+                                        isActive={safePage === i}
+                                        className={`cursor-pointer text-sm ${safePage === i ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "hover:bg-slate-200"}`}
+                                      >
+                                        {i}
+                                      </PaginationLink>
+                                    </PaginationItem>,
+                                  );
+                                }
+
+                                if (rightBound < totalPages) {
+                                  if (rightBound < totalPages - 1) {
+                                    pageNumbers.push(<PaginationEllipsis key="rightEllipsis" className="hidden sm:flex" />);
+                                  }
+                                  pageNumbers.push(
+                                    <PaginationItem key={totalPages} className="hidden sm:block">
+                                      <PaginationLink
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        className="cursor-pointer text-sm hover:bg-slate-200"
+                                      >
+                                        {totalPages}
+                                      </PaginationLink>
+                                    </PaginationItem>,
+                                  );
+                                }
+                              }
+
+                              return pageNumbers;
+                            })()}
+                            {/* Mobile: Show current page info */}
+                            <PaginationItem className="sm:hidden">
+                              <span className="px-3 py-2 text-sm text-slate-600">
+                                Page {safePage} of {totalPages}
+                              </span>
+                            </PaginationItem>
+                            <PaginationItem>
+                              <PaginationNext
+                                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                className={`text-sm ${
+                                  safePage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer hover:bg-slate-200"
+                                }`}
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
                       </div>
                     )}
                   </>
