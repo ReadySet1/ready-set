@@ -379,8 +379,11 @@ jobs:
         run: pnpm prisma generate
 
       - name: Build application
-        run: pnpm build
+        run: |
+          pnpm prisma generate
+          pnpm exec next build
         env:
+          NODE_OPTIONS: '--max-old-space-size=6144'
           DATABASE_URL: postgresql://test:test@localhost:5432/test_db
           NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key-1234567890
