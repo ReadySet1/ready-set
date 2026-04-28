@@ -452,6 +452,7 @@ const Signin = ({
                     alt="logo"
                     width={140}
                     height={30}
+                    style={{ height: "auto" }}
                     className="dark:hidden"
                   />
                   <Image
@@ -459,6 +460,7 @@ const Signin = ({
                     alt="logo"
                     width={140}
                     height={30}
+                    style={{ height: "auto" }}
                     className="hidden dark:block"
                   />
                 </Link>

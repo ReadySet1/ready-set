@@ -19,6 +19,7 @@ const Footer = () => {
                   alt="logo"
                   width={140}
                   height={30}
+                  style={{ height: "auto" }}
                   className="max-w-full"
                 />
               </Link>

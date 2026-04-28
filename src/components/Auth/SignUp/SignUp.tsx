@@ -299,6 +299,7 @@ const SignUp = () => {
                   alt="logo"
                   width={140}
                   height={30}
+                  style={{ height: "auto" }}
                   className="dark:hidden"
                   priority
                 />
@@ -307,6 +308,7 @@ const SignUp = () => {
                   alt="logo"
                   width={140}
                   height={30}
+                  style={{ height: "auto" }}
                   className="hidden dark:block"
                   priority
                 />
