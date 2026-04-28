@@ -459,6 +459,7 @@ export default function CompleteProfile() {
                     alt="logo"
                     width={140}
                     height={30}
+                    style={{ height: "auto" }}
                     className="dark:hidden"
                     priority
                   />
@@ -467,6 +468,7 @@ export default function CompleteProfile() {
                     alt="logo"
                     width={140}
                     height={30}
+                    style={{ height: "auto" }}
                     className="hidden dark:block"
                     priority
                   />
@@ -530,6 +532,7 @@ export default function CompleteProfile() {
                   alt="logo"
                   width={140}
                   height={30}
+                  style={{ height: "auto" }}
                   className="dark:hidden"
                   priority
                 />
@@ -538,6 +541,7 @@ export default function CompleteProfile() {
                   alt="logo"
                   width={140}
                   height={30}
+                  style={{ height: "auto" }}
                   className="hidden dark:block"
                   priority
                 />
