@@ -53,7 +53,6 @@ export default function ClientLayout({
       <ToasterContext />
       {!isBackendAdminRoute &&
         !isStudioRoute &&
-        !isHomePage &&
         !isProfilePage &&
         !isDriverRoute && <Header key={headerKey} />}
       <main className="flex-grow">{children}</main>
