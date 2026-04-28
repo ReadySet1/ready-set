@@ -159,19 +159,28 @@ const CookieConsentBanner = ({ metricoolHash, gaMeasurementId }: CookieConsentBa
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <button
+                  type="button"
                   onClick={handleAcceptAll}
+                  aria-label="Accept all cookies"
+                  data-testid="cookie-accept-all"
                   className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-md text-sm font-medium transition-colors"
                 >
                   Accept All
                 </button>
                 <button
+                  type="button"
                   onClick={handlePreferences}
+                  aria-label="Manage cookie preferences"
+                  data-testid="cookie-manage-preferences"
                   className="w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white px-6 py-2.5 rounded-md text-sm font-medium transition-colors"
                 >
                   Manage Preferences
                 </button>
                 <button
+                  type="button"
                   onClick={handleRejectAll}
+                  aria-label="Reject all cookies"
+                  data-testid="cookie-reject-all"
                   className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white px-6 py-2.5 rounded-md text-sm font-medium transition-colors"
                 >
                   Reject All
