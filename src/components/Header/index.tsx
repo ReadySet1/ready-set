@@ -156,6 +156,7 @@ const Logo: React.FC<LogoProps> = ({
             alt="logo"
             width={280}
             height={40}
+            style={{ height: "auto" }}
             className={`header-logo w-full ${logoClasses.light}`}
           />
           <Image
@@ -163,6 +164,7 @@ const Logo: React.FC<LogoProps> = ({
             alt="logo"
             width={280}
             height={40}
+            style={{ height: "auto" }}
             className={`header-logo w-full ${logoClasses.dark}`}
           />
         </>
@@ -173,6 +175,7 @@ const Logo: React.FC<LogoProps> = ({
             alt="logo"
             width={180}
             height={40}
+            style={{ height: "auto" }}
             className={`header-logo w-full ${logoClasses.light}`}
           />
           <Image
@@ -180,6 +183,7 @@ const Logo: React.FC<LogoProps> = ({
             alt="logo"
             width={180}
             height={40}
+            style={{ height: "auto" }}
             className={`header-logo w-full ${logoClasses.dark}`}
           />
         </>
