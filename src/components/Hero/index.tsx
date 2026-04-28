@@ -25,6 +25,7 @@ type MotionDivProps = Omit<React.HTMLProps<HTMLDivElement>, keyof MotionProps> &
 // Custom motion components
 const MotionDiv: React.FC<MotionDivProps> = motion("div");
 const MotionHeader: React.FC<MotionDivProps> = motion("header");
+const MotionH1: React.FC<MotionDivProps> = motion("h1");
 const MotionHeading: React.FC<MotionDivProps> = motion("h2");
 
 const ButtonLink: React.FC<ButtonLinkProps> = ({
@@ -89,16 +90,16 @@ const Hero: React.FC = () => {
     <section className="relative p-4">
       {" "}
       {/* Removed min-h-screen */}
-      {/* Hidden SEO content */}
+      {/* Hidden SEO content (supplementary; document H1 is the visible one below) */}
       <div
         className="sr-only"
         role="complementary"
         aria-label="Company Overview"
       >
-        <h1>
+        <h2>
           Ready Set Group LLC - Bay Area&apos;s Premier Business Solutions
           Provider
-        </h1>
+        </h2>
         <p>
           Ready Set Group LLC, founded in 2019, has established itself as a
           cornerstone of Silicon Valley&apos;s business infrastructure. Our
@@ -169,6 +170,12 @@ const Hero: React.FC = () => {
           quality={100}
         />
       </div>
+      {/* Top-edge scrim: keeps the white global Header readable against the
+          yellow hero. Pointer-events disabled so it doesn't intercept clicks. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32 bg-gradient-to-b from-black/45 via-black/15 to-transparent sm:h-40"
+      />
       {/* Changed h-screen to pt-16 (or higher as needed) and added padding-bottom */}
       <div className="flex flex-col items-center pb-16 pt-16 sm:pb-24 sm:pt-20 md:pt-24 lg:pt-20">
         <MotionHeader
@@ -195,14 +202,36 @@ const Hero: React.FC = () => {
             </div>
           </MotionDiv>
 
-          <MotionHeading
+          <MotionH1
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.5 }}
+            className="mt-4 max-w-3xl text-balance text-center text-3xl font-extrabold text-white drop-shadow-lg sm:mt-6 sm:text-4xl md:text-5xl lg:text-6xl"
+          >
+            Same-day catering delivery for Bay Area enterprises.
+          </MotionH1>
+          <MotionDiv
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.7, duration: 0.5 }}
-            className="mb-8 mt-4 text-balance text-xl font-bold text-white drop-shadow-lg dark:text-white sm:mb-12 sm:mt-6 sm:text-2xl md:mb-16 md:text-3xl lg:text-4xl"
+            transition={{ delay: 0.8, duration: 0.5 }}
+            className="mt-4 max-w-2xl text-balance text-center text-base text-white/90 drop-shadow sm:text-lg md:text-xl"
           >
-            How can we help?
-          </MotionHeading>
+            Trusted by Apple, Google, and Facebook since 2019. Plus virtual
+            assistants who actually free up your week.
+          </MotionDiv>
+          <MotionDiv
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.0, duration: 0.5 }}
+            className="mt-6 mb-8 sm:mt-8 sm:mb-12 md:mb-16"
+          >
+            <Link
+              href="/logistics"
+              className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-3 text-base font-semibold text-gray-900 shadow-lg transition-colors hover:bg-gray-100 sm:px-8 sm:py-4 sm:text-lg"
+            >
+              Get a Quote
+            </Link>
+          </MotionDiv>
         </MotionHeader>
 
         {/* Removed flex-1 and items-end, added mt-auto to push buttons to bottom, or simply removed flex-1 and used a top margin */}

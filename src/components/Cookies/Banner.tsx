@@ -133,37 +133,33 @@ const CookieConsentBanner = ({ metricoolHash, gaMeasurementId }: CookieConsentBa
       {gaMeasurementId && <GoogleAnalytics gaId={gaMeasurementId} />}
 
       {isVisible && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg p-4 md:p-6 z-50">
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-gray-200 shadow-lg p-3 md:p-4 z-50">
           <div className="max-w-7xl mx-auto relative">
-            <button 
+            <button
               onClick={handleClose}
-              className="absolute -top-2 right-2 md:right-0 text-gray-500 hover:text-gray-700 p-2" 
+              className="absolute -top-1 right-2 md:right-0 text-gray-500 hover:text-gray-700 p-2"
               aria-label="Close banner"
             >
               <X size={20} />
             </button>
-            <div className="flex flex-col gap-4">
-              <div className="pr-8">
-                <p className="text-sm md:text-base text-gray-600">
-                  We use cookies to enhance your experience, serve personalized ads or content, and analyze traffic. 
-                  Under the California Consumer Privacy Act (CCPA) and other U.S. privacy laws, you have the right to manage your cookie preferences. 
-                  By clicking &quot;Accept All,&quot; you consent to our use of cookies. To learn more, read our{' '}
-                  <Link href="https://support.google.com/analytics/answer/6004245?hl=en" className="text-blue-600 hover:text-blue-800 underline">
-                    Cookie Policy
-                  </Link>{' '}
-                  and{' '}
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="pr-8 md:flex-1">
+                <p className="text-sm text-gray-600">
+                  We use cookies to improve your experience and analyze traffic.
+                  See our{' '}
                   <Link href="/privacy-policy" className="text-blue-600 hover:text-blue-800 underline">
                     Privacy Policy
                   </Link>
+                  .
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:flex-shrink-0">
                 <button
                   type="button"
                   onClick={handleAcceptAll}
                   aria-label="Accept all cookies"
                   data-testid="cookie-accept-all"
-                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-md text-sm font-medium transition-colors"
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
                 >
                   Accept All
                 </button>
@@ -172,16 +168,16 @@ const CookieConsentBanner = ({ metricoolHash, gaMeasurementId }: CookieConsentBa
                   onClick={handlePreferences}
                   aria-label="Manage cookie preferences"
                   data-testid="cookie-manage-preferences"
-                  className="w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white px-6 py-2.5 rounded-md text-sm font-medium transition-colors"
+                  className="w-full sm:w-auto border border-gray-300 hover:bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-medium transition-colors"
                 >
-                  Manage Preferences
+                  Manage
                 </button>
                 <button
                   type="button"
                   onClick={handleRejectAll}
                   aria-label="Reject all cookies"
                   data-testid="cookie-reject-all"
-                  className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white px-6 py-2.5 rounded-md text-sm font-medium transition-colors"
+                  className="w-full sm:w-auto border border-gray-300 hover:bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-medium transition-colors"
                 >
                   Reject All
                 </button>
