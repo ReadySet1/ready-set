@@ -285,7 +285,7 @@ const SignUp = () => {
   };
 
   return (
-    <section className="bg-[#F4F7FF] py-4 dark:bg-dark lg:py-8">
+    <section className="bg-auth-tint py-4 dark:bg-dark lg:py-8">
       <div className="container">
         <div className="flex justify-center">
           <Card className="w-full max-w-2xl shadow-sm">

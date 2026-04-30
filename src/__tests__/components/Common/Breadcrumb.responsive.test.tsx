@@ -39,9 +39,9 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
       const mainContainer = getMainContainer();
       expect(mainContainer).toHaveClass(
         "pt-[80px]",
-        "sm:pt-[100px]",
+        "sm:pt-page-y-sm",
         "md:pt-[130px]",
-        "lg:pt-[160px]",
+        "lg:pt-page-y-xl",
       );
     });
 
@@ -273,9 +273,9 @@ describe("Breadcrumb - Mobile Responsiveness", () => {
 
       // Check responsive vertical padding on main container
       expect(mainContainer).toHaveClass(
-        "sm:pt-[100px]",
+        "sm:pt-page-y-sm",
         "md:pt-[130px]",
-        "lg:pt-[160px]",
+        "lg:pt-page-y-xl",
       );
       expect(mainContainer).toHaveClass("sm:pb-[50px]", "md:pb-[60px]");
     });

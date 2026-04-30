@@ -43,8 +43,8 @@ const RegistrationSuccessModal: React.FC<RegistrationSuccessModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#FBD113]">
-            <CheckCircle2 className="h-10 w-10 text-[#1A1A1A]" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand">
+            <CheckCircle2 className="h-10 w-10 text-text-primary" />
           </div>
           <DialogTitle className="text-center text-2xl">
             Registration Successful!
@@ -88,11 +88,11 @@ const RegistrationSuccessModal: React.FC<RegistrationSuccessModalProps> = ({
           </div>
 
           {emailSent ? (
-            <div className="flex items-start gap-3 rounded-lg border border-[#FFC61A] bg-[#FBD113] p-4 dark:border-[#E5BE00] dark:bg-[#FBD113]">
-              <Mail className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#1A1A1A]" />
+            <div className="flex items-start gap-3 rounded-lg border border-cta-hover bg-brand p-4 dark:border-[#E5BE00] dark:bg-brand">
+              <Mail className="mt-0.5 h-5 w-5 flex-shrink-0 text-text-primary" />
               <div className="text-sm">
-                <p className="font-medium text-[#1A1A1A]">Check Your Email</p>
-                <p className="mt-1 text-[#1A1A1A]">
+                <p className="font-medium text-text-primary">Check Your Email</p>
+                <p className="mt-1 text-text-primary">
                   We've sent a confirmation email to{" "}
                   <strong>{userEmail}</strong>. Please verify your email address
                   to activate your account.
@@ -131,7 +131,7 @@ const RegistrationSuccessModal: React.FC<RegistrationSuccessModalProps> = ({
         <DialogFooter className="sm:justify-center">
           <Button
             onClick={handleGoToLogin}
-            className="w-full bg-gradient-to-r from-[#FBD113] to-[#FFC61A] font-semibold text-[#1A1A1A] hover:from-[#E5BE00] hover:to-[#F0B610] sm:w-auto"
+            className="w-full bg-gradient-to-r from-[#FBD113] to-[#FFC61A] font-semibold text-text-primary hover:from-[#E5BE00] hover:to-[#F0B610] sm:w-auto"
             size="lg"
           >
             Go to Login

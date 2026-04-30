@@ -260,7 +260,7 @@ export function AddressSelector({
         <>
           {/* Show prompt to search if no query */}
           {!debouncedSearch && !isLoading && (
-            <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed bg-slate-50">
+            <div className="flex min-h-card-h-sm items-center justify-center rounded-lg border border-dashed bg-slate-50">
               <div className="text-center space-y-2 px-4">
                 <Search className="h-8 w-8 mx-auto text-muted-foreground/50" />
                 <p className="text-sm font-medium text-slate-700">
@@ -275,7 +275,7 @@ export function AddressSelector({
 
           {/* Show message for queries that are too short */}
           {debouncedSearch && debouncedSearch.length < 2 && !isLoading && (
-            <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed">
+            <div className="flex min-h-card-h-sm items-center justify-center rounded-lg border border-dashed">
               <p className="text-sm text-muted-foreground">
                 Type at least 2 characters to search
               </p>
@@ -320,7 +320,7 @@ export function AddressSelector({
 
           {/* No results found */}
           {debouncedSearch && debouncedSearch.length >= 2 && addresses.length === 0 && !isLoading && (
-            <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed">
+            <div className="flex min-h-card-h-sm items-center justify-center rounded-lg border border-dashed">
               <div className="text-center space-y-2 px-4">
                 <MapPin className="h-8 w-8 mx-auto text-muted-foreground/50" />
                 <p className="text-sm font-medium text-slate-700">

@@ -41,7 +41,7 @@ const DiscoveryBanner: React.FC<CTAProps> = ({
         {/* Content container */}
         <div className="container relative z-10 mx-auto px-4 py-16">
           <div className="mx-auto max-w-4xl space-y-8 text-center">
-            <h2 className="mx-auto max-w-3xl text-4xl font-bold text-[#1a1a1a] md:text-5xl">
+            <h2 className="mx-auto max-w-3xl text-4xl font-bold text-text-primary md:text-5xl">
               Is your current business model{" "}
               <span className="font-extrabold">holding you back?</span>
             </h2>

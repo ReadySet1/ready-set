@@ -223,7 +223,7 @@ describe("FoodHeader Component", () => {
       render(<FoodHeader />);
 
       const section = screen.getByText("From Pickup to Complete Setup").closest("section");
-      expect(section).toHaveClass("relative", "min-h-[500px]", "w-full");
+      expect(section).toHaveClass("relative", "min-h-card-h-lg", "w-full");
       expect(section?.className).toMatch(/mb-16|md:mb-24|lg:mb-32/);
     });
 

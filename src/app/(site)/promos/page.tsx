@@ -31,7 +31,7 @@ export default async function Blog() {
     <>
       <Breadcrumb pageName="Welcome to our Promos blog" />
 
-      <section className="pb-10 pt-20 lg:pb-20 lg:pt-[120px]">
+      <section className="pb-10 pt-20 lg:pb-20 lg:pt-page-y">
         <div className="container mx-auto">
           <div className="-mx-4 flex flex-wrap justify-center sm:px-4">
           <SingleBlog data={data} basePath="promos" />

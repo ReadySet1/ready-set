@@ -125,7 +125,7 @@ const AppointmentDialog: React.FC<AppointmentDialogProps> = ({
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
-        <div className="h-[70vh] min-h-[400px] w-full bg-white">
+        <div className="h-[70vh] min-h-card-h-md w-full bg-white">
           <iframe
             src={calendarUrl}
             width="100%"

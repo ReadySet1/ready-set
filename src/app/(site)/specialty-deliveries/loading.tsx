@@ -2,7 +2,7 @@ export default function Loading() {
   return (
     <div className="pt-20 md:pt-24 animate-pulse">
       {/* Hero section skeleton */}
-      <div className="h-[500px] md:h-[600px] bg-gray-200 rounded-lg mb-8" />
+      <div className="h-card-h-lg md:h-[600px] bg-gray-200 rounded-lg mb-8" />
 
       {/* Partners section skeleton */}
       <div className="container mx-auto px-4 mb-8">
@@ -24,7 +24,7 @@ export default function Loading() {
       </div>
 
       {/* Terms section skeleton */}
-      <div className="h-[400px] bg-gray-200 rounded-lg" />
+      <div className="h-card-h-md bg-gray-200 rounded-lg" />
     </div>
   )
 }
