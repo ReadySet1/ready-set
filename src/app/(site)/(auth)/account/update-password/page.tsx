@@ -122,7 +122,7 @@ export default function UpdatePasswordPage() {
   // Loading state while checking session
   if (isSessionValid === null) {
     return (
-      <section className="bg-[#F4F7FF] pb-14 pt-[120px] dark:bg-dark sm:pt-[140px] md:pt-[160px] lg:pb-20 lg:pt-[180px]">
+      <section className="bg-auth-tint pb-14 pt-page-y dark:bg-dark sm:pt-page-y-lg md:pt-page-y-xl lg:pb-20 lg:pt-page-y-2xl">
         <div className="container">
           <div className="flex justify-center">
             <Card className="w-full max-w-md">
@@ -142,7 +142,7 @@ export default function UpdatePasswordPage() {
   // Invalid session state
   if (isSessionValid === false) {
     return (
-      <section className="bg-[#F4F7FF] pb-14 pt-[120px] dark:bg-dark sm:pt-[140px] md:pt-[160px] lg:pb-20 lg:pt-[180px]">
+      <section className="bg-auth-tint pb-14 pt-page-y dark:bg-dark sm:pt-page-y-lg md:pt-page-y-xl lg:pb-20 lg:pt-page-y-2xl">
         <div className="container">
           <div className="flex justify-center">
             <Card className="w-full max-w-md">
@@ -168,7 +168,7 @@ export default function UpdatePasswordPage() {
   // Success state
   if (isSuccess) {
     return (
-      <section className="bg-[#F4F7FF] pb-14 pt-[120px] dark:bg-dark sm:pt-[140px] md:pt-[160px] lg:pb-20 lg:pt-[180px]">
+      <section className="bg-auth-tint pb-14 pt-page-y dark:bg-dark sm:pt-page-y-lg md:pt-page-y-xl lg:pb-20 lg:pt-page-y-2xl">
         <div className="container">
           <div className="flex justify-center">
             <Card className="w-full max-w-md">
@@ -189,7 +189,7 @@ export default function UpdatePasswordPage() {
   }
 
   return (
-    <section className="bg-[#F4F7FF] pb-14 pt-[120px] dark:bg-dark sm:pt-[140px] md:pt-[160px] lg:pb-20 lg:pt-[180px]">
+    <section className="bg-auth-tint pb-14 pt-page-y dark:bg-dark sm:pt-page-y-lg md:pt-page-y-xl lg:pb-20 lg:pt-page-y-2xl">
       <div className="container">
         <div className="flex justify-center">
           <Card className="w-full max-w-md">

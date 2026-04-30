@@ -244,7 +244,7 @@ const OrderDetailsPage = () => {
           </div>
 
           {isLoading ? (
-            <div className="flex min-h-[400px] items-center justify-center">
+            <div className="flex min-h-card-h-md items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : orderDetails ? (
@@ -460,7 +460,7 @@ const OrderDetailsPage = () => {
               </div>
             </div>
           ) : (
-            <div className="flex min-h-[400px] items-center justify-center">
+            <div className="flex min-h-card-h-md items-center justify-center">
               <div className="text-center">
                 <Package className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-sm font-semibold text-gray-900">

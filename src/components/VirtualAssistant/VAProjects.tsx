@@ -159,7 +159,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
         </button>
       </div>
     </DialogHeader>
-    <div className="mt-4 h-[70vh] min-h-[400px] w-full bg-white dark:bg-gray-900">
+    <div className="mt-4 h-[70vh] min-h-card-h-md w-full bg-white dark:bg-gray-900">
       {showCalendar ? (
         <iframe
           src="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ26Tewp9laqwen17F4qh13UwlakRL20eQ6LOJn7ANJ4swhUdFfc4inaFMixVsMghhFzE3nlpTSx?gv=true"

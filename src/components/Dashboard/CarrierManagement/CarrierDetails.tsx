@@ -113,7 +113,7 @@ export const CarrierDetails: React.FC<CarrierDetailsProps> = ({ carrierId }) => 
 
   if (loading || !carrier) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-card-h-md">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       </div>
     );

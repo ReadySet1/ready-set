@@ -188,7 +188,7 @@ const Hero: React.FC = () => {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.5, duration: 0.5 }}
-            className="relative h-[200px] w-[300px] sm:h-[300px] sm:w-[400px] md:h-[400px] md:w-[500px]"
+            className="relative h-[200px] w-[300px] sm:h-[300px] sm:w-[400px] md:h-card-h-md md:w-[500px]"
           >
             <div className="relative h-full w-full">
               <Image

@@ -2,7 +2,7 @@
 
 const Blog = () => {
   return (
-    <section className="pb-10 pt-20 lg:pb-20 lg:pt-[120px]">
+    <section className="pb-10 pt-20 lg:pb-20 lg:pt-page-y">
       <div className="container">
         <div className="-mx-4 flex flex-wrap">
           {/* {blogData.map((blog) => (

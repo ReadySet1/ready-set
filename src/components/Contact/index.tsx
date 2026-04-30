@@ -348,7 +348,7 @@ const Contact = () => {
                     type="text"
                     name="name"
                     placeholder="Adam Gelius"
-                    className="w-full border-0 border-b border-[#f1f1f1] bg-transparent pb-3 text-dark placeholder:text-body-color/60 focus:border-yellow-600 focus:outline-none dark:border-dark-3 dark:text-white"
+                    className="w-full border-0 border-b border-gray-200 bg-transparent pb-3 text-dark placeholder:text-body-color/60 focus:border-yellow-600 focus:outline-none dark:border-dark-3 dark:text-white"
                   />
                   {errors.name && (
                     <span className="mt-1 text-sm text-red-500">
@@ -368,7 +368,7 @@ const Contact = () => {
                     type="email"
                     name="email"
                     placeholder="example@yourmail.com"
-                    className="w-full border-0 border-b border-[#f1f1f1] bg-transparent pb-3 text-dark placeholder:text-body-color/60 focus:border-yellow-600 focus:outline-none dark:border-dark-3 dark:text-white"
+                    className="w-full border-0 border-b border-gray-200 bg-transparent pb-3 text-dark placeholder:text-body-color/60 focus:border-yellow-600 focus:outline-none dark:border-dark-3 dark:text-white"
                   />
                   {errors.email && (
                     <span className="mt-1 text-sm text-red-500">
@@ -388,7 +388,7 @@ const Contact = () => {
                     type="text"
                     name="phone"
                     placeholder="415-123-2222"
-                    className="w-full border-0 border-b border-[#f1f1f1] bg-transparent pb-3 text-dark placeholder:text-body-color/60 focus:border-yellow-600 focus:outline-none dark:border-dark-3 dark:text-white"
+                    className="w-full border-0 border-b border-gray-200 bg-transparent pb-3 text-dark placeholder:text-body-color/60 focus:border-yellow-600 focus:outline-none dark:border-dark-3 dark:text-white"
                   />
                   {errors.phone && (
                     <span className="mt-1 text-sm text-red-500">
@@ -411,7 +411,7 @@ const Contact = () => {
                     name="message"
                     rows={1}
                     placeholder="type your message here"
-                    className="w-full resize-none border-0 border-b border-[#f1f1f1] bg-transparent pb-3 text-dark placeholder:text-body-color/60 focus:border-yellow-600 focus:outline-none dark:border-dark-3 dark:text-white"
+                    className="w-full resize-none border-0 border-b border-gray-200 bg-transparent pb-3 text-dark placeholder:text-body-color/60 focus:border-yellow-600 focus:outline-none dark:border-dark-3 dark:text-white"
                   ></textarea>
                   {errors.email && (
                     <span className="mt-1 text-sm text-red-500">
