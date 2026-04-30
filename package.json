@@ -190,6 +190,7 @@
     "tailgrids": "^2.3.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
+    "twilio": "^5.13.1",
     "uuid": "13.0.0",
     "vercel": "^50.38.2",
     "yup": "^1.7.1",
@@ -263,7 +264,7 @@
       "prisma"
     ],
     "overrides": {
-      "path-to-regexp": "^8.0.0",
+      "path-to-regexp": ">=8.4.0",
       "glob": "11.1.0",
       "rimraf": "6.0.1",
       "uuid": "11.0.3",
