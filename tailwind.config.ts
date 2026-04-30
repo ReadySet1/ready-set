@@ -2,13 +2,22 @@ import type { Config } from "tailwindcss";
 
 /**
  * Tailwind CSS Configuration
- * 
+ *
  * Brand Colors: See src/styles/brand-colors.ts for centralized color system
  * - Primary brand colors: amber-300/400 (use for brand elements)
  * - Semantic colors: yellow-400/500/600 (use for warnings, highlights)
- * 
- * Note: Tailwind includes amber and yellow color palettes by default.
- * Dynamic class names are avoided - use colorClassMap from brand-colors.ts instead.
+ *
+ * Semantic tokens (M3): use these instead of arbitrary hex values.
+ * - bg-brand / bg-brand-muted / bg-brand-deep — yellow brand surfaces
+ * - bg-cta / bg-cta-hover — interactive yellow surfaces
+ * - text-text-primary / text-text-muted / text-text-inverse — text colors
+ * - bg-surface / bg-surface-subtle / bg-surface-inverted — backgrounds
+ * - bg-auth-tint — auth-page accent surface
+ *
+ * Spacing tokens (M3): named replacements for common arbitrary px values.
+ * - pt-page-y / -lg / -xl / -2xl — section vertical rhythm
+ * - h-card-h / -md / -lg, min-h-card-h-sm — card height constraints
+ * - w-card-min — card width baseline
  */
 const config: Config = {
   darkMode: ["class"],
@@ -24,6 +33,38 @@ const config: Config = {
         'custom-yellow': "#ffc61a",
         'dark-navy': '#1a202c',
         'charcoal': '#2d3748',
+        brand: {
+          DEFAULT: '#FBD113',
+          muted: '#F8CC48',
+          deep: '#854D0E',
+        },
+        cta: {
+          DEFAULT: '#FBD113',
+          hover: '#FFC61A',
+        },
+        surface: {
+          DEFAULT: '#FFFFFF',
+          subtle: '#F9FAFB',
+          inverted: '#1A1A1A',
+        },
+        text: {
+          primary: '#1A1A1A',
+          muted: '#4B5563',
+          inverse: '#FFFFFF',
+        },
+        'auth-tint': '#F4F7FF',
+      },
+      spacing: {
+        'page-y-sm': '100px',
+        'page-y': '120px',
+        'page-y-lg': '140px',
+        'page-y-xl': '160px',
+        'page-y-2xl': '180px',
+        'card-min': '300px',
+        'card-h-sm': '200px',
+        'card-h': '300px',
+        'card-h-md': '400px',
+        'card-h-lg': '500px',
       },
       keyframes: {
         "accordion-down": {
