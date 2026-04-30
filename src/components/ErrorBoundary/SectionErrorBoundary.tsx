@@ -157,7 +157,7 @@ class SectionErrorBoundary extends Component<Props, State> {
 
       // Default section error UI
       return (
-        <div className="flex min-h-[400px] items-center justify-center p-4">
+        <div className="flex min-h-card-h-md items-center justify-center p-4">
           <Card className="w-full max-w-2xl">
             <CardHeader className="text-center">
               <div className="mb-4 flex items-center justify-center">

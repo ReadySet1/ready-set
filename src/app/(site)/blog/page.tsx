@@ -136,7 +136,7 @@ export default async function Blog() {
       {/* Further adjusted padding-top for section and increased font size for the paragraph */}
       <section className="pb-0 pt-[50px]">
         {" "}
-        {/* Changed pt-[100px] to pt-[70px] */}
+        {/* Changed pt-page-y-sm to pt-[70px] */}
         <div className="container">
           <div className="-mx-4 flex flex-wrap items-center justify-between">
             <div className="mb-8 w-full px-4 md:mb-0 lg:mb-0">

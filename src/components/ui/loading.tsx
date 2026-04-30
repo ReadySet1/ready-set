@@ -34,7 +34,7 @@ export function LoadingDashboard() {
 // For non-overlay loading within containers
 export function LoadingContainer({ className }: { className?: string }) {
   return (
-    <div className={cn("w-full min-h-[400px] flex items-center justify-center", className)}>
+    <div className={cn("w-full min-h-card-h-md flex items-center justify-center", className)}>
       <Loading message="Loading..." />
     </div>
   );

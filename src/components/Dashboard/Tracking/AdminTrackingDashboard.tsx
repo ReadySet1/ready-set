@@ -30,7 +30,7 @@ import type { TrackedDriver, DeliveryTracking } from '@/types/tracking';
 const LiveDriverMap = dynamic(() => import('./LiveDriverMap'), {
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center h-full min-h-[400px]">
+    <div className="flex items-center justify-center h-full min-h-card-h-md">
       <div className="flex flex-col items-center gap-2">
         <RefreshCwIcon className="h-8 w-8 animate-spin text-muted-foreground" />
         <p className="text-sm text-muted-foreground">Loading map...</p>

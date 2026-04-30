@@ -37,7 +37,7 @@ const EmptyAddressState: React.FC<EmptyAddressStateProps> = ({
   const message = getEmptyMessage();
 
   return (
-    <div className="flex min-h-[400px] flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-8 dark:border-gray-700 dark:bg-gray-800/50">
+    <div className="flex min-h-card-h-md flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-8 dark:border-gray-700 dark:bg-gray-800/50">
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700">
         <MapPin className="h-8 w-8 text-gray-500 dark:text-gray-400" />
       </div>

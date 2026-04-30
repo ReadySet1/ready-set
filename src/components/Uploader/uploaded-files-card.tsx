@@ -167,7 +167,7 @@ export function UploadedFilesViewer({
   );
 
   const renderFileList = () => (
-    <ScrollArea className="h-[400px]">
+    <ScrollArea className="h-card-h-md">
       <div className="space-y-4">
         {files.map((file) => (
           <div

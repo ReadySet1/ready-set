@@ -40,7 +40,7 @@ export default function PromotionalPricingBanner() {
         <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
           <span className="text-lg font-bold">Promotional Pricing Chart</span>
           <span className="text-sm font-medium">October 1 - October 15</span>
-          <Button className="bg-[#ffc61a] text-black hover:bg-[#e6b118] text-sm px-4 py-1 flex items-center">
+          <Button className="bg-cta-hover text-black hover:bg-[#e6b118] text-sm px-4 py-1 flex items-center">
             <ShoppingCart className="w-4 h-4 mr-2" />
             View Chart
           </Button>

@@ -564,7 +564,7 @@ const Testimonials = () => {
               </div>
             </div>
           </div>
-          <div className="flex justify-center items-center min-h-[300px]">
+          <div className="flex justify-center items-center min-h-card-h">
             <div className="text-center">
               <div className="animate-spin h-8 w-8 border-4 border-black border-t-transparent rounded-full mx-auto mb-4"></div>
               <p className="text-black">Loading testimonials...</p>
@@ -597,7 +597,7 @@ const Testimonials = () => {
               </div>
             </div>
           </div>
-          <div className="flex justify-center items-center min-h-[300px]">
+          <div className="flex justify-center items-center min-h-card-h">
             <div className="text-center max-w-md">
               <div className="text-red-500 text-4xl mb-4">⚠️</div>
               <h3 className="text-xl font-semibold text-black mb-2">Error Loading Testimonials</h3>
@@ -637,7 +637,7 @@ const Testimonials = () => {
               </div>
             </div>
           </div>
-          <div className="flex justify-center items-center min-h-[300px]">
+          <div className="flex justify-center items-center min-h-card-h">
             <div className="text-center max-w-md">
               <div className="text-6xl mb-6">💬</div>
               <h3 className="text-2xl font-semibold text-black mb-4">No Testimonials Yet</h3>
@@ -740,7 +740,7 @@ const Testimonials = () => {
 
                   {/* Manual carousel */}
                   <div
-                    className="relative h-[400px] sm:h-[500px]"
+                    className="relative h-card-h-md sm:h-card-h-lg"
                     onMouseEnter={() =>
                       setIsPaused({ ...isPaused, [category]: true })
                     }
@@ -873,7 +873,7 @@ const Testimonials = () => {
                                         }
                                         cardRefs.current[category][index] = el;
                                       }}
-                                      className="relative mt-2 max-h-[320px] overflow-y-auto rounded-xl bg-yellow-400 p-4 pt-6 text-black shadow-lg sm:mt-0 sm:max-h-[400px] sm:p-6 sm:pt-8"
+                                      className="relative mt-2 max-h-[320px] overflow-y-auto rounded-xl bg-yellow-400 p-4 pt-6 text-black shadow-lg sm:mt-0 sm:max-h-card-h-md sm:p-6 sm:pt-8"
                                       initial={{ y: 20, opacity: 0 }}
                                       animate={{
                                         y: 0,
@@ -959,7 +959,7 @@ const Testimonials = () => {
                                         }
                                         cardRefs.current[category][index] = el;
                                       }}
-                                      className="relative mt-2 max-h-[320px] overflow-y-auto rounded-xl bg-black p-4 pr-4 pt-6 text-white shadow-lg sm:mt-0 sm:max-h-[400px] sm:p-6 sm:pr-24 sm:pt-8"
+                                      className="relative mt-2 max-h-[320px] overflow-y-auto rounded-xl bg-black p-4 pr-4 pt-6 text-white shadow-lg sm:mt-0 sm:max-h-card-h-md sm:p-6 sm:pr-24 sm:pt-8"
                                       initial={{ y: 20, opacity: 0 }}
                                       animate={{
                                         y: 0,
