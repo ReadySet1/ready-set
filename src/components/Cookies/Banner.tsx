@@ -22,6 +22,10 @@ interface CookieConsentBannerProps {
 const CookieConsentBanner = ({ metricoolHash, gaMeasurementId }: CookieConsentBannerProps) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
+  // consentLoaded gates analytics script mount: we never render GA/Metricool
+  // until we've read the persisted consent. Otherwise their <Script> tags would
+  // boot on first paint, set cookies, and fire pageviews before the user can decide.
+  const [consentLoaded, setConsentLoaded] = useState(false);
   const [consentGiven, setConsentGiven] = useState<CookiePreferences>({
     necessary: true,
     analytics: false,
@@ -30,22 +34,35 @@ const CookieConsentBanner = ({ metricoolHash, gaMeasurementId }: CookieConsentBa
   });
 
   useEffect(() => {
+    // Pre-empt GA: even if its script somehow loads, this flag prevents it from
+    // sending hits or setting cookies until consent is confirmed.
+    if (typeof window !== 'undefined' && gaMeasurementId) {
+      (window as Record<string, unknown>)[`ga-disable-${gaMeasurementId}`] = true;
+    }
+
     const consentStatus = localStorage.getItem('cookieConsentStatus');
     if (!consentStatus) {
       setIsVisible(true);
-    } else {
-      try {
-        const savedPreferences = JSON.parse(localStorage.getItem('cookiePreferences') || '{}');
-        setConsentGiven(savedPreferences);
-        
-        if (window && gaMeasurementId) {
-          window[`ga-disable-${gaMeasurementId}`] = !(savedPreferences.analytics || savedPreferences.marketing);
-        }
-      } catch (error) {
-        console.error('Error parsing cookie preferences:', error);
+      setConsentLoaded(true);
+      return;
+    }
+
+    try {
+      const savedPreferences = JSON.parse(localStorage.getItem('cookiePreferences') || '{}');
+      setConsentGiven(savedPreferences);
+
+      if (window && gaMeasurementId) {
+        window[`ga-disable-${gaMeasurementId}`] = !(savedPreferences.analytics || savedPreferences.marketing);
       }
+    } catch (error) {
+      console.error('Error parsing cookie preferences:', error);
+    } finally {
+      setConsentLoaded(true);
     }
   }, [gaMeasurementId]);
+
+  const analyticsAllowed = consentGiven.analytics || consentGiven.marketing;
+  const canMountAnalytics = consentLoaded && analyticsAllowed;
 
   const handleAcceptAll = () => {
     const preferences: CookiePreferences = {
@@ -129,8 +146,8 @@ const CookieConsentBanner = ({ metricoolHash, gaMeasurementId }: CookieConsentBa
 
   return (
     <>
-      {metricoolHash && <MetricoolScript trackingHash={metricoolHash} />}
-      {gaMeasurementId && <GoogleAnalytics gaId={gaMeasurementId} />}
+      {canMountAnalytics && metricoolHash && <MetricoolScript trackingHash={metricoolHash} />}
+      {canMountAnalytics && gaMeasurementId && <GoogleAnalytics gaId={gaMeasurementId} />}
 
       {isVisible && (
         <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-gray-200 shadow-lg p-3 md:p-4 z-50">
