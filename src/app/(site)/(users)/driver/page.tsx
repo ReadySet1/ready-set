@@ -163,7 +163,7 @@ const DriverPage = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem asChild>
-                    <Link href="/driver/profile" className="flex items-center">
+                    <Link href="/profile" className="flex items-center">
                       <UserIcon className="w-4 h-4 mr-2" />
                       My Profile
                     </Link>
