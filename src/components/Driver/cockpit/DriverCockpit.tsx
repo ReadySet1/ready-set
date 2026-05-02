@@ -104,7 +104,7 @@ export function DriverCockpit({
               aria-label="Order details"
             >
               <ClipboardList className="w-5 h-5 text-gray-600" />
-              <span className="text-[10px] text-gray-500 mt-0.5">Details</span>
+              <span className="text-xs text-gray-500 mt-0.5">Details</span>
             </Link>
             <Link
               href={`/driver/deliveries/${encodeURIComponent(delivery.orderNumber)}/files`}
@@ -112,7 +112,7 @@ export function DriverCockpit({
               aria-label="Order files"
             >
               <Paperclip className="w-5 h-5 text-gray-600" />
-              <span className="text-[10px] text-gray-500 mt-0.5">Files</span>
+              <span className="text-xs text-gray-500 mt-0.5">Files</span>
             </Link>
           </div>
         </div>

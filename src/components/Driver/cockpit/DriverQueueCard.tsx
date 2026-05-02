@@ -76,7 +76,7 @@ export function DriverQueueCard({ delivery, section }: DriverQueueCardProps) {
           {/* Status badge */}
           <span
             className={cn(
-              'text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap',
+              'text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap',
               STATUS_BADGE_COLORS[section],
             )}
           >
