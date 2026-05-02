@@ -54,6 +54,7 @@ export function StatusButton({
         onClick={() => setDialogOpen(true)}
         className="w-full h-14 rounded-full bg-[#FBD113] text-gray-900 font-bold text-base
                    active:scale-[0.97] transition-transform
+                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2
                    disabled:opacity-50 disabled:cursor-not-allowed
                    flex items-center justify-center gap-2"
         style={{ fontFamily: 'Montserrat, sans-serif' }}
