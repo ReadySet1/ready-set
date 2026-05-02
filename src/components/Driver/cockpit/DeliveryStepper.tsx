@@ -18,7 +18,7 @@ const STEP_LABELS: Record<string, string> = {
 
 /**
  * Vertical 7-step stepper showing delivery progress.
- * Brand yellow (#FBD113) for completed/current steps, gray for future.
+ * Brand yellow for completed/current steps, gray for future.
  */
 export function DeliveryStepper({ currentStatus, compact = false }: DeliveryStepperProps) {
   const currentIndex = getStatusIndex(currentStatus);
@@ -41,8 +41,8 @@ export function DeliveryStepper({ currentStatus, compact = false }: DeliveryStep
                 className={cn(
                   'rounded-full border-2 flex-shrink-0 transition-all',
                   compact ? 'w-3 h-3' : 'w-4 h-4',
-                  isCompleted && 'bg-[#FBD113] border-[#FBD113]',
-                  isCurrent && 'bg-[#FBD113] border-[#FBD113] ring-4 ring-[#FBD113]/30 animate-pulse',
+                  isCompleted && 'bg-brand border-brand',
+                  isCurrent && 'bg-brand border-brand ring-4 ring-brand/30 animate-pulse',
                   isFuture && 'bg-white border-gray-300',
                 )}
               />
@@ -51,7 +51,7 @@ export function DeliveryStepper({ currentStatus, compact = false }: DeliveryStep
                   className={cn(
                     'w-0.5 flex-1',
                     compact ? 'min-h-[16px]' : 'min-h-[24px]',
-                    index < activeIndex ? 'bg-[#FBD113]' : 'bg-gray-200',
+                    index < activeIndex ? 'bg-brand' : 'bg-gray-200',
                   )}
                 />
               )}

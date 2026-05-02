@@ -52,7 +52,7 @@ export function StatusButton({
         type="button"
         disabled={disabled || isLoading}
         onClick={() => setDialogOpen(true)}
-        className="w-full h-14 rounded-full bg-[#FBD113] text-gray-900 font-bold text-base
+        className="w-full h-14 rounded-full bg-cta text-gray-900 font-bold text-base
                    active:scale-[0.97] transition-transform
                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2
                    disabled:opacity-50 disabled:cursor-not-allowed
@@ -83,7 +83,7 @@ export function StatusButton({
                 setDialogOpen(false);
                 onConfirm();
               }}
-              className="bg-[#FBD113] text-gray-900 hover:bg-[#e6c011]"
+              className="bg-cta text-gray-900 hover:bg-cta-hover"
             >
               Confirm
             </AlertDialogAction>

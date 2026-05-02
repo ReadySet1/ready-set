@@ -139,7 +139,7 @@ export function DriverQueue() {
       <div className="bg-white border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#FBD113] rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-brand rounded-full flex items-center justify-center">
               <Truck className="w-5 h-5 text-gray-900" />
             </div>
             <div>
@@ -232,7 +232,7 @@ export function DriverQueue() {
               {doneToday.length > 0 && (
                 <Link
                   href="/driver/history"
-                  className="block text-center text-sm font-medium text-[#c5a210] mt-2 py-2"
+                  className="block text-center text-sm font-medium text-brand-deep mt-2 py-2"
                 >
                   View All History
                 </Link>

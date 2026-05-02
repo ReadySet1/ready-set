@@ -15,13 +15,13 @@ interface DriverQueueCardProps {
 }
 
 const ACCENT_COLORS: Record<QueueSection, string> = {
-  now: 'border-l-[#FBD113]',
+  now: 'border-l-brand',
   up_next: 'border-l-gray-300',
   done_today: 'border-l-green-500',
 };
 
 const STATUS_BADGE_COLORS: Record<QueueSection, string> = {
-  now: 'bg-[#FBD113]/20 text-amber-800',
+  now: 'bg-brand/20 text-amber-800',
   up_next: 'bg-gray-100 text-gray-600',
   done_today: 'bg-green-100 text-green-800',
 };
