@@ -9,6 +9,12 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
 import { enforceBodySizeLimit } from '@/lib/security/body-size-limit';
+import { enforceRateLimit } from '@/lib/security/rate-limit';
+import {
+  readIdempotencyContext,
+  replayCachedResponse,
+  storeAndReturnResponse,
+} from '@/lib/security/idempotency';
 import {
   validateCaterValleyAuth,
   ensureAddress,
@@ -83,6 +89,17 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    // 1a. Per-partner rate limit (after auth so we can attribute the count
+    //     to a specific partner).
+    const rateLimitReject = await enforceRateLimit('catervalley', 'orders.draft');
+    if (rateLimitReject) return rateLimitReject;
+
+    // 1b. Idempotency-Key replay. If the partner provides the header and
+    //     we've already responded to this key, return the cached response.
+    const idempotency = readIdempotencyContext(request, 'catervalley');
+    const replay = await replayCachedResponse(idempotency);
+    if (replay) return replay;
 
     // 2. Parse and validate request body
     let requestBody: DraftOrderRequest;
@@ -228,13 +245,10 @@ export async function POST(request: NextRequest) {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        return NextResponse.json(
-          {
-            status: 'ERROR',
-            message: `Order with code ${validatedData.orderCode} already exists`,
-          },
-          { status: 409 }
-        );
+        return storeAndReturnResponse(idempotency, 409, {
+          status: 'ERROR',
+          message: `Order with code ${validatedData.orderCode} already exists`,
+        });
       }
       throw error;
     }
@@ -255,7 +269,7 @@ export async function POST(request: NextRequest) {
     };
 
 
-    return NextResponse.json(response, { status: 201 });
+    return storeAndReturnResponse(idempotency, 201, response);
 
   } catch (error) {
     console.error('Error creating CaterValley draft order:', error);
