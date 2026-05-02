@@ -155,7 +155,7 @@ const DriverPage = () => {
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
+                  <Button variant="ghost" size="icon" className="rounded-full" aria-label="User menu">
                     <div className="w-9 h-9 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center">
                       <UserIcon className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                     </div>
