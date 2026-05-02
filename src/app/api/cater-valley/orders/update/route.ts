@@ -5,8 +5,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
+import { enforceBodySizeLimit } from '@/lib/security/body-size-limit';
 import {
   validateCaterValleyAuth,
   ensureAddress,
@@ -68,12 +70,16 @@ interface UpdateOrderResponse {
 
 export async function POST(request: NextRequest) {
   try {
+    // 0. Reject oversized bodies before doing any work.
+    const sizeReject = enforceBodySizeLimit(request);
+    if (sizeReject) return sizeReject;
+
     // 1. Authentication
     if (!validateCaterValleyAuth(request)) {
       return NextResponse.json(
-        { 
+        {
           status: 'ERROR',
-          message: 'Unauthorized - Invalid API key or partner header' 
+          message: 'Unauthorized - Invalid API key or partner header'
         },
         { status: 401 }
       );
@@ -107,7 +113,9 @@ export async function POST(request: NextRequest) {
 
     const validatedData = validationResult.data;
 
-    // 3. Check if order exists and belongs to CaterValley
+    // 3. Check if order exists and belongs to CaterValley.
+    //    Soft-deleted orders return 404 (rather than letting partner clients
+    //    "resurrect" deleted orders by updating them).
     const existingOrder = await prisma.cateringRequest.findUnique({
       where: { id: validatedData.id },
       include: {
@@ -117,7 +125,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!existingOrder) {
+    if (!existingOrder || existingOrder.deletedAt) {
       return NextResponse.json(
         {
           status: 'ERROR',
@@ -160,14 +168,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Check for duplicate order codes (excluding current order)
+    // 5. Fast-path duplicate check on rename (excluding current order and
+    //    soft-deleted rows). The DB unique constraint at update time is
+    //    the authoritative race-safe guard (handled in catch block below).
     const normalizedOrderNumber = normalizeOrderNumber(validatedData.orderCode);
     if (normalizedOrderNumber !== existingOrder.orderNumber) {
       const duplicateOrder = await prisma.cateringRequest.findFirst({
-        where: { 
+        where: {
           orderNumber: normalizedOrderNumber,
           id: { not: validatedData.id },
+          deletedAt: null,
         },
+        select: { id: true },
       });
 
       if (duplicateOrder) {
@@ -210,44 +222,64 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. Update or create addresses
-    const [pickupAddressRecord, deliveryAddressRecord] = await Promise.all([
-      ensureAddress(validatedData.pickupLocation),
-      ensureAddress(validatedData.dropOffLocation),
-    ]);
-
-    // 7. Update the order
-    // Import timezone utility for proper conversion
+    // 6. Address upserts and order update run in a single transaction so
+    //    a newly inserted address can't be left orphaned by a failed
+    //    order update.
     const { localTimeToUtc } = await import('@/lib/utils/timezone');
     const deliveryDateTime = new Date(localTimeToUtc(validatedData.deliveryDate, validatedData.deliveryTime));
     const pickupTime = calculatePickupTime(validatedData.deliveryDate, validatedData.deliveryTime);
 
-    const updatedOrder = await prisma.cateringRequest.update({
-      where: { id: validatedData.id },
-      data: {
-        orderNumber: normalizedOrderNumber,
-        pickupAddressId: pickupAddressRecord.id,
-        deliveryAddressId: deliveryAddressRecord.id,
-        headcount: validatedData.totalItem,
-        orderTotal: validatedData.priceTotal,
-        pickupDateTime: new Date(pickupTime),
-        arrivalDateTime: deliveryDateTime,
-        clientAttention: validatedData.dropOffLocation.recipient.name,
-        pickupNotes: `CaterValley Order - Pickup from: ${validatedData.pickupLocation.name}`,
-        specialNotes: usedFallbackDistance
-          ? `${validatedData.dropOffLocation.instructions || ''}\n[FALLBACK DISTANCE: ${distance}mi - Manual review needed]`.trim()
-          : validatedData.dropOffLocation.instructions || '',
-        // Update delivery cost and distance for transparency
-        deliveryCost: pricingResult.deliveryFee,
-        deliveryDistance: distance,
-        updatedAt: new Date(),
-      },
-      include: {
-        pickupAddress: true,
-        deliveryAddress: true,
-        user: true,
-      },
-    });
+    let updatedOrder;
+    try {
+      updatedOrder = await prisma.$transaction(async (tx) => {
+        const [pickupAddressRecord, deliveryAddressRecord] = await Promise.all([
+          ensureAddress(validatedData.pickupLocation, tx),
+          ensureAddress(validatedData.dropOffLocation, tx),
+        ]);
+
+        return tx.cateringRequest.update({
+          where: { id: validatedData.id },
+          data: {
+            orderNumber: normalizedOrderNumber,
+            pickupAddressId: pickupAddressRecord.id,
+            deliveryAddressId: deliveryAddressRecord.id,
+            headcount: validatedData.totalItem,
+            orderTotal: validatedData.priceTotal,
+            pickupDateTime: new Date(pickupTime),
+            arrivalDateTime: deliveryDateTime,
+            clientAttention: validatedData.dropOffLocation.recipient.name,
+            pickupNotes: `CaterValley Order - Pickup from: ${validatedData.pickupLocation.name}`,
+            specialNotes: usedFallbackDistance
+              ? `${validatedData.dropOffLocation.instructions || ''}\n[FALLBACK DISTANCE: ${distance}mi - Manual review needed]`.trim()
+              : validatedData.dropOffLocation.instructions || '',
+            deliveryCost: pricingResult.deliveryFee,
+            deliveryDistance: distance,
+            updatedAt: new Date(),
+          },
+          include: {
+            pickupAddress: true,
+            deliveryAddress: true,
+            user: true,
+          },
+        });
+      });
+    } catch (error) {
+      // Race-safe: a concurrent request may have claimed the new orderNumber
+      // between our fast-path check and the update.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        return NextResponse.json(
+          {
+            status: 'ERROR',
+            message: `Order with code ${validatedData.orderCode} already exists`,
+          },
+          { status: 409 }
+        );
+      }
+      throw error;
+    }
 
     // 8. Return success response
     const response: UpdateOrderResponse = {

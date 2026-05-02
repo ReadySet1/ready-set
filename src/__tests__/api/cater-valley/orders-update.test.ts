@@ -6,13 +6,17 @@ import * as pricingService from '@/lib/services/pricingService';
 import * as pricingHelper from '@/app/api/cater-valley/_lib/pricing-helper';
 import { expectSuccessResponse, expectErrorResponse } from '@/__tests__/helpers/api-test-helpers';
 
-// Mock dependencies
-jest.mock('@/lib/db/prisma', () => ({
-  prisma: {
+// Mock dependencies. `$transaction` invokes the callback with the same
+// mock client so `tx.foo.bar()` calls inside the route hit the same
+// jest.fn instances as bare `prisma.foo.bar()` calls.
+jest.mock('@/lib/db/prisma', () => {
+  const mockPrisma: any = {
     address: { findFirst: jest.fn(), create: jest.fn() },
     cateringRequest: { findUnique: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
-  },
-}));
+  };
+  mockPrisma.$transaction = jest.fn((callback: (tx: any) => unknown) => callback(mockPrisma));
+  return { prisma: mockPrisma };
+});
 
 jest.mock('@/lib/services/pricingService', () => ({
   calculatePickupTime: jest.fn(),

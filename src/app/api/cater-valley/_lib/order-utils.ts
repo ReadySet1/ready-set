@@ -4,6 +4,14 @@
  */
 
 import { prisma } from '@/lib/db/prisma';
+import type { Prisma, PrismaClient } from '@prisma/client';
+
+/**
+ * Either the global Prisma client or a transaction client. Helpers accept
+ * this so callers can opt-in to transactional execution by passing the
+ * `tx` argument from `prisma.$transaction(async (tx) => ...)`.
+ */
+export type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
 
 /**
  * Normalizes order number with CV- prefix
@@ -19,13 +27,15 @@ export function normalizeOrderNumber(orderCode: string): string {
 }
 
 /**
- * Creates or finds the CaterValley system user
- * Used as the owner for all CaterValley orders
+ * Creates or finds the CaterValley system user.
+ * Used as the owner for all CaterValley orders.
  *
- * @returns The CaterValley system user profile
+ * @param executor - Optional Prisma client/transaction client. Defaults to the
+ *   global client. Pass `tx` from `prisma.$transaction(async (tx) => ...)` so
+ *   the upsert participates in the same transaction as the order create.
  */
-export async function ensureCaterValleySystemUser() {
-  return await prisma.profile.upsert({
+export async function ensureCaterValleySystemUser(executor: PrismaExecutor = prisma) {
+  return executor.profile.upsert({
     where: { email: 'system@catervalley.com' },
     update: {
       updatedAt: new Date(),

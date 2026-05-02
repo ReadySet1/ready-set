@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/db/prisma';
+import type { PrismaExecutor } from './order-utils';
 
 /**
  * Location data structure for address operations
@@ -35,18 +36,22 @@ export function extractZipFromAddress(address: string): string {
 }
 
 /**
- * Creates or finds an address in the database
- * First attempts to find an existing address, creates new one if not found
+ * Creates or finds an address in the database.
+ * Tries to find an existing match first, creates a new row if none exists.
  *
  * @param location - Location data containing address details
- * @returns Object with the address ID
+ * @param executor - Optional Prisma client/transaction client. Defaults to the
+ *   global client. Pass `tx` so the lookup-or-create participates in the
+ *   caller's transaction; otherwise an order-create rollback can leave a
+ *   newly inserted address orphaned.
  */
-export async function ensureAddress(location: LocationData): Promise<{ id: string }> {
-  // Parse ZIP from address if not provided separately
+export async function ensureAddress(
+  location: LocationData,
+  executor: PrismaExecutor = prisma
+): Promise<{ id: string }> {
   const zipCode = location.zip || extractZipFromAddress(location.address);
 
-  // First, try to find an existing address
-  const existingAddress = await prisma.address.findFirst({
+  const existingAddress = await executor.address.findFirst({
     where: {
       street1: location.address,
       city: location.city,
@@ -60,8 +65,7 @@ export async function ensureAddress(location: LocationData): Promise<{ id: strin
     return existingAddress;
   }
 
-  // Create new address if not found
-  const newAddress = await prisma.address.create({
+  return executor.address.create({
     data: {
       street1: location.address,
       city: location.city,
@@ -72,6 +76,4 @@ export async function ensureAddress(location: LocationData): Promise<{ id: strin
     },
     select: { id: true },
   });
-
-  return newAddress;
 }
