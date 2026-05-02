@@ -9,6 +9,12 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
 import { enforceBodySizeLimit } from '@/lib/security/body-size-limit';
+import { enforceRateLimit } from '@/lib/security/rate-limit';
+import {
+  readIdempotencyContext,
+  replayCachedResponse,
+  storeAndReturnResponse,
+} from '@/lib/security/idempotency';
 import {
   validateCaterValleyAuth,
   ensureAddress,
@@ -84,6 +90,13 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    const rateLimitReject = await enforceRateLimit('catervalley', 'orders.update');
+    if (rateLimitReject) return rateLimitReject;
+
+    const idempotency = readIdempotencyContext(request, 'catervalley');
+    const replay = await replayCachedResponse(idempotency);
+    if (replay) return replay;
 
     // 2. Parse and validate request body
     let requestBody: UpdateOrderRequest;
@@ -270,13 +283,10 @@ export async function POST(request: NextRequest) {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        return NextResponse.json(
-          {
-            status: 'ERROR',
-            message: `Order with code ${validatedData.orderCode} already exists`,
-          },
-          { status: 409 }
-        );
+        return storeAndReturnResponse(idempotency, 409, {
+          status: 'ERROR',
+          message: `Order with code ${validatedData.orderCode} already exists`,
+        });
       }
       throw error;
     }
@@ -297,7 +307,7 @@ export async function POST(request: NextRequest) {
     };
 
 
-    return NextResponse.json(response, { status: 200 });
+    return storeAndReturnResponse(idempotency, 200, response);
 
   } catch (error) {
     console.error('Error updating CaterValley order:', error);

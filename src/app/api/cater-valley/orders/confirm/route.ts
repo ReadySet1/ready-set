@@ -7,6 +7,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
 import { enforceBodySizeLimit } from '@/lib/security/body-size-limit';
+import { enforceRateLimit } from '@/lib/security/rate-limit';
+import {
+  readIdempotencyContext,
+  replayCachedResponse,
+  storeAndReturnResponse,
+} from '@/lib/security/idempotency';
 import {
   validateCaterValleyAuth,
   isOrderEditable,
@@ -83,6 +89,13 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    const rateLimitReject = await enforceRateLimit('catervalley', 'orders.confirm');
+    if (rateLimitReject) return rateLimitReject;
+
+    const idempotency = readIdempotencyContext(request, 'catervalley');
+    const replay = await replayCachedResponse(idempotency);
+    if (replay) return replay;
 
     // 2. Parse and validate request body
     let requestBody: ConfirmOrderRequest;
@@ -171,12 +184,12 @@ export async function POST(request: NextRequest) {
       });
 
       
-      return NextResponse.json({
+      return storeAndReturnResponse(idempotency, 200, {
         id: cancelledOrder.id,
         orderNumber: cancelledOrder.orderNumber,
         status: 'CANCELLED' as const,
         message: 'Order has been cancelled successfully',
-      }, { status: 200 });
+      });
     }
 
     // 5. Confirm the order
@@ -212,8 +225,8 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    
-    return NextResponse.json(response, { status: 200 });
+
+    return storeAndReturnResponse(idempotency, 200, response);
 
   } catch (error) {
     console.error('Error confirming CaterValley order:', error);

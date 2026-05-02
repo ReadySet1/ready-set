@@ -701,5 +701,40 @@ describe('POST /api/cater-valley/orders/draft - Create Draft Order', () => {
       const data = await response.json();
       expect(data.message).toMatch(/already exists/i);
     });
+
+    it('replays a cached response on retry with the same Idempotency-Key', async () => {
+      // Reset the in-memory Redis store so the cache is empty.
+      const { _resetRedisClientForTests } = await import('@/lib/redis/client');
+      _resetRedisClientForTests();
+      const { _resetRateLimiterForTests } = await import('@/lib/security/rate-limit');
+      _resetRateLimiterForTests();
+
+      const buildRequest = () =>
+        new Request('http://localhost:3000/api/cater-valley/orders/draft', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': 'test-api-key',
+            partner: 'catervalley',
+            'idempotency-key': 'partner-retry-uuid-1',
+          },
+          body: JSON.stringify({ ...validOrderData, orderCode: 'IDEMPOTENT-001' }),
+        });
+
+      const first = await POST(buildRequest());
+      expect(first.status).toBe(201);
+
+      // Second call with the same key should hit the cache and NOT touch
+      // the DB again.
+      const createCallCountAfterFirst = (prisma.cateringRequest.create as jest.Mock).mock.calls.length;
+      const second = await POST(buildRequest());
+
+      expect(second.status).toBe(201);
+      expect(second.headers.get('x-idempotent-replay')).toBe('true');
+      // Verify we did NOT issue another DB create for the replay.
+      expect((prisma.cateringRequest.create as jest.Mock).mock.calls.length).toBe(
+        createCallCountAfterFirst
+      );
+    });
   });
 });
