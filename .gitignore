@@ -140,3 +140,4 @@ src/components/Pricing/FlowerPricingLandingPageSimple.tsx
 *.key
 *.cert
 *.crt
+.gstack/
