@@ -57,7 +57,6 @@ export function StatusButton({
                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2
                    disabled:opacity-50 disabled:cursor-not-allowed
                    flex items-center justify-center gap-2"
-        style={{ fontFamily: 'Montserrat, sans-serif' }}
       >
         {isLoading ? (
           <>

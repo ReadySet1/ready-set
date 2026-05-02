@@ -89,7 +89,7 @@ export function DriverCockpit({
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
               {isPickupLeg ? 'Picking up from' : 'Delivering to'}
             </p>
-            <h2 className="text-lg font-bold text-gray-900 mt-0.5" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            <h2 className="text-lg font-bold text-gray-900 mt-0.5">
               {isPickupLeg ? vendorName : (delivery.delivery_address?.street1 || 'Delivery Location')}
             </h2>
             <div className="flex items-center gap-1 mt-1 text-sm text-gray-500">
