@@ -12,6 +12,7 @@ function createRequest(headers: Record<string, string>): NextRequest {
 
 describe('validateCaterValleyAuth', () => {
   const ORIGINAL_KEY = process.env.CATERVALLEY_API_KEY;
+  const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
 
   beforeEach(() => {
     process.env.CATERVALLEY_API_KEY = 'super-secret-test-key-1234567890';
@@ -23,6 +24,7 @@ describe('validateCaterValleyAuth', () => {
     } else {
       process.env.CATERVALLEY_API_KEY = ORIGINAL_KEY;
     }
+    process.env.NODE_ENV = ORIGINAL_NODE_ENV;
   });
 
   it('rejects requests with wrong partner header', () => {
@@ -67,13 +69,27 @@ describe('validateCaterValleyAuth', () => {
     expect(validateCaterValleyAuth(req)).toBe(true);
   });
 
-  it('accepts requests when env key is unset (local dev fallback)', () => {
+  it('accepts requests when env key is unset in non-production (local dev fallback)', () => {
     delete process.env.CATERVALLEY_API_KEY;
+    process.env.NODE_ENV = 'development';
     const req = createRequest({
       partner: 'catervalley',
       'x-api-key': 'whatever',
     });
     expect(validateCaterValleyAuth(req)).toBe(true);
+  });
+
+  it('rejects requests when env key is unset in production (fail-closed)', () => {
+    delete process.env.CATERVALLEY_API_KEY;
+    process.env.NODE_ENV = 'production';
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const req = createRequest({
+      partner: 'catervalley',
+      'x-api-key': 'whatever',
+    });
+    expect(validateCaterValleyAuth(req)).toBe(false);
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
   });
 
   it('uses constant-time comparison (no early-exit on first byte mismatch)', () => {

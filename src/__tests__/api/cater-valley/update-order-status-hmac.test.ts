@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 // src/__tests__/api/cater-valley/update-order-status-hmac.test.ts
 
 import { POST } from '@/app/api/cater-valley/update-order-status/route';
@@ -86,7 +89,7 @@ describe('POST /api/cater-valley/update-order-status — HMAC verification', () 
 
     it('does not warn when signature is valid', async () => {
       const body = { orderNumber: 'CV-1', status: 'READY' };
-      const sig = signPayload(SHARED_SECRET, JSON.stringify(body));
+      const sig = await signPayload(SHARED_SECRET, JSON.stringify(body));
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       const response = await POST(createRequest(body, { [SIGNATURE_HEADER]: sig }));
       expect(response.status).toBe(200);
@@ -122,7 +125,7 @@ describe('POST /api/cater-valley/update-order-status — HMAC verification', () 
 
     it('accepts requests with valid signature', async () => {
       const body = { orderNumber: 'CV-1', status: 'READY' };
-      const sig = signPayload(SHARED_SECRET, JSON.stringify(body));
+      const sig = await signPayload(SHARED_SECRET, JSON.stringify(body));
       const response = await POST(createRequest(body, { [SIGNATURE_HEADER]: sig }));
       expect(response.status).toBe(200);
       expect(caterValleyService.updateCaterValleyOrderStatus).toHaveBeenCalledWith('CV-1', 'READY');
@@ -130,7 +133,7 @@ describe('POST /api/cater-valley/update-order-status — HMAC verification', () 
 
     it('rejects requests where body has been tampered with after signing', async () => {
       const originalBody = { orderNumber: 'CV-1', status: 'READY' };
-      const sig = signPayload(SHARED_SECRET, JSON.stringify(originalBody));
+      const sig = await signPayload(SHARED_SECRET, JSON.stringify(originalBody));
       const tamperedRequest = new Request(
         'http://localhost:3000/api/cater-valley/update-order-status',
         {

@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 // src/__tests__/services/caterValleyService.outbound.test.ts
 //
 // Verifies outbound webhook hardening added in Phase 1:
@@ -56,7 +59,7 @@ describe('updateCaterValleyOrderStatus — outbound webhook security', () => {
     expect(headers[SIGNATURE_HEADER]).toBeDefined();
     expect(headers[SIGNATURE_HEADER]).toMatch(/^[a-f0-9]{64}$/);
 
-    const expected = signPayload('shared-secret-with-catervalley', sentBody);
+    const expected = await signPayload('shared-secret-with-catervalley', sentBody);
     expect(headers[SIGNATURE_HEADER]).toBe(expected);
   });
 

@@ -56,6 +56,22 @@ describe('checkOutboundUrl', () => {
     });
   });
 
+  describe('IPv4-mapped and -compatible IPv6', () => {
+    it.each([
+      '::ffff:127.0.0.1',
+      '::ffff:10.0.0.1',
+      '::ffff:192.168.1.1',
+      '::ffff:169.254.169.254',
+    ])('rejects IPv4-mapped IPv6 to private space: %s', (host) => {
+      const result = checkOutboundUrl(`http://[${host}]/`);
+      expect(result.ok).toBe(false);
+    });
+
+    it('rejects IPv4-compatible IPv6 to loopback', () => {
+      expect(checkOutboundUrl('http://[::127.0.0.1]/').ok).toBe(false);
+    });
+  });
+
   describe('production https enforcement', () => {
     it('rejects http URLs in production', () => {
       process.env.NODE_ENV = 'production';

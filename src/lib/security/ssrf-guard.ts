@@ -37,11 +37,49 @@ function isPrivateIPv4(host: string): boolean {
   return false;
 }
 
+/**
+ * Decode the trailing 32 bits of an IPv6 address (last two hex groups, or a
+ * dotted IPv4 tail) into dotted-quad form. Returns null if the input doesn't
+ * look like one of those embedded forms.
+ *
+ * Note: the WHATWG URL parser normalizes `[::ffff:127.0.0.1]` to
+ * `[::ffff:7f00:1]`, so we must accept both the dotted and the hex
+ * representations.
+ */
+function decodeEmbeddedIPv4(tail: string): string | null {
+  if (/^[0-9.]+$/.test(tail)) return tail;
+  const hexMatch = tail.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (!hexMatch || !hexMatch[1] || !hexMatch[2]) return null;
+  const hi = parseInt(hexMatch[1], 16);
+  const lo = parseInt(hexMatch[2], 16);
+  if (Number.isNaN(hi) || Number.isNaN(lo)) return null;
+  const a = (hi >> 8) & 0xff;
+  const b = hi & 0xff;
+  const c = (lo >> 8) & 0xff;
+  const d = lo & 0xff;
+  return `${a}.${b}.${c}.${d}`;
+}
+
 function isPrivateIPv6(host: string): boolean {
   const lower = host.toLowerCase().replace(/^\[|\]$/g, '');
   if (lower === '::' || lower === '::1') return true;
   if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
   if (lower.startsWith('fe80:')) return true;
+  // IPv4-mapped IPv6 (::ffff:a.b.c.d, normalized to ::ffff:H:H) — without
+  // this, a URL like http://[::ffff:127.0.0.1]/ slips past every other
+  // check and resolves to loopback through the IPv6 stack.
+  const v4MapMatch = lower.match(/^::ffff:(.+)$/);
+  if (v4MapMatch && v4MapMatch[1]) {
+    const decoded = decodeEmbeddedIPv4(v4MapMatch[1]);
+    if (decoded && isPrivateIPv4(decoded)) return true;
+  }
+  // IPv4-compatible IPv6 (::a.b.c.d, normalized to ::H:H), deprecated but
+  // still routable.
+  const v4CompatMatch = lower.match(/^::([^:]+:[^:]+|[0-9.]+)$/);
+  if (v4CompatMatch && v4CompatMatch[1]) {
+    const decoded = decodeEmbeddedIPv4(v4CompatMatch[1]);
+    if (decoded && isPrivateIPv4(decoded)) return true;
+  }
   return false;
 }
 

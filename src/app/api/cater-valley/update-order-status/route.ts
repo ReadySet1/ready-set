@@ -19,11 +19,11 @@ interface UpdateStatusRequestBody {
 
 type HmacResult = 'ok' | 'no-secret-configured' | 'missing-signature' | 'mismatch';
 
-function verifyInboundHmac(rawBody: string, providedSig: string | null): HmacResult {
+async function verifyInboundHmac(rawBody: string, providedSig: string | null): Promise<HmacResult> {
   const secret = process.env.CATERVALLEY_INBOUND_WEBHOOK_SECRET;
   if (!secret) return 'no-secret-configured';
   if (!providedSig) return 'missing-signature';
-  return verifySignature(secret, rawBody, providedSig) ? 'ok' : 'mismatch';
+  return (await verifySignature(secret, rawBody, providedSig)) ? 'ok' : 'mismatch';
 }
 
 // --- API Route Handler ---
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     // their side), failures are logged but the request still processes.
     const enforceHmac = process.env.ENFORCE_INBOUND_WEBHOOK_HMAC === 'true';
     const providedSig = request.headers.get(SIGNATURE_HEADER);
-    const hmacResult = verifyInboundHmac(rawBody, providedSig);
+    const hmacResult = await verifyInboundHmac(rawBody, providedSig);
 
     if (hmacResult !== 'ok' && hmacResult !== 'no-secret-configured') {
       const detail = {

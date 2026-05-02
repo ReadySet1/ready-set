@@ -30,6 +30,15 @@ export function validateCaterValleyAuth(request: NextRequest): boolean {
 
   const expectedApiKey = process.env.CATERVALLEY_API_KEY;
   if (!expectedApiKey) {
+    // Fail closed in production: a missing key is a deploy/config error,
+    // not a bypass. In non-production we keep fail-open so local dev and
+    // tests can hit these endpoints without provisioning the secret.
+    if (process.env.NODE_ENV === 'production') {
+      console.error(
+        '[CaterValley] CATERVALLEY_API_KEY is not configured — rejecting request.'
+      );
+      return false;
+    }
     return true;
   }
 

@@ -93,7 +93,7 @@ export async function updateCaterValleyOrderStatus(
     // becomes required and unsigned requests should fail their auth.
     const outboundSecret = process.env.CATERVALLEY_OUTBOUND_WEBHOOK_SECRET;
     if (outboundSecret) {
-      headers[SIGNATURE_HEADER] = signPayload(outboundSecret, requestBody);
+      headers[SIGNATURE_HEADER] = await signPayload(outboundSecret, requestBody);
     }
 
     try {
