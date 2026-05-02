@@ -31,6 +31,8 @@ interface OrderLocationMapProps {
   className?: string;
   height?: string;
   showNavigationControls?: boolean;
+  /** Which delivery leg to display markers for. Default shows all markers. */
+  leg?: 'pickup' | 'dropoff' | 'all';
 }
 
 /**
@@ -50,6 +52,7 @@ export default function OrderLocationMap({
   className,
   height = '250px',
   showNavigationControls = true,
+  leg,
 }: OrderLocationMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -60,8 +63,11 @@ export default function OrderLocationMap({
   const [mapError, setMapError] = useState<string | null>(null);
 
   // Check if we have valid coordinates to display
-  const hasPickupCoords = pickupAddress?.latitude && pickupAddress?.longitude;
-  const hasDeliveryCoords = deliveryAddress?.latitude && deliveryAddress?.longitude;
+  // When leg is specified, filter which markers are shown
+  const showPickup = !leg || leg === 'all' || leg === 'pickup';
+  const showDelivery = !leg || leg === 'all' || leg === 'dropoff';
+  const hasPickupCoords = showPickup && pickupAddress?.latitude && pickupAddress?.longitude;
+  const hasDeliveryCoords = showDelivery && deliveryAddress?.latitude && deliveryAddress?.longitude;
   const hasDriverCoords = driverLocation?.lat && driverLocation?.lng;
   const hasAnyCoords = hasPickupCoords || hasDeliveryCoords || hasDriverCoords;
 

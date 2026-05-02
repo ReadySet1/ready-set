@@ -1,97 +1,123 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import Link from "next/link";
-import SingleOrder from "@/components/Orders/SingleOrder";
+import { Loader2 } from "lucide-react";
+import { DriverCockpit } from "@/components/Driver/cockpit/DriverCockpit";
+import { DriverCompletedOrder } from "@/components/Driver/cockpit/DriverCompletedOrder";
+import { useDeliveryStatusRealtime } from "@/hooks/tracking/useDeliveryStatusRealtime";
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Home, Truck } from "lucide-react";
+  getNextStatus,
+  isDeliveryCompleted,
+} from "@/lib/delivery-status-transitions";
+import { useToast } from "@/components/ui/use-toast";
+import { useDriverDelivery } from "@/hooks/useDriverDelivery";
 
 const DriverOrderPage = () => {
-  const [orderNumber, setOrderNumber] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
 
-  useEffect(() => {
-    // Get the order number from the URL params
-    if (params?.order_number) {
-      const rawOrderNumber = Array.isArray(params.order_number) 
-        ? params.order_number[0] 
-        : params.order_number;
-      
-      if (rawOrderNumber) {
-        setOrderNumber(decodeURIComponent(rawOrderNumber));
-      }
+  const orderNumber = (() => {
+    if (!params?.order_number) return "";
+    const raw = Array.isArray(params.order_number)
+      ? params.order_number[0]
+      : params.order_number;
+    return raw ? decodeURIComponent(raw) : "";
+  })();
+
+  const { delivery, isLoading, error, refetch } = useDriverDelivery(orderNumber);
+
+  // Realtime status sync for external changes
+  useDeliveryStatusRealtime({
+    orderId: delivery?.id,
+    enabled: !!delivery && !isDeliveryCompleted(delivery.driverStatus),
+    showNotifications: false,
+    onStatusUpdate: () => {
+      refetch();
+    },
+  });
+
+  // Handle status update
+  const handleStatusUpdate = async () => {
+    if (!delivery) return;
+
+    const currentStatus = delivery.driverStatus || null;
+    const nextStatus = getNextStatus(currentStatus);
+    if (!nextStatus) return;
+
+    setIsUpdating(true);
+    try {
+      const res = await fetch(
+        `/api/orders/${encodeURIComponent(delivery.orderNumber)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ driverStatus: nextStatus }),
+        },
+      );
+
+      if (!res.ok) throw new Error("Failed to update status");
+
+      // Refresh delivery data after status change
+      await refetch();
+
+      toast({
+        title: "Status Updated",
+        description: `Order #${delivery.orderNumber} updated successfully.`,
+      });
+    } catch (err) {
+      console.error("Error updating delivery status:", err);
+      toast({
+        title: "Update Failed",
+        description: "Could not update delivery status. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
     }
-  }, [params]);
-
-  const handleDeleteSuccess = () => {
-    router.push("/driver");
   };
 
-  return (
-    <div className="flex min-h-screen w-full flex-col bg-slate-50">
-      <div className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white px-6 shadow-sm">
-        <Button
-          onClick={() => router.push("/driver")}
-          variant="ghost"
-          size="icon"
-          className="mr-2 h-9 w-9 text-slate-500 hover:text-green-600"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          <span className="sr-only">Back to driver dashboard</span>
-        </Button>
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/driver" className="flex items-center">
-                  <Home className="mr-1 h-4 w-4" />
-                  Driver Dashboard
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link
-                  href="/driver"
-                  className="flex items-center"
-                >
-                  <Truck className="mr-1 h-4 w-4" />
-                  Deliveries
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="font-medium text-green-600">
-                Order {orderNumber}
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      </div>
+  const handleBack = () => {
+    router.push("/driver/deliveries");
+  };
 
-      <div className="flex-1">
-        <SingleOrder 
-          onDeleteSuccess={handleDeleteSuccess} 
-          showHeader={false}
-          canAssignDriver={false}
-          canUpdateDriverStatus={true}
-          canDeleteOrder={false}
-          canEditOrder={false}
-        />
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[100dvh]">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       </div>
-    </div>
+    );
+  }
+
+  if (error || !delivery) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[100dvh] px-4">
+        <p className="text-red-600 mb-3">{error || "Delivery not found"}</p>
+        <button
+          type="button"
+          onClick={handleBack}
+          className="text-sm font-medium text-gray-700 underline"
+        >
+          Back to Queue
+        </button>
+      </div>
+    );
+  }
+
+  if (isDeliveryCompleted(delivery.driverStatus)) {
+    return <DriverCompletedOrder delivery={delivery} onBack={handleBack} />;
+  }
+
+  return (
+    <DriverCockpit
+      delivery={delivery}
+      onStatusUpdate={handleStatusUpdate}
+      onBack={handleBack}
+      isUpdating={isUpdating}
+    />
   );
 };
 

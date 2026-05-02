@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   NavigationIcon,
   MapPinIcon,
@@ -14,7 +13,6 @@ import {
   PauseIcon,
   PackageIcon,
   CheckCircleIcon,
-  AlertCircleIcon,
   UserIcon,
   HistoryIcon,
   LogOutIcon,
@@ -26,7 +24,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import DriverDeliveries from "@/components/Driver/DriverDeliveries";
 import { DriverStatsCard } from "@/components/Driver/DriverStatsCard";
 import { useDriverStats } from "@/hooks/tracking/useDriverStats";
 import { useUser } from "@/contexts/UserContext";
@@ -112,17 +109,17 @@ const DriverPage = () => {
   }, []);
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
       minute: '2-digit',
-      hour12: true 
+      hour12: true
     });
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString('en-US', {
       weekday: 'long',
-      month: 'long', 
+      month: 'long',
       day: 'numeric'
     });
   };
@@ -239,37 +236,39 @@ const DriverPage = () => {
             </Card>
           </Link>
 
-          {/* View Deliveries */}
-          <Card className="h-full border-2 border-transparent hover:border-amber-400 transition-all duration-200 bg-gradient-to-r from-gray-800 to-gray-900 text-white hover:shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <MapPinIcon className="w-6 h-6 text-amber-400" />
-                    <h3 className="text-lg font-semibold">My Deliveries</h3>
-                  </div>
-                  <p className="text-gray-300 text-sm">
-                    View today's delivery schedule
-                  </p>
-                  <div className="flex items-center space-x-4 text-amber-300">
-                    <div className="flex items-center space-x-1">
-                      <PackageIcon className="w-4 h-4" />
-                      <span className="text-xs">
-                        {stats?.deliveryStats.inProgress ?? 0} Pending
-                      </span>
+          {/* View Deliveries — now wrapped in Link to /driver/deliveries */}
+          <Link href="/driver/deliveries" className="block">
+            <Card className="h-full border-2 border-transparent hover:border-amber-400 transition-all duration-200 bg-gradient-to-r from-gray-800 to-gray-900 text-white hover:shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <MapPinIcon className="w-6 h-6 text-amber-400" />
+                      <h3 className="text-lg font-semibold">My Deliveries</h3>
                     </div>
-                    <div className="flex items-center space-x-1">
-                      <CheckCircleIcon className="w-4 h-4" />
-                      <span className="text-xs">
-                        {stats?.deliveryStats.completed ?? 0} Complete
-                      </span>
+                    <p className="text-gray-300 text-sm">
+                      View today&apos;s delivery schedule
+                    </p>
+                    <div className="flex items-center space-x-4 text-amber-300">
+                      <div className="flex items-center space-x-1">
+                        <PackageIcon className="w-4 h-4" />
+                        <span className="text-xs">
+                          {stats?.deliveryStats.inProgress ?? 0} Pending
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <CheckCircleIcon className="w-4 h-4" />
+                        <span className="text-xs">
+                          {stats?.deliveryStats.completed ?? 0} Complete
+                        </span>
+                      </div>
                     </div>
                   </div>
+                  <MapPinIcon className="w-8 h-8 text-amber-400 opacity-60" />
                 </div>
-                <MapPinIcon className="w-8 h-8 text-amber-400 opacity-60" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
 
           {/* View History */}
           <Link href="/driver/history" className="block">
@@ -304,9 +303,6 @@ const DriverPage = () => {
             showTrends={true}
           />
         )}
-
-        {/* Delivery Details */}
-        <DriverDeliveries />
       </div>
     </div>
   );

@@ -176,6 +176,59 @@ export function shouldNotifyAdmin(status: DriverStatus | string): boolean {
 }
 
 /**
+ * Descriptive CTA labels for the driver cockpit.
+ * Each label tells the driver what tapping the button *means*.
+ */
+export const COCKPIT_CTA_LABELS: Record<DriverStatus, string> = {
+  [DriverStatus.ASSIGNED]: 'Start Route',
+  [DriverStatus.EN_ROUTE_TO_VENDOR]: "I've Arrived at Vendor",
+  [DriverStatus.ARRIVED_AT_VENDOR]: 'Picked Up',
+  [DriverStatus.PICKED_UP]: 'Start Delivery',
+  [DriverStatus.EN_ROUTE_TO_CLIENT]: "I've Arrived at Client",
+  [DriverStatus.ARRIVED_TO_CLIENT]: 'Mark Delivered',
+  [DriverStatus.COMPLETED]: 'Delivered',
+};
+
+/**
+ * Get the cockpit CTA button label for the current status.
+ * Returns the label for the action that will advance the delivery.
+ */
+export function getCockpitCTALabel(status: DriverStatus | string | null | undefined): string {
+  if (!status) return COCKPIT_CTA_LABELS[DriverStatus.ASSIGNED];
+  return COCKPIT_CTA_LABELS[status as DriverStatus] || 'Next';
+}
+
+/**
+ * Delivery leg — which address the driver is heading toward.
+ */
+export type DeliveryLeg = 'pickup' | 'dropoff' | 'completed';
+
+/**
+ * Determine the current delivery leg from the driver status.
+ * - pickup: ASSIGNED, EN_ROUTE_TO_VENDOR, ARRIVED_AT_VENDOR
+ * - dropoff: PICKED_UP, EN_ROUTE_TO_CLIENT, ARRIVED_TO_CLIENT
+ * - completed: COMPLETED
+ */
+export function getDeliveryLeg(status: DriverStatus | string | null | undefined): DeliveryLeg {
+  if (!status) return 'pickup';
+
+  switch (status) {
+    case DriverStatus.ASSIGNED:
+    case DriverStatus.EN_ROUTE_TO_VENDOR:
+    case DriverStatus.ARRIVED_AT_VENDOR:
+      return 'pickup';
+    case DriverStatus.PICKED_UP:
+    case DriverStatus.EN_ROUTE_TO_CLIENT:
+    case DriverStatus.ARRIVED_TO_CLIENT:
+      return 'dropoff';
+    case DriverStatus.COMPLETED:
+      return 'completed';
+    default:
+      return 'pickup';
+  }
+}
+
+/**
  * Map a delivery status to the database timestamp column(s) that should be set.
  * Returns an array of SQL column assignments (e.g., ['picked_up_at = NOW()']).
  * ASSIGNED is handled separately by assignDeliveryToDriver.
