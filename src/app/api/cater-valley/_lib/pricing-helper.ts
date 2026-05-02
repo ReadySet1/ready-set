@@ -67,14 +67,16 @@ export async function calculateCaterValleyPricing(
   try {
     distance = await calculateDistance(pickupAddress, dropoffAddress);
   } catch (error) {
-    // Track distance calculation failure in Sentry for operational visibility
+    // Track distance calculation failure in Sentry for operational visibility.
+    // Full street addresses are PII; redact to city/state granularity which
+    // is enough for operational triage of "this region failed to geocode".
     captureException(error as Error, {
       action: 'calculate_distance',
       feature: feature,
       metadata: {
         orderCode: orderCode,
-        pickupAddress: pickupAddress,
-        dropoffAddress: dropoffAddress
+        pickupCityState: `${pickupLocation.city}, ${pickupLocation.state}`,
+        dropoffCityState: `${dropOffLocation.city}, ${dropOffLocation.state}`,
       }
     });
 

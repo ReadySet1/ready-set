@@ -179,9 +179,20 @@ export async function calculateDeliveryPrice(params: PricingParams): Promise<Pri
  * Calculate actual distance between two addresses using Google Maps API
  * This replaces the mock implementation with real distance calculation
  */
+/**
+ * Redact full address strings to "City, ST" for Sentry payloads. Street
+ * numbers / lines are PII; the city/state granularity is sufficient for
+ * operational triage of geocoding failures.
+ */
+function redactAddressForLogging(address: string): string {
+  const parts = address.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) return parts.slice(-2).join(', ');
+  return '<redacted>';
+}
+
 export async function calculateDistance(pickupAddress: string, dropoffAddress: string): Promise<number> {
   const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
-  
+
   if (!GOOGLE_MAPS_API_KEY) {
     captureMessage(
       'Google Maps API key not configured. Using estimated distance.',
@@ -189,7 +200,10 @@ export async function calculateDistance(pickupAddress: string, dropoffAddress: s
       {
         action: 'missing_google_maps_key',
         feature: 'distance_calculation',
-        metadata: { pickupAddress, dropoffAddress }
+        metadata: {
+          pickupCityState: redactAddressForLogging(pickupAddress),
+          dropoffCityState: redactAddressForLogging(dropoffAddress),
+        }
       }
     );
     return estimateDistance(pickupAddress, dropoffAddress);
@@ -200,8 +214,12 @@ export async function calculateDistance(pickupAddress: string, dropoffAddress: s
     const destinations = encodeURIComponent(dropoffAddress);
     
     const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origins}&destinations=${destinations}&units=imperial&key=${GOOGLE_MAPS_API_KEY}`;
-    
-    const response = await fetch(url);
+
+    // 5s timeout: previously this fetch was unbounded, so a hung Google
+    // Maps request would block the partner's order/draft handler until
+    // the platform's request timeout (≥30s on Vercel). Existing catch
+    // block already falls back to estimateDistance() on AbortError.
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
     const data = await response.json();
     
     if (data.status === 'OK' && data.rows[0]?.elements[0]?.status === 'OK') {
@@ -219,8 +237,8 @@ export async function calculateDistance(pickupAddress: string, dropoffAddress: s
           action: 'distance_calculated',
           feature: 'google_maps_api',
           metadata: {
-            pickupAddress,
-            dropoffAddress,
+            pickupCityState: redactAddressForLogging(pickupAddress),
+            dropoffCityState: redactAddressForLogging(dropoffAddress),
             miles: miles.toFixed(2),
             distanceText
           }
@@ -236,8 +254,8 @@ export async function calculateDistance(pickupAddress: string, dropoffAddress: s
           action: 'google_maps_api_error',
           feature: 'distance_calculation',
           metadata: {
-            pickupAddress,
-            dropoffAddress,
+            pickupCityState: redactAddressForLogging(pickupAddress),
+            dropoffCityState: redactAddressForLogging(dropoffAddress),
             apiStatus: data.status,
             errorMessage: data.error_message,
             elementStatus: data.rows[0]?.elements[0]?.status
@@ -251,7 +269,10 @@ export async function calculateDistance(pickupAddress: string, dropoffAddress: s
     captureException(error as Error, {
       action: 'google_maps_api_failure',
       feature: 'distance_calculation',
-      metadata: { pickupAddress, dropoffAddress }
+      metadata: {
+        pickupCityState: redactAddressForLogging(pickupAddress),
+        dropoffCityState: redactAddressForLogging(dropoffAddress),
+      }
     });
     return estimateDistance(pickupAddress, dropoffAddress);
   }
