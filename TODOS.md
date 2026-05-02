@@ -38,3 +38,26 @@ Design debt and follow-up work from design reviews.
 - **What**: The "Location Simulator" floating panel appears for logged-in drivers on production builds.
 - **Why**: Should be gated behind `process.env.NODE_ENV === 'development'` or a feature flag. Non-destructive but confusing for real drivers.
 - **Files**: Likely in a layout component or tracking module
+
+## Driver Dashboard — QA Findings (2026-05-02)
+
+Report: `.gstack/qa-reports/qa-report-localhost-2026-05-02.md`
+
+### Q01: Stats API 500 on driver dashboard (HIGH) — ISSUE-002/006
+- **What**: `/api/drivers/{id}/stats?period=today` returns 500. The DriverStatsCard renders "Unable to load statistics / Failed to fetch driver stats" prominently on the dashboard. The `useDriverStats` hook retries every few seconds, flooding the console with 500 errors.
+- **Why**: The `getDriverStats()` service crashes for the authenticated driver ID. Likely a missing table, column, or permissions issue.
+- **Files**: `src/app/api/drivers/[driverId]/stats/route.ts`, `src/components/Driver/DriverStatsCard.tsx`, `src/hooks/tracking/useDriverStats.ts`
+
+### Q02: View History silent redirect for non-driver users (MEDIUM) — ISSUE-001
+- **What**: Clicking "View History" on the driver dashboard redirects non-driver users to the homepage with no feedback. No error message, no toast, no explanation.
+- **Why**: `src/app/(site)/(users)/driver/history/page.tsx:42-45` calls `redirect("/")` when no driver record found. Should show an inline message or disable the card.
+- **Files**: `src/app/(site)/(users)/driver/history/page.tsx`
+
+### Q03: "Opps!" typo in 404 SVG (LOW) — ISSUE-005
+- **What**: The 404 page illustration contains the text "Opps!" baked into SVG path data. The paragraph below correctly says "Oops!"
+- **Why**: The typo is in `<path d="...">` coordinates, not editable text. The SVG asset needs to be regenerated.
+- **Files**: `src/components/NotFound/index.tsx:30-58`
+
+### Fixed by /qa on feature/redesign-driver-update-status (2026-05-02)
+- **ISSUE-003**: My Profile link pointed to `/driver/profile` (404). Fixed → `/profile`. Commit: `a5755c53`
+- **ISSUE-004**: Avatar menu button missing `aria-label`. Fixed → `aria-label="User menu"`. Commit: `262302fc`
