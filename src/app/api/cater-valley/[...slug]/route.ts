@@ -1,165 +1,123 @@
 /**
- * Catch-all debug endpoint for CaterValley API requests
- * This captures any requests that don't match existing endpoints
+ * Catch-all endpoint for unmatched CaterValley API requests.
+ *
+ * Returns a stable 404 with the list of valid endpoints so partner clients
+ * can self-diagnose typos. Never echoes request headers or body — the
+ * previous version returned full headers (including x-api-key) in the
+ * JSON response, which was a credential disclosure surface.
+ *
+ * In non-production, additional context (slug, search params, body)
+ * is included to aid local debugging.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
-  const resolvedParams = await params;
+import { isDebugEnabled, redactHeaders } from '../_lib/debug-guard';
+
+const AVAILABLE_ENDPOINTS = [
+  'POST /api/cater-valley/orders/draft',
+  'POST /api/cater-valley/orders/update',
+  'POST /api/cater-valley/orders/confirm',
+  'POST /api/cater-valley/update-order-status',
+];
+
+const NOT_FOUND_MESSAGE = 'Endpoint not found.';
+
+async function readBodySafely(request: NextRequest): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch {
+    try {
+      const text = await request.text();
+      return text ? { raw: text } : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function basePayload(method: string) {
+  return {
+    method,
+    message: NOT_FOUND_MESSAGE,
+    availableEndpoints: AVAILABLE_ENDPOINTS,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+async function debugContext(
+  request: NextRequest,
+  slug: string[],
+  includeBody: boolean
+): Promise<Record<string, unknown>> {
+  if (!isDebugEnabled()) return {};
   const headers = Object.fromEntries(request.headers.entries());
-  const url = request.url;
-  // Use nextUrl.searchParams if available, otherwise fall back to URL parsing
   const searchParams = request.nextUrl?.searchParams
     ? Object.fromEntries(request.nextUrl.searchParams.entries())
-    : Object.fromEntries(new URL(url).searchParams.entries());
-  const slug = resolvedParams.slug;
+    : Object.fromEntries(new URL(request.url).searchParams.entries());
 
-            
-  return NextResponse.json({
-    method: 'GET',
-    url,
+  const ctx: Record<string, unknown> = {
     slug,
-    headers,
+    headers: redactHeaders(headers),
     searchParams,
-    message: 'Catch-all debug endpoint - request logged. This endpoint does not exist.',
-    availableEndpoints: [
-      'POST /api/cater-valley/orders/draft',
-      'POST /api/cater-valley/orders/update',
-      'POST /api/cater-valley/orders/confirm'
-    ],
-    timestamp: new Date().toISOString(),
-  }, { status: 404 });
-}
-
-export async function POST(request: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
-  const resolvedParams = await params;
-  const headers = Object.fromEntries(request.headers.entries());
-  const url = request.url;
-  // Use nextUrl.searchParams if available, otherwise fall back to URL parsing
-  const searchParams = request.nextUrl?.searchParams
-    ? Object.fromEntries(request.nextUrl.searchParams.entries())
-    : Object.fromEntries(new URL(url).searchParams.entries());
-  const slug = resolvedParams.slug;
-  
-  let body = null;
-  try {
-    body = await request.json();
-  } catch (error) {
-    try {
-      const text = await request.text();
-      body = { raw: text };
-    } catch (textError) {
-      body = { error: 'Could not parse body' };
-    }
+  };
+  if (includeBody) {
+    ctx.body = await readBodySafely(request);
   }
-
-              
-  return NextResponse.json({
-    method: 'POST',
-    url,
-    slug,
-    headers,
-    searchParams,
-    body,
-    message: 'Catch-all debug endpoint - request logged. This endpoint does not exist.',
-    availableEndpoints: [
-      'POST /api/cater-valley/orders/draft',
-      'POST /api/cater-valley/orders/update',
-      'POST /api/cater-valley/orders/confirm'
-    ],
-    timestamp: new Date().toISOString(),
-  }, { status: 404 });
+  return ctx;
 }
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
-  const resolvedParams = await params;
-  const headers = Object.fromEntries(request.headers.entries());
-  const url = request.url;
-  const slug = resolvedParams.slug;
-  
-  let body = null;
-  try {
-    body = await request.json();
-  } catch (error) {
-    try {
-      const text = await request.text();
-      body = { raw: text };
-    } catch (textError) {
-      body = { error: 'Could not parse body' };
-    }
-  }
-
-            
-  return NextResponse.json({
-    method: 'PUT',
-    url,
-    slug,
-    headers,
-    body,
-    message: 'Catch-all debug endpoint - request logged. This endpoint does not exist.',
-    availableEndpoints: [
-      'POST /api/cater-valley/orders/draft',
-      'POST /api/cater-valley/orders/update',
-      'POST /api/cater-valley/orders/confirm'
-    ],
-    timestamp: new Date().toISOString(),
-  }, { status: 404 });
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string[] }> }
+) {
+  const { slug } = await params;
+  return NextResponse.json(
+    { ...basePayload('GET'), ...(await debugContext(request, slug, false)) },
+    { status: 404 }
+  );
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
-  const resolvedParams = await params;
-  const headers = Object.fromEntries(request.headers.entries());
-  const url = request.url;
-  const slug = resolvedParams.slug;
-  
-  let body = null;
-  try {
-    body = await request.json();
-  } catch (error) {
-    try {
-      const text = await request.text();
-      body = { raw: text };
-    } catch (textError) {
-      body = { error: 'Could not parse body' };
-    }
-  }
-
-            
-  return NextResponse.json({
-    method: 'PATCH',
-    url,
-    slug,
-    headers,
-    body,
-    message: 'Catch-all debug endpoint - request logged. This endpoint does not exist.',
-    availableEndpoints: [
-      'POST /api/cater-valley/orders/draft',
-      'POST /api/cater-valley/orders/update',
-      'POST /api/cater-valley/orders/confirm'
-    ],
-    timestamp: new Date().toISOString(),
-  }, { status: 404 });
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string[] }> }
+) {
+  const { slug } = await params;
+  return NextResponse.json(
+    { ...basePayload('POST'), ...(await debugContext(request, slug, true)) },
+    { status: 404 }
+  );
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ slug: string[] }> }) {
-  const resolvedParams = await params;
-  const headers = Object.fromEntries(request.headers.entries());
-  const url = request.url;
-  const slug = resolvedParams.slug;
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string[] }> }
+) {
+  const { slug } = await params;
+  return NextResponse.json(
+    { ...basePayload('PUT'), ...(await debugContext(request, slug, true)) },
+    { status: 404 }
+  );
+}
 
-          
-  return NextResponse.json({
-    method: 'DELETE',
-    url,
-    slug,
-    headers,
-    message: 'Catch-all debug endpoint - request logged. This endpoint does not exist.',
-    availableEndpoints: [
-      'POST /api/cater-valley/orders/draft',
-      'POST /api/cater-valley/orders/update',
-      'POST /api/cater-valley/orders/confirm'
-    ],
-    timestamp: new Date().toISOString(),
-  }, { status: 404 });
-} 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string[] }> }
+) {
+  const { slug } = await params;
+  return NextResponse.json(
+    { ...basePayload('PATCH'), ...(await debugContext(request, slug, true)) },
+    { status: 404 }
+  );
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string[] }> }
+) {
+  const { slug } = await params;
+  return NextResponse.json(
+    { ...basePayload('DELETE'), ...(await debugContext(request, slug, false)) },
+    { status: 404 }
+  );
+}

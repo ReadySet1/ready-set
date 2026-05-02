@@ -28,8 +28,8 @@ describe('GET/POST/PUT/PATCH/DELETE /api/cater-valley/[...slug] - CaterValley Ca
       const data = await response.json();
       expect(data.method).toBe('GET');
       expect(data.slug).toEqual(['unknown', 'path']);
-      expect(data.message).toContain('does not exist');
-      expect(data.availableEndpoints).toHaveLength(3);
+      expect(data.message).toContain('not found');
+      expect(data.availableEndpoints.length).toBeGreaterThanOrEqual(3);
     });
 
     it('should include request details in GET response', async () => {
@@ -45,7 +45,6 @@ describe('GET/POST/PUT/PATCH/DELETE /api/cater-valley/[...slug] - CaterValley Ca
       const data = await response.json();
 
       expect(data.method).toBe('GET');
-      expect(data.url).toContain('/api/cater-valley/test');
       expect(data.searchParams).toEqual({ param: 'value' });
       expect(data.headers).toHaveProperty('x-custom', 'header');
       expect(data.timestamp).toBeDefined();
@@ -90,7 +89,7 @@ describe('GET/POST/PUT/PATCH/DELETE /api/cater-valley/[...slug] - CaterValley Ca
       const data = await response.json();
       expect(data.method).toBe('POST');
       expect(data.body).toEqual({ test: 'data' });
-      expect(data.message).toContain('does not exist');
+      expect(data.message).toContain('not found');
     });
 
     it('should capture POST body in response', async () => {
@@ -212,7 +211,7 @@ describe('GET/POST/PUT/PATCH/DELETE /api/cater-valley/[...slug] - CaterValley Ca
       const response = await PATCH(request, context);
       const data = await response.json();
 
-      expect(data.availableEndpoints).toHaveLength(3);
+      expect(data.availableEndpoints.length).toBeGreaterThanOrEqual(3);
       expect(data.availableEndpoints[0]).toContain('draft');
     });
   });
@@ -232,12 +231,13 @@ describe('GET/POST/PUT/PATCH/DELETE /api/cater-valley/[...slug] - CaterValley Ca
       expect(data.slug).toEqual(['unknown']);
     });
 
-    it('should include headers in DELETE response', async () => {
+    it('should redact sensitive headers in DELETE response', async () => {
       const request = createNextRequest('http://localhost:3000/api/cater-valley/test', {
         method: 'DELETE',
         headers: {
           'x-api-key': 'test-key',
           'partner': 'test-partner',
+          'x-custom': 'safe',
         },
       });
       const context = { params: Promise.resolve({ slug: ['test'] }) };
@@ -245,8 +245,9 @@ describe('GET/POST/PUT/PATCH/DELETE /api/cater-valley/[...slug] - CaterValley Ca
       const response = await DELETE(request, context);
       const data = await response.json();
 
-      expect(data.headers).toHaveProperty('x-api-key', 'test-key');
-      expect(data.headers).toHaveProperty('partner', 'test-partner');
+      expect(data.headers).toHaveProperty('x-api-key', '<redacted>');
+      expect(data.headers).toHaveProperty('partner', '<redacted>');
+      expect(data.headers).toHaveProperty('x-custom', 'safe');
     });
 
     it('should handle DELETE with multiple slug segments', async () => {
@@ -339,8 +340,61 @@ describe('GET/POST/PUT/PATCH/DELETE /api/cater-valley/[...slug] - CaterValley Ca
       const data = await response.json();
 
       expect(data.method).toBe('PUT');
-      // When no body is provided, body parsing may return null, empty object, or error
-      expect(data.body).toBeDefined();
+      // body may be null when no payload is provided
+      expect(data).toHaveProperty('body');
+    });
+  });
+
+  describe('🔒 Production hardening', () => {
+    const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+
+    afterEach(() => {
+      process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+    });
+
+    it('does not echo headers, body, or slug to anonymous callers in production', async () => {
+      process.env.NODE_ENV = 'production';
+      const request = createNextRequest('http://localhost:3000/api/cater-valley/wrong/path', {
+        method: 'POST',
+        headers: {
+          'x-api-key': 'leaked-key',
+          partner: 'catervalley',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ secret: 'value' }),
+      });
+      const context = { params: Promise.resolve({ slug: ['wrong', 'path'] }) };
+
+      const response = await POST(request, context);
+      const data = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(data.method).toBe('POST');
+      expect(data.message).toContain('not found');
+      expect(data.availableEndpoints.length).toBeGreaterThanOrEqual(3);
+      // Production must NOT leak any of these:
+      expect(data).not.toHaveProperty('headers');
+      expect(data).not.toHaveProperty('body');
+      expect(data).not.toHaveProperty('slug');
+      expect(data).not.toHaveProperty('searchParams');
+      expect(JSON.stringify(data)).not.toContain('leaked-key');
+    });
+
+    it('still includes debug context in non-production', async () => {
+      process.env.NODE_ENV = 'development';
+      const request = createNextRequest('http://localhost:3000/api/cater-valley/wrong', {
+        method: 'POST',
+        body: JSON.stringify({ test: 'data' }),
+      });
+      const context = { params: Promise.resolve({ slug: ['wrong'] }) };
+
+      const response = await POST(request, context);
+      const data = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(data).toHaveProperty('headers');
+      expect(data).toHaveProperty('body');
+      expect(data).toHaveProperty('slug', ['wrong']);
     });
   });
 });
