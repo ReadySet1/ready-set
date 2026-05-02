@@ -7,6 +7,7 @@ import {
   type OrderStatus,
   type CaterValleyUpdateResult,
 } from '@/services/caterValleyService'; // Import from the service file
+import { verifySignature, SIGNATURE_HEADER } from '@/lib/security/hmac';
 
 // Interface for the request body expected by this route handler
 interface UpdateStatusRequestBody {
@@ -14,6 +15,15 @@ interface UpdateStatusRequestBody {
   status: OrderStatus;
   // Add any other internal identifiers if needed, e.g., your internal order ID
   // internalOrderId?: string;
+}
+
+type HmacResult = 'ok' | 'no-secret-configured' | 'missing-signature' | 'mismatch';
+
+function verifyInboundHmac(rawBody: string, providedSig: string | null): HmacResult {
+  const secret = process.env.CATERVALLEY_INBOUND_WEBHOOK_SECRET;
+  if (!secret) return 'no-secret-configured';
+  if (!providedSig) return 'missing-signature';
+  return verifySignature(secret, rawBody, providedSig) ? 'ok' : 'mismatch';
 }
 
 // --- API Route Handler ---
@@ -28,14 +38,51 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    let requestBody: UpdateStatusRequestBody;
+    // Read raw body once so we can both verify the HMAC over the exact bytes
+    // and parse JSON from the same payload. `request.json()` consumes the
+    // stream, so we can't call it after .text().
+    let rawBody: string;
     try {
-        requestBody = await request.json();
+      rawBody = await request.text();
     } catch (e) {
-        console.error("Error parsing JSON body:", e);
-        return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 });
+      console.error('Error reading request body:', e);
+      return NextResponse.json({ message: 'Could not read request body' }, { status: 400 });
     }
 
+    // HMAC verification — additive rollout.
+    // ENFORCE_INBOUND_WEBHOOK_HMAC=true rejects unsigned/mismatched requests
+    // with 401. When false (initial rollout while CaterValley adds signing on
+    // their side), failures are logged but the request still processes.
+    const enforceHmac = process.env.ENFORCE_INBOUND_WEBHOOK_HMAC === 'true';
+    const providedSig = request.headers.get(SIGNATURE_HEADER);
+    const hmacResult = verifyInboundHmac(rawBody, providedSig);
+
+    if (hmacResult !== 'ok' && hmacResult !== 'no-secret-configured') {
+      const detail = {
+        result: hmacResult,
+        enforced: enforceHmac,
+        hasSignatureHeader: providedSig !== null,
+      };
+      if (enforceHmac) {
+        console.warn('[CaterValley] Inbound webhook HMAC failed — rejecting:', detail);
+        return NextResponse.json(
+          { message: 'Invalid or missing webhook signature' },
+          { status: 401 }
+        );
+      }
+      console.warn(
+        '[CaterValley] Inbound webhook HMAC failed — log-only mode (request still processed):',
+        detail
+      );
+    }
+
+    let requestBody: UpdateStatusRequestBody;
+    try {
+      requestBody = JSON.parse(rawBody);
+    } catch (e) {
+      console.error('Error parsing JSON body:', e);
+      return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 });
+    }
 
     // 2. Validate Input
     const { orderNumber, status } = requestBody;
@@ -52,10 +99,6 @@ export async function POST(request: NextRequest) {
             { status: 400 }
         );
     }
-
-    // --- Security Note ---
-    // Add authentication/authorization checks here if this endpoint
-    // needs to be protected. Verify the caller has permission to update this order.
 
 
     // 3. Call the External API via the service function
