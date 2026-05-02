@@ -152,13 +152,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingOrder && !existingOrder.deletedAt) {
-      return NextResponse.json(
-        {
-          status: 'ERROR',
-          message: `Order with code ${validatedData.orderCode} already exists`,
-        },
-        { status: 409 }
-      );
+      return storeAndReturnResponse(idempotency, 409, {
+        status: 'ERROR',
+        message: `Order with code ${validatedData.orderCode} already exists`,
+      });
     }
 
     // 5. Calculate pricing with distance, bridge toll detection, and validation

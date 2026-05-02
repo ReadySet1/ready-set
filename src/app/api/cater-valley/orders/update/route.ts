@@ -196,13 +196,10 @@ export async function POST(request: NextRequest) {
       });
 
       if (duplicateOrder) {
-        return NextResponse.json(
-          {
-            status: 'ERROR',
-            message: `Order with code ${validatedData.orderCode} already exists`,
-          },
-          { status: 409 }
-        );
+        return storeAndReturnResponse(idempotency, 409, {
+          status: 'ERROR',
+          message: `Order with code ${validatedData.orderCode} already exists`,
+        });
       }
     }
 
