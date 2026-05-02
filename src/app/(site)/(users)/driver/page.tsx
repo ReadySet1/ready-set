@@ -191,7 +191,7 @@ const DriverPage = () => {
               <UserIcon className="w-6 h-6 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white" suppressHydrationWarning>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white" suppressHydrationWarning>
                 {isMounted ? `Good ${greeting}, ${driverName}!` : `Hello, ${driverName}!`}
               </h2>
               <p className="text-gray-600 dark:text-gray-400">Ready to make some deliveries today?</p>
