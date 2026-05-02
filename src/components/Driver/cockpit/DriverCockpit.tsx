@@ -64,7 +64,7 @@ export function DriverCockpit({
         <button
           type="button"
           onClick={onBack}
-          className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-white shadow-md
+          className="absolute top-4 left-4 z-20 w-11 h-11 rounded-full bg-white shadow-md
                      flex items-center justify-center active:bg-gray-100"
           aria-label="Back to queue"
         >
@@ -100,7 +100,7 @@ export function DriverCockpit({
           <div className="flex items-center gap-1.5 flex-shrink-0 pt-1">
             <Link
               href={`/driver/deliveries/${encodeURIComponent(delivery.orderNumber)}/details`}
-              className="w-10 h-10 rounded-lg flex flex-col items-center justify-center hover:bg-gray-100 active:bg-gray-200 transition-colors"
+              className="w-11 h-11 rounded-lg flex flex-col items-center justify-center hover:bg-gray-100 active:bg-gray-200 transition-colors"
               aria-label="Order details"
             >
               <ClipboardList className="w-5 h-5 text-gray-600" />
@@ -108,7 +108,7 @@ export function DriverCockpit({
             </Link>
             <Link
               href={`/driver/deliveries/${encodeURIComponent(delivery.orderNumber)}/files`}
-              className="w-10 h-10 rounded-lg flex flex-col items-center justify-center hover:bg-gray-100 active:bg-gray-200 transition-colors"
+              className="w-11 h-11 rounded-lg flex flex-col items-center justify-center hover:bg-gray-100 active:bg-gray-200 transition-colors"
               aria-label="Order files"
             >
               <Paperclip className="w-5 h-5 text-gray-600" />

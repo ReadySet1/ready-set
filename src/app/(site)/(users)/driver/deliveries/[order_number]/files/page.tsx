@@ -112,7 +112,7 @@ const OrderFilesPage = () => {
         <button
           type="button"
           onClick={handleBack}
-          className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100"
+          className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-gray-100"
           aria-label="Back to cockpit"
         >
           <ArrowLeft className="w-5 h-5 text-gray-700" />

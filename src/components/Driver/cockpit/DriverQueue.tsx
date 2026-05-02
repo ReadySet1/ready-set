@@ -157,7 +157,7 @@ export function DriverQueue() {
               type="button"
               onClick={() => fetchDeliveries(true)}
               disabled={isRefreshing}
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100"
+              className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-gray-100"
               aria-label="Refresh deliveries"
             >
               <RefreshCw className={`w-4 h-4 text-gray-600 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -165,7 +165,7 @@ export function DriverQueue() {
             <button
               type="button"
               onClick={handleSignOut}
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100"
+              className="w-11 h-11 rounded-full flex items-center justify-center hover:bg-gray-100"
               aria-label="Sign out"
             >
               <LogOut className="w-4 h-4 text-gray-600" />
