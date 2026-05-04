@@ -414,7 +414,7 @@ const Signin = ({
 
   if (isUserLoading) {
     return (
-      <section className="bg-[#F4F7FF] py-14 dark:bg-dark lg:py-20">
+      <section className="bg-auth-tint py-14 dark:bg-dark lg:py-20">
         <div className="container">
           <div className="flex h-64 items-center justify-center">
             <div className="text-center">
@@ -437,7 +437,7 @@ const Signin = ({
   }
 
   return (
-    <section className="bg-[#F4F7FF] py-14 dark:bg-dark lg:py-20">
+    <section className="bg-auth-tint py-14 dark:bg-dark lg:py-20">
       <div className="container">
         <div className="-mx-4 flex flex-wrap">
           <div className="w-full px-4">
@@ -452,6 +452,7 @@ const Signin = ({
                     alt="logo"
                     width={140}
                     height={30}
+                    style={{ height: "auto" }}
                     className="dark:hidden"
                   />
                   <Image
@@ -459,6 +460,7 @@ const Signin = ({
                     alt="logo"
                     width={140}
                     height={30}
+                    style={{ height: "auto" }}
                     className="hidden dark:block"
                   />
                 </Link>

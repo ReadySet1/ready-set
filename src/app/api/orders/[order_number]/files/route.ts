@@ -102,9 +102,24 @@ export async function GET(
       );
     }
 
-    // Check if user has access to the files
+    // Allow drivers assigned to this order to access files
+    let isAssignedDriver = false;
     if (!hasAccess && user.id !== orderUserId) {
-            return NextResponse.json(
+      const dispatch = await prisma.dispatch.findFirst({
+        where: {
+          driverId: user.id,
+          ...(cateringRequest
+            ? { cateringRequestId: orderId }
+            : { onDemandId: orderId }),
+        },
+        select: { id: true },
+      });
+      isAssignedDriver = !!dispatch;
+    }
+
+    // Check if user has access to the files
+    if (!hasAccess && user.id !== orderUserId && !isAssignedDriver) {
+      return NextResponse.json(
         { error: "You do not have permission to access these files" },
         { status: 403 }
       );

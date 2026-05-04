@@ -307,6 +307,75 @@ export function ClientConfigurationManager({
     setValidation({ valid: true, errors: [] });
   };
 
+  const handleCreateNew = () => {
+    const newConfig: ClientDeliveryConfiguration = {
+      id: `new-config-${Date.now()}`,
+      clientName: 'New Configuration',
+      vendorName: '',
+      description: '',
+      isActive: true,
+      pricingTiers: [
+        { headcountMin: 0, headcountMax: 24, foodCostMin: 0, foodCostMax: 299.99, regularRate: 60, within10Miles: 30 },
+        { headcountMin: 25, headcountMax: 49, foodCostMin: 300, foodCostMax: 599.99, regularRate: 70, within10Miles: 40 },
+        { headcountMin: 50, headcountMax: 74, foodCostMin: 600, foodCostMax: 899.99, regularRate: 90, within10Miles: 60 },
+      ],
+      mileageRate: 3.00,
+      distanceThreshold: 10,
+      dailyDriveDiscounts: {
+        twoDrivers: -5,
+        threeDrivers: -10,
+        fourPlusDrivers: -15,
+      },
+      driverPaySettings: {
+        maxPayPerDrop: 40,
+        basePayPerDrop: 23,
+        bonusPay: 10,
+        readySetFee: 70,
+      },
+      bridgeTollSettings: {
+        defaultTollAmount: 8,
+        autoApplyForAreas: [],
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    setSelectedConfig(null);
+    setEditingConfig(newConfig);
+    setValidation({ valid: true, errors: [] });
+    setSaveSuccess(false);
+    setActiveTab('overview');
+  };
+
+  const handleDelete = async () => {
+    if (!selectedConfig) return;
+
+    try {
+      const response = await fetch(`/api/calculator/configurations?id=${selectedConfig.id}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to delete configuration');
+      }
+
+      setShowDeleteConfirm(false);
+      setSelectedConfig(null);
+
+      // Reload and reset to default
+      await loadConfigurations();
+      setEditingConfig(JSON.parse(JSON.stringify(READY_SET_FOOD_STANDARD)));
+      setSelectedConfig(READY_SET_FOOD_STANDARD);
+    } catch (error) {
+      console.error('Failed to delete configuration:', error);
+      setValidation({
+        valid: false,
+        errors: ['Failed to delete configuration']
+      });
+      setShowDeleteConfirm(false);
+    }
+  };
+
   if (!editingConfig) {
     return <div>Loading...</div>;
   }
@@ -326,6 +395,10 @@ export function ClientConfigurationManager({
         </div>
 
         <div className="flex gap-2">
+          <Button variant="default" size="sm" onClick={handleCreateNew} className="bg-emerald-600 hover:bg-emerald-700">
+            <Plus className="h-4 w-4 mr-2" />
+            Create New
+          </Button>
           <Button variant="outline" size="sm" onClick={handleClone}>
             <Copy className="h-4 w-4 mr-2" />
             Clone
@@ -348,6 +421,33 @@ export function ClientConfigurationManager({
               onChange={handleImport}
             />
           </label>
+          {selectedConfig && (
+            <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete Configuration</DialogTitle>
+                  <DialogDescription>
+                    Are you sure you want to delete &ldquo;{selectedConfig.clientName}&rdquo;? This action will deactivate the configuration.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="destructive" onClick={handleDelete}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 

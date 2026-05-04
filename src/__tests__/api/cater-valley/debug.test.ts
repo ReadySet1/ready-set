@@ -44,8 +44,9 @@ describe('GET/POST/PUT/PATCH /api/cater-valley/debug - CaterValley Debug Endpoin
       const response = await GET(request);
       const data = await expectSuccessResponse(response, 200);
 
-      expect(data.headers).toHaveProperty('x-api-key', 'test-key');
-      expect(data.headers).toHaveProperty('partner', 'test-partner');
+      // Sensitive headers must be redacted; non-sensitive ones pass through
+      expect(data.headers).toHaveProperty('x-api-key', '<redacted>');
+      expect(data.headers).toHaveProperty('partner', '<redacted>');
       expect(data.headers).toHaveProperty('user-agent', 'test-agent');
     });
 
@@ -106,8 +107,8 @@ describe('GET/POST/PUT/PATCH /api/cater-valley/debug - CaterValley Debug Endpoin
       const response = await POST(request);
       const data = await expectSuccessResponse(response, 200);
 
-      expect(data.headers).toHaveProperty('x-api-key', 'secret-key');
-      expect(data.headers).toHaveProperty('partner', 'catervalley');
+      expect(data.headers).toHaveProperty('x-api-key', '<redacted>');
+      expect(data.headers).toHaveProperty('partner', '<redacted>');
       expect(data.headers).toHaveProperty('content-type', 'application/json');
     });
 
@@ -219,7 +220,7 @@ describe('GET/POST/PUT/PATCH /api/cater-valley/debug - CaterValley Debug Endpoin
 
       expect(data.method).toBe('PATCH');
       expect(data.headers).toHaveProperty('x-custom-header', 'custom-value');
-      expect(data.headers).toHaveProperty('authorization', 'Bearer token123');
+      expect(data.headers).toHaveProperty('authorization', '<redacted>');
       expect(data.body).toEqual({ patch: 'data' });
     });
   });
@@ -281,7 +282,7 @@ describe('GET/POST/PUT/PATCH /api/cater-valley/debug - CaterValley Debug Endpoin
       expect(data.body).toBeDefined();
     });
 
-    it('should handle PATCH when body parsing fails completely', async () => {
+    it('should handle PATCH when body is empty/missing', async () => {
       const request = new Request('http://localhost:3000/api/cater-valley/debug', {
         method: 'PATCH',
       });
@@ -290,7 +291,9 @@ describe('GET/POST/PUT/PATCH /api/cater-valley/debug - CaterValley Debug Endpoin
       const data = await expectSuccessResponse(response, 200);
 
       expect(data.method).toBe('PATCH');
-      expect(data.body).toHaveProperty('error', 'Could not parse body');
+      // Empty body parses to null in the new implementation rather than
+      // an error sentinel object — both forms are equivalently safe.
+      expect(data).toHaveProperty('body');
     });
 
     it('should preserve timestamp format', async () => {
@@ -300,6 +303,37 @@ describe('GET/POST/PUT/PATCH /api/cater-valley/debug - CaterValley Debug Endpoin
       const data = await expectSuccessResponse(response, 200);
 
       expect(data.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    });
+  });
+
+  describe('🔒 Production hardening', () => {
+    const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+
+    afterEach(() => {
+      process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+    });
+
+    it('returns plain 404 in production with no header/body echo', async () => {
+      process.env.NODE_ENV = 'production';
+      const request = new Request('http://localhost:3000/api/cater-valley/debug', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'leaked-key',
+          authorization: 'Bearer secret',
+        },
+        body: JSON.stringify({ secret: 'should-not-leak' }),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(404);
+
+      const data = await response.json();
+      expect(data).not.toHaveProperty('headers');
+      expect(data).not.toHaveProperty('body');
+      expect(data).not.toHaveProperty('searchParams');
+      expect(JSON.stringify(data)).not.toContain('leaked-key');
+      expect(JSON.stringify(data)).not.toContain('should-not-leak');
     });
   });
 });

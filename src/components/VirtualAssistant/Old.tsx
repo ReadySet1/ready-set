@@ -182,7 +182,7 @@ const ReadySetVirtualAssistantPage: React.FC = () => {
           </p>
         </div>
         <div className="w-full lg:w-1/2 lg:pl-8">
-          <div className="relative h-[300px] lg:h-[400px]">
+          <div className="relative h-[300px] lg:h-card-h-md">
             <Image
               src={getCloudinaryUrl("virtual/header")}
               alt="ReadySet Virtual Assistant Team"

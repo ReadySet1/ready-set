@@ -498,10 +498,18 @@ export default function DriverTrackingPortal({ className }: DriverTrackingPortal
                 </div>
 
                 <div className="text-sm text-muted-foreground space-y-1">
-                  <p className="flex items-center gap-1">
-                    <MapPinIcon className="w-3 h-3" />
-                    {delivery.deliveryLocation.coordinates[1].toFixed(4)}, {delivery.deliveryLocation.coordinates[0].toFixed(4)}
-                  </p>
+                  {(() => {
+                    const coords = delivery.deliveryLocation?.coordinates;
+                    const lng = coords?.[0];
+                    const lat = coords?.[1];
+                    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+                    return (
+                      <p className="flex items-center gap-1">
+                        <MapPinIcon className="w-3 h-3" />
+                        {lat.toFixed(4)}, {lng.toFixed(4)}
+                      </p>
+                    );
+                  })()}
                   {delivery.estimatedArrival && (
                     <p className="flex items-center gap-1">
                       <ClockIcon className="w-3 h-3" />

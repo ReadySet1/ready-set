@@ -49,7 +49,7 @@ const ScheduleDialog: React.FC<AppointmentDialogProps> = ({
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
-        <div className="relative h-[70vh] min-h-[400px] w-full bg-white dark:bg-gray-900">
+        <div className="relative h-[70vh] min-h-card-h-md w-full bg-white dark:bg-gray-900">
           {!iframeLoaded && !iframeError && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-yellow-400" />

@@ -273,7 +273,7 @@ const ClientOrdersPage = () => {
         <div className="absolute left-0 top-0 -z-[1] h-1/2 w-full bg-[#E9F9FF] dark:bg-dark-700 lg:h-[45%] xl:h-1/2"></div>
         <div className="container px-4">
           {isLoading ? (
-            <div className="flex min-h-[400px] items-center justify-center">
+            <div className="flex min-h-card-h-md items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (

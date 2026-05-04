@@ -49,7 +49,7 @@ const SpecialtyHero: React.FC<SpecialtyHeroProps> = ({ onRequestQuote }) => {
   const circleSizeClass = {
     mobile: "h-[280px] w-[280px]",
     tablet: "h-[380px] w-[380px]",
-    desktop: "h-[500px] w-[500px]",
+    desktop: "h-card-h-lg w-[500px]",
   }[screenSize];
 
   const imageContainerClass = {

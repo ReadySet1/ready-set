@@ -151,6 +151,7 @@ export async function POST(request: Request) {
               currentStatus: (order.status as OrderStatus) ?? null,
               currentDriverStatus: (order.driverStatus as DriverStatusEnum | null) ?? null,
               nextOrderStatus: CateringStatus.ASSIGNED,
+              nextDriverStatus: DriverStatusEnum.ASSIGNED,
             },
             prisma,
           );
@@ -168,6 +169,36 @@ export async function POST(request: Request) {
 
         return { updatedOrder, dispatch };
       });
+
+      // Upsert the Delivery record so the assignedAt timestamp is captured.
+      // Runs outside the transaction (non-critical) — silent failure is acceptable.
+      try {
+        const dbOrderNumber = (result.updatedOrder as any).orderNumber as string;
+        // Resolve Driver model ID from the Profile-based driverId on the dispatch
+        const dispatchDriverProfileId = result.dispatch?.driver?.id as string | undefined;
+        let deliveryDriverId: string | null = null;
+        if (dispatchDriverProfileId) {
+          const driverRecord = await prisma.driver.findFirst({
+            where: { profileId: dispatchDriverProfileId },
+            select: { id: true },
+          });
+          deliveryDriverId = driverRecord?.id ?? null;
+        }
+
+        await prisma.delivery.upsert({
+          where: { orderNumber: dbOrderNumber },
+          update: { assignedAt: new Date() },
+          create: {
+            orderNumber: dbOrderNumber,
+            deliveryAddress: '',
+            driverId: deliveryDriverId,
+            status: 'ASSIGNED',
+            assignedAt: new Date(),
+          },
+        });
+      } catch (deliveryErr) {
+        console.error('Failed to upsert delivery assignedAt:', deliveryErr);
+      }
 
       // Serialize the result before sending the response
       const serializedResult = serializeData(result);

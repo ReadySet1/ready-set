@@ -346,7 +346,7 @@ export default function RouteOptimizer() {
           waypointCoords={waypoints
             .filter((wp) => wp.coords != null)
             .map((wp) => wp.coords as LatLng)}
-          className="h-[400px]"
+          className="h-card-h-md"
         />
 
         {route && (

@@ -10,9 +10,11 @@ import {
   expectErrorResponse,
 } from '@/__tests__/helpers/api-test-helpers';
 
-// Mock dependencies
-jest.mock('@/lib/db/prisma', () => ({
-  prisma: {
+// Mock dependencies. `$transaction` invokes the callback with the same
+// mock client so any `tx.foo.bar()` calls inside the route hit the same
+// jest.fn instances as bare `prisma.foo.bar()` calls.
+jest.mock('@/lib/db/prisma', () => {
+  const mockPrisma: any = {
     profile: {
       upsert: jest.fn(),
     },
@@ -24,8 +26,10 @@ jest.mock('@/lib/db/prisma', () => ({
       findUnique: jest.fn(),
       create: jest.fn(),
     },
-  },
-}));
+  };
+  mockPrisma.$transaction = jest.fn((callback: (tx: any) => unknown) => callback(mockPrisma));
+  return { prisma: mockPrisma };
+});
 
 jest.mock('@/lib/services/pricingService', () => ({
   calculatePickupTime: jest.fn(),
@@ -626,6 +630,110 @@ describe('POST /api/cater-valley/orders/draft - Create Draft Order', () => {
             orderNumber: 'CV-TEST-002', // Not duplicated
           }),
         })
+      );
+    });
+  });
+
+  describe('🔒 Phase 1 hardening', () => {
+    it('rejects bodies above the 1MB limit with 413', async () => {
+      const request = new Request('http://localhost:3000/api/cater-valley/orders/draft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'test-api-key',
+          partner: 'catervalley',
+          'content-length': '2000000',
+        },
+        body: JSON.stringify(validOrderData),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(413);
+      // Auth is checked AFTER body size; both should pass-through cleanly
+      expect(prisma.cateringRequest.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('treats a soft-deleted order as not-conflicting (allows reuse of orderCode)', async () => {
+      (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValueOnce({
+        id: 'old-order-id',
+        deletedAt: new Date('2025-01-01'),
+      });
+
+      const request = new Request('http://localhost:3000/api/cater-valley/orders/draft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'test-api-key',
+          partner: 'catervalley',
+        },
+        body: JSON.stringify(validOrderData),
+      });
+
+      const response = await POST(request);
+      // Soft-deleted match must NOT block — still 201/SUCCESS path.
+      expect(response.status).toBe(201);
+      expect(prisma.cateringRequest.create).toHaveBeenCalled();
+    });
+
+    it('returns 409 when DB unique-violation races our fast-path check', async () => {
+      // Fast-path says no existing order, but the DB raises P2002 at insert
+      // (a concurrent partner request beat us between the find and create).
+      (prisma.cateringRequest.findUnique as jest.Mock).mockResolvedValueOnce(null);
+      const { Prisma } = await import('@prisma/client');
+      const p2002 = new Prisma.PrismaClientKnownRequestError(
+        'Unique constraint failed on the constraint: `cateringRequest_orderNumber_key`',
+        { code: 'P2002', clientVersion: 'test' }
+      );
+      (prisma.cateringRequest.create as jest.Mock).mockRejectedValueOnce(p2002);
+
+      const request = new Request('http://localhost:3000/api/cater-valley/orders/draft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'test-api-key',
+          partner: 'catervalley',
+        },
+        body: JSON.stringify(validOrderData),
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(409);
+      const data = await response.json();
+      expect(data.message).toMatch(/already exists/i);
+    });
+
+    it('replays a cached response on retry with the same Idempotency-Key', async () => {
+      // Reset the in-memory Redis store so the cache is empty.
+      const { _resetRedisClientForTests } = await import('@/lib/redis/client');
+      _resetRedisClientForTests();
+      const { _resetRateLimiterForTests } = await import('@/lib/security/rate-limit');
+      _resetRateLimiterForTests();
+
+      const buildRequest = () =>
+        new Request('http://localhost:3000/api/cater-valley/orders/draft', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': 'test-api-key',
+            partner: 'catervalley',
+            'idempotency-key': 'partner-retry-uuid-1',
+          },
+          body: JSON.stringify({ ...validOrderData, orderCode: 'IDEMPOTENT-001' }),
+        });
+
+      const first = await POST(buildRequest());
+      expect(first.status).toBe(201);
+
+      // Second call with the same key should hit the cache and NOT touch
+      // the DB again.
+      const createCallCountAfterFirst = (prisma.cateringRequest.create as jest.Mock).mock.calls.length;
+      const second = await POST(buildRequest());
+
+      expect(second.status).toBe(201);
+      expect(second.headers.get('x-idempotent-replay')).toBe('true');
+      // Verify we did NOT issue another DB create for the replay.
+      expect((prisma.cateringRequest.create as jest.Mock).mock.calls.length).toBe(
+        createCallCountAfterFirst
       );
     });
   });

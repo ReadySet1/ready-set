@@ -83,7 +83,7 @@ export function AddressSectionList({
 
   if (sections.length === 0) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center">
+      <div className="flex min-h-card-h-sm items-center justify-center">
         {emptyState || (
           <div className="text-center">
             <p className="text-sm text-muted-foreground">No addresses available</p>
@@ -231,7 +231,7 @@ export function AddressEmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-[300px] flex-col items-center justify-center space-y-4 text-center">
+    <div className="flex min-h-card-h flex-col items-center justify-center space-y-4 text-center">
       {Icon && <Icon className="h-12 w-12 text-muted-foreground/50" />}
       <div className="space-y-2">
         <h3 className="text-lg font-semibold">{title}</h3>

@@ -1,6 +1,11 @@
 /**
  * CaterValley Integration Status Endpoint
- * Provides information about the integration status and available endpoints
+ * Provides information about the integration status and available endpoints.
+ *
+ * The public response intentionally does NOT advertise environment
+ * configuration (whether API keys or webhook URLs are set) — that signal
+ * helped attackers fingerprint a deployment. Operators who need that
+ * detail should query application logs or Sentry instead.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -8,27 +13,23 @@ import { prisma } from '@/lib/db/prisma';
 
 export async function GET(request: NextRequest) {
   try {
-    // Check database connectivity
+    // Check database connectivity. Soft-deleted orders are excluded so the
+    // public count reflects active CaterValley traffic.
     let dbStatus = 'connected';
     let orderCount = 0;
     try {
       orderCount = await prisma.cateringRequest.count({
         where: {
           orderNumber: {
-            startsWith: 'CV-'
-          }
-        }
+            startsWith: 'CV-',
+          },
+          deletedAt: null,
+        },
       });
     } catch (error) {
       dbStatus = 'error';
       console.error('Database connectivity check failed:', error);
     }
-
-    // Check environment configuration
-    const envStatus = {
-      apiKeyConfigured: !!process.env.CATERVALLEY_API_KEY,
-      webhookUrlConfigured: !!process.env.CATERVALLEY_WEBHOOK_URL,
-    };
 
     const status = {
       service: 'Ready Set CaterValley Integration',
@@ -39,31 +40,29 @@ export async function GET(request: NextRequest) {
         status: dbStatus,
         caterValleyOrderCount: orderCount,
       },
-      environment: envStatus,
       endpoints: {
         draft: {
           method: 'POST',
           path: '/api/cater-valley/orders/draft',
           description: 'Create a new draft order with pricing calculation',
-          authentication: 'Required: partner: catervalley, x-api-key',
+          authentication: 'Required: partner + x-api-key headers',
         },
         update: {
           method: 'POST',
           path: '/api/cater-valley/orders/update',
           description: 'Update an existing draft order and recalculate pricing',
-          authentication: 'Required: partner: catervalley, x-api-key',
+          authentication: 'Required: partner + x-api-key headers',
         },
         confirm: {
           method: 'POST',
           path: '/api/cater-valley/orders/confirm',
           description: 'Confirm or cancel an order',
-          authentication: 'Required: partner: catervalley, x-api-key',
+          authentication: 'Required: partner + x-api-key headers',
         },
         webhook: {
           method: 'POST',
-          url: process.env.CATERVALLEY_WEBHOOK_URL || 'https://api.catervalley.com/api/operation/order/update-order-status',
-          description: 'Ready Set sends status updates to CaterValley',
-          authentication: 'Required: partner: ready-set',
+          description:
+            'Ready Set sends status updates to CaterValley (HMAC-signed when configured)',
         },
       },
       statusMapping: {

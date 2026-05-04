@@ -22,6 +22,10 @@ interface CookieConsentBannerProps {
 const CookieConsentBanner = ({ metricoolHash, gaMeasurementId }: CookieConsentBannerProps) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
+  // consentLoaded gates analytics script mount: we never render GA/Metricool
+  // until we've read the persisted consent. Otherwise their <Script> tags would
+  // boot on first paint, set cookies, and fire pageviews before the user can decide.
+  const [consentLoaded, setConsentLoaded] = useState(false);
   const [consentGiven, setConsentGiven] = useState<CookiePreferences>({
     necessary: true,
     analytics: false,
@@ -30,22 +34,35 @@ const CookieConsentBanner = ({ metricoolHash, gaMeasurementId }: CookieConsentBa
   });
 
   useEffect(() => {
+    // Pre-empt GA: even if its script somehow loads, this flag prevents it from
+    // sending hits or setting cookies until consent is confirmed.
+    if (typeof window !== 'undefined' && gaMeasurementId) {
+      (window as Record<string, unknown>)[`ga-disable-${gaMeasurementId}`] = true;
+    }
+
     const consentStatus = localStorage.getItem('cookieConsentStatus');
     if (!consentStatus) {
       setIsVisible(true);
-    } else {
-      try {
-        const savedPreferences = JSON.parse(localStorage.getItem('cookiePreferences') || '{}');
-        setConsentGiven(savedPreferences);
-        
-        if (window && gaMeasurementId) {
-          window[`ga-disable-${gaMeasurementId}`] = !(savedPreferences.analytics || savedPreferences.marketing);
-        }
-      } catch (error) {
-        console.error('Error parsing cookie preferences:', error);
+      setConsentLoaded(true);
+      return;
+    }
+
+    try {
+      const savedPreferences = JSON.parse(localStorage.getItem('cookiePreferences') || '{}');
+      setConsentGiven(savedPreferences);
+
+      if (window && gaMeasurementId) {
+        window[`ga-disable-${gaMeasurementId}`] = !(savedPreferences.analytics || savedPreferences.marketing);
       }
+    } catch (error) {
+      console.error('Error parsing cookie preferences:', error);
+    } finally {
+      setConsentLoaded(true);
     }
   }, [gaMeasurementId]);
+
+  const analyticsAllowed = consentGiven.analytics || consentGiven.marketing;
+  const canMountAnalytics = consentLoaded && analyticsAllowed;
 
   const handleAcceptAll = () => {
     const preferences: CookiePreferences = {
@@ -129,50 +146,55 @@ const CookieConsentBanner = ({ metricoolHash, gaMeasurementId }: CookieConsentBa
 
   return (
     <>
-      {metricoolHash && <MetricoolScript trackingHash={metricoolHash} />}
-      {gaMeasurementId && <GoogleAnalytics gaId={gaMeasurementId} />}
+      {canMountAnalytics && metricoolHash && <MetricoolScript trackingHash={metricoolHash} />}
+      {canMountAnalytics && gaMeasurementId && <GoogleAnalytics gaId={gaMeasurementId} />}
 
       {isVisible && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg p-4 md:p-6 z-50">
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-gray-200 shadow-lg p-3 md:p-4 z-50">
           <div className="max-w-7xl mx-auto relative">
-            <button 
+            <button
               onClick={handleClose}
-              className="absolute -top-2 right-2 md:right-0 text-gray-500 hover:text-gray-700 p-2" 
+              className="absolute -top-1 right-2 md:right-0 text-gray-500 hover:text-gray-700 p-2"
               aria-label="Close banner"
             >
               <X size={20} />
             </button>
-            <div className="flex flex-col gap-4">
-              <div className="pr-8">
-                <p className="text-sm md:text-base text-gray-600">
-                  We use cookies to enhance your experience, serve personalized ads or content, and analyze traffic. 
-                  Under the California Consumer Privacy Act (CCPA) and other U.S. privacy laws, you have the right to manage your cookie preferences. 
-                  By clicking &quot;Accept All,&quot; you consent to our use of cookies. To learn more, read our{' '}
-                  <Link href="https://support.google.com/analytics/answer/6004245?hl=en" className="text-blue-600 hover:text-blue-800 underline">
-                    Cookie Policy
-                  </Link>{' '}
-                  and{' '}
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="pr-8 md:flex-1">
+                <p className="text-sm text-gray-600">
+                  We use cookies to improve your experience and analyze traffic.
+                  See our{' '}
                   <Link href="/privacy-policy" className="text-blue-600 hover:text-blue-800 underline">
                     Privacy Policy
                   </Link>
+                  .
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:flex-shrink-0">
                 <button
+                  type="button"
                   onClick={handleAcceptAll}
-                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-md text-sm font-medium transition-colors"
+                  aria-label="Accept all cookies"
+                  data-testid="cookie-accept-all"
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
                 >
                   Accept All
                 </button>
                 <button
+                  type="button"
                   onClick={handlePreferences}
-                  className="w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white px-6 py-2.5 rounded-md text-sm font-medium transition-colors"
+                  aria-label="Manage cookie preferences"
+                  data-testid="cookie-manage-preferences"
+                  className="w-full sm:w-auto border border-gray-300 hover:bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-medium transition-colors"
                 >
-                  Manage Preferences
+                  Manage
                 </button>
                 <button
+                  type="button"
                   onClick={handleRejectAll}
-                  className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white px-6 py-2.5 rounded-md text-sm font-medium transition-colors"
+                  aria-label="Reject all cookies"
+                  data-testid="cookie-reject-all"
+                  className="w-full sm:w-auto border border-gray-300 hover:bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-medium transition-colors"
                 >
                   Reject All
                 </button>

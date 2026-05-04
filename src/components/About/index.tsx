@@ -5,7 +5,7 @@ const About = () => {
   return (
     <section
       id="about"
-      className="bg-gray-1 pb-8 pt-20 dark:bg-dark-2 lg:pb-[70px] lg:pt-[120px]"
+      className="bg-gray-1 pb-8 pt-20 dark:bg-dark-2 lg:pb-[70px] lg:pt-page-y"
     >
       <div className="container">
         <div className="wow fadeInUp" data-wow-delay=".2s">
@@ -30,7 +30,7 @@ const About = () => {
             </div>
 
             <div className="w-full px-4 lg:w-1/2">
-              <div className="relative h-[500px] w-full">
+              <div className="relative h-card-h-lg w-full">
                 <Image
                   src={getCloudinaryUrl("about/hexagon-image")}
                   alt="about image"

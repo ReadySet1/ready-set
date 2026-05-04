@@ -44,18 +44,23 @@ const DeliveryOptionCard: React.FC<DeliveryOptionCardProps> = ({
         {title}
       </h3>
 
-      <div className="relative mx-4 mb-4 overflow-hidden rounded-lg">
+      {/* Image with skeleton placeholder while loading (closes FINDING-039
+          for /logistics service cards). Aspect ratio reserved so the
+          surrounding layout doesn't shift when the image arrives. */}
+      <div
+        className="relative mx-4 mb-4 overflow-hidden rounded-lg bg-gray-100 animate-pulse"
+        style={{ aspectRatio: "5/3" }}
+      >
         <Image
           src={imageSrc}
           alt={imageAlt}
-          width={500}
-          height={300}
-          className="h-auto w-full rounded-lg object-cover"
-          style={{
-            aspectRatio: "5/3",
-            objectFit: "cover",
+          fill
+          sizes="(max-width: 768px) 100vw, 50vw"
+          className="rounded-lg object-cover"
+          onLoadingComplete={(img) => {
+            // Remove the pulse skeleton once the image is in.
+            img.parentElement?.classList.remove("animate-pulse", "bg-gray-100");
           }}
-          priority={false}
         />
       </div>
 
@@ -63,6 +68,7 @@ const DeliveryOptionCard: React.FC<DeliveryOptionCardProps> = ({
         <p className="mb-6 text-base text-gray-600">{description}</p>
 
         <div className="flex items-center justify-center space-x-4">
+          {/* Primary CTA: filled brand-yellow. */}
           <button
             type="button"
             className="rounded-lg bg-yellow-400 px-6 py-3 font-bold text-gray-800 transition duration-300 ease-in-out hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50"
@@ -71,9 +77,11 @@ const DeliveryOptionCard: React.FC<DeliveryOptionCardProps> = ({
             Get a Quote
           </button>
 
+          {/* Secondary CTA: ghost / outline so it visually demotes against
+              the primary. Closes FINDING-020. */}
           <button
             type="button"
-            className="rounded-lg bg-yellow-300 px-6 py-3 font-bold text-gray-800 transition duration-300 ease-in-out hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50"
+            className="rounded-lg border-2 border-yellow-400 bg-transparent px-6 py-3 font-bold text-gray-800 transition duration-300 ease-in-out hover:bg-yellow-50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-50"
             onClick={handleLearnMoreClick}
           >
             Learn More

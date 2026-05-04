@@ -79,7 +79,7 @@ export function DriverStatsCard({
             <CardTitle className="text-lg font-medium">
               Performance Stats
               {isFetching && !isLoading && (
-                <span className="ml-2 inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                <span className="ml-2 inline-block h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
               )}
             </CardTitle>
             {!compact && (
@@ -110,14 +110,14 @@ export function DriverStatsCard({
             {/* Delivery Stats */}
             <div className="grid grid-cols-2 gap-4">
               <StatItem
-                icon={<Package className="h-5 w-5 text-blue-500" />}
+                icon={<Package className="h-5 w-5 text-amber-500" />}
                 label="Deliveries"
                 value={stats.deliveryStats.total}
                 subValue={`${stats.deliveryStats.completed} completed`}
                 compact={compact}
               />
               <StatItem
-                icon={<Truck className="h-5 w-5 text-green-500" />}
+                icon={<Truck className="h-5 w-5 text-amber-600" />}
                 label="In Progress"
                 value={stats.deliveryStats.inProgress}
                 compact={compact}
@@ -127,14 +127,14 @@ export function DriverStatsCard({
             {/* Distance Stats */}
             <div className="grid grid-cols-2 gap-4">
               <StatItem
-                icon={<MapPin className="h-5 w-5 text-purple-500" />}
+                icon={<MapPin className="h-5 w-5 text-amber-500" />}
                 label="Miles Driven"
                 value={stats.distanceStats.totalMiles}
                 subValue={`${stats.distanceStats.averageMilesPerDelivery} avg/delivery`}
                 compact={compact}
               />
               <StatItem
-                icon={<Clock className="h-5 w-5 text-orange-500" />}
+                icon={<Clock className="h-5 w-5 text-gray-800 dark:text-gray-300" />}
                 label="Hours Worked"
                 value={stats.shiftStats.totalHoursWorked}
                 subValue={`${stats.shiftStats.totalShifts} shifts`}
@@ -144,11 +144,11 @@ export function DriverStatsCard({
 
             {/* Current Shift (if active) */}
             {stats.currentShift && (
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 border border-blue-200 dark:border-blue-800">
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-950 p-3 border border-amber-200 dark:border-amber-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-2" />
-                    <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                    <Activity className="h-4 w-4 text-amber-600 dark:text-amber-400 mr-2" />
+                    <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
                       Active Shift
                     </span>
                   </div>
@@ -159,10 +159,10 @@ export function DriverStatsCard({
                   )}
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                  <div className="text-blue-700 dark:text-blue-300">
+                  <div className="text-amber-700 dark:text-amber-300">
                     <span className="font-medium">{stats.currentShift.currentDeliveries}</span> deliveries
                   </div>
-                  <div className="text-blue-700 dark:text-blue-300">
+                  <div className="text-amber-700 dark:text-amber-300">
                     <span className="font-medium">{stats.currentShift.currentMiles}</span> miles
                   </div>
                 </div>

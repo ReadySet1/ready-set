@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Clock, Truck, Shield } from "lucide-react";
 import ServiceFeaturesSection from "@/components/ui/ServiceFeaturesSection";
-import ScrollToSection from "@/components/Common/ScrollToSection";
 import ScheduleDialog from "./Schedule";
+import { FormManager } from "@/components/Logistics/QuoteRequest/Quotes/FormManager";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const LogisticsPage: React.FC = () => {
-  const [shouldScroll, setShouldScroll] = useState(false);
+  const { openForm, DialogForm } = FormManager();
 
   // Logistics-specific features
   const logisticsFeatures = [
@@ -32,10 +32,11 @@ const LogisticsPage: React.FC = () => {
     },
   ];
 
-  // Handle button clicks - restored original functionality
+  // Open the Catering / Food quote modal directly (most common service).
+  // Previously scrolled to the food-services anchor, which left users with
+  // an extra step ("now pick a service"). Modal-first matches the CTA copy.
   const handleGetQuote = () => {
-    // Scroll to the "Our Services" section
-    setShouldScroll(true);
+    openForm("food");
   };
 
   return (
@@ -57,7 +58,7 @@ const LogisticsPage: React.FC = () => {
         }
         variant="logistics"
       />
-      {shouldScroll && <ScrollToSection targetId="food-services" />}
+      {DialogForm}
     </>
   );
 };
