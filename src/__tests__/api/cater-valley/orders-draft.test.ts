@@ -44,6 +44,37 @@ jest.mock('@/lib/utils/timezone', () => ({
   localTimeToUtc: jest.fn((date: string, time: string) => `${date}T${time}:00Z`),
 }));
 
+// Mock the partner registry so the route's async auth path can run
+// without a real database round-trip. Returns a CaterValley row when
+// the test sends partner=catervalley + x-api-key=test-api-key.
+jest.mock('@/lib/services/partner-registry', () => ({
+  authenticatePartner: jest.fn(async (req: Request) => {
+    const slug = req.headers.get('partner');
+    const apiKey = req.headers.get('x-api-key');
+    if (!slug) return { ok: false, reason: 'missing_partner_header' };
+    if (!apiKey) return { ok: false, reason: 'missing_api_key' };
+    if (slug === 'catervalley' && apiKey === 'test-api-key') {
+      return {
+        ok: true,
+        partner: {
+          id: 'partner-cv-id',
+          slug: 'catervalley',
+          displayName: 'CaterValley',
+          orderPrefix: 'CV-',
+          webhookUrl: null,
+          webhookSecret: null,
+          rateLimitPerMin: 100,
+          isActive: true,
+        },
+      };
+    }
+    return { ok: false, reason: 'invalid_key' };
+  }),
+  getPartnerBySlug: jest.fn(),
+  computeApiKeyHash: jest.fn((k: string) => `hash:${k}`),
+  _resetPartnerCacheForTests: jest.fn(),
+}));
+
 describe('POST /api/cater-valley/orders/draft - Create Draft Order', () => {
   const validOrderData = {
     orderCode: 'TEST-001',

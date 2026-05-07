@@ -31,6 +31,34 @@ jest.mock('@/lib/utils/timezone', () => ({
   localTimeToUtc: jest.fn((date: string, time: string) => `${date}T${time}:00Z`),
 }));
 
+jest.mock('@/lib/services/partner-registry', () => ({
+  authenticatePartner: jest.fn(async (req: Request) => {
+    const slug = req.headers.get('partner');
+    const apiKey = req.headers.get('x-api-key');
+    if (!slug) return { ok: false, reason: 'missing_partner_header' };
+    if (!apiKey) return { ok: false, reason: 'missing_api_key' };
+    if (slug === 'catervalley' && apiKey === 'test-api-key') {
+      return {
+        ok: true,
+        partner: {
+          id: 'partner-cv-id',
+          slug: 'catervalley',
+          displayName: 'CaterValley',
+          orderPrefix: 'CV-',
+          webhookUrl: null,
+          webhookSecret: null,
+          rateLimitPerMin: 100,
+          isActive: true,
+        },
+      };
+    }
+    return { ok: false, reason: 'invalid_key' };
+  }),
+  getPartnerBySlug: jest.fn(),
+  computeApiKeyHash: jest.fn((k: string) => `hash:${k}`),
+  _resetPartnerCacheForTests: jest.fn(),
+}));
+
 describe('POST /api/cater-valley/orders/update - Update Order', () => {
   const validUpdateData = {
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -233,7 +261,7 @@ describe('POST /api/cater-valley/orders/update - Update Order', () => {
       });
 
       const response = await POST(request);
-      await expectErrorResponse(response, 403, /cannot be updated via CaterValley API/i);
+      await expectErrorResponse(response, 403, /cannot be updated via the partner API/i);
     });
 
     it('should reject orders in non-updatable status', async () => {

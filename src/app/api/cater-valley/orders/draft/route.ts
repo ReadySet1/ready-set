@@ -1,6 +1,16 @@
 /**
- * CaterValley Orders Draft API Endpoint
- * Receives order data from CaterValley and creates a draft order
+ * Partner Order API — Draft endpoint.
+ *
+ * Receives a candidate order from a partner platform, calculates a
+ * delivery quote, persists the draft, and returns the order id +
+ * pricing. Partner identity is resolved from the `partner` +
+ * `x-api-key` headers via the api_partners registry; the `partner`
+ * row's order prefix and display name drive how the order is stored.
+ *
+ * Available at both `/api/cater-valley/orders/draft` (legacy URL kept
+ * for CaterValley) and `/api/partners/orders/draft` (canonical URL
+ * advertised in the partner contract). The two are wired to the same
+ * handler — see src/app/api/partners/orders/draft/route.ts.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,16 +26,17 @@ import {
   storeAndReturnResponse,
 } from '@/lib/security/idempotency';
 import {
-  validateCaterValleyAuth,
+  authenticatePartnerRequest,
   ensureAddress,
-  extractZipFromAddress,
-  normalizeOrderNumber,
-  ensureCaterValleySystemUser,
+  buildOrderNumber,
+  buildOrderGuid,
+  ensurePartnerSystemUser,
   calculateCaterValleyPricing,
   type PricingCalculationResult,
 } from '@/app/api/cater-valley/_lib';
 
-// Validation schema for CaterValley draft order request
+// Validation schema — same shape across all partners. The contract is
+// fixed by the API spec; partner identity comes from headers, not body.
 const DraftOrderSchema = z.object({
   orderCode: z.string().min(1, 'Order code is required'),
   deliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
@@ -66,10 +77,10 @@ interface DraftOrderResponse {
   message?: string;
   breakdown?: {
     basePrice: number;
-    mileageFee?: number;         // Dollar amount for mileage over 10 miles
-    dailyDriveDiscount?: number; // Dollar amount discount for multiple daily drives
-    bridgeToll?: number;         // Dollar amount for bridge toll
-    peakTimeMultiplier?: number; // Reserved for future use
+    mileageFee?: number;
+    dailyDriveDiscount?: number;
+    bridgeToll?: number;
+    peakTimeMultiplier?: number;
   };
 }
 
@@ -79,25 +90,18 @@ export async function POST(request: NextRequest) {
     const sizeReject = enforceBodySizeLimit(request);
     if (sizeReject) return sizeReject;
 
-    // 1. Authentication
-    if (!validateCaterValleyAuth(request)) {
-      return NextResponse.json(
-        {
-          status: 'ERROR',
-          message: 'Unauthorized - Invalid API key or partner header'
-        },
-        { status: 401 }
-      );
-    }
+    // 1. Authentication — resolve partner from headers via registry.
+    const auth = await authenticatePartnerRequest(request);
+    if (!auth.ok) return auth.response;
+    const { partner } = auth;
 
     // 1a. Per-partner rate limit (after auth so we can attribute the count
     //     to a specific partner).
-    const rateLimitReject = await enforceRateLimit('catervalley', 'orders.draft');
+    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.draft');
     if (rateLimitReject) return rateLimitReject;
 
-    // 1b. Idempotency-Key replay. If the partner provides the header and
-    //     we've already responded to this key, return the cached response.
-    const idempotency = readIdempotencyContext(request, 'catervalley');
+    // 1b. Idempotency-Key replay — namespaced by partner slug.
+    const idempotency = readIdempotencyContext(request, partner.slug);
     const replay = await replayCachedResponse(idempotency);
     if (replay) return replay;
 
@@ -107,9 +111,9 @@ export async function POST(request: NextRequest) {
       requestBody = await request.json();
     } catch (error) {
       return NextResponse.json(
-        { 
+        {
           status: 'ERROR',
-          message: 'Invalid JSON in request body' 
+          message: 'Invalid JSON in request body',
         },
         { status: 400 }
       );
@@ -134,7 +138,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           status: 'ERROR',
-          message: 'Delivery time is not available - must be at least 2 hours in advance and within business hours (7 AM - 10 PM)',
+          message:
+            'Delivery time is not available - must be at least 2 hours in advance and within business hours (7 AM - 10 PM)',
         },
         { status: 422 }
       );
@@ -145,7 +150,7 @@ export async function POST(request: NextRequest) {
     //    nicety — the authoritative duplicate check is the unique
     //    constraint enforced by the DB at create time (step 7), which
     //    closes the read-then-write race window.
-    const normalizedOrderNumber = normalizeOrderNumber(validatedData.orderCode);
+    const normalizedOrderNumber = buildOrderNumber(validatedData.orderCode, partner.orderPrefix);
     const existingOrder = await prisma.cateringRequest.findUnique({
       where: { orderNumber: normalizedOrderNumber },
       select: { id: true, deletedAt: true },
@@ -173,14 +178,13 @@ export async function POST(request: NextRequest) {
         dropOffLocation: validatedData.dropOffLocation,
         totalItem: validatedData.totalItem,
         priceTotal: validatedData.priceTotal,
-        feature: 'catervalley_webhook_draft'
+        feature: `${partner.slug}_webhook_draft`,
       });
 
       distance = result.distance;
       usedFallbackDistance = result.usedFallbackDistance;
       pricingResult = result.pricingResult;
     } catch (error) {
-      // Pricing calculation error (e.g., zero delivery fee)
       return NextResponse.json(
         {
           status: 'ERROR',
@@ -196,14 +200,16 @@ export async function POST(request: NextRequest) {
     //    back the whole thing — no orphaned addresses or half-created
     //    orders.
     const { localTimeToUtc } = await import('@/lib/utils/timezone');
-    const deliveryDateTime = new Date(localTimeToUtc(validatedData.deliveryDate, validatedData.deliveryTime));
+    const deliveryDateTime = new Date(
+      localTimeToUtc(validatedData.deliveryDate, validatedData.deliveryTime)
+    );
     const pickupTime = calculatePickupTime(validatedData.deliveryDate, validatedData.deliveryTime);
 
     let draftOrder;
     try {
       draftOrder = await prisma.$transaction(async (tx) => {
         const [systemUser, pickupAddressRecord, deliveryAddressRecord] = await Promise.all([
-          ensureCaterValleySystemUser(tx),
+          ensurePartnerSystemUser(partner, tx),
           ensureAddress(validatedData.pickupLocation, tx),
           ensureAddress(validatedData.dropOffLocation, tx),
         ]);
@@ -220,14 +226,14 @@ export async function POST(request: NextRequest) {
             pickupDateTime: new Date(pickupTime),
             arrivalDateTime: deliveryDateTime,
             clientAttention: validatedData.dropOffLocation.recipient.name,
-            pickupNotes: `CaterValley Order - Pickup from: ${validatedData.pickupLocation.name}`,
+            pickupNotes: `${partner.displayName} Order - Pickup from: ${validatedData.pickupLocation.name}`,
             specialNotes: usedFallbackDistance
               ? `${validatedData.dropOffLocation.instructions || ''}\n[FALLBACK DISTANCE: ${distance}mi - Manual review needed]`.trim()
               : validatedData.dropOffLocation.instructions || '',
-            brokerage: 'CaterValley',
+            brokerage: partner.displayName,
             deliveryCost: pricingResult.deliveryFee,
             deliveryDistance: distance,
-            guid: `cv-${validatedData.orderCode}-${Date.now()}`,
+            guid: buildOrderGuid(validatedData.orderCode, partner),
           },
           include: {
             pickupAddress: true,
@@ -241,10 +247,7 @@ export async function POST(request: NextRequest) {
       // between our fast-path check and this insert, Prisma raises
       // P2002 (unique constraint). Convert to a deterministic 409 instead
       // of a 500.
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         return storeAndReturnResponse(idempotency, 409, {
           status: 'ERROR',
           message: `Order with code ${validatedData.orderCode} already exists`,
@@ -268,13 +271,10 @@ export async function POST(request: NextRequest) {
       },
     };
 
-
     return storeAndReturnResponse(idempotency, 201, response);
-
   } catch (error) {
-    console.error('Error creating CaterValley draft order:', error);
+    console.error('Error creating partner draft order:', error);
 
-    // Handle specific database errors
     if (error instanceof Error) {
       if (error.message.includes('Unique constraint')) {
         return NextResponse.json(
@@ -295,4 +295,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

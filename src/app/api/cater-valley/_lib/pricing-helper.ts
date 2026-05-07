@@ -20,7 +20,9 @@ export interface PricingCalculationInput {
   dropOffLocation: LocationData;
   totalItem: number;
   priceTotal: number;
-  feature: 'catervalley_webhook_draft' | 'catervalley_webhook_update';
+  // Free-form Sentry tag identifying which partner + endpoint triggered
+  // the calculation, e.g. `catervalley_webhook_draft`, `catercow_webhook_update`.
+  feature: string;
 }
 
 export interface PricingCalculationResult {
