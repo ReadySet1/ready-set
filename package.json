@@ -71,7 +71,9 @@
     "calculator:data": "tsx scripts/migrate-calculator-data.ts",
     "calculator:data:force": "tsx scripts/migrate-calculator-data.ts --force",
     "calculator:test": "tsx scripts/migrate-calculator-data.ts --test",
-    "calculator:setup": "pnpm calculator:migrate && pnpm db:generate && pnpm calculator:data && pnpm calculator:test"
+    "calculator:setup": "pnpm calculator:migrate && pnpm db:generate && pnpm calculator:data && pnpm calculator:test",
+    "seed:partner:catervalley": "tsx scripts/seed-catervalley-partner.ts",
+    "seed:partner:catercow": "tsx scripts/seed-catercow-partner.ts"
   },
   "trustedDependencies": [
     "@testing-library/react",

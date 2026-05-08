@@ -1,0 +1,87 @@
+meta {
+  name: 1. Create Draft Order
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{PARTNERS_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{CATERCOW_PARTNER}}
+  x-api-key: {{CATERCOW_API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "CC-{{$timestamp}}",
+    "deliveryDate": "2026-06-15",
+    "deliveryTime": "11:30",
+    "totalItem": 30,
+    "priceTotal": 850.00,
+    "pickupLocation": {
+      "name": "Tasty Catering Co.",
+      "address": "123 Main St",
+      "city": "San Francisco",
+      "state": "CA",
+      "zip": "94102",
+      "phone": "415-555-0100"
+    },
+    "dropOffLocation": {
+      "name": "Acme Corp HQ",
+      "address": "500 Market St",
+      "city": "San Francisco",
+      "state": "CA",
+      "zip": "94105",
+      "instructions": "Loading dock, ring bell #3",
+      "recipient": {
+        "name": "Jane Smith",
+        "phone": "4155550200"
+      }
+    }
+  }
+}
+
+docs {
+  # CaterCow — Create Draft Order
+
+  Submits a candidate order and receives a delivery quote. No commitment yet.
+
+  ## Expected Response
+  - Status: 201
+  - Body: `{ status: "SUCCESS", id: "<uuid>", deliveryPrice: <number>, ... }`
+
+  Captures `id` into the `cc_orderId` variable for use by the Update / Confirm requests.
+}
+
+tests {
+  test("Order created successfully (201)", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Response has SUCCESS status", function() {
+    expect(res.getBody().status).to.equal("SUCCESS");
+  });
+
+  test("Order ID is returned", function() {
+    const body = res.getBody();
+    expect(body.id).to.be.a('string');
+    expect(body.id).to.have.lengthOf.above(0);
+  });
+
+  test("Delivery price is calculated", function() {
+    const body = res.getBody();
+    expect(body.deliveryPrice).to.be.a('number');
+    expect(body.deliveryPrice).to.be.above(0);
+  });
+}
+
+script:post-response {
+  if (res.getStatus() === 201 && res.getBody().id) {
+    bru.setVar("cc_orderId", res.getBody().id);
+  }
+}

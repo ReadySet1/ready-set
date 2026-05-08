@@ -1014,3 +1014,31 @@ model DriverWeeklySummary {
   @@schema("public")
   @@map("driver_weekly_summaries")
 }
+
+/// Registry of partner platforms authorized to submit catering orders via the
+/// partner order API (e.g. CaterValley, CaterCow). Each row carries the inbound
+/// API key hash, outbound webhook config, and the labels (display name + order
+/// number prefix) used when persisting orders submitted by this partner.
+model ApiPartner {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug            String    @unique
+  displayName     String    @map("display_name")
+  orderPrefix     String    @map("order_prefix")
+  apiKeyHash      String    @map("api_key_hash")
+  apiKeyLastFour  String    @map("api_key_last_four") @db.VarChar(4)
+  webhookUrl      String?   @map("webhook_url")
+  webhookSecret   String?   @map("webhook_secret")
+  rateLimitPerMin Int       @default(100) @map("rate_limit_per_min")
+  isActive        Boolean   @default(true) @map("is_active")
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy       String?   @map("deleted_by") @db.Uuid
+
+  @@index([apiKeyHash])
+  @@index([slug, deletedAt])
+  @@index([deletedAt])
+  @@schema("public")
+  @@map("api_partners")
+}
