@@ -1,0 +1,275 @@
+{
+  "title": "Ready Set — Tasks Board",
+  "subtitle": "Action items from the Dev Team Meetings on May 4, 2026 and May 11, 2026 — status as of May 11.",
+  "generated": "2026-05-11",
+  "sources": [
+    "meetings/shared/2026-05-04-dev-team-meeting.md",
+    "meetings/shared/2026-05-11-dev-team-meeting.md",
+    "meetings/shared/2026-05-11-may4-action-item-review.md",
+    "meetings/shared/2026-05-11-weekly-recap.md"
+  ],
+  "columns": [
+    {
+      "key": "done",
+      "title": "✓ Done"
+    },
+    {
+      "key": "progress",
+      "title": "◐ In Progress / Blocked"
+    },
+    {
+      "key": "open",
+      "title": "○ Open (Carried Over)"
+    },
+    {
+      "key": "new",
+      "title": "★ New — May 11"
+    }
+  ],
+  "owners": {
+    "emmanuel": "Emmanuel",
+    "gary": "Gary",
+    "fernando": "Fernando"
+  },
+  "sourceLabels": {
+    "may4": "May 4",
+    "may11": "May 11",
+    "qa": "QA"
+  },
+  "tasks": [
+    {
+      "id": "report-twilio-costs",
+      "status": "done",
+      "title": "Report Twilio costs (5-line analysis)",
+      "owner": "fernando",
+      "source": "may4",
+      "sourceRef": "#9",
+      "description": "5-line analysis delivered; fed into the larger counter-proposal."
+    },
+    {
+      "id": "research-twilio-alternatives",
+      "status": "done",
+      "title": "Research alternative API providers vs Twilio",
+      "owner": "emmanuel",
+      "source": "may4",
+      "sourceRef": "#10",
+      "description": "Telnyx counter-proposal delivered — projected savings $780–$840/yr vs Twilio. SignalWire flagged as fallback. Report at <code>docs/ready-set/reports/2026-05-07-twilio-alternatives-analysis.md</code>."
+    },
+    {
+      "id": "recruit-tester",
+      "status": "done",
+      "title": "Recruit tester (10–15 hrs/week)",
+      "owner": "emmanuel",
+      "source": "may4",
+      "sourceRef": "#13",
+      "description": "Candidate confirmed at ~15 hrs/week, communicated to Gary on 2026-05-06."
+    },
+    {
+      "id": "work-50-hours",
+      "status": "done",
+      "title": "Work 50 hours this week (catch-up)",
+      "owner": "fernando",
+      "source": "may4",
+      "sourceRef": "#12",
+      "description": "Completed without flags raised in the recap."
+    },
+    {
+      "id": "coolfire-bridge-api",
+      "status": "progress",
+      "title": "Internal Website → Google Sheet → Coolfire bridge API",
+      "owner": "emmanuel",
+      "source": "may4",
+      "sourceRef": "#8",
+      "tags": [
+        "critical"
+      ],
+      "description": "Largest open item. Coolfire export still requires the Google Sheet hop until this lands. Blocks the July Coolfire sunset."
+    },
+    {
+      "id": "driver-tracking-sync",
+      "status": "progress",
+      "title": "Resolve driver tracking sync issues",
+      "owner": "emmanuel",
+      "source": "may11",
+      "description": "Status sync between dashboard ↔ driver interface + intermittent websocket connections. Prioritize distance calculations before map drawing."
+    },
+    {
+      "id": "driver-phone-storage",
+      "status": "progress",
+      "title": "Decide driver phone storage (Sheet vs DB profile)",
+      "owner": "emmanuel",
+      "source": "may4",
+      "sourceRef": "#1",
+      "description": "Blocks the Google Sheet automation thread."
+    },
+    {
+      "id": "coolfire-api-docs",
+      "status": "open",
+      "title": "Review Coolfire API docs & scope endpoints",
+      "owner": "emmanuel",
+      "source": "may4",
+      "sourceRef": "#2",
+      "description": "July transition target — clock is ticking."
+    },
+    {
+      "id": "destino-square-integration",
+      "status": "open",
+      "title": "Integrate Destino via Square backend",
+      "owner": "emmanuel",
+      "source": "may4",
+      "sourceRef": "#3",
+      "description": "This week's Destino work was firefighting (stability/auth/deps), not the Square→ReadySet order API."
+    },
+    {
+      "id": "fresh-rolls-review",
+      "status": "open",
+      "title": "Review Fresh Rolls site (Square-based)",
+      "owner": "emmanuel",
+      "source": "may4",
+      "sourceRef": "#4",
+      "description": "Inquiry from Gary; no proposal sent yet. They want to send and receive orders."
+    },
+    {
+      "id": "consult-james-catercow",
+      "status": "open",
+      "title": "Consult James — Destino + existing CaterCow link?",
+      "owner": "emmanuel",
+      "source": "may4",
+      "sourceRef": "#5",
+      "description": "Gary planned to chat with him this week as well."
+    },
+    {
+      "id": "princess-payment-reconcile",
+      "status": "open",
+      "title": "Reconcile Princess payment owed to Emmanuel",
+      "owner": "gary",
+      "source": "may4",
+      "sourceRef": "#6",
+      "description": "Outstanding small difference from previous work."
+    },
+    {
+      "id": "legal-contract-nonpaying",
+      "status": "open",
+      "title": "Draft legal contract for non-paying clients",
+      "owner": "gary",
+      "source": "may4",
+      "sourceRef": "#7",
+      "description": "Tied to \"withhold maintenance, don't take down sites\" policy. Still needs paper."
+    },
+    {
+      "id": "verify-twilio-region-isolation",
+      "status": "open",
+      "title": "Verify Twilio per-region isolation",
+      "owner": "fernando",
+      "source": "may4",
+      "sourceRef": "#11",
+      "tags": [
+        "moot"
+      ],
+      "description": "Likely moot if Telnyx is approved; confirm equivalent in Telnyx evaluation instead."
+    },
+    {
+      "id": "rea-342-soft-delete-orders",
+      "status": "open",
+      "title": "REA-342 — Fix hard-delete in /api/orders/delete",
+      "owner": "emmanuel",
+      "source": "qa",
+      "sourceRef": "REA-342",
+      "relatedQa": "REA-OMG-06",
+      "tags": [
+        "bug"
+      ],
+      "description": "DELETE /api/orders/delete performs hard delete instead of soft-delete. Schema gaps: <code>Dispatch.deletedAt</code> and <code>deletedBy</code> missing. Promoted from QA fail on test REA-OMG-06."
+    },
+    {
+      "id": "rea-343-bulk-delete-defects",
+      "status": "open",
+      "title": "REA-343 — Fix bulk-delete defects + S3 cleanup",
+      "owner": "emmanuel",
+      "source": "qa",
+      "sourceRef": "REA-343",
+      "relatedQa": "REA-OMG-07",
+      "tags": [
+        "bug"
+      ],
+      "description": "6 defects in <code>src/app/api/orders/bulk-delete/route.ts</code>: hard delete instead of soft, wrong S3 bucket name, BUCKET_NAME shadowed, path extraction fallback orphans files, storage errors swallowed, no orphan tracking. Promoted from QA fail on test REA-OMG-07."
+    },
+    {
+      "id": "rea-344-assign-driver-broadcast",
+      "status": "open",
+      "title": "REA-344 — Wire assignDriver realtime broadcast",
+      "owner": "emmanuel",
+      "source": "qa",
+      "sourceRef": "REA-344",
+      "relatedQa": "REA-OMG-08",
+      "tags": [
+        "bug"
+      ],
+      "description": "No realtime broadcast emitted from <code>assignDriver/route.ts</code>. Infrastructure exists (<code>broadcastDeliveryAssigned</code> in <code>lib/realtime/channels.ts:475</code>) but has zero callers — admin dashboard requires reload. Secondary: Delivery upsert creates rows with <code>deliveryAddress=''</code> and swallows errors. Promoted from QA fail on test REA-OMG-08."
+    },
+    {
+      "id": "test-telnyx-integration",
+      "status": "new",
+      "title": "Test Telnyx Integration",
+      "owner": "emmanuel",
+      "source": "may11",
+      "description": "Verify the new vendor works correctly with the existing codebase."
+    },
+    {
+      "id": "email-telnyx-details",
+      "status": "new",
+      "title": "Email Telnyx provider details",
+      "owner": "emmanuel",
+      "source": "may11",
+      "description": "Send Gary the information regarding the alternative telecom vendor Telnyx."
+    },
+    {
+      "id": "calc-porting-costs",
+      "status": "new",
+      "title": "Calculate 5-line porting/migration costs",
+      "owner": "emmanuel",
+      "source": "may11",
+      "description": "Determine the total fee required for porting 5 lines to the new platform."
+    },
+    {
+      "id": "research-phone-segmentation",
+      "status": "new",
+      "title": "Research phone segmentation by marketplace",
+      "owner": "emmanuel",
+      "source": "may11",
+      "description": "Investigate groups/dividers to organize marketplaces inside the comms provider. Goal: consolidate 5 lines → 3."
+    },
+    {
+      "id": "update-hours-sheet",
+      "status": "new",
+      "title": "Update Hours Sheet (previous weeks)",
+      "owner": "emmanuel",
+      "source": "may11",
+      "description": "Record the work duration from the previous weeks into the tracking document."
+    },
+    {
+      "id": "contact-james-trial",
+      "status": "new",
+      "title": "Contact James — order processing trial",
+      "owner": "gary",
+      "source": "may11",
+      "description": "Reach out this week to coordinate a trial for order processing using the new integration. James is the pilot client."
+    },
+    {
+      "id": "james-payment-plan",
+      "status": "new",
+      "title": "Create payment plan for James",
+      "owner": "gary",
+      "source": "may11",
+      "description": "Establish a schedule for James to pay outstanding invoices — funds additional testing resources."
+    },
+    {
+      "id": "kco-calculator-scope",
+      "status": "new",
+      "title": "Calculator scope for KCO integration",
+      "owner": "emmanuel",
+      "source": "may11",
+      "description": "Calculator must handle driver, vendor, and internal calculations simultaneously to eliminate manual data entry errors."
+    }
+  ]
+}
