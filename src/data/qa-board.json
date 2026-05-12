@@ -1,0 +1,1104 @@
+{
+  "source": "2026-Q2-test-cases.csv",
+  "generated": "2026-05-12",
+  "total": 29,
+  "counts": {
+    "PASS": 7,
+    "PARTIAL-FAIL": 1,
+    "FAIL": 8,
+    "BLOCKED": 0,
+    "IN-PROGRESS": 2,
+    "NOT-RUN": 11,
+    "SKIPPED": 0,
+    "UNKNOWN": 0
+  },
+  "verdictOrder": [
+    "PASS",
+    "PARTIAL-FAIL",
+    "FAIL",
+    "BLOCKED",
+    "IN-PROGRESS",
+    "NOT-RUN",
+    "SKIPPED",
+    "UNKNOWN"
+  ],
+  "verdictLabel": {
+    "PASS": "Pass",
+    "PARTIAL-FAIL": "Partial Fail",
+    "FAIL": "Fail",
+    "BLOCKED": "Blocked",
+    "IN-PROGRESS": "In Progress",
+    "NOT-RUN": "Not Run",
+    "SKIPPED": "Skipped",
+    "UNKNOWN": "Unknown"
+  },
+  "tests": [
+    {
+      "key": "REA-OMG-01",
+      "summary": "Create catering order — happy path",
+      "description": "Admin creates a catering order with all required fields and the order appears in the list with status ACTIVE.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "order-management",
+        "crud"
+      ],
+      "components": [
+        "admin/orders",
+        "api/orders"
+      ],
+      "folder": "Q2 2026/Order Management",
+      "notes": "PASS — Admin successfully created catering order via /admin/catering-orders/new. Form rendered with required field markers, server action returned successfully, and order appeared in list with status ACTIVE. No console errors detected.",
+      "verdict": "PASS",
+      "steps": [
+        {
+          "step": "Navigate to /admin/catering-orders/new",
+          "data": "Logged in as ADMIN; client/user available",
+          "expected": "Form renders with required field markers"
+        },
+        {
+          "step": "Fill required fields and submit",
+          "data": "pickupAddress, deliveryAddress, pickupDateTime, arrivalDateTime, headcount",
+          "expected": "Server action returns {success:true,orderId,orderNumber}; redirect to detail"
+        },
+        {
+          "step": "Verify order appears in list",
+          "data": "/admin/catering-orders sorted newest first",
+          "expected": "Status ACTIVE; deletedAt null"
+        },
+        {
+          "step": "GET /api/orders/[order_number]",
+          "data": "",
+          "expected": "200 with full order payload incl. addresses"
+        }
+      ]
+    },
+    {
+      "key": "REA-OMG-02",
+      "summary": "Create on-demand order — happy path with vehicle dimensions",
+      "description": "Admin creates an on-demand order with vehicle type and L/W/H/Weight; values persist on read.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "order-management",
+        "on-demand"
+      ],
+      "components": [
+        "admin/on-demand-orders",
+        "api/orders"
+      ],
+      "folder": "Q2 2026/Order Management",
+      "notes": "PARTIAL FAIL — Order created with vehicle dimensions persisted correctly, but post-submit redirect goes to On-Demand orders dashboard instead of order detail page. Navigation bug — file separately.",
+      "verdict": "PARTIAL-FAIL",
+      "steps": [
+        {
+          "step": "Navigate to /admin/on-demand-orders/new and submit valid form",
+          "data": "vehicleType in CAR|VAN|TRUCK; length, width, height, weight; itemDelivered",
+          "expected": "Order created; redirect to detail page"
+        },
+        {
+          "step": "Verify dimensions persisted",
+          "data": "GET /api/orders/[order_number]",
+          "expected": "vehicleType + L/W/H/Weight match input"
+        }
+      ]
+    },
+    {
+      "key": "REA-OMG-03",
+      "summary": "List, filter, paginate, sort orders",
+      "description": "Admin order list supports status filter, search, pagination, sort; soft-deleted records never appear.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "order-management",
+        "crud"
+      ],
+      "components": [
+        "admin/orders",
+        "api/orders"
+      ],
+      "folder": "Q2 2026/Order Management",
+      "notes": "PASS — Admin order list correctly supports status filter, search, pagination, and sort. Filtered results match criteria, URL query params reflect active filters, and soft-deleted records are properly excluded from results.",
+      "verdict": "PASS",
+      "steps": [
+        {
+          "step": "Apply status filter on /admin/catering-orders",
+          "data": "status=ACTIVE",
+          "expected": "Only matching orders shown; URL/query reflects filter"
+        },
+        {
+          "step": "Search by partial order number",
+          "data": "search=<partial>",
+          "expected": "Case-insensitive match returned"
+        },
+        {
+          "step": "Pagination + sort via API",
+          "data": "take, skip, sortBy=createdAt, sortOrder=desc",
+          "expected": "Paginated results in correct order"
+        },
+        {
+          "step": "Soft-deleted exclusion",
+          "data": "Order with deletedAt set",
+          "expected": "Result set has all rows with deletedAt:null"
+        }
+      ]
+    },
+    {
+      "key": "REA-OMG-04",
+      "summary": "Update order — valid status transition via state machine",
+      "description": "PATCH advances order status through a transition allowed by state-machine; invalid transitions are rejected.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "order-management",
+        "crud"
+      ],
+      "components": [
+        "api/orders",
+        "state-machine"
+      ],
+      "folder": "Q2 2026/Order Management",
+      "notes": "PASS — Executed automated test matrix against PATCH /api/orders/[order_number] on development. 9 of 10 transitions verified successfully (1 skipped due to test ordering). All 5 valid transitions (ACTIVE→ASSIGNED→IN_PROGRESS→DELIVERED→COMPLETED, PENDING→CANCELLED) returned 200 and persisted in DB. All 4 invalid transitions tested (skip-steps and terminal-state reversals) returned 422 with \"Cannot transition status from X to Y\" and DB state remained unchanged (rollback verified). State machine in src/lib/state-machine/order-state.ts working as designed.",
+      "verdict": "PASS",
+      "steps": [
+        {
+          "step": "As ADMIN PATCH /api/orders/[order_number]",
+          "data": "status: ACTIVE -> ASSIGNED",
+          "expected": "200 with updated order; transition allowed"
+        },
+        {
+          "step": "Re-fetch order",
+          "data": "GET /api/orders/[order_number]",
+          "expected": "Status updated; updatedAt bumped"
+        },
+        {
+          "step": "Attempt invalid transition",
+          "data": "ACTIVE -> DELIVERED (skipping intermediate)",
+          "expected": "4xx with clear validation error"
+        }
+      ]
+    },
+    {
+      "key": "REA-OMG-05",
+      "summary": "Reject edit when order is in terminal status",
+      "description": "PATCH on COMPLETED / DELIVERED / CANCELLED orders is rejected; record unchanged.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "order-management",
+        "crud"
+      ],
+      "components": [
+        "api/orders/[order_number]"
+      ],
+      "folder": "Q2 2026/Order Management",
+      "notes": "PASS — Verified via UI on development.readysetllc.com as ADMIN. Attempted edits on orders in COMPLETED, DELIVERED, and CANCELLED states were rejected as expected; no changes persisted. Edit guard from isTerminalStatus() in src/app/api/orders/[order_number]/schemas.ts (TERMINAL_STATUSES = COMPLETED, DELIVERED, CANCELLED) correctly blocks field mutations on terminal orders. State machine in order-state.ts is independent and governs status transitions only.",
+      "verdict": "PASS",
+      "steps": [
+        {
+          "step": "PATCH non-status field on terminal-status order",
+          "data": "Order with status COMPLETED",
+          "expected": "4xx terminal-status guard; order unchanged"
+        },
+        {
+          "step": "Repeat for DELIVERED",
+          "data": "Order with status DELIVERED",
+          "expected": "Same rejection"
+        },
+        {
+          "step": "Repeat for CANCELLED",
+          "data": "Order with status CANCELLED",
+          "expected": "Same rejection"
+        }
+      ]
+    },
+    {
+      "key": "REA-OMG-06",
+      "summary": "Soft-delete cascades to dispatches",
+      "description": "DELETE soft-deletes the order, cascades dispatches; record stays in DB with deletedAt set; list endpoints filter it out.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "order-management",
+        "crud"
+      ],
+      "components": [
+        "api/orders/delete"
+      ],
+      "folder": "Q2 2026/Order Management",
+      "notes": "FAIL — DELETE /api/orders/delete performs hard delete instead of soft-delete. Reproduced end-to-end with Test 050126; order + 1 dispatch physically removed. Read-path filter works (control test PASS). Schema gaps: Dispatch.deletedAt and deletedBy missing. See bug ticket REA-342.",
+      "verdict": "FAIL",
+      "steps": [
+        {
+          "step": "As ADMIN DELETE /api/orders/delete?orderId=&orderType=",
+          "data": "Order with at least one dispatch",
+          "expected": "200; transaction succeeds"
+        },
+        {
+          "step": "Verify DB row",
+          "data": "Same order id",
+          "expected": "Row present with deletedAt, deletedBy populated"
+        },
+        {
+          "step": "Verify list filters",
+          "data": "GET /api/orders",
+          "expected": "Order absent; list filters by deletedAt:null"
+        },
+        {
+          "step": "Verify dispatch cascade",
+          "data": "Same order's dispatches",
+          "expected": "Dispatches removed/soft-deleted per implementation"
+        }
+      ]
+    },
+    {
+      "key": "REA-OMG-07",
+      "summary": "Bulk-delete + S3 file cleanup",
+      "description": "Bulk-delete soft-deletes multiple orders and cleans associated uploaded files from S3.",
+      "status": "DONE",
+      "priority": "Medium",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "order-management",
+        "crud"
+      ],
+      "components": [
+        "api/orders/bulk-delete"
+      ],
+      "folder": "Q2 2026/Order Management",
+      "notes": "FAIL — Code review (2026-05-08). 6 defects in src/app/api/orders/bulk-delete/route.ts: (1) hard delete instead of soft (lines 196-204); (2) wrong bucket name \"order-files\" vs actual \"fileUploader\"; (3) BUCKET_NAME shadowed; (4) path extraction fallback returns only filename → orphans; (5) storage errors swallowed (transaction commits anyway); (6) no orphan tracking. Drift from delete/route.ts singular handler. Bug ticket: REA-343",
+      "verdict": "FAIL",
+      "steps": [
+        {
+          "step": "POST /api/orders/bulk-delete",
+          "data": "{orderNumbers:[A,B,C]}",
+          "expected": "200 summary of soft-deleted orders"
+        },
+        {
+          "step": "Verify each soft-deleted",
+          "data": "Same order numbers",
+          "expected": "Each row has deletedAt"
+        },
+        {
+          "step": "Verify S3 cleanup",
+          "data": "Previously uploaded files for those orders",
+          "expected": "Files unreachable via signed URL"
+        }
+      ]
+    },
+    {
+      "key": "REA-OMG-08",
+      "summary": "Assign driver to order; broadcast",
+      "description": "Assigning a driver updates order, creates Delivery row with assignedAt, and broadcasts driver status to admin dashboard.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "order-management",
+        "driver-assignment"
+      ],
+      "components": [
+        "api/orders/assignDriver",
+        "realtime"
+      ],
+      "folder": "Q2 2026/Order Management",
+      "notes": "FAIL — Code review (2026-05-08). Steps 1-2 PASS with caveats; Step 3 FAIL: no realtime broadcast emitted from assignDriver/route.ts. Infrastructure exists (broadcastDeliveryAssigned in lib/realtime/channels.ts:475) but is dead code — 0 callers. Admin dashboard requires reload. Secondary: Delivery upsert creates rows with deliveryAddress='' and swallows errors silently. See REA-344",
+      "verdict": "FAIL",
+      "steps": [
+        {
+          "step": "POST /api/orders/assignDriver",
+          "data": "Valid driverId + orderId",
+          "expected": "200; order driverStatus/status reflects assignment"
+        },
+        {
+          "step": "Verify Delivery row",
+          "data": "Driver+order ids",
+          "expected": "Row present with assignedAt timestamp"
+        },
+        {
+          "step": "Realtime broadcast",
+          "data": "Open admin dashboard tab",
+          "expected": "Dashboard reflects assignment without reload"
+        }
+      ]
+    },
+    {
+      "key": "REA-OMG-09",
+      "summary": "Required-field validation on create",
+      "description": "Missing pickup or delivery address (or required datetimes) fails create with field error and no order is created.",
+      "status": "DONE",
+      "priority": "Medium",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "order-management",
+        "crud"
+      ],
+      "components": [
+        "admin/catering-orders/_actions"
+      ],
+      "folder": "Q2 2026/Order Management",
+      "notes": "FAIL - Critical (highest of 5 defects) 5 (1 Critical, 2 High, 2 Medium). D1: form ignores server fieldErrors. D2: dead-code submit paths bypass Zod. D3: server action input typed as z.output. D4: Zod↔Prisma drift on datetimes (verified via psql — nullable in DB despite Zod required; 0 dirty rows in prod, structural only). D5: address shows only first subfield error. See Plane work flow REA-345",
+      "verdict": "FAIL",
+      "steps": [
+        {
+          "step": "Submit without pickup address",
+          "data": "Catering form",
+          "expected": "Field error returned; no order created"
+        },
+        {
+          "step": "Submit without delivery address",
+          "data": "Catering form",
+          "expected": "Field error returned; no order created"
+        },
+        {
+          "step": "Submit without pickup/arrival datetime",
+          "data": "Catering form",
+          "expected": "Field error returned; no order created"
+        }
+      ]
+    },
+    {
+      "key": "REA-OMG-10",
+      "summary": "Conditional needHost validation",
+      "description": "needHost=YES requires hoursNeeded and numberOfHosts; needHost=NO requires both null.",
+      "status": "DONE",
+      "priority": "Medium",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "order-management",
+        "crud"
+      ],
+      "components": [
+        "admin/catering-orders/_actions/schemas"
+      ],
+      "folder": "Q2 2026/Order Management",
+      "notes": "PARTIAL PASS.- High (highest of 3 defects). D1: Step 3 unreachable from canonical UI flow — host fields conditionally hidden + autoreset on needHost=NO. D2: dead-code submit paths (manualDirectSubmit, debugSubmit) silently coerce hoursNeeded/numberOfHosts to null instead of erroring. D3: duplicated cleanup logic across useEffect and Select onValueChange (code smell). DB alignment verified via psql — no Zod↔Postgres drift on needHost/hoursNeeded/numberOfHosts. See REA-346",
+      "verdict": "NOT-RUN",
+      "steps": [
+        {
+          "step": "Submit needHost=YES without hoursNeeded",
+          "data": "Catering form",
+          "expected": "Validation error"
+        },
+        {
+          "step": "Submit needHost=YES with hoursNeeded + numberOfHosts",
+          "data": "Catering form",
+          "expected": "Success"
+        },
+        {
+          "step": "Submit needHost=NO with hoursNeeded set",
+          "data": "Catering form",
+          "expected": "Validation error (must be null)"
+        }
+      ]
+    },
+    {
+      "key": "REA-OMG-11",
+      "summary": "Role gating — HELPDESK PATCH; ADMIN-only DELETE",
+      "description": "HELPDESK can update orders but cannot delete; ADMIN/SUPER_ADMIN can do both.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "order-management",
+        "authz"
+      ],
+      "components": [
+        "api/orders/[order_number]",
+        "api/orders/delete"
+      ],
+      "folder": "Q2 2026/Order Management",
+      "notes": "PASS (role gating) / FAIL (collateral). Critical (D1: hard delete)D1: DELETE hard-deletes (REA-OMG-06 reincidence), verified via psql — only 1 of 83 catering_requests has deletedAt populated. D2: PATCH status-only updates bypass role gating (any authenticated user can change order status). D3: profile lookup uses Supabase in PATCH vs Prisma in DELETE. D4: PATCH uses order_number, DELETE uses orderId UUID. D5: no HELPDESK delete-request path for future role evolution. D6: soft-delete schema incomplete (only deletedAt; missing deletedBy and deletionReason). See REA-347",
+      "verdict": "PASS",
+      "steps": [
+        {
+          "step": "As HELPDESK PATCH /api/orders/[order_number]",
+          "data": "Valid change",
+          "expected": "200"
+        },
+        {
+          "step": "As HELPDESK DELETE /api/orders/delete",
+          "data": "Same order",
+          "expected": "403 forbidden"
+        },
+        {
+          "step": "As ADMIN DELETE /api/orders/delete",
+          "data": "Same order",
+          "expected": "200"
+        }
+      ]
+    },
+    {
+      "key": "REA-DRT-01",
+      "summary": "Driver shift broadcasts on driver-locations channel (realtime ON)",
+      "description": "With both feature flags ON, a driver going on-shift broadcasts location updates over Supabase Realtime channel driver-locations.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "driver-tracking",
+        "realtime"
+      ],
+      "components": [
+        "Driver/DriverTrackingPortal",
+        "lib/realtime"
+      ],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "PASS (with concerns).- High (D1 ticket data, D2 validation drift)D1: ticket Test Data lists FF_* env vars without required NEXT_PUBLIC_ prefix; copying literally would disable flags. D2: validateBroadcastPayload validStatuses array missing 'EN_ROUTE_TO_VENDOR' (compounds REA-OMG-08). D3: channels.ts docstring references migration 20251107000008 which does not exist (verified via filesystem). D4: DriverLocationPayload includes activityType but driver_locations table has no matching column — broadcast preserves it, REST persistence drops it. D5: dual transport (broadcast + postgres_changes) without documented dedup contract — admin listener may receive duplicate events. D6: FF_USE_REALTIME_ADMIN_DASHBOARD listed as required test data but only affects admin receiver, not driver broadcaster. DB verified via psql (driver_locations 15 columns, no activity_type), migration history grep confirmed missing trigger migration. See REA-348",
+      "verdict": "PASS",
+      "steps": [
+        {
+          "step": "Sign in as driver; open /driver/tracking; start shift",
+          "data": "FF_USE_REALTIME_LOCATION_UPDATES=true; FF_USE_REALTIME_ADMIN_DASHBOARD=true",
+          "expected": "Portal subscribes to driver-locations; geolocation accepted"
+        },
+        {
+          "step": "Trigger location update",
+          "data": "Real or simulated movement",
+          "expected": "driver:location:updated events emitted; visible in WS frames"
+        },
+        {
+          "step": "Open /admin/tracking in second tab",
+          "data": "Same realtime flags",
+          "expected": "Driver appears live on map without refresh"
+        }
+      ]
+    },
+    {
+      "key": "REA-DRT-02",
+      "summary": "REST fallback when realtime is OFF",
+      "description": "With realtime flags OFF, driver location reaches admin via /api/tracking/locations + /api/tracking/live polling.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "driver-tracking",
+        "realtime"
+      ],
+      "components": [
+        "api/tracking/locations",
+        "api/tracking/live"
+      ],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL — Static review + DB introspection on development (project khvteminrbghoeuqajzm, branch development @ 1d2e8d10). 9 defects (1 Critical, 5 High, 1 Medium, 2 Low). Test premise contradicts real architecture: client never calls POST /api/tracking/locations (0 callsites in src/, useLocationTracking calls server action updateDriverLocation in driver-actions.ts:392); /api/tracking/live serves text/event-stream (SSE), not polling; FF_USE_REALTIME_*=false are code defaults (feature-flags.ts), not test config. Critical finding (DT2-09): repo↔DB drift. Migrations 20251107000001/000005/000006/000007/000008 and 20260109000001 not registered in supabase_migrations.schema_migrations under those names; trigger trigger_driver_location_update and function notify_driver_location_update don't exist in development DB (verified via pg_trigger and pg_proc). Comment in driver-actions.ts:463 (\"Database trigger automatically broadcasts\") is factually false — likely root cause of DT-001. POST endpoint orphan, no auth, middleware excludes /api from matcher, would INSERT activity_type column that doesn't exist in runtime schema. RLS enabled on driver_locations but mitigation depends on whether node-pg Pool runs as service_role. Recommendation: delete orphan endpoint (closes 5 defects in 1 PR), apply migration 000008 to development, rewrite test to validate real architecture (server action + SSE), reconcile repo↔DB before any further QA in this layer.",
+      "verdict": "FAIL",
+      "steps": [
+        {
+          "step": "Driver shift active; trigger location update",
+          "data": "FF_USE_REALTIME_*=false",
+          "expected": "POST /api/tracking/locations 200"
+        },
+        {
+          "step": "Verify DB",
+          "data": "driver_locations table",
+          "expected": "Row inserted with driver_id, lat, lng"
+        },
+        {
+          "step": "Admin polls",
+          "data": "GET /api/tracking/live",
+          "expected": "Response includes recent location"
+        }
+      ]
+    },
+    {
+      "key": "REA-DRT-03",
+      "summary": "Admin dashboard renders live drivers + stats",
+      "description": "AdminTrackingDashboard renders markers, list, and stats accurately for multiple active drivers.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "driver-tracking",
+        "realtime"
+      ],
+      "components": [
+        "Dashboard/Tracking/AdminTrackingDashboard"
+      ],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL.- AdminTrackingDashboard renders markers, list, and stats accurately for multiple active drivers. Each driver on map and in DriverStatusList / Counts match underlying data / Map centers/zooms on that driver",
+      "verdict": "FAIL",
+      "steps": [
+        {
+          "step": "Open /admin/tracking with 2+ drivers active",
+          "data": "Drivers on-shift",
+          "expected": "Each driver on map and in DriverStatusList"
+        },
+        {
+          "step": "Stats panel",
+          "data": "",
+          "expected": "Counts match underlying data"
+        },
+        {
+          "step": "Click a driver in list",
+          "data": "",
+          "expected": "Map centers/zooms on that driver"
+        }
+      ]
+    },
+    {
+      "key": "REA-DRT-04",
+      "summary": "Regression — portal handles missing deliveryLocation.coordinates",
+      "description": "Verify fix from commit 5d777c5: driver portal renders without crash when active delivery has no delivery_location_geojson; no Sentry READY-SET-NEXTJS-1R.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "driver-tracking",
+        "regression"
+      ],
+      "components": [
+        "Driver/DriverTrackingPortal"
+      ],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "PASS — fix 5d777c5 verified. Backend handles NULL geojson correctly; portal uses optional chaining + type narrowing; 19/19 deliveries in dev DB have delivery_location IS NULL (deterministic repro). Zero unguarded call sites in src/components/Driver/. Adjacent DT4-01 (Medium, out of scope): DeliveryAssignmentPanel.tsx:128 has partial guard but no type-narrowing — hardening recommended.",
+      "verdict": "PASS",
+      "steps": [
+        {
+          "step": "Assign driver to delivery without delivery_location_geojson",
+          "data": "Delivery row with null geojson",
+          "expected": "Backend returns delivery successfully"
+        },
+        {
+          "step": "Open /driver/tracking as that driver",
+          "data": "",
+          "expected": "Portal renders; no console error 'Cannot read properties of undefined (reading 1)'"
+        },
+        {
+          "step": "Coordinate display block",
+          "data": "",
+          "expected": "Hidden or shows placeholder per guard pattern in DriverLiveMap.tsx:259"
+        }
+      ]
+    },
+    {
+      "key": "REA-DRT-05",
+      "summary": "Test driver simulator drives admin map",
+      "description": "Simulator at /admin/tracking/test-driver produces movement that admin dashboard sees in real time.",
+      "status": "DONE",
+      "priority": "Medium",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "driver-tracking",
+        "simulator"
+      ],
+      "components": [
+        "admin/tracking/test-driver"
+      ],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL — DT5-01 Critical (channel.off is not a function), DT5-B High (no DB persistence), DT5-F High (Service Worker Cache errors). Simulator emits 86+ broadcasts but admin channel closes ~1ms after subscribe. Blocks DRT-06+. Combined with DT2-09, both Realtime transports broken. See REA-367",
+      "verdict": "FAIL",
+      "steps": [
+        {
+          "step": "Open /admin/tracking/test-driver and start simulated route",
+          "data": "Both realtime flags=true",
+          "expected": "Simulator emits driver-locations broadcasts"
+        },
+        {
+          "step": "Open /admin/tracking in second tab",
+          "data": "",
+          "expected": "Simulated marker moves along route in real time"
+        }
+      ]
+    },
+    {
+      "key": "REA-DRT-06",
+      "summary": "Delivery progress reflects on dashboard",
+      "description": "Each delivery stage (assigned -> delivered) persists timestamps and updates admin dashboard without manual refresh.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "driver-tracking",
+        "realtime"
+      ],
+      "components": [
+        "Driver/DriverTrackingPortal",
+        "Dashboard/Tracking"
+      ],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL — DT6-04 Critical (case-sensitive filter omits COMPLETED, terminal deliveries stay \"active\"), DT6-13 Critical (order# is UUID substring + hardcoded \"On Demand\", not searchable), DT6-12 Critical (Sistemas A/B parallel, no FK), DT6-19 Critical (Complete accepts no proof of delivery), DT6-02 Critical (no Realtime listener for delivery rows, only SSE 5s polling works). Driver-side persistence PASS (7/7 timestamps). Admin propagation PARTIAL (via SSE, not Realtime). 20 findings total (5 Critical, 8 High, 5 Medium, 2 Low). Blocks production release. See REA-368 on Plane.",
+      "verdict": "FAIL",
+      "steps": [
+        {
+          "step": "Walk through each delivery stage in driver portal",
+          "data": "Active assigned delivery",
+          "expected": "Each step persists Delivery timestamps (assignedAt, enRouteToVendorAt, arrivedAtVendorAt, pickedUpAt, enRouteAt, arrivedAtClientAt, deliveredAt)"
+        },
+        {
+          "step": "Admin dashboard updates",
+          "data": "Open /admin/tracking",
+          "expected": "Each transition visible without reload"
+        },
+        {
+          "step": "Final state",
+          "data": "After deliveredAt set",
+          "expected": "Order moves to terminal state; delivery row complete"
+        }
+      ]
+    },
+    {
+      "key": "REA-DRT-07",
+      "summary": "Feature flag combinations",
+      "description": "Verify behavior under all four flag combinations (driver + admin × on/off).",
+      "status": "In Process",
+      "priority": "Medium",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "driver-tracking",
+        "feature-flags"
+      ],
+      "components": [
+        "lib/feature-flags"
+      ],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "",
+      "verdict": "IN-PROGRESS",
+      "steps": [
+        {
+          "step": "Both flags true",
+          "data": "",
+          "expected": "Realtime path on both sides; no REST fallback"
+        },
+        {
+          "step": "Both flags false",
+          "data": "",
+          "expected": "REST-only on both sides"
+        },
+        {
+          "step": "Driver true; Admin false",
+          "data": "",
+          "expected": "Driver broadcasts; admin polls — no errors"
+        },
+        {
+          "step": "Driver false; Admin true",
+          "data": "",
+          "expected": "Admin subscribed but no events; data only via REST"
+        }
+      ]
+    },
+    {
+      "key": "REA-DRT-08",
+      "summary": "Offline queue + flush on reconnect",
+      "description": "When driver loses connection, location updates queue locally and flush to API/realtime on reconnect.",
+      "status": "In Process",
+      "priority": "Medium",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "driver-tracking",
+        "offline"
+      ],
+      "components": [
+        "hooks/tracking/useOfflineQueue"
+      ],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "",
+      "verdict": "IN-PROGRESS",
+      "steps": [
+        {
+          "step": "Driver shift active; toggle offline",
+          "data": "DevTools Network=Offline",
+          "expected": "Updates queued locally; no errors"
+        },
+        {
+          "step": "Restore connection",
+          "data": "Network=Online",
+          "expected": "Queued updates flush in order to /api/tracking/locations and/or realtime"
+        },
+        {
+          "step": "Admin dashboard catch-up",
+          "data": "",
+          "expected": "Full path visible after reconnect"
+        }
+      ]
+    },
+    {
+      "key": "REA-CAL-01",
+      "summary": "One-way driving distance — Haversine x 1.35",
+      "description": "calculateEstimatedDrivingDistance returns expected miles for known coords (SF -> Oakland).",
+      "status": "TO DO",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "calculator",
+        "drives"
+      ],
+      "components": [
+        "lib/calculator/distance-calculator"
+      ],
+      "folder": "Q2 2026/Calculator Drives",
+      "notes": "",
+      "verdict": "NOT-RUN",
+      "steps": [
+        {
+          "step": "Calculator tab address mode; enter SF + Oakland coords",
+          "data": "(37.7749,-122.4194) -> (37.8044,-122.2712)",
+          "expected": "Distance returned, rounded to 1 decimal, matches fixture"
+        },
+        {
+          "step": "Run unit test",
+          "data": "pnpm test src/lib/calculator/__tests__/distance-calculator.test.ts",
+          "expected": "Tests pass"
+        }
+      ]
+    },
+    {
+      "key": "REA-CAL-02",
+      "summary": "Round-trip distance = 2 x one-way",
+      "description": "calculateEstimatedRoundTripDistance returns exactly double the one-way value (within rounding).",
+      "status": "TO DO",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "calculator",
+        "drives"
+      ],
+      "components": [
+        "lib/calculator/distance-calculator"
+      ],
+      "folder": "Q2 2026/Calculator Drives",
+      "notes": "",
+      "verdict": "NOT-RUN",
+      "steps": [
+        {
+          "step": "Trigger round-trip computation",
+          "data": "Same coords as REA-CAL-01",
+          "expected": "Round-trip miles = one-way x 2"
+        }
+      ]
+    },
+    {
+      "key": "REA-CAL-03",
+      "summary": "Drive time / ETA from Mapbox geocoding",
+      "description": "Address-mode populates estimatedDriveTime from Mapbox routing response.",
+      "status": "TO DO",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "calculator",
+        "drives"
+      ],
+      "components": [
+        "components/calculator/DeliveryCalculator"
+      ],
+      "folder": "Q2 2026/Calculator Drives",
+      "notes": "",
+      "verdict": "NOT-RUN",
+      "steps": [
+        {
+          "step": "Enter pickup + dropoff addresses",
+          "data": "Two real addresses; departure time set",
+          "expected": "Addresses geocode; estimatedDriveTime populates non-zero minutes"
+        },
+        {
+          "step": "Confirm Mapbox directions request",
+          "data": "Network tab",
+          "expected": "200 with route duration"
+        }
+      ]
+    },
+    {
+      "key": "REA-CAL-04",
+      "summary": "Bridge toll auto-applies for configured areas",
+      "description": "When pickup or dropoff is in autoApplyForAreas, defaultTollAmount is applied to customer total and driver pay.",
+      "status": "TO DO",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "calculator",
+        "drives"
+      ],
+      "components": [
+        "lib/calculator/client-configurations",
+        "vendor-pricing/BridgeTollEditor"
+      ],
+      "folder": "Q2 2026/Calculator Drives",
+      "notes": "",
+      "verdict": "NOT-RUN",
+      "steps": [
+        {
+          "step": "Select vendor with bridge toll auto-apply",
+          "data": "Vendor + addresses in configured area",
+          "expected": "bridgeToll line item appears for customer and driver"
+        },
+        {
+          "step": "Verify amount",
+          "data": "",
+          "expected": "Matches defaultTollAmount"
+        }
+      ]
+    },
+    {
+      "key": "REA-CAL-05",
+      "summary": "Mileage charge above/below distanceThreshold",
+      "description": "Distance <= threshold uses flat fee; distance > threshold adds per-mile rate (vendor and driver).",
+      "status": "TO DO",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "calculator",
+        "drives"
+      ],
+      "components": [
+        "lib/calculator/client-configurations",
+        "lib/calculator/distance-calculator"
+      ],
+      "folder": "Q2 2026/Calculator Drives",
+      "notes": "",
+      "verdict": "NOT-RUN",
+      "steps": [
+        {
+          "step": "Calc with mileage = threshold - 1",
+          "data": "threshold=10",
+          "expected": "No per-mile charge beyond flat"
+        },
+        {
+          "step": "Calc with mileage = threshold + 5",
+          "data": "threshold=10",
+          "expected": "Per-mile charge = 5 x rate added on top"
+        },
+        {
+          "step": "Driver mileage pay",
+          "data": "driverMileageSettings",
+          "expected": "Per-mile pay only over threshold"
+        }
+      ]
+    },
+    {
+      "key": "REA-CAL-06",
+      "summary": "Driver pay tiered by headcount and food cost",
+      "description": "driverBasePayTiers and driverFoodCostPayTiers resolve to correct base pay; tier boundaries handled per spec.",
+      "status": "TO DO",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "calculator",
+        "drives"
+      ],
+      "components": [
+        "lib/calculator/client-configurations",
+        "vendor-pricing/DriverPaySettingsEditor"
+      ],
+      "folder": "Q2 2026/Calculator Drives",
+      "notes": "",
+      "verdict": "NOT-RUN",
+      "steps": [
+        {
+          "step": "Calc in known tier",
+          "data": "Specific headcount + food cost",
+          "expected": "Driver basePay equals tier value"
+        },
+        {
+          "step": "Calc at tier boundary",
+          "data": "max of one tier, min of next",
+          "expected": "Pay matches correct tier per documented inclusivity"
+        }
+      ]
+    },
+    {
+      "key": "REA-CAL-07",
+      "summary": "Multi-stop pricing",
+      "description": "Each extra stop adds $5 customer / $2.50 driver.",
+      "status": "TO DO",
+      "priority": "Medium",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "calculator",
+        "drives"
+      ],
+      "components": [
+        "lib/calculator multi-stop"
+      ],
+      "folder": "Q2 2026/Calculator Drives",
+      "notes": "",
+      "verdict": "NOT-RUN",
+      "steps": [
+        {
+          "step": "Calc with numberOfStops=1",
+          "data": "Baseline",
+          "expected": "No extra-stop charges"
+        },
+        {
+          "step": "Calc with numberOfStops=3",
+          "data": "2 extra stops",
+          "expected": "Customer +$10, driver +$5"
+        },
+        {
+          "step": "Run multi-stop tests",
+          "data": "pnpm test src/lib/calculator/__tests__/multi-stop-pricing.test.ts",
+          "expected": "Tests pass"
+        }
+      ]
+    },
+    {
+      "key": "REA-CAL-08",
+      "summary": "Daily drive discount (numberOfDrives)",
+      "description": "Discount applies as numberOfDrives increases per spec.",
+      "status": "TO DO",
+      "priority": "Medium",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "calculator",
+        "drives"
+      ],
+      "components": [
+        "lib/calculator daily-drive-discount"
+      ],
+      "folder": "Q2 2026/Calculator Drives",
+      "notes": "",
+      "verdict": "NOT-RUN",
+      "steps": [
+        {
+          "step": "Calc with numberOfDrives=1",
+          "data": "Baseline",
+          "expected": "No discount"
+        },
+        {
+          "step": "Calc with values 2..4+",
+          "data": "",
+          "expected": "Discount tier applied per spec; customer total reduced"
+        },
+        {
+          "step": "Result.customerCharges.dailyDriveDiscount",
+          "data": "",
+          "expected": "Discount value visible"
+        }
+      ]
+    },
+    {
+      "key": "REA-CAL-09",
+      "summary": "Adjust Vendor Pricing — DB persists, takes effect immediately",
+      "description": "Edits in Adjust Vendor Pricing tab save to DB via POST /api/calculator/configurations and the next /api/calculator/calculate reflects new values.",
+      "status": "TO DO",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "calculator",
+        "vendor-pricing"
+      ],
+      "components": [
+        "components/calculator/vendor-pricing",
+        "api/calculator/configurations"
+      ],
+      "folder": "Q2 2026/Calculator Drives",
+      "notes": "",
+      "verdict": "NOT-RUN",
+      "steps": [
+        {
+          "step": "Edit a field in Adjust Vendor Pricing tab; save",
+          "data": "Vendor + field + new value",
+          "expected": "POST /api/calculator/configurations 200; audit log shows changed fields"
+        },
+        {
+          "step": "Verify DB",
+          "data": "delivery_configurations row",
+          "expected": "New value persisted"
+        },
+        {
+          "step": "Run calc against same vendor",
+          "data": "Same inputs as before edit",
+          "expected": "New value applied; GET /api/calculator/config returns DB value first"
+        }
+      ]
+    },
+    {
+      "key": "REA-CAL-10",
+      "summary": "Save calculation to history",
+      "description": "Saving from Calculator tab persists via /api/calculator/save and surfaces in Recent Calculations tab; survives reload.",
+      "status": "TO DO",
+      "priority": "Medium",
+      "assignee": "Fernando Cardenas",
+      "labels": [
+        "qa",
+        "q2-2026",
+        "calculator",
+        "drives"
+      ],
+      "components": [
+        "api/calculator/save",
+        "api/calculator/history"
+      ],
+      "folder": "Q2 2026/Calculator Drives",
+      "notes": "",
+      "verdict": "NOT-RUN",
+      "steps": [
+        {
+          "step": "Run calc and click Save",
+          "data": "Any valid calc input",
+          "expected": "POST /api/calculator/save 200 with id"
+        },
+        {
+          "step": "Switch to Recent Calculations tab",
+          "data": "",
+          "expected": "Saved entry visible at top"
+        },
+        {
+          "step": "Reload page; switch tab",
+          "data": "",
+          "expected": "Entry still visible (persisted)"
+        }
+      ]
+    }
+  ]
+}
