@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Kanban, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { parseDescription } from "@/lib/internal-boards";
 import type { TasksBoardData, TasksBoardTask } from "@/types/internal-boards";
 
 const STATUS_STYLES: Record<
@@ -87,7 +88,7 @@ export function TasksBoard({
             </div>
           </div>
 
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:gap-3 [scrollbar-width:thin]">
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:gap-3">
             <StatPill label="Total"        value={data.tasks.length} tone="amber" />
             <StatPill label="Done"         value={counts.done}       tone="emerald" />
             <StatPill label="In Progress"  value={counts.progress}   tone="amber" />
@@ -99,7 +100,7 @@ export function TasksBoard({
 
       <main className="flex-1 px-4 py-4 sm:px-6">
         <div className="mx-auto max-w-[1600px]">
-          <div className="flex gap-4 overflow-x-auto pb-4 [scrollbar-width:thin]">
+          <div className="flex gap-4 overflow-x-auto pb-4">
             {data.columns.map((col) => (
               <Column
                 key={col.key}
@@ -262,13 +263,20 @@ function TaskCard({
       </div>
 
       {task.description && (
-        <p
-          className={cn(
-            "text-[12px] leading-relaxed text-slate-600",
-            "[&_code]:break-all [&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[10.5px] [&_code]:text-slate-700",
+        <p className="text-[12px] leading-relaxed text-slate-600">
+          {parseDescription(task.description).map((seg, i) =>
+            seg.kind === "code" ? (
+              <code
+                key={i}
+                className="break-all rounded bg-slate-100 px-1 py-0.5 font-mono text-[10.5px] text-slate-700"
+              >
+                {seg.value}
+              </code>
+            ) : (
+              <span key={i}>{seg.value}</span>
+            ),
           )}
-          dangerouslySetInnerHTML={{ __html: task.description }}
-        />
+        </p>
       )}
 
       {linkedQa && (

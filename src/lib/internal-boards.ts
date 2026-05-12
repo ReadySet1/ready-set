@@ -1,5 +1,29 @@
 import type { QaBoardData, TasksBoardData } from "@/types/internal-boards";
 
+export type DescriptionSegment =
+  | { kind: "text"; value: string }
+  | { kind: "code"; value: string };
+
+const CODE_PATTERN = /<code>([\s\S]*?)<\/code>/g;
+
+export function parseDescription(input: string | undefined): DescriptionSegment[] {
+  if (!input) return [];
+  const segments: DescriptionSegment[] = [];
+  let lastIndex = 0;
+  for (const match of input.matchAll(CODE_PATTERN)) {
+    const start = match.index ?? 0;
+    if (start > lastIndex) {
+      segments.push({ kind: "text", value: input.slice(lastIndex, start) });
+    }
+    segments.push({ kind: "code", value: match[1] ?? "" });
+    lastIndex = start + match[0].length;
+  }
+  if (lastIndex < input.length) {
+    segments.push({ kind: "text", value: input.slice(lastIndex) });
+  }
+  return segments;
+}
+
 export interface RelatedTaskRef {
   id: string;
   title: string;

@@ -6,6 +6,8 @@
 
 export type TaskStatus = "done" | "progress" | "open" | "new";
 
+export type TaskTag = "critical" | "moot" | "bug";
+
 export interface TasksBoardColumn {
   key: TaskStatus;
   title: string;
@@ -18,7 +20,7 @@ export interface TasksBoardTask {
   owner: string;
   source: string;
   sourceRef?: string;
-  tags?: string[];
+  tags?: TaskTag[];
   description?: string;
   relatedQa?: string;
 }

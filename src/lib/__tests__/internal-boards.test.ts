@@ -1,6 +1,7 @@
 import {
   buildRelatedTasksByQaKey,
   buildQaSummaryByKey,
+  parseDescription,
 } from "@/lib/internal-boards";
 import type { QaBoardData, TasksBoardData } from "@/types/internal-boards";
 
@@ -95,5 +96,51 @@ describe("buildQaSummaryByKey", () => {
       }],
     };
     expect(buildQaSummaryByKey(data)["REA-X"]?.verdict).toBe("PASS");
+  });
+});
+
+describe("parseDescription", () => {
+  it("returns empty array for undefined or empty input", () => {
+    expect(parseDescription(undefined)).toEqual([]);
+    expect(parseDescription("")).toEqual([]);
+  });
+
+  it("returns a single text segment when no code tags are present", () => {
+    expect(parseDescription("plain text")).toEqual([
+      { kind: "text", value: "plain text" },
+    ]);
+  });
+
+  it("splits text and code segments", () => {
+    const result = parseDescription("see <code>file.ts</code> for details");
+    expect(result).toEqual([
+      { kind: "text", value: "see " },
+      { kind: "code", value: "file.ts" },
+      { kind: "text", value: " for details" },
+    ]);
+  });
+
+  it("handles multiple code segments", () => {
+    const result = parseDescription("<code>a</code> and <code>b</code>");
+    expect(result).toEqual([
+      { kind: "code", value: "a" },
+      { kind: "text", value: " and " },
+      { kind: "code", value: "b" },
+    ]);
+  });
+
+  it("does NOT execute or pass through script tags — they are treated as plain text", () => {
+    const malicious = 'safe <script>alert("xss")</script> end';
+    const result = parseDescription(malicious);
+    expect(result).toEqual([{ kind: "text", value: malicious }]);
+    expect(result.every((s) => s.kind === "text" || s.kind === "code")).toBe(true);
+  });
+
+  it("does NOT pass through arbitrary tags as HTML — only <code> is structured", () => {
+    const result = parseDescription("<b>bold</b> and <code>code</code>");
+    expect(result).toEqual([
+      { kind: "text", value: "<b>bold</b> and " },
+      { kind: "code", value: "code" },
+    ]);
   });
 });

@@ -62,7 +62,7 @@ export function QaBoard({
             </div>
           </div>
 
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:gap-3 [scrollbar-width:thin]">
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:gap-3">
             <StatPill label="Total" value={data.total} tone="amber" />
             {visibleVerdicts.map((v) => (
               <StatPill
