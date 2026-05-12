@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { TasksBoard } from "@/components/internal-boards/TasksBoard";
 import tasksData from "@/data/tasks-board.json";
 import qaData from "@/data/qa-board.json";
+import { buildQaSummaryByKey } from "@/lib/internal-boards";
 import type { QaBoardData, TasksBoardData } from "@/types/internal-boards";
 
 export const metadata: Metadata = {
@@ -11,11 +12,7 @@ export const metadata: Metadata = {
 
 const tasks = tasksData as TasksBoardData;
 const qa = qaData as QaBoardData;
-
-const qaSummaryByKey: Record<string, { summary: string; verdict: string }> = {};
-for (const t of qa.tests) {
-  qaSummaryByKey[t.key] = { summary: t.summary, verdict: qa.verdictLabel[t.verdict] };
-}
+const qaSummaryByKey = buildQaSummaryByKey(qa);
 
 export default function TasksBoardPage() {
   return <TasksBoard data={tasks} qaSummaryByKey={qaSummaryByKey} />;
