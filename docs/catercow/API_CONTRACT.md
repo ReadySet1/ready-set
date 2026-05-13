@@ -1,11 +1,11 @@
 # Ready Set — Partner Order API
 
 **Audience:** CaterCow Engineering
-**Status:** Draft for partner review
-**Last Updated:** 2026-05-01
-**Version:** 0.1 (proposed)
+**Status:** Reflects current Ready Set implementation
+**Last Updated:** 2026-05-12
+**Version:** 0.2
 
-> This document is a proposal for the API contract between CaterCow and Ready Set. Field names, headers, and pricing values are subject to confirmation before implementation. Once both parties approve, Ready Set will formalize this as v1.0 and stand up the endpoints described below.
+> This document describes the API contract between CaterCow and Ready Set as currently implemented. v0.2 reconciles field names and response shapes with the live routes (previous v0.1 drafted-but-not-yet-built shapes that drifted from what shipped). All endpoints below have been deployed to staging and are ready for CaterCow's integration testing.
 
 ---
 
@@ -36,6 +36,12 @@ partner: catercow
 x-api-key: <issued-by-ready-set>
 ```
 
+Optional but **strongly recommended**:
+
+```
+Idempotency-Key: <unique-key-per-logical-request>
+```
+
 Ready Set will issue CaterCow a unique `x-api-key` for production and a separate key for staging. Keys are scoped to the partner identifier and can be rotated on request.
 
 **Authentication failure response (401):**
@@ -45,6 +51,20 @@ Ready Set will issue CaterCow a unique `x-api-key` for production and a separate
   "message": "Invalid authentication credentials"
 }
 ```
+
+---
+
+## Idempotency
+
+Every mutating endpoint (`/orders/draft`, `/orders/update`, `/orders/confirm`) accepts an `Idempotency-Key` header. When present, Ready Set caches the response for **24 hours**, keyed by `(partner, idempotency-key)`. Repeated requests within that window return the cached response with the original status code — safe to retry on network failure, timeout, or 5xx without risk of double-creating orders.
+
+```
+Idempotency-Key: 7c4d2e8a-1f9b-4a0e-9c3d-5e6f7a8b9c0d
+```
+
+**Recommended:** generate a fresh UUIDv4 per logical request; reuse it for retries of the same request. Different logical requests should use different keys.
+
+**Caveat:** the cache key is `(partner, idempotency-key)` only — payload contents are not part of the key. If you send a different body with the same Idempotency-Key, you will receive the cached response from the original body, not a recomputed one. Always generate a new key when the request payload changes meaningfully.
 
 ---
 
@@ -97,24 +117,35 @@ Ready Set will issue CaterCow a unique `x-api-key` for production and a separate
 }
 ```
 
-### Response (200)
+### Response (201 Created)
+
+On success, returns HTTP **201 Created**:
 
 ```ts
 {
-  status: "SUCCESS" | "ERROR";
-  message?: string;
+  status: "SUCCESS";
+  id: string;                       // UUID — use for /orders/update and /orders/confirm
+  deliveryPrice: number;            // Final delivery fee charged to the partner (USD)
+  totalPrice: number;               // deliveryPrice + priceTotal (convenience)
+  estimatedPickupTime: string;      // ISO 8601 UTC — when the driver is expected to pick up
 
-  // Present on SUCCESS
-  orderId?: string;               // UUID — use for update/confirm
-  deliveryFee?: number;           // Final fee charged to CaterCow
-  deliveryCost?: number;          // Base cost before mileage
-  totalMileagePay?: number;       // Mileage surcharge included in deliveryFee
-  totalFee?: number;              // deliveryFee + priceTotal
+  breakdown?: {
+    basePrice: number;              // Base delivery fee component before adjustments
+    mileageFee?: number;            // Mileage surcharge applied (if any)
+    dailyDriveDiscount?: number;    // Same-day-volume discount applied (if any)
+    bridgeToll?: number;            // Driver-side bridge toll (NOT charged to partner; informational only)
+    peakTimeMultiplier?: number;    // Multiplier applied for peak windows (if any)
+  };
+}
+```
 
-  // Diagnostics
-  distance?: number;              // Miles, pickup → drop-off
-  numberOfBridges?: number;       // 0 or 1 (informational only)
-  usedFallbackDistance?: boolean; // true if Google Maps lookup failed
+On error, returns one of the codes in the [Error Codes](#error-codes) section with shape:
+
+```ts
+{
+  status: "ERROR";
+  message: string;
+  details?: Record<string, unknown>; // Present on 400 validation errors — Zod-formatted field paths
 }
 ```
 
@@ -151,18 +182,19 @@ Ready Set will issue CaterCow a unique `x-api-key` for production and a separate
 }
 ```
 
-**Response:**
+**Response (HTTP 201):**
 ```json
 {
   "status": "SUCCESS",
-  "orderId": "ac59dadb-0ca0-45f4-ab9e-2e009d3c5b3b",
-  "deliveryFee": 62.50,
-  "deliveryCost": 62.50,
-  "totalMileagePay": 0,
-  "totalFee": 912.50,
-  "distance": 1.8,
-  "numberOfBridges": 0,
-  "usedFallbackDistance": false
+  "id": "ac59dadb-0ca0-45f4-ab9e-2e009d3c5b3b",
+  "deliveryPrice": 62.50,
+  "totalPrice": 912.50,
+  "estimatedPickupTime": "2026-05-15T18:30:00.000Z",
+  "breakdown": {
+    "basePrice": 62.50,
+    "mileageFee": 0,
+    "dailyDriveDiscount": 0
+  }
 }
 ```
 
@@ -176,30 +208,42 @@ Ready Set will issue CaterCow a unique `x-api-key` for production and a separate
 
 ### Request
 
+Update is a **full-body replace**, not a partial update. Send every field exactly as you would for `/orders/draft`, plus the `id` returned from the original draft. Fields you don't intend to change should be sent with their current value. Sending a partial body will return `400 Bad Request`.
+
 ```ts
 {
-  id: string;                     // UUID returned from /orders/draft
-  // Any of the draft fields, only those that change
-  orderCode?: string;
-  deliveryDate?: string;
-  deliveryTime?: string;
-  totalItem?: number;
-  priceTotal?: number;
-  pickupLocation?: { /* same shape as draft */ };
-  dropOffLocation?: { /* same shape as draft */ };
+  id: string;                       // UUID returned from /orders/draft
+  orderCode: string;                // Required (same value as draft, unless intentionally changing)
+  deliveryDate: string;             // Required
+  deliveryTime: string;             // Required
+  totalItem: number;                // Required
+  priceTotal: number;               // Required
+  pickupLocation: { /* full shape same as draft, all required fields */ };
+  dropOffLocation: { /* full shape same as draft, all required fields */ };
   metadata?: Record<string, unknown>;
 }
 ```
 
-### Response
+### Response (200 OK)
 
-Same shape as `/orders/draft` response.
+Same shape as `/orders/draft` response, but returned with HTTP **200 OK** instead of 201 Created.
+
+```ts
+{
+  status: "SUCCESS";
+  id: string;
+  deliveryPrice: number;
+  totalPrice: number;
+  estimatedPickupTime: string;
+  breakdown?: { /* same as draft */ };
+}
+```
 
 ---
 
 ## Endpoint 3 — Confirm Order
 
-**Purpose:** Finalize the draft for dispatch. Once confirmed, Ready Set will assign a driver and begin webhook callbacks.
+**Purpose:** Finalize the draft for dispatch. Once confirmed (`isAccepted: true`), Ready Set will assign a driver and begin webhook callbacks. Sending `isAccepted: false` cancels the draft.
 
 **`POST /orders/confirm`**
 
@@ -207,23 +251,36 @@ Same shape as `/orders/draft` response.
 
 ```ts
 {
-  id: string;                     // UUID from draft/update
-  isAccepted: boolean;            // true to confirm, false to reject
-  reason?: string;                // required if isAccepted === false
+  id: string;                       // UUID from draft/update
+  isAccepted: boolean;              // true to confirm, false to reject
+  reason?: string;                  // Required when isAccepted === false
   metadata?: Record<string, unknown>;
 }
 ```
 
-### Response
+### Response (200 OK)
 
 ```ts
 {
-  status: "SUCCESS" | "ERROR";
+  status: "CONFIRMED" | "CANCELLED" | "ERROR";
   message: string;
-  orderNumber?: string;           // Ready Set's internal order number, e.g. "CC-12345"
-  orderId?: string;
+  id: string;                       // The same order UUID
+  orderNumber: string;              // Ready Set's prefixed order number, e.g. "CC-12345"
+
+  // Present when status === "CONFIRMED"
+  estimatedDeliveryTime?: string;   // ISO 8601 UTC — when delivery is expected to complete
+  driverAssignment?: {
+    expectedAssignmentTime: string; // ISO 8601 UTC — when a driver is expected to be assigned
+    trackingAvailable: boolean;     // true once driver assignment unlocks live tracking
+  };
 }
 ```
+
+The `status` field distinguishes the two success branches:
+
+- `"CONFIRMED"` — order accepted and dispatched (request had `isAccepted: true`)
+- `"CANCELLED"` — order intentionally rejected (request had `isAccepted: false`)
+- `"ERROR"` — unexpected failure during confirmation; check `message`
 
 ---
 
@@ -283,11 +340,14 @@ CaterCow's webhook should return `200 OK` within 10 seconds. Non-2xx responses t
 
 Every quote returned by `/orders/draft` and `/orders/update` includes:
 
-- `deliveryFee` — the final fee charged to the partner for the delivery
-- `deliveryCost` — base cost component before any distance-based adjustments
-- `totalMileagePay` — distance-based component (if applicable)
-- `totalFee` — `deliveryFee + priceTotal` (convenience field)
-- `distance`, `numberOfBridges`, `usedFallbackDistance` — diagnostics
+- `deliveryPrice` — the final fee charged to the partner for the delivery
+- `totalPrice` — `deliveryPrice + priceTotal` (convenience field)
+- `estimatedPickupTime` — ISO 8601 UTC, when the driver is expected to arrive at pickup
+- `breakdown.basePrice` — base cost component before any distance-based adjustments
+- `breakdown.mileageFee` — distance-based surcharge (if applicable)
+- `breakdown.dailyDriveDiscount` — same-day-volume discount (if applicable)
+- `breakdown.bridgeToll` — driver-side toll compensation (informational only; not charged to the partner)
+- `breakdown.peakTimeMultiplier` — peak window multiplier (if applicable)
 
 ### Reference pricing structure (example only)
 
@@ -337,12 +397,31 @@ Delivery fee is typically calculated as the **lesser** of headcount tier or food
 
 | HTTP | Status field | Meaning |
 |------|--------------|---------|
-| 200 | `SUCCESS` | Request succeeded |
-| 400 | `ERROR` | Invalid request payload (see `message`) |
+| 200 | `SUCCESS` / `CONFIRMED` / `CANCELLED` | Request succeeded (update, confirm) |
+| 201 | `SUCCESS` | Order draft created (draft endpoint only) |
+| 400 | `ERROR` | Invalid request payload — `message` describes the failure; `details` includes field-level errors (Zod-formatted) |
 | 401 | `ERROR` | Missing or invalid auth headers |
-| 404 | `ERROR` | Order not found (update/confirm) |
-| 422 | `ERROR` | Pricing calculation failed |
-| 500 | `ERROR` | Internal error — please retry or contact support |
+| 404 | `ERROR` | Order not found (update / confirm) |
+| 409 | `ERROR` | Duplicate `orderCode` for this partner — an active order with the same code already exists. The conflicting order's `id` is included in `details.existingOrderId`. Treat this as a successful idempotent retry: use the existing `id` for subsequent update / confirm calls. |
+| 413 | `ERROR` | Request body exceeds the 256 KB size limit |
+| 415 | `ERROR` | Wrong `Content-Type` (must be `application/json`) |
+| 422 | `ERROR` | Pricing calculation failed — typically a malformed pickup / drop-off address. Retry with corrected values. |
+| 429 | `ERROR` | Rate limit exceeded — see [Rate Limiting](#rate-limiting). Response includes a `Retry-After` header (seconds) indicating when to retry. |
+| 500 | `ERROR` | Internal error — please retry (idempotent via `Idempotency-Key`) or contact support |
+
+---
+
+## Rate Limiting
+
+All partner endpoints enforce a per-partner rate limit. The default ceiling is **100 requests / minute** per partner (sliding window), measured across all endpoints combined. Rates can be raised on request via the support contact below.
+
+Exceeding the limit returns:
+
+- HTTP `429 Too Many Requests`
+- `Retry-After: <seconds>` header — the number of seconds to wait before the next attempt
+- Response body: `{ "status": "ERROR", "message": "Rate limit exceeded" }`
+
+Respect the `Retry-After` value rather than guessing — the limiter is sliding-window and an arbitrary retry can hit a fresh rejection. Combined with `Idempotency-Key`, you can safely retry a 429 once the window opens without risk of duplicate processing.
 
 ---
 
@@ -390,6 +469,17 @@ Ready Set will provide:
 ---
 
 ## Changelog
+
+### v0.2 (2026-05-12)
+- Reconciled response shapes with the live route implementations. Previous v0.1 fields drifted from what shipped:
+  - Draft / Update response: `orderId` → `id`, `deliveryFee` → `deliveryPrice`, `totalFee` → `totalPrice`. Removed `deliveryCost`, `totalMileagePay`, `distance`, `numberOfBridges`, `usedFallbackDistance` (these were proposed in v0.1 but the routes return them under `breakdown.*` instead).
+  - Draft endpoint returns HTTP **201 Created** (was documented as 200).
+  - Added `estimatedPickupTime` and the full `breakdown` object to draft / update responses.
+  - Confirm response: documented the real `status` enum (`"CONFIRMED" | "CANCELLED" | "ERROR"`), the `driverAssignment` object, and `estimatedDeliveryTime`.
+- Documented `Idempotency-Key` header (24h cache, partner-scoped).
+- Documented update endpoint as **full-body replace** (Zod schema requires every field).
+- Added 409 (duplicate `orderCode`), 413 (body size), 415 (content-type), 429 (rate limit) to the Error Codes table.
+- Added a Rate Limiting section covering the per-partner 100/min default and the `Retry-After` header.
 
 ### v0.1 (2026-05-01)
 - Initial draft for CaterCow review
