@@ -196,14 +196,14 @@ export async function POST(request: NextRequest) {
     );
 
   } catch (error: unknown) {
-    // Catch unexpected errors
+    // Catch unexpected errors. Log server-side with full context, but NEVER echo
+    // error.message across the partner trust boundary — it can leak Prisma column
+    // names, internal IDs, or upstream provider response text. See PR #402
+    // pre-landing review #13.
     console.error('Error in /api/cater-valley/update-order-status:', error);
 
-    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
-
-    // Return a generic server error response
     return NextResponse.json(
-      { message: `Internal Server Error: ${errorMessage}` },
+      { message: 'Internal Server Error' },
       { status: 500 }
     );
   }

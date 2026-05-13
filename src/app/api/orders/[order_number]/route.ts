@@ -676,30 +676,30 @@ export async function PATCH(
         // Broadcast real-time delivery status update (non-blocking)
         // This allows helpdesk, vendor, and client users to see status changes instantly
         const broadcastDeliveryStatus = async () => {
+          const adminSupabase = await createAdminClient();
+          const dispatch = (updatedOrder as any).dispatches?.[0];
+          const driverId = dispatch?.driver?.id;
+          const driverName = dispatch?.driver?.name;
+
+          if (!driverId) {
+            console.warn('No driver assigned, skipping delivery status broadcast');
+            return;
+          }
+
+          const payload: DeliveryStatusUpdatedPayload = {
+            orderId: (updatedOrder as any).id,
+            orderNumber: (updatedOrder as any).orderNumber,
+            orderType: orderType,
+            driverId: driverId,
+            status: driverStatus as 'ASSIGNED' | 'EN_ROUTE_TO_VENDOR' | 'ARRIVED_AT_VENDOR' | 'PICKED_UP' | 'EN_ROUTE_TO_CLIENT' | 'ARRIVED_TO_CLIENT' | 'COMPLETED',
+            previousStatus: (existingOrder as any)?.driverStatus || undefined,
+            driverName: driverName || undefined,
+            timestamp: new Date().toISOString(),
+          };
+
+          const channel = adminSupabase.channel(REALTIME_CHANNELS.DRIVER_STATUS);
+
           try {
-            const adminSupabase = await createAdminClient();
-            const dispatch = (updatedOrder as any).dispatches?.[0];
-            const driverId = dispatch?.driver?.id;
-            const driverName = dispatch?.driver?.name;
-
-            if (!driverId) {
-              console.warn('No driver assigned, skipping delivery status broadcast');
-              return;
-            }
-
-            const payload: DeliveryStatusUpdatedPayload = {
-              orderId: (updatedOrder as any).id,
-              orderNumber: (updatedOrder as any).orderNumber,
-              orderType: orderType,
-              driverId: driverId,
-              status: driverStatus as 'ASSIGNED' | 'EN_ROUTE_TO_VENDOR' | 'ARRIVED_AT_VENDOR' | 'PICKED_UP' | 'EN_ROUTE_TO_CLIENT' | 'ARRIVED_TO_CLIENT' | 'COMPLETED',
-              previousStatus: (existingOrder as any)?.driverStatus || undefined,
-              driverName: driverName || undefined,
-              timestamp: new Date().toISOString(),
-            };
-
-            const channel = adminSupabase.channel(REALTIME_CHANNELS.DRIVER_STATUS);
-
             // Subscribe first (required to send)
             await new Promise<void>((resolve, reject) => {
               channel.subscribe((status) => {
@@ -721,16 +721,21 @@ export async function PATCH(
             if (result !== 'ok') {
               console.warn('Delivery status broadcast returned non-ok result:', result);
             }
-
-            // Cleanup: unsubscribe from channel
-            await adminSupabase.removeChannel(channel);
-          } catch (err) {
-            console.error('Failed to broadcast delivery status update:', err);
+          } finally {
+            // Always release the channel, even on subscribe/send failure
+            await adminSupabase.removeChannel(channel).catch((cleanupErr) => {
+              console.warn('Failed to remove realtime channel during cleanup:', cleanupErr);
+            });
           }
         };
 
-        // Fire and forget - don't block the response
-        broadcastDeliveryStatus();
+        // Fire and forget - don't block the response. Attach .catch so any rejection
+        // from the broadcast (subscribe timeout, send failure) is surfaced rather than
+        // becoming an unhandled promise rejection that may crash the worker under
+        // --unhandled-rejections=strict.
+        broadcastDeliveryStatus().catch((err) => {
+          console.error('Failed to broadcast delivery status update:', err);
+        });
       }
 
       // Send customer notification for significant field changes (non-blocking)

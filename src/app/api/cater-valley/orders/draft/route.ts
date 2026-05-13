@@ -182,10 +182,14 @@ export async function POST(request: NextRequest) {
       usedFallbackDistance = result.usedFallbackDistance;
       pricingResult = result.pricingResult;
     } catch (error) {
+      // Log the underlying error for ops but never echo error.message across the
+      // partner trust boundary — it can leak Prisma column names, file paths, or
+      // upstream provider response text. See PR #402 pre-landing review #13.
+      console.error('[CaterValley draft] Pricing calculation failed:', error);
       return NextResponse.json(
         {
           status: 'ERROR',
-          message: error instanceof Error ? error.message : 'Pricing calculation error',
+          message: 'Pricing calculation failed. Please verify pickup/delivery addresses and order details, then retry.',
         },
         { status: 422 }
       );
