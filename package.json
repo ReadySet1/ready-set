@@ -197,6 +197,7 @@
     "tailgrids": "^2.3.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
+    "twilio": "^5.13.1",
     "uuid": "14.0.0",
     "vercel": "^50.38.2",
     "yup": "^1.7.1",
