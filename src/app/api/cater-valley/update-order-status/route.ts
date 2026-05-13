@@ -57,6 +57,24 @@ export async function POST(request: NextRequest) {
     const providedSig = request.headers.get(SIGNATURE_HEADER);
     const hmacResult = await verifyInboundHmac(rawBody, providedSig);
 
+    // Misconfiguration guard: when enforcement is ON but the secret is missing,
+    // we MUST NOT silently accept traffic. The original code treated
+    // 'no-secret-configured' as a pass under both modes, so a missing env var
+    // in production would disable HMAC entirely — exactly the failure mode
+    // ENFORCE_INBOUND_WEBHOOK_HMAC was supposed to prevent. Fail closed with
+    // 500 so the misconfig is visible in the partner-facing logs immediately.
+    // See PR #402 pre-landing review #3.
+    if (enforceHmac && hmacResult === 'no-secret-configured') {
+      console.error(
+        '[CaterValley] CRITICAL: ENFORCE_INBOUND_WEBHOOK_HMAC=true but CATERVALLEY_INBOUND_WEBHOOK_SECRET is unset. ' +
+          'Refusing all inbound webhooks until the secret is configured.'
+      );
+      return NextResponse.json(
+        { message: 'Webhook verification misconfigured on the server. Contact support.' },
+        { status: 500 }
+      );
+    }
+
     if (hmacResult !== 'ok' && hmacResult !== 'no-secret-configured') {
       const detail = {
         result: hmacResult,

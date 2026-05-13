@@ -25,10 +25,36 @@ export type PrismaExecutor = PrismaClient | Prisma.TransactionClient;
  * Idempotent: if the orderCode already starts with the prefix it's
  * returned unchanged, so retries from partners that pre-prefix don't
  * end up with `CC-CC-12345`.
+ *
+ * The short-circuit is only safe given two invariants enforced elsewhere:
+ *   1. order_prefix is UNIQUE across active partners
+ *      (see migration 20260512000000_add_unique_active_partner_constraints)
+ *   2. prefix matches PARTNER_ORDER_PREFIX_PATTERN so substring-overlap
+ *      attacks across partners are impossible
+ * This function asserts (2) at runtime as defense in depth.
+ *
+ * See PR #402 pre-landing review #8.
  */
 export function buildOrderNumber(orderCode: string, prefix: string): string {
+  if (!PARTNER_ORDER_PREFIX_PATTERN.test(prefix)) {
+    throw new Error(
+      `Invalid partner orderPrefix "${prefix}". Must match ${PARTNER_ORDER_PREFIX_PATTERN}. ` +
+        `This indicates a misconfigured partner row — fix the admin/seed flow before processing orders.`
+    );
+  }
   return orderCode.startsWith(prefix) ? orderCode : `${prefix}${orderCode}`;
 }
+
+/**
+ * Strict format for partner order prefixes. Enforces:
+ *   - 2-8 ASCII uppercase letters followed by a single hyphen
+ *   - No two prefixes can be a substring-prefix of each other
+ *     (e.g. "CV-" and "C-" cannot both exist because "C-" is not a
+ *     valid match — it requires 2+ letters)
+ * Examples: "CV-", "CC-", "EZ-", "DOORDASH-" are valid; "C-", "cv-",
+ * "CV", "CV_" are not.
+ */
+export const PARTNER_ORDER_PREFIX_PATTERN = /^[A-Z]{2,8}-$/;
 
 /**
  * Email address used for the partner's system user (the Profile that
