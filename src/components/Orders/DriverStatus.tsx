@@ -48,24 +48,30 @@ interface DriverStatusCardProps {
 // Update the status maps to use the enum with UPPERCASE keys
 const driverStatusMap: Record<DriverStatus, string> = {
   [DriverStatus.ASSIGNED]: "🚗 Assigned",
-  [DriverStatus.ARRIVED_AT_VENDOR]: "🏪 At Vendor",
-  [DriverStatus.EN_ROUTE_TO_CLIENT]: "🚚 On the Way",
-  [DriverStatus.ARRIVED_TO_CLIENT]: "🏁 Arrived",
-  [DriverStatus.COMPLETED]: "✅ Completed",
+  [DriverStatus.EN_ROUTE_TO_VENDOR]: "🚗 En Route to Resto",
+  [DriverStatus.ARRIVED_AT_VENDOR]: "🏪 Arrived at Vendor",
+  [DriverStatus.PICKED_UP]: "📦 Pick Up Completed",
+  [DriverStatus.EN_ROUTE_TO_CLIENT]: "🚚 En Route to Client",
+  [DriverStatus.ARRIVED_TO_CLIENT]: "🏁 Arrived at Client",
+  [DriverStatus.COMPLETED]: "✅ Delivered",
 };
 
 const driverStatusProgress: Record<DriverStatus, number> = {
   [DriverStatus.ASSIGNED]: 0,
-  [DriverStatus.ARRIVED_AT_VENDOR]: 25,
-  [DriverStatus.EN_ROUTE_TO_CLIENT]: 50,
-  [DriverStatus.ARRIVED_TO_CLIENT]: 75,
+  [DriverStatus.EN_ROUTE_TO_VENDOR]: 14,
+  [DriverStatus.ARRIVED_AT_VENDOR]: 28,
+  [DriverStatus.PICKED_UP]: 43,
+  [DriverStatus.EN_ROUTE_TO_CLIENT]: 57,
+  [DriverStatus.ARRIVED_TO_CLIENT]: 71,
   [DriverStatus.COMPLETED]: 100,
 };
 
 // Badge colors mapping for driver status
 const driverStatusColors: Record<DriverStatus, string> = {
   [DriverStatus.ASSIGNED]: "border-yellow-300 bg-yellow-100 text-yellow-800",
+  [DriverStatus.EN_ROUTE_TO_VENDOR]: "border-orange-300 bg-orange-100 text-orange-800",
   [DriverStatus.ARRIVED_AT_VENDOR]: "border-blue-300 bg-blue-100 text-blue-800",
+  [DriverStatus.PICKED_UP]: "border-cyan-300 bg-cyan-100 text-cyan-800",
   [DriverStatus.EN_ROUTE_TO_CLIENT]:
     "border-green-300 bg-green-100 text-green-800",
   [DriverStatus.ARRIVED_TO_CLIENT]:
@@ -116,7 +122,13 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
       case DriverStatus.ASSIGNED:
         timeEstimate = "~30-45 min";
         break;
+      case DriverStatus.EN_ROUTE_TO_VENDOR:
+        timeEstimate = "~25-40 min";
+        break;
       case DriverStatus.ARRIVED_AT_VENDOR:
+        timeEstimate = "~25-35 min";
+        break;
+      case DriverStatus.PICKED_UP:
         timeEstimate = "~20-30 min";
         break;
       case DriverStatus.EN_ROUTE_TO_CLIENT:
@@ -221,49 +233,85 @@ export const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
                 </div>
               </div>
 
-              {/* Enhanced progress bar with timestamps */}
-              <div className="relative">
+              {/* Enhanced progress bar — Desktop: single bar + single label row */}
+              <div className="relative hidden md:block">
                 <Progress
                   value={getProgressValue(order.driver_status)}
                   className="h-3 w-full bg-slate-200"
-                  indicatorClassName={cn("transition-all duration-500", {
-                    "bg-yellow-400":
-                      order.driver_status === DriverStatus.ASSIGNED,
-                    "bg-blue-500":
-                      order.driver_status === DriverStatus.ARRIVED_AT_VENDOR,
-                    "bg-green-500":
-                      order.driver_status === DriverStatus.EN_ROUTE_TO_CLIENT,
-                    "bg-purple-500":
-                      order.driver_status === DriverStatus.ARRIVED_TO_CLIENT,
-                    "bg-slate-500":
-                      order.driver_status === DriverStatus.COMPLETED,
-                  })}
+                  indicatorClassName="transition-all duration-500 bg-amber-600"
                 />
-
                 <div className="mt-1 flex justify-between text-xs text-slate-500">
-                  <div className="flex flex-col items-center">
-                    <span>Assigned</span>
-                    <span className="text-[10px]">
-                      {formatDateTime(order.pickup_time)}
-                    </span>
+                  <span className="text-center">En Route to Resto</span>
+                  <span className="text-center">Arrived at Vendor</span>
+                  <span className="text-center">Pick Up Completed</span>
+                  <span className="text-center">En Route to Client</span>
+                  <span className="text-center">Arrived at Client</span>
+                  <span className="text-center">Delivered</span>
+                </div>
+              </div>
+
+              {/* Enhanced progress bar — Mobile: two bars, each with 3 labels */}
+              <div className="space-y-4 md:hidden">
+                {/* First bar: Assigned → Pick Up Completed */}
+                <div className="relative">
+                  <Progress
+                    value={(() => {
+                      const s = order.driver_status;
+                      if (!s || s === DriverStatus.ASSIGNED) return 0;
+                      if (s === DriverStatus.EN_ROUTE_TO_VENDOR) return 33;
+                      if (s === DriverStatus.ARRIVED_AT_VENDOR) return 66;
+                      return 100;
+                    })()}
+                    className="h-3 w-full bg-slate-200"
+                    indicatorClassName={cn("transition-all duration-500", {
+                      "bg-yellow-400":
+                        order.driver_status === DriverStatus.ASSIGNED,
+                      "bg-orange-500":
+                        order.driver_status === DriverStatus.EN_ROUTE_TO_VENDOR,
+                      "bg-blue-500":
+                        order.driver_status === DriverStatus.ARRIVED_AT_VENDOR,
+                      "bg-cyan-500":
+                        order.driver_status === DriverStatus.PICKED_UP,
+                      "bg-green-500":
+                        order.driver_status === DriverStatus.EN_ROUTE_TO_CLIENT,
+                      "bg-purple-500":
+                        order.driver_status === DriverStatus.ARRIVED_TO_CLIENT,
+                      "bg-slate-500":
+                        order.driver_status === DriverStatus.COMPLETED,
+                    })}
+                  />
+                  <div className="mt-1 flex justify-between text-[11px] text-slate-500">
+                    <span className="text-center">En Route<br />to Resto</span>
+                    <span className="text-center">Arrived<br />at Vendor</span>
+                    <span className="text-center">Pick Up<br />Completed</span>
                   </div>
-                  <div className="flex flex-col items-center">
-                    <span>At Vendor</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span>En Route</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span>Arrived</span>
-                    <span className="text-[10px]">
-                      {formatDateTime(order.arrival_time)}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span>Completed</span>
-                    <span className="text-[10px]">
-                      {formatDateTime(order.complete_time)}
-                    </span>
+                </div>
+
+                {/* Second bar: En Route to Client → Delivered */}
+                <div className="relative">
+                  <Progress
+                    value={(() => {
+                      const s = order.driver_status;
+                      if (!s) return 0;
+                      if (s === DriverStatus.EN_ROUTE_TO_CLIENT) return 33;
+                      if (s === DriverStatus.ARRIVED_TO_CLIENT) return 66;
+                      if (s === DriverStatus.COMPLETED) return 100;
+                      return 0;
+                    })()}
+                    className="h-3 w-full bg-slate-200"
+                    indicatorClassName={cn("transition-all duration-500", {
+                      "bg-green-500":
+                        order.driver_status === DriverStatus.EN_ROUTE_TO_CLIENT,
+                      "bg-purple-500":
+                        order.driver_status === DriverStatus.ARRIVED_TO_CLIENT,
+                      "bg-slate-500":
+                        order.driver_status === DriverStatus.COMPLETED,
+                    })}
+                  />
+                  <div className="mt-1 flex justify-between text-[11px] text-slate-500">
+                    <span className="text-center">En Route<br />to Client</span>
+                    <span className="text-center">Arrived<br />at Client</span>
+                    <span className="text-center">Delivered</span>
                   </div>
                 </div>
               </div>

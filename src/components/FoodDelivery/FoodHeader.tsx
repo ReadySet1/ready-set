@@ -58,7 +58,7 @@ const FoodHeader: React.FC = () => {
 
   return (
     <section
-      className="relative min-h-[500px] w-full md:h-[70vh] md:min-h-[600px] mt-6 md:mt-8 lg:mt-4 mb-16 md:mb-24 lg:mb-32"
+      className="relative min-h-card-h-lg w-full md:h-[70vh] md:min-h-[600px] mt-6 md:mt-8 lg:mt-4 mb-16 md:mb-24 lg:mb-32"
     >
       {/* Background image container */}
       <div className="absolute inset-0 z-0 overflow-hidden">

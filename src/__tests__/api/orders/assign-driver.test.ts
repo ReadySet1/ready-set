@@ -8,24 +8,32 @@ import * as softDeleteHandlers from '@/lib/soft-delete-handlers';
 
 // Mock dependencies
 jest.mock('@/utils/supabase/server');
-jest.mock('@/utils/prismaDB', () => ({
-  prisma: {
-    $transaction: jest.fn(),
-    cateringRequest: {
-      findUnique: jest.fn(),
-      update: jest.fn(),
-    },
-    onDemand: {
-      findUnique: jest.fn(),
-      update: jest.fn(),
-    },
-    dispatch: {
-      findFirst: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-  },
-}));
+jest.mock('@/utils/prismaDB', () => {
+  const cateringRequest = {
+    findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+    update: jest.fn(),
+  };
+  const onDemand = {
+    findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+    update: jest.fn(),
+  };
+  const dispatch = {
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  };
+  const mock = {
+    cateringRequest,
+    onDemand,
+    dispatch,
+    // $transaction runs the callback against the same mock so that calls
+    // inside the route hit these jest.fn() instances.
+    $transaction: jest.fn(async (cb: (tx: unknown) => unknown) => cb(mock)),
+  };
+  return { prisma: mock };
+});
 jest.mock('@/lib/soft-delete-handlers');
 
 describe('/api/orders/assignDriver POST API', () => {
@@ -249,6 +257,7 @@ describe('/api/orders/assignDriver POST API', () => {
           cateringRequest: {
             findUnique: jest.fn().mockResolvedValue(mockOrder),
             update: jest.fn().mockResolvedValue(mockUpdatedOrder),
+            findUniqueOrThrow: jest.fn().mockResolvedValue(mockUpdatedOrder),
           },
           dispatch: {
             findFirst: jest.fn().mockResolvedValue(null), // No existing dispatch
@@ -307,6 +316,7 @@ describe('/api/orders/assignDriver POST API', () => {
           cateringRequest: {
             findUnique: jest.fn().mockResolvedValue(mockOrder),
             update: jest.fn().mockResolvedValue(mockUpdatedOrder),
+            findUniqueOrThrow: jest.fn().mockResolvedValue(mockUpdatedOrder),
           },
           dispatch: {
             findFirst: jest.fn().mockResolvedValue(existingDispatch),
@@ -396,6 +406,7 @@ describe('/api/orders/assignDriver POST API', () => {
           onDemand: {
             findUnique: jest.fn().mockResolvedValue(mockOrder),
             update: jest.fn().mockResolvedValue(mockUpdatedOrder),
+            findUniqueOrThrow: jest.fn().mockResolvedValue(mockUpdatedOrder),
           },
           dispatch: {
             findFirst: jest.fn().mockResolvedValue(null),
@@ -454,6 +465,7 @@ describe('/api/orders/assignDriver POST API', () => {
           onDemand: {
             findUnique: jest.fn().mockResolvedValue(mockOrder),
             update: jest.fn().mockResolvedValue(mockUpdatedOrder),
+            findUniqueOrThrow: jest.fn().mockResolvedValue(mockUpdatedOrder),
           },
           dispatch: {
             findFirst: jest.fn().mockResolvedValue(existingDispatch),
@@ -641,6 +653,7 @@ describe('/api/orders/assignDriver POST API', () => {
           cateringRequest: {
             findUnique: jest.fn().mockResolvedValue(mockOrder),
             update: jest.fn().mockResolvedValue(mockUpdatedOrder),
+            findUniqueOrThrow: jest.fn().mockResolvedValue(mockUpdatedOrder),
           },
           dispatch: {
             findFirst: jest.fn().mockResolvedValue(null),
@@ -698,6 +711,7 @@ describe('/api/orders/assignDriver POST API', () => {
           cateringRequest: {
             findUnique: jest.fn().mockResolvedValue(mockOrder),
             update: jest.fn().mockResolvedValue(mockUpdatedOrder),
+            findUniqueOrThrow: jest.fn().mockResolvedValue(mockUpdatedOrder),
           },
           dispatch: {
             findFirst: jest.fn().mockResolvedValue(null),

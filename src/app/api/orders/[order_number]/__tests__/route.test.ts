@@ -141,6 +141,10 @@ describe('Orders API Route - Delivery Status Broadcast', () => {
 
   describe('PATCH with driverStatus', () => {
     it('should trigger broadcast when driverStatus is updated', async () => {
+      // Realistic transition: ARRIVED_AT_VENDOR → EN_ROUTE_TO_CLIENT, with the
+      // order already in IN_PROGRESS. The default fixture (ACTIVE + ASSIGNED)
+      // would be rejected by the state machine.
+      setupMocks({ status: 'IN_PROGRESS', driverStatus: 'ARRIVED_AT_VENDOR' });
       const { PATCH } = await importRoute();
 
       const request = createPatchRequest({ driverStatus: 'EN_ROUTE_TO_CLIENT' });

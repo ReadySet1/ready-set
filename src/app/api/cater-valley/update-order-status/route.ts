@@ -7,6 +7,7 @@ import {
   type OrderStatus,
   type CaterValleyUpdateResult,
 } from '@/services/caterValleyService'; // Import from the service file
+import { verifySignature, SIGNATURE_HEADER } from '@/lib/security/hmac';
 
 // Interface for the request body expected by this route handler
 interface UpdateStatusRequestBody {
@@ -14,6 +15,15 @@ interface UpdateStatusRequestBody {
   status: OrderStatus;
   // Add any other internal identifiers if needed, e.g., your internal order ID
   // internalOrderId?: string;
+}
+
+type HmacResult = 'ok' | 'no-secret-configured' | 'missing-signature' | 'mismatch';
+
+async function verifyInboundHmac(rawBody: string, providedSig: string | null): Promise<HmacResult> {
+  const secret = process.env.CATERVALLEY_INBOUND_WEBHOOK_SECRET;
+  if (!secret) return 'no-secret-configured';
+  if (!providedSig) return 'missing-signature';
+  return (await verifySignature(secret, rawBody, providedSig)) ? 'ok' : 'mismatch';
 }
 
 // --- API Route Handler ---
@@ -28,14 +38,69 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    let requestBody: UpdateStatusRequestBody;
+    // Read raw body once so we can both verify the HMAC over the exact bytes
+    // and parse JSON from the same payload. `request.json()` consumes the
+    // stream, so we can't call it after .text().
+    let rawBody: string;
     try {
-        requestBody = await request.json();
+      rawBody = await request.text();
     } catch (e) {
-        console.error("Error parsing JSON body:", e);
-        return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 });
+      console.error('Error reading request body:', e);
+      return NextResponse.json({ message: 'Could not read request body' }, { status: 400 });
     }
 
+    // HMAC verification — additive rollout.
+    // ENFORCE_INBOUND_WEBHOOK_HMAC=true rejects unsigned/mismatched requests
+    // with 401. When false (initial rollout while CaterValley adds signing on
+    // their side), failures are logged but the request still processes.
+    const enforceHmac = process.env.ENFORCE_INBOUND_WEBHOOK_HMAC === 'true';
+    const providedSig = request.headers.get(SIGNATURE_HEADER);
+    const hmacResult = await verifyInboundHmac(rawBody, providedSig);
+
+    // Misconfiguration guard: when enforcement is ON but the secret is missing,
+    // we MUST NOT silently accept traffic. The original code treated
+    // 'no-secret-configured' as a pass under both modes, so a missing env var
+    // in production would disable HMAC entirely — exactly the failure mode
+    // ENFORCE_INBOUND_WEBHOOK_HMAC was supposed to prevent. Fail closed with
+    // 500 so the misconfig is visible in the partner-facing logs immediately.
+    // See PR #402 pre-landing review #3.
+    if (enforceHmac && hmacResult === 'no-secret-configured') {
+      console.error(
+        '[CaterValley] CRITICAL: ENFORCE_INBOUND_WEBHOOK_HMAC=true but CATERVALLEY_INBOUND_WEBHOOK_SECRET is unset. ' +
+          'Refusing all inbound webhooks until the secret is configured.'
+      );
+      return NextResponse.json(
+        { message: 'Webhook verification misconfigured on the server. Contact support.' },
+        { status: 500 }
+      );
+    }
+
+    if (hmacResult !== 'ok' && hmacResult !== 'no-secret-configured') {
+      const detail = {
+        result: hmacResult,
+        enforced: enforceHmac,
+        hasSignatureHeader: providedSig !== null,
+      };
+      if (enforceHmac) {
+        console.warn('[CaterValley] Inbound webhook HMAC failed — rejecting:', detail);
+        return NextResponse.json(
+          { message: 'Invalid or missing webhook signature' },
+          { status: 401 }
+        );
+      }
+      console.warn(
+        '[CaterValley] Inbound webhook HMAC failed — log-only mode (request still processed):',
+        detail
+      );
+    }
+
+    let requestBody: UpdateStatusRequestBody;
+    try {
+      requestBody = JSON.parse(rawBody);
+    } catch (e) {
+      console.error('Error parsing JSON body:', e);
+      return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 });
+    }
 
     // 2. Validate Input
     const { orderNumber, status } = requestBody;
@@ -52,10 +117,6 @@ export async function POST(request: NextRequest) {
             { status: 400 }
         );
     }
-
-    // --- Security Note ---
-    // Add authentication/authorization checks here if this endpoint
-    // needs to be protected. Verify the caller has permission to update this order.
 
 
     // 3. Call the External API via the service function
@@ -153,14 +214,14 @@ export async function POST(request: NextRequest) {
     );
 
   } catch (error: unknown) {
-    // Catch unexpected errors
+    // Catch unexpected errors. Log server-side with full context, but NEVER echo
+    // error.message across the partner trust boundary — it can leak Prisma column
+    // names, internal IDs, or upstream provider response text. See PR #402
+    // pre-landing review #13.
     console.error('Error in /api/cater-valley/update-order-status:', error);
 
-    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
-
-    // Return a generic server error response
     return NextResponse.json(
-      { message: `Internal Server Error: ${errorMessage}` },
+      { message: 'Internal Server Error' },
       { status: 500 }
     );
   }

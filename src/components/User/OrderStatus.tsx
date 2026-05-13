@@ -29,18 +29,34 @@ interface DriverStatusCardProps {
 }
 
 const driverStatusMap: Record<string, string> = {
+  ASSIGNED: "🚗 Assigned",
+  ARRIVED_AT_VENDOR: "🏪 Arrived at Vendor",
+  PICKED_UP: "📦 Pick Up Completed",
+  EN_ROUTE_TO_CLIENT: "🚚 En Route to Client",
+  ARRIVED_TO_CLIENT: "🏁 Arrived at Client",
+  COMPLETED: "✅ Delivered",
+  // Legacy lowercase mappings
   assigned: "🚗 Assigned",
-  arrived_at_vendor: "🏪 At Vendor",
-  en_route_to_client: "🚚 On the Way",
-  arrived_to_client: "🏁 Arrived",
-  completed: "✅ Completed",
+  arrived_at_vendor: "🏪 Arrived at Vendor",
+  picked_up: "📦 Pick Up Completed",
+  en_route_to_client: "🚚 En Route to Client",
+  arrived_to_client: "🏁 Arrived at Client",
+  completed: "✅ Delivered",
 };
 
 const driverStatusProgress: Record<string, number> = {
+  ASSIGNED: 0,
+  ARRIVED_AT_VENDOR: 20,
+  PICKED_UP: 40,
+  EN_ROUTE_TO_CLIENT: 60,
+  ARRIVED_TO_CLIENT: 80,
+  COMPLETED: 100,
+  // Legacy lowercase mappings
   assigned: 0,
-  arrived_at_vendor: 25,
-  en_route_to_client: 50,
-  arrived_to_client: 75,
+  arrived_at_vendor: 20,
+  picked_up: 40,
+  en_route_to_client: 60,
+  arrived_to_client: 80,
   completed: 100,
 };
 
@@ -92,20 +108,22 @@ const OrderStatusCard: React.FC<DriverStatusCardProps> = ({
             </div>
             <div className="space-y-2 py-4">
               <div className="flex flex-col items-center justify-center">
-                <span className="mb-2 text-xl font-medium">Drive Status</span>
+                <span className="mb-2 text-xl font-medium">Driver Status</span>
                 <Badge
                   variant="outline"
                   className={cn("px-4 py-2 text-lg font-medium", {
                     "border-yellow-300 bg-yellow-100 text-yellow-800":
-                      order.driver_status === "assigned" || !order.driver_status,
+                      order.driver_status === "assigned" || order.driver_status === "ASSIGNED" || !order.driver_status,
                     "border-blue-300 bg-blue-100 text-blue-800":
-                      order.driver_status === "arrived_at_vendor",
+                      order.driver_status === "arrived_at_vendor" || order.driver_status === "ARRIVED_AT_VENDOR",
+                    "border-cyan-300 bg-cyan-100 text-cyan-800":
+                      order.driver_status === "picked_up" || order.driver_status === "PICKED_UP",
                     "border-green-300 bg-green-100 text-green-800":
-                      order.driver_status === "en_route_to_client",
+                      order.driver_status === "en_route_to_client" || order.driver_status === "EN_ROUTE_TO_CLIENT",
                     "border-purple-300 bg-purple-100 text-purple-800":
-                      order.driver_status === "arrived_to_client",
+                      order.driver_status === "arrived_to_client" || order.driver_status === "ARRIVED_TO_CLIENT",
                     "border-gray-300 bg-gray-100 text-gray-800":
-                      order.driver_status === "completed",
+                      order.driver_status === "completed" || order.driver_status === "COMPLETED",
                   })}
                 >
                   {getDisplayStatus(order.driver_status)}
@@ -114,11 +132,28 @@ const OrderStatusCard: React.FC<DriverStatusCardProps> = ({
               <Progress
                 value={getProgressValue(order.driver_status)}
                 className="w-full"
-                indicatorClassName="bg-yellow-400"
+                indicatorClassName={cn("transition-all duration-500", {
+                  "bg-yellow-400":
+                    order.driver_status === "assigned" || order.driver_status === "ASSIGNED" || !order.driver_status,
+                  "bg-blue-500":
+                    order.driver_status === "arrived_at_vendor" || order.driver_status === "ARRIVED_AT_VENDOR",
+                  "bg-cyan-500":
+                    order.driver_status === "picked_up" || order.driver_status === "PICKED_UP",
+                  "bg-green-500":
+                    order.driver_status === "en_route_to_client" || order.driver_status === "EN_ROUTE_TO_CLIENT",
+                  "bg-purple-500":
+                    order.driver_status === "arrived_to_client" || order.driver_status === "ARRIVED_TO_CLIENT",
+                  "bg-slate-500":
+                    order.driver_status === "completed" || order.driver_status === "COMPLETED",
+                })}
               />
               <div className="text-muted-foreground flex justify-between text-xs">
-                <span>Not Started</span>
-                <span>Completed</span>
+                <span>Assigned</span>
+                <span>Arrived at Vendor</span>
+                <span>Pick Up Completed</span>
+                <span>En Route to Client</span>
+                <span>Arrived at Client</span>
+                <span>Delivered</span>
               </div>
             </div>
             <div className="flex justify-center">

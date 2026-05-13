@@ -7,10 +7,13 @@ import { createClient } from "@/utils/supabase/server";
 jest.mock("@/utils/prismaDB", () => ({
   prisma: {
     cateringRequest: {
-      findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
     onDemand: {
-      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+    },
+    delivery: {
+      findFirst: jest.fn(),
     },
     $disconnect: jest.fn(),
   },
@@ -21,8 +24,9 @@ jest.mock("@/utils/supabase/server", () => ({
 }));
 
 type PrismaMock = {
-  cateringRequest: { findUnique: jest.Mock };
-  onDemand: { findUnique: jest.Mock };
+  cateringRequest: { findFirst: jest.Mock };
+  onDemand: { findFirst: jest.Mock };
+  delivery: { findFirst: jest.Mock };
   $disconnect: jest.Mock;
 };
 
@@ -121,8 +125,8 @@ describe("/api/user-orders/[order_number]", () => {
   });
 
   it("normalizes catering order to snake_case fields", async () => {
-    mockPrisma.cateringRequest.findUnique.mockResolvedValue(baseCatering);
-    mockPrisma.onDemand.findUnique.mockResolvedValue(null);
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue(baseCatering);
+    mockPrisma.onDemand.findFirst.mockResolvedValue(null);
 
     const res = await GET({} as NextRequest, {
       params: Promise.resolve({ order_number: encodeURIComponent("CAT001") }),
@@ -152,8 +156,8 @@ describe("/api/user-orders/[order_number]", () => {
   });
 
   it("falls back to on-demand order and normalizes fields", async () => {
-    mockPrisma.cateringRequest.findUnique.mockResolvedValue(null);
-    mockPrisma.onDemand.findUnique.mockResolvedValue(baseOnDemand);
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue(null);
+    mockPrisma.onDemand.findFirst.mockResolvedValue(baseOnDemand);
 
     const res = await GET({} as NextRequest, {
       params: Promise.resolve({ order_number: encodeURIComponent("OND001") }),
@@ -171,8 +175,8 @@ describe("/api/user-orders/[order_number]", () => {
   });
 
   it("returns 404 when order is not found", async () => {
-    mockPrisma.cateringRequest.findUnique.mockResolvedValue(null);
-    mockPrisma.onDemand.findUnique.mockResolvedValue(null);
+    mockPrisma.cateringRequest.findFirst.mockResolvedValue(null);
+    mockPrisma.onDemand.findFirst.mockResolvedValue(null);
 
     const res = await GET({} as NextRequest, {
       params: Promise.resolve({ order_number: encodeURIComponent("MISSING") }),

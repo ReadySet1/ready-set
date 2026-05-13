@@ -666,7 +666,11 @@ describe('/api/orders/[order_number] PATCH API - Edit Order', () => {
         }),
       });
 
-      const mockOrder = createMockCateringOrder({ orderNumber: 'CAT001', status: 'ACTIVE' });
+      const mockOrder = createMockCateringOrder({
+        orderNumber: 'CAT001',
+        status: 'ASSIGNED',
+        driverStatus: 'ASSIGNED',
+      });
       mockCateringFindFirst.mockResolvedValue(mockOrder);
       mockCateringUpdate.mockResolvedValue({ ...mockOrder, driverStatus: 'EN_ROUTE_TO_VENDOR' });
 

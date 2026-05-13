@@ -31,6 +31,7 @@ export const CARRIER_CONFIGS: Record<string, CarrierConfig> = {
     enabled: true,
     statusMapping: {
       ASSIGNED: 'CONFIRM',
+      EN_ROUTE_TO_VENDOR: 'CONFIRM',
       ARRIVED_AT_VENDOR: 'READY',
       PICKED_UP: 'ON_THE_WAY',
       EN_ROUTE_TO_CLIENT: 'ON_THE_WAY',
@@ -57,6 +58,7 @@ export const CARRIER_CONFIGS: Record<string, CarrierConfig> = {
     enabled: true,
     statusMapping: {
       ASSIGNED: 'COURIER_ASSIGNED',
+      EN_ROUTE_TO_VENDOR: 'COURIER_ASSIGNED',
       ARRIVED_AT_VENDOR: 'ARRIVED_AT_PICKUP',
       PICKED_UP: 'ORDER_PICKED_UP',
       EN_ROUTE_TO_CLIENT: 'EN_ROUTE_TO_DROPOFF',

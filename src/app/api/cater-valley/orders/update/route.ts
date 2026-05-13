@@ -1,23 +1,37 @@
 /**
- * CaterValley Orders Update API Endpoint
- * Allows CaterValley to update existing draft orders
+ * Partner Order API — Update endpoint.
+ *
+ * Modifies a draft order before confirmation. Same partner identity
+ * resolution as /draft. The existing order's owner/prefix is checked
+ * against the resolved partner so partner A can't update partner B's
+ * orders even with valid credentials.
+ *
+ * Available at both `/api/cater-valley/orders/update` and
+ * `/api/partners/orders/update`.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { calculatePickupTime, isDeliveryTimeAvailable } from '@/lib/services/pricingService';
+import { enforceBodySizeLimit } from '@/lib/security/body-size-limit';
+import { enforceRateLimit } from '@/lib/security/rate-limit';
 import {
-  validateCaterValleyAuth,
+  readIdempotencyContext,
+  replayCachedResponse,
+  storeAndReturnResponse,
+} from '@/lib/security/idempotency';
+import {
+  authenticatePartnerRequest,
   ensureAddress,
-  normalizeOrderNumber,
+  buildOrderNumber,
   isOrderEditable,
-  isCaterValleyOrder,
+  isPartnerOrder,
   calculateCaterValleyPricing,
   type PricingCalculationResult,
 } from '@/app/api/cater-valley/_lib';
 
-// Validation schema for CaterValley update order request
 const UpdateOrderSchema = z.object({
   id: z.string().uuid('Invalid order ID format'),
   orderCode: z.string().min(1, 'Order code is required'),
@@ -59,35 +73,37 @@ interface UpdateOrderResponse {
   message?: string;
   breakdown?: {
     basePrice: number;
-    mileageFee?: number;         // Dollar amount for mileage over 10 miles
-    dailyDriveDiscount?: number; // Dollar amount discount for multiple daily drives
-    bridgeToll?: number;         // Dollar amount for bridge toll
-    peakTimeMultiplier?: number; // Reserved for future use
+    mileageFee?: number;
+    dailyDriveDiscount?: number;
+    bridgeToll?: number;
+    peakTimeMultiplier?: number;
   };
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Authentication
-    if (!validateCaterValleyAuth(request)) {
-      return NextResponse.json(
-        { 
-          status: 'ERROR',
-          message: 'Unauthorized - Invalid API key or partner header' 
-        },
-        { status: 401 }
-      );
-    }
+    const sizeReject = enforceBodySizeLimit(request);
+    if (sizeReject) return sizeReject;
 
-    // 2. Parse and validate request body
+    const auth = await authenticatePartnerRequest(request);
+    if (!auth.ok) return auth.response;
+    const { partner } = auth;
+
+    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.update');
+    if (rateLimitReject) return rateLimitReject;
+
+    const idempotency = readIdempotencyContext(request, partner.slug);
+    const replay = await replayCachedResponse(idempotency);
+    if (replay) return replay;
+
     let requestBody: UpdateOrderRequest;
     try {
       requestBody = await request.json();
     } catch (error) {
       return NextResponse.json(
-        { 
+        {
           status: 'ERROR',
-          message: 'Invalid JSON in request body' 
+          message: 'Invalid JSON in request body',
         },
         { status: 400 }
       );
@@ -107,7 +123,9 @@ export async function POST(request: NextRequest) {
 
     const validatedData = validationResult.data;
 
-    // 3. Check if order exists and belongs to CaterValley
+    // 3. Check if order exists and belongs to the authenticated partner.
+    //    Soft-deleted orders return 404 (rather than letting partner clients
+    //    "resurrect" deleted orders by updating them).
     const existingOrder = await prisma.cateringRequest.findUnique({
       where: { id: validatedData.id },
       include: {
@@ -117,7 +135,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!existingOrder) {
+    if (!existingOrder || existingOrder.deletedAt) {
       return NextResponse.json(
         {
           status: 'ERROR',
@@ -127,18 +145,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify this is a CaterValley order
-    if (!isCaterValleyOrder(existingOrder.orderNumber, existingOrder.user.email)) {
+    // Verify this order belongs to the authenticated partner.
+    if (!isPartnerOrder(existingOrder.orderNumber, existingOrder.user.email, partner)) {
       return NextResponse.json(
         {
           status: 'ERROR',
-          message: 'This order cannot be updated via CaterValley API',
+          message: 'This order cannot be updated via the partner API',
         },
         { status: 403 }
       );
     }
 
-    // Check if order is in a state that allows updates
     if (!isOrderEditable(existingOrder.status)) {
       return NextResponse.json(
         {
@@ -149,39 +166,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Business validation
     if (!isDeliveryTimeAvailable(validatedData.deliveryDate, validatedData.deliveryTime)) {
       return NextResponse.json(
         {
           status: 'ERROR',
-          message: 'Delivery time is not available - must be at least 2 hours in advance and within business hours (7 AM - 10 PM)',
+          message:
+            'Delivery time is not available - must be at least 2 hours in advance and within business hours (7 AM - 10 PM)',
         },
         { status: 422 }
       );
     }
 
-    // 5. Check for duplicate order codes (excluding current order)
-    const normalizedOrderNumber = normalizeOrderNumber(validatedData.orderCode);
+    // 5. Fast-path duplicate check on rename (excluding current order and
+    //    soft-deleted rows). The DB unique constraint at update time is
+    //    the authoritative race-safe guard (handled in catch block below).
+    const normalizedOrderNumber = buildOrderNumber(validatedData.orderCode, partner.orderPrefix);
     if (normalizedOrderNumber !== existingOrder.orderNumber) {
       const duplicateOrder = await prisma.cateringRequest.findFirst({
-        where: { 
+        where: {
           orderNumber: normalizedOrderNumber,
           id: { not: validatedData.id },
+          deletedAt: null,
         },
+        select: { id: true },
       });
 
       if (duplicateOrder) {
-        return NextResponse.json(
-          {
-            status: 'ERROR',
-            message: `Order with code ${validatedData.orderCode} already exists`,
-          },
-          { status: 409 }
-        );
+        return storeAndReturnResponse(idempotency, 409, {
+          status: 'ERROR',
+          message: `Order with code ${validatedData.orderCode} already exists`,
+        });
       }
     }
 
-    // 4. Calculate pricing with distance, bridge toll detection, and validation
     let distance: number;
     let usedFallbackDistance: boolean;
     let pricingResult: PricingCalculationResult['pricingResult'];
@@ -193,63 +210,75 @@ export async function POST(request: NextRequest) {
         dropOffLocation: validatedData.dropOffLocation,
         totalItem: validatedData.totalItem,
         priceTotal: validatedData.priceTotal,
-        feature: 'catervalley_webhook_update'
+        feature: `${partner.slug}_webhook_update`,
       });
 
       distance = result.distance;
       usedFallbackDistance = result.usedFallbackDistance;
       pricingResult = result.pricingResult;
     } catch (error) {
-      // Pricing calculation error (e.g., zero delivery fee)
+      // Log server-side, never echo error.message across the partner trust boundary.
+      // See PR #402 pre-landing review #13.
+      console.error('[CaterValley update] Pricing calculation failed:', error);
       return NextResponse.json(
         {
           status: 'ERROR',
-          message: error instanceof Error ? error.message : 'Pricing calculation error',
+          message: 'Pricing calculation failed. Please verify pickup/delivery addresses and order details, then retry.',
         },
         { status: 422 }
       );
     }
 
-    // 6. Update or create addresses
-    const [pickupAddressRecord, deliveryAddressRecord] = await Promise.all([
-      ensureAddress(validatedData.pickupLocation),
-      ensureAddress(validatedData.dropOffLocation),
-    ]);
-
-    // 7. Update the order
-    // Import timezone utility for proper conversion
     const { localTimeToUtc } = await import('@/lib/utils/timezone');
-    const deliveryDateTime = new Date(localTimeToUtc(validatedData.deliveryDate, validatedData.deliveryTime));
+    const deliveryDateTime = new Date(
+      localTimeToUtc(validatedData.deliveryDate, validatedData.deliveryTime)
+    );
     const pickupTime = calculatePickupTime(validatedData.deliveryDate, validatedData.deliveryTime);
 
-    const updatedOrder = await prisma.cateringRequest.update({
-      where: { id: validatedData.id },
-      data: {
-        orderNumber: normalizedOrderNumber,
-        pickupAddressId: pickupAddressRecord.id,
-        deliveryAddressId: deliveryAddressRecord.id,
-        headcount: validatedData.totalItem,
-        orderTotal: validatedData.priceTotal,
-        pickupDateTime: new Date(pickupTime),
-        arrivalDateTime: deliveryDateTime,
-        clientAttention: validatedData.dropOffLocation.recipient.name,
-        pickupNotes: `CaterValley Order - Pickup from: ${validatedData.pickupLocation.name}`,
-        specialNotes: usedFallbackDistance
-          ? `${validatedData.dropOffLocation.instructions || ''}\n[FALLBACK DISTANCE: ${distance}mi - Manual review needed]`.trim()
-          : validatedData.dropOffLocation.instructions || '',
-        // Update delivery cost and distance for transparency
-        deliveryCost: pricingResult.deliveryFee,
-        deliveryDistance: distance,
-        updatedAt: new Date(),
-      },
-      include: {
-        pickupAddress: true,
-        deliveryAddress: true,
-        user: true,
-      },
-    });
+    let updatedOrder;
+    try {
+      updatedOrder = await prisma.$transaction(async (tx) => {
+        const [pickupAddressRecord, deliveryAddressRecord] = await Promise.all([
+          ensureAddress(validatedData.pickupLocation, tx),
+          ensureAddress(validatedData.dropOffLocation, tx),
+        ]);
 
-    // 8. Return success response
+        return tx.cateringRequest.update({
+          where: { id: validatedData.id },
+          data: {
+            orderNumber: normalizedOrderNumber,
+            pickupAddressId: pickupAddressRecord.id,
+            deliveryAddressId: deliveryAddressRecord.id,
+            headcount: validatedData.totalItem,
+            orderTotal: validatedData.priceTotal,
+            pickupDateTime: new Date(pickupTime),
+            arrivalDateTime: deliveryDateTime,
+            clientAttention: validatedData.dropOffLocation.recipient.name,
+            pickupNotes: `${partner.displayName} Order - Pickup from: ${validatedData.pickupLocation.name}`,
+            specialNotes: usedFallbackDistance
+              ? `${validatedData.dropOffLocation.instructions || ''}\n[FALLBACK DISTANCE: ${distance}mi - Manual review needed]`.trim()
+              : validatedData.dropOffLocation.instructions || '',
+            deliveryCost: pricingResult.deliveryFee,
+            deliveryDistance: distance,
+            updatedAt: new Date(),
+          },
+          include: {
+            pickupAddress: true,
+            deliveryAddress: true,
+            user: true,
+          },
+        });
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return storeAndReturnResponse(idempotency, 409, {
+          status: 'ERROR',
+          message: `Order with code ${validatedData.orderCode} already exists`,
+        });
+      }
+      throw error;
+    }
+
     const response: UpdateOrderResponse = {
       id: updatedOrder.id,
       deliveryPrice: pricingResult.deliveryFee,
@@ -260,17 +289,13 @@ export async function POST(request: NextRequest) {
         basePrice: pricingResult.deliveryCost,
         mileageFee: pricingResult.totalMileagePay,
         dailyDriveDiscount: pricingResult.dailyDriveDiscount,
-        // Note: Bridge toll ($8) is NOT included - it's driver compensation paid by Ready Set
       },
     };
 
-
-    return NextResponse.json(response, { status: 200 });
-
+    return storeAndReturnResponse(idempotency, 200, response);
   } catch (error) {
-    console.error('Error updating CaterValley order:', error);
+    console.error('Error updating partner order:', error);
 
-    // Handle specific database errors
     if (error instanceof Error) {
       if (error.message.includes('Unique constraint')) {
         return NextResponse.json(
@@ -301,4 +326,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

@@ -248,7 +248,7 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         const mockExistingOrder = {
           id: 'order-1',
           orderNumber: 'CATER-001',
-          status: 'PENDING',
+          status: 'ASSIGNED',
           user: { name: 'John Doe', email: 'john@example.com' },
           pickupAddress: {},
           deliveryAddress: { state: 'CA' },
@@ -295,8 +295,8 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         const mockExistingOrder = {
           id: 'order-2',
           orderNumber: 'OD-002',
-          status: 'PENDING',
-          driverStatus: null,
+          status: 'ASSIGNED',
+          driverStatus: 'ASSIGNED',
           user: { name: 'Jane Smith', email: 'jane@example.com' },
           pickupAddress: {},
           deliveryAddress: { state: 'TX' },
@@ -308,7 +308,7 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
 
         const mockUpdatedOrder = {
           ...mockExistingOrder,
-          driverStatus: 'EN_ROUTE',
+          driverStatus: 'EN_ROUTE_TO_VENDOR',
           status: 'IN_PROGRESS', // Auto-synced from driver status
         };
 
@@ -317,13 +317,13 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
 
         const request = createPatchRequest(
           'http://localhost:3000/api/orders/OD-002',
-          { driverStatus: 'EN_ROUTE' }
+          { driverStatus: 'EN_ROUTE_TO_VENDOR' }
         );
         const params = { order_number: 'OD-002' };
         const response = await PATCH(request, { params: Promise.resolve(params) });
         const data = await expectSuccessResponse(response, 200);
 
-        expect(data.driverStatus).toBe('EN_ROUTE');
+        expect(data.driverStatus).toBe('EN_ROUTE_TO_VENDOR');
         expect(data.order_type).toBe('on_demand');
       });
 
@@ -335,7 +335,8 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         const mockExistingOrder = {
           id: 'order-1',
           orderNumber: 'CATER-001',
-          status: 'PENDING',
+          status: 'ASSIGNED',
+          driverStatus: 'ASSIGNED',
           user: { name: 'John Doe', email: 'john@example.com' },
           pickupAddress: {},
           deliveryAddress: { state: 'CA' },
@@ -348,7 +349,7 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         const mockUpdatedOrder = {
           ...mockExistingOrder,
           status: 'IN_PROGRESS',
-          driverStatus: 'ASSIGNED',
+          driverStatus: 'EN_ROUTE_TO_VENDOR',
         };
 
         (prisma.cateringRequest.findFirst as jest.Mock).mockResolvedValue(mockExistingOrder);
@@ -356,14 +357,14 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
 
         const request = createPatchRequest(
           'http://localhost:3000/api/orders/CATER-001',
-          { status: 'IN_PROGRESS', driverStatus: 'ASSIGNED' }
+          { status: 'IN_PROGRESS', driverStatus: 'EN_ROUTE_TO_VENDOR' }
         );
         const params = { order_number: 'CATER-001' };
         const response = await PATCH(request, { params: Promise.resolve(params) });
         const data = await expectSuccessResponse(response, 200);
 
         expect(data.status).toBe('IN_PROGRESS');
-        expect(data.driverStatus).toBe('ASSIGNED');
+        expect(data.driverStatus).toBe('EN_ROUTE_TO_VENDOR');
       });
     });
 
@@ -430,7 +431,7 @@ describe('/api/orders/[order_number] - Get and Update Order', () => {
         const mockExistingOrder = {
           id: 'order-1',
           orderNumber: 'CATER-001',
-          status: 'PENDING',
+          status: 'ASSIGNED',
           user: { name: 'John Doe', email: 'john@example.com' },
           pickupAddress: {},
           deliveryAddress: { state: 'CA' },

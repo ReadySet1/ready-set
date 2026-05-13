@@ -37,6 +37,7 @@ export class CaterValleyWebhookService {
   private static mapDriverStatusToCaterValley(driverStatus: DriverStatus): CaterValleyStatus | null {
     const statusMap: Record<DriverStatus, CaterValleyStatus | null> = {
       ASSIGNED: 'CONFIRM',
+      EN_ROUTE_TO_VENDOR: 'CONFIRM',
       ARRIVED_AT_VENDOR: 'READY',
       PICKED_UP: 'READY', // Order picked up, mapped to READY for CaterValley
       EN_ROUTE_TO_CLIENT: 'ON_THE_WAY',

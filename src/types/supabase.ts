@@ -1488,6 +1488,7 @@ export type Database = {
         | "ARRIVED_TO_CLIENT"
         | "ASSIGNED"
         | "COMPLETED"
+        | "EN_ROUTE_TO_VENDOR"
       FormType: "FOOD" | "FLOWER" | "BAKERY" | "SPECIALTY"
       OnDemandStatus:
         | "ACTIVE"

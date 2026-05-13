@@ -6,7 +6,7 @@ import { getCloudinaryUrl } from "@/lib/cloudinary";
 
 const MainMeal: React.FC = () => {
   return (
-    <div className="relative min-h-[500px] w-full overflow-hidden">
+    <div className="relative min-h-card-h-lg w-full overflow-hidden">
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <Image

@@ -1,22 +1,30 @@
 /**
- * CaterValley Orders Confirm API Endpoint
- * Confirms or cancels orders from CaterValley
+ * Partner Order API — Confirm endpoint.
+ *
+ * Finalizes a draft for dispatch (or rejects it). Available at both
+ * `/api/cater-valley/orders/confirm` and `/api/partners/orders/confirm`.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db/prisma';
+import { enforceBodySizeLimit } from '@/lib/security/body-size-limit';
+import { enforceRateLimit } from '@/lib/security/rate-limit';
 import {
-  validateCaterValleyAuth,
+  readIdempotencyContext,
+  replayCachedResponse,
+  storeAndReturnResponse,
+} from '@/lib/security/idempotency';
+import {
+  authenticatePartnerRequest,
   isOrderEditable,
-  isCaterValleyOrder,
+  isPartnerOrder,
 } from '@/app/api/cater-valley/_lib';
 
-// Validation schema for CaterValley confirm order request
 const ConfirmOrderSchema = z.object({
   id: z.string().uuid('Invalid order ID format'),
   isAccepted: z.boolean(),
-  reason: z.string().optional(), // For rejection reasons
+  reason: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -34,60 +42,49 @@ interface ConfirmOrderResponse {
   };
 }
 
-/**
- * Triggers internal dispatch processes for confirmed orders
- */
 async function triggerOrderDispatch(orderId: string): Promise<void> {
   try {
-    // In a real implementation, this would:
-    // 1. Add the order to the dispatch queue
-    // 2. Notify available drivers
-    // 3. Start the driver assignment process
-    // 4. Set up tracking and notifications
-
-        
-    // For now, we'll just log the action
-    // In the future, you might call internal services here:
-    // await dispatchService.queueOrder(orderId);
-    // await notificationService.notifyDrivers(orderId);
-    
+    // In a real implementation, this would queue the order, notify
+    // drivers, and start tracking. Failure here must not fail the
+    // confirmation response — the partner already considers the order
+    // accepted, and a dispatch retry can pick it up later.
+    void orderId;
   } catch (error) {
     console.error(`Failed to trigger dispatch for order ${orderId}:`, error);
-    // Don't throw here - we don't want to fail the confirmation if dispatch setup fails
   }
 }
 
-/**
- * Calculates estimated delivery time based on pickup time and service area
- */
 function calculateEstimatedDeliveryTime(pickupDateTime: Date): string {
-  // Add typical delivery time (30-60 minutes depending on distance)
-  const estimatedDeliveryTime = new Date(pickupDateTime.getTime() + 45 * 60 * 1000); // 45 minutes average
+  // 45 minute average between pickup and delivery; replace with a
+  // distance-derived estimate once we have one.
+  const estimatedDeliveryTime = new Date(pickupDateTime.getTime() + 45 * 60 * 1000);
   return estimatedDeliveryTime.toISOString();
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Authentication
-    if (!validateCaterValleyAuth(request)) {
-      return NextResponse.json(
-        { 
-          status: 'ERROR',
-          message: 'Unauthorized - Invalid API key or partner header' 
-        },
-        { status: 401 }
-      );
-    }
+    const sizeReject = enforceBodySizeLimit(request);
+    if (sizeReject) return sizeReject;
 
-    // 2. Parse and validate request body
+    const auth = await authenticatePartnerRequest(request);
+    if (!auth.ok) return auth.response;
+    const { partner } = auth;
+
+    const rateLimitReject = await enforceRateLimit(partner.slug, 'orders.confirm');
+    if (rateLimitReject) return rateLimitReject;
+
+    const idempotency = readIdempotencyContext(request, partner.slug);
+    const replay = await replayCachedResponse(idempotency);
+    if (replay) return replay;
+
     let requestBody: ConfirmOrderRequest;
     try {
       requestBody = await request.json();
     } catch (error) {
       return NextResponse.json(
-        { 
+        {
           status: 'ERROR',
-          message: 'Invalid JSON in request body' 
+          message: 'Invalid JSON in request body',
         },
         { status: 400 }
       );
@@ -107,7 +104,6 @@ export async function POST(request: NextRequest) {
 
     const validatedData = validationResult.data;
 
-    // 3. Check if order exists and belongs to CaterValley
     const existingOrder = await prisma.cateringRequest.findUnique({
       where: { id: validatedData.id },
       include: {
@@ -117,7 +113,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!existingOrder) {
+    if (!existingOrder || existingOrder.deletedAt) {
       return NextResponse.json(
         {
           status: 'ERROR',
@@ -127,18 +123,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify this is a CaterValley order
-    if (!isCaterValleyOrder(existingOrder.orderNumber, existingOrder.user.email)) {
+    if (!isPartnerOrder(existingOrder.orderNumber, existingOrder.user.email, partner)) {
       return NextResponse.json(
         {
           status: 'ERROR',
-          message: 'This order cannot be confirmed via CaterValley API',
+          message: 'This order cannot be confirmed via the partner API',
         },
         { status: 403 }
       );
     }
 
-    // Check if order is in a state that allows confirmation
     if (!isOrderEditable(existingOrder.status)) {
       return NextResponse.json(
         {
@@ -149,33 +143,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Process confirmation or cancellation
     if (!validatedData.isAccepted) {
-      // Cancel the order
       const cancelledOrder = await prisma.cateringRequest.update({
         where: { id: validatedData.id },
-        data: { 
+        data: {
           status: 'CANCELLED',
-          specialNotes: validatedData.reason 
+          specialNotes: validatedData.reason
             ? `${existingOrder.specialNotes || ''}\nCancellation reason: ${validatedData.reason}`.trim()
             : existingOrder.specialNotes,
           updatedAt: new Date(),
         },
       });
 
-      
-      return NextResponse.json({
+      return storeAndReturnResponse(idempotency, 200, {
         id: cancelledOrder.id,
         orderNumber: cancelledOrder.orderNumber,
         status: 'CANCELLED' as const,
         message: 'Order has been cancelled successfully',
-      }, { status: 200 });
+      });
     }
 
-    // 5. Confirm the order
     const confirmedOrder = await prisma.cateringRequest.update({
       where: { id: validatedData.id },
-      data: { 
+      data: {
         status: 'CONFIRMED',
         updatedAt: new Date(),
       },
@@ -185,11 +175,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 6. Trigger internal dispatch processes
     await triggerOrderDispatch(confirmedOrder.id);
 
-    // 7. Calculate response data
-    const estimatedDeliveryTime = confirmedOrder.pickupDateTime 
+    const estimatedDeliveryTime = confirmedOrder.pickupDateTime
       ? calculateEstimatedDeliveryTime(confirmedOrder.pickupDateTime)
       : undefined;
 
@@ -200,18 +188,15 @@ export async function POST(request: NextRequest) {
       message: 'Order has been confirmed and is ready for dispatch',
       estimatedDeliveryTime,
       driverAssignment: {
-        expectedAssignmentTime: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes
+        expectedAssignmentTime: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         trackingAvailable: true,
       },
     };
 
-    
-    return NextResponse.json(response, { status: 200 });
-
+    return storeAndReturnResponse(idempotency, 200, response);
   } catch (error) {
-    console.error('Error confirming CaterValley order:', error);
+    console.error('Error confirming partner order:', error);
 
-    // Handle specific database errors
     if (error instanceof Error) {
       if (error.message.includes('Record to update not found')) {
         return NextResponse.json(
@@ -232,4 +217,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

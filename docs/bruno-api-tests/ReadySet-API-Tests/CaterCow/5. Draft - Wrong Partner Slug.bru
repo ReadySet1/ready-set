@@ -1,0 +1,56 @@
+meta {
+  name: 5. Draft - Wrong Partner Slug
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{PARTNERS_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: catervalley
+  x-api-key: {{CATERCOW_API_KEY}}
+}
+
+body:json {
+  {
+    "orderCode": "CC-MISMATCH",
+    "deliveryDate": "2026-06-15",
+    "deliveryTime": "11:30",
+    "totalItem": 30,
+    "priceTotal": 850.00,
+    "pickupLocation": {
+      "name": "Tasty Catering Co.",
+      "address": "123 Main St",
+      "city": "San Francisco",
+      "state": "CA"
+    },
+    "dropOffLocation": {
+      "name": "Acme Corp HQ",
+      "address": "500 Market St",
+      "city": "San Francisco",
+      "state": "CA",
+      "recipient": {
+        "name": "Jane Smith",
+        "phone": "4155550200"
+      }
+    }
+  }
+}
+
+docs {
+  # CaterCow — Slug/Key Mismatch (negative test)
+
+  A valid CaterCow API key sent with `partner: catervalley` must NOT
+  authenticate. Defense against header/key mismatch.
+}
+
+tests {
+  test("Rejected with 401", function() {
+    expect(res.getStatus()).to.equal(401);
+  });
+}

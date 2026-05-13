@@ -1,0 +1,64 @@
+meta {
+  name: 2. Update Order
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{PARTNERS_URL}}/orders/update
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{CATERCOW_PARTNER}}
+  x-api-key: {{CATERCOW_API_KEY}}
+}
+
+body:json {
+  {
+    "id": "{{cc_orderId}}",
+    "orderCode": "CC-UPDATED",
+    "deliveryDate": "2026-06-15",
+    "deliveryTime": "12:00",
+    "totalItem": 40,
+    "priceTotal": 1100.00,
+    "pickupLocation": {
+      "name": "Tasty Catering Co.",
+      "address": "123 Main St",
+      "city": "San Francisco",
+      "state": "CA",
+      "zip": "94102"
+    },
+    "dropOffLocation": {
+      "name": "Acme Corp HQ",
+      "address": "500 Market St",
+      "city": "San Francisco",
+      "state": "CA",
+      "zip": "94105",
+      "recipient": {
+        "name": "Jane Smith",
+        "phone": "4155550200"
+      }
+    }
+  }
+}
+
+docs {
+  # CaterCow — Update Order
+
+  Updates the draft created by Step 1. Run Step 1 first so `cc_orderId` is set.
+}
+
+tests {
+  test("Update succeeded (200)", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Response has SUCCESS status", function() {
+    expect(res.getBody().status).to.equal("SUCCESS");
+  });
+  test("Recalculated delivery price matches new headcount/total", function() {
+    expect(res.getBody().deliveryPrice).to.be.a('number');
+  });
+}

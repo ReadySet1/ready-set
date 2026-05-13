@@ -1,0 +1,30 @@
+Production delivery_configurations backup
+Timestamp: 2026-04-20T04:29:22.396Z
+Row count: 5
+================================================================================
+
+config_id: cater-valley
+client_name: CaterValley
+is_active: true
+updated_at: Thu Jan 15 2026 11:21:29 GMT-0600 (Central Standard Time)
+----------------------------------------
+config_id: generic-template
+client_name: Generic Template
+is_active: false
+updated_at: Thu Oct 09 2025 12:03:45 GMT-0600 (Central Standard Time)
+----------------------------------------
+config_id: kasa
+client_name: Kasa
+is_active: true
+updated_at: Thu Oct 09 2025 12:03:45 GMT-0600 (Central Standard Time)
+----------------------------------------
+config_id: ready-set-food-premium
+client_name: Ready Set Food - Premium
+is_active: false
+updated_at: Thu Oct 09 2025 12:03:45 GMT-0600 (Central Standard Time)
+----------------------------------------
+config_id: ready-set-food-standard
+client_name: Ready Set Food - Standard
+is_active: true
+updated_at: Thu Oct 09 2025 10:56:33 GMT-0600 (Central Standard Time)
+----------------------------------------

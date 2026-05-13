@@ -1,0 +1,46 @@
+meta {
+  name: 3. Confirm Order
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{PARTNERS_URL}}/orders/confirm
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{CATERCOW_PARTNER}}
+  x-api-key: {{CATERCOW_API_KEY}}
+}
+
+body:json {
+  {
+    "id": "{{cc_orderId}}",
+    "isAccepted": true
+  }
+}
+
+docs {
+  # CaterCow — Confirm Order
+
+  Finalizes the draft for dispatch. After this call:
+    - `orderNumber` will start with `CC-` (CaterCow's prefix)
+    - `brokerage` column = "CaterCow" in catering_requests
+    - Once CaterCow's webhook URL is configured, status callbacks fire
+      with HMAC `x-readyset-signature` headers
+}
+
+tests {
+  test("Confirm succeeded (200)", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Order is CONFIRMED", function() {
+    expect(res.getBody().status).to.equal("CONFIRMED");
+  });
+  test("orderNumber has CC- prefix", function() {
+    expect(res.getBody().orderNumber).to.match(/^CC-/);
+  });
+}

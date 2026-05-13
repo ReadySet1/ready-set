@@ -124,6 +124,30 @@ API Route → Server Action → Service Layer → Utils → Prisma
 
 **Seed Script**: `scripts/seed-delivery-configurations.ts` — Seeds in-memory configs to DB
 
+### Internal Dashboards (QA + Tasks)
+
+Two admin-only pages render generated JSON for cross-team visibility:
+
+- `/admin/qa-board` — `src/app/(backend)/admin/qa-board/page.tsx`
+- `/admin/tasks-board` — `src/app/(backend)/admin/tasks-board/page.tsx`
+- Components: `src/components/internal-boards/{QaBoard,TasksBoard,VerdictBadge}.tsx`
+- Types: `src/types/internal-boards.ts`
+- Data: `src/data/{qa-board,tasks-board}.json` — **generated, do not hand-edit**
+
+The JSON files are produced from workspace-level sources (one level up from `repos/ready-set/`):
+
+- Tasks board source: `meetings/shared/tasks-board.json` (hand-edited)
+- QA board source: `docs/ready-set/qa/YYYY-QN-test-cases.csv` (re-exported from Jira/TestRail each quarter)
+
+Regenerate via:
+
+```bash
+node meetings/shared/build-tasks-board.mjs        # tasks board
+node docs/ready-set/qa/build-qa-board.mjs         # QA board
+```
+
+Cross-link convention: tasks promoted from a QA failure carry `relatedQa: "REA-OMG-NN"` in `tasks-board.json`. The QA page renders a "Tracked as task" badge on linked failures; the Tasks page renders a "From QA" badge on linked tasks. See workspace `CLAUDE.md` "Tasks board" section for the full promotion convention.
+
 ### Testing
 
 **Jest** (`jest.config.js`):
@@ -144,12 +168,14 @@ API Route → Server Action → Service Layer → Utils → Prisma
 
 ### Git Workflow
 
-**IMPORTANT: Always create a Pull Request before merging into `main`.**
+**IMPORTANT: All new work targets `development` first, then `development` is promoted to `main`.**
 
-- Never merge directly into `main` - always create a PR first
-- PRs require passing CI checks before merge
-- Use feature branches: `feature/REA-XXX-description`
-- Run `pnpm pre-push-check` and `pnpm test:ci` before creating PRs
+- **Branch flow:** `feature/* → development → main`. Open every PR against `development`, never directly against `main`.
+- The only PRs that target `main` are periodic promotion PRs from `development` (typically named `chore/sync-main-into-development` or similar).
+- Never merge directly into `main` or `development` - always create a PR first.
+- PRs require passing CI checks before merge.
+- Use feature branches: `feature/REA-XXX-description` (or `refactor/...`, `fix/...`, `chore/...` as appropriate).
+- Run `pnpm pre-push-check` and `pnpm test:ci` before creating PRs.
 
 ### External Integrations
 

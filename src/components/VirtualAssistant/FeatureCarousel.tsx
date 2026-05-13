@@ -17,17 +17,17 @@ import { getCloudinaryUrl } from "@/lib/cloudinary";
 const features = [
   {
     iconPath: getCloudinaryUrl("virtual/drive"),
-    title: "Put Your Business\non Autopilot",
+    title: "Put Your Business on Autopilot",
     alt: "Drive Icon",
   },
   {
     iconPath: getCloudinaryUrl("virtual/time"),
-    title: "Focus your\ntime on  \n what matters",
+    title: "Focus your time on what matters",
     alt: "Time Icon",
   },
   {
     iconPath: getCloudinaryUrl("virtual/dollar"),
-    title: "Delegated tasks to\n grow revenue",
+    title: "Delegated tasks to grow revenue",
     alt: "Dollar Icon",
   },
 ];
@@ -38,7 +38,10 @@ export default function FeatureCarousel() {
       <div className="mb-6 w-full rounded-2xl bg-black p-6 shadow-lg lg:p-12">
         <div className="flex flex-col gap-6 md:flex-row md:items-center">
           <div className="w-full md:w-1/3">
-            <h2 className="text-xl font-bold leading-tight text-white lg:text-2xl">
+            <h2
+              className="text-xl font-bold leading-tight text-white lg:text-2xl"
+              aria-label="Your productivity partner, anytime, anywhere!"
+            >
               YOUR <br /> PRODUCTIVITY
               <br />
               PARTNER, ANYTIME

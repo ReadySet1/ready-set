@@ -91,9 +91,12 @@ export async function GET(req: NextRequest, props: { params: Promise<{ order_num
 
     let order: Order | null = null;
 
-    // Try to find catering request
-    const cateringRequest = await prisma.cateringRequest.findUnique({
-      where: { orderNumber: order_number },
+    // Try to find catering request (case-insensitive + soft delete filter)
+    const cateringRequest = await prisma.cateringRequest.findFirst({
+      where: {
+        orderNumber: { equals: order_number, mode: 'insensitive' },
+        deletedAt: null,
+      },
       include: {
         user: { select: { name: true, email: true } },
         pickupAddress: true,
@@ -119,9 +122,12 @@ export async function GET(req: NextRequest, props: { params: Promise<{ order_num
         order_type: "catering",
       };
     } else {
-      // If not found, try to find on-demand order
-      const onDemandOrder = await prisma.onDemand.findUnique({
-        where: { orderNumber: order_number },
+      // If not found, try to find on-demand order (case-insensitive + soft delete filter)
+      const onDemandOrder = await prisma.onDemand.findFirst({
+        where: {
+          orderNumber: { equals: order_number, mode: 'insensitive' },
+          deletedAt: null,
+        },
         include: {
           user: { select: { name: true, email: true } },
           pickupAddress: true,
@@ -148,6 +154,40 @@ export async function GET(req: NextRequest, props: { params: Promise<{ order_num
 
     if (order) {
       const normalized = normalizeOrderForClient(order);
+
+      // Enrich with delivery stage timestamps from the Delivery tracking model.
+      // Use the actual DB order number to ensure case-sensitive match.
+      const dbOrderNumber = (order as any).orderNumber as string;
+      try {
+        const delivery = await prisma.delivery.findFirst({
+          where: { orderNumber: { equals: dbOrderNumber, mode: 'insensitive' } },
+          select: {
+            assignedAt: true,
+            enRouteToVendorAt: true,
+            arrivedAtVendorAt: true,
+            pickedUpAt: true,
+            enRouteAt: true,
+            arrivedAtClientAt: true,
+            deliveredAt: true,
+          },
+        });
+
+        if (delivery) {
+          const toISO = (d: Date | null) => d?.toISOString() ?? null;
+          normalized.deliveryTimestamps = {
+            assignedAt: toISO(delivery.assignedAt),
+            enRouteToVendorAt: toISO(delivery.enRouteToVendorAt),
+            arrivedAtVendorAt: toISO(delivery.arrivedAtVendorAt),
+            pickedUpAt: toISO(delivery.pickedUpAt),
+            enRouteAt: toISO(delivery.enRouteAt),
+            arrivedAtClientAt: toISO(delivery.arrivedAtClientAt),
+            deliveredAt: toISO(delivery.deliveredAt),
+          };
+        }
+      } catch (deliveryError) {
+        console.warn('Failed to fetch delivery timestamps:', deliveryError);
+      }
+
       return NextResponse.json(normalized);
     }
 

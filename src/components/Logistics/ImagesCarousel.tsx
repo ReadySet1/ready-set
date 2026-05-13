@@ -46,7 +46,7 @@ const ImageCarousel = () => {
                 key={index}
                 className="basis-full pl-8 md:basis-1/2 lg:basis-1/4"
               >
-                <div className="relative h-[400px] w-full overflow-hidden rounded-3xl bg-white p-2">
+                <div className="relative h-card-h-md w-full overflow-hidden rounded-3xl bg-white p-2">
                   <img
                     src={image.src}
                     alt={image.alt}
@@ -56,7 +56,7 @@ const ImageCarousel = () => {
               </CarouselItem>
             ))}
           </CarouselContent>
-          <CarouselPrevious className="absolute -left-16 top-1/2 h-12 w-12 -translate-y-1/2 border-0 bg-[#F8CC48] hover:bg-[#F8CC48]/80">
+          <CarouselPrevious className="absolute -left-16 top-1/2 h-12 w-12 -translate-y-1/2 border-0 bg-brand-muted hover:bg-brand-muted/80">
             <span className="sr-only">Previous slide</span>
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -73,7 +73,7 @@ const ImageCarousel = () => {
               <path d="m15 18-6-6 6-6" />
             </svg>
           </CarouselPrevious>
-          <CarouselNext className="absolute -right-16 top-1/2 h-12 w-12 -translate-y-1/2 border-0 bg-[#F8CC48] hover:bg-[#F8CC48]/80">
+          <CarouselNext className="absolute -right-16 top-1/2 h-12 w-12 -translate-y-1/2 border-0 bg-brand-muted hover:bg-brand-muted/80">
             <span className="sr-only">Next slide</span>
             <svg
               xmlns="http://www.w3.org/2000/svg"

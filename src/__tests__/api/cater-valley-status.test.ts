@@ -73,7 +73,11 @@ describe('/api/cater-valley/status API', () => {
       expect(data.database.caterValleyOrderCount).toBe(0);
     });
 
-    it('should report environment configuration status', async () => {
+    it('does NOT leak environment configuration to public callers', async () => {
+      // Phase 1 hardening removed `data.environment` from the public response
+      // because the apiKeyConfigured / webhookUrlConfigured booleans were a
+      // deployment fingerprint signal for attackers. Operators should query
+      // logs / Sentry instead.
       (prisma.cateringRequest.count as jest.Mock).mockResolvedValue(0);
       process.env.CATERVALLEY_API_KEY = 'configured-key';
       process.env.CATERVALLEY_WEBHOOK_URL = 'https://webhook.url';
@@ -84,23 +88,7 @@ describe('/api/cater-valley/status API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.environment.apiKeyConfigured).toBe(true);
-      expect(data.environment.webhookUrlConfigured).toBe(true);
-    });
-
-    it('should report missing environment variables', async () => {
-      (prisma.cateringRequest.count as jest.Mock).mockResolvedValue(0);
-      delete process.env.CATERVALLEY_API_KEY;
-      delete process.env.CATERVALLEY_WEBHOOK_URL;
-
-      const request = createGetRequest('http://localhost:3000/api/cater-valley/status');
-
-      const response = await GET(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.environment.apiKeyConfigured).toBe(false);
-      expect(data.environment.webhookUrlConfigured).toBe(false);
+      expect(data).not.toHaveProperty('environment');
     });
 
     it('should include endpoint documentation', async () => {
@@ -117,7 +105,7 @@ describe('/api/cater-valley/status API', () => {
         method: 'POST',
         path: '/api/cater-valley/orders/draft',
         description: 'Create a new draft order with pricing calculation',
-        authentication: 'Required: partner: catervalley, x-api-key',
+        authentication: 'Required: partner + x-api-key headers',
       });
 
       expect(data.endpoints).toHaveProperty('update');

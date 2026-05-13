@@ -1,5 +1,18 @@
 // src/services/caterValleyService.ts
 
+// server-only is a defense-in-depth marker: webpack will throw if this
+// module ends up in the client bundle. Required because the outbound
+// HMAC secret (CATERVALLEY_OUTBOUND_WEBHOOK_SECRET) is server-only —
+// importing this file from a client component would silently fall
+// through to unsigned requests, defeating the outbound HMAC rollout
+// from PR #391. Client-side callers must route through the Server
+// Action at src/app/actions/sync-cater-valley-order-status.ts.
+// See PR #402 pre-landing review #1.
+import 'server-only';
+
+import { signPayload, SIGNATURE_HEADER } from '@/lib/security/hmac';
+import { checkOutboundUrl } from '@/lib/security/ssrf-guard';
+
 // Define allowed status values based on the documentation
 export const ALLOWED_STATUSES = [
     'CONFIRM',
@@ -42,10 +55,10 @@ export async function updateCaterValleyOrderStatus(
     status: OrderStatus
   ): Promise<CaterValleyUpdateResult> {
     const CATER_VALLEY_API_URL =
+      process.env.CATERVALLEY_WEBHOOK_URL ||
       'https://api.catervalley.com/api/operation/order/update-order-status';
-    // Hardcode the partner header as specified in the CaterValley documentation
     const PARTNER_HEADER = 'ready-set';
-  
+
     // Input validation
     if (!orderNumber || typeof orderNumber !== 'string' || orderNumber.trim() === '') {
         return {
@@ -61,24 +74,44 @@ export async function updateCaterValleyOrderStatus(
           error: `Invalid status provided for CaterValley update: ${status}. Must be one of ${ALLOWED_STATUSES.join(', ')}.`,
         };
     }
-  
+
+    const ssrfCheck = checkOutboundUrl(CATER_VALLEY_API_URL);
+    if (!ssrfCheck.ok) {
+      console.error('[CaterValley Service] Outbound URL rejected by SSRF guard:', ssrfCheck.reason);
+      return {
+        success: false,
+        orderFound: false,
+        error: `Refusing to call CaterValley webhook: ${ssrfCheck.reason}`,
+      };
+    }
+
     // Ensure status is always uppercase as expected by the API
     const normalizedStatus = status.toUpperCase() as OrderStatus;
-    
-    
+    const requestBody = JSON.stringify({
+      orderNumber,
+      status: normalizedStatus,
+    });
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      partner: PARTNER_HEADER,
+    };
+
+    // Sign the body with HMAC-SHA256 if a secret is configured. Additive
+    // rollout: CaterValley can ignore this header until they add
+    // verification on their side. Once they're verifying, the header
+    // becomes required and unsigned requests should fail their auth.
+    const outboundSecret = process.env.CATERVALLEY_OUTBOUND_WEBHOOK_SECRET;
+    if (outboundSecret) {
+      headers[SIGNATURE_HEADER] = await signPayload(outboundSecret, requestBody);
+    }
+
     try {
       const response = await fetch(CATER_VALLEY_API_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'partner': PARTNER_HEADER, // Crucial header for CaterValley
-        },
-        body: JSON.stringify({ 
-          orderNumber, 
-          status: normalizedStatus 
-        }),
-        // Consider adding a timeout if needed
-        // signal: AbortSignal.timeout(10000) // 10 seconds timeout
+        headers,
+        body: requestBody,
+        signal: AbortSignal.timeout(10000),
       });
   
       // Log raw response details for debugging

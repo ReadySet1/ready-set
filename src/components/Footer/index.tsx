@@ -5,7 +5,7 @@ import { getCloudinaryUrl } from "@/lib/cloudinary";
 const Footer = () => {
   return (
     <footer
-      className="wow fadeInUp relative z-10 pt-20 lg:pt-[100px]"
+      className="wow fadeInUp relative z-10 pt-20 lg:pt-24"
       style={{ backgroundColor: '#000000' }}
       data-wow-delay=".15s"
     >
@@ -19,6 +19,7 @@ const Footer = () => {
                   alt="logo"
                   width={140}
                   height={30}
+                  style={{ height: "auto" }}
                   className="max-w-full"
                 />
               </Link>

@@ -44,12 +44,13 @@ describe('GET/POST /api/cater-valley/status - CaterValley Integration Status', (
       expect(data).toHaveProperty('version', '1.0.0');
       expect(data).toHaveProperty('timestamp');
       expect(data).toHaveProperty('database');
-      expect(data).toHaveProperty('environment');
       expect(data).toHaveProperty('endpoints');
       expect(data).toHaveProperty('statusMapping');
       expect(data).toHaveProperty('pricing');
       expect(data).toHaveProperty('businessHours');
       expect(data).toHaveProperty('contact');
+      // Environment configuration is intentionally NOT advertised publicly.
+      expect(data).not.toHaveProperty('environment');
     });
 
     it('should show database connectivity status', async () => {
@@ -63,15 +64,18 @@ describe('GET/POST /api/cater-valley/status - CaterValley Integration Status', (
       expect(data.database.caterValleyOrderCount).toBe(15);
     });
 
-    it('should show environment configuration', async () => {
+    it('should not advertise environment configuration in the public response', async () => {
       (prisma.cateringRequest.count as jest.Mock).mockResolvedValue(0);
 
       const request = createGetRequest('http://localhost:3000/api/cater-valley/status');
       const response = await GET(request);
       const data = await expectSuccessResponse(response, 200);
 
-      expect(data.environment.apiKeyConfigured).toBe(true);
-      expect(data.environment.webhookUrlConfigured).toBe(true);
+      // Previously this endpoint exposed booleans like `apiKeyConfigured`
+      // which fingerprinted whether secrets were set on the server.
+      expect(data).not.toHaveProperty('environment');
+      expect(JSON.stringify(data)).not.toContain('apiKeyConfigured');
+      expect(JSON.stringify(data)).not.toContain('webhookUrlConfigured');
     });
 
     it('should list available endpoints', async () => {
@@ -88,7 +92,7 @@ describe('GET/POST /api/cater-valley/status - CaterValley Integration Status', (
 
       expect(data.endpoints.draft.method).toBe('POST');
       expect(data.endpoints.draft.path).toBe('/api/cater-valley/orders/draft');
-      expect(data.endpoints.draft.authentication).toContain('catervalley');
+      expect(data.endpoints.draft.authentication).toMatch(/x-api-key/);
     });
 
     it('should show status mapping for order states', async () => {
@@ -195,7 +199,7 @@ describe('GET/POST /api/cater-valley/status - CaterValley Integration Status', (
       expect(data.database.status).toBe('connected');
     });
 
-    it('should handle missing environment variables', async () => {
+    it('does not change response shape when env vars are missing', async () => {
       delete process.env.CATERVALLEY_API_KEY;
       delete process.env.CATERVALLEY_WEBHOOK_URL;
 
@@ -205,8 +209,9 @@ describe('GET/POST /api/cater-valley/status - CaterValley Integration Status', (
       const response = await GET(request);
       const data = await expectSuccessResponse(response, 200);
 
-      expect(data.environment.apiKeyConfigured).toBe(false);
-      expect(data.environment.webhookUrlConfigured).toBe(false);
+      // Status endpoint must not leak whether env vars are configured.
+      expect(data).not.toHaveProperty('environment');
+      expect(data.database.caterValleyOrderCount).toBe(10);
     });
 
     it('should handle POST with invalid JSON gracefully', async () => {
@@ -225,7 +230,7 @@ describe('GET/POST /api/cater-valley/status - CaterValley Integration Status', (
       expect(data.service).toBe('Ready Set CaterValley Integration');
     });
 
-    it('should include webhook URL from environment', async () => {
+    it('does not leak the configured webhook URL in the public response', async () => {
       const customWebhookUrl = 'https://custom.catervalley.com/webhook';
       process.env.CATERVALLEY_WEBHOOK_URL = customWebhookUrl;
 
@@ -235,7 +240,10 @@ describe('GET/POST /api/cater-valley/status - CaterValley Integration Status', (
       const response = await GET(request);
       const data = await expectSuccessResponse(response, 200);
 
-      expect(data.endpoints.webhook.url).toBe(customWebhookUrl);
+      // Previously the webhook URL was echoed back to anonymous callers.
+      // That was a fingerprinting vector and is now suppressed.
+      expect(data.endpoints.webhook).not.toHaveProperty('url');
+      expect(JSON.stringify(data)).not.toContain(customWebhookUrl);
     });
 
     it('should include contact information', async () => {

@@ -44,7 +44,7 @@ describe("Footer Component", () => {
         "relative",
         "z-10",
         "pt-20",
-        "lg:pt-[100px]"
+        "lg:pt-24"
       );
     });
 
@@ -276,7 +276,7 @@ describe("Footer Component", () => {
     it("should have responsive padding classes", () => {
       render(<Footer />);
       const footer = screen.getByRole("contentinfo");
-      expect(footer).toHaveClass("pt-20", "lg:pt-[100px]");
+      expect(footer).toHaveClass("pt-20", "lg:pt-24");
     });
 
     it("should have responsive margin classes for sections", () => {

@@ -167,13 +167,59 @@ export async function GET(req: NextRequest) {
       .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(skip, skip + limit);
 
-    const serializedDeliveries = allDeliveries.map((delivery) => ({
-      ...JSON.parse(
+    // Batch-fetch delivery stage timestamps for all orders
+    const orderNumbers = allDeliveries
+      .map((d: any) => d.orderNumber)
+      .filter(Boolean) as string[];
+
+    let deliveryTimestampsMap: Record<string, any> = {};
+    if (orderNumbers.length > 0) {
+      try {
+        const deliveryRecords = await prisma.delivery.findMany({
+          where: { orderNumber: { in: orderNumbers } },
+          select: {
+            orderNumber: true,
+            assignedAt: true,
+            enRouteToVendorAt: true,
+            arrivedAtVendorAt: true,
+            pickedUpAt: true,
+            enRouteAt: true,
+            arrivedAtClientAt: true,
+            deliveredAt: true,
+          },
+        });
+
+        const toISO = (d: Date | null) => d?.toISOString() ?? null;
+        for (const rec of deliveryRecords) {
+          if (rec.orderNumber) {
+            deliveryTimestampsMap[rec.orderNumber] = {
+              assignedAt: toISO(rec.assignedAt),
+              enRouteToVendorAt: toISO(rec.enRouteToVendorAt),
+              arrivedAtVendorAt: toISO(rec.arrivedAtVendorAt),
+              pickedUpAt: toISO(rec.pickedUpAt),
+              enRouteAt: toISO(rec.enRouteAt),
+              arrivedAtClientAt: toISO(rec.arrivedAtClientAt),
+              deliveredAt: toISO(rec.deliveredAt),
+            };
+          }
+        }
+      } catch (deliveryError) {
+        console.warn('Failed to fetch delivery timestamps for driver deliveries:', deliveryError);
+      }
+    }
+
+    const serializedDeliveries = allDeliveries.map((delivery) => {
+      const serialized = JSON.parse(
         JSON.stringify(delivery, (key, value) =>
           typeof value === "bigint" ? value.toString() : value,
         ),
-      ),
-    }));
+      );
+      const orderNum = (delivery as any).orderNumber;
+      if (orderNum && deliveryTimestampsMap[orderNum]) {
+        serialized.deliveryTimestamps = deliveryTimestampsMap[orderNum];
+      }
+      return serialized;
+    });
 
     // Return deliveries with metadata about the historical limit applied
     return NextResponse.json({

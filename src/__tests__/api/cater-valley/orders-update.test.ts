@@ -6,13 +6,17 @@ import * as pricingService from '@/lib/services/pricingService';
 import * as pricingHelper from '@/app/api/cater-valley/_lib/pricing-helper';
 import { expectSuccessResponse, expectErrorResponse } from '@/__tests__/helpers/api-test-helpers';
 
-// Mock dependencies
-jest.mock('@/lib/db/prisma', () => ({
-  prisma: {
+// Mock dependencies. `$transaction` invokes the callback with the same
+// mock client so `tx.foo.bar()` calls inside the route hit the same
+// jest.fn instances as bare `prisma.foo.bar()` calls.
+jest.mock('@/lib/db/prisma', () => {
+  const mockPrisma: any = {
     address: { findFirst: jest.fn(), create: jest.fn() },
     cateringRequest: { findUnique: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
-  },
-}));
+  };
+  mockPrisma.$transaction = jest.fn((callback: (tx: any) => unknown) => callback(mockPrisma));
+  return { prisma: mockPrisma };
+});
 
 jest.mock('@/lib/services/pricingService', () => ({
   calculatePickupTime: jest.fn(),
@@ -25,6 +29,34 @@ jest.mock('@/app/api/cater-valley/_lib/pricing-helper', () => ({
 
 jest.mock('@/lib/utils/timezone', () => ({
   localTimeToUtc: jest.fn((date: string, time: string) => `${date}T${time}:00Z`),
+}));
+
+jest.mock('@/lib/services/partner-registry', () => ({
+  authenticatePartner: jest.fn(async (req: Request) => {
+    const slug = req.headers.get('partner');
+    const apiKey = req.headers.get('x-api-key');
+    if (!slug) return { ok: false, reason: 'missing_partner_header' };
+    if (!apiKey) return { ok: false, reason: 'missing_api_key' };
+    if (slug === 'catervalley' && apiKey === 'test-api-key') {
+      return {
+        ok: true,
+        partner: {
+          id: 'partner-cv-id',
+          slug: 'catervalley',
+          displayName: 'CaterValley',
+          orderPrefix: 'CV-',
+          webhookUrl: null,
+          webhookSecret: null,
+          rateLimitPerMin: 100,
+          isActive: true,
+        },
+      };
+    }
+    return { ok: false, reason: 'invalid_key' };
+  }),
+  getPartnerBySlug: jest.fn(),
+  computeApiKeyHash: jest.fn((k: string) => `hash:${k}`),
+  _resetPartnerCacheForTests: jest.fn(),
 }));
 
 describe('POST /api/cater-valley/orders/update - Update Order', () => {
@@ -229,7 +261,7 @@ describe('POST /api/cater-valley/orders/update - Update Order', () => {
       });
 
       const response = await POST(request);
-      await expectErrorResponse(response, 403, /cannot be updated via CaterValley API/i);
+      await expectErrorResponse(response, 403, /cannot be updated via the partner API/i);
     });
 
     it('should reject orders in non-updatable status', async () => {
