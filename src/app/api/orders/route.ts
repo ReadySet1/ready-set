@@ -6,7 +6,6 @@ import { sendOrderEmail, CateringOrder as EmailSenderCateringOrder, OnDemandOrde
 import { createClient } from "@/utils/supabase/server";
 import { CateringNeedHost } from "@/types/order";
 import { CateringStatus, OnDemandStatus } from "@/types/order-status";
-import { updateCaterValleyOrderStatus } from '@/services/caterValleyService';
 import { localTimeToUtc } from "@/lib/utils/timezone";
 import { cookies } from 'next/headers';
 import { validateApiAuth } from '@/utils/api-auth';
