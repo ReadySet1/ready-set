@@ -1,5 +1,16 @@
 import { Order, OrderStatus, isCateringRequest } from '@/types/order';
-import { updateCaterValleyOrderStatus, type OrderStatus as CaterValleyOrderStatus, type CaterValleyUpdateResult } from '@/services/caterValleyService';
+// IMPORTANT: caterValleyService is `import 'server-only'` — never import it
+// directly here. This module is reachable from client components
+// (SingleOrder.tsx → brokerSyncService → caterValleyService) and the
+// browser bundle does not have CATERVALLEY_OUTBOUND_WEBHOOK_SECRET, so
+// running updateCaterValleyOrderStatus client-side would silently skip
+// HMAC signing. Route through the Server Action; types are erased at
+// build time so `import type` is safe. See PR #402 review #1.
+import { syncCaterValleyOrderStatusAction } from '@/app/actions/sync-cater-valley-order-status';
+import type {
+  OrderStatus as CaterValleyOrderStatus,
+  CaterValleyUpdateResult,
+} from '@/services/caterValleyService';
 import toast from 'react-hot-toast';
 
 // --- Configuration for Broker Status Mapping ---
@@ -35,7 +46,7 @@ export async function syncOrderStatusWithBroker(order: Order, newStatus: OrderSt
       // Configure sync based on broker
       if (brokerIdentifier === 'CaterValley') { // Use the specific identifier from your DB
           requiresSync = true;
-          syncFunction = updateCaterValleyOrderStatus;
+          syncFunction = syncCaterValleyOrderStatusAction;
           statusMap = caterValleyStatusMap;
                 }
       // --- Add else if blocks for other brokers ---
@@ -61,7 +72,7 @@ export async function syncOrderStatusWithBroker(order: Order, newStatus: OrderSt
             
       // Handle CaterValley sync with enhanced error handling
       if (brokerIdentifier === 'CaterValley') {
-        const result: CaterValleyUpdateResult = await updateCaterValleyOrderStatus(order.orderNumber, brokerStatus);
+        const result: CaterValleyUpdateResult = await syncCaterValleyOrderStatusAction(order.orderNumber, brokerStatus);
         
         if (result.success) {
                     // Optional success toast: toast.success(`Status synced with ${brokerIdentifier}.`);

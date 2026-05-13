@@ -1,0 +1,60 @@
+meta {
+  name: 4. Draft - Invalid Auth
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{PARTNERS_URL}}/orders/draft
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  partner: {{CATERCOW_PARTNER}}
+  x-api-key: this-is-not-the-real-key
+}
+
+body:json {
+  {
+    "orderCode": "CC-AUTH-FAIL",
+    "deliveryDate": "2026-06-15",
+    "deliveryTime": "11:30",
+    "totalItem": 30,
+    "priceTotal": 850.00,
+    "pickupLocation": {
+      "name": "Tasty Catering Co.",
+      "address": "123 Main St",
+      "city": "San Francisco",
+      "state": "CA"
+    },
+    "dropOffLocation": {
+      "name": "Acme Corp HQ",
+      "address": "500 Market St",
+      "city": "San Francisco",
+      "state": "CA",
+      "recipient": {
+        "name": "Jane Smith",
+        "phone": "4155550200"
+      }
+    }
+  }
+}
+
+docs {
+  # CaterCow — Invalid API Key (negative test)
+
+  A request with the correct partner slug but a wrong key must be
+  rejected with 401. This is the primary defense against credential
+  brute force.
+}
+
+tests {
+  test("Rejected with 401", function() {
+    expect(res.getStatus()).to.equal(401);
+  });
+  test("Response status is ERROR", function() {
+    expect(res.getBody().status).to.equal("ERROR");
+  });
+}

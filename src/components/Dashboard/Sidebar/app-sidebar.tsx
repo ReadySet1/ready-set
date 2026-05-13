@@ -19,6 +19,8 @@ import {
   Package,
   NavigationIcon,
   FileSpreadsheet,
+  Kanban,
+  TestTube2,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -206,6 +208,22 @@ export function AppSidebar() {
     },
   ];
 
+  // Internal dashboards (QA + meeting action items, generated from JSON sources)
+  const internalItems: SidebarNavItem[] = [
+    {
+      title: "QA Board",
+      href: "/admin/qa-board",
+      icon: TestTube2,
+      isActive: pathname?.includes("/admin/qa-board") ?? false,
+    },
+    {
+      title: "Tasks Board",
+      href: "/admin/tasks-board",
+      icon: Kanban,
+      isActive: pathname?.includes("/admin/tasks-board") ?? false,
+    },
+  ];
+
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
@@ -332,6 +350,29 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {toolsItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={item.isActive}
+                    tooltip={item.title}
+                    className="py-1.5"
+                  >
+                    <Link href={item.href}>
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-3 py-1">Internal</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {internalItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild

@@ -140,3 +140,12 @@ src/components/Pricing/FlowerPricingLandingPageSimple.tsx
 *.key
 *.cert
 *.crt
+.gstack/
+
+# Defensive: never commit credential handoff docs or local API key overrides
+**/*CREDENTIALS*
+**/*credentials*.md
+**/*SECRETS*
+# Bruno API test local overrides — put real keys here, never in *.bru committed files
+docs/bruno-api-tests/**/*.local.bru
+docs/bruno-api-tests/**/secrets.bru

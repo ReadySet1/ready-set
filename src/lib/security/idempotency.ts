@@ -15,7 +15,7 @@
 
 import { NextResponse } from 'next/server';
 
-import { getRedisClient } from '@/lib/redis/client';
+import { getRedisClientAsync } from '@/lib/redis/client';
 
 const TTL_SECONDS_DEFAULT = 24 * 60 * 60;
 const HEADER_NAME = 'idempotency-key';
@@ -58,7 +58,7 @@ export async function replayCachedResponse(
 ): Promise<NextResponse | null> {
   if (!ctx.key) return null;
   try {
-    const client = getRedisClient();
+    const client = await getRedisClientAsync();
     const raw = await client.get(buildRedisKey(ctx.partnerSlug, ctx.key));
     if (!raw) return null;
     const cached = raw as CachedResponse;
@@ -90,7 +90,7 @@ export async function storeAndReturnResponse(
   if (ctx.key) {
     try {
       const cached: CachedResponse = { status, body };
-      const client = getRedisClient();
+      const client = await getRedisClientAsync();
       await client.set(buildRedisKey(ctx.partnerSlug, ctx.key), cached, {
         ex: ttlSeconds,
       });

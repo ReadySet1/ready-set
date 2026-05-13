@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Internal QA + Tasks Dashboards**: Admin-only pages at `/admin/qa-board` and `/admin/tasks-board` for cross-team visibility into testing state and meeting action items
+  - QA Board: renders quarterly Jira/TestRail test case exports grouped by folder with pass/fail/blocked/in-progress/not-run counts and expandable step tables
+  - Tasks Board: kanban view of meeting action items + promoted QA failures, with cross-link badges between the two boards via `relatedQa` field
+  - Data flow: workspace generator scripts (`meetings/shared/build-tasks-board.mjs`, `docs/ready-set/qa/build-qa-board.mjs`) emit normalized JSON into `src/data/`; server components import statically at build time
+  - Structured `<code>` rendering via `parseDescription()` helper — no `dangerouslySetInnerHTML`, no XSS surface
+  - Auth reuses existing `/admin/*` middleware gate (`src/middleware/routeProtection.ts`)
+  - Sidebar adds new "Internal" section with QA Board + Tasks Board entries
+
 - **Multi-Stop Calculator Demo (REA-318)**: Auto-distance calculation feature
   - Geocode API endpoint for address-to-coordinates conversion
   - Auto-distance calculation between stops using Haversine formula

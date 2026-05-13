@@ -1,5 +1,15 @@
 // src/services/caterValleyService.ts
 
+// server-only is a defense-in-depth marker: webpack will throw if this
+// module ends up in the client bundle. Required because the outbound
+// HMAC secret (CATERVALLEY_OUTBOUND_WEBHOOK_SECRET) is server-only —
+// importing this file from a client component would silently fall
+// through to unsigned requests, defeating the outbound HMAC rollout
+// from PR #391. Client-side callers must route through the Server
+// Action at src/app/actions/sync-cater-valley-order-status.ts.
+// See PR #402 pre-landing review #1.
+import 'server-only';
+
 import { signPayload, SIGNATURE_HEADER } from '@/lib/security/hmac';
 import { checkOutboundUrl } from '@/lib/security/ssrf-guard';
 
