@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prismaPooled, healthCheck } from '@/lib/db/prisma-pooled';
 import { addSecurityHeaders } from '@/lib/auth-middleware';
 import { getErrorMetrics } from '@/lib/error-logging';
+// Imported at build time so the deployed version is baked into the bundle.
+// process.env.npm_package_version is only set when the process started via
+// pnpm/npm scripts, which is not guaranteed on Vercel's runtime. Reading
+// package.json directly gives the same value in local dev, CI, and prod.
+import packageJson from '../../../../package.json';
 
 interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -341,7 +346,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const healthStatus: HealthStatus = {
       status: calculateOverallStatus(services),
       timestamp: new Date().toISOString(),
-      version: process.env.npm_package_version || '1.0.0',
+      version: packageJson.version,
       environment: process.env.NODE_ENV || 'development',
       uptime,
       services,
