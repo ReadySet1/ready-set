@@ -34,7 +34,8 @@
   "sourceLabels": {
     "may4": "May 4",
     "may11": "May 11",
-    "qa": "QA"
+    "qa": "QA",
+    "catercow": "CaterCow"
   },
   "tasks": [
     {
@@ -208,6 +209,19 @@
       "description": "No realtime broadcast emitted from <code>assignDriver/route.ts</code>. Infrastructure exists (<code>broadcastDeliveryAssigned</code> in <code>lib/realtime/channels.ts:475</code>) but has zero callers — admin dashboard requires reload. Secondary: Delivery upsert creates rows with <code>deliveryAddress=''</code> and swallows errors. Promoted from QA fail on test REA-OMG-08."
     },
     {
+      "id": "rea-drt-07-supabase-browser-session-bridge",
+      "status": "open",
+      "title": "REA-DRT-07 — Bridge SSR cookie to browser supabase-js session (Realtime never initializes)",
+      "owner": "emmanuel",
+      "source": "qa",
+      "relatedQa": "REA-DRT-07",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "description": "<code>supabase.auth.getSession()</code> returns null in the browser; <code>localStorage</code> has no <code>sb-&lt;ref&gt;-auth-token</code> key after login. SSR cookie is set server-side but not bridged to the browser <code>supabase-js</code> client, so all Realtime-dependent flows (<code>useRealtimeLocationTracking</code>, <code>useAdminRealtimeTracking</code>) early-return and never open a WS connection. <strong>First investigation target:</strong> <code>src/utils/supabase/client.ts</code> vs <code>src/middleware.ts</code> — verify <code>createBrowserClient</code> cookie config matches the SSR client. Related: Sentry READY-SET-NEXTJS-1S (unhandled refresh rejection on <code>/driver/tracking</code> — patched on <code>fix/auth-refresh-unhandled-rejection</code> as graceful failure, but root cause is this bug). Reported by Fer in QA notes; no engineering ticket filed yet."
+    },
+    {
       "id": "test-telnyx-integration",
       "status": "new",
       "title": "Test Telnyx Integration",
@@ -270,6 +284,54 @@
       "owner": "emmanuel",
       "source": "may11",
       "description": "Calculator must handle driver, vendor, and internal calculations simultaneously to eliminate manual data entry errors."
+    },
+    {
+      "id": "catercow-webhook-preconfigure",
+      "status": "progress",
+      "title": "Pre-configure CaterCow staging webhook URL",
+      "owner": "emmanuel",
+      "source": "catercow",
+      "description": "Dispatcher landed (<code>src/lib/services/partnerWebhookService.ts</code>) and wired into the status route; <code>scripts/update-partner-webhook.ts</code> is ready. Still need to run it against the staging DB: <code>PARTNER_SLUG=catercow WEBHOOK_URL=https://api.staging.steerdelivery.com/webhooks/ready_set pnpm tsx scripts/update-partner-webhook.ts</code>. Their endpoint isn't live yet, so dispatcher will log <code>[partner-webhook] misconfigured</code> until <code>webhookSecret</code> is also set."
+    },
+    {
+      "id": "catercow-dispatcher-refactor",
+      "status": "done",
+      "title": "Generalize outbound webhook dispatcher (partner-registry-driven)",
+      "owner": "emmanuel",
+      "source": "catercow",
+      "description": "New <code>src/lib/services/partnerWebhookService.ts</code> reads <code>webhookUrl</code>/<code>webhookSecret</code> from the <code>api_partners</code> row at send time. Wired into <code>/api/catering-requests/[orderId]/status/route.ts</code> for partners not in <code>CARRIER_CONFIGS</code>. HMAC-SHA256 signed per <code>API_CONTRACT.md</code> (<code>x-readyset-signature</code>); 3-attempt retry, no-retry on 4xx; 6 new unit tests; existing 161 cater-valley tests still green."
+    },
+    {
+      "id": "catercow-hmac-secret",
+      "status": "new",
+      "title": "Generate + deliver CaterCow webhook HMAC secret",
+      "owner": "emmanuel",
+      "source": "catercow",
+      "description": "Generate a 256-bit secret (<code>crypto.randomBytes(32)</code>), set <code>webhookSecret</code> on the staging row, deliver to CaterCow via 1Password share link (7-day expiry). Trigger: their webhook endpoint becomes reachable."
+    },
+    {
+      "id": "catercow-steerdelivery-domain-check",
+      "status": "new",
+      "title": "Confirm CaterCow ↔ steerdelivery.com relationship with Gary",
+      "owner": "emmanuel",
+      "source": "catercow",
+      "description": "Nate's webhook URL is on <code>steerdelivery.com</code>, not <code>catercow.com</code>. Verify this is a known parent/shared-infra relationship before exchanging production HMAC secrets. Quick Slack to Gary should resolve."
+    },
+    {
+      "id": "catercow-get-orders-scope",
+      "status": "open",
+      "title": "Scope GET /orders/{id} for partner API v1.x",
+      "owner": "emmanuel",
+      "source": "catercow",
+      "description": "Pre-scoped in <code>docs/catercow/IMPLEMENTATION_PLAN.md</code> Phase 4.1 (~half day). Reads from <code>catering_requests</code> filtered by <code>brokerage = partner.displayName</code>, returns status + last 10 lifecycle events. Pull forward only if CaterCow flags as a go-live blocker."
+    },
+    {
+      "id": "catercow-openapi-export",
+      "status": "open",
+      "title": "OpenAPI 3.1 export from Zod schemas",
+      "owner": "emmanuel",
+      "source": "catercow",
+      "description": "Pre-scoped in <code>docs/catercow/IMPLEMENTATION_PLAN.md</code> Phase 4.2 (~half day). Generate from existing Zod schemas in <code>src/app/api/partners/orders/*/route.ts</code> using <code>zod-to-openapi</code>; output <code>docs/catercow/openapi.yaml</code> + a <code>pnpm openapi:partners</code> script. Defer until CaterCow flags it as needed."
     }
   ]
 }
