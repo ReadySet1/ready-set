@@ -336,6 +336,45 @@ describe('Token Refresh Service', () => {
       expect(tokenRefreshService.refreshTokenWithRetry).toHaveBeenCalled();
     });
 
+    it('should not leak an unhandled rejection when auto-refresh fails', async () => {
+      // Regression: Sentry READY-SET-NEXTJS-1S — AuthError(REFRESH_FAILED) thrown
+      // from a setTimeout-fired refresh used to surface as an unhandled
+      // promise rejection. The safeRefreshTokenWithRetry wrapper must catch it.
+      const session: Session = {
+        access_token: 'token',
+        refresh_token: 'refresh',
+        expires_at: Math.floor((Date.now() - 1000) / 1000), // Already expired -> immediate path
+        user: { id: 'user-123' } as User,
+      };
+
+      const refreshError = new AuthError(
+        AuthErrorType.REFRESH_FAILED,
+        'Failed to refresh session',
+        'unknown',
+        false,
+      );
+      jest
+        .spyOn(tokenRefreshService, 'refreshTokenWithRetry')
+        .mockRejectedValue(refreshError);
+
+      const unhandledRejections: unknown[] = [];
+      const onUnhandled = (reason: unknown) => unhandledRejections.push(reason);
+      process.on('unhandledRejection', onUnhandled);
+
+      try {
+        tokenRefreshService.startAutoRefresh(session);
+        // Let the immediate refresh promise settle + dynamic import resolve.
+        await jest.advanceTimersByTimeAsync(100);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(tokenRefreshService.refreshTokenWithRetry).toHaveBeenCalled();
+        expect(unhandledRejections).toHaveLength(0);
+      } finally {
+        process.off('unhandledRejection', onUnhandled);
+      }
+    });
+
     it('should stop auto refresh when requested', async () => {
       const session: Session = {
         access_token: 'token',
