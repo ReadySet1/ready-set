@@ -13,17 +13,25 @@
  * IMPORTANT: This endpoint should be protected or removed in production
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@/lib/monitoring/sentry';
+import { withAuth } from '@/lib/auth-middleware';
+import { devOnlyGuard } from '@/lib/auth/dev-only-guard';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
-  // Only allow in development
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json(
-      { error: 'This endpoint is disabled in production' },
-      { status: 403 }
+export async function GET(request: NextRequest) {
+  const blocked = devOnlyGuard();
+  if (blocked) return blocked;
+
+  const authResult = await withAuth(request, {
+    allowedRoles: ['SUPER_ADMIN'],
+    requireAuth: true,
+  });
+  if (!authResult.success || authResult.response) {
+    return (
+      authResult.response ??
+      NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     );
   }
 

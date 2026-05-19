@@ -105,6 +105,9 @@ API Route → Server Action → Service Layer → Utils → Prisma
 **Route Protection**: Role-based via middleware
 - Routes: `/admin/*`, `/driver/*`, `/client/*`, `/helpdesk/*`
 - Config: `src/middleware/routeProtection.ts`
+- **Middleware does NOT run for `/api/*`** — each API route must handle its own auth via `withAuth({ allowedRoles })` from `src/lib/auth-middleware.ts`.
+
+**Debug / test routes**: if you add a route under `src/app/api/debug/`, `src/app/api/test-*`, `src/app/api/test/`, or any page that exists only for engineering (e.g. SSR-error pages), it MUST be gated by `devOnlyGuard()` from `src/lib/auth/dev-only-guard.ts` (returns 404 in production) AND by `withAuth({ allowedRoles: ['SUPER_ADMIN'], requireAuth: true })`. See `docs/architecture/REMEDIATION_PLAN.md` → Appendix A for the gating pattern.
 
 ### Delivery Calculator — Vendor Pricing
 

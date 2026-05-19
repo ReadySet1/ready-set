@@ -2,8 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkVendorAccess } from "@/lib/services/vendor";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { withAuth } from "@/lib/auth-middleware";
+import { devOnlyGuard } from "@/lib/auth/dev-only-guard";
 
 export async function GET(req: NextRequest) {
+  const blocked = devOnlyGuard();
+  if (blocked) return blocked;
+
+  const authResult = await withAuth(req, {
+    allowedRoles: ["SUPER_ADMIN"],
+    requireAuth: true,
+  });
+  if (!authResult.success || authResult.response) {
+    return (
+      authResult.response ??
+      NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    );
+  }
+
   try {
     // Test 1: Prisma client and database connection
     let prismaTest: { success: boolean; testQuery?: unknown; message?: string; error?: string } = { success: false, error: 'Unknown error' };

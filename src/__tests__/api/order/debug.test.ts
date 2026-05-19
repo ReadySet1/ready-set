@@ -37,14 +37,43 @@ jest.mock('@prisma/client', () => ({
   })),
 }));
 
+jest.mock('@/lib/auth-middleware', () => ({
+  withAuth: jest.fn(),
+}));
+
 import { GET } from '@/app/api/order/debug/route';
 import { checkVendorAccess } from '@/lib/services/vendor';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db/prisma';
+import { withAuth } from '@/lib/auth-middleware';
+
+const originalNodeEnv = process.env.NODE_ENV;
+
+function setNodeEnv(value: string | undefined) {
+  Object.defineProperty(process.env, 'NODE_ENV', {
+    value,
+    configurable: true,
+  });
+}
 
 describe('/api/order/debug GET API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default: NODE_ENV is "test" (Jest default) and the caller is SUPER_ADMIN
+    setNodeEnv('test');
+    (withAuth as jest.Mock).mockResolvedValue({
+      success: true,
+      context: {
+        user: { id: 'super-admin-id', email: 'super@example.com', type: 'SUPER_ADMIN' },
+        isAdmin: true,
+        isSuperAdmin: true,
+        isHelpdesk: false,
+      },
+    });
+  });
+
+  afterEach(() => {
+    setNodeEnv(originalNodeEnv);
   });
 
   describe('✅ Successful Debug Information Collection', () => {
@@ -488,6 +517,38 @@ describe('/api/order/debug GET API', () => {
       expect(data.tests.authentication.success).toBe(false);
       expect(data.tests.vendorAccess.success).toBe(false);
       expect(data.tests.profileTest.success).toBe(false);
+    });
+  });
+
+  describe('🛡️ Production gating + auth', () => {
+    it('returns 404 in production regardless of role', async () => {
+      setNodeEnv('production');
+
+      const request = createGetRequest('http://localhost:3000/api/order/debug');
+      const response = await GET(request);
+
+      expect(response.status).toBe(404);
+      // withAuth must not even be invoked once the dev-only guard short-circuits
+      expect(withAuth).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 (from withAuth) when caller is not SUPER_ADMIN', async () => {
+      const forbidden = new Response(
+        JSON.stringify({ error: 'Insufficient permissions' }),
+        { status: 403, headers: { 'content-type': 'application/json' } },
+      );
+      (withAuth as jest.Mock).mockResolvedValue({
+        success: false,
+        response: forbidden,
+        context: {},
+      });
+
+      const request = createGetRequest('http://localhost:3000/api/order/debug');
+      const response = await GET(request);
+
+      expect(response.status).toBe(403);
+      // No business logic should have run
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
   });
 });
