@@ -404,7 +404,7 @@
     },
     {
       "id": "rea-367-realtime-channel-off-cleanup",
-      "status": "open",
+      "status": "progress",
       "title": "REA-367 — Realtime <code>channel.off()</code> cleanup throws (channel closes ~1ms after subscribe)",
       "owner": "emmanuel",
       "source": "qa",
@@ -414,7 +414,20 @@
         "bug",
         "critical"
       ],
-      "description": "<code>RealtimeChannelManager.off()</code> (<code>src/lib/realtime/channels.ts:168-173</code>) calls <code>this.channel.off('broadcast', { event }, listener)</code>, but the Supabase <code>RealtimeChannel</code> has no runtime <code>.off()</code> — that's a Phoenix Channels method present only via a <code>.d.ts</code> type augmentation. So cleanup throws <code>TypeError: this.channel.off is not a function</code>; the <code>catch</code> only swallows 'closed' / 'not found' / 'already removed' messages, so it logs a WARN and the channel tears down — the admin <code>driver-locations</code> channel reaches <code>subscribed</code> then closes ~1ms later. <strong>Fix:</strong> drop the per-event <code>off()</code> path and tear down via <code>client.removeChannel(channel)</code> / <code>channel.unsubscribe()</code> (supabase-js v2 has no per-callback removal). Confirmed live during REA-DRT-07 verification on 2026-05-20 (channel <code>subscribed</code> → cleanup TypeError → <code>closed</code>). Blocks DRT-06+. Promoted from QA fail <strong>REA-DRT-05</strong> (sub-step DT5-01, Critical)."
+      "description": "<code>RealtimeChannelManager.off()</code> (<code>src/lib/realtime/channels.ts:168-173</code>) calls <code>this.channel.off('broadcast', { event }, listener)</code>, but the Supabase <code>RealtimeChannel</code> has no runtime <code>.off()</code> — that's a Phoenix Channels method present only via a <code>.d.ts</code> type augmentation. So cleanup throws <code>TypeError: this.channel.off is not a function</code>; the <code>catch</code> only swallows 'closed' / 'not found' / 'already removed' messages, so it logs a WARN and the channel tears down — the admin <code>driver-locations</code> channel reaches <code>subscribed</code> then closes ~1ms later. <strong>Fix:</strong> drop the per-event <code>off()</code> path and tear down via <code>client.removeChannel(channel)</code> / <code>channel.unsubscribe()</code> (supabase-js v2 has no per-callback removal). Confirmed live during REA-DRT-07 verification on 2026-05-20 (channel <code>subscribed</code> → cleanup TypeError → <code>closed</code>). Blocks DRT-06+. Promoted from QA fail <strong>REA-DRT-05</strong> (sub-step DT5-01, Critical). <strong>In progress:</strong> fixed in PR #410 (stable broadcast dispatcher; removed the phantom <code>channel.off()</code> + its <code>.d.ts</code> augmentation; 38 tests). The TypeError + cleanup WARN are verified gone. The remaining subscribe→close (StrictMode) is split to <code>rea-367b-realtime-strictmode-resubscribe</code>."
+    },
+    {
+      "id": "rea-367b-realtime-strictmode-resubscribe",
+      "status": "open",
+      "title": "Realtime channel closes after subscribe under React StrictMode (no re-subscribe)",
+      "owner": "emmanuel",
+      "source": "qa",
+      "sourceRef": "REA-367",
+      "relatedQa": "REA-DRT-05",
+      "tags": [
+        "bug"
+      ],
+      "description": "Split from REA-367. After the <code>channel.off</code> fix (PR #410), the admin <code>driver-locations</code> channel still reaches <code>subscribed</code> then closes ~1ms later in dev and does not re-subscribe. Root cause is a React <strong>StrictMode</strong> double-invoke race in <code>useAdminRealtimeTracking</code> (<code>src/hooks/tracking/useAdminRealtimeTracking.ts:512-534</code>): mount 1's deferred <code>.then</code> cleanup (lines 518-523) calls <code>removeChannel('driver-locations')</code> on the channel mount 2 established (the RealtimeClient dedups by channel name), tearing it down with no re-subscribe. StrictMode double-invoke is <strong>dev-only</strong>, so production single-mount is unaffected — but it blocks dev/QA (DRT-06+). <strong>Fix direction:</strong> ref-count or guard the shared channel so a stale mount's cleanup can't remove a channel a live mount owns (or key channels per-subscriber). Verify on <code>development.readysetllc.com</code> (prod build, no StrictMode double-invoke) after #410 merges. Found during #410 verification on 2026-05-20."
     }
   ]
 }
