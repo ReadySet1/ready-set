@@ -401,6 +401,20 @@
       "owner": "emmanuel",
       "source": "may19",
       "description": "First version of the ordering system is functional on the testing site (local mode). Gary deferred today's demo to focus the Christino 2:00 meeting on financials; demo to land next week."
+    },
+    {
+      "id": "rea-367-realtime-channel-off-cleanup",
+      "status": "open",
+      "title": "REA-367 — Realtime <code>channel.off()</code> cleanup throws (channel closes ~1ms after subscribe)",
+      "owner": "emmanuel",
+      "source": "qa",
+      "sourceRef": "REA-367",
+      "relatedQa": "REA-DRT-05",
+      "tags": [
+        "bug",
+        "critical"
+      ],
+      "description": "<code>RealtimeChannelManager.off()</code> (<code>src/lib/realtime/channels.ts:168-173</code>) calls <code>this.channel.off('broadcast', { event }, listener)</code>, but the Supabase <code>RealtimeChannel</code> has no runtime <code>.off()</code> — that's a Phoenix Channels method present only via a <code>.d.ts</code> type augmentation. So cleanup throws <code>TypeError: this.channel.off is not a function</code>; the <code>catch</code> only swallows 'closed' / 'not found' / 'already removed' messages, so it logs a WARN and the channel tears down — the admin <code>driver-locations</code> channel reaches <code>subscribed</code> then closes ~1ms later. <strong>Fix:</strong> drop the per-event <code>off()</code> path and tear down via <code>client.removeChannel(channel)</code> / <code>channel.unsubscribe()</code> (supabase-js v2 has no per-callback removal). Confirmed live during REA-DRT-07 verification on 2026-05-20 (channel <code>subscribed</code> → cleanup TypeError → <code>closed</code>). Blocks DRT-06+. Promoted from QA fail <strong>REA-DRT-05</strong> (sub-step DT5-01, Critical)."
     }
   ]
 }
