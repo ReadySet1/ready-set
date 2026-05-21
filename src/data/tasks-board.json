@@ -1,12 +1,13 @@
 {
   "title": "Ready Set — Tasks Board",
-  "subtitle": "Action items from the Dev Team Meetings on May 4, 2026 and May 11, 2026 — status as of May 11.",
-  "generated": "2026-05-11",
+  "subtitle": "Action items from the Dev Team Meetings on May 4, May 11, and May 19, 2026 — status as of May 19.",
+  "generated": "2026-05-19",
   "sources": [
     "meetings/shared/2026-05-04-dev-team-meeting.md",
     "meetings/shared/2026-05-11-dev-team-meeting.md",
     "meetings/shared/2026-05-11-may4-action-item-review.md",
-    "meetings/shared/2026-05-11-weekly-recap.md"
+    "meetings/shared/2026-05-11-weekly-recap.md",
+    "meetings/shared/2026-05-19-dev-team-meeting.md"
   ],
   "columns": [
     {
@@ -23,7 +24,7 @@
     },
     {
       "key": "new",
-      "title": "★ New — May 11"
+      "title": "★ New — May 19"
     }
   ],
   "owners": {
@@ -34,6 +35,7 @@
   "sourceLabels": {
     "may4": "May 4",
     "may11": "May 11",
+    "may19": "May 19",
     "qa": "QA",
     "catercow": "CaterCow"
   },
@@ -219,7 +221,7 @@
         "bug",
         "critical"
       ],
-      "description": "<code>supabase.auth.getSession()</code> returns null in the browser; <code>localStorage</code> has no <code>sb-&lt;ref&gt;-auth-token</code> key after login. SSR cookie is set server-side but not bridged to the browser <code>supabase-js</code> client, so all Realtime-dependent flows (<code>useRealtimeLocationTracking</code>, <code>useAdminRealtimeTracking</code>) early-return and never open a WS connection. <strong>First investigation target:</strong> <code>src/utils/supabase/client.ts</code> vs <code>src/middleware.ts</code> — verify <code>createBrowserClient</code> cookie config matches the SSR client. Related: Sentry READY-SET-NEXTJS-1S (unhandled refresh rejection on <code>/driver/tracking</code> — patched on <code>fix/auth-refresh-unhandled-rejection</code> as graceful failure, but root cause is this bug). Reported by Fer in QA notes; no engineering ticket filed yet."
+      "description": "<strong>Root cause (investigated 2026-05-19):</strong> server-side cookie defaults force <code>httpOnly: true</code> on every cookie they write — including the <code>sb-&lt;ref&gt;-auth-token</code> chunks. <code>src/utils/supabase/server.ts:10-16</code> and <code>src/utils/supabase/middleware.ts:6-12</code> both define <code>{ httpOnly: true, ...options }</code> defaults, and <code>@supabase/ssr</code> doesn't override <code>httpOnly</code>, so the auth cookies land HttpOnly. The browser supabase-js client (<code>src/utils/supabase/client.ts:19-28</code>) reads cookies via <code>document.cookie</code>, which by spec cannot see HttpOnly cookies — so <code>getSession()</code> returns null, Realtime channels never authenticate, and <code>TokenRefreshService</code> throws <code>REFRESH_FAILED</code> (the symptom #404 patched as graceful failure). Regression introduced in commit <code>f49f6ec5</code> (2026-01-07 mobile-Safari ITP fix); the <code>sameSite: 'lax'</code> + request+response sync changes in that commit were correct, only <code>httpOnly: true</code> was wrong. <strong>Fix:</strong> drop <code>httpOnly: true</code> from <code>getDefaultCookieOptions</code> (server.ts) and <code>getCookieOptions</code> (middleware.ts); auth cookies must be JS-readable for the <code>@supabase/ssr</code> SSR↔browser bridge. ~2-line change in 2 files. Add a browser <code>getSession()</code> smoke test in <code>src/lib/auth/__tests__/token-refresh-and-session.test.ts</code> that fails if auth cookies are written HttpOnly. <strong>Tradeoff:</strong> XSS-exfiltrable auth tokens in principle; mitigated by existing CSP + dompurify + Supabase's short-lived JWT + refresh-token rotation. <strong>Keep #404 patch in place</strong> — graceful sign-in redirect on legitimate session expiry is still correct behavior. <strong>Out of scope:</strong> Realtime reconnect handler (see <code>docs/architecture/REMEDIATION_PLAN.md</code>). See <code>docs/JOURNAL.md</code> 2026-05-19 for full trace."
     },
     {
       "id": "test-telnyx-integration",
@@ -255,11 +257,11 @@
     },
     {
       "id": "update-hours-sheet",
-      "status": "new",
+      "status": "done",
       "title": "Update Hours Sheet (previous weeks)",
       "owner": "emmanuel",
       "source": "may11",
-      "description": "Record the work duration from the previous weeks into the tracking document."
+      "description": "Sheet updated with the latest tracked hours; Emmanuel confirmed in the May 19 meeting. Gary will review tonight (see <code>gary-review-hours-file</code>)."
     },
     {
       "id": "contact-james-trial",
@@ -332,6 +334,73 @@
       "owner": "emmanuel",
       "source": "catercow",
       "description": "Pre-scoped in <code>docs/catercow/IMPLEMENTATION_PLAN.md</code> Phase 4.2 (~half day). Generate from existing Zod schemas in <code>src/app/api/partners/orders/*/route.ts</code> using <code>zod-to-openapi</code>; output <code>docs/catercow/openapi.yaml</code> + a <code>pnpm openapi:partners</code> script. Defer until CaterCow flags it as needed."
+    },
+    {
+      "id": "fernando-email-seo-updates",
+      "status": "new",
+      "title": "Email SEO updates → sync with Caleb",
+      "owner": "fernando",
+      "source": "may19",
+      "description": "Complete the email SEO modifications Gary requested two weeks ago, then sync with Caleb for final verification."
+    },
+    {
+      "id": "fernando-redesign-address-manager",
+      "status": "new",
+      "title": "Redesign address manager — 3 proposals",
+      "owner": "fernando",
+      "source": "may19",
+      "description": "Current UI is confusing for selecting or adding addresses during new catering / on-demand orders. Develop 3 design proposals and review with Iman to pick the one that fits current architecture."
+    },
+    {
+      "id": "push-jitter-dev-code",
+      "status": "new",
+      "title": "Push Jitter integration code to <code>development</code>",
+      "owner": "emmanuel",
+      "source": "may19",
+      "description": "Push current local testing code for the Jitter integration to <code>development</code> so it can be verified in the staging environment. Endpoints (draft / update / confirm) already shared with Nate; waiting on partner-side feedback."
+    },
+    {
+      "id": "driver-integration-realworld-test",
+      "status": "new",
+      "title": "Real-world driver integration test (Thursday 2026-05-21)",
+      "owner": "emmanuel",
+      "source": "may19",
+      "tags": [
+        "critical"
+      ],
+      "description": "Real-world test with Gary + Mark on Thursday 2026-05-21. Monitor logs, identify + resolve errors. Co-owners: Fernando (testing), Gary (field). First step of the 3-week phased rollout (2–3 drivers at a time) leading to the July Cool Fire sunset."
+    },
+    {
+      "id": "gary-review-hours-file",
+      "status": "new",
+      "title": "Review Google hours file tonight",
+      "owner": "gary",
+      "source": "may19",
+      "description": "Review the updated hours sheet tonight; contact Emmanuel with any questions before the next scheduled meeting."
+    },
+    {
+      "id": "vendor-multi-pickup-support",
+      "status": "new",
+      "title": "Vendor multi-pickup-location support",
+      "owner": "emmanuel",
+      "source": "may19",
+      "description": "Implement multiple pickup locations per vendor. Test with Fresh (3 locations). Fresh is lenient on expectations since the company uses the product themselves."
+    },
+    {
+      "id": "fernando-ux-report-fixes",
+      "status": "progress",
+      "title": "Address Fernando's UX report",
+      "owner": "emmanuel",
+      "source": "may19",
+      "description": "Triage + ship fixes from the UX report Fernando provided. In progress per Emmanuel's May 19 update."
+    },
+    {
+      "id": "christino-demo-prep",
+      "status": "open",
+      "title": "Prepare Christino demo endpoint (deferred to next week)",
+      "owner": "emmanuel",
+      "source": "may19",
+      "description": "First version of the ordering system is functional on the testing site (local mode). Gary deferred today's demo to focus the Christino 2:00 meeting on financials; demo to land next week."
     }
   ]
 }
