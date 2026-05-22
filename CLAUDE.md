@@ -105,6 +105,9 @@ API Route → Server Action → Service Layer → Utils → Prisma
 **Route Protection**: Role-based via middleware
 - Routes: `/admin/*`, `/driver/*`, `/client/*`, `/helpdesk/*`
 - Config: `src/middleware/routeProtection.ts`
+- **Middleware does NOT run for `/api/*`** — each API route must handle its own auth via `withAuth({ allowedRoles })` from `src/lib/auth-middleware.ts`.
+
+**Debug / test routes**: if you add a route under `src/app/api/debug/`, `src/app/api/test-*`, `src/app/api/test/`, or any page that exists only for engineering (e.g. SSR-error pages), it MUST be gated by `devOnlyGuard()` from `src/lib/auth/dev-only-guard.ts` (returns 404 in production) AND by `withAuth({ allowedRoles: ['SUPER_ADMIN'], requireAuth: true })`. See `docs/architecture/REMEDIATION_PLAN.md` → Appendix A for the gating pattern.
 
 ### Delivery Calculator — Vendor Pricing
 
@@ -176,6 +179,38 @@ Cross-link convention: tasks promoted from a QA failure carry `relatedQa: "REA-O
 - PRs require passing CI checks before merge.
 - Use feature branches: `feature/REA-XXX-description` (or `refactor/...`, `fix/...`, `chore/...` as appropriate).
 - Run `pnpm pre-push-check` and `pnpm test:ci` before creating PRs.
+- **Conventional commits required** — see Versioning section below for the prefixes that drive release-please.
+
+### Versioning
+
+The app's version (`package.json`) is managed by [`release-please`](https://github.com/googleapis/release-please) — humans never bump it manually. The bot watches `main`; after each dev → main sync it opens a `chore(main): release X.Y.Z` PR that:
+
+- Bumps `package.json` `version`
+- Cuts the current `## [Unreleased]` block of `CHANGELOG.md` into a `## [X.Y.Z] - YYYY-MM-DD` section
+- Creates the git tag and a GitHub Release when merged
+
+**Conventional commit prefixes → bump level:**
+
+| Prefix | Section in CHANGELOG | Bump |
+|---|---|---|
+| `feat:` | Added | minor |
+| `fix:` | Fixed | patch |
+| `perf:` | Performance | patch |
+| `security:` | Security | patch |
+| `refactor:` | Changed | patch |
+| `design:` | Changed | patch |
+| `docs:` | Documentation | patch |
+| `test:` / `chore:` / `build:` / `ci:` | (hidden) | patch |
+| Any of the above with `!` (e.g. `feat!:`) or `BREAKING CHANGE:` footer | — | major |
+
+Config lives in `release-please-config.json` + `.release-please-manifest.json`; workflow in `.github/workflows/release-please.yml`.
+
+**Independently versioned (NOT managed by release-please):**
+
+- **Partner API contracts** in `docs/catercow/API_CONTRACT.md` and `docs/catervalley/API_CONTRACT.md` — these are partner-facing agreements (currently v0.2 and v1.0 respectively) that evolve on their own cycle. Bumping them is a manual doc edit + changelog entry in the doc itself.
+- **Database schema** — versioned implicitly by Prisma's timestamped migration filenames (`prisma/migrations/YYYYMMDDHHMMSS_*`).
+
+`/api/health` returns the current `package.json` version as `version` — useful for verifying which build is live in a given environment.
 
 ### External Integrations
 

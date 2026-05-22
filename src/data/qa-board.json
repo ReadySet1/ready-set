@@ -1,13 +1,13 @@
 {
   "source": "2026-Q2-test-cases.csv",
-  "generated": "2026-05-12",
+  "generated": "2026-05-15",
   "total": 29,
   "counts": {
     "PASS": 7,
     "PARTIAL-FAIL": 1,
-    "FAIL": 8,
+    "FAIL": 9,
     "BLOCKED": 0,
-    "IN-PROGRESS": 2,
+    "IN-PROGRESS": 1,
     "NOT-RUN": 11,
     "SKIPPED": 0,
     "UNKNOWN": 0
@@ -680,7 +680,7 @@
       "key": "REA-DRT-07",
       "summary": "Feature flag combinations",
       "description": "Verify behavior under all four flag combinations (driver + admin × on/off).",
-      "status": "In Process",
+      "status": "DONE",
       "priority": "Medium",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -693,8 +693,8 @@
         "lib/feature-flags"
       ],
       "folder": "Q2 2026/Driver Tracking",
-      "notes": "",
-      "verdict": "IN-PROGRESS",
+      "notes": "FAIL [BUG][CRITICAL] Supabase Realtime never initializes - browser client has no active session | Module: Tracking / Realtime | Priority: Urgent | Severity: Critical | Reproducible: 100% | Environment: Local dev + Production (per 2026-04-04 QA) | Affected: useRealtimeLocationTracking, useAdminRealtimeTracking, all Realtime-dependent flows | Symptom: zero WebSocket connections to <project>.supabase.co/realtime/v1/websocket despite NEXT_PUBLIC_FF_USE_REALTIME_LOCATION_UPDATES=true and NEXT_PUBLIC_FF_USE_REALTIME_ADMIN_DASHBOARD=true | Root cause hypothesis: supabase.auth.getSession() returns null in browser; localStorage has no sb-<ref>-auth-token key after login; SSR cookie (sb-khvteminrbghoeuqajzm-auth-token) is set server-side but not bridged to the browser supabase-js client | Code path: src/hooks/tracking/useRealtimeLocationTracking.ts:initializeRealtime + src/hooks/tracking/useAdminRealtimeTracking.ts (early return on !session, setConnectionMode('sse')) | Repro manual: pnpm dev, login as admin or driver, open /admin/tracking or /driver/tracking, DevTools Network filter 'ws' → only HMR socket, no Supabase WS | Repro E2E: e2e/drt07-feature-flag-combinations.spec.ts — 3/3 tests fail asserting wsActivity.supabaseWsOpened=true | Related: 2026-04-04 production QA report (vendors stuck in 'Connecting...') | Acceptance criteria: (1) browser localStorage contains sb-<ref>-auth-token with valid JWT after login (2) supabase.auth.getSession() returns active session in browser, not null (3) WS connection to /realtime/v1/websocket opens on /admin/tracking and on /driver/tracking after Enable Location (4) REA-DRT-07 spec passes without code modifications | First investigation target: src/utils/supabase/client.ts vs middleware.ts — verify createBrowserClient cookie config matches SSR client | Reported by: Fer",
+      "verdict": "FAIL",
       "steps": [
         {
           "step": "Both flags true",

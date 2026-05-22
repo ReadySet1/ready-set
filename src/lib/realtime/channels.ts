@@ -30,14 +30,18 @@ import {
 import { realtimeLogger } from '../logging/realtime-logger';
 
 // ============================================================================
-// Type Definitions
+// Broadcast listener pattern
 // ============================================================================
 
 /**
- * Type augmentation for RealtimeChannel is now in types/supabase-realtime.d.ts
- * This provides proper TypeScript support for the off() method from Phoenix Channels.
- *
- * @see types/supabase-realtime.d.ts
+ * supabase-js v2 `RealtimeChannel` has NO per-listener removal API — there is
+ * no `channel.off(...)` at runtime (it's a Phoenix Channels method that the
+ * supabase wrapper does not expose). Each channel class below therefore binds
+ * one STABLE dispatcher per event that reads the current handler from
+ * `eventHandlers` at call time. Re-registering an event just swaps the handler
+ * (no rebind → no duplicate broadcasts); `off()` mutes by dropping the handler;
+ * full teardown happens via `client.unsubscribe()` → `supabase.removeChannel()`,
+ * which removes every binding at once. See REA-367.
  */
 
 // ============================================================================
@@ -142,60 +146,38 @@ export class DriverLocationChannel {
       );
     }
 
-    // Remove existing listener first to prevent duplicates
-    if (this.listenerRefs.has(eventName)) {
-      this.off(eventName);
-    }
-
-    // Create listener function and store reference
-    // Wrap handler to match Phoenix channel listener signature and handle async
-    const listener = (...args: unknown[]) => {
-      const payload = (args[0] as { payload: T }) || { payload: args[0] as T };
-      void handler(payload.payload);
-    };
-    this.listenerRefs.set(eventName, listener);
+    // Always store the latest handler; the stable dispatcher reads it at call time.
     this.eventHandlers.set(eventName, handler);
 
+    // Bind the dispatcher exactly once per event. Re-registering only swaps the
+    // handler above (no rebind → no duplicate broadcasts). supabase-js v2 has no
+    // per-listener removal, so we never call channel.off().
+    if (this.listenerRefs.has(eventName)) {
+      return;
+    }
+
+    const dispatch = (...args: unknown[]) => {
+      const current = this.eventHandlers.get(eventName);
+      if (!current) return; // removed via off()
+      const envelope = (args[0] as { payload: unknown }) || { payload: args[0] };
+      void current(envelope.payload as MessagePayload);
+    };
+    this.listenerRefs.set(eventName, dispatch);
+
     // Register listener with channel
-    (this.channel as unknown as { on: (type: string, filter: { event: string }, callback: (...args: unknown[]) => void) => void }).on('broadcast', { event: eventName }, listener);
+    (this.channel as unknown as { on: (type: string, filter: { event: string }, callback: (...args: unknown[]) => void) => void }).on('broadcast', { event: eventName }, dispatch);
   }
 
   /**
-   * Remove event listener with improved error handling
+   * Remove an event handler.
    *
-   * Uses the off() method from Phoenix Channels (now properly typed via type augmentation)
+   * supabase-js v2 has no per-listener removal, so this drops the handler from
+   * the maps, which mutes the still-bound dispatcher. The binding itself is torn
+   * down with the whole channel in unsubscribe() (via removeChannel).
    */
   off(eventName: RealtimeEventName): void {
-    const listener = this.listenerRefs.get(eventName);
-    if (listener && this.channel) {
-      try {
-        // off() method is now properly typed via types/supabase-realtime.d.ts
-        this.channel.off('broadcast', { event: eventName }, listener);
-      } catch (error) {
-        // Phoenix Channels doesn't expose structured error types, so we use message matching
-        // Expected errors during cleanup (listener already removed, channel closed, etc.)
-        const errorMessage = (error as Error)?.message || '';
-        const isExpectedCleanupError =
-          errorMessage.includes('not found') ||
-          errorMessage.includes('does not exist') ||
-          errorMessage.includes('already removed') ||
-          errorMessage.includes('closed');
-
-        if (!isExpectedCleanupError) {
-          // Log unexpected errors for debugging, but continue cleanup
-          realtimeLogger.warn('Unexpected error during event listener cleanup', {
-            metadata: {
-              eventName,
-              channel: REALTIME_CHANNELS.DRIVER_LOCATIONS,
-              errorMessage,
-              errorType: error?.constructor?.name || 'Unknown',
-            },
-          });
-        }
-      }
-    }
-    this.listenerRefs.delete(eventName);
     this.eventHandlers.delete(eventName);
+    this.listenerRefs.delete(eventName);
   }
 
   /**
@@ -203,18 +185,14 @@ export class DriverLocationChannel {
    * Automatically cleans up ALL listeners to prevent memory leaks
    */
   async unsubscribe(): Promise<void> {
-    // Clean up all broadcast event listeners
-    for (const eventName of this.listenerRefs.keys()) {
-      this.off(eventName as RealtimeEventName);
-    }
+    // Drop handler references; removeChannel (below) tears down every binding.
+    this.eventHandlers.clear();
+    this.listenerRefs.clear();
 
     // Unsubscribe from channel (this also cleans up postgres_changes listeners)
     await this.client.unsubscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
 
-    // Clear all references
     this.channel = null;
-    this.eventHandlers.clear();
-    this.listenerRefs.clear();
   }
 
   /**
@@ -307,22 +285,26 @@ export class DriverStatusChannel {
       );
     }
 
-    // Remove existing listener first to prevent duplicates
-    if (this.listenerRefs.has(eventName)) {
-      this.off(eventName);
-    }
-
-    // Create listener function and store reference
-    // Wrap handler to match Phoenix channel listener signature and handle async
-    const listener = (...args: unknown[]) => {
-      const payload = (args[0] as { payload: T }) || { payload: args[0] as T };
-      void handler(payload.payload);
-    };
-    this.listenerRefs.set(eventName, listener);
+    // Always store the latest handler; the stable dispatcher reads it at call time.
     this.eventHandlers.set(eventName, handler);
 
+    // Bind the dispatcher exactly once per event. Re-registering only swaps the
+    // handler above (no rebind → no duplicate broadcasts). supabase-js v2 has no
+    // per-listener removal, so we never call channel.off().
+    if (this.listenerRefs.has(eventName)) {
+      return;
+    }
+
+    const dispatch = (...args: unknown[]) => {
+      const current = this.eventHandlers.get(eventName);
+      if (!current) return; // removed via off()
+      const envelope = (args[0] as { payload: unknown }) || { payload: args[0] };
+      void current(envelope.payload as MessagePayload);
+    };
+    this.listenerRefs.set(eventName, dispatch);
+
     // Register listener with channel
-    (this.channel as unknown as { on: (type: string, filter: { event: string }, callback: (...args: unknown[]) => void) => void }).on('broadcast', { event: eventName }, listener);
+    (this.channel as unknown as { on: (type: string, filter: { event: string }, callback: (...args: unknown[]) => void) => void }).on('broadcast', { event: eventName }, dispatch);
   }
 
   /**
@@ -351,41 +333,15 @@ export class DriverStatusChannel {
   }
 
   /**
-   * Remove event listener with improved error handling
+   * Remove an event handler.
    *
-   * Uses the off() method from Phoenix Channels (now properly typed via type augmentation)
+   * supabase-js v2 has no per-listener removal, so this drops the handler from
+   * the maps, which mutes the still-bound dispatcher. The binding itself is torn
+   * down with the whole channel in unsubscribe() (via removeChannel).
    */
   off(eventName: RealtimeEventName): void {
-    const listener = this.listenerRefs.get(eventName);
-    if (listener && this.channel) {
-      try {
-        // off() method is now properly typed via types/supabase-realtime.d.ts
-        this.channel.off('broadcast', { event: eventName }, listener);
-      } catch (error) {
-        // Phoenix Channels doesn't expose structured error types, so we use message matching
-        // Expected errors during cleanup (listener already removed, channel closed, etc.)
-        const errorMessage = (error as Error)?.message || '';
-        const isExpectedCleanupError =
-          errorMessage.includes('not found') ||
-          errorMessage.includes('does not exist') ||
-          errorMessage.includes('already removed') ||
-          errorMessage.includes('closed');
-
-        if (!isExpectedCleanupError) {
-          // Log unexpected errors for debugging, but continue cleanup
-          realtimeLogger.warn('Unexpected error during event listener cleanup', {
-            metadata: {
-              eventName,
-              channel: REALTIME_CHANNELS.DRIVER_STATUS,
-              errorMessage,
-              errorType: error?.constructor?.name || 'Unknown',
-            },
-          });
-        }
-      }
-    }
-    this.listenerRefs.delete(eventName);
     this.eventHandlers.delete(eventName);
+    this.listenerRefs.delete(eventName);
   }
 
   /**
@@ -393,10 +349,9 @@ export class DriverStatusChannel {
    * Automatically cleans up ALL listeners to prevent memory leaks
    */
   async unsubscribe(): Promise<void> {
-    // Clean up all broadcast event listeners
-    for (const eventName of this.listenerRefs.keys()) {
-      this.off(eventName as RealtimeEventName);
-    }
+    // Drop handler references; removeChannel (below) tears down every binding.
+    this.eventHandlers.clear();
+    this.listenerRefs.clear();
 
     // Untrack presence
     await this.untrackPresence();
@@ -404,10 +359,7 @@ export class DriverStatusChannel {
     // Unsubscribe from channel
     await this.client.unsubscribe(REALTIME_CHANNELS.DRIVER_STATUS);
 
-    // Clear all references
     this.channel = null;
-    this.eventHandlers.clear();
-    this.listenerRefs.clear();
   }
 
   /**
@@ -513,60 +465,38 @@ export class AdminCommandsChannel {
       );
     }
 
-    // Remove existing listener first to prevent duplicates
-    if (this.listenerRefs.has(eventName)) {
-      this.off(eventName);
-    }
-
-    // Create listener function and store reference
-    // Wrap handler to match Phoenix channel listener signature and handle async
-    const listener = (...args: unknown[]) => {
-      const payload = (args[0] as { payload: T }) || { payload: args[0] as T };
-      void handler(payload.payload);
-    };
-    this.listenerRefs.set(eventName, listener);
+    // Always store the latest handler; the stable dispatcher reads it at call time.
     this.eventHandlers.set(eventName, handler);
 
+    // Bind the dispatcher exactly once per event. Re-registering only swaps the
+    // handler above (no rebind → no duplicate broadcasts). supabase-js v2 has no
+    // per-listener removal, so we never call channel.off().
+    if (this.listenerRefs.has(eventName)) {
+      return;
+    }
+
+    const dispatch = (...args: unknown[]) => {
+      const current = this.eventHandlers.get(eventName);
+      if (!current) return; // removed via off()
+      const envelope = (args[0] as { payload: unknown }) || { payload: args[0] };
+      void current(envelope.payload as MessagePayload);
+    };
+    this.listenerRefs.set(eventName, dispatch);
+
     // Register listener with channel
-    (this.channel as unknown as { on: (type: string, filter: { event: string }, callback: (...args: unknown[]) => void) => void }).on('broadcast', { event: eventName }, listener);
+    (this.channel as unknown as { on: (type: string, filter: { event: string }, callback: (...args: unknown[]) => void) => void }).on('broadcast', { event: eventName }, dispatch);
   }
 
   /**
-   * Remove event listener with improved error handling
+   * Remove an event handler.
    *
-   * Uses the off() method from Phoenix Channels (now properly typed via type augmentation)
+   * supabase-js v2 has no per-listener removal, so this drops the handler from
+   * the maps, which mutes the still-bound dispatcher. The binding itself is torn
+   * down with the whole channel in unsubscribe() (via removeChannel).
    */
   off(eventName: RealtimeEventName): void {
-    const listener = this.listenerRefs.get(eventName);
-    if (listener && this.channel) {
-      try {
-        // off() method is now properly typed via types/supabase-realtime.d.ts
-        this.channel.off('broadcast', { event: eventName }, listener);
-      } catch (error) {
-        // Phoenix Channels doesn't expose structured error types, so we use message matching
-        // Expected errors during cleanup (listener already removed, channel closed, etc.)
-        const errorMessage = (error as Error)?.message || '';
-        const isExpectedCleanupError =
-          errorMessage.includes('not found') ||
-          errorMessage.includes('does not exist') ||
-          errorMessage.includes('already removed') ||
-          errorMessage.includes('closed');
-
-        if (!isExpectedCleanupError) {
-          // Log unexpected errors for debugging, but continue cleanup
-          realtimeLogger.warn('Unexpected error during event listener cleanup', {
-            metadata: {
-              eventName,
-              channel: REALTIME_CHANNELS.ADMIN_COMMANDS,
-              errorMessage,
-              errorType: error?.constructor?.name || 'Unknown',
-            },
-          });
-        }
-      }
-    }
-    this.listenerRefs.delete(eventName);
     this.eventHandlers.delete(eventName);
+    this.listenerRefs.delete(eventName);
   }
 
   /**
@@ -574,18 +504,14 @@ export class AdminCommandsChannel {
    * Automatically cleans up ALL listeners to prevent memory leaks
    */
   async unsubscribe(): Promise<void> {
-    // Clean up all broadcast event listeners
-    for (const eventName of this.listenerRefs.keys()) {
-      this.off(eventName as RealtimeEventName);
-    }
+    // Drop handler references; removeChannel (below) tears down every binding.
+    this.eventHandlers.clear();
+    this.listenerRefs.clear();
 
     // Unsubscribe from channel
     await this.client.unsubscribe(REALTIME_CHANNELS.ADMIN_COMMANDS);
 
-    // Clear all references
     this.channel = null;
-    this.eventHandlers.clear();
-    this.listenerRefs.clear();
   }
 
   /**

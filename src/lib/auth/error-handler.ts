@@ -61,6 +61,31 @@ const RECOVERY_STRATEGIES: ErrorRecoveryStrategy[] = [
     priority: 8,
   },
 
+  // Refresh failure recovery: the refresh_token itself is no good (revoked,
+  // expired, or the post-sign-in race left storage stale). User must re-auth.
+  {
+    canRecover: (error) => error.type === AuthErrorType.REFRESH_FAILED,
+    recover: async (error) => {
+      if (typeof window === 'undefined') return;
+
+      try {
+        const { getSessionManager } = await import('./session-manager');
+        const sessionManager = getSessionManager();
+        await sessionManager.clearSession();
+      } catch (clearError) {
+        authLogger.warn('AuthErrorHandler: clearSession failed during REFRESH_FAILED recovery', clearError);
+      }
+
+      // Avoid a redirect loop if we're already on the sign-in page — covers
+      // the case where a stale refresh fires immediately after the user
+      // lands on sign-in.
+      if (!window.location.pathname.startsWith('/sign-in')) {
+        window.location.replace('/sign-in?error=session_expired');
+      }
+    },
+    priority: 5,
+  },
+
   // Fingerprint mismatch recovery (lowest priority - usually requires user intervention)
   {
     canRecover: (error) => error.type === AuthErrorType.FINGERPRINT_MISMATCH,

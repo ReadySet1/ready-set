@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-05-13
+
+Periodic dev → main sync ([PR #402](https://github.com/ReadySet1/ready-set/pull/402)). 89 commits / ~25 PRs since the previous release window. First versioned release after baseline rebase — anchors retroactively to merge commit `c3803ac9`.
+
 ### Added
 - **Internal QA + Tasks Dashboards**: Admin-only pages at `/admin/qa-board` and `/admin/tasks-board` for cross-team visibility into testing state and meeting action items
   - QA Board: renders quarterly Jira/TestRail test case exports grouped by folder with pass/fail/blocked/in-progress/not-run counts and expandable step tables
