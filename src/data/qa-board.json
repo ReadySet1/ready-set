@@ -1,14 +1,14 @@
 {
   "source": "2026-Q2-test-cases.csv",
-  "generated": "2026-05-15",
+  "generated": "2026-05-23",
   "total": 29,
   "counts": {
-    "PASS": 7,
-    "PARTIAL-FAIL": 1,
-    "FAIL": 9,
-    "BLOCKED": 0,
+    "PASS": 11,
+    "PARTIAL-FAIL": 4,
+    "FAIL": 11,
+    "BLOCKED": 1,
     "IN-PROGRESS": 1,
-    "NOT-RUN": 11,
+    "NOT-RUN": 1,
     "SKIPPED": 0,
     "UNKNOWN": 0
   },
@@ -759,7 +759,7 @@
       "key": "REA-CAL-01",
       "summary": "One-way driving distance — Haversine x 1.35",
       "description": "calculateEstimatedDrivingDistance returns expected miles for known coords (SF -> Oakland).",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -772,8 +772,8 @@
         "lib/calculator/distance-calculator"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PASS — distance-calculator.test.ts 17/17. SF (37.7749,-122.4194) -> Oakland (37.8044,-122.2712) = 11.3mi (Haversine km x 1.35 x 0.621371, rounded 1dp). Implementation correct. Two follow-ups raised: (1) [TECH-DEBT][Low] assertions too loose in the suite — SF->Oakland asserts 8<=d<=14 so a regression disabling the 1.35x multiplier (~8.3mi) or inflating to 1.68x (~14mi) would still pass; multiplier test accepts ~1.08-1.55; rounding test checks string format not the Math.round contract; SF->LA comment inconsistent with its range. Harden to toBeCloseTo(11.3,1), ratio result/haversineMiles ~1.35 +/-0.05, and Number.isInteger(distance*10). Implementation file unchanged (test-quality only). (2) [BUG?][Medium] calculateEstimatedRoundTripDistance docstring (L49-51) describes 3 legs (depot -> pickup -> delivery -> depot) but code (L64) computes oneWay*2 (2 legs, no depot/return). If real flow is 3-leg with depot not co-located with pickup, distance under-reports ~33%, impacting driver pay + fee estimation. Existing test codifies current code, not the docstring, so drift is uncaught. Needs domain-owner validation + caller audit before any change.",
+      "verdict": "PASS",
       "steps": [
         {
           "step": "Calculator tab address mode; enter SF + Oakland coords",
@@ -791,7 +791,7 @@
       "key": "REA-CAL-02",
       "summary": "Round-trip distance = 2 x one-way",
       "description": "calculateEstimatedRoundTripDistance returns exactly double the one-way value (within rounding).",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -804,8 +804,8 @@
         "lib/calculator/distance-calculator"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PASS — 5/5 green in 0.61s. calculateEstimatedRoundTripDistance returns oneWay x 2, validated with toBeCloseTo(oneWay*2, 1) for SF->Oakland (expected ~22.6mi). Test literally satisfies the ticket spec. WARNING: this PASS validates behavior that is under investigation in the follow-up raised from REA-CAL-01 (docstring describes 3 legs depot->pickup->delivery->depot, code does 2). If the product owner confirms intent is 3 legs, this test will be codifying the bug and REA-CAL-02 must be re-evaluated. Inherited test-quality observations (see CAL-05 hardening ticket): loose range 16-28mi for an expected 22.6, and the rounding assert verifies string format not the Math.round contract.",
+      "verdict": "PASS",
       "steps": [
         {
           "step": "Trigger round-trip computation",
@@ -818,7 +818,7 @@
       "key": "REA-CAL-03",
       "summary": "Drive time / ETA from Mapbox geocoding",
       "description": "Address-mode populates estimatedDriveTime from Mapbox routing response.",
-      "status": "TO DO",
+      "status": "BLOCKED",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -831,8 +831,8 @@
         "components/calculator/DeliveryCalculator"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "BLOCKED — spec drift. Ticket specifies Mapbox routing but the implementation uses Google Directions: DeliveryCalculator.tsx:275 comment 'Calculate mileage from addresses using Google Directions API'; calculateMileageFromAddresses (L276) calls internal /api/route... (L297) with Google as upstream. Only Mapbox usage in src/ is visual map rendering (MileageCalculator/MileageMap.tsx, Driver/DriverLiveMap) — neither feeds estimatedDriveTime. A tester following the ticket literally would look for api.mapbox.com/directions and find nothing. Two readings exist: strict (must be Mapbox) -> auto FAIL; intent-based (populates ETA from a directions API) -> likely PASS. Not executable with confidence until spec is corrected. Pending QA-lead decision on provider, then rewrite summary/description/steps to reference /api/route... (Google upstream, expect 200 with totalDurationMinutes), plus audit qa-board.json for similar Mapbox-vs-Google drift. Spec intentionally left unchanged for now.",
+      "verdict": "BLOCKED",
       "steps": [
         {
           "step": "Enter pickup + dropoff addresses",
@@ -850,7 +850,7 @@
       "key": "REA-CAL-04",
       "summary": "Bridge toll auto-applies for configured areas",
       "description": "When pickup or dropoff is in autoApplyForAreas, defaultTollAmount is applied to customer total and driver pay.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -864,8 +864,8 @@
         "vendor-pricing/BridgeTollEditor"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "FAIL — feature not implemented. The pricing engine never consults bridgeTollSettings.autoApplyForAreas; there is no address-to-area matching anywhere. Toll only applies when the caller passes requiresBridge:true explicitly. Evidence: pnpm test src/lib/calculator/__tests__/bridge-toll-auto-apply.test.ts → tests 1 & 2 fail 'Expected 8.5, Received 0' (branch qa/rea-cal-04-test-evidence, DO NOT MERGE). Code refs: delivery-cost-calculator.ts:736 (toll keyed off boolean, not area), :19-29 (DeliveryCostInput has no pickup/dropoffAddress), calculator-service.ts:300 (just forwards caller boolean), client-configurations.ts:86 (autoApplyForAreas declared but unread; all 6 active vendor configs populate SF/Oakland/Marin). Admin UIs (BridgeTollEditor.tsx, ClientConfigurationManager.tsx:810-819) write the field — operator-facing affordance suggesting it works. FIX SCOPE (bigger than it looks): (1) pick canonical area representation, (2) add pickup/dropoffAddress to DeliveryCostInput + Zod CalculationInput, (3) add shouldAutoApplyBridgeToll matcher — naive address.includes is unsafe ('South San Francisco' matches 'San Francisco'; 'Oakland Park FL' matches 'Oakland') so use case-insensitive + token/geocoded match, (4) OR matcher with requiresBridge so manual override still works; warn if they disagree, (5) forward addresses in calculator-service.ts:295-304, (6) wire DeliveryCalculator.tsx:268 addresses (currently collected then discarded), (7) positive+negative engine & integration tests. ARCH FINDING (follow-up): 4 disconnected 'area' shapes (autoApplyForAreas string[], CalculationInput.deliveryArea free-text, ClientConfigurationSchema.areaRules, DeliveryCostInput none) — consolidate before adding more area-dependent features. Plus spec-drift follow-up: qa-board.json REA-CAL-04 describes behavior that does not exist; reword as 'VERIFY post-implementation, blocked by product bug' or defer from active block.",
+      "verdict": "FAIL",
       "steps": [
         {
           "step": "Select vendor with bridge toll auto-apply",
@@ -883,7 +883,7 @@
       "key": "REA-CAL-05",
       "summary": "Mileage charge above/below distanceThreshold",
       "description": "Distance <= threshold uses flat fee; distance > threshold adds per-mile rate (vendor and driver).",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -897,8 +897,8 @@
         "lib/calculator/distance-calculator"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PASS — mileage threshold logic works; below-threshold uses flat fee, above-threshold adds per-mile rate for both customer and driver. Discriminating test mileage-threshold.test.ts (branch qa/rea-cal-05-test-evidence) pins the implemented formula for READY_SET_FOOD_STANDARD and TRY_HUNGRY. Two follow-ups raised: (1) [DOC-DRIFT][Medium] components field names lib/calculator/distance-calculator (Haversine module, same as CAL-01/02) but the mileage charge logic actually lives in lib/calculator/delivery-cost-calculator.ts — customer charge L485-506, driver mileage pay L705-725. Update components to delivery-cost-calculator (keep client-configurations, the field source). (2) [TECH-DEBT][Medium] suite hardening across CAL-01..05: range-based asserts tolerate Haversine drift; tautological round-trip test (CAL-02); structure-only asserts (kasa/try-hungry/hy-food pricing tests assert distanceThreshold===10 without exercising the threshold); LATENT FORMULA AMBIGUITY — driver-over-threshold is totalMileage×rate, NOT flat+(excess×rate); all current configs are calibrated so both formulas match, masking the cliff a future non-calibrated vendor would expose; per-vendor rate hardcoding risk (most configs $3.00, Try Hungry $2.50 — a hardcoded $3.00 regression passes every test except a Try-Hungry-specific one). Fixes: exact-fixture distance asserts, merge mileage-threshold.test.ts into main suite as regression guard, add below/above threshold pair per vendor, document the 'total×rate' formula inline at delivery-cost-calculator.ts ~L716, document the 'every active config is calibrated' assumption near driverMileageSettings.",
+      "verdict": "PASS",
       "steps": [
         {
           "step": "Calc with mileage = threshold - 1",
@@ -921,7 +921,7 @@
       "key": "REA-CAL-06",
       "summary": "Driver pay tiered by headcount and food cost",
       "description": "driverBasePayTiers and driverFoodCostPayTiers resolve to correct base pay; tier boundaries handled per spec.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -935,8 +935,8 @@
         "vendor-pricing/DriverPaySettingsEditor"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PARTIAL-FAIL — headcount tier resolution is correct, but food-cost axis is ignored when headcount>0; needs product confirmation. delivery-cost-calculator.ts:L339 only consults driverFoodCostPayTiers when headcount===0 && foodCost>0; otherwise foodCost is ignored for driver base pay even when its tier would resolve higher. Repro (KASA, both tier sets): headcount=30, foodCost=1200, totalMileage=15 → headcount tier 25-49 gives basePay=23; food-cost tier $1,200-$1,499 gives basePay=53; ACTUAL returned=23. So a KASA order pays the driver $23 instead of $53. KASA notes mention both tier sets and the food-cost table has a $1,500+ by-case flag, suggesting food cost is a meaningful axis — but unconfirmed. Resolutions: (a) CODE WINS — update ticket+KASA docs that food-cost tiers apply only when no headcount; document test E1 as intended; or (b) TICKET WINS — refactor determineDriverBasePay to apply a LESSER/GREATER rule between headcount- and food-cost-resolved tiers (E1 would fail, signaling the refactor). Evidence: test E1 in src/lib/calculator/__tests__/driver-pay-tiered.test.ts. THREE additional findings: (1) [Low] MANUAL_REVIEW_HEADCOUNT_THRESHOLD is a global const=100 but vendors declare different thresholds via tier structure (TRY_HUNGRY/CATER_VALLEY 100 ✓, KASA 125, HY_FOOD 200); correct only by coincidence (manual review fires only when tier.basePay===0, which sits in the top tier ≥100). Risk: a basePay:0 in an intermediate tier would fire review at 100 instead of surfacing a config error. Fix per the L113-126 comment: move threshold to ClientDeliveryConfiguration.manualReviewThreshold and read per-vendor. (2) [Medium] validateConfiguration (client-configurations.ts L713-768) validates driverBasePayTiers for gaps/overlaps/null-last/basePay>=0/manual-review, but driverFoodCostPayTiers gets NO such validation though KASA & HY_FOOD use both; an admin-introduced gap is accepted silently and throws 'No driver base pay tier found for food cost' at runtime. Fix: extract tier validation into a (min,max,name) helper and run it on both arrays. (3) [Low] fractional gap between foodCostMax=299.99 and foodCostMin=300 — isInTier uses >=min && <=max, so 299.995 matches neither tier and throws; real risk low but calculated values (tax-inclusive subtotals, per-person averages, conversions) can land in the gap. Fix: contiguous boundaries or round foodCost to 2dp. Refs: client-configurations.ts L277-282 (KASA), L505-510 (HY_FOOD).",
+      "verdict": "PARTIAL-FAIL",
       "steps": [
         {
           "step": "Calc in known tier",
@@ -954,7 +954,7 @@
       "key": "REA-CAL-07",
       "summary": "Multi-stop pricing",
       "description": "Each extra stop adds $5 customer / $2.50 driver.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "Medium",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -967,8 +967,8 @@
         "lib/calculator multi-stop"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PASS — multi-stop pricing works; numberOfStops=3 adds +$10 customer / +$5 driver (CUSTOMER_EXTRA_STOP_RATE=5.00, DRIVER_EXTRA_STOP_BONUS=2.50, both global). 33/33 in multi-stop-pricing.test.ts. Three follow-ups, all Low: (1) no input validation for numberOfStops in calculateDeliveryCost/calculateDriverPay (other inputs validated at L437-440); the L240 guard if(numberOfStops<=1) return 0 masks pathological cases — 0 and -2 silently return 0, and 2.7 is unguarded → (2.7-1)*5 = $8.5 non-integer monetary charge. Fix: throw if <1 || !Number.isInteger. Risk for API consumers (CaterValley, planned ezCater). (2) multi-stop-pricing.test.ts has 3 edge-case tests ('0 stops treat as 1', 'negative treat as 1', 'decimal round down') that ENCODE the defect instead of asserting toThrow — they act as a regression guard against fixing it; replace with toThrow tests when validation lands. (3) all 33 tests use clientConfigId='ready-set-food-standard' only; no cross-vendor coverage — would miss per-vendor rate divergence or a constants→config migration. Fix: parameterize 2-3 tests via describe.each across kasa/cater-valley/try-hungry/hy-food (tune inputs to avoid manual-review/zero-order branches). Part of the CAL-01..08 test-hardening roll-up.",
+      "verdict": "PASS",
       "steps": [
         {
           "step": "Calc with numberOfStops=1",
@@ -991,7 +991,7 @@
       "key": "REA-CAL-08",
       "summary": "Daily drive discount (numberOfDrives)",
       "description": "Discount applies as numberOfDrives increases per spec.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "Medium",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -1004,8 +1004,8 @@
         "lib/calculator daily-drive-discount"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PARTIAL-FAIL — discount applies per spec (discountPerDrive × numberOfDrives, docstring L244 confirms TOTAL = per-drive × count) and tests pass, BUT [Medium] revenue-loss bug: the multiplication is unbounded with no cap on numberOfDrives (validation only requires >=1 at L440). Small-tier order (hc=24, fc=0, <10mi → deliveryCost=$60) with numberOfDrives=10 → deliveryFee = 60 + 0 - (15×10) = -$90, i.e. Ready Set pays the customer. Not reproducible in current fixtures (hc=50/fc=700 have headroom); found by logical analysis of delivery-cost-calculator.ts L258 + L506-518. Fix: cap discount at pre-discount subtotal — const cappedDiscount = Math.min(discount, subtotal) — or validate deliveryFee>=0 and surface manual review. Same revenue-risk class as CAL-04. Two more (Low): (a) service-layer integration test asserts only dailyDriveDiscount<0 (sign), not exact amount — won't catch magnitude drift; replace with exact value (e.g. -30 for 3 drives). (b) spec-clarity: table comments like '2: 5 // 2 drives/day = -$5 per drive' are ambiguous between $5/drive×N (current) vs $5 flat; clarify comments and/or rename keys (perDriveDiscountAtTwo). Same ambiguity class as CAL-02/06.",
+      "verdict": "PARTIAL-FAIL",
       "steps": [
         {
           "step": "Calc with numberOfDrives=1",
@@ -1028,7 +1028,7 @@
       "key": "REA-CAL-09",
       "summary": "Adjust Vendor Pricing — DB persists, takes effect immediately",
       "description": "Edits in Adjust Vendor Pricing tab save to DB via POST /api/calculator/configurations and the next /api/calculator/calculate reflects new values.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -1042,8 +1042,8 @@
         "api/calculator/configurations"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PARTIAL-FAIL — config persistence works (POST /api/calculator/configurations calls deliveryConfiguration.upsert; live evidence 2026-05-18 shows changes computed correctly: kasa mileageRate 3→4) and the next calculate reflects the new value; the spec steps pass. BUT F1 (HIGH, blocks full closure): the config-change audit log is emitted ONLY via console.log('[AUDIT]') + Sentry.addBreadcrumb — neither is durable/queryable. console.log rotates on Vercel; Sentry breadcrumbs are discarded if no error follows in the request. Cannot answer 'who changed kasa.mileageRate on date X and why' after the fact. Fix: persist to an audit table — reuse UserAudit (action='calculator-config:update'|...) or new ConfigurationAudit model FK to delivery_configurations.configId. Evidence test (qa/rea-cal-09-test-evidence) asserts only deliveryConfiguration.findUnique+upsert are touched — no audit model. Additional findings: F7 (Medium) DB→merged-config logic duplicated identically in 3 places (configurations/route.ts GET, config/route.ts L99-121, calculator-service.ts L263-285); subtle merge rules (only 3 boolean flags inherit, structural data must NOT) risk drift → extract dbRecordToClientConfig helper + unit tests. F8 (Medium) CalculatorService.getCalculatorConfig is a stub that throws 'Not implemented' → GET /api/calculator/calculate returns 500 (REA-CAL-09 uses POST so not blocked); investigate consumers, then implement or remove the dead route. F2 (Low) on create (previous=null) computeConfigChanges returns [{field:'_action'...}], so changedFields=['_action'] breaks field-filtered audit queries; enumerate actual fields with null oldValue, keep action='create' as discriminator (do AFTER F1). Incidental (separate auth ticket, not part of this test): [SOFT_DELETE_AUDIT] warning — Profile.findUnique({where:{email}}) can't auto-inject deletedAt:null; a soft-deleted profile could still resolve; audit auth lookups (getCurrentUser/syncOAuthProfile), switch to findFirst{email,deletedAt:null} or post-check.",
+      "verdict": "PARTIAL-FAIL",
       "steps": [
         {
           "step": "Edit a field in Adjust Vendor Pricing tab; save",
@@ -1066,7 +1066,7 @@
       "key": "REA-CAL-10",
       "summary": "Save calculation to history",
       "description": "Saving from Calculator tab persists via /api/calculator/save and surfaces in Recent Calculations tab; survives reload.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "Medium",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -1080,8 +1080,8 @@
         "api/calculator/history"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "FAIL — save feature effectively non-functional; nothing has ever persisted. Bug #1 (HIGH): POST /api/calculator/save passes clientConfigId as a domain string (e.g. 'kasa') but calculation_history.client_config_id is UUID-typed → Postgres rejects INSERT with 22P02 'invalid input syntax for type uuid', yet the endpoint still returns 200. DB evidence: SELECT COUNT(*) FROM calculation_history = 0 across all time. Root cause: clientConfigId is a string everywhere (matches delivery_configurations.config_id) but the history column expects a UUID. Fix Option A (recommended): ALTER COLUMN client_config_id TYPE text + prisma String?; Option B: resolve config_id→row UUID before insert. Bug #2 (HIGH): saveCalculationHistory swallows errors — Path A (Supabase response {error}) only console.error's and returns void (Sentry NOT called); Path B (JS exception) calls Sentry. Since the 22P02 is a response error (Path A), no save failure has EVER reached Sentry — invisible to dashboards, user sees success. Fix: capture+throw on response error; route already returns 500 on throw. Bug #3 (HIGH): the Recent Calculations tab in CalculatorClient.tsx renders volatile useState(savedCalculations), does NOT consume /api/calculator/history, and is lost on reload (repro 2026-05-18: entry shows after save, gone after F5 → 'No calculations yet'). Even with persistence fixed, the tab wouldn't show cross-session history. Fix: hoist useCalculatorHistory into CalculatorClient, drop local state, refresh on save. + Finding #4 (Medium): /api/calculator/history uses Bearer-token auth while every other calculator endpoint uses session cookies — breaks SSR/server-action callers; convert to cookie-based createClient(). + Finding #5 (Medium, needs product decision): admin/super_admin without ?userId sees GLOBAL history of all users (filter skipped when userId undefined); decide self-default vs explicit ?userId=all opt-in. All three bugs interdependent — fix #1+#2+#3 together for end-to-end correctness. Evidence branch qa/rea-cal-10-test-evidence (save/history route.audit tests + CalculatorClient.test.tsx with it.todo placeholders).",
+      "verdict": "FAIL",
       "steps": [
         {
           "step": "Run calc and click Save",
