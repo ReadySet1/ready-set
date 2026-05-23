@@ -23,6 +23,131 @@
   font-display: swap;
 }
 
+/* ────────────────────────────────────────────────────────────────
+ * V2 design tokens — CSS variable definitions
+ *
+ * Status: ADDITIVE in this PR. These variables back the new
+ * brand / neutral / semantic Tailwind tokens added in
+ * tailwind.config.ts. Legacy components don't consume them yet —
+ * they keep using legacy hex tokens (#FBD113, #F4F7FF, etc.).
+ *
+ * Base element rules (body bg/color, focus rings, ::selection,
+ * `* border-color`) are intentionally NOT included here — those
+ * land in the sweep PR (PR-B) alongside call-site migration.
+ *
+ * See: tailwind.tokens.ts and globals.css in the design bundle
+ *      docs/ready-set/reports/2026-05-22-design-baseline/
+ * ─────────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    /* Brand ramp */
+    --brand-50:  48 100% 96%;
+    --brand-100: 50 96% 88%;
+    --brand-200: 50 96% 76%;
+    --brand-300: 50 96% 65%;
+    --brand-400: 50 97% 53%;   /* #FBD113 — anchor, matches legacy brand */
+    --brand-500: 47 92% 47%;
+    --brand-600: 42 95% 39%;
+    --brand-700: 36 90% 31%;
+    --brand-800: 32 80% 24%;
+    --brand-900: 28 80% 14%;
+
+    /* Neutrals (warm, low chroma) */
+    --neutral-50:  60 14% 97%;
+    --neutral-100: 50 12% 94%;
+    --neutral-200: 50 14% 89%;
+    --neutral-300: 48 10% 80%;
+    --neutral-400: 50 4%  62%;
+    --neutral-500: 51 3%  43%;
+    --neutral-600: 50 4%  31%;
+    --neutral-700: 48 4%  22%;
+    --neutral-800: 50 9%  13%;
+    --neutral-900: 60 10% 7%;
+
+    /* Semantic ramps */
+    --success-50:  138 76% 97%;
+    --success-100: 141 84% 93%;
+    --success-500: 142 71% 45%;
+    --success-600: 142 76% 36%;
+    --success-700: 142 72% 29%;
+
+    --warning-50:  48 100% 96%;
+    --warning-100: 48 96% 89%;
+    --warning-500: 38 92% 50%;
+    --warning-600: 32 95% 44%;
+    --warning-700: 26 90% 37%;
+
+    --error-50:    0 86% 97%;
+    --error-100:   0 93% 94%;
+    --error-500:   0 84% 60%;
+    --error-600:   0 72% 51%;
+    --error-700:   0 74% 42%;
+
+    --info-50:    214 100% 97%;
+    --info-100:   214 95% 93%;
+    --info-500:   217 91% 60%;
+    --info-600:   221 83% 53%;
+    --info-700:   224 76% 48%;
+
+    /* Shadcn semantic aliases (light) */
+    --background:        var(--neutral-50);
+    --foreground:        var(--neutral-900);
+    --card:              0 0% 100%;
+    --card-foreground:   var(--neutral-900);
+    --popover:           0 0% 100%;
+    --popover-foreground:var(--neutral-900);
+    --primary:           var(--brand-400);
+    --primary-hover:     var(--brand-500);
+    --primary-foreground:var(--neutral-900);
+    --secondary:         var(--neutral-100);
+    --secondary-foreground: var(--neutral-900);
+    --muted:             var(--neutral-100);
+    --muted-foreground:  var(--neutral-500);
+    --accent:            var(--brand-50);
+    --accent-foreground: var(--brand-800);
+    --destructive:           var(--error-600);
+    --destructive-foreground: 0 0% 100%;
+    --border:            var(--neutral-200);
+    --input:             var(--neutral-200);
+    --ring:              var(--brand-500);
+
+    /* Type */
+    --font-sans:    "Montserrat", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-display: "Kabel", "Montserrat", sans-serif;
+    --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Radius (Shadcn maps `--radius` to its components) */
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background:        var(--neutral-900);
+    --foreground:        var(--neutral-50);
+    --card:              var(--neutral-800);
+    --card-foreground:   var(--neutral-50);
+    --popover:           var(--neutral-800);
+    --popover-foreground:var(--neutral-50);
+    --primary:           var(--brand-400);
+    --primary-hover:     var(--brand-300);
+    --primary-foreground:var(--neutral-900);
+    --secondary:         var(--neutral-800);
+    --secondary-foreground: var(--neutral-50);
+    --muted:             var(--neutral-800);
+    --muted-foreground:  var(--neutral-400);
+    --accent:            var(--brand-900);
+    --accent-foreground: var(--brand-100);
+    --destructive:           var(--error-500);
+    --destructive-foreground: var(--neutral-50);
+    --border:            var(--neutral-700);
+    --input:             var(--neutral-700);
+    --ring:              var(--brand-400);
+  }
+
+  /* Opt-in display font (marketing/H1). Default headings stay Kabel
+     via the existing `h1, h2` rule below until PR-B. */
+  .font-display { font-family: var(--font-display); }
+}
+
 /* Custom utility classes */
 @layer utilities {
   .scrollbar-hide {
