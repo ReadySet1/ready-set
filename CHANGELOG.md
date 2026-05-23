@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0](https://github.com/ReadySet1/ready-set/compare/v2.1.0...v2.2.0) (2026-05-23)
+
+
+### Added
+
+* add automated SMS reminders for driver deliveries ([42769ac](https://github.com/ReadySet1/ready-set/commit/42769ac0b1a79e05f20bfd24cbcb14f55ac21ad7))
+* **lib:** add devOnlyGuard() helper ([bb90e50](https://github.com/ReadySet1/ready-set/commit/bb90e500ff9d8b8d49b72d5d5fe11080f1e999e5))
+* **security:** gate debug + test routes with devOnlyGuard + SUPER_ADMIN ([8b99c35](https://github.com/ReadySet1/ready-set/commit/8b99c357525f8367edc0d2c4a68c2acbd3827a11))
+
+
+### Fixed
+
+* **auth:** bridge SSR cookie to browser supabase-js session (REA-DRT-07) ([649d15c](https://github.com/ReadySet1/ready-set/commit/649d15c4bb39c146dfa9af1b9cf15a2baf059f51))
+* **auth:** catch fire-and-forget token refresh rejections ([06afb52](https://github.com/ReadySet1/ready-set/commit/06afb522086032ae44b4fd28c477dc5071253df2))
+* **auth:** catch fire-and-forget token refresh rejections and force re-auth ([83051ce](https://github.com/ReadySet1/ready-set/commit/83051ce29d98e8d58c83782369fb13162e825599))
+* **auth:** drop httpOnly from Supabase auth cookies so browser session bridges (REA-DRT-07) ([a463e3f](https://github.com/ReadySet1/ready-set/commit/a463e3f0dfdc63218258e2e5230ebcc428b9e454))
+* **build:** inline app version via next.config env, not JSON import ([5c22902](https://github.com/ReadySet1/ready-set/commit/5c22902d7e4a82d55f5959ac1529d778e4077014))
+* **health:** read version from package.json at build time ([3efe2f0](https://github.com/ReadySet1/ready-set/commit/3efe2f03667cfbec731bf63442b8be23fe27f94e))
+* read package.json once at next.config.js load time and expose just the version string via the env block (next inlines env entries as build-time string literals). /api/health now reads process.env.APP_VERSION, which is the single string '2.1.0' baked in at build time — no JSON in the bundle. ([5c22902](https://github.com/ReadySet1/ready-set/commit/5c22902d7e4a82d55f5959ac1529d778e4077014))
+* **realtime:** stop calling non-existent channel.off() (REA-367) ([3735ed8](https://github.com/ReadySet1/ready-set/commit/3735ed846632c5b2a1fd6b1b56260716af622f46))
+* **realtime:** stop calling non-existent channel.off(); stable broadcast dispatcher (REA-367) ([7f6d82c](https://github.com/ReadySet1/ready-set/commit/7f6d82cbab2d2f24f6b1db747fd6f107e161f905))
+
+
+### Documentation
+
+* **claude:** add Versioning section covering release-please flow ([b866ffc](https://github.com/ReadySet1/ready-set/commit/b866ffc864a5af52040d71d86156f1be7952a59f))
+* introduce ARCHITECTURE.md + REMEDIATION_PLAN.md, mark item [#4](https://github.com/ReadySet1/ready-set/issues/4) shipped ([19b1590](https://github.com/ReadySet1/ready-set/commit/19b15907ea8116e4e49e505241a95953e9e20e7f))
+
 ## [Unreleased]
 
 ## [2.1.0] - 2026-05-13

@@ -1,6 +1,6 @@
 {
   "name": "ready-set-nextjs",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "engines": {
     "node": ">=20.0.0 <23.0.0",
