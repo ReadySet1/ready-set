@@ -27,7 +27,7 @@
  * V2 design tokens — CSS variable definitions
  *
  * Status: ADDITIVE in this PR. These variables back the new
- * brand-*/neutral-*/semantic Tailwind tokens added in
+ * brand / neutral / semantic Tailwind tokens added in
  * tailwind.config.ts. Legacy components don't consume them yet —
  * they keep using legacy hex tokens (#FBD113, #F4F7FF, etc.).
  *
