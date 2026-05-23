@@ -1,28 +1,78 @@
-import * as React from "react"
-import { cn } from "@/lib/utils"
+/**
+ * Ready Set — Input (v2)
+ * components/ui/input.tsx
+ *
+ * Drop-in replacement. Adds a CVA `size` variant matched to Button
+ * (xs / sm / default / lg) and a built-in `error` prop that wires
+ * `aria-invalid` + visual error treatment.
+ *
+ * Breaking change: the native HTML `size` attribute is omitted in
+ * favor of the CVA variant prop. Numeric `size={N}` no longer compiles.
+ *
+ * Peer deps: react, class-variance-authority, clsx, tailwind-merge.
+ */
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+
+import { cn } from "@/lib/utils";
+
+const inputVariants = cva(
+  [
+    "flex w-full rounded-lg border bg-card text-foreground",
+    "border-input",
+    "transition-colors duration-150 ease-out",
+    "placeholder:text-neutral-400 dark:placeholder:text-neutral-500",
+    // File input slot
+    "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground",
+    // Focus
+    "focus-visible:outline-none",
+    "focus-visible:border-brand-500",
+    "focus-visible:ring-[3px] focus-visible:ring-brand-100 dark:focus-visible:ring-brand-900",
+    // Disabled
+    "disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted",
+    // aria-invalid → error visuals
+    "aria-[invalid=true]:border-error-500",
+    "aria-[invalid=true]:focus-visible:border-error-500",
+    "aria-[invalid=true]:focus-visible:ring-error-100 dark:aria-[invalid=true]:focus-visible:ring-error-700/40",
+  ].join(" "),
+  {
+    variants: {
+      size: {
+        xs: "h-8 px-2.5 text-xs",
+        sm: "h-9 px-3 text-sm",
+        default: "h-10 px-3 text-sm",
+        lg: "h-11 px-3.5 text-base",
+      },
+    },
+    defaultVariants: {
+      size: "default",
+    },
+  }
+);
 
 export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {}
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">,
+    VariantProps<typeof inputVariants> {
+  /**
+   * When true, sets `aria-invalid` and applies the error border + halo.
+   * Replaces ad-hoc `aria-invalid` + manual className overrides.
+   */
+  error?: boolean;
+}
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, value, ...props }, ref) => {
-    // Convert null value to empty string to avoid React warning
-    const sanitizedValue = value === null ? "" : value;
-    
+  ({ className, type = "text", size, error, "aria-invalid": ariaInvalid, ...props }, ref) => {
     return (
       <input
-        type={type}
-        className={cn(
-          "flex h-12 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:border-blue-400 hover:border-slate-300 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300",
-          className
-        )}
         ref={ref}
-        value={sanitizedValue}
+        type={type}
+        aria-invalid={error || ariaInvalid || undefined}
+        className={cn(inputVariants({ size }), className)}
         {...props}
       />
-    )
+    );
   }
-)
-Input.displayName = "Input"
+);
+Input.displayName = "Input";
 
-export { Input }
+export { Input, inputVariants };
