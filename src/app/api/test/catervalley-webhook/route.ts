@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth-middleware';
+import { devOnlyGuard } from '@/lib/auth/dev-only-guard';
+import { redactHeaders } from '@/app/api/cater-valley/_lib/debug-guard';
 
 interface TestResult {
   url: string;
@@ -24,6 +27,20 @@ interface TestResult {
  * GET /api/test/catervalley-webhook
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const blocked = devOnlyGuard();
+  if (blocked) return blocked;
+
+  const authResult = await withAuth(request, {
+    allowedRoles: ['SUPER_ADMIN'],
+    requireAuth: true,
+  });
+  if (!authResult.success || authResult.response) {
+    return (
+      authResult.response ??
+      NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    );
+  }
+
   const webhookUrl = process.env.CATERVALLEY_WEBHOOK_URL || 'https://api.catervalley.com/api/operation/order/update-order-status';
   const apiKey = process.env.CATERVALLEY_API_KEY;
 
@@ -39,7 +56,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const result: TestResult = {
     url: webhookUrl,
     method: 'POST',
-    headers: testHeaders,
+    headers: redactHeaders(testHeaders),
     connectivity: {
       connected: false,
     },
@@ -157,6 +174,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  * POST /api/test/catervalley-webhook
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const blocked = devOnlyGuard();
+  if (blocked) return blocked;
+
+  const authResult = await withAuth(request, {
+    allowedRoles: ['SUPER_ADMIN'],
+    requireAuth: true,
+  });
+  if (!authResult.success || authResult.response) {
+    return (
+      authResult.response ??
+      NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    );
+  }
+
   try {
     const body = await request.json();
     const { orderNumber, status } = body;
@@ -212,7 +243,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         httpStatusText: response.statusText,
         responseBody,
         sentPayload: payload,
-        sentHeaders: headers,
+        sentHeaders: redactHeaders(headers),
         webhookUrl,
       };
 
@@ -225,7 +256,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         sentPayload: payload,
-        sentHeaders: headers,
+        sentHeaders: redactHeaders(headers),
         webhookUrl,
       };
 

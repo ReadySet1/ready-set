@@ -25,6 +25,7 @@ import {
   type PresenceState,
 } from '@/lib/realtime/types';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { realtimeLogger } from '@/lib/logging/realtime-logger';
 
 // Mock the RealtimeClient
 jest.mock('@/lib/realtime/client', () => ({
@@ -32,6 +33,17 @@ jest.mock('@/lib/realtime/client', () => ({
     getInstance: jest.fn(),
   },
   getRealtimeClient: jest.fn(),
+}));
+
+// Mock the realtime logger so we can assert the REA-367 cleanup WARN never fires.
+jest.mock('@/lib/logging/realtime-logger', () => ({
+  realtimeLogger: {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    connection: jest.fn(),
+  },
 }));
 
 describe('Channel Classes', () => {
@@ -42,7 +54,10 @@ describe('Channel Classes', () => {
     // Reset all mocks
     jest.clearAllMocks();
 
-    // Create mock Realtime channel
+    // Create mock Realtime channel.
+    // NOTE (REA-367): there is intentionally NO `off` here, because supabase-js
+    // v2 RealtimeChannel has no runtime `.off()`. The production code must never
+    // call it — if it does, this mock surfaces the TypeError. Do not add `off`.
     mockRealtimeChannel = {
       on: jest.fn().mockReturnThis(),
       subscribe: jest.fn(),
@@ -643,6 +658,75 @@ describe('Channel Classes', () => {
     it('should create AdminCommandsChannel', () => {
       const channel = createAdminCommandsChannel();
       expect(channel).toBeInstanceOf(AdminCommandsChannel);
+    });
+  });
+
+  // Regression coverage for REA-367: the prior code called `this.channel.off(...)`,
+  // which throws `TypeError: this.channel.off is not a function` on supabase-js v2
+  // and tore the channel down ~1ms after subscribe.
+  describe('REA-367: broadcast listener lifecycle', () => {
+    const CLEANUP_WARN = 'Unexpected error during event listener cleanup';
+
+    const getDispatch = (event: string) =>
+      (mockRealtimeChannel.on as jest.Mock).mock.calls.find(
+        (c) => c[0] === 'broadcast' && c[1]?.event === event,
+      )?.[2] as ((...args: unknown[]) => void) | undefined;
+
+    it('never calls channel.off and never warns across on/unsubscribe (all channels)', async () => {
+      // The mock channel has no `.off()`; any call would throw and trigger the WARN.
+      expect((mockRealtimeChannel as any).off).toBeUndefined();
+
+      const location = new DriverLocationChannel();
+      await location.subscribe({ onLocationUpdate: jest.fn() });
+      await expect(location.unsubscribe()).resolves.not.toThrow();
+
+      const status = new DriverStatusChannel();
+      await status.subscribe({ onStatusUpdate: jest.fn() });
+      await expect(status.unsubscribe()).resolves.not.toThrow();
+
+      const admin = new AdminCommandsChannel();
+      await admin.subscribe({ onDeliveryAssigned: jest.fn() });
+      await expect(admin.unsubscribe()).resolves.not.toThrow();
+
+      expect(realtimeLogger.warn).not.toHaveBeenCalledWith(CLEANUP_WARN, expect.anything());
+    });
+
+    it('re-registering an event does not rebind, and the latest handler wins', async () => {
+      const channel = new DriverLocationChannel();
+      await channel.subscribe();
+
+      const h1 = jest.fn();
+      const h2 = jest.fn();
+      channel.on(REALTIME_EVENTS.DRIVER_LOCATION_UPDATED, h1);
+      channel.on(REALTIME_EVENTS.DRIVER_LOCATION_UPDATED, h2);
+
+      // Bound exactly once on the underlying channel (no duplicate broadcasts).
+      const broadcastBinds = (mockRealtimeChannel.on as jest.Mock).mock.calls.filter(
+        (c) => c[0] === 'broadcast' && c[1]?.event === REALTIME_EVENTS.DRIVER_LOCATION_UPDATED,
+      );
+      expect(broadcastBinds).toHaveLength(1);
+
+      // The single bound dispatcher routes to the most recently registered handler.
+      const dispatch = getDispatch(REALTIME_EVENTS.DRIVER_LOCATION_UPDATED);
+      const payload = { driverId: 'd1', timestamp: 1 };
+      dispatch?.({ payload });
+      expect(h1).not.toHaveBeenCalled();
+      expect(h2).toHaveBeenCalledWith(payload);
+    });
+
+    it('off() mutes the handler without throwing or rebinding', async () => {
+      const channel = new DriverLocationChannel();
+      await channel.subscribe();
+
+      const handler = jest.fn();
+      channel.on(REALTIME_EVENTS.DRIVER_LOCATION_UPDATED, handler);
+      const dispatch = getDispatch(REALTIME_EVENTS.DRIVER_LOCATION_UPDATED);
+
+      channel.off(REALTIME_EVENTS.DRIVER_LOCATION_UPDATED);
+      dispatch?.({ payload: { driverId: 'd1', timestamp: 2 } });
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(realtimeLogger.warn).not.toHaveBeenCalledWith(CLEANUP_WARN, expect.anything());
     });
   });
 });

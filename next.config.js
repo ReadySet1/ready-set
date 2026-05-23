@@ -71,10 +71,22 @@ if (isBuild && process.env.NODE_ENV !== 'development') {
  *
  * @type {import('next').NextConfig}
  */
+// Read the package version once at config-load time so the literal can be
+// inlined as a build-time string. This avoids importing package.json from a
+// route file (which bundles the whole JSON into every function's chunk and
+// pushed the Vercel build close to its 4GB heap ceiling).
+const { version: APP_VERSION } = require('./package.json');
+
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
   compress: true, // Enable gzip compression for production
+
+  // Inlined at build time. Surfaces in /api/health so operators can verify
+  // which build is live in a given environment. See repo CLAUDE.md → Versioning.
+  env: {
+    APP_VERSION,
+  },
 
   typescript: {
     // Skip type checking during builds to prevent deployment failures

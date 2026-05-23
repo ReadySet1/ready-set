@@ -2,12 +2,22 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Cookie options optimized for mobile Safari compatibility (ITP)
-const getCookieOptions = (options?: Record<string, unknown>) => ({
+// Cookie options optimized for mobile Safari compatibility (ITP).
+//
+// ⚠️ DO NOT add `httpOnly: true` here. These options are applied to every
+// cookie @supabase/ssr writes during the middleware session refresh, including
+// the `sb-<ref>-auth-token` chunks. The browser supabase-js client
+// (src/utils/supabase/client.ts) reads the session via `document.cookie`, which
+// by spec cannot see HttpOnly cookies — so an HttpOnly auth cookie makes
+// `getSession()` return null in the browser, breaks all Supabase Realtime
+// flows, and surfaces as REFRESH_FAILED (Sentry READY-SET-NEXTJS-1S).
+// Regression history: REA-DRT-07 (httpOnly was wrongly added in f49f6ec5).
+// The XSS tradeoff is accepted and mitigated by CSP + short-lived JWTs +
+// refresh-token rotation.
+export const getCookieOptions = (options?: Record<string, unknown>) => ({
   path: '/',
   sameSite: 'lax' as const, // 'lax' is more compatible with mobile Safari than 'strict'
   secure: process.env.NODE_ENV === 'production',
-  httpOnly: true,
   ...options,
 })
 

@@ -109,11 +109,11 @@ export class TokenRefreshService {
       });
 
       this.refreshTimer = setTimeout(() => {
-        this.refreshTokenWithRetry();
+        this.safeRefreshTokenWithRetry('scheduled_expiry');
       }, timeUntilRefresh);
     } else {
       // Token is already close to expiry or expired, refresh immediately
-      this.refreshTokenWithRetry();
+      this.safeRefreshTokenWithRetry('immediate_expiry');
     }
 
     // Start background refresh if enabled
@@ -159,6 +159,36 @@ export class TokenRefreshService {
       clearInterval(this.backgroundRefreshTimer);
       this.backgroundRefreshTimer = null;
     }
+  }
+
+  // Fire-and-forget wrapper around refreshTokenWithRetry that catches any final
+  // rejection and routes it through the central auth error handler. Without this
+  // wrapper, callers that invoke refreshTokenWithRetry() from a setTimeout or
+  // event handler leak the rejection as an unhandled promise rejection.
+  private safeRefreshTokenWithRetry(reason: string): void {
+    this.refreshTokenWithRetry().catch(async (error) => {
+      authLogger.error('TokenRefreshService: Auto-refresh failed, surfacing to error handler', {
+        reason,
+        error: error instanceof Error ? error.message : error,
+      });
+
+      try {
+        const { getAuthErrorHandler } = await import('./error-handler');
+        const handler = getAuthErrorHandler();
+        const authError =
+          error instanceof AuthError
+            ? error
+            : new AuthError(
+                AuthErrorType.REFRESH_FAILED,
+                error instanceof Error ? error.message : 'Auto-refresh failed',
+                'auto_refresh_unhandled',
+                false,
+              );
+        await handler.handleError(authError, { source: 'auto_refresh', reason });
+      } catch (handlerError) {
+        authLogger.error('TokenRefreshService: Error handler itself failed', handlerError);
+      }
+    });
   }
 
   // Refresh token with retry logic

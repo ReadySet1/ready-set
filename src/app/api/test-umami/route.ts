@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CONSTANTS } from '@/constants';
+import { devOnlyGuard } from '@/lib/auth/dev-only-guard';
 
 /**
  * Test API route to verify Umami self-hosted instance connectivity
  */
 export async function GET(request: NextRequest) {
+  const blocked = devOnlyGuard();
+  if (blocked) return blocked;
+
   try {
     const testResults = {
       timestamp: new Date().toISOString(),

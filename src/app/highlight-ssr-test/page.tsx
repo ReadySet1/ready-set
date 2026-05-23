@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 
 // Define correct interface for page props
@@ -10,12 +11,18 @@ interface Props {
   searchParams: { error?: string };
 }
 
-export default async function HighlightSsrTestPage(props: { 
+export default async function HighlightSsrTestPage(props: {
   params: Promise<any>;
   searchParams: Promise<any>;
 }) {
+  // This page exists only to verify Highlight's SSR error capture in dev.
+  // Never reachable in production.
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
+
   const searchParams = await props.searchParams;
-  
+
   // Throw an error if the error query parameter is present
   if (typeof searchParams.error !== "undefined") {
     console.error("Throwing intentional SSR error for Highlight testing")

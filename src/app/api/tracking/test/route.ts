@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/auth-middleware';
+import { devOnlyGuard } from '@/lib/auth/dev-only-guard';
 // import { Pool } from 'pg';
 const Pool = require('pg').Pool;
 
@@ -10,6 +12,20 @@ const pool = new Pool({
 
 // GET - Test tracking system connectivity and data
 export async function GET(request: NextRequest) {
+  const blocked = devOnlyGuard();
+  if (blocked) return blocked;
+
+  const authResult = await withAuth(request, {
+    allowedRoles: ['SUPER_ADMIN'],
+    requireAuth: true,
+  });
+  if (!authResult.success || authResult.response) {
+    return (
+      authResult.response ??
+      NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    );
+  }
+
   try {
     const tests = [];
     
@@ -190,6 +206,20 @@ export async function GET(request: NextRequest) {
 
 // POST - Run performance tests
 export async function POST(request: NextRequest) {
+  const blocked = devOnlyGuard();
+  if (blocked) return blocked;
+
+  const authResult = await withAuth(request, {
+    allowedRoles: ['SUPER_ADMIN'],
+    requireAuth: true,
+  });
+  if (!authResult.success || authResult.response) {
+    return (
+      authResult.response ??
+      NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    );
+  }
+
   try {
     const body = await request.json();
     const { test_type = 'basic' } = body;
