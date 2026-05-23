@@ -1,14 +1,14 @@
 {
   "source": "2026-Q2-test-cases.csv",
-  "generated": "2026-05-15",
+  "generated": "2026-05-23",
   "total": 29,
   "counts": {
-    "PASS": 7,
+    "PASS": 8,
     "PARTIAL-FAIL": 1,
     "FAIL": 9,
-    "BLOCKED": 0,
+    "BLOCKED": 1,
     "IN-PROGRESS": 1,
-    "NOT-RUN": 11,
+    "NOT-RUN": 9,
     "SKIPPED": 0,
     "UNKNOWN": 0
   },
@@ -759,7 +759,7 @@
       "key": "REA-CAL-01",
       "summary": "One-way driving distance — Haversine x 1.35",
       "description": "calculateEstimatedDrivingDistance returns expected miles for known coords (SF -> Oakland).",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -772,8 +772,8 @@
         "lib/calculator/distance-calculator"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PASS — distance-calculator.test.ts 17/17. SF (37.7749,-122.4194) -> Oakland (37.8044,-122.2712) = 11.3mi (Haversine km x 1.35 x 0.621371, rounded 1dp). Implementation correct. Two follow-ups raised: (1) [TECH-DEBT][Low] assertions too loose in the suite — SF->Oakland asserts 8<=d<=14 so a regression disabling the 1.35x multiplier (~8.3mi) or inflating to 1.68x (~14mi) would still pass; multiplier test accepts ~1.08-1.55; rounding test checks string format not the Math.round contract; SF->LA comment inconsistent with its range. Harden to toBeCloseTo(11.3,1), ratio result/haversineMiles ~1.35 +/-0.05, and Number.isInteger(distance*10). Implementation file unchanged (test-quality only). (2) [BUG?][Medium] calculateEstimatedRoundTripDistance docstring (L49-51) describes 3 legs (depot -> pickup -> delivery -> depot) but code (L64) computes oneWay*2 (2 legs, no depot/return). If real flow is 3-leg with depot not co-located with pickup, distance under-reports ~33%, impacting driver pay + fee estimation. Existing test codifies current code, not the docstring, so drift is uncaught. Needs domain-owner validation + caller audit before any change.",
+      "verdict": "PASS",
       "steps": [
         {
           "step": "Calculator tab address mode; enter SF + Oakland coords",
@@ -818,7 +818,7 @@
       "key": "REA-CAL-03",
       "summary": "Drive time / ETA from Mapbox geocoding",
       "description": "Address-mode populates estimatedDriveTime from Mapbox routing response.",
-      "status": "TO DO",
+      "status": "BLOCKED",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -831,8 +831,8 @@
         "components/calculator/DeliveryCalculator"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "BLOCKED — spec drift. Ticket specifies Mapbox routing but the implementation uses Google Directions: DeliveryCalculator.tsx:275 comment 'Calculate mileage from addresses using Google Directions API'; calculateMileageFromAddresses (L276) calls internal /api/route... (L297) with Google as upstream. Only Mapbox usage in src/ is visual map rendering (MileageCalculator/MileageMap.tsx, Driver/DriverLiveMap) — neither feeds estimatedDriveTime. A tester following the ticket literally would look for api.mapbox.com/directions and find nothing. Two readings exist: strict (must be Mapbox) -> auto FAIL; intent-based (populates ETA from a directions API) -> likely PASS. Not executable with confidence until spec is corrected. Pending QA-lead decision on provider, then rewrite summary/description/steps to reference /api/route... (Google upstream, expect 200 with totalDurationMinutes), plus audit qa-board.json for similar Mapbox-vs-Google drift. Spec intentionally left unchanged for now.",
+      "verdict": "BLOCKED",
       "steps": [
         {
           "step": "Enter pickup + dropoff addresses",
