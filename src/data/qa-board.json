@@ -3,12 +3,12 @@
   "generated": "2026-05-23",
   "total": 29,
   "counts": {
-    "PASS": 9,
+    "PASS": 10,
     "PARTIAL-FAIL": 2,
     "FAIL": 10,
     "BLOCKED": 1,
     "IN-PROGRESS": 1,
-    "NOT-RUN": 6,
+    "NOT-RUN": 5,
     "SKIPPED": 0,
     "UNKNOWN": 0
   },
@@ -791,7 +791,7 @@
       "key": "REA-CAL-02",
       "summary": "Round-trip distance = 2 x one-way",
       "description": "calculateEstimatedRoundTripDistance returns exactly double the one-way value (within rounding).",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -804,8 +804,8 @@
         "lib/calculator/distance-calculator"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PASS — 5/5 green in 0.61s. calculateEstimatedRoundTripDistance returns oneWay x 2, validated with toBeCloseTo(oneWay*2, 1) for SF->Oakland (expected ~22.6mi). Test literally satisfies the ticket spec. WARNING: this PASS validates behavior that is under investigation in the follow-up raised from REA-CAL-01 (docstring describes 3 legs depot->pickup->delivery->depot, code does 2). If the product owner confirms intent is 3 legs, this test will be codifying the bug and REA-CAL-02 must be re-evaluated. Inherited test-quality observations (see CAL-05 hardening ticket): loose range 16-28mi for an expected 22.6, and the rounding assert verifies string format not the Math.round contract.",
+      "verdict": "PASS",
       "steps": [
         {
           "step": "Trigger round-trip computation",
