@@ -3,12 +3,12 @@
   "generated": "2026-05-23",
   "total": 29,
   "counts": {
-    "PASS": 8,
-    "PARTIAL-FAIL": 1,
-    "FAIL": 9,
+    "PASS": 9,
+    "PARTIAL-FAIL": 2,
+    "FAIL": 10,
     "BLOCKED": 1,
     "IN-PROGRESS": 1,
-    "NOT-RUN": 9,
+    "NOT-RUN": 6,
     "SKIPPED": 0,
     "UNKNOWN": 0
   },
@@ -850,7 +850,7 @@
       "key": "REA-CAL-04",
       "summary": "Bridge toll auto-applies for configured areas",
       "description": "When pickup or dropoff is in autoApplyForAreas, defaultTollAmount is applied to customer total and driver pay.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -864,8 +864,8 @@
         "vendor-pricing/BridgeTollEditor"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "FAIL — feature not implemented. The pricing engine never consults bridgeTollSettings.autoApplyForAreas; there is no address-to-area matching anywhere. Toll only applies when the caller passes requiresBridge:true explicitly. Evidence: pnpm test src/lib/calculator/__tests__/bridge-toll-auto-apply.test.ts → tests 1 & 2 fail 'Expected 8.5, Received 0' (branch qa/rea-cal-04-test-evidence, DO NOT MERGE). Code refs: delivery-cost-calculator.ts:736 (toll keyed off boolean, not area), :19-29 (DeliveryCostInput has no pickup/dropoffAddress), calculator-service.ts:300 (just forwards caller boolean), client-configurations.ts:86 (autoApplyForAreas declared but unread; all 6 active vendor configs populate SF/Oakland/Marin). Admin UIs (BridgeTollEditor.tsx, ClientConfigurationManager.tsx:810-819) write the field — operator-facing affordance suggesting it works. FIX SCOPE (bigger than it looks): (1) pick canonical area representation, (2) add pickup/dropoffAddress to DeliveryCostInput + Zod CalculationInput, (3) add shouldAutoApplyBridgeToll matcher — naive address.includes is unsafe ('South San Francisco' matches 'San Francisco'; 'Oakland Park FL' matches 'Oakland') so use case-insensitive + token/geocoded match, (4) OR matcher with requiresBridge so manual override still works; warn if they disagree, (5) forward addresses in calculator-service.ts:295-304, (6) wire DeliveryCalculator.tsx:268 addresses (currently collected then discarded), (7) positive+negative engine & integration tests. ARCH FINDING (follow-up): 4 disconnected 'area' shapes (autoApplyForAreas string[], CalculationInput.deliveryArea free-text, ClientConfigurationSchema.areaRules, DeliveryCostInput none) — consolidate before adding more area-dependent features. Plus spec-drift follow-up: qa-board.json REA-CAL-04 describes behavior that does not exist; reword as 'VERIFY post-implementation, blocked by product bug' or defer from active block.",
+      "verdict": "FAIL",
       "steps": [
         {
           "step": "Select vendor with bridge toll auto-apply",
@@ -883,7 +883,7 @@
       "key": "REA-CAL-05",
       "summary": "Mileage charge above/below distanceThreshold",
       "description": "Distance <= threshold uses flat fee; distance > threshold adds per-mile rate (vendor and driver).",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -897,8 +897,8 @@
         "lib/calculator/distance-calculator"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PASS — mileage threshold logic works; below-threshold uses flat fee, above-threshold adds per-mile rate for both customer and driver. Discriminating test mileage-threshold.test.ts (branch qa/rea-cal-05-test-evidence) pins the implemented formula for READY_SET_FOOD_STANDARD and TRY_HUNGRY. Two follow-ups raised: (1) [DOC-DRIFT][Medium] components field names lib/calculator/distance-calculator (Haversine module, same as CAL-01/02) but the mileage charge logic actually lives in lib/calculator/delivery-cost-calculator.ts — customer charge L485-506, driver mileage pay L705-725. Update components to delivery-cost-calculator (keep client-configurations, the field source). (2) [TECH-DEBT][Medium] suite hardening across CAL-01..05: range-based asserts tolerate Haversine drift; tautological round-trip test (CAL-02); structure-only asserts (kasa/try-hungry/hy-food pricing tests assert distanceThreshold===10 without exercising the threshold); LATENT FORMULA AMBIGUITY — driver-over-threshold is totalMileage×rate, NOT flat+(excess×rate); all current configs are calibrated so both formulas match, masking the cliff a future non-calibrated vendor would expose; per-vendor rate hardcoding risk (most configs $3.00, Try Hungry $2.50 — a hardcoded $3.00 regression passes every test except a Try-Hungry-specific one). Fixes: exact-fixture distance asserts, merge mileage-threshold.test.ts into main suite as regression guard, add below/above threshold pair per vendor, document the 'total×rate' formula inline at delivery-cost-calculator.ts ~L716, document the 'every active config is calibrated' assumption near driverMileageSettings.",
+      "verdict": "PASS",
       "steps": [
         {
           "step": "Calc with mileage = threshold - 1",
@@ -921,7 +921,7 @@
       "key": "REA-CAL-06",
       "summary": "Driver pay tiered by headcount and food cost",
       "description": "driverBasePayTiers and driverFoodCostPayTiers resolve to correct base pay; tier boundaries handled per spec.",
-      "status": "TO DO",
+      "status": "DONE",
       "priority": "High",
       "assignee": "Fernando Cardenas",
       "labels": [
@@ -935,8 +935,8 @@
         "vendor-pricing/DriverPaySettingsEditor"
       ],
       "folder": "Q2 2026/Calculator Drives",
-      "notes": "",
-      "verdict": "NOT-RUN",
+      "notes": "PARTIAL-FAIL — headcount tier resolution is correct, but food-cost axis is ignored when headcount>0; needs product confirmation. delivery-cost-calculator.ts:L339 only consults driverFoodCostPayTiers when headcount===0 && foodCost>0; otherwise foodCost is ignored for driver base pay even when its tier would resolve higher. Repro (KASA, both tier sets): headcount=30, foodCost=1200, totalMileage=15 → headcount tier 25-49 gives basePay=23; food-cost tier $1,200-$1,499 gives basePay=53; ACTUAL returned=23. So a KASA order pays the driver $23 instead of $53. KASA notes mention both tier sets and the food-cost table has a $1,500+ by-case flag, suggesting food cost is a meaningful axis — but unconfirmed. Resolutions: (a) CODE WINS — update ticket+KASA docs that food-cost tiers apply only when no headcount; document test E1 as intended; or (b) TICKET WINS — refactor determineDriverBasePay to apply a LESSER/GREATER rule between headcount- and food-cost-resolved tiers (E1 would fail, signaling the refactor). Evidence: test E1 in src/lib/calculator/__tests__/driver-pay-tiered.test.ts. THREE additional findings: (1) [Low] MANUAL_REVIEW_HEADCOUNT_THRESHOLD is a global const=100 but vendors declare different thresholds via tier structure (TRY_HUNGRY/CATER_VALLEY 100 ✓, KASA 125, HY_FOOD 200); correct only by coincidence (manual review fires only when tier.basePay===0, which sits in the top tier ≥100). Risk: a basePay:0 in an intermediate tier would fire review at 100 instead of surfacing a config error. Fix per the L113-126 comment: move threshold to ClientDeliveryConfiguration.manualReviewThreshold and read per-vendor. (2) [Medium] validateConfiguration (client-configurations.ts L713-768) validates driverBasePayTiers for gaps/overlaps/null-last/basePay>=0/manual-review, but driverFoodCostPayTiers gets NO such validation though KASA & HY_FOOD use both; an admin-introduced gap is accepted silently and throws 'No driver base pay tier found for food cost' at runtime. Fix: extract tier validation into a (min,max,name) helper and run it on both arrays. (3) [Low] fractional gap between foodCostMax=299.99 and foodCostMin=300 — isInTier uses >=min && <=max, so 299.995 matches neither tier and throws; real risk low but calculated values (tax-inclusive subtotals, per-person averages, conversions) can land in the gap. Fix: contiguous boundaries or round foodCost to 2dp. Refs: client-configurations.ts L277-282 (KASA), L505-510 (HY_FOOD).",
+      "verdict": "PARTIAL-FAIL",
       "steps": [
         {
           "step": "Calc in known tier",
