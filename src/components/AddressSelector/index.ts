@@ -6,10 +6,24 @@
  * @module AddressSelector
  */
 
-// Main component
+// Main component (unified entry point — detects new vs legacy props)
 export { AddressSelector } from './AddressSelector';
 
-// Sub-components
+// Route Builder components (new API)
+export { RouteBuilder } from './RouteBuilder';
+export { RouteBar } from './RouteBar';
+export { RouteSlot } from './RouteSlot';
+export { Connector } from './Connector';
+export { MiniMap } from './MiniMap';
+export { Library } from './Library';
+export { LibraryToolbar } from './LibraryToolbar';
+export { AddressTile } from './AddressTile';
+export { useRouteBuilder } from './useRouteBuilder';
+
+// Legacy component
+export { AddressSelectorLegacy } from './AddressSelectorLegacy';
+
+// Legacy sub-components
 export { AddressSearchCombobox } from './AddressSearchCombobox';
 export { AddressCompactCard } from './AddressCompactCard';
 export { AddressSectionList, AddressEmptyState } from './AddressSectionList';
@@ -23,6 +37,15 @@ export { useAddressRecents } from '@/hooks/useAddressRecents';
 // Re-export types for convenience
 export type {
   AddressSelectorProps,
+  RouteBuilderProps,
+  RouteSlotProps,
+  ConnectorProps,
+  MiniMapProps,
+  AddressTileProps,
+  LibraryToolbarProps,
+  LibraryProps,
+  ActiveSlot,
+  ScopeFilter,
   AddressSection,
   AddressSearchFilters,
   AddressWithMetadata,

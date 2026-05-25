@@ -10,6 +10,7 @@ import { CateringFormData, Address } from "@/types/catering";
 import { CateringNeedHost } from "@/types/order";
 import { createClient } from "@/utils/supabase/client";
 import { AddressSelector } from "@/components/AddressSelector";
+import type { Address as AddressSelectorAddress } from "@/types/address";
 import {
   Loader2,
   AlertCircle,
@@ -588,21 +589,26 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
 
       <div className="mb-6">
         <h3 className="mb-4 border-b border-gray-200 pb-2 text-lg font-medium text-gray-800">
-          Pickup Location
+          Pickup & Delivery
         </h3>
         <AddressSelector
-          mode="client"
-          type="pickup"
-          onSelect={(address) => {
-            setValue("pickupAddress", address);
+          pickup={(watch("pickupAddress")?.id ? watch("pickupAddress") : null) as AddressSelectorAddress | null}
+          delivery={(watch("deliveryAddress")?.id ? watch("deliveryAddress") : null) as AddressSelectorAddress | null}
+          onChange={({ pickup, delivery }) => {
+            if (pickup !== undefined) {
+              setValue("pickupAddress", pickup ?? {
+                id: "", street1: "", street2: null, city: "", state: "", zip: "",
+                locationNumber: null, parkingLoading: null, isRestaurant: false, isShared: false,
+              });
+            }
+            if (delivery !== undefined) {
+              setValue("deliveryAddress", delivery ?? {
+                id: "", street1: "", street2: null, city: "", state: "", zip: "",
+                locationNumber: null, parkingLoading: null, isRestaurant: false, isShared: false,
+              });
+            }
           }}
-          selectedAddressId={watch("pickupAddress")?.id}
-          showFavorites
-          showRecents
-          allowAddNew
-          addressTypeFilter="restaurant"
-          defaultCollapsed={true}
-          showAllAddressesSection={false}
+          mode="client"
         />
       </div>
 
@@ -721,25 +727,7 @@ const CateringRequestForm: React.FC<CateringRequestFormProps> = ({
         />
       </div>
 
-      <div className="mb-8">
-        <h3 className="mb-5 border-b border-gray-200 pb-3 text-lg font-medium text-gray-800">
-          Delivery Details
-        </h3>
-        <AddressSelector
-          mode="client"
-          type="delivery"
-          onSelect={(address) => {
-            setValue("deliveryAddress", address);
-          }}
-          selectedAddressId={watch("deliveryAddress")?.id}
-          showFavorites
-          showRecents
-          allowAddNew
-          addressTypeFilter="private"
-          defaultCollapsed={true}
-          showAllAddressesSection={false}
-        />
-      </div>
+      {/* Delivery address is now handled by the unified Route Builder above */}
 
       {/* Delivery Cost Estimator */}
       <div className="mb-8">
