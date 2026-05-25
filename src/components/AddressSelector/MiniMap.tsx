@@ -131,7 +131,7 @@ export function MiniMap({ pickup, delivery }: MiniMapProps) {
       <div
         className={cn(
           'flex items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50',
-          'h-full min-h-[80px]',
+          'h-full min-h-[60px]',
         )}
       >
         <div className="text-center">
@@ -147,7 +147,7 @@ export function MiniMap({ pickup, delivery }: MiniMapProps) {
   return (
     <div
       ref={mapContainerRef}
-      className="h-full min-h-[80px] w-full rounded-lg overflow-hidden"
+      className="h-full min-h-[60px] w-full rounded-lg overflow-hidden"
     />
   );
 }

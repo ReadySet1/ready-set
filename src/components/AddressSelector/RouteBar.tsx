@@ -36,8 +36,8 @@ export function RouteBar({
 
   return (
     <div className={cn('rounded-xl border border-slate-200 bg-white p-3 sm:p-4', className)}>
-      {/* Desktop (lg+): horizontal 4-col layout */}
-      <div className="hidden lg:grid lg:grid-cols-[1fr_auto_1fr_200px] lg:items-center lg:gap-3">
+      {/* Desktop & Tablet (md+): 3-col row + map below */}
+      <div className="hidden md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:gap-3">
         <RouteSlot
           role="pickup"
           address={pickup}
@@ -53,29 +53,7 @@ export function RouteBar({
           onEdit={() => onEditSlot('delivery')}
           onClear={() => onClearSlot('delivery')}
         />
-        <div className="h-[80px]">
-          <MiniMap pickup={pickupCoords} delivery={deliveryCoords} />
-        </div>
-      </div>
-
-      {/* Tablet (md to lg): 3 cols + map below */}
-      <div className="hidden md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:gap-3 lg:hidden">
-        <RouteSlot
-          role="pickup"
-          address={pickup}
-          isActive={activeSlot === 'pickup'}
-          onEdit={() => onEditSlot('pickup')}
-          onClear={() => onClearSlot('pickup')}
-        />
-        <Connector pickup={pickup} delivery={delivery} />
-        <RouteSlot
-          role="delivery"
-          address={delivery}
-          isActive={activeSlot === 'delivery'}
-          onEdit={() => onEditSlot('delivery')}
-          onClear={() => onClearSlot('delivery')}
-        />
-        <div className="col-span-3 mt-2 h-[80px]">
+        <div className="col-span-3 mt-2 h-[60px]">
           <MiniMap pickup={pickupCoords} delivery={deliveryCoords} />
         </div>
       </div>

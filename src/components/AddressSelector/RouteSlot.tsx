@@ -39,7 +39,7 @@ export function RouteSlot({ role, address, isActive, onEdit, onClear }: RouteSlo
         type="button"
         onClick={onEdit}
         className={cn(
-          'w-full rounded-lg border-2 border-dashed p-3 sm:p-4 text-left transition-colors min-h-[56px]',
+          'w-full min-w-0 rounded-lg border-2 border-dashed p-2.5 sm:p-3 text-left transition-colors min-h-[48px]',
           'border-slate-200 hover:border-slate-300',
         )}
         aria-label={`Select ${config.label.toLowerCase()} address`}
@@ -60,7 +60,7 @@ export function RouteSlot({ role, address, isActive, onEdit, onClear }: RouteSlo
     return (
       <div
         className={cn(
-          'w-full rounded-lg border-2 border-dashed p-3 sm:p-4 min-h-[56px]',
+          'w-full min-w-0 rounded-lg border-2 border-dashed p-2.5 sm:p-3 min-h-[48px]',
           config.activeBorder, config.bg,
           'animate-pulse',
         )}
@@ -86,7 +86,7 @@ export function RouteSlot({ role, address, isActive, onEdit, onClear }: RouteSlo
   return (
     <div
       className={cn(
-        'w-full rounded-lg border p-3 sm:p-4 transition-colors min-h-[56px]',
+        'w-full min-w-0 rounded-lg border p-2.5 sm:p-3 transition-colors min-h-[48px]',
         isActive
           ? cn(config.activeBorder, config.bg, 'ring-2', config.ring)
           : cn(config.border, config.bg),
@@ -98,10 +98,10 @@ export function RouteSlot({ role, address, isActive, onEdit, onClear }: RouteSlo
           <MapPin className={cn('mt-0.5 h-4 w-4 shrink-0', config.icon)} />
           <div className="min-w-0">
             <p className={cn('text-xs sm:text-sm font-medium', config.text)}>{config.label}</p>
-            <p className="truncate text-sm sm:text-base font-medium text-slate-900">
+            <p className="truncate text-xs sm:text-sm font-medium text-slate-900">
               {address!.name || address!.street1}
             </p>
-            <p className="truncate text-[11px] sm:text-xs text-slate-500">
+            <p className="truncate text-[10px] sm:text-[11px] text-slate-500">
               {address!.name ? address!.street1 + ', ' : ''}
               {address!.city}, {address!.state} {address!.zip}
             </p>
