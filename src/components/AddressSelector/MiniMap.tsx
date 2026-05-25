@@ -1,11 +1,11 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { MapPin } from 'lucide-react';
+import { MapPin, ArrowRight } from 'lucide-react';
 import type { MiniMapProps } from '@/types/address-selector';
 import { cn } from '@/lib/utils';
 
-export function MiniMap({ pickup, delivery }: MiniMapProps) {
+export function MiniMap({ pickup, delivery, pickupLabel, deliveryLabel }: MiniMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -126,7 +126,35 @@ export function MiniMap({ pickup, delivery }: MiniMapProps) {
   }, [pickup, delivery, hasValidToken, hasCoords, token]);
 
   // Placeholder when no coords or no token
+  const hasLabels = pickupLabel || deliveryLabel;
+
   if (!hasValidToken || !hasCoords || mapError) {
+    // Route summary when addresses are selected but lack GPS coordinates
+    if (hasLabels) {
+      return (
+        <div
+          className={cn(
+            'flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3',
+            'h-full min-h-[60px]',
+          )}
+        >
+          {pickupLabel && (
+            <span className="truncate rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">
+              {pickupLabel}
+            </span>
+          )}
+          {pickupLabel && deliveryLabel && (
+            <ArrowRight className="h-3 w-3 shrink-0 text-slate-300" />
+          )}
+          {deliveryLabel && (
+            <span className="truncate rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+              {deliveryLabel}
+            </span>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div
         className={cn(

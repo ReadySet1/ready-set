@@ -187,6 +187,8 @@ export interface ConnectorProps {
 export interface MiniMapProps {
   pickup: { lat: number; lng: number } | null;
   delivery: { lat: number; lng: number } | null;
+  pickupLabel?: string | null;
+  deliveryLabel?: string | null;
 }
 
 /**
