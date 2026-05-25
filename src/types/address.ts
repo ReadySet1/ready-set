@@ -16,6 +16,8 @@ export interface Address {
     name: string | null;
     isRestaurant: boolean;
     isShared: boolean;
+    latitude?: number | null;
+    longitude?: number | null;
     createdAt: Date;
     updatedAt: Date;
     createdBy: string | null;

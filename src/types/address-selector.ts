@@ -138,3 +138,94 @@ export interface AddressUsageHistory {
   usedAt: Date;
   context: 'pickup' | 'delivery' | 'order';
 }
+
+/**
+ * Active slot in the route builder state machine
+ */
+export type ActiveSlot = 'pickup' | 'delivery' | null;
+
+/**
+ * Scope filter for the address library
+ */
+export type ScopeFilter = 'recent' | 'favorites' | 'all' | 'mine';
+
+/**
+ * Props for the RouteBuilder component
+ */
+export interface RouteBuilderProps {
+  pickup: Address | null;
+  delivery: Address | null;
+  onChange: (value: { pickup: Address | null; delivery: Address | null }) => void;
+  onCreateNew?: () => void;
+  mode?: 'client' | 'admin';
+  className?: string;
+  isLoading?: boolean;
+}
+
+/**
+ * Props for the RouteSlot component
+ */
+export interface RouteSlotProps {
+  role: 'pickup' | 'delivery';
+  address: Address | null;
+  isActive: boolean;
+  onEdit: () => void;
+  onClear: () => void;
+}
+
+/**
+ * Props for the Connector component
+ */
+export interface ConnectorProps {
+  pickup: Address | null;
+  delivery: Address | null;
+}
+
+/**
+ * Props for the MiniMap component
+ */
+export interface MiniMapProps {
+  pickup: { lat: number; lng: number } | null;
+  delivery: { lat: number; lng: number } | null;
+}
+
+/**
+ * Props for the AddressTile component
+ */
+export interface AddressTileProps {
+  address: AddressWithMetadata;
+  activeSlot: ActiveSlot;
+  onAssign: (address: Address) => void;
+  onFavoriteToggle?: (addressId: string) => void;
+  isFavorite?: boolean;
+}
+
+/**
+ * Props for the LibraryToolbar component
+ */
+export interface LibraryToolbarProps {
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  activeScope: ScopeFilter;
+  onScopeChange: (scope: ScopeFilter) => void;
+  onCreateNew: () => void;
+}
+
+/**
+ * Props for the Library component
+ */
+export interface LibraryProps {
+  addresses: AddressWithMetadata[];
+  activeSlot: ActiveSlot;
+  onAssign: (address: Address) => void;
+  onFavoriteToggle: (addressId: string) => void;
+  favoriteIds: string[];
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  activeScope: ScopeFilter;
+  onScopeChange: (scope: ScopeFilter) => void;
+  onCreateNew: () => void;
+  isLoading?: boolean;
+  pagination?: PaginationInfo;
+  onPageChange?: (page: number) => void;
+}

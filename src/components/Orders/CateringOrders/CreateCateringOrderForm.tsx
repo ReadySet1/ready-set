@@ -1175,53 +1175,30 @@ export const CreateCateringOrderForm: React.FC<
           </div>
         </div>
 
-        {/* Address Sections */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="space-y-4 rounded-md border bg-slate-50/50 p-4">
-            <h4 className="text-md mb-3 font-semibold">Pickup Address</h4>
-            <AddressSelector
-              mode="admin"
-              type="pickup"
-              onSelect={(address) => {
-                setValue("pickupAddress", address);
-              }}
-              selectedAddressId={'id' in watch("pickupAddress") ? (watch("pickupAddress") as { id?: string }).id : undefined}
-              showFavorites
-              showRecents
-              allowAddNew
-            />
-            {errors.pickupAddress && (
-              <div className="mt-2 text-sm text-red-500">
-                {errors.pickupAddress.street1?.message ||
-                  errors.pickupAddress.city?.message ||
-                  errors.pickupAddress.state?.message ||
-                  errors.pickupAddress.zip?.message}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-4 rounded-md border bg-slate-50/50 p-4">
-            <h4 className="text-md mb-3 font-semibold">Delivery Address</h4>
-            <AddressSelector
-              mode="admin"
-              type="delivery"
-              onSelect={(address) => {
-                setValue("deliveryAddress", address);
-              }}
-              selectedAddressId={'id' in watch("deliveryAddress") ? (watch("deliveryAddress") as { id?: string }).id : undefined}
-              showFavorites
-              showRecents
-              allowAddNew
-            />
-            {errors.deliveryAddress && (
-              <div className="mt-2 text-sm text-red-500">
-                {errors.deliveryAddress.street1?.message ||
-                  errors.deliveryAddress.city?.message ||
-                  errors.deliveryAddress.state?.message ||
-                  errors.deliveryAddress.zip?.message}
-              </div>
-            )}
-          </div>
+        {/* Address Selection — Route Builder */}
+        <div className="space-y-2">
+          <h4 className="text-md font-semibold">Pickup & Delivery Addresses</h4>
+          <AddressSelector
+            pickup={('id' in watch("pickupAddress") && (watch("pickupAddress") as Address).id) ? watch("pickupAddress") as Address : null}
+            delivery={('id' in watch("deliveryAddress") && (watch("deliveryAddress") as Address).id) ? watch("deliveryAddress") as Address : null}
+            onChange={({ pickup, delivery }) => {
+              if (pickup !== undefined) setValue("pickupAddress", pickup ?? { street1: "", city: "", state: "", zip: "" });
+              if (delivery !== undefined) setValue("deliveryAddress", delivery ?? { street1: "", city: "", state: "", zip: "" });
+            }}
+            mode="admin"
+          />
+          {(errors.pickupAddress || errors.deliveryAddress) && (
+            <div className="mt-2 text-sm text-red-500">
+              {errors.pickupAddress?.street1?.message ||
+                errors.pickupAddress?.city?.message ||
+                errors.pickupAddress?.state?.message ||
+                errors.pickupAddress?.zip?.message ||
+                errors.deliveryAddress?.street1?.message ||
+                errors.deliveryAddress?.city?.message ||
+                errors.deliveryAddress?.state?.message ||
+                errors.deliveryAddress?.zip?.message}
+            </div>
+          )}
         </div>
 
         {/* Notes Section */}
