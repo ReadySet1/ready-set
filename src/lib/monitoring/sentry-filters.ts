@@ -89,19 +89,27 @@ function isNetworkError(event: ErrorEvent): boolean {
 }
 
 /**
- * Check if error is an AbortError from Supabase Auth's navigator lock timeout
- * This is a known issue in @supabase/auth-js where the lock acquisition abort
- * isn't caught internally, causing an unhandled rejection. Not actionable.
- * Fixes: READY-SET-NEXTJS-1D
+ * Check if error is an AbortError from Supabase Auth's navigator lock (Web Locks API).
+ * Two known variants, both caused by @supabase/auth-js not catching the lock abort
+ * internally, surfacing as an unhandled rejection. Neither is actionable (0 users impacted):
+ *   1. "signal is aborted without reason"  — lock acquisition timeout (has auth-js frames)
+ *   2. "Lock broken by another request with the 'steal' option." — a concurrent request
+ *      stole the lock; arrives as a global unhandledrejection with NO stacktrace.
+ * Fixes: READY-SET-NEXTJS-1D, READY-SET-NEXTJS-1M
  */
 function isSupabaseLockAbortError(event: ErrorEvent): boolean {
   const errorType = event.exception?.values?.[0]?.type || '';
   const errorValue = event.exception?.values?.[0]?.value || '';
 
   if (errorType !== 'AbortError') return false;
+
+  // Variant 2: "steal" — message is specific enough; it arrives with no stacktrace
+  // frames, so we must NOT require an auth-js frame here.
+  if (errorValue.includes('Lock broken by another request')) return true;
+
+  // Variant 1: lock acquisition timeout — verify it originates from auth-js locks.
   if (!errorValue.includes('signal is aborted without reason')) return false;
 
-  // Verify it originates from the Supabase auth-js locks module
   const frames = event.exception?.values?.[0]?.stacktrace?.frames || [];
   return frames.some(
     (frame: { filename?: string; module?: string }) =>
