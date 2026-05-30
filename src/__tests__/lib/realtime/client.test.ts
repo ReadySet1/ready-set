@@ -79,13 +79,23 @@ process.env.NODE_ENV = 'test';
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-key';
 
-import { RealtimeClient } from '@/lib/realtime/client';
+import {
+  RealtimeClient,
+  CHANNEL_ERROR_MAX_RETRIES,
+  CHANNEL_ERROR_BACKOFF_BASE_MS,
+} from '@/lib/realtime/client';
 import { REALTIME_CHANNELS, type RealtimeChannelName } from '@/lib/realtime/types';
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
+import { realtimeLogger } from '@/lib/logging/realtime-logger';
 
 // Helper to flush all pending microtasks (allow async auth/profile checks to complete)
 const flushPromises = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+// Helper to wait out a CHANNEL_ERROR retry's backoff (plus a small buffer)
+const waitForBackoff = (attempt: number) =>
+  new Promise<void>((resolve) =>
+    setTimeout(resolve, CHANNEL_ERROR_BACKOFF_BASE_MS * attempt + 50),
+  );
 
 describe('RealtimeClient', () => {
   let mockSupabaseClient: any;
@@ -275,7 +285,37 @@ describe('RealtimeClient', () => {
       expect(client.isConnected(REALTIME_CHANNELS.DRIVER_LOCATIONS)).toBe(true);
     });
 
-    it('should handle subscription errors', async () => {
+    it('should retry transient CHANNEL_ERROR and resolve when it recovers', async () => {
+      // A single CHANNEL_ERROR is usually a Realtime tenant cold-start blip;
+      // the channel recovers on the next status callback and must NOT reject.
+      const client = RealtimeClient.getInstance();
+      const onConnect = jest.fn();
+      const onError = jest.fn();
+      const error = new Error('transient cold-start');
+
+      const subscribePromise = client.subscribe(
+        REALTIME_CHANNELS.DRIVER_LOCATIONS,
+        undefined,
+        { onConnect, onError }
+      );
+
+      // First CHANNEL_ERROR -> retry #1 (refreshSession + backoff, no reject)
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
+      await waitForBackoff(1);
+
+      // Auto-reconnect succeeds on the next callback invocation
+      const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS);
+      if (callback) callback('SUBSCRIBED');
+
+      await expect(subscribePromise).resolves.toBeDefined();
+      expect(onConnect).toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+      expect(client.isConnected(REALTIME_CHANNELS.DRIVER_LOCATIONS)).toBe(true);
+      // Token refreshed exactly once, on the first retry
+      expect(mockSupabaseClient.auth.refreshSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('should reject only after exhausting CHANNEL_ERROR retries', async () => {
       const client = RealtimeClient.getInstance();
       const onError = jest.fn();
       const error = new Error('Subscription failed');
@@ -285,18 +325,71 @@ describe('RealtimeClient', () => {
         undefined,
         { onError }
       );
+      // Attach the rejection expectation up-front to avoid an unhandled rejection
+      const rejection = expect(subscribePromise).rejects.toThrow('Subscription failed');
 
-      // First CHANNEL_ERROR triggers a retry (refreshSession + return)
+      // Retry #1 (driven through the auth flush)
       await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
-      // Wait for the async refreshSession inside the callback to complete
-      await flushPromises();
-      // Second CHANNEL_ERROR actually rejects
-      const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      if (callback) callback('CHANNEL_ERROR', error);
+      await waitForBackoff(1);
 
-      await expect(subscribePromise).rejects.toThrow('Subscription failed');
+      const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!;
+      // Remaining retries (#2 .. #MAX) each back off and wait, never rejecting
+      for (let attempt = 2; attempt <= CHANNEL_ERROR_MAX_RETRIES; attempt++) {
+        callback('CHANNEL_ERROR', error);
+        await waitForBackoff(attempt);
+      }
+
+      // One more CHANNEL_ERROR past the retry budget -> finally rejects
+      callback('CHANNEL_ERROR', error);
+
+      await rejection;
       expect(onError).toHaveBeenCalled();
       expect(client.isConnected(REALTIME_CHANNELS.DRIVER_LOCATIONS)).toBe(false);
+      // Token refreshed only once across all retries
+      expect(mockSupabaseClient.auth.refreshSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('should log exhausted CHANNEL_ERROR as warn (not error) to keep Sentry quiet', async () => {
+      // Regression for Sentry READY-SET-NEXTJS-1F: the post-retry failure must
+      // be a warning (no Sentry capture), mirroring TIMED_OUT, since the UI
+      // still falls back via onError. The old 'Channel subscription error'
+      // error-level log must be gone.
+      const warnSpy = jest.spyOn(realtimeLogger, 'warn');
+      const errorSpy = jest.spyOn(realtimeLogger, 'error');
+
+      const client = RealtimeClient.getInstance();
+      const error = new Error('Subscription failed');
+
+      const subscribePromise = client.subscribe(
+        REALTIME_CHANNELS.DRIVER_LOCATIONS,
+        undefined,
+        { onError: jest.fn() }
+      );
+      const rejection = expect(subscribePromise).rejects.toThrow('Subscription failed');
+
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
+      await waitForBackoff(1);
+
+      const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!;
+      for (let attempt = 2; attempt <= CHANNEL_ERROR_MAX_RETRIES; attempt++) {
+        callback('CHANNEL_ERROR', error);
+        await waitForBackoff(attempt);
+      }
+      callback('CHANNEL_ERROR', error);
+      await rejection;
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Channel subscription failed after retries - may fallback to SSE',
+        expect.objectContaining({ channelName: REALTIME_CHANNELS.DRIVER_LOCATIONS }),
+      );
+      // The noisy error-level log that fed Sentry NEXTJS-1F is gone
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        'Channel subscription error',
+        expect.anything(),
+      );
+
+      warnSpy.mockRestore();
+      errorSpy.mockRestore();
     });
 
     it('should handle subscription timeout', async () => {
@@ -597,14 +690,20 @@ describe('RealtimeClient', () => {
       const error = new Error('Connection failed');
 
       const subscribePromise = client.subscribe(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      // First CHANNEL_ERROR triggers retry
-      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
-      await flushPromises();
-      // Second CHANNEL_ERROR actually rejects
-      const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS);
-      if (callback) callback('CHANNEL_ERROR', error);
+      const rejection = expect(subscribePromise).rejects.toThrow();
 
-      await expect(subscribePromise).rejects.toThrow();
+      // Retry #1 (driven through the auth flush), then exhaust the rest
+      await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
+      await waitForBackoff(1);
+      const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!;
+      for (let attempt = 2; attempt <= CHANNEL_ERROR_MAX_RETRIES; attempt++) {
+        callback('CHANNEL_ERROR', error);
+        await waitForBackoff(attempt);
+      }
+      // One past the budget -> rejects and records error state
+      callback('CHANNEL_ERROR', error);
+
+      await rejection;
 
       const state = client.getConnectionState(REALTIME_CHANNELS.DRIVER_LOCATIONS);
       expect(state.state).toBe('error');
