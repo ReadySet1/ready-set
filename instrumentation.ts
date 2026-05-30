@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import type { NextRequest } from 'next/server';
 
 import { initializeMonitoring, initializeEdgeMonitoring } from './src/lib/monitoring';
-import { createBeforeSend, SERVER_IGNORE_ERRORS } from '@/lib/monitoring/sentry-filters';
+import { createBeforeSend, getSentryEnvironment, SERVER_IGNORE_ERRORS } from '@/lib/monitoring/sentry-filters';
 
 function initSentryForCurrentRuntime(): void {
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
@@ -22,7 +22,7 @@ function initSentryForCurrentRuntime(): void {
 
   const baseConfig = {
     dsn,
-    environment: process.env.NODE_ENV,
+    environment: getSentryEnvironment(),
     release: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA,
     tracesSampleRate: getSampleRate(),
     debug: false,
