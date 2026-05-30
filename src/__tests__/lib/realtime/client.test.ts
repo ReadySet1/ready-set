@@ -82,20 +82,15 @@ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-key';
 import {
   RealtimeClient,
   CHANNEL_ERROR_MAX_RETRIES,
-  CHANNEL_ERROR_BACKOFF_BASE_MS,
 } from '@/lib/realtime/client';
 import { REALTIME_CHANNELS, type RealtimeChannelName } from '@/lib/realtime/types';
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
 import { realtimeLogger } from '@/lib/logging/realtime-logger';
 
-// Helper to flush all pending microtasks (allow async auth/profile checks to complete)
+// Helper to flush all pending microtasks (allow async auth/profile checks to
+// complete, including the once-only token refresh on the first CHANNEL_ERROR retry)
 const flushPromises = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
-// Helper to wait out a CHANNEL_ERROR retry's backoff (plus a small buffer)
-const waitForBackoff = (attempt: number) =>
-  new Promise<void>((resolve) =>
-    setTimeout(resolve, CHANNEL_ERROR_BACKOFF_BASE_MS * attempt + 50),
-  );
 
 describe('RealtimeClient', () => {
   let mockSupabaseClient: any;
@@ -301,7 +296,7 @@ describe('RealtimeClient', () => {
 
       // First CHANNEL_ERROR -> retry #1 (refreshSession + backoff, no reject)
       await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
-      await waitForBackoff(1);
+      await flushPromises();
 
       // Auto-reconnect succeeds on the next callback invocation
       const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS);
@@ -330,13 +325,13 @@ describe('RealtimeClient', () => {
 
       // Retry #1 (driven through the auth flush)
       await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
-      await waitForBackoff(1);
+      await flushPromises();
 
       const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!;
       // Remaining retries (#2 .. #MAX) each back off and wait, never rejecting
       for (let attempt = 2; attempt <= CHANNEL_ERROR_MAX_RETRIES; attempt++) {
         callback('CHANNEL_ERROR', error);
-        await waitForBackoff(attempt);
+        await flushPromises();
       }
 
       // One more CHANNEL_ERROR past the retry budget -> finally rejects
@@ -368,12 +363,12 @@ describe('RealtimeClient', () => {
       const rejection = expect(subscribePromise).rejects.toThrow('Subscription failed');
 
       await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
-      await waitForBackoff(1);
+      await flushPromises();
 
       const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!;
       for (let attempt = 2; attempt <= CHANNEL_ERROR_MAX_RETRIES; attempt++) {
         callback('CHANNEL_ERROR', error);
-        await waitForBackoff(attempt);
+        await flushPromises();
       }
       callback('CHANNEL_ERROR', error);
       await rejection;
@@ -694,11 +689,11 @@ describe('RealtimeClient', () => {
 
       // Retry #1 (driven through the auth flush), then exhaust the rest
       await triggerSubscriptionAfterAuth(REALTIME_CHANNELS.DRIVER_LOCATIONS, 'CHANNEL_ERROR', error);
-      await waitForBackoff(1);
+      await flushPromises();
       const callback = subscribeCallbacks.get(REALTIME_CHANNELS.DRIVER_LOCATIONS)!;
       for (let attempt = 2; attempt <= CHANNEL_ERROR_MAX_RETRIES; attempt++) {
         callback('CHANNEL_ERROR', error);
-        await waitForBackoff(attempt);
+        await flushPromises();
       }
       // One past the budget -> rejects and records error state
       callback('CHANNEL_ERROR', error);

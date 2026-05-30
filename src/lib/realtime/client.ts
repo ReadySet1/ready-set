@@ -30,18 +30,17 @@ import { createClient as createBrowserClient } from '@/utils/supabase/client';
 // Environment validation is handled by the browser client in @/utils/supabase/client
 
 /**
- * CHANNEL_ERROR retry tuning.
+ * CHANNEL_ERROR retry budget.
  *
  * Supabase Realtime shuts the tenant down when idle and takes ~100-300ms to
  * cold-start its replication connection. The first subscribe after an idle
  * period races that boot window: the WebSocket closes mid-join and every
- * subscribed channel receives a transient CHANNEL_ERROR. A single immediate
- * retry frequently lands inside the same boot window and also fails, so we
- * retry a few times with incremental backoff before treating it as real.
- * See Sentry READY-SET-NEXTJS-1F.
+ * subscribed channel receives a transient CHANNEL_ERROR. The SDK auto-reconnects
+ * the socket (on its own rejoin backoff) and re-invokes the status callback, so
+ * a single CHANNEL_ERROR is usually noise. We tolerate a few of them before
+ * treating the failure as real. See Sentry READY-SET-NEXTJS-1F.
  */
 export const CHANNEL_ERROR_MAX_RETRIES = 3;
-export const CHANNEL_ERROR_BACKOFF_BASE_MS = 300;
 
 // ============================================================================
 // Authorization
@@ -470,19 +469,17 @@ export class RealtimeClient {
             resolve(channel);
           } else if (status === 'CHANNEL_ERROR') {
             // CHANNEL_ERROR is usually a transient Realtime tenant cold-start
-            // (see CHANNEL_ERROR_MAX_RETRIES note). Retry with incremental
-            // backoff before failing. Supabase auto-reconnects the socket and
-            // re-invokes this callback, so we refresh the token once (covers
-            // expired-token closes) and wait for the next status.
+            // (see CHANNEL_ERROR_MAX_RETRIES note). Supabase auto-reconnects the
+            // socket on its own rejoin backoff and re-invokes this callback, so
+            // we just cap how many CHANNEL_ERRORs we tolerate and refresh the
+            // token once (covers expired-token closes) before giving up.
             if (channelErrorRetries < CHANNEL_ERROR_MAX_RETRIES) {
               channelErrorRetries++;
-              const backoffMs = CHANNEL_ERROR_BACKOFF_BASE_MS * channelErrorRetries;
-              realtimeLogger.warn('Channel error, retrying with backoff', {
+              realtimeLogger.warn('Channel error, retrying', {
                 channelName,
                 metadata: {
                   attempt: channelErrorRetries,
                   maxRetries: CHANNEL_ERROR_MAX_RETRIES,
-                  backoffMs,
                 },
                 error,
               });
@@ -499,9 +496,7 @@ export class RealtimeClient {
                 }
               }
 
-              // Space out reconnect attempts so we don't burn every retry
-              // inside the same cold-start window.
-              await new Promise((r) => setTimeout(r, backoffMs));
+              // Wait for the SDK's next reconnect attempt to re-invoke this callback.
               return;
             }
 
