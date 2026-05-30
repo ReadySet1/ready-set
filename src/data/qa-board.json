@@ -1,11 +1,11 @@
 {
   "source": "2026-Q2-test-cases.csv",
   "generated": "2026-05-23",
-  "total": 29,
+  "total": 35,
   "counts": {
     "PASS": 11,
     "PARTIAL-FAIL": 4,
-    "FAIL": 11,
+    "FAIL": 17,
     "BLOCKED": 1,
     "IN-PROGRESS": 1,
     "NOT-RUN": 1,
@@ -753,6 +753,110 @@
           "data": "",
           "expected": "Full path visible after reconnect"
         }
+      ]
+    },
+    {
+      "key": "REA-DRT-09",
+      "summary": "Admin map: WebSocket 'connected' but renders zero drivers (marker flickers)",
+      "description": "Live admin tracking shows the driver marker appearing then disappearing while the dashboard stays in WebSocket mode. Root cause is in the data-source merge, not the GPS feed.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": ["qa", "q2-2026", "driver-tracking", "realtime", "bug"],
+      "components": ["hooks/tracking/useAdminRealtimeTracking", "Dashboard/Tracking"],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL - Found in 2026-05-29 two-driver test session (development). useAdminRealtimeTracking merges sources as activeDrivers = (isRealtimeConnected && useRealtime) ? Array.from(realtimeDrivers.values()) : sseActiveDrivers. The realtimeDrivers Map is only populated by incoming driver_location_updated broadcasts, which never arrive (see REA-DRT-12). client.ts resolves onConnect on channel status SUBSCRIBED regardless of data, so isRealtimeConnected flips true and the map swaps to an empty source -> marker vanishes; on channel bounce it falls back to SSE -> marker reappears. No SSE seeding and no merge-by-driverId fallback. Evidence: screenshot 2:39 PM '1 drivers/1 updates' (SSE window) vs 3:03 PM 'WebSocket Mode / 0 drivers / No active drivers'. Fix: seed realtimeDrivers from SSE on connect, or merge by driverId instead of either/or; do not treat SUBSCRIBED as 'has data'. Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {"step": "Open /admin/tracking with realtime ON and 1-2 drivers on shift sending GPS", "data": "WebSocket mode", "expected": "Driver marker stays visible continuously"},
+        {"step": "Observe over several minutes", "data": "", "expected": "No flicker; marker persists across channel reconnects"},
+        {"step": "Toggle WebSocket/SSE mode", "data": "", "expected": "Same driver set in both modes (no empty map in WS mode)"}
+      ]
+    },
+    {
+      "key": "REA-DRT-10",
+      "summary": "SSE /api/tracking/live killed by Vercel 300s maxDuration",
+      "description": "The admin live stream endpoint terminates after 300s, dropping the only working transport (SSE) every 5 minutes.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": ["qa", "q2-2026", "driver-tracking", "sse", "bug"],
+      "components": ["api/tracking/live"],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL - Found 2026-05-29 (development). Route opens an SSE ReadableStream with a 5s setInterval but exports no maxDuration/runtime. Vercel runtime logs show repeated 'Vercel Runtime Timeout Error: Task timed out after 300 seconds' on GET /api/tracking/live. EventSource auto-reconnects but leaves data gaps every ~5 min, contributing to marker flicker (REA-DRT-09). Fix: add export const maxDuration / runtime, or move the live stream off a long-running serverless function (rely on Supabase Realtime once REA-DRT-12 is fixed). Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {"step": "Open /admin/tracking and keep it open >5 min", "data": "", "expected": "Stream stays alive; no 300s timeout"},
+        {"step": "Check Vercel runtime logs for /api/tracking/live", "data": "", "expected": "No 'Task timed out after 300 seconds'"}
+      ]
+    },
+    {
+      "key": "REA-DRT-11",
+      "summary": "Driver pages 500 ERR_REQUIRE_ESM (html-encoding-sniffer / @exodus/bytes)",
+      "description": "Driver-facing routes intermittently return 500, stopping GPS capture at the source.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": ["qa", "q2-2026", "driver-tracking", "build", "bug"],
+      "components": ["Driver/DriverTrackingPortal", "app/driver"],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL - Found 2026-05-29 (development). /driver, /driver/tracking and /driver/deliveries/[id] intermittently 500 with: require() of ES Module @exodus/bytes/encoding-lite.js from html-encoding-sniffer@6.0.0 not supported (code ERR_REQUIRE_ESM, digest 2585452143). When the driver page crashes, useLocationTracking stops -> no GPS pings -> admin loses the marker regardless of transport. Same ESM/CJS class as the catering quote-form bug. Fix: pin/replace the offending transitive dependency or add to serverComponentsExternalPackages / transpilePackages. Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {"step": "Open /driver/deliveries/[id] as a driver", "data": "Active delivery", "expected": "200, page renders"},
+        {"step": "Refresh several times", "data": "", "expected": "No 500 ERR_REQUIRE_ESM in logs"}
+      ]
+    },
+    {
+      "key": "REA-DRT-12",
+      "summary": "Broadcast transport gap: pg_notify is not bridged to Supabase Realtime broadcast",
+      "description": "Extends REA-DRT-02 (DT2-09): even after applying the missing trigger, location broadcasts would not reach admin clients.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": ["qa", "q2-2026", "driver-tracking", "realtime", "bug"],
+      "components": ["lib/realtime", "supabase/migrations", "app/actions/tracking/driver-actions"],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL - Found 2026-05-29 (development). driver-actions.ts updateDriverLocation delegates broadcasting to the DB trigger; migration 20251107000008 notify_driver_location_update() uses pg_notify('driver_location_update', ...). Supabase Realtime does NOT bridge pg_notify to the broadcast channel the admin listens on (channel.on('broadcast', {event: 'driver_location_updated'})). Repo grep confirms no realtime.send / realtime.broadcast_changes / ALTER PUBLICATION supabase_realtime ... driver_locations anywhere. So even fixing the repo<->DB drift in REA-DRT-02 would not deliver updates. Fix Opt A: rewrite trigger to use realtime.send(payload, 'driver_location_updated', 'driver-locations', false) + grants/RLS on realtime.messages. Fix Opt B: subscribe admin to postgres_changes (pass onDatabaseInsert) and add driver_locations to the supabase_realtime publication. Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {"step": "Driver sends a location; inspect admin WS frames", "data": "Realtime ON", "expected": "driver_location_updated broadcast received on driver-locations channel"},
+        {"step": "Verify DB broadcast mechanism", "data": "trigger/function", "expected": "Uses realtime.send (or postgres_changes via publication), not pg_notify"}
+      ]
+    },
+    {
+      "key": "REA-DRT-13",
+      "summary": "Driver dropped from admin map during break / outside 5-min window",
+      "description": "A driver who is on break or whose GPS pings stall for >5 min is filtered out of the admin map even though tracking is active.",
+      "status": "DONE",
+      "priority": "Medium",
+      "assignee": "Fernando Cardenas",
+      "labels": ["qa", "q2-2026", "driver-tracking", "bug"],
+      "components": ["api/tracking/live"],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL - Found 2026-05-29 (development). The recentLocations query in api/tracking/live filters recorded_at > NOW() - INTERVAL '5 minutes' AND driver_id IN (drivers WHERE is_on_duty = true), and the activeDrivers projection computes isOnDuty as current_shift_id != null AND shift_status = 'active'. When a driver starts a break the shift moves to status='paused' (see 'REST' badge in driver screenshots), so the driver is excluded from the map even while still sending location. Same applies if pings stall beyond the 5-min window. Fix: include paused shifts (or a dedicated on-shift flag) and/or widen/decouple the freshness window from the on-duty gate. Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {"step": "Driver on active shift visible on /admin/tracking", "data": "", "expected": "Marker visible"},
+        {"step": "Driver starts a break (REST)", "data": "shift status -> paused", "expected": "Marker remains visible while location is still being sent"},
+        {"step": "No GPS ping for >5 min then resume", "data": "", "expected": "Marker reappears on next ping without losing the driver from the list"}
+      ]
+    },
+    {
+      "key": "REA-DRT-14",
+      "summary": "Driver status transition EN_ROUTE_TO_VENDOR -> ARRIVED_TO_CLIENT rejected (live repro)",
+      "description": "Live reproduction during the test session of the status-transition failure previously seen as a static finding in REA-DRT-01 (D2) and REA-OMG-08.",
+      "status": "DONE",
+      "priority": "High",
+      "assignee": "Fernando Cardenas",
+      "labels": ["qa", "q2-2026", "driver-tracking", "state-machine", "bug"],
+      "components": ["Driver/DriverTrackingPortal", "app/actions/tracking"],
+      "folder": "Q2 2026/Driver Tracking",
+      "notes": "FAIL - Found 2026-05-29 (development). Driver portal threw 'Failed to update driver status: Cannot transition driverStatus from EN_ROUTE_TO_VENDOR to ARRIVED_TO_CLIENT' (screenshot). The transition guard does not allow advancing from EN_ROUTE_TO_VENDOR directly to ARRIVED_TO_CLIENT (intermediate states ARRIVED_AT_VENDOR / EN_ROUTE_TO_CLIENT appear required), and retrying eventually succeeded, indicating an ordering/guard issue rather than a hard block. Confirms and extends the static findings in REA-DRT-01 (D2: validStatuses missing EN_ROUTE_TO_VENDOR) and REA-OMG-08. Fix: align the allowed-transition map with the actual driver flow and ensure all status values are registered. Reported by Fernando Sanchez for Emmanuel.",
+      "verdict": "FAIL",
+      "steps": [
+        {"step": "As driver, advance a delivery through each status in order", "data": "Active delivery", "expected": "Each transition succeeds without error toast"},
+        {"step": "Attempt EN_ROUTE_TO_VENDOR -> ARRIVED_TO_CLIENT path used in the field", "data": "", "expected": "Either allowed, or UI prevents skipping with a clear message (no 'Cannot transition' failure)"}
       ]
     },
     {
