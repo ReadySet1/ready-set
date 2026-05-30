@@ -149,3 +149,4 @@ src/components/Pricing/FlowerPricingLandingPageSimple.tsx
 # Bruno API test local overrides — put real keys here, never in *.bru committed files
 docs/bruno-api-tests/**/*.local.bru
 docs/bruno-api-tests/**/secrets.bru
+.vercel

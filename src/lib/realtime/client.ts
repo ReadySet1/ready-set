@@ -29,6 +29,19 @@ import { createClient as createBrowserClient } from '@/utils/supabase/client';
 
 // Environment validation is handled by the browser client in @/utils/supabase/client
 
+/**
+ * CHANNEL_ERROR retry budget.
+ *
+ * Supabase Realtime shuts the tenant down when idle and takes ~100-300ms to
+ * cold-start its replication connection. The first subscribe after an idle
+ * period races that boot window: the WebSocket closes mid-join and every
+ * subscribed channel receives a transient CHANNEL_ERROR. The SDK auto-reconnects
+ * the socket (on its own rejoin backoff) and re-invokes the status callback, so
+ * a single CHANNEL_ERROR is usually noise. We tolerate a few of them before
+ * treating the failure as real. See Sentry READY-SET-NEXTJS-1F.
+ */
+export const CHANNEL_ERROR_MAX_RETRIES = 3;
+
 // ============================================================================
 // Authorization
 // ============================================================================
@@ -432,7 +445,7 @@ export class RealtimeClient {
       userType: effectiveUserContext.userType,
     });
 
-    let hasRetriedOnError = false;
+    let channelErrorRetries = 0;
 
     return new Promise((resolve, reject) => {
       channel
@@ -455,24 +468,36 @@ export class RealtimeClient {
             callbacks?.onConnect?.();
             resolve(channel);
           } else if (status === 'CHANNEL_ERROR') {
-            // Retry once with a token refresh before failing
-            if (!hasRetriedOnError) {
-              hasRetriedOnError = true;
-              realtimeLogger.warn('Channel error, attempting token refresh and retry', {
+            // CHANNEL_ERROR is usually a transient Realtime tenant cold-start
+            // (see CHANNEL_ERROR_MAX_RETRIES note). Supabase auto-reconnects the
+            // socket on its own rejoin backoff and re-invokes this callback, so
+            // we just cap how many CHANNEL_ERRORs we tolerate and refresh the
+            // token once (covers expired-token closes) before giving up.
+            if (channelErrorRetries < CHANNEL_ERROR_MAX_RETRIES) {
+              channelErrorRetries++;
+              realtimeLogger.warn('Channel error, retrying', {
                 channelName,
+                metadata: {
+                  attempt: channelErrorRetries,
+                  maxRetries: CHANNEL_ERROR_MAX_RETRIES,
+                },
                 error,
               });
 
-              try {
-                await this.supabase.auth.refreshSession();
-                // Supabase Realtime will auto-reconnect with the new token
-                return;
-              } catch (refreshError) {
-                realtimeLogger.error('Token refresh failed during channel error retry', {
-                  channelName,
-                  error: refreshError,
-                });
+              // Refresh the auth token once, on the first retry.
+              if (channelErrorRetries === 1) {
+                try {
+                  await this.supabase.auth.refreshSession();
+                } catch (refreshError) {
+                  realtimeLogger.warn('Token refresh failed during channel error retry', {
+                    channelName,
+                    error: refreshError,
+                  });
+                }
               }
+
+              // Wait for the SDK's next reconnect attempt to re-invoke this callback.
+              return;
             }
 
             const connectionError = new RealtimeConnectionError(
@@ -488,9 +513,13 @@ export class RealtimeClient {
             // Track error in metrics
             this.recordError(channelName, connectionError);
 
-            realtimeLogger.error('Channel subscription error', {
+            // Log as warning (not error) so transient cold-start churn that
+            // recovers via auto-reconnect / SSE fallback doesn't flood Sentry.
+            // Mirrors the TIMED_OUT handling below; the failure is still
+            // surfaced to callers via onError + reject. (Sentry NEXTJS-1F)
+            realtimeLogger.warn('Channel subscription failed after retries - may fallback to SSE', {
               channelName,
-              error: connectionError,
+              metadata: { retries: channelErrorRetries },
             });
 
             callbacks?.onError?.(connectionError);

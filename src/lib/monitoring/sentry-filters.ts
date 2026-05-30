@@ -8,6 +8,36 @@
 import type { ErrorEvent, EventHint } from '@sentry/nextjs';
 
 /**
+ * Resolve the Sentry `environment` tag, shared by the client, server, and edge
+ * Sentry.init() sites so they always agree.
+ *
+ * `process.env.NODE_ENV` is NOT a usable signal here: Next.js forces it to
+ * `'production'` for every `next build` output, so the dev deployment
+ * (development.readysetllc.com) reported `environment: production` and its
+ * noise polluted the production Sentry environment.
+ *
+ * Resolution order (first defined wins):
+ *   1. NEXT_PUBLIC_SENTRY_ENVIRONMENT — explicit per-deployment override. Set
+ *      this to `development` in the ready-set-dev Vercel project. It is the only
+ *      fully reliable signal when a custom domain is served by a "production"
+ *      Vercel deployment of a non-prod project.
+ *   2. NEXT_PUBLIC_VERCEL_ENV / VERCEL_ENV — Vercel's env ('production' |
+ *      'preview' | 'development'). The NEXT_PUBLIC_ variant is the only one
+ *      readable in the browser bundle (requires Vercel's "expose system env
+ *      vars" setting); VERCEL_ENV covers server/edge runtimes.
+ *   3. NODE_ENV — local-dev fallback only.
+ */
+export function getSentryEnvironment(): string {
+  return (
+    process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ||
+    process.env.NEXT_PUBLIC_VERCEL_ENV ||
+    process.env.VERCEL_ENV ||
+    process.env.NODE_ENV ||
+    'development'
+  );
+}
+
+/**
  * Custom filter function type
  */
 export type CustomFilter = (event: ErrorEvent, hint: EventHint) => boolean;
