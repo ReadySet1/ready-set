@@ -38,6 +38,14 @@ describe('/api/calculator/configurations API', () => {
     auth: {
       getUser: jest.fn(),
     },
+    // authorizeCalculatorAdmin() resolves the caller's role via
+    // supabase.from('profiles').select('type').eq('id', …).maybeSingle().
+    // Default to an admin profile so authorized POST/DELETE paths pass.
+    from: jest.fn(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: { type: 'super_admin' } }),
+    })),
   };
 
   beforeEach(() => {

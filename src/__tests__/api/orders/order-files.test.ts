@@ -24,6 +24,9 @@ jest.mock('@/utils/prismaDB', () => ({
     onDemand: {
       findFirst: jest.fn(),
     },
+    dispatch: {
+      findFirst: jest.fn(),
+    },
     fileUpload: {
       findMany: jest.fn(),
     },
@@ -304,6 +307,9 @@ describe('GET /api/orders/[order_number]/files - Fetch Order Files', () => {
       mockSupabaseClient.auth.getUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
       });
+      // No dispatch assignment by default — the user is not the assigned driver,
+      // so access must fall through to 403 rather than the driver-access path.
+      (prisma.dispatch.findFirst as jest.Mock).mockResolvedValue(null);
     });
 
     it('should return 403 when CLIENT tries to access another user order files', async () => {

@@ -263,9 +263,10 @@ describe("CateringRequestForm", () => {
       render(<CateringRequestForm />);
     });
 
-    // Check that key form elements are rendered
-    // There are 2 AddressSelectors (pickup and delivery)
-    expect(screen.getAllByTestId("mock-address-manager")).toHaveLength(2);
+    // Check that key form elements are rendered.
+    // The redesigned form renders ONE unified AddressSelector that takes both
+    // pickup and delivery props (was two separate selectors before the redesign).
+    expect(screen.getAllByTestId("mock-address-manager")).toHaveLength(1);
     // Form labels - component uses "Brokerage / Direct" label
     expect(screen.getByLabelText(/brokerage/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/order number/i)).toBeInTheDocument();
