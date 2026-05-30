@@ -11,9 +11,25 @@ export async function POST(request: Request) {
 
   try {
     const data = await request.json();
-    
-    // Debug log received data
-    
+
+    // --- Server-side validation for required driver documents ---
+    if (data.role === "Driver for Catering Deliveries") {
+      const missingDocs: string[] = [];
+      if (!data.driversLicenseFilePath) missingDocs.push("driver's license");
+      if (!data.insuranceFilePath) missingDocs.push("insurance");
+      if (!data.vehicleRegFilePath) missingDocs.push("vehicle registration");
+      if (!data.driverPhotoFilePath) missingDocs.push("driver photo");
+      if (!data.carPhotoFilePath) missingDocs.push("car photo");
+      if (!data.equipmentPhotoFilePath) missingDocs.push("equipment photo");
+
+      if (missingDocs.length > 0) {
+        return NextResponse.json(
+          { error: `Missing required documents: ${missingDocs.join(", ")}` },
+          { status: 400 }
+        );
+      }
+    }
+
     // --- Step 1: Identify and Fetch FileUpload Records ---
     const fileIdsToProcess = [
       data.resumeFileId,

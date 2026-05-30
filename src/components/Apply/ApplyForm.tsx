@@ -688,6 +688,9 @@ const JobApplicationForm = () => {
       if (carPhotoUpload.uploadedFiles.length === 0) {
         errors.push("Please upload your car photo");
       }
+      if (equipmentPhotoUpload.uploadedFiles.length === 0) {
+        errors.push("Please upload your equipment photo");
+      }
     }
 
     return errors;
@@ -1346,10 +1349,14 @@ const JobApplicationForm = () => {
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">
                         Equipment Photo
+                        <span className="ml-2 font-normal text-gray-500">
+                          (including bags and cart)
+                        </span>
+                        <span className="ml-1 text-red-500">*</span>
                       </label>
                       <FileUpload
                         name="equipmentPhoto"
-                        label="Upload Photo (Optional)"
+                        label="Upload Photo"
                         startUpload={equipmentPhotoUpload.onUpload as any}
                         file={
                           (equipmentPhotoUpload
@@ -1541,6 +1548,12 @@ const JobApplicationForm = () => {
                         <p>
                           Car Photo:{" "}
                           {carPhotoUpload.uploadedFiles.length > 0
+                            ? "Uploaded"
+                            : "Not uploaded"}
+                        </p>
+                        <p>
+                          Equipment Photo:{" "}
+                          {equipmentPhotoUpload.uploadedFiles.length > 0
                             ? "Uploaded"
                             : "Not uploaded"}
                         </p>
