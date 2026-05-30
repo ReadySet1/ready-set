@@ -13,11 +13,16 @@ class MockEventSource {
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
 
+  private listeners: Record<string, ((event: Event) => void)[]> = {};
   private static instances: MockEventSource[] = [];
 
   constructor(url: string) {
     this.url = url;
     MockEventSource.instances.push(this);
+  }
+
+  addEventListener(type: string, handler: (event: Event) => void) {
+    (this.listeners[type] ||= []).push(handler);
   }
 
   close() {
@@ -36,6 +41,12 @@ class MockEventSource {
 
   simulateError() {
     this.onerror?.(new Event('error'));
+  }
+
+  // Fire the server's named `reconnect` event (the /api/tracking/live ~50s
+  // stream-rotation signal) at any registered addEventListener('reconnect') handler.
+  simulateReconnectEvent() {
+    this.listeners['reconnect']?.forEach((handler) => handler(new Event('reconnect')));
   }
 
   static getLastInstance(): MockEventSource | undefined {
@@ -228,6 +239,56 @@ describe('useRealTimeTracking', () => {
       });
 
       expect(result.current.isConnected).toBe(false);
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('stays silent on the server\'s planned ~50s stream rotation', async () => {
+      // The /api/tracking/live SSE route self-closes every ~50s (Vercel
+      // maxDuration guard) and emits a `reconnect` event first. The browser
+      // auto-reconnects, so this must NOT surface a user-facing error — otherwise
+      // the admin dashboard flashes "Connection error occurred" every 50 seconds.
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const { result } = renderHook(() => useRealTimeTracking());
+      const eventSource = MockEventSource.getLastInstance();
+
+      await act(async () => {
+        eventSource?.simulateOpen();
+      });
+      expect(result.current.isConnected).toBe(true);
+
+      // Server signals rotation, then the stream closes and the browser begins
+      // auto-reconnecting (readyState CONNECTING, not CLOSED).
+      await act(async () => {
+        eventSource?.simulateReconnectEvent();
+        eventSource!.readyState = MockEventSource.CONNECTING;
+        eventSource?.simulateError();
+      });
+
+      expect(result.current.error).toBeNull();
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        'SSE connection error:',
+        expect.anything(),
+      );
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('still surfaces an error on an unexpected transient drop', async () => {
+      // Without a preceding `reconnect` signal, a CONNECTING-state error is a
+      // genuine unexpected blip and should stay visible.
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const { result } = renderHook(() => useRealTimeTracking());
+      const eventSource = MockEventSource.getLastInstance();
+
+      await act(async () => {
+        eventSource?.simulateOpen();
+      });
+
+      await act(async () => {
+        eventSource!.readyState = MockEventSource.CONNECTING;
+        eventSource?.simulateError();
+      });
+
+      expect(result.current.error).toBe('Connection error occurred');
       consoleErrorSpy.mockRestore();
     });
 

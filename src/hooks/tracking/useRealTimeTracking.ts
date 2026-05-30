@@ -168,6 +168,11 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const connectRef = useRef<(() => void) | null>(null);
+  // Set when the server sends its `reconnect` event just before intentionally
+  // rotating the stream (the /api/tracking/live ~50s maxDuration guard). Lets
+  // onerror tell a planned rotation apart from an unexpected drop, so we don't
+  // flash a connection error to the admin every 50 seconds.
+  const expectingReconnectRef = useRef(false);
 
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 1000; // 1 second
@@ -199,6 +204,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
 
     try {
       setError(null);
+      expectingReconnectRef.current = false;
       const eventSource = new EventSource('/api/tracking/live');
       eventSourceRef.current = eventSource;
 
@@ -206,6 +212,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
                 setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
+        expectingReconnectRef.current = false;
       };
 
       eventSource.onmessage = (event) => {
@@ -238,17 +245,37 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
         }
       };
 
+      // The server rotates the stream every ~50s (Vercel maxDuration guard) and
+      // sends this `reconnect` event just before closing. Flag it as a planned
+      // rotation so the following onerror stays silent and the browser's native
+      // auto-reconnect takes over without alarming the user.
+      eventSource.addEventListener('reconnect', () => {
+        expectingReconnectRef.current = true;
+        reconnectAttemptsRef.current = 0;
+      });
+
       eventSource.onerror = (event) => {
-        // Only log actual errors, not normal close events
-        if (eventSource.readyState !== EventSource.CLOSED) {
-          console.error('SSE connection error:', event);
-          setError('Connection error occurred');
-        }
         setIsConnected(false);
 
         if (eventSource.readyState === EventSource.CLOSED) {
+          // The browser will not retry on its own (e.g. endpoint unreachable or
+          // a non-2xx reconnect). Drive our own backoff, which only surfaces a
+          // user-facing error once the retry budget is exhausted.
+          expectingReconnectRef.current = false;
           scheduleReconnect();
+          return;
         }
+
+        // readyState CONNECTING: the browser is already auto-reconnecting.
+        if (expectingReconnectRef.current) {
+          // Planned ~50s stream rotation — expected, recover silently.
+          expectingReconnectRef.current = false;
+          return;
+        }
+
+        // Unexpected transient drop — keep it visible but soft; onopen clears it.
+        console.error('SSE connection error:', event);
+        setError('Connection error occurred');
       };
 
     } catch (connectionError) {

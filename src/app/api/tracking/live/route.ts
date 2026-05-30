@@ -3,6 +3,14 @@ import { withAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/utils/prismaDB';
 import { captureException, captureMessage } from '@/lib/monitoring/sentry';
 
+// This route returns a long-lived SSE stream. Pin the Node.js runtime (Prisma
+// requires it) and raise the function ceiling. The stream self-terminates
+// (STREAM_MAX_MS, below) before this limit elapses, so Vercel never kills it
+// with a Runtime Timeout Error — the browser EventSource then auto-reconnects.
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
 /**
  * Typed result row for the active drivers query.
  *
@@ -141,6 +149,11 @@ export async function GET(request: NextRequest) {
     // Interval and cleanup function stored in outer scope so cancel() method can access them
     let intervalId: NodeJS.Timeout | null = null;
     let cleanupFn: (() => void) | null = null;
+    let maxDurationTimeout: NodeJS.Timeout | null = null;
+    // End the stream gracefully before Vercel's maxDuration (60s) elapses so
+    // the platform never logs a Runtime Timeout Error. 50s leaves headroom;
+    // the browser EventSource reconnects automatically on a clean close.
+    const STREAM_MAX_MS = 50_000;
 
     const stream = new ReadableStream({
       start(controller) {
@@ -473,6 +486,7 @@ export async function GET(request: NextRequest) {
         // Cleanup function
         const cleanup = () => {
           if (intervalId) clearInterval(intervalId);
+          if (maxDurationTimeout) clearTimeout(maxDurationTimeout);
           try {
             controller.close();
           } catch (error) {
@@ -483,15 +497,39 @@ export async function GET(request: NextRequest) {
         // Store cleanup function in outer scope for cancel() method
         cleanupFn = cleanup;
 
+        // Proactively end the stream before Vercel's function ceiling so the
+        // platform never kills it mid-flight (which logs a Runtime Timeout
+        // Error). Signal the client first so it can reconnect cleanly; the
+        // EventSource API reconnects on its own after a normal close anyway.
+        maxDurationTimeout = setTimeout(() => {
+          try {
+            if (controller.desiredSize !== null) {
+              const reconnectMessage = `event: reconnect\ndata: ${JSON.stringify({
+                type: 'reconnect',
+                reason: 'stream_cycle',
+                timestamp: new Date().toISOString(),
+              })}\n\n`;
+              controller.enqueue(new TextEncoder().encode(reconnectMessage));
+            }
+          } catch {
+            // Controller already closing — fall through to cleanup.
+          }
+          cleanup();
+        }, STREAM_MAX_MS);
+
         // Handle client disconnect
         request.signal.addEventListener('abort', cleanup);
       },
 
       cancel() {
-        // Clean up interval and event listener when stream is cancelled
+        // Clean up interval, timeout, and event listener when stream is cancelled
         if (intervalId) {
           clearInterval(intervalId);
           intervalId = null;
+        }
+        if (maxDurationTimeout) {
+          clearTimeout(maxDurationTimeout);
+          maxDurationTimeout = null;
         }
         if (cleanupFn) {
           request.signal.removeEventListener('abort', cleanupFn);
