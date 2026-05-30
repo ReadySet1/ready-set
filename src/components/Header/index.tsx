@@ -16,6 +16,7 @@ import { AuthButtonsSkeleton } from "@/components/Skeleton/AuthSkeleton";
 import { clearAuthCookies, hasAuthCookies } from "@/utils/auth/cookies";
 import { uiLogger } from "@/utils/logger";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import { WhatsNewBadge } from "@/components/changelog/WhatsNewBadge";
 
 // Define base menu items (visible to all users)
 const baseMenuItems: MenuItem[] = [
@@ -478,7 +479,22 @@ const Header: React.FC = () => {
             />
 
             {/* Auth Buttons (only visible on desktop; mobile handled by MobileMenu) */}
-            <div className="hidden items-center justify-end pr-16 sm:flex lg:pr-0">
+            <div className="hidden items-center justify-end gap-4 pr-16 sm:flex lg:pr-0">
+              {/* What's New entry point with unseen-version badge */}
+              <Link
+                href="/changelog"
+                aria-label="What's New"
+                className={`relative hidden items-center font-medium lg:flex ${
+                  sticky
+                    ? "text-dark dark:text-white"
+                    : isVirtualAssistantPage || isHomePage || isLogisticsPage
+                      ? "text-white"
+                      : "text-dark dark:text-white"
+                }`}
+              >
+                What&apos;s New
+                <WhatsNewBadge className="absolute -right-2.5 -top-1" />
+              </Link>
               {isLoading ? (
                 <AuthButtonsSkeleton
                   sticky={sticky}
