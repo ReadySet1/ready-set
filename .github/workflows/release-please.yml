@@ -19,7 +19,43 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v4
+      - id: release
+        uses: googleapis/release-please-action@v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # When a release PR is open/updated, regenerate the user-facing
+      # changelog data from commit `Changelog:` trailers and commit it onto
+      # the release branch for human review before merge. Additive + no-op
+      # when no release PR exists.
+      - name: Checkout (for changelog regeneration)
+        if: ${{ steps.release.outputs.pr }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        if: ${{ steps.release.outputs.pr }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Update user-facing changelog
+        if: ${{ steps.release.outputs.pr }}
+        env:
+          RELEASE_PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+        run: |
+          set -euo pipefail
+          git fetch origin "$RELEASE_PR_BRANCH"
+          git checkout "$RELEASE_PR_BRANCH"
+          node scripts/build-changelog.mjs
+          if git diff --quiet -- src/data/changelog.json; then
+            echo "No changelog.json changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/data/changelog.json
+          git commit -m "chore: update user-facing changelog from commit trailers"
+          git push origin "HEAD:$RELEASE_PR_BRANCH"
