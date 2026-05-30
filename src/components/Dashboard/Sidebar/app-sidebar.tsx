@@ -21,6 +21,8 @@ import {
   FileSpreadsheet,
   Kanban,
   TestTube2,
+  ScrollText,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -59,6 +61,7 @@ import {
 } from "@/components/ui/collapsible";
 import { useUser } from "@/contexts/UserContext";
 import { clearAuthCookies } from "@/utils/auth/cookies";
+import { WhatsNewBadge } from "@/components/changelog/WhatsNewBadge";
 
 type SidebarNavItem = {
   title: string;
@@ -221,6 +224,12 @@ export function AppSidebar() {
       href: "/admin/tasks-board",
       icon: Kanban,
       isActive: pathname?.includes("/admin/tasks-board") ?? false,
+    },
+    {
+      title: "Changelog",
+      href: "/admin/changelog",
+      icon: ScrollText,
+      isActive: pathname?.includes("/admin/changelog") ?? false,
     },
   ];
 
@@ -387,6 +396,22 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              {/* Public "What's New" page — visible to all roles. */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname?.includes("/changelog") ?? false}
+                  tooltip="What's New"
+                  className="py-1.5"
+                >
+                  <Link href="/changelog">
+                    <Sparkles className="h-5 w-5" />
+                    <span>What&apos;s New</span>
+                    <WhatsNewBadge className="ml-auto" />
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

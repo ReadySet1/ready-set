@@ -1,0 +1,38 @@
+{
+  "title": "What's New at Ready Set",
+  "subtitle": "Product updates, in plain language",
+  "entries": [
+    {
+      "version": "2.1.0",
+      "date": "2026-05-13",
+      "title": "Better order visibility and a smoother address picker",
+      "summary": "This update brings live driver tracking to more order views, clearer dashboards, and a friendlier way to enter delivery addresses.",
+      "changes": [
+        {
+          "type": "new",
+          "text": "You can now follow your driver on the map in real time from your order page."
+        },
+        {
+          "type": "new",
+          "text": "Create on-demand orders directly from your dashboard in just a few steps."
+        },
+        {
+          "type": "improved",
+          "text": "Dashboards now show pending and cancelled orders at a glance, so nothing slips through the cracks."
+        },
+        {
+          "type": "improved",
+          "text": "The address selector is easier to use, especially on your phone."
+        },
+        {
+          "type": "fixed",
+          "text": "Smoothed out a few rough edges on the delivery map."
+        }
+      ],
+      "link": {
+        "label": "Technical details",
+        "url": "https://github.com/ReadySet1/ready-set/releases/tag/v2.1.0"
+      }
+    }
+  ]
+}
