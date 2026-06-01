@@ -120,9 +120,9 @@ RUN groupadd --system --gid 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-# Ensure the Prisma client + query engine are present for the runtime server
-# (standalone tracing occasionally misses the engine binary).
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+# The Prisma client + native query engine are pulled into .next/standalone by
+# next.config.js `outputFileTracingIncludes` (the standalone copy above already
+# carries them at their resolved pnpm path), so no separate engine COPY here.
 
 USER nextjs
 EXPOSE 3000
