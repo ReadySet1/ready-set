@@ -78,6 +78,9 @@ export async function generateMetadata({
         }
       : undefined,
     keywords: seo?.seoKeywords?.join(", "),
+    alternates: {
+      canonical: `/blog/${slug}`,
+    },
   };
 }
 
@@ -167,7 +170,8 @@ export default async function BlogPost({
     notFound();
   }
 
-  const { title, mainImage, body, seo, _updatedAt } = post;
+  const { title, mainImage, body, seo, _createdAt, _updatedAt, publishedAt } =
+    post;
 
   const formattedDate = format(new Date(_updatedAt), "MMMM d, yyyy");
 
@@ -189,7 +193,7 @@ export default async function BlogPost({
           "@type": "BlogPosting",
           headline: title,
           ...(ogImage ? { image: ogImage } : {}),
-          datePublished: _updatedAt,
+          datePublished: publishedAt || _createdAt,
           dateModified: _updatedAt,
           author: {
             "@type": "Organization",

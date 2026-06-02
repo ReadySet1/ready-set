@@ -19,7 +19,7 @@ import type { Metadata } from "next";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 import JsonLd from "@/components/SEO/JsonLd";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://readysetllc.com";
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://readysetllc.com").replace(/\/$/, "");
 const ogImageUrl = getCloudinaryUrl("og-image");
 
 export const metadata: Metadata = {

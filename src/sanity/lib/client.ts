@@ -100,6 +100,7 @@ const FALLBACK_IMAGE_REF = "image-Tb9Ew8CXIwaY6R1kjMvI0uRR-2000x3000-jpg";
 const createMockPostResponse = (slug?: string): ExtendedPostDocument => ({
   _type: "post",
   _id: "mock-post-id",
+  _createdAt: new Date().toISOString(),
   _updatedAt: new Date().toISOString(),
   title: "Mock Post Title",
   slug: {
@@ -216,6 +217,7 @@ export async function getPostBySlug(slug: string): Promise<PostDocument> {
     return {
       _type: "post",
       _id: `fallback-${slug}`,
+      _createdAt: new Date().toISOString(),
       _updatedAt: new Date().toISOString(),
       title: "Fallback Post",
       slug: { current: slug },
