@@ -34,8 +34,13 @@ name: Build & Push Image
 # are not needed to build the image.
 
 on:
-  push:
-    branches: [main, development]
+  # Auto-build on push is intentionally PAUSED until the self-host VPS/Coolify
+  # target is ready (no point spending ~12 min/build on an image nobody pulls).
+  # To re-enable push builds, restore:
+  #   push:
+  #     branches: [main, development]
+  # Manual dispatch via the Actions tab / `gh workflow run build-and-push.yml`
+  # becomes available once this file lands on the default branch (main).
   workflow_dispatch:
 
 env:
