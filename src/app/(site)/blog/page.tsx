@@ -13,31 +13,21 @@ export const dynamic = "force-dynamic";
 export const revalidate = 30;
 
 export const metadata: Metadata = {
-  title: "Business Blog For Efficiency and Growth | Ready Set LLC",
+  title: "Business Blog For Efficiency and Growth",
   description:
     "Explore our blog for practical advice on business efficiency, operational excellence, and sustainable growth strategies for small to mid-sized companies.",
   keywords: [
     "logistics blog",
-    "virtual assistant insights",
-    "Bay Area business",
     "catering delivery tips",
-    "business solutions",
-    "industry updates",
-    "logistics expertise",
-    "VA services blog",
     "business efficiency",
+    "Bay Area business",
     "delivery insights",
-    "professional tips",
-    "Silicon Valley logistics",
-    "business management",
-    "service excellence",
-    "industry best practices",
   ],
   openGraph: {
-    title: "Business Blog For Efficiency and Growth | Ready Set LLC",
+    title: "Business Blog For Efficiency and Growth | Ready Set",
     description:
       "Explore our blog for practical advice on business efficiency, operational excellence, and sustainable growth strategies for small to mid-sized companies.",
-    url: "https://readyset.consulting/blog",
+    url: "/blog",
     siteName: "Ready Set",
     images: [
       {
@@ -51,13 +41,13 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Business Blog For Efficiency and Growth | Ready Set LLC",
+    title: "Business Blog For Efficiency and Growth | Ready Set",
     description:
       "Explore our blog for practical advice on business efficiency, operational excellence, and sustainable growth strategies for small to mid-sized companies.",
     images: [getCloudinaryUrl("blog-og")],
   },
   alternates: {
-    canonical: "https://readyset.consulting/blog",
+    canonical: "/blog",
   },
 };
 
@@ -131,7 +121,7 @@ export default async function Blog() {
       </div>
 
       {/* Visual content */}
-      <Breadcrumb pageName="Welcome to our blog" />
+      <Breadcrumb pageName="Welcome to our blog" pagePath="/blog" />
 
       {/* Further adjusted padding-top for section and increased font size for the paragraph */}
       <section className="pb-0 pt-[50px]">

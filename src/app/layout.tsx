@@ -17,6 +17,7 @@ import UmamiAnalytics from "@/components/Analytics/UmamiAnalytics";
 import QueryProvider from "@/providers/QueryProvider";
 import type { Metadata } from "next";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
+import JsonLd from "@/components/SEO/JsonLd";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://readysetllc.com";
 const ogImageUrl = getCloudinaryUrl("og-image");
@@ -86,6 +87,16 @@ export default function RootLayout({
     >
       <head></head>
       <body className="overflow-x-hidden">
+        <JsonLd
+          data={{
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: "Ready Set LLC",
+            url: siteUrl,
+            logo: ogImageUrl,
+            // TODO(fernando): add telephone, address, areaServed, sameAs
+          }}
+        />
         <GlobalErrorBoundary>
           <QueryProvider>
             <UserProvider>

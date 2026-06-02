@@ -41,6 +41,9 @@ export const metadata: Metadata = {
     title: "About Ready Set | SF Bay Area & Austin's Premier Delivery Service",
     description: "Discover how Ready Set delivers excellence with certified, professional courier services in San Francisco Bay Area and Austin. HIPAA compliant, Food Handler certified team.",
   },
+  alternates: {
+    canonical: "/about",
+  },
   robots: {
     index: true,
     follow: true,
@@ -67,7 +70,7 @@ export const metadata: Metadata = {
 const AboutPage = () => {
   return (
     <main>
-      <Breadcrumb pageName="Our Story"/>
+      <Breadcrumb pageName="Our Story" pagePath="/about" />
       <About />
       <BusinessServices />
       <Team />

@@ -6,6 +6,14 @@ import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
 import { getCloudinaryUrl } from "@/lib/cloudinary";
 
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: "/free-resources",
+  },
+};
+
 // Export with dynamic data fetching to avoid static generation problems
 export const dynamic = "force-dynamic";
 

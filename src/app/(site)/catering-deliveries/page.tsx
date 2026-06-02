@@ -15,29 +15,28 @@ import CateringStats from "@/components/FoodDelivery/CateringStats";
 import CateringContact from "@/components/FoodDelivery/CateringContact";
 
 export const metadata: Metadata = {
-  title: "Food Delivery Services for Events | Ready Set",
+  title: "Catering Delivery Services",
   description:
-    "We offer reliable and efficient catering delivery services for your events. Delicious food delivered right to your door in Bay Area and Sillicon Valley!",
+    "Reliable catering delivery and full setup across the SF Bay Area, Austin, and Atlanta. Request a quote today.", // DRAFT — review copy
   keywords: [
-    "food delivery",
     "catering delivery",
-    "event food",
-    "catering service",
-    "banquet delivery",
+    "food delivery service",
+    "event catering",
+    "Bay Area catering",
   ],
   openGraph: {
-    title: "Exceptional Catering and Food Delivery Services | Ready Set",
+    title: "Catering Delivery Services | Ready Set",
     description:
-      "Make your event a success with our high-quality food delivery. Serving in Bay Area and Sillicon Valley, always ensuring a memorable culinary experience.",
+      "Reliable catering delivery and full setup across the SF Bay Area, Austin, and Atlanta. Request a quote today.",
     type: "website",
     locale: "en_US",
     siteName: "Ready Set",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Your Brand: Hassle-Free Food Delivery for Events",
+    title: "Catering Delivery Services | Ready Set",
     description:
-      "Need delicious food for your next event? We handle the delivery in Bay Area and Sillicon Valley! Contact us today.",
+      "Reliable catering delivery and full setup across the SF Bay Area, Austin, and Atlanta. Request a quote today.",
   },
   robots: {
     index: true,
@@ -48,6 +47,9 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
+  },
+  alternates: {
+    canonical: "/catering-deliveries",
   },
 };
 
