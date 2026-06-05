@@ -1,9 +1,9 @@
 name: Build & Push Image
 
 # Builds the production Docker image in CI (off the VPS) and pushes it to GHCR.
-# An existing Coolify host then pulls and runs the prebuilt image — so no
-# `next build` ever runs on the server. This is the replacement for Vercel's
-# (billed) build step.
+# The self-host box (Dokploy on the arm64 Hetzner host) then pulls and runs the
+# prebuilt image — so no `next build` ever runs on the server. This is the
+# replacement for Vercel's (billed) build step. Built multi-arch (amd64+arm64).
 #
 # Required repo config (Settings -> Secrets and variables -> Actions):
 #   Variables (non-secret, baked into the client bundle at build time):
@@ -34,13 +34,11 @@ name: Build & Push Image
 # are not needed to build the image.
 
 on:
-  # Auto-build on push is intentionally PAUSED until the self-host VPS/Coolify
-  # target is ready (no point spending ~12 min/build on an image nobody pulls).
-  # To re-enable push builds, restore:
-  #   push:
-  #     branches: [main, development]
-  # Manual dispatch via the Actions tab / `gh workflow run build-and-push.yml`
-  # becomes available once this file lands on the default branch (main).
+  # Self-host VPS target is now live (Dokploy on the arm64 Hetzner box), so
+  # auto-builds are RE-ENABLED — every push to these branches produces a fresh
+  # multi-arch image the box can pull. Replaces Vercel's billed build step.
+  push:
+    branches: [main, development]
   workflow_dispatch:
 
 env:
@@ -57,6 +55,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      # Required to build linux/arm64 on the amd64 GitHub runner (emulation).
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -82,9 +84,11 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          # Serving host is the x86_64 Coolify box. If you later serve on the
-          # arm64 box, change this to linux/arm64 (or both, comma-separated).
-          platforms: linux/amd64
+          # Serving host is the arm64 Hetzner box (Dokploy). amd64 kept for
+          # flexibility / local x86 use. arm64 builds via QEMU emulation here —
+          # if that gets too slow or OOMs, switch to a native arm64 runner
+          # (runs-on: ubuntu-24.04-arm) with a per-arch matrix + manifest merge.
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
